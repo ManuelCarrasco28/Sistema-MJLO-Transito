@@ -57,6 +57,10 @@ export function ChartsSection() {
                   <stop offset="0" stopColor="#1a73e8" stopOpacity="0.22" />
                   <stop offset="1" stopColor="#1a73e8" stopOpacity="0.0" />
                 </linearGradient>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="4" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
               </defs>
               <path d="M0 111 L120 91 L240 102 L360 64 L480 52 L600 24 L600 170 L0 170 Z" fill="url(#tailAreaBlue)" />
               <polyline
@@ -67,6 +71,7 @@ export function ChartsSection() {
                 strokeWidth="3"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                filter="url(#glow)"
               />
               <polyline
                 className="chart-line chart-line-delayed"
@@ -77,6 +82,7 @@ export function ChartsSection() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeDasharray="6 6"
+                filter="url(#glow)"
               />
               {[['0', '111'], ['120', '91'], ['240', '102'], ['360', '64'], ['480', '52'], ['600', '24']].map(
                 ([cx, cy]) => (
@@ -104,7 +110,7 @@ export function ChartsSection() {
 
         <div className="my-auto flex flex-col items-center gap-6 pt-6 sm:flex-row xl:flex-col 2xl:flex-row">
           <div
-            className="donut-pop relative grid size-36 shrink-0 place-items-center rounded-full shadow-[0_8px_20px_rgba(26,115,232,0.15)]"
+            className="donut-pop relative grid size-36 shrink-0 place-items-center rounded-full shadow-[0_8px_20px_rgba(26,115,232,0.15)] transition-transform duration-300 hover:scale-105 cursor-pointer"
             style={{ background: 'conic-gradient(#1a73e8 0 68%, #22d3ee 68% 88%, #f59e0b 88% 100%)' }}
           >
             <div className="grid size-25 place-items-center rounded-full bg-white dark:bg-[#0f172a] text-center shadow-inner">
