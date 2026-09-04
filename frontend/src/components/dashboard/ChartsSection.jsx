@@ -214,7 +214,7 @@ export function ChartsSection() {
     <>
     <section aria-label="Gráficos de gestión" className="grid gap-6 xl:grid-cols-[1.65fr_1fr]">
       <article
-        className="chart-panel animate-enter rounded-2xl border border-blue-100 dark:border-slate-800 bg-gradient-to-br from-white via-white to-blue-50/60 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-blue-950/20 p-5 shadow-xs sm:p-6"
+        className="chart-panel animate-enter rounded-2xl border border-blue-100 dark:border-slate-800 bg-linear-to-br from-white via-white to-blue-50/60 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-blue-950/20 p-5 shadow-xs sm:p-6"
         style={{ animationDelay: '460ms' }}
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
@@ -322,7 +322,7 @@ export function ChartsSection() {
       </article>
 
       <article
-        className="chart-panel animate-enter flex flex-col rounded-2xl border border-cyan-100 dark:border-slate-800 bg-gradient-to-br from-white via-white to-cyan-50/70 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-cyan-950/20 p-5 shadow-xs sm:p-6"
+        className="chart-panel animate-enter flex flex-col rounded-2xl border border-cyan-100 dark:border-slate-800 bg-linear-to-br from-white via-white to-cyan-50/70 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-cyan-950/20 p-5 shadow-xs sm:p-6"
         style={{ animationDelay: '540ms' }}
       >
         <div className="border-b border-slate-100 dark:border-slate-800 pb-4">
@@ -372,7 +372,7 @@ export function ChartsSection() {
       </article>
 
       <article
-        className="chart-panel animate-enter rounded-2xl border border-amber-100 bg-gradient-to-br from-white via-white to-amber-50/70 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-amber-950/20 sm:p-6 xl:col-span-2"
+        className="chart-panel animate-enter rounded-2xl border border-amber-100 bg-linear-to-br from-white via-white to-amber-50/70 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-amber-950/20 sm:p-6 xl:col-span-2"
         style={{ animationDelay: '610ms' }}
       >
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-4 dark:border-slate-800">
@@ -436,7 +436,7 @@ export function ChartsSection() {
                 aria-label={`Ver detalle de multas y pagos del año ${item.year}`}
                 className={`group rounded-2xl border p-4 transition duration-300 hover:-translate-y-1 hover:shadow-lg ${
                   item.year === '2026'
-                    ? 'border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 text-left dark:border-blue-900/60 dark:from-blue-950/30 dark:to-cyan-950/20'
+                    ? 'border-blue-200 bg-linear-to-br from-blue-50 to-cyan-50 text-left dark:border-blue-900/60 dark:from-blue-950/30 dark:to-cyan-950/20'
                     : 'border-slate-200/80 bg-slate-50/70 text-left dark:border-slate-800 dark:bg-slate-950/30'
                 }`}
               >
@@ -451,13 +451,13 @@ export function ChartsSection() {
                 <div className="mt-4 flex h-32 items-end justify-center gap-4 border-b border-slate-200/70 pb-3 dark:border-slate-800">
                   <div className="flex h-full w-10 items-end rounded-t-xl bg-rose-100 dark:bg-rose-950/50">
                     <span
-                      className="chart-bar block w-full rounded-t-xl bg-gradient-to-t from-rose-600 via-red-500 to-orange-400 shadow-[0_10px_22px_rgba(225,29,72,0.22)]"
+                      className="chart-bar block w-full rounded-t-xl bg-linear-to-t from-rose-600 via-red-500 to-orange-400 shadow-[0_10px_22px_rgba(225,29,72,0.22)]"
                       style={{ '--bar-height': item.multasHeight, animationDelay: `${260 + index * 90}ms` }}
                     />
                   </div>
                   <div className="flex h-full w-10 items-end rounded-t-xl bg-emerald-100 dark:bg-emerald-950/50">
                     <span
-                      className="chart-bar block w-full rounded-t-xl bg-gradient-to-t from-emerald-700 via-teal-500 to-cyan-400 shadow-[0_10px_22px_rgba(5,150,105,0.2)]"
+                      className="chart-bar block w-full rounded-t-xl bg-linear-to-t from-emerald-700 via-teal-500 to-cyan-400 shadow-[0_10px_22px_rgba(5,150,105,0.2)]"
                       style={{ '--bar-height': item.pagosHeight, animationDelay: `${340 + index * 90}ms` }}
                     />
                   </div>
@@ -496,13 +496,13 @@ export function ChartsSection() {
               <div className="flex h-32 items-end justify-center gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
                 <div className="flex h-full w-7 items-end rounded-t-lg bg-rose-100 dark:bg-rose-950/50">
                   <span
-                    className="chart-bar block w-full rounded-t-lg bg-gradient-to-t from-rose-600 to-orange-400 shadow-[0_8px_18px_rgba(225,29,72,0.22)]"
+                    className="chart-bar block w-full rounded-t-lg bg-linear-to-t from-rose-600 to-orange-400 shadow-[0_8px_18px_rgba(225,29,72,0.22)]"
                     style={{ '--bar-height': item.multasHeight, animationDelay: `${260 + index * 55}ms` }}
                   />
                 </div>
                 <div className="flex h-full w-7 items-end rounded-t-lg bg-emerald-100 dark:bg-emerald-950/50">
                   <span
-                    className="chart-bar block w-full rounded-t-lg bg-gradient-to-t from-emerald-600 to-cyan-400 shadow-[0_8px_18px_rgba(5,150,105,0.2)]"
+                    className="chart-bar block w-full rounded-t-lg bg-linear-to-t from-emerald-600 to-cyan-400 shadow-[0_8px_18px_rgba(5,150,105,0.2)]"
                     style={{ '--bar-height': item.pagosHeight, animationDelay: `${340 + index * 55}ms` }}
                   />
                 </div>
@@ -525,7 +525,7 @@ export function ChartsSection() {
       </article>
 
       <article
-        className="chart-panel animate-enter flex h-full flex-col rounded-2xl border border-orange-100 bg-gradient-to-br from-white via-white to-orange-50/70 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-orange-950/20 sm:p-6"
+        className="chart-panel animate-enter flex h-full flex-col rounded-2xl border border-orange-100 bg-linear-to-br from-white via-white to-orange-50/70 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-orange-950/20 sm:p-6"
         style={{ animationDelay: '690ms' }}
       >
         <div className="border-b border-slate-100 pb-4 dark:border-slate-800">
@@ -587,7 +587,7 @@ export function ChartsSection() {
       </article>
 
       <article
-        className="chart-panel animate-enter flex h-full flex-col rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50/70 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-indigo-950/20 sm:p-6"
+        className="chart-panel animate-enter flex h-full flex-col rounded-2xl border border-indigo-100 bg-linear-to-br from-white via-white to-indigo-50/70 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-indigo-950/20 sm:p-6"
         style={{ animationDelay: '760ms' }}
       >
         <div className="border-b border-slate-100 pb-4 dark:border-slate-800">
@@ -606,7 +606,7 @@ export function ChartsSection() {
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div
-                  className={`chart-progress h-full rounded-full bg-gradient-to-r ${item.color}`}
+                  className={`chart-progress h-full rounded-full bg-linear-to-r ${item.color}`}
                   style={{ '--progress-width': item.progress, animationDelay: `${820 + index * 100}ms` }}
                 />
               </div>
@@ -616,7 +616,7 @@ export function ChartsSection() {
       </article>
 
       <article
-        className="chart-panel animate-enter rounded-2xl border border-emerald-100 bg-gradient-to-br from-white via-white to-emerald-50/60 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-emerald-950/20 sm:p-6 xl:col-span-2"
+        className="chart-panel animate-enter rounded-2xl border border-emerald-100 bg-linear-to-br from-white via-white to-emerald-50/60 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-emerald-950/20 sm:p-6 xl:col-span-2"
         style={{ animationDelay: '830ms' }}
       >
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-4 dark:border-slate-800">
@@ -637,7 +637,7 @@ export function ChartsSection() {
                 <div key={item.label} className="flex h-full flex-col items-center justify-end gap-2">
                   <div className="flex h-40 w-12 items-end rounded-t-2xl bg-slate-100 dark:bg-slate-800">
                     <span
-                      className={`chart-bar block w-full rounded-t-2xl bg-gradient-to-t ${item.color} shadow-[0_10px_24px_rgba(15,23,42,0.14)]`}
+                      className={`chart-bar block w-full rounded-t-2xl bg-linear-to-t ${item.color} shadow-[0_10px_24px_rgba(15,23,42,0.14)]`}
                       style={{ '--bar-height': item.progress, animationDelay: `${260 + index * 120}ms` }}
                     />
                   </div>
@@ -669,7 +669,7 @@ export function ChartsSection() {
                 </div>
                 <div className="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                   <div
-                    className={`chart-progress h-full rounded-full bg-gradient-to-r ${item.color}`}
+                    className={`chart-progress h-full rounded-full bg-linear-to-r ${item.color}`}
                     style={{ '--progress-width': item.progress, animationDelay: `${560 + index * 120}ms` }}
                   />
                 </div>
@@ -692,7 +692,7 @@ export function ChartsSection() {
           className="modal-enter w-full max-w-3xl overflow-hidden rounded-3xl border border-white/40 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.35)] dark:border-slate-700 dark:bg-[#0f172a]"
           onMouseDown={(event) => event.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-cyan-50 px-6 py-5 dark:border-slate-800 dark:from-slate-900 dark:to-cyan-950/30">
+          <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-linear-to-r from-blue-50 to-cyan-50 px-6 py-5 dark:border-slate-800 dark:from-slate-900 dark:to-cyan-950/30">
             <div>
               <h2 id="expanded-chart-title" className="text-xl font-extrabold text-slate-900 dark:text-white">
                 {currentExpanded.title}
@@ -766,7 +766,7 @@ export function ChartsSection() {
           className="modal-enter w-full max-w-2xl overflow-hidden rounded-3xl border border-white/40 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.35)] dark:border-slate-700 dark:bg-[#0f172a]"
           onMouseDown={(event) => event.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-rose-50 via-white to-emerald-50 px-6 py-5 dark:border-slate-800 dark:from-rose-950/25 dark:via-slate-900 dark:to-emerald-950/25">
+          <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-linear-to-r from-rose-50 via-white to-emerald-50 px-6 py-5 dark:border-slate-800 dark:from-rose-950/25 dark:via-slate-900 dark:to-emerald-950/25">
             <div>
               <h2 id="expanded-multas-pagos-title" className="text-xl font-extrabold text-slate-900 dark:text-white">
                 Multas y pagos registrados
@@ -816,14 +816,14 @@ export function ChartsSection() {
                 <div className="flex h-full w-20 items-end rounded-t-2xl bg-rose-100 dark:bg-rose-950/50">
                   <span
                     key={`modal-multas-${expandedMultasPagos.title}`}
-                    className="chart-bar block w-full rounded-t-2xl bg-gradient-to-t from-rose-700 via-red-500 to-orange-400 shadow-[0_16px_34px_rgba(225,29,72,0.25)]"
+                    className="chart-bar block w-full rounded-t-2xl bg-linear-to-t from-rose-700 via-red-500 to-orange-400 shadow-[0_16px_34px_rgba(225,29,72,0.25)]"
                     style={{ '--bar-height': expandedMultasPagos.multasHeight, animationDelay: '120ms' }}
                   />
                 </div>
                 <div className="flex h-full w-20 items-end rounded-t-2xl bg-emerald-100 dark:bg-emerald-950/50">
                   <span
                     key={`modal-pagos-${expandedMultasPagos.title}`}
-                    className="chart-bar block w-full rounded-t-2xl bg-gradient-to-t from-emerald-700 via-teal-500 to-cyan-400 shadow-[0_16px_34px_rgba(5,150,105,0.22)]"
+                    className="chart-bar block w-full rounded-t-2xl bg-linear-to-t from-emerald-700 via-teal-500 to-cyan-400 shadow-[0_16px_34px_rgba(5,150,105,0.22)]"
                     style={{ '--bar-height': expandedMultasPagos.pagosHeight, animationDelay: '260ms' }}
                   />
                 </div>

@@ -48,9 +48,9 @@ export function QuickActions() {
             <button
               key={action.label}
               type="button"
-              className={`group relative overflow-hidden rounded-2xl border border-white/70 bg-gradient-to-br ${currentStyle.card} p-1 text-left shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-700/70 ${currentStyle.border}`}
+              className={`group relative overflow-hidden rounded-2xl border border-white/70 bg-linear-to-br ${currentStyle.card} p-1 text-left shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-700/70 ${currentStyle.border}`}
             >
-              <span className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${currentStyle.accent}`} aria-hidden="true" />
+              <span className={`absolute inset-x-0 top-0 h-1 bg-linear-to-r ${currentStyle.accent}`} aria-hidden="true" />
               <span className="absolute -right-10 -top-10 size-24 rounded-full bg-white/25 blur-2xl transition-opacity duration-300 group-hover:opacity-80" aria-hidden="true" />
               <div className="relative rounded-[0.85rem] bg-white/94 p-3 dark:bg-slate-950/82">
                 <div className="flex items-center gap-3.5">

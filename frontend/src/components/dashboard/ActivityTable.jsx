@@ -19,7 +19,7 @@ export function ActivityTable() {
       className="animate-enter overflow-hidden rounded-2xl border border-blue-100 dark:border-slate-800 bg-white dark:bg-[#0f172a] shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
       style={{ animationDelay: '620ms' }}
     >
-      <div className="flex justify-end border-b border-blue-100 bg-gradient-to-r from-blue-50/90 to-cyan-50/70 px-5 py-4 dark:border-slate-800 dark:from-slate-900/80 dark:to-cyan-950/20">
+      <div className="flex justify-end border-b border-blue-100 bg-linear-to-r from-blue-50/90 to-cyan-50/70 px-5 py-4 dark:border-slate-800 dark:from-slate-900/80 dark:to-cyan-950/20">
         <div className="flex w-full items-center justify-end gap-3">
           <div className="relative">
             <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />

@@ -82,7 +82,7 @@ function Dashboard({ onLogout }) {
           onLogout={onLogout}
         />
 
-        <div className="mx-auto max-w-[96rem] space-y-6 p-4 sm:p-6 lg:p-7 xl:p-8">
+        <div className="mx-auto max-w-384 space-y-6 p-4 sm:p-6 lg:p-7 xl:p-8">
           <div className="rounded-2xl border border-blue-900/10 bg-[#123b6d] p-5 text-white shadow-[0_12px_28px_rgba(15,42,82,0.18)] dark:border-blue-900/40 dark:bg-[#102a4d] sm:p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="border-l-4 border-cyan-300 pl-4">
@@ -96,13 +96,13 @@ function Dashboard({ onLogout }) {
                   Subgerencia de Tránsito, Transporte y Seguridad Vial · MDJLO
                 </p>
               </div>
-              <div className="grid gap-3 text-sm sm:grid-cols-3 lg:min-w-[32rem]">
+              <div className="grid gap-3 text-sm sm:grid-cols-3 lg:min-w-lg">
                 {[
                   ['Turno', 'Diario'],
                   ['Sede', 'Palacio Municipal'],
                   ['Fecha', '04/09/2026'],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl border border-white/15 bg-white/[0.08] px-4 py-3">
+                  <div key={label} className="rounded-xl border border-white/15 bg-white/8 px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-blue-100/80">{label}</p>
                     <p className="mt-1 font-bold text-white">{value}</p>
                   </div>
