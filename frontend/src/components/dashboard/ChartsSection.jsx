@@ -682,7 +682,7 @@ export function ChartsSection() {
 
     {currentExpanded && (
       <div
-        className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-80 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
         role="dialog"
         aria-modal="true"
         aria-labelledby="expanded-chart-title"
@@ -756,7 +756,7 @@ export function ChartsSection() {
 
     {expandedMultasPagos && (
       <div
-        className="fixed inset-0 z-[85] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-85 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
         role="dialog"
         aria-modal="true"
         aria-labelledby="expanded-multas-pagos-title"
