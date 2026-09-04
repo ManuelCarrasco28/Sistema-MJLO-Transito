@@ -10,10 +10,19 @@ class StatusController extends ResourceController
 
     public function index()
     {
+        $dbStatus = 'not_configured';
+        try {
+            $db = \Config\Database::connect();
+            $db->initialize();
+            $dbStatus = 'connected';
+        } catch (\Throwable $e) {
+            $dbStatus = 'error: ' . $e->getMessage();
+        }
+
         return $this->respond([
-            'status'  => 'ok',
-            'service' => 'Sistema MJLO Tránsito API',
-            'database' => 'not_configured',
+            'status'   => 'ok',
+            'service'  => 'Sistema MJLO Tránsito API',
+            'database' => $dbStatus,
         ]);
     }
 }
