@@ -1,9 +1,17 @@
+import { useState } from 'react'
 import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
 import { activity } from '../../../public/js/dashboardData'
 
 export function ActivityTable() {
+  const [searchTerm, setSearchTerm] = useState('')
   const avatarColors = ['bg-blue-600', 'bg-cyan-600', 'bg-indigo-600', 'bg-rose-600', 'bg-amber-600']
+
+  const filteredActivity = activity.filter(item => 
+    item.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.detail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.user.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
     <section
@@ -11,18 +19,30 @@ export function ActivityTable() {
       className="animate-enter overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0f172a] shadow-xs"
       style={{ animationDelay: '620ms' }}
     >
-      <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-4 gap-4">
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white">Actividad reciente y registro diario</h2>
           <p className="mt-0.5 text-xs text-slate-400">Últimos movimientos registrados en tiempo real.</p>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline transition"
-        >
-          <span>Ver historial completo</span>
-          <Icon name="arrow" className="size-3.5" />
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Buscar actividad..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-4 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors w-full sm:w-64"
+            />
+          </div>
+          <button
+            type="button"
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline transition shrink-0"
+          >
+            <span>Ver historial</span>
+            <Icon name="arrow" className="size-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className="hidden overflow-x-auto md:block">
@@ -37,7 +57,11 @@ export function ActivityTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {activity.map((item) => {
+            {filteredActivity.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="px-5 py-8 text-center text-sm text-slate-500">No se encontraron resultados para "{searchTerm}"</td>
+              </tr>
+            ) : filteredActivity.map((item) => {
               const initials = item.user
                 .split(' ')
                 .map((w) => w[0])
@@ -45,7 +69,7 @@ export function ActivityTable() {
                 .join('')
               const colorIdx = item.user.charCodeAt(0) % avatarColors.length
               return (
-                <tr key={item.detail} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/60">
+                <tr key={item.detail} className="group transition-colors hover:bg-blue-50/50 dark:hover:bg-slate-800/80 cursor-pointer">
                   <td className="px-5 py-3.5">
                     <p className="text-sm font-bold text-slate-800 dark:text-white">{item.action}</p>
                   </td>
@@ -76,7 +100,9 @@ export function ActivityTable() {
       </div>
 
       <div className="divide-y divide-slate-100 dark:divide-slate-800 md:hidden">
-        {activity.map((item) => (
+        {filteredActivity.length === 0 ? (
+          <div className="p-8 text-center text-sm text-slate-500">No se encontraron resultados para "{searchTerm}"</div>
+        ) : filteredActivity.map((item) => (
           <article key={item.detail} className="p-4 space-y-2">
             <div className="flex items-start justify-between gap-3">
               <p className="text-sm font-bold text-slate-800 dark:text-white">{item.action}</p>
