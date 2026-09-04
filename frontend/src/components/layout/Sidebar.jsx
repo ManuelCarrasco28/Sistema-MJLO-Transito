@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { navigation } from '../../../public/js/navigation'
 import { Icon } from '../ui/Icon'
 
-export function Sidebar({ activeItem, mobileOpen, onClose, onLogout, hiddenOnDesktop }) {
+export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, hiddenOnDesktop }) {
   const navigate = useNavigate()
 
   const groups = [
@@ -70,6 +70,7 @@ export function Sidebar({ activeItem, mobileOpen, onClose, onLogout, hiddenOnDes
                       key={label}
                       type="button"
                       onClick={() => {
+                        onSelect(label)
                         navigate(getRoute(label))
                         onClose()
                       }}
