@@ -37,8 +37,8 @@ export function MetricCards() {
               <span className={`grid size-12 place-items-center rounded-xl ${currentTheme.iconBox}`}>
                 <Icon name={card.icon} className="size-5.5" />
               </span>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${currentTheme.badge}`}>
-                <Icon name={trendIcon} className="size-3" />
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold shadow-sm transition-colors ${currentTheme.badge}`}>
+                <Icon name={trendIcon} className="size-3 animate-pulse" />
                 {card.change}
               </span>
             </div>
