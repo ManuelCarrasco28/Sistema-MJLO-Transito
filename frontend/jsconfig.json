@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "checkJs": false,
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"],
