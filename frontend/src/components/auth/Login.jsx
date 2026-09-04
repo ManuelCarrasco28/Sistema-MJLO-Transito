@@ -11,7 +11,6 @@ export function Login({ onLogin }) {
   const [isShaking, setIsShaking] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Clear shake state after animation finishes
   useEffect(() => {
     if (isShaking) {
       const timer = setTimeout(() => setIsShaking(false), 500)
@@ -31,7 +30,6 @@ export function Login({ onLogin }) {
     setIsLoading(true)
     setError('')
 
-    // Simulamos una petición de red de 1.5s
     setTimeout(() => {
       if (username.trim().toLowerCase() !== 'admin' || password !== 'admin123') {
         setError('El usuario o la contraseña son incorrectos.')
@@ -51,7 +49,6 @@ export function Login({ onLogin }) {
 
       <section className="relative grid w-full max-w-5xl overflow-hidden rounded-3xl border border-white/30 bg-white shadow-[0_24px_70px_rgba(7,26,47,0.22)] lg:grid-cols-[0.92fr_1.08fr]">
         <div className="relative hidden overflow-hidden bg-[#071a2f] p-8 text-white lg:flex lg:flex-col lg:justify-between xl:p-10">
-          {/* Subtle gradient glow effects */}
           <div className="absolute -right-32 -top-32 size-80 rounded-full border border-cyan-300/20 bg-cyan-500/5 blur-3xl" aria-hidden="true" />
           <div className="absolute -left-20 -bottom-20 size-96 rounded-full border border-white/10 bg-blue-500/10 blur-3xl" aria-hidden="true" />
 
@@ -79,29 +76,37 @@ export function Login({ onLogin }) {
           </div>
 
           <form onSubmit={handleSubmit} className={`space-y-4 ${isShaking ? 'animate-shake' : ''}`} noValidate>
-            <label className="block">
-              <span className="mb-1.5 block text-xs sm:text-sm font-bold text-slate-700">Usuario</span>
-              <span className="flex h-11 sm:h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-slate-400 transition-colors focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 hover:bg-slate-100">
-                <Icon name="user" />
+            {/* Floating label usuario (Facebook Style) */}
+            <div className="relative flex h-14 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300">
+              <Icon name="user" className="size-5 text-slate-400 shrink-0 mr-2.5 mt-2" />
+              <div className="relative flex-1 h-full flex items-center">
                 <input
+                  id="username"
                   value={username}
                   onChange={(event) => {
                     setUsername(event.target.value)
                     if (error) setError('')
                   }}
                   autoComplete="username"
-                  placeholder="Ingresa tu usuario"
+                  placeholder=" "
                   disabled={isLoading}
-                  className="h-full min-w-0 flex-1 bg-transparent text-sm sm:text-base text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50"
+                  className="peer h-full w-full bg-transparent pt-3 text-sm font-semibold text-slate-800 outline-none placeholder:text-transparent disabled:opacity-50"
                 />
-              </span>
-            </label>
+                <label
+                  htmlFor="username"
+                  className="pointer-events-none absolute left-0 top-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-2 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-700"
+                >
+                  Usuario
+                </label>
+              </div>
+            </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-xs sm:text-sm font-bold text-slate-700">Contraseña</span>
-              <span className="flex h-11 sm:h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-slate-400 transition-colors focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 hover:bg-slate-100">
-                <Icon name="lock" />
+            {/* Floating label contraseña (Facebook Style) */}
+            <div className="relative flex h-14 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300">
+              <Icon name="lock" className="size-5 text-slate-400 shrink-0 mr-2.5 mt-2" />
+              <div className="relative flex-1 h-full flex items-center">
                 <input
+                  id="password"
                   value={password}
                   onChange={(event) => {
                     setPassword(event.target.value)
@@ -109,21 +114,27 @@ export function Login({ onLogin }) {
                   }}
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
-                  placeholder="Ingresa tu contraseña"
+                  placeholder=" "
                   disabled={isLoading}
-                  className="h-full min-w-0 flex-1 bg-transparent text-sm sm:text-base text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50"
+                  className="peer h-full w-full bg-transparent pt-3 text-sm font-semibold text-slate-800 outline-none placeholder:text-transparent disabled:opacity-50"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((current) => !current)}
-                  disabled={isLoading}
-                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  className="rounded-lg p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600 disabled:opacity-50"
+                <label
+                  htmlFor="password"
+                  className="pointer-events-none absolute left-0 top-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-2 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-700"
                 >
-                  <Icon name="eye" />
-                </button>
-              </span>
-            </label>
+                  Contraseña
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+                disabled={isLoading}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                className="rounded-lg p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600 disabled:opacity-50"
+              >
+                <Icon name="eye" />
+              </button>
+            </div>
 
             <div className="flex items-center justify-between text-xs sm:text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -152,7 +163,7 @@ export function Login({ onLogin }) {
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative flex h-11 sm:h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-[#0b3458] px-5 text-sm sm:text-base font-extrabold text-white shadow-[0_10px_24px_rgba(11,52,88,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#092a48] hover:shadow-[0_14px_28px_rgba(11,52,88,0.22)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600 active:translate-y-0 disabled:opacity-80 disabled:pointer-events-none disabled:transform-none"
+              className="group relative flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-[#0b3458] px-5 text-sm sm:text-base font-extrabold text-white shadow-[0_10px_24px_rgba(11,52,88,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#092a48] hover:shadow-[0_14px_28px_rgba(11,52,88,0.22)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600 active:translate-y-0 disabled:opacity-80 disabled:pointer-events-none disabled:transform-none"
             >
               {isLoading ? (
                 <>
