@@ -2,6 +2,8 @@ import { Icon } from '../ui/Icon'
 
 export function Header({
   onOpenMobile,
+  sidebarHidden,
+  onToggleSidebar,
   darkMode,
   setDarkMode,
   notifications,
@@ -32,6 +34,14 @@ export function Header({
           className="rounded-xl border border-slate-200 dark:border-slate-700 p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 lg:hidden"
         >
           <Icon name="menu" />
+        </button>
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label={sidebarHidden ? 'Mostrar menú lateral' : 'Ocultar menú lateral'}
+          className="hidden size-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-xs transition hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-[#1e293b] dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white lg:grid"
+        >
+          <Icon name="menu" className="size-5" />
         </button>
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">

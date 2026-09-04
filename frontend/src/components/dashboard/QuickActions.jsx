@@ -4,51 +4,68 @@ import { quickActions } from '../../../public/js/dashboardData'
 export function QuickActions() {
   const actionStyles = {
     blue: {
-      icon: 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white',
+      icon: 'bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300 group-hover:bg-blue-600 group-hover:text-white',
+      accent: 'from-blue-600 to-cyan-400',
+      card: 'from-blue-600 to-cyan-500',
       border: 'hover:border-blue-300 dark:hover:border-blue-500',
     },
     cyan: {
-      icon: 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 group-hover:bg-cyan-600 group-hover:text-white',
+      icon: 'bg-cyan-50 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 group-hover:bg-cyan-600 group-hover:text-white',
+      accent: 'from-cyan-500 to-teal-400',
+      card: 'from-cyan-500 to-teal-500',
       border: 'hover:border-cyan-300 dark:hover:border-cyan-500',
     },
     amber: {
-      icon: 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 group-hover:bg-amber-600 group-hover:text-white',
+      icon: 'bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-300 group-hover:bg-amber-600 group-hover:text-white',
+      accent: 'from-amber-500 to-orange-400',
+      card: 'from-amber-500 to-orange-500',
       border: 'hover:border-amber-300 dark:hover:border-amber-500',
     },
     emerald: {
-      icon: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white',
+      icon: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 group-hover:bg-emerald-600 group-hover:text-white',
+      accent: 'from-emerald-500 to-cyan-400',
+      card: 'from-emerald-500 to-cyan-500',
       border: 'hover:border-emerald-300 dark:hover:border-emerald-500',
     },
   }
 
   return (
-    <section aria-label="Accesos rápidos">
-      <div className="mb-3 flex items-center justify-between">
+    <section
+      aria-label="Accesos rápidos"
+      className="relative overflow-hidden rounded-2xl border border-cyan-200/70 bg-white/80 p-4 shadow-[0_14px_36px_rgba(8,145,178,0.08)] dark:border-slate-800 dark:bg-[#0f172a] sm:p-5"
+    >
+      <div className="pointer-events-none absolute right-0 top-0 h-28 w-72 rounded-bl-full bg-cyan-300/15 blur-2xl dark:bg-cyan-500/10" aria-hidden="true" />
+      <div className="relative mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-bold text-slate-800 dark:text-white">Accesos rápidos operativos</h2>
-          <p className="text-xs text-slate-400">Atajos para el registro de operaciones de fiscalización y trámites.</p>
+          <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">Accesos rápidos operativos</h2>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Atajos principales para registrar movimientos del área de tránsito.</p>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="relative grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {quickActions.map((action) => {
           const currentStyle = actionStyles[action.tone]
           return (
             <button
               key={action.label}
               type="button"
-              className={`group flex items-center gap-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0f172a] p-4 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${currentStyle.border}`}
+              className={`group relative overflow-hidden rounded-2xl border border-white/70 bg-gradient-to-br ${currentStyle.card} p-1 text-left shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-700/70 ${currentStyle.border}`}
             >
-              <span className={`grid size-11 shrink-0 place-items-center rounded-xl transition-colors duration-200 ${currentStyle.icon}`}>
-                <Icon name={action.icon} className="size-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-slate-800 dark:text-white">{action.label}</p>
-                <p className="text-xs text-slate-400">{action.description}</p>
+              <span className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${currentStyle.accent}`} aria-hidden="true" />
+              <span className="absolute -right-10 -top-10 size-24 rounded-full bg-white/25 blur-2xl transition-opacity duration-300 group-hover:opacity-80" aria-hidden="true" />
+              <div className="relative rounded-[0.85rem] bg-white/94 p-3 dark:bg-slate-950/82">
+                <div className="flex items-center gap-3.5">
+                  <span className={`grid size-10 shrink-0 place-items-center rounded-xl transition-all duration-300 group-hover:scale-105 ${currentStyle.icon}`}>
+                    <Icon name={action.icon} className="size-4.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-extrabold text-slate-800 dark:text-white">{action.label}</p>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{action.description}</p>
+                  </div>
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-slate-50 text-slate-400 transition-all duration-300 group-hover:translate-x-1 group-hover:bg-blue-600 group-hover:text-white dark:bg-slate-800 dark:text-slate-500">
+                    <Icon name="arrow" className="size-3.5" />
+                  </span>
+                </div>
               </div>
-              <Icon
-                name="arrow"
-                className="size-4 shrink-0 text-slate-300 dark:text-slate-600 transition-all duration-200 group-hover:translate-x-1 group-hover:text-blue-600 dark:group-hover:text-blue-400"
-              />
             </button>
           )
         })}

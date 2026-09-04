@@ -16,15 +16,11 @@ export function ActivityTable() {
   return (
     <section
       aria-label="Actividad reciente"
-      className="animate-enter overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0f172a] shadow-xs"
+      className="animate-enter overflow-hidden rounded-2xl border border-blue-100 dark:border-slate-800 bg-white dark:bg-[#0f172a] shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
       style={{ animationDelay: '620ms' }}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-4 gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white">Actividad reciente y registro diario</h2>
-          <p className="mt-0.5 text-xs text-slate-400">Últimos movimientos registrados en tiempo real.</p>
-        </div>
-        <div className="flex items-center gap-3">
+      <div className="flex justify-end border-b border-blue-100 bg-gradient-to-r from-blue-50/90 to-cyan-50/70 px-5 py-4 dark:border-slate-800 dark:from-slate-900/80 dark:to-cyan-950/20">
+        <div className="flex w-full items-center justify-end gap-3">
           <div className="relative">
             <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             <input 
@@ -47,7 +43,7 @@ export function ActivityTable() {
 
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-3xl text-left">
-          <thead className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <thead className="border-b border-slate-100 bg-slate-50/90 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/60">
             <tr>
               <th className="px-5 py-3.5">Actividad</th>
               <th className="px-5 py-3.5">Detalle / Expediente</th>
