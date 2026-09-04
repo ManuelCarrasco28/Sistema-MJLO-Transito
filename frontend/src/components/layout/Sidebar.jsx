@@ -1,13 +1,24 @@
+import { useNavigate } from 'react-router-dom'
 import { navigation } from '../../../public/js/navigation'
 import { Icon } from '../ui/Icon'
 
-export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, hiddenOnDesktop }) {
+export function Sidebar({ activeItem, mobileOpen, onClose, onLogout, hiddenOnDesktop }) {
+  const navigate = useNavigate()
+
   const groups = [
     ['Principal', navigation.slice(0, 1)],
     ['Gestión', navigation.slice(1, 5)],
     ['Operaciones', navigation.slice(5, 9)],
     ['Control', navigation.slice(9)],
   ]
+
+  // Función simple para generar ruta a partir del nombre
+  const getRoute = (label) => {
+    const formatStr = label.toLowerCase()
+      .replace('í', 'i')
+      .replace('ó', 'o')
+    return `/${formatStr}`
+  }
 
   return (
     <>
@@ -59,7 +70,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, h
                       key={label}
                       type="button"
                       onClick={() => {
-                        onSelect(label)
+                        navigate(getRoute(label))
                         onClose()
                       }}
                       className={`group flex w-full items-center gap-3 rounded-lg px-3 py-1.5 text-left text-sm font-semibold transition-all duration-200 ${

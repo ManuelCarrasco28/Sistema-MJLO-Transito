@@ -1,14 +1,29 @@
 import { useState, useRef, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { sampleNotifications } from '../public/js/dashboardData'
 import { Login } from './components/auth/Login'
 import { Sidebar } from './components/layout/Sidebar'
 import { Header } from './components/layout/Header'
-import { MetricCards } from './components/dashboard/MetricCards'
-import { QuickActions } from './components/dashboard/QuickActions'
-import { ChartsSection } from './components/dashboard/ChartsSection'
+import { DashboardHome } from './pages/DashboardHome'
+import { Vehiculos } from './pages/Vehiculos'
+import { Personas } from './pages/Personas'
+import { Organizaciones } from './pages/Organizaciones'
+import { Documentos } from './pages/Documentos'
 
-function Dashboard({ onLogout }) {
-  const [activeItem, setActiveItem] = useState('Dashboard')
+function Layout({ onLogout }) {
+  const location = useLocation()
+  
+  // Mapear rutas a nombres amigables para el sidebar
+  const getActiveItem = () => {
+    const path = location.pathname
+    if (path.includes('/vehiculos')) return 'Vehículos'
+    if (path.includes('/personas')) return 'Personas'
+    if (path.includes('/organizaciones')) return 'Organizaciones'
+    if (path.includes('/documentos')) return 'Documentos'
+    return 'Dashboard'
+  }
+
+  const [activeItem, setActiveItem] = useState(getActiveItem())
   const [mobileOpen, setMobileOpen] = useState(false)
   const [sidebarHidden, setSidebarHidden] = useState(false)
   const [notifications, setNotifications] = useState(sampleNotifications)
@@ -24,6 +39,11 @@ function Dashboard({ onLogout }) {
   })
   const notifRef = useRef(null)
   const userMenuRef = useRef(null)
+
+  // Update active item when route changes
+  useEffect(() => {
+    setActiveItem(getActiveItem())
+  }, [location.pathname])
 
   useEffect(() => {
     if (darkMode) {
@@ -64,7 +84,7 @@ function Dashboard({ onLogout }) {
         onLogout={onLogout}
         hiddenOnDesktop={sidebarHidden}
       />
-      <div className="min-w-0 lg:h-dvh lg:overflow-y-auto">
+      <div className="min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col">
         <Header
           onOpenMobile={() => setMobileOpen(true)}
           sidebarHidden={sidebarHidden}
@@ -82,49 +102,21 @@ function Dashboard({ onLogout }) {
           onLogout={onLogout}
         />
 
-        <div className="mx-auto max-w-384 space-y-6 p-4 sm:p-6 lg:p-7 xl:p-8">
-          <div className="rounded-2xl border border-blue-900/10 bg-[#123b6d] p-5 text-white shadow-[0_12px_28px_rgba(15,42,82,0.18)] dark:border-blue-900/40 dark:bg-[#102a4d] sm:p-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="border-l-4 border-cyan-300 pl-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">
-                  Municipalidad Distrital de José Leonardo Ortiz
-                </p>
-                <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-[2rem]">
-                  Panel de Control Operativo
-                </h1>
-                <p className="mt-1 text-sm text-blue-50/90">
-                  Subgerencia de Tránsito, Transporte y Seguridad Vial · MDJLO
-                </p>
+        <div className="mx-auto w-full max-w-[96rem] flex-1 space-y-6 p-4 sm:p-6 lg:p-7 xl:p-8">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardHome />} />
+            <Route path="/vehiculos" element={<Vehiculos />} />
+            <Route path="/personas" element={<Personas />} />
+            <Route path="/organizaciones" element={<Organizaciones />} />
+            <Route path="/documentos" element={<Documentos />} />
+            <Route path="*" element={
+              <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">
+                <h2 className="text-xl font-bold">Módulo en desarrollo</h2>
+                <p className="mt-2 text-slate-500">Esta sección estará disponible próximamente.</p>
               </div>
-              <div className="grid gap-3 text-sm sm:grid-cols-3 lg:min-w-lg">
-                {[
-                  ['Turno', 'Diario'],
-                  ['Sede', 'Palacio Municipal'],
-                  ['Fecha', '04/09/2026'],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl border border-white/15 bg-white/8 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-blue-100/80">{label}</p>
-                    <p className="mt-1 font-bold text-white">{value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div>
-              <h2 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white sm:text-xl">
-                Resumen de gestión municipal
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Indicadores simulados para presentación del sistema.
-              </p>
-            </div>
-          </div>
-
-          <MetricCards />
-          <QuickActions />
-          <ChartsSection />
+            } />
+          </Routes>
         </div>
       </div>
     </main>
@@ -133,10 +125,15 @@ function Dashboard({ onLogout }) {
 
 function App() {
   const [authenticated, setAuthenticated] = useState(false)
-  return authenticated ? (
-    <Dashboard onLogout={() => setAuthenticated(false)} />
-  ) : (
-    <Login onLogin={() => setAuthenticated(true)} />
+  
+  return (
+    <BrowserRouter>
+      {authenticated ? (
+        <Layout onLogout={() => setAuthenticated(false)} />
+      ) : (
+        <Login onLogin={() => setAuthenticated(true)} />
+      )}
+    </BrowserRouter>
   )
 }
 
