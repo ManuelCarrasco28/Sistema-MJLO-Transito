@@ -187,7 +187,7 @@ export function Header({
                 <p className="text-sm font-bold text-slate-800 dark:text-white">Manuel Carrasco</p>
                 <p className="text-xs text-slate-400 truncate">manuelpe@mdjlo.gob.pe</p>
                 <span className="mt-1.5 inline-block rounded-md bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
-                  Administradora
+                  Administrador
                 </span>
               </div>
               <div className="py-1">
