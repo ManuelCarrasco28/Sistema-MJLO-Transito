@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { initialOrganizaciones } from '../data/mockData'
+import { RegistryHeader } from '../components/ui/RegistryHeader'
 
 export function Organizaciones() {
-  const [organizaciones, setOrganizaciones] = useState(initialOrganizaciones)
+  const [organizaciones, setOrganizaciones] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
@@ -25,6 +25,13 @@ export function Organizaciones() {
     flotaTotal: 50,
     estado: 'ACTIVO',
   })
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/organizaciones', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : Promise.reject(response))
+      .then((payload) => setOrganizaciones(payload.data ?? []))
+      .catch(() => setOrganizaciones([]))
+  }, [])
 
   // Métricas estadísticas
   const totalOrgs = organizaciones.length
@@ -97,120 +104,125 @@ export function Organizaciones() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Encabezado Principal */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-md shadow-indigo-500/20">
-              <Icon name="building" className="size-6" />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black tracking-tight text-slate-800 dark:text-white sm:text-3xl">
-                  Organizaciones de Transporte
-                </h1>
-                <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
-                  {totalOrgs} Entidades
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Registro oficial de empresas de transporte y asociaciones de mototaxistas autorizadas en JLO.
-              </p>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-3.5 sm:space-y-4">
+      <RegistryHeader
+        title="Organizaciones"
+        description="Empresas y asociaciones de transporte, representantes legales y flota vinculada."
+        icon="building"
+        action="Registrar organización"
+        onCreate={handleOpenCreateModal}
+        area="Tránsito Municipal"
+        badgeText="Padrón Oficial 2026"
+      />
 
-        <button
-          type="button"
-          onClick={handleOpenCreateModal}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-600/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-indigo-600/30 active:scale-95 cursor-pointer"
-        >
-          <span className="text-lg leading-none">+</span>
-          <span>Registrar Organización</span>
-        </button>
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
+          Indicadores de empresas y asociaciones
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Estado de personerías jurídicas, modalidad operativa y flota habilitada.
+        </p>
       </div>
 
-      {/* Tarjetas de Métricas Estadísticas */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Tarjetas de Métricas Estadísticas Compactas */}
+      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         {/* Card 1: Total */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-indigo-500 dark:border-t-indigo-400 bg-linear-to-br from-white via-white to-indigo-50/70 dark:from-[#15152f] dark:via-[#0f172a] dark:to-indigo-900/35">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Entidades</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
-              <Icon name="building" className="size-5" />
+            <span className="grid size-8.5 place-items-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+              <Icon name="building" className="size-4.5" />
             </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{totalOrgs}</p>
-            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200/60 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 shadow-2xs dark:border-indigo-800/60 dark:bg-indigo-950/50 dark:text-indigo-300">
               Padrón 2026
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Entidades registradas</p>
-        </div>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Total Entidades</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(totalOrgs)}
+            </h3>
+          </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Personas jurídicas registradas
+          </p>
+        </article>
 
         {/* Card 2: Asociaciones */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-amber-500 dark:border-t-amber-400 bg-linear-to-br from-white via-white to-amber-50/80 dark:from-[#1e1a12] dark:via-[#0f172a] dark:to-amber-900/35">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              Asociaciones
+            <span className="grid size-8.5 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
+              <Icon name="vehicle" className="size-4.5" />
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold">
-              🛺
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{asociaciones}</p>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 shadow-2xs dark:border-amber-800/60 dark:bg-amber-950/50 dark:text-amber-400">
               Mototaxis
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Asociaciones de transporte menor</p>
-        </div>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Asociaciones</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(asociaciones)}
+            </h3>
+          </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Transporte público menor (Trimóviles)
+          </p>
+        </article>
 
         {/* Card 3: Empresas */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-cyan-500 dark:border-t-cyan-400 bg-linear-to-br from-white via-white to-cyan-50/80 dark:from-[#0d1e30] dark:via-[#0f172a] dark:to-cyan-900/40">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
-              Empresas S.A.C.
+            <span className="grid size-8.5 place-items-center rounded-lg bg-cyan-50 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300">
+              <Icon name="building" className="size-4.5" />
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
-              🏢
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{empresas}</p>
-            <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-md border border-cyan-200/60 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700 shadow-2xs dark:border-cyan-800/60 dark:bg-cyan-950/50 dark:text-cyan-300">
               Transporte Mayor
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Colectivos y transporte urbano</p>
-        </div>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Empresas S.A.C.</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(empresas)}
+            </h3>
+          </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Colectivos, combis y empresas
+          </p>
+        </article>
 
         {/* Card 4: Flota Acumulada */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-emerald-600 dark:border-t-emerald-500 bg-linear-to-br from-white via-white to-emerald-50/70 dark:from-[#0d2218] dark:via-[#0f172a] dark:to-emerald-900/35">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Flota Autorizada
+            <span className="grid size-8.5 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+              <Icon name="check" className="size-4.5" />
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-              ⚡
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{flotaAcumulada}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
-              Unidades Total
+            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-400">
+              Capacidad
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Capacidad total agrupada</p>
-        </div>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Flota Autorizada</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(flotaAcumulada)}
+            </h3>
+          </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Unidades totales en padrones
+          </p>
+        </article>
+      </div>
+
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
+          Registro oficial de organizaciones
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Directorio de personas jurídicas autorizadas para la prestación del servicio de transporte.
+        </p>
       </div>
 
       {/* Tabla y Filtros */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -297,7 +309,7 @@ export function Organizaciones() {
                 <tr>
                   <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
                     <div className="mx-auto max-w-xs space-y-2">
-                      <p className="text-3xl">🏢</p>
+                      <Icon name="building" className="size-10" />
                       <p className="font-bold text-slate-600 dark:text-slate-300">
                         No se encontraron organizaciones
                       </p>
@@ -393,23 +405,26 @@ export function Organizaciones() {
 
       {/* Formulario Modal Estilo Facebook (Sin Asteriscos) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-6 py-4 text-white dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-lg bg-indigo-500/20 text-indigo-400">
-                  <Icon name="building" className="size-4.5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-blue-900/20 bg-[#123b6d] px-6 py-4.5 text-white dark:border-slate-800 dark:bg-[#102a4d]">
+              <div className="flex items-center gap-3">
+                <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-cyan-300">
+                  <Icon name="building" className="size-5" />
                 </span>
-                <h3 className="text-lg font-extrabold">
-                  {isEditing ? 'Editar Registro de Organización' : 'Registrar Nueva Organización'}
-                </h3>
+                <div>
+                  <h3 className="text-lg font-extrabold text-white">
+                    {isEditing ? 'Editar Registro de Organización' : 'Registrar Nueva Organización'}
+                  </h3>
+                  <p className="text-xs text-blue-100/80">Gestión de personería jurídica y padrón</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white cursor-pointer"
+                className="grid size-9 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-xs transition hover:bg-white/20 cursor-pointer"
               >
-                ✕
+                <Icon name="close" className="size-4" />
               </button>
             </div>
 

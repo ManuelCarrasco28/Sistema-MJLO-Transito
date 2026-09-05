@@ -18,7 +18,7 @@ export function Login({ onLogin }) {
     }
   }, [isShaking])
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     if (!username.trim() || !password) {
@@ -30,16 +30,36 @@ export function Login({ onLogin }) {
     setIsLoading(true)
     setError('')
 
-    setTimeout(() => {
-      if (username.trim().toLowerCase() !== 'admin' || password !== 'admin123') {
-        setError('El usuario o la contraseña son incorrectos.')
+    try {
+      const response = await fetch('http://localhost:8080/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          usuario: username.trim(),
+          password,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        const message = data.messages?.error || data.messages || data.message || 'El usuario o la contraseña son incorrectos.'
+        setError(Array.isArray(message) ? message.join(' ') : message)
         setIsShaking(true)
-        setIsLoading(false)
         return
       }
+
+      localStorage.setItem('user', JSON.stringify(data.data))
+      onLogin(data.data)
+    } catch (err) {
+      setError('No se pudo conectar con el servidor backend.')
+      setIsShaking(true)
+    } finally {
       setIsLoading(false)
-      onLogin()
-    }, 1500)
+    }
   }
 
   return (

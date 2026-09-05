@@ -1,7 +1,6 @@
 import { Icon } from '../ui/Icon'
-import { summaryCards } from '../../../public/js/dashboardData'
 
-export function MetricCards() {
+export function MetricCards({ cards = [], loading = false }) {
   const themeStyles = {
     blue: {
       iconBox: 'bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300',
@@ -24,10 +23,18 @@ export function MetricCards() {
       badge: 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-200/60 dark:border-rose-800/60',
     },
   }
+  const displayCards = loading
+    ? [
+        { label: 'Vehículos registrados', value: '...', detail: 'Cargando', change: '', positive: null, icon: 'vehicle', tone: 'blue' },
+        { label: 'Documentos vigentes', value: '...', detail: 'Cargando', change: '', positive: null, icon: 'document', tone: 'cyan' },
+        { label: 'Inspecciones pendientes', value: '...', detail: 'Cargando', change: '', positive: null, icon: 'inspection', tone: 'amber' },
+        { label: 'Papeletas pendientes', value: '...', detail: 'Cargando', change: '', positive: null, icon: 'ticket', tone: 'slate' },
+      ]
+    : cards
 
   return (
     <section aria-label="Resumen de indicadores" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {summaryCards.map((card, index) => {
+      {displayCards.map((card, index) => {
         const currentTheme = themeStyles[card.tone]
         const trendIcon = card.positive === true ? 'trendUp' : card.positive === false ? 'trendDown' : 'trendFlat'
 
@@ -41,14 +48,18 @@ export function MetricCards() {
               <span className={`grid size-12 place-items-center rounded-xl ${currentTheme.iconBox}`}>
                 <Icon name={card.icon} className="size-5.5" />
               </span>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold shadow-sm transition-colors ${currentTheme.badge}`}>
-                <Icon name={trendIcon} className="size-3 animate-pulse" />
-                {card.change}
-              </span>
+              {card.change !== '' && (
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold shadow-sm transition-colors ${currentTheme.badge}`}>
+                  <Icon name={trendIcon} className="size-3 animate-pulse" />
+                  {card.change}
+                </span>
+              )}
             </div>
             <div className="mt-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-400">{card.label}</p>
-              <h3 className="mt-1 text-2xl font-bold tracking-tight text-slate-800 dark:text-white lg:text-3xl">{card.value}</h3>
+              <h3 className="mt-1 text-2xl font-bold tracking-tight text-slate-800 dark:text-white lg:text-3xl">
+                {typeof card.value === 'number' ? new Intl.NumberFormat('es-PE').format(card.value) : card.value}
+              </h3>
             </div>
             <p className="mt-3 border-t border-slate-100 dark:border-slate-800 pt-2.5 text-xs text-slate-500 dark:text-slate-400">{card.detail}</p>
           </article>

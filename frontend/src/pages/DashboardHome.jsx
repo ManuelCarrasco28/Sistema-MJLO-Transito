@@ -1,8 +1,37 @@
+import { useEffect, useState } from 'react'
 import { MetricCards } from '../components/dashboard/MetricCards'
 import { QuickActions } from '../components/dashboard/QuickActions'
 import { ChartsSection } from '../components/dashboard/ChartsSection'
 
 export function DashboardHome() {
+  const [dashboardData, setDashboardData] = useState(null)
+  const [error, setError] = useState('')
+  const currentDate = new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date())
+
+  useEffect(() => {
+    let active = true
+
+    fetch('http://localhost:8080/api/dashboard', { credentials: 'include' })
+      .then((response) => {
+        if (!response.ok) throw new Error('No se pudo cargar el resumen del dashboard.')
+        return response.json()
+      })
+      .then((data) => {
+        if (active) setDashboardData(data)
+      })
+      .catch(() => {
+        if (active) setError('No se pudo cargar información de la base de datos.')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-blue-900/10 bg-[#123b6d] p-5 text-white shadow-[0_12px_28px_rgba(15,42,82,0.18)] dark:border-blue-900/40 dark:bg-[#102a4d] sm:p-6">
@@ -18,11 +47,10 @@ export function DashboardHome() {
               Subgerencia de Tránsito, Transporte y Seguridad Vial · MDJLO
             </p>
           </div>
-          <div className="grid gap-3 text-sm sm:grid-cols-3 lg:min-w-[32rem]">
+          <div className="grid gap-3 text-sm sm:grid-cols-2 lg:min-w-[22rem]">
             {[
-              ['Turno', 'Diario'],
-              ['Sede', 'Palacio Municipal'],
-              ['Fecha', '04/09/2026'],
+              ['Área', 'Tránsito Municipal'],
+              ['Fecha', currentDate],
             ].map(([label, value]) => (
               <div key={label} className="rounded-xl border border-white/15 bg-white/8 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wider text-blue-100/80">{label}</p>
@@ -39,15 +67,20 @@ export function DashboardHome() {
             Resumen de gestión municipal
           </h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Indicadores simulados para presentación del sistema.
+            Indicadores obtenidos desde la base de datos.
           </p>
         </div>
       </div>
 
-      <MetricCards />
+      {error && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+          {error}
+        </div>
+      )}
+
+      <MetricCards cards={dashboardData?.summaryCards} loading={!dashboardData && !error} />
       <QuickActions />
-      <ChartsSection />
+      <ChartsSection data={dashboardData} loading={!dashboardData && !error} />
     </div>
   )
 }
-

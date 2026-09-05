@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { initialDocumentos, initialVehiculos } from '../data/mockData'
+import { RegistryHeader } from '../components/ui/RegistryHeader'
 
 export function Documentos() {
-  const [documentos, setDocumentos] = useState(initialDocumentos)
+  const [documentos, setDocumentos] = useState([])
+  const [vehiculos, setVehiculos] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
@@ -14,15 +15,27 @@ export function Documentos() {
   const [isEditing, setIsEditing] = useState(false)
 
   const [formData, setFormData] = useState({
-    vehiculoPlaca: initialVehiculos[0]?.placa || 'M4X-821',
+    vehiculoPlaca: '',
     tipoDocumento: 'TARJETA_OPERATIVIDAD',
     codigo: '',
     fechaExpedicion: '2026-01-01',
     fechaExpiracion: '2027-01-01',
     estado: 'VIGENTE',
-    propietario: initialVehiculos[0]?.propietario || 'Carlos Mendoza',
-    asociacion: initialVehiculos[0]?.organizacion || 'Asociación Leonardo Ortiz',
+    propietario: '',
+    asociacion: '',
   })
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/documentos', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : Promise.reject(response))
+      .then((payload) => setDocumentos(payload.data ?? []))
+      .catch(() => setDocumentos([]))
+
+    fetch('http://localhost:8080/api/vehiculos', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : Promise.reject(response))
+      .then((payload) => setVehiculos(payload.data ?? []))
+      .catch(() => setVehiculos([]))
+  }, [])
 
   // Métricas estadísticas
   const totalDocs = documentos.length
@@ -43,14 +56,14 @@ export function Documentos() {
 
   const handleOpenCreateModal = () => {
     setFormData({
-      vehiculoPlaca: initialVehiculos[0]?.placa || 'M4X-821',
+      vehiculoPlaca: vehiculos[0]?.placa || '',
       tipoDocumento: 'TARJETA_OPERATIVIDAD',
       codigo: `TUC-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       fechaExpedicion: new Date().toISOString().split('T')[0],
       fechaExpiracion: '2027-12-31',
       estado: 'VIGENTE',
-      propietario: initialVehiculos[0]?.propietario || 'Carlos Mendoza',
-      asociacion: initialVehiculos[0]?.organizacion || 'Asociación Leonardo Ortiz',
+      propietario: vehiculos[0]?.propietario || '',
+      asociacion: vehiculos[0]?.organizacion || '',
     })
     setIsEditing(false)
     setIsModalOpen(true)
@@ -123,130 +136,136 @@ export function Documentos() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Encabezado Principal */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-md shadow-emerald-500/20">
-              <Icon name="document" className="size-6" />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black tracking-tight text-slate-800 dark:text-white sm:text-3xl">
-                  Control de Documentos
-                </h1>
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300">
-                  {totalDocs} Expedientes
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Emisión e inspección de Tarjetas Únicas de Circulación (TUC), SOAT y autorizaciones municipales en JLO.
-              </p>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-3.5 sm:space-y-4">
+      <RegistryHeader
+        title="Documentos"
+        description="Control documental, autorizaciones vehiculares (TUC), SOAT y certificados vigentes."
+        icon="document"
+        action="Emitir documento"
+        onCreate={handleOpenCreateModal}
+        area="Tránsito Municipal"
+        badgeText="Padrón Oficial 2026"
+      />
 
-        <button
-          type="button"
-          onClick={handleOpenCreateModal}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-emerald-600/30 active:scale-95 cursor-pointer"
-        >
-          <span className="text-lg leading-none">+</span>
-          <span>Emitir Documento</span>
-        </button>
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
+          Indicadores de control documental
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Seguimiento de autorizaciones, vigencias y vencimientos de la flota activa.
+        </p>
       </div>
 
-      {/* Tarjetas de Métricas Estadísticas */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Tarjetas de Métricas Estadísticas Compactas */}
+      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         {/* Card 1: Total */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-cyan-500 dark:border-t-cyan-400 bg-linear-to-br from-white via-white to-cyan-50/80 dark:from-[#0d1e30] dark:via-[#0f172a] dark:to-cyan-900/40">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Emitidos</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-              <Icon name="document" className="size-5" />
+            <span className="grid size-8.5 place-items-center rounded-lg bg-cyan-50 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300">
+              <Icon name="document" className="size-4.5" />
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-cyan-200/60 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700 shadow-2xs dark:border-cyan-800/60 dark:bg-cyan-950/50 dark:text-cyan-300">
+              Expedientes 2026
             </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{totalDocs}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
-              Padrón 2026
-            </span>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Total Emitidos</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(totalDocs)}
+            </h3>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Documentos procesados</p>
-        </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Documentos procesados
+          </p>
+        </article>
 
         {/* Card 2: Vigentes */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-emerald-600 dark:border-t-emerald-500 bg-linear-to-br from-white via-white to-emerald-50/70 dark:from-[#0d2218] dark:via-[#0f172a] dark:to-emerald-900/35">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Vigentes
+            <span className="grid size-8.5 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+              <Icon name="check" className="size-4.5" />
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">
-              ✓
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{vigentes}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
-              {porcentajeVigentes}% Habilitados
+            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-400">
+              {porcentajeVigentes}% al día
             </span>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Vigentes</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(vigentes)}
+            </h3>
+          </div>
+          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
               className="h-full rounded-full bg-emerald-500 transition-all duration-500"
               style={{ width: `${porcentajeVigentes}%` }}
             />
           </div>
-        </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Autorizaciones habilitadas
+          </p>
+        </article>
 
         {/* Card 3: En Trámite */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-amber-500 dark:border-t-amber-400 bg-linear-to-br from-white via-white to-amber-50/80 dark:from-[#1e1a12] dark:via-[#0f172a] dark:to-amber-900/35">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-              En Trámite
+            <span className="grid size-8.5 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
+              <Icon name="clock" className="size-4.5" />
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-              📑
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{enTramite}</p>
-            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 shadow-2xs dark:border-amber-800/60 dark:bg-amber-950/50 dark:text-amber-400">
               Pendientes
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">En revisión o firma digital</p>
-        </div>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">En Trámite</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(enTramite)}
+            </h3>
+          </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            En revisión o firma digital
+          </p>
+        </article>
 
         {/* Card 4: Vencidos */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-rose-500 dark:border-t-rose-400 bg-linear-to-br from-white via-white to-rose-50/70 dark:from-[#211528] dark:via-[#0f172a] dark:to-rose-900/35">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-              Vencidos
+            <span className="grid size-8.5 place-items-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
+              <Icon name="alert" className="size-4.5" />
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
-              ⏰
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{vencidos}</p>
-            <span className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-md border border-rose-200/60 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600 shadow-2xs dark:border-rose-800/60 dark:bg-rose-950/50 dark:text-rose-400">
               Expirados
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Requieren renovación inmediata</p>
-        </div>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Vencidos</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(vencidos)}
+            </h3>
+          </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Requieren renovación inmediata
+          </p>
+        </article>
+      </div>
+
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
+          Padrón de documentos y autorizaciones
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Control sistemático de Tarjetas de Operatividad (TUC), SOAT y Certificados de Capacitación.
+        </p>
       </div>
 
       {/* Tabla y Filtros */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por N° Código, placa vehicular, propietario o empresa..."
+              placeholder="Buscar por N° Código, placa vehicular, titular o empresa..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-emerald-400"
@@ -331,7 +350,7 @@ export function Documentos() {
                 <tr>
                   <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
                     <div className="mx-auto max-w-xs space-y-2">
-                      <p className="text-3xl">📄</p>
+                      <Icon name="document" className="size-10" />
                       <p className="font-bold text-slate-600 dark:text-slate-300">
                         No se encontraron documentos
                       </p>
@@ -420,23 +439,26 @@ export function Documentos() {
 
       {/* Formulario Modal Estilo Facebook (Sin Asteriscos) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-6 py-4 text-white dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-lg bg-emerald-500/20 text-emerald-400">
-                  <Icon name="document" className="size-4.5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-blue-900/20 bg-[#123b6d] px-6 py-4.5 text-white dark:border-slate-800 dark:bg-[#102a4d]">
+              <div className="flex items-center gap-3">
+                <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-cyan-300">
+                  <Icon name="document" className="size-5" />
                 </span>
-                <h3 className="text-lg font-extrabold">
-                  {isEditing ? 'Editar Documento Municipal' : 'Emitir Nuevo Documento'}
-                </h3>
+                <div>
+                  <h3 className="text-lg font-extrabold text-white">
+                    {isEditing ? 'Editar Documento Municipal' : 'Emitir Nuevo Documento'}
+                  </h3>
+                  <p className="text-xs text-blue-100/80">Gestión de TUC, SOAT y habilitaciones</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white cursor-pointer"
+                className="grid size-9 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-xs transition hover:bg-white/20 cursor-pointer"
               >
-                ✕
+                <Icon name="close" className="size-4" />
               </button>
             </div>
 
@@ -452,7 +474,7 @@ export function Documentos() {
                       id="doc_veh"
                       value={formData.vehiculoPlaca}
                       onChange={(e) => {
-                        const veh = initialVehiculos.find((v) => v.placa === e.target.value)
+                        const veh = vehiculos.find((v) => v.placa === e.target.value)
                         setFormData({
                           ...formData,
                           vehiculoPlaca: e.target.value,
@@ -462,7 +484,7 @@ export function Documentos() {
                       }}
                       className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
                     >
-                      {initialVehiculos.map((v) => (
+                      {vehiculos.map((v) => (
                         <option key={v.id} value={v.placa}>
                           {v.placa} ({v.marca} {v.modelo})
                         </option>

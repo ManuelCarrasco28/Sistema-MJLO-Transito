@@ -91,13 +91,13 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, h
           ))}
         </nav>
 
-        <div className="mx-3 mb-3 shrink-0 rounded-xl border border-white/10 bg-[#0b1328] p-2">
+        <div className="mx-3 mb-3 shrink-0 border-t border-white/10 pt-2.5">
           <button
             type="button"
             onClick={onLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-400 transition hover:bg-red-500/15 hover:text-red-300"
+            className="group flex w-full items-center gap-2.5 rounded-lg border border-white/10 bg-white/4 px-3 py-2 text-xs font-semibold text-slate-300 transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-white active:scale-[0.98] cursor-pointer"
           >
-            <Icon name="logout" className="size-4.5 shrink-0" />
+            <Icon name="logout" className="size-4 text-red-400 transition-all duration-200 group-hover:scale-110 group-hover:text-red-300" />
             <span>Cerrar sesión</span>
           </button>
         </div>

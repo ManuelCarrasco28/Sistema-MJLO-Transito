@@ -15,8 +15,18 @@ export function Header({
   notifRef,
   userMenuRef,
   onLogout,
+  user,
 }) {
   const unreadCount = notifications.filter((item) => item.unread).length
+  const userFullName = [user?.nombres, user?.apellidos].filter(Boolean).join(' ') || 'Usuario'
+  const userInitials = [user?.nombres, user?.apellidos]
+    .filter(Boolean)
+    .map((value) => value.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'US'
+  const userEmail = user?.usuario ? `${user.usuario}@mdjlo.gob.pe` : 'usuario@mdjlo.gob.pe'
+  const userRole = user?.cargo || 'Trabajador municipal'
   const currentDate = new Intl.DateTimeFormat('es-PE', {
     weekday: 'long',
     day: 'numeric',
@@ -173,10 +183,10 @@ export function Header({
             className="flex items-center gap-2.5 rounded-full p-1 transition hover:bg-slate-100/80 dark:hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-blue-600"
           >
             <span className="grid size-10 place-items-center rounded-full bg-[#1a73e8] text-xs font-bold text-white shadow-xs">
-              MT
+              {userInitials}
             </span>
             <span className="hidden text-sm font-semibold text-slate-700 dark:text-slate-200 sm:inline">
-              Manuel Carrasco
+              {userFullName}
             </span>
             <Icon name="chevronDown" className="size-4 text-slate-400" />
           </button>
@@ -184,10 +194,10 @@ export function Header({
           {userMenuOpen && (
             <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] p-2 shadow-xl animate-enter">
               <div className="border-b border-slate-100 dark:border-slate-800 px-3 py-2.5">
-                <p className="text-sm font-bold text-slate-800 dark:text-white">Manuel Carrasco</p>
-                <p className="text-xs text-slate-400 truncate">manuelpe@mdjlo.gob.pe</p>
+                <p className="text-sm font-bold text-slate-800 dark:text-white">{userFullName}</p>
+                <p className="text-xs text-slate-400 truncate">{userEmail}</p>
                 <span className="mt-1.5 inline-block rounded-md bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
-                  Administrador
+                  {userRole}
                 </span>
               </div>
               <div className="py-1">

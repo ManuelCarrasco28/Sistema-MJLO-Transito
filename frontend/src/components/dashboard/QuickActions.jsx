@@ -1,5 +1,11 @@
 import { Icon } from '../ui/Icon'
-import { quickActions } from '../../../public/js/dashboardData'
+
+const quickActions = [
+  { label: 'Registrar vehículo', description: 'Nueva unidad', icon: 'vehicle', tone: 'blue' },
+  { label: 'Registrar inspección', description: 'Nueva evaluación', icon: 'inspection', tone: 'cyan' },
+  { label: 'Registrar papeleta', description: 'Nueva infracción', icon: 'ticket', tone: 'amber' },
+  { label: 'Registrar pago', description: 'Nuevo ingreso', icon: 'payment', tone: 'emerald' },
+]
 
 export function QuickActions() {
   const actionStyles = {

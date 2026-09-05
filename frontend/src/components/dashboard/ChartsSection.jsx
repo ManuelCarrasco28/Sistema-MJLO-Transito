@@ -1,56 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '../ui/Icon'
 
-export function ChartsSection() {
+export function ChartsSection({ data, loading = false }) {
   const [expandedChart, setExpandedChart] = useState(null)
   const [expandedMultasPagos, setExpandedMultasPagos] = useState(null)
   const [selectedYear, setSelectedYear] = useState('2026')
   const [operationsZoom, setOperationsZoom] = useState(0)
   const operationsChartRef = useRef(null)
-  const expedientesBreakdown = [
-    { label: 'Vigentes', value: '956', percent: '68%', color: 'bg-blue-600', progress: '68%' },
-    { label: 'Observados', value: '281', percent: '20%', color: 'bg-cyan-400', progress: '20%' },
-    { label: 'Por vencer', value: '169', percent: '12%', color: 'bg-amber-500', progress: '12%' },
+  const emptyMonths = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep'].map((month) => ({ month, multas: 0, pagos: 0 }))
+  const expedientesBreakdown = data?.expedientes ?? [
+    { label: 'Vigentes', value: 0, percent: '0%', color: 'bg-blue-600', progress: '0%' },
+    { label: 'Observados', value: 0, percent: '0%', color: 'bg-cyan-400', progress: '0%' },
+    { label: 'Por vencer', value: 0, percent: '0%', color: 'bg-amber-500', progress: '0%' },
   ]
-  const multasPagosPorAnio = {
-    2023: {
-      totals: { multas: '684', pagos: '438', pendiente: 'S/ 48,930', recuperacion: '64%' },
-      months: [
-        ['Ene', '42%', '26%'], ['Feb', '48%', '30%'], ['Mar', '45%', '28%'], ['Abr', '54%', '35%'],
-        ['May', '51%', '33%'], ['Jun', '59%', '39%'], ['Jul', '57%', '37%'], ['Ago', '63%', '43%'],
-        ['Sep', '60%', '41%'], ['Oct', '55%', '38%'], ['Nov', '49%', '34%'], ['Dic', '46%', '32%'],
-      ],
-    },
-    2024: {
-      totals: { multas: '742', pagos: '516', pendiente: 'S/ 54,880', recuperacion: '69%' },
-      months: [
-        ['Ene', '46%', '32%'], ['Feb', '52%', '38%'], ['Mar', '48%', '35%'], ['Abr', '61%', '44%'],
-        ['May', '57%', '42%'], ['Jun', '66%', '49%'], ['Jul', '63%', '47%'], ['Ago', '70%', '52%'],
-        ['Sep', '68%', '51%'], ['Oct', '59%', '45%'], ['Nov', '54%', '41%'], ['Dic', '50%', '39%'],
-      ],
-    },
-    2025: {
-      totals: { multas: '895', pagos: '642', pendiente: 'S/ 63,210', recuperacion: '72%' },
-      months: [
-        ['Ene', '58%', '40%'], ['Feb', '64%', '47%'], ['Mar', '60%', '45%'], ['Abr', '71%', '51%'],
-        ['May', '69%', '50%'], ['Jun', '76%', '56%'], ['Jul', '72%', '54%'], ['Ago', '84%', '61%'],
-        ['Sep', '78%', '59%'], ['Oct', '74%', '57%'], ['Nov', '67%', '52%'], ['Dic', '62%', '49%'],
-      ],
-    },
-    2026: {
-      totals: { multas: '781', pagos: '548', pendiente: 'S/ 51,940', recuperacion: '70%' },
-      months: [
-        ['Ene', '68%', '42%'], ['Feb', '74%', '51%'], ['Mar', '61%', '49%'], ['Abr', '89%', '63%'],
-        ['May', '77%', '55%'], ['Jun', '94%', '71%'], ['Jul', '82%', '69%'], ['Ago', '100%', '76%'],
-        ['Sep', '91%', '72%'],
-      ],
-    },
+  const multasPagosPorAnio = data?.multasPagosPorAnio ?? {
+    2026: { totals: { multas: 0, pagos: 0, pendiente: 0 }, months: emptyMonths },
   }
   const availableYears = Object.keys(multasPagosPorAnio).sort((a, b) => Number(b) - Number(a))
-  const isAllYearsSelected = selectedYear === 'todos'
-  const multasPagos = multasPagosPorAnio[isAllYearsSelected ? '2026' : selectedYear]
   const parseNumber = (value) => Number(String(value).replaceAll(',', '').replace('S/', '').replace('%', '').trim())
   const formatNumber = (value) => new Intl.NumberFormat('es-PE').format(value)
+  const selectedDataYear = multasPagosPorAnio[selectedYear] ? selectedYear : availableYears[0]
+  const isAllYearsSelected = selectedYear === 'todos'
+  const multasPagos = multasPagosPorAnio[isAllYearsSelected ? selectedDataYear : selectedDataYear]
   const totalMultasHistorico = Object.values(multasPagosPorAnio).reduce((sum, data) => sum + parseNumber(data.totals.multas), 0)
   const totalPagosHistorico = Object.values(multasPagosPorAnio).reduce((sum, data) => sum + parseNumber(data.totals.pagos), 0)
   const totalPendienteHistorico = Object.values(multasPagosPorAnio).reduce((sum, data) => sum + parseNumber(data.totals.pendiente), 0)
@@ -60,20 +31,16 @@ export function ChartsSection() {
   const getMonthlyValues = (year, data) => {
     const totalMultas = parseNumber(data.totals.multas)
     const totalPagos = parseNumber(data.totals.pagos)
-    const multasWeights = data.months.map(([, multas]) => parseNumber(multas))
-    const pagosWeights = data.months.map(([, , pagos]) => parseNumber(pagos))
-    const multasWeightTotal = multasWeights.reduce((sum, value) => sum + value, 0)
-    const pagosWeightTotal = pagosWeights.reduce((sum, value) => sum + value, 0)
-    const rawItems = data.months.map(([month], index) => ({
+    const rawItems = data.months.map((monthItem) => ({
       type: 'month',
-      title: `${month} ${year}`,
+      title: `${monthItem.month} ${year}`,
       period: year === '2026' ? 'Año actual' : 'Periodo anual',
-      month,
+      month: monthItem.month,
       year,
-      multas: Math.round((totalMultas * multasWeights[index]) / multasWeightTotal),
-      pagos: Math.round((totalPagos * pagosWeights[index]) / pagosWeightTotal),
+      multas: parseNumber(monthItem.multas),
+      pagos: parseNumber(monthItem.pagos),
     }))
-    const maxValue = Math.max(...rawItems.flatMap((item) => [item.multas, item.pagos]))
+    const maxValue = Math.max(1, ...rawItems.flatMap((item) => [item.multas, item.pagos]), totalMultas, totalPagos)
     return rawItems.map((item) => ({
       ...item,
       pendiente: Math.max(item.multas - item.pagos, 0),
@@ -81,6 +48,7 @@ export function ChartsSection() {
       pagosHeight: `${Math.max(12, Math.round((item.pagos / maxValue) * 100))}%`,
     }))
   }
+  const yearlyMax = Math.max(1, ...Object.values(multasPagosPorAnio).flatMap((data) => [parseNumber(data.totals.multas), parseNumber(data.totals.pagos)]))
   const yearlyMultasPagos = Object.entries(multasPagosPorAnio)
     .sort(([a], [b]) => Number(a) - Number(b))
     .map(([year, data]) => ({
@@ -91,63 +59,25 @@ export function ChartsSection() {
       multas: parseNumber(data.totals.multas),
       pagos: parseNumber(data.totals.pagos),
       pendiente: parseNumber(data.totals.pendiente),
-      multasHeight: `${Math.round((parseNumber(data.totals.multas) / 895) * 100)}%`,
-      pagosHeight: `${Math.round((parseNumber(data.totals.pagos) / 895) * 100)}%`,
+      multasHeight: `${Math.max(8, Math.round((parseNumber(data.totals.multas) / yearlyMax) * 100))}%`,
+      pagosHeight: `${Math.max(8, Math.round((parseNumber(data.totals.pagos) / yearlyMax) * 100))}%`,
     }))
-  const monthlyMultasPagos = getMonthlyValues(selectedYear, multasPagos)
-  const vehiculosDeposito = [
-    { label: 'En depósito', value: '84', percent: '58%', color: 'bg-orange-500', progress: '58%' },
-    { label: 'Liberados', value: '61', percent: '42%', color: 'bg-emerald-500', progress: '42%' },
+  const monthlyMultasPagos = getMonthlyValues(selectedDataYear, multasPagos)
+  const vehiculosDeposito = data?.vehiculosDeposito ?? [
+    { label: 'En depósito', value: 0, percent: '0%', color: 'bg-orange-500', progress: '0%' },
+    { label: 'Liberados', value: 0, percent: '0%', color: 'bg-emerald-500', progress: '0%' },
   ]
-  const organizaciones = [
-    { label: 'Empresas transporte', value: '46', progress: '76%', color: 'from-blue-600 to-cyan-400' },
-    { label: 'Asociaciones', value: '28', progress: '52%', color: 'from-indigo-600 to-blue-400' },
-    { label: 'Comités urbanos', value: '19', progress: '38%', color: 'from-amber-500 to-orange-400' },
-    { label: 'Observadas', value: '11', progress: '24%', color: 'from-rose-600 to-orange-400' },
-  ]
-  const operatividad = [
-    {
-      label: 'Activas',
-      value: 128,
-      detail: 'Habilitadas para operar',
-      progress: '64%',
-      color: 'from-emerald-600 to-cyan-400',
-      chip: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
-    },
-    {
-      label: 'En trámite',
-      value: 46,
-      detail: 'Pendientes de evaluación',
-      progress: '23%',
-      color: 'from-blue-600 to-indigo-400',
-      chip: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
-    },
-    {
-      label: 'Vencidas',
-      value: 26,
-      detail: 'Requieren regularización',
-      progress: '13%',
-      color: 'from-rose-600 to-orange-400',
-      chip: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
-    },
-  ]
+  const organizaciones = data?.organizaciones ?? []
+  const operatividad = data?.operatividad ?? []
   const totalOperatividad = operatividad.reduce((sum, item) => sum + item.value, 0)
-  const operationsData = [
-    { month: 'Ene', registros: 32, inspecciones: 18 },
-    { month: 'Feb', registros: 40, inspecciones: 24 },
-    { month: 'Mar', registros: 36, inspecciones: 28 },
-    { month: 'Abr', registros: 48, inspecciones: 34 },
-    { month: 'May', registros: 44, inspecciones: 31 },
-    { month: 'Jun', registros: 52, inspecciones: 38 },
-    { month: 'Jul', registros: 58, inspecciones: 45 },
-    { month: 'Ago', registros: 64, inspecciones: 50 },
-    { month: 'Sep', registros: 70, inspecciones: 55 },
-  ]
+  const operationsData = data?.operacionesMensuales ?? emptyMonths.map(({ month }) => ({ month, registros: 0, inspecciones: 0 }))
+  const totalExpedientes = expedientesBreakdown.reduce((sum, item) => sum + parseNumber(item.value), 0)
+  const totalVehiculosDeposito = vehiculosDeposito.reduce((sum, item) => sum + parseNumber(item.value), 0)
   const zoomWindows = [9, 6, 4, 3]
   const visibleOperations = operationsData.slice(-zoomWindows[operationsZoom])
   const chartWidth = 600
   const chartHeight = 180
-  const chartMax = 80
+  const chartMax = Math.max(1, Math.ceil(Math.max(...operationsData.flatMap((item) => [item.registros, item.inspecciones])) / 10) * 10)
   const xStep = visibleOperations.length > 1 ? chartWidth / (visibleOperations.length - 1) : chartWidth
   const toPoint = (item, index, key) => {
     const x = index * xStep
@@ -161,7 +91,7 @@ export function ChartsSection() {
     expedientes: {
       title: 'Estado de expedientes',
       subtitle: 'Distribución ampliada de documentos vigentes y observados',
-      total: '1,406',
+      total: formatNumber(totalExpedientes),
       unit: 'expedientes',
       background: 'conic-gradient(#1a73e8 0 68%, #22d3ee 68% 88%, #f59e0b 88% 100%)',
       ring: 'border-blue-300/50',
@@ -170,7 +100,7 @@ export function ChartsSection() {
     deposito: {
       title: 'Vehículos en depósito',
       subtitle: 'Detalle ampliado de unidades retenidas y liberadas',
-      total: '145',
+      total: formatNumber(totalVehiculosDeposito),
       unit: 'unidades',
       background: 'conic-gradient(#f97316 0 58%, #10b981 58% 100%)',
       ring: 'border-orange-300/50',
@@ -220,7 +150,7 @@ export function ChartsSection() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
           <div>
             <h2 className="text-lg font-bold text-slate-800 dark:text-white">Operaciones mensuales</h2>
-            <p className="mt-0.5 text-xs text-slate-400">Registros e inspecciones acumuladas durante 2026</p>
+            <p className="mt-0.5 text-xs text-slate-400">Trámites e inspecciones registradas en la base de datos</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -244,7 +174,7 @@ export function ChartsSection() {
             <div className="absolute inset-0 flex flex-col justify-between text-xs text-slate-300 dark:text-slate-700" aria-hidden="true">
               {[80, 60, 40, 20, 0].map((value) => (
                 <div key={value} className="flex items-center gap-3">
-                  <span className="w-5 text-right font-medium text-slate-400 dark:text-slate-500">{value}</span>
+                  <span className="w-5 text-right font-medium text-slate-400 dark:text-slate-500">{Math.round((chartMax * value) / 80)}</span>
                   <span className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
                 </div>
               ))}
@@ -315,7 +245,7 @@ export function ChartsSection() {
           </div>
           <div className="mt-3 flex items-center justify-end rounded-xl border border-blue-100 bg-white/70 px-3 py-2 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
             <span>
-              {visibleOperations[0].month} - {visibleOperations[visibleOperations.length - 1].month} 2026
+              {visibleOperations[0].month} - {visibleOperations[visibleOperations.length - 1].month} {new Date().getFullYear()}
             </span>
           </div>
         </div>
@@ -341,7 +271,7 @@ export function ChartsSection() {
             <span className="donut-ring-pulse absolute inset-0 rounded-full border border-blue-300/50" aria-hidden="true" />
             <div className="grid size-25 place-items-center rounded-full bg-white dark:bg-[#0f172a] text-center shadow-inner">
               <span>
-                <strong className="block text-2xl font-extrabold text-slate-800 dark:text-white">1,406</strong>
+                <strong className="block text-2xl font-extrabold text-slate-800 dark:text-white">{formatNumber(totalExpedientes)}</strong>
                 <span className="text-[11px] font-medium text-slate-400">expedientes</span>
               </span>
             </div>
@@ -482,15 +412,15 @@ export function ChartsSection() {
           {monthlyMultasPagos.map((item, index) => (
             <button
               type="button"
-              key={`${selectedYear}-${item.month}`}
+              key={`${selectedDataYear}-${item.month}`}
               onClick={() => setExpandedMultasPagos(item)}
-              aria-label={`Ver detalle de multas y pagos de ${item.month} ${selectedYear}`}
+              aria-label={`Ver detalle de multas y pagos de ${item.month} ${selectedDataYear}`}
               className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-left shadow-xs transition hover:-translate-y-1 hover:border-amber-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50 dark:hover:border-amber-800"
             >
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{item.month}</span>
                 <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                  {selectedYear}
+                  {selectedDataYear}
                 </span>
               </div>
               <div className="flex h-32 items-end justify-center gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
@@ -544,7 +474,7 @@ export function ChartsSection() {
             <span className="donut-ring-pulse absolute inset-0 rounded-full border border-orange-300/50" aria-hidden="true" />
             <div className="grid size-24 place-items-center rounded-full bg-white text-center shadow-inner dark:bg-[#0f172a]">
               <span>
-                <strong className="block text-2xl font-extrabold text-slate-800 dark:text-white">145</strong>
+                <strong className="block text-2xl font-extrabold text-slate-800 dark:text-white">{formatNumber(totalVehiculosDeposito)}</strong>
                 <span className="text-[11px] font-medium text-slate-400">unidades</span>
               </span>
             </div>

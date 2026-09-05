@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { sampleNotifications } from '../public/js/dashboardData'
 import { Login } from './components/auth/Login'
 import { Sidebar } from './components/layout/Sidebar'
 import { Header } from './components/layout/Header'
@@ -10,7 +9,7 @@ import { Personas } from './pages/Personas'
 import { Organizaciones } from './pages/Organizaciones'
 import { Documentos } from './pages/Documentos'
 
-function Layout({ onLogout }) {
+function Layout({ onLogout, user }) {
   const location = useLocation()
   
   // Mapear rutas a nombres amigables para el sidebar
@@ -26,7 +25,7 @@ function Layout({ onLogout }) {
   const [activeItem, setActiveItem] = useState(getActiveItem())
   const [mobileOpen, setMobileOpen] = useState(false)
   const [sidebarHidden, setSidebarHidden] = useState(false)
-  const [notifications, setNotifications] = useState(sampleNotifications)
+  const [notifications, setNotifications] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(() => {
@@ -100,6 +99,7 @@ function Layout({ onLogout }) {
           notifRef={notifRef}
           userMenuRef={userMenuRef}
           onLogout={onLogout}
+          user={user}
         />
 
         <div className="mx-auto w-full max-w-[96rem] flex-1 space-y-6 p-4 sm:p-6 lg:p-7 xl:p-8">
@@ -124,14 +124,35 @@ function Layout({ onLogout }) {
 }
 
 function App() {
-  const [authenticated, setAuthenticated] = useState(false)
+  const [user, setUser] = useState(() => {
+    if (typeof window === 'undefined') return null
+
+    const savedUser = localStorage.getItem('user')
+    if (!savedUser) return null
+
+    try {
+      return JSON.parse(savedUser)
+    } catch {
+      localStorage.removeItem('user')
+      return null
+    }
+  })
+
+  const handleLogin = (userData) => {
+    setUser(userData)
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('user')
+    setUser(null)
+  }
   
   return (
     <BrowserRouter>
-      {authenticated ? (
-        <Layout onLogout={() => setAuthenticated(false)} />
+      {user ? (
+        <Layout onLogout={handleLogout} user={user} />
       ) : (
-        <Login onLogin={() => setAuthenticated(true)} />
+        <Login onLogin={handleLogin} />
       )}
     </BrowserRouter>
   )

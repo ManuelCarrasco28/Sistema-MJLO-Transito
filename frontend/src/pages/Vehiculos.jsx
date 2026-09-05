@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { initialVehiculos, initialOrganizaciones } from '../data/mockData'
+import { RegistryHeader } from '../components/ui/RegistryHeader'
 
 export function Vehiculos() {
-  const [vehiculos, setVehiculos] = useState(initialVehiculos)
+  const [vehiculos, setVehiculos] = useState([])
+  const [organizaciones, setOrganizaciones] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
@@ -23,13 +24,25 @@ export function Vehiculos() {
     numeroSerie: '',
     serieMotor: '',
     partidaRegistral: '',
-    organizacion: initialOrganizaciones[0]?.razonSocial || 'Independiente',
+    organizacion: '',
     propietario: '',
     propietarioDni: '',
     estado: 'FORMALIZADO',
     soatEstado: 'VIGENTE',
     tucNumero: 'TUC-2026-000',
   })
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/vehiculos', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : Promise.reject(response))
+      .then((payload) => setVehiculos(payload.data ?? []))
+      .catch(() => setVehiculos([]))
+
+    fetch('http://localhost:8080/api/organizaciones', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : Promise.reject(response))
+      .then((payload) => setOrganizaciones(payload.data ?? []))
+      .catch(() => setOrganizaciones([]))
+  }, [])
 
   // Métricas estadísticas
   const totalVehiculos = vehiculos.length
@@ -66,7 +79,7 @@ export function Vehiculos() {
       numeroSerie: '',
       serieMotor: '',
       partidaRegistral: '',
-      organizacion: initialOrganizaciones[0]?.razonSocial || 'Independiente',
+      organizacion: organizaciones[0]?.razonSocial || '',
       propietario: '',
       propietarioDni: '',
       estado: 'FORMALIZADO',
@@ -116,131 +129,137 @@ export function Vehiculos() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Encabezado principal */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-md shadow-blue-500/20">
-              <Icon name="vehicle" className="size-6" />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black tracking-tight text-slate-800 dark:text-white sm:text-3xl">
-                  Registro de Vehículos
-                </h1>
-                <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-950/80 dark:text-blue-300">
-                  {totalVehiculos} Unidades
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Padrón Municipal Digital de unidades de transporte público y mototaxis autorizados en JLO.
-              </p>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-3.5 sm:space-y-4">
+      <RegistryHeader
+        title="Vehículos"
+        description="Padrón vehicular municipal. Unidades registradas, titulares y situación administrativa."
+        icon="vehicle"
+        action="Registrar vehículo"
+        onCreate={handleOpenCreateModal}
+        area="Tránsito Municipal"
+        badgeText="Padrón Oficial 2026"
+      />
 
-        <button
-          type="button"
-          onClick={handleOpenCreateModal}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-blue-600/30 active:scale-95 cursor-pointer"
-        >
-          <span className="text-lg leading-none">+</span>
-          <span>Registrar Vehículo</span>
-        </button>
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
+          Indicadores del padrón vehicular
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Resumen operativo de unidades autorizadas y en fiscalización vial.
+        </p>
       </div>
 
-      {/* Tarjetas de Métricas Estadísticas */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Tarjetas de Métricas Estadísticas Compactas */}
+      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         {/* Card 1: Total */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-blue-600 dark:border-t-blue-500 bg-linear-to-br from-white via-white to-blue-50/70 dark:from-[#101a33] dark:via-[#0f172a] dark:to-blue-900/45">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Unidades</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-              <Icon name="vehicle" className="size-5" />
+            <span className="grid size-8.5 place-items-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+              <Icon name="vehicle" className="size-4.5" />
             </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{totalVehiculos}</p>
-            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-md border border-blue-200/60 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 shadow-2xs dark:border-blue-800/60 dark:bg-blue-950/50 dark:text-blue-300">
               Padrón 2026
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Vehículos en la base municipal</p>
-        </div>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Total Unidades</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(totalVehiculos)}
+            </h3>
+          </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Vehículos en la base municipal
+          </p>
+        </article>
 
         {/* Card 2: Formalizados */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-emerald-600 dark:border-t-emerald-500 bg-linear-to-br from-white via-white to-emerald-50/70 dark:from-[#0d2218] dark:via-[#0f172a] dark:to-emerald-900/35">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Formalizados
+            <span className="grid size-8.5 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+              <Icon name="check" className="size-4.5" />
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">
-              ✓
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{formalizados}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-400">
               {porcentajeFormalizados}% del total
             </span>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Formalizados</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(formalizados)}
+            </h3>
+          </div>
+          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
               className="h-full rounded-full bg-emerald-500 transition-all duration-500"
               style={{ width: `${porcentajeFormalizados}%` }}
             />
           </div>
-        </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Unidades autorizadas y al día
+          </p>
+        </article>
 
-        {/* Card 3: Pendientes */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* Card 3: En Trámite */}
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-amber-500 dark:border-t-amber-400 bg-linear-to-br from-white via-white to-amber-50/80 dark:from-[#1e1a12] dark:via-[#0f172a] dark:to-amber-900/35">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              En Trámite
+            <span className="grid size-8.5 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
+              <Icon name="clock" className="size-4.5" />
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
-              ⏳
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{pendientes}</p>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 shadow-2xs dark:border-amber-800/60 dark:bg-amber-950/50 dark:text-amber-400">
               Pendientes
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">En proceso de revisión documental</p>
-        </div>
-
-        {/* Card 4: Suspendidos / Baja */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-              Observados / Baja
-            </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
-              ⚠
-            </span>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">En Trámite</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(pendientes)}
+            </h3>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{suspendidos}</p>
-            <span className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            En proceso de revisión documental
+          </p>
+        </article>
+
+        {/* Card 4: Observados / Baja */}
+        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-rose-500 dark:border-t-rose-400 bg-linear-to-br from-white via-white to-rose-50/70 dark:from-[#211528] dark:via-[#0f172a] dark:to-rose-900/35">
+          <div className="flex items-center justify-between">
+            <span className="grid size-8.5 place-items-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
+              <Icon name="alert" className="size-4.5" />
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-rose-200/60 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600 shadow-2xs dark:border-rose-800/60 dark:bg-rose-950/50 dark:text-rose-400">
               Restringidos
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Inhabilitados para prestar servicio</p>
-        </div>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Observados / Baja</p>
+            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
+              {new Intl.NumberFormat('es-PE').format(suspendidos)}
+            </h3>
+          </div>
+          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Inhabilitados para prestar servicio
+          </p>
+        </article>
+      </div>
+
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
+          Listado y gestión de unidades
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Padrón oficial con filtros por placa, titular, empresa y estado administrativo.
+        </p>
       </div>
 
       {/* Barra de Búsqueda y Filtros */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
           {/* Buscador */}
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por placa (ej: M4X-821), marca, modelo, DNI o propietario..."
+              placeholder="Buscar por placa, marca, modelo, DNI o propietario..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-400"
@@ -326,7 +345,7 @@ export function Vehiculos() {
                 <tr>
                   <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
                     <div className="mx-auto max-w-xs space-y-2">
-                      <p className="text-3xl">🚗</p>
+                      <Icon name="vehicle" className="size-10" />
                       <p className="font-bold text-slate-600 dark:text-slate-300">
                         No se encontraron vehículos
                       </p>
@@ -445,23 +464,26 @@ export function Vehiculos() {
 
       {/* Modal de Registro / Edición (Estilo Facebook con etiquetas flotantes sin *) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-6 py-4 text-white dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-lg bg-blue-500/20 text-blue-400">
-                  <Icon name="vehicle" className="size-4.5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-blue-900/20 bg-[#123b6d] px-6 py-4.5 text-white dark:border-slate-800 dark:bg-[#102a4d]">
+              <div className="flex items-center gap-3">
+                <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-cyan-300">
+                  <Icon name="vehicle" className="size-5" />
                 </span>
-                <h3 className="text-lg font-extrabold">
-                  {isEditing ? 'Editar Registro de Vehículo' : 'Registrar Nuevo Vehículo'}
-                </h3>
+                <div>
+                  <h3 className="text-lg font-extrabold text-white">
+                    {isEditing ? 'Editar Registro de Vehículo' : 'Registrar Nuevo Vehículo'}
+                  </h3>
+                  <p className="text-xs text-blue-100/80">Gestión de datos técnicos y propietario</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white"
+                className="grid size-9 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-xs transition hover:bg-white/20 cursor-pointer"
               >
-                ✕
+                <Icon name="close" className="size-4" />
               </button>
             </div>
 
@@ -689,7 +711,7 @@ export function Vehiculos() {
                       onChange={(e) => setFormData({ ...formData, organizacion: e.target.value })}
                       className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                     >
-                      {initialOrganizaciones.map((org) => (
+                      {organizaciones.map((org) => (
                         <option key={org.id} value={org.razonSocial}>
                           {org.razonSocial} ({org.siglas})
                         </option>
