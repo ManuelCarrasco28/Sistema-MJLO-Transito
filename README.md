@@ -50,8 +50,17 @@ npm run dev
 
 Disponible en `http://localhost:5173`.
 Credenciales de acceso:
-- Usuario: `admin`
-- Contraseña: `admin123`
+Usuario: diegobarturen
+Contra: diego123
+
+Usuario: manuelcarrasco
+Contra: manuel123
+
+Usuario: milenkasegundo
+Contra: milenka123
+
+Usuario: angelosaavedra
+Contra: angelo123
 
 ## Ejecución del Backend
 
