@@ -8,6 +8,10 @@ import { Vehiculos } from './pages/Vehiculos'
 import { Personas } from './pages/Personas'
 import { Organizaciones } from './pages/Organizaciones'
 import { Documentos } from './pages/Documentos'
+import { Inspecciones } from './pages/Inspecciones'
+import { Papeletas } from './pages/Papeletas'
+import { CursosSeguridad } from './pages/CursosSeguridad'
+import { Pagos } from './pages/Pagos'
 
 function Layout({ onLogout, user }) {
   const location = useLocation()
@@ -19,6 +23,10 @@ function Layout({ onLogout, user }) {
     if (path.includes('/personas')) return 'Personas'
     if (path.includes('/organizaciones')) return 'Organizaciones'
     if (path.includes('/documentos')) return 'Documentos'
+    if (path.includes('/inspecciones')) return 'Inspecciones'
+    if (path.includes('/papeletas')) return 'Papeletas'
+    if (path.includes('/cursos')) return 'Cursos'
+    if (path.includes('/pagos')) return 'Pagos'
     return 'Dashboard'
   }
 
@@ -110,6 +118,11 @@ function Layout({ onLogout, user }) {
             <Route path="/personas" element={<Personas />} />
             <Route path="/organizaciones" element={<Organizaciones />} />
             <Route path="/documentos" element={<Documentos />} />
+            <Route path="/inspecciones" element={<Inspecciones />} />
+            <Route path="/papeletas" element={<Papeletas />} />
+            <Route path="/cursos" element={<CursosSeguridad />} />
+            <Route path="/cursos-seguridad" element={<CursosSeguridad />} />
+            <Route path="/pagos" element={<Pagos />} />
             <Route path="*" element={
               <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">
                 <h2 className="text-xl font-bold">Módulo en desarrollo</h2>
