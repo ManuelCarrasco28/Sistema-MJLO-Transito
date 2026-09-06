@@ -12,11 +12,31 @@ import { Inspecciones } from './pages/Inspecciones'
 import { Papeletas } from './pages/Papeletas'
 import { CursosSeguridad } from './pages/CursosSeguridad'
 import { Pagos } from './pages/Pagos'
+import { Retenciones } from './pages/Retenciones'
+import { Permisos } from './pages/Permisos'
+import { apiFetch, getCachedData, setCachedData } from './config/api'
 
 function Layout({ onLogout, user }) {
   const location = useLocation()
   
-  // Mapear rutas a nombres amigables para el sidebar
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const endpoints = ['/vehiculos', '/personas', '/organizaciones', '/documentos']
+      for (const ep of endpoints) {
+        if (!getCachedData(ep)) {
+          try {
+            const res = await apiFetch(ep)
+            if (res.ok) {
+              const payload = await res.json()
+              if (payload?.data) setCachedData(ep, payload.data)
+            }
+          } catch (_) {}
+        }
+      }
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [])
+
   const getActiveItem = () => {
     const path = location.pathname
     if (path.includes('/vehiculos')) return 'Vehículos'
@@ -27,6 +47,8 @@ function Layout({ onLogout, user }) {
     if (path.includes('/papeletas')) return 'Papeletas'
     if (path.includes('/cursos')) return 'Cursos'
     if (path.includes('/pagos')) return 'Pagos'
+    if (path.includes('/retenciones')) return 'Retenciones'
+    if (path.includes('/permisos')) return 'Permisos'
     return 'Dashboard'
   }
 
@@ -47,7 +69,6 @@ function Layout({ onLogout, user }) {
   const notifRef = useRef(null)
   const userMenuRef = useRef(null)
 
-  // Update active item when route changes
   useEffect(() => {
     setActiveItem(getActiveItem())
   }, [location.pathname])
@@ -123,6 +144,8 @@ function Layout({ onLogout, user }) {
             <Route path="/cursos" element={<CursosSeguridad />} />
             <Route path="/cursos-seguridad" element={<CursosSeguridad />} />
             <Route path="/pagos" element={<Pagos />} />
+            <Route path="/retenciones" element={<Retenciones />} />
+            <Route path="/permisos" element={<Permisos />} />
             <Route path="*" element={
               <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">
                 <h2 className="text-xl font-bold">Módulo en desarrollo</h2>

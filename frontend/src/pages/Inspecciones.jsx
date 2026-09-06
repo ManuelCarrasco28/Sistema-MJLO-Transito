@@ -1,28 +1,34 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { criteriosInspeccion, initialVehiculos } from '../data/mockData'
+import { Pagination } from '../components/ui/Pagination'
+import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 export function Inspecciones() {
-  const [inspecciones, setInspecciones] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  const cachedInsp = getCachedData('/inspecciones')
+  const cachedCrit = getCachedData('/inspeccion-criterios')
+  const cachedVeh = getCachedData('/vehiculos')
+  const [inspecciones, setInspecciones] = useState(cachedInsp || [])
+  const [criteriosInspeccion, setCriteriosInspeccion] = useState(cachedCrit || [])
+  const [vehiculos, setVehiculos] = useState(cachedVeh || [])
+  const [isLoading, setIsLoading] = useState(!cachedInsp)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterResultado, setFilterResultado] = useState('TODOS')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(8)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedInspeccion, setSelectedInspeccion] = useState(null)
 
-  // Formulario para registrar nueva inspección
   const [formData, setFormData] = useState({
-    vehiculoPlaca: initialVehiculos[0]?.placa || 'M4X-821',
-    inspector: 'Ing. Carlos Ramos - Inspector Técnico',
+    vehiculoPlaca: '',
+    inspector: 'Inspector Técnico Municipal',
     resultado: 'APROBADO',
     observaciones: '',
-    detalles: criteriosInspeccion.map((c) => ({ criterioId: c.id, estado: 'BIEN', obs: '' })),
+    detalles: [],
   })
 
-  // Métricas estadísticas
   const totales = inspecciones.length
   const aprobados = inspecciones.filter((i) => i.resultado === 'APROBADO').length
   const observados = inspecciones.filter((i) => i.resultado === 'OBSERVADO').length
@@ -30,7 +36,7 @@ export function Inspecciones() {
   const porcentajeAprobados = totales > 0 ? Math.round((aprobados / totales) * 100) : 0
 
   const filteredInspecciones = inspecciones.filter((i) => {
-    const vehiculo = initialVehiculos.find((v) => v.placa === i.vehiculoPlaca)
+    const vehiculo = vehiculos.find((v) => v.placa === i.vehiculoPlaca)
     const fullSearch = `${i.numeroInspeccion} ${i.vehiculoPlaca} ${i.inspector} ${vehiculo?.propietario || ''} ${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`.toLowerCase()
     const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
     const matchesResultado = filterResultado === 'TODOS' || i.resultado === filterResultado
@@ -38,26 +44,43 @@ export function Inspecciones() {
   })
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/inspecciones', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        const fetched = (data.data || []).map(i => ({
-          ...i,
-          detalles: typeof i.detalles === 'string' ? JSON.parse(i.detalles) : i.detalles
-        }))
-        setInspecciones(fetched)
-        setIsLoading(false)
-      })
-      .catch(err => {
-        console.error('Error fetching inspecciones:', err)
-        setIsLoading(false)
-      })
+    setCurrentPage(1)
+  }, [searchTerm, filterResultado])
+
+  const paginatedInspecciones = filteredInspecciones.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch('/inspecciones').then(res => res.json()).catch(() => ({ data: [] })),
+      apiFetch('/inspeccion-criterios').then(res => res.json()).catch(() => ({ data: [] })),
+      apiFetch('/vehiculos').then(res => res.json()).catch(() => ({ data: [] }))
+    ]).then(([inspRes, critRes, vehRes]) => {
+      const fetched = (inspRes.data || []).map(i => ({
+        ...i,
+        detalles: typeof i.detalles === 'string' ? JSON.parse(i.detalles) : (i.detalles || [])
+      }))
+      const cData = critRes.data || []
+      const vData = vehRes.data || []
+      setInspecciones(fetched)
+      setCriteriosInspeccion(cData)
+      setVehiculos(vData)
+      setCachedData('/inspecciones', fetched)
+      setCachedData('/inspeccion-criterios', cData)
+      setCachedData('/vehiculos', vData)
+      setIsLoading(false)
+    }).catch(err => {
+      console.error('Error fetching inspecciones:', err)
+      setIsLoading(false)
+    })
   }, [])
 
   const handleOpenCreateModal = () => {
     setFormData({
-      vehiculoPlaca: initialVehiculos[0]?.placa || 'M4X-821',
-      inspector: 'Ing. Carlos Ramos - Inspector Técnico',
+      vehiculoPlaca: vehiculos[0]?.placa || '',
+      inspector: 'Inspector Técnico Municipal',
       resultado: 'APROBADO',
       observaciones: '',
       detalles: criteriosInspeccion.map((c) => ({ criterioId: c.id, estado: 'BIEN', obs: '' })),
@@ -91,10 +114,7 @@ export function Inspecciones() {
   const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro que desea eliminar este registro de inspección?')) {
       try {
-        await fetch(`http://localhost:8080/api/inspecciones/${id}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        })
+        await apiFetch(`/inspecciones/${id}`, { method: 'DELETE' })
         setInspecciones(inspecciones.filter(i => i.id !== id))
       } catch (err) {
         console.error('Error al eliminar:', err)
@@ -126,21 +146,17 @@ export function Inspecciones() {
 
     try {
       if (selectedInspeccion) {
-        const response = await fetch(`http://localhost:8080/api/inspecciones/${selectedInspeccion.id}`, {
+        const response = await apiFetch(`/inspecciones/${selectedInspeccion.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(payload)
+          body: payload
         })
         if (response.ok) {
           setInspecciones(inspecciones.map(i => i.id === selectedInspeccion.id ? { ...i, ...formData } : i))
         }
       } else {
-        const response = await fetch('http://localhost:8080/api/inspecciones', {
+        const response = await apiFetch('/inspecciones', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(payload)
+          body: payload
         })
         const result = await response.json()
         if (response.ok && result.data) {
@@ -160,7 +176,7 @@ export function Inspecciones() {
 
   return (
     <div className="space-y-6">
-      {/* Cabecera de Página (Color Celeste / Sky) */}
+      
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-500/30">
@@ -175,20 +191,11 @@ export function Inspecciones() {
             </p>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={handleOpenCreateModal}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-md shadow-sky-600/20 transition-all hover:bg-sky-700 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-        >
-          <span className="text-lg leading-none">+</span>
-          <span>Registrar Inspección</span>
-        </button>
       </div>
 
-      {/* Tarjetas de Estadísticas Modernas */}
+      
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Totales */}
+        
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -207,7 +214,7 @@ export function Inspecciones() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Constataciones registradas</p>
         </div>
 
-        {/* Card 2: Aprobados */}
+        
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
@@ -231,7 +238,7 @@ export function Inspecciones() {
           </div>
         </div>
 
-        {/* Card 3: Observados */}
+        
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
@@ -250,7 +257,7 @@ export function Inspecciones() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Deficiencias leves (plazo 48h)</p>
         </div>
 
-        {/* Card 4: Desaprobados */}
+        
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
@@ -270,7 +277,7 @@ export function Inspecciones() {
         </div>
       </div>
 
-      {/* Tabla y Filtros */}
+      
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -304,10 +311,18 @@ export function Inspecciones() {
               <option value="OBSERVADO">Observados</option>
               <option value="DESAPROBADO">Desaprobados</option>
             </select>
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-sky-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <span className="text-base leading-none font-black">+</span>
+              <span>Registrar Inspección</span>
+            </button>
           </div>
         </div>
 
-        {/* Tabla con prevención de solapamiento y botones modernos */}
+        
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
@@ -318,11 +333,28 @@ export function Inspecciones() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Fecha & Hora</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Inspector Asignado</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Resultado</th>
-                <th className="px-3.5 py-3.5 text-right whitespace-nowrap">Acciones</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredInspecciones.length === 0 ? (
+              {isLoading && inspecciones.length === 0 ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                  </tr>
+                ))
+              ) : filteredInspecciones.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
                     <div className="mx-auto max-w-xs space-y-2">
@@ -337,29 +369,29 @@ export function Inspecciones() {
                   </td>
                 </tr>
               ) : (
-                filteredInspecciones.map((i) => {
-                  const vehiculo = initialVehiculos.find((v) => v.placa === i.vehiculoPlaca)
+                paginatedInspecciones.map((i) => {
+                  const vehiculo = vehiculos.find((v) => v.placa === i.vehiculoPlaca)
                   return (
-                    <tr key={i.id} className="transition-colors hover:bg-indigo-50/30 dark:hover:bg-slate-800/40">
+                    <tr key={i.id} className="group transition-colors hover:bg-indigo-50/30 dark:hover:bg-slate-800/40">
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
                         <span className="font-mono font-extrabold text-indigo-700 dark:text-indigo-400">
                           {i.numeroInspeccion}
                         </span>
                       </td>
 
-                      {/* Placa Horizontal Peruana */}
+                      
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
                         <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
                           {i.vehiculoPlaca}
                         </span>
                       </td>
 
-                      {/* Vehículo y Propietario con truncate anti-solapamiento */}
-                      <td className="px-3.5 py-3.5 max-w-[200px]">
+                      
+                      <td className="px-3.5 py-3.5 max-w-[180px]">
                         <p className="font-bold text-slate-800 dark:text-white truncate" title={`${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`}>
                           {vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : 'Vehículo Registrado'}
                         </p>
-                        <p className="text-xs text-slate-400 truncate max-w-[180px]" title={vehiculo?.propietario || 'No especificado'}>
+                        <p className="text-xs text-slate-400 truncate max-w-[160px]" title={vehiculo?.propietario || 'No especificado'}>
                           {vehiculo?.propietario || 'Propietario no asignado'}
                         </p>
                       </td>
@@ -377,7 +409,7 @@ export function Inspecciones() {
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{i.inspector}</p>
                       </td>
 
-                      {/* Estado con punto animado */}
+                      
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${i.resultado === 'APROBADO'
@@ -392,9 +424,9 @@ export function Inspecciones() {
                         </span>
                       </td>
 
-                      {/* Botones de Acción Modernos con feedback táctil */}
-                      <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
+                      
+                      <td className="sticky right-0 z-10 bg-white group-hover:bg-indigo-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                        <div className="flex items-center justify-end gap-1.5 pr-1">
                           <button
                             type="button"
                             onClick={() => handleOpenDetail(i)}
@@ -436,9 +468,20 @@ export function Inspecciones() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredInspecciones.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(size) => {
+            setItemsPerPage(size)
+            setCurrentPage(1)
+          }}
+        />
       </div>
 
-      {/* Modal: Registrar Inspección */}
+      
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
@@ -476,7 +519,7 @@ export function Inspecciones() {
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
                   <datalist id="vehiculos-list">
-                    {initialVehiculos.map((v) => (
+                    {vehiculos.map((v) => (
                       <option key={v.id} value={v.placa}>
                         {v.marca} {v.modelo} - {v.propietario}
                       </option>
@@ -608,7 +651,7 @@ export function Inspecciones() {
         </div>
       )}
 
-      {/* Modal: Detalle de la Inspección */}
+      
       {isDetailModalOpen && selectedInspeccion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
@@ -662,7 +705,7 @@ export function Inspecciones() {
                 </div>
               </div>
 
-              {/* Evaluación Criterio por Criterio */}
+              
               {selectedInspeccion.detalles && selectedInspeccion.detalles.length > 0 && (
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
                   <p className="mb-2.5 font-bold uppercase text-slate-400 text-[11px] tracking-wider">
@@ -733,7 +776,7 @@ export function Inspecciones() {
         </div>
       )}
 
-      {/* Modal: Previsualización de Acta / Certificado para Imprimir */}
+      
       {isPreviewModalOpen && selectedInspeccion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">

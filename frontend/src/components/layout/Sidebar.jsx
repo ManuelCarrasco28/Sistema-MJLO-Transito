@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { navigation } from '../../../public/js/navigation'
+import { navigation } from '../../config/navigation'
 import { Icon } from '../ui/Icon'
 
 export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, hiddenOnDesktop }) {
@@ -12,7 +12,6 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, h
     ['Control', navigation.slice(9)],
   ]
 
-  // Función simple para generar ruta a partir del nombre
   const getRoute = (label) => {
     const formatStr = label.toLowerCase()
       .replace('í', 'i')

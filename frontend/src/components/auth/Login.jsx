@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../ui/Icon'
 import { Logo } from '../ui/Logo'
+import { apiFetch } from '../../config/api'
 
 export function Login({ onLogin }) {
   const [username, setUsername] = useState('')
@@ -31,16 +32,12 @@ export function Login({ onLogin }) {
     setError('')
 
     try {
-      const response = await fetch('http://localhost:8080/api/login', {
+      const response = await apiFetch('/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
+        body: {
           usuario: username.trim(),
           password,
-        }),
+        },
       })
 
       const data = await response.json()
@@ -96,7 +93,7 @@ export function Login({ onLogin }) {
           </div>
 
           <form onSubmit={handleSubmit} className={`space-y-4 ${isShaking ? 'animate-shake' : ''}`} noValidate>
-            {/* Floating label usuario (Facebook Style) */}
+            
             <div className="relative flex h-14 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300">
               <Icon name="user" className="size-5 text-slate-400 shrink-0 mr-2.5 mt-2" />
               <div className="relative flex-1 h-full flex items-center">
@@ -121,7 +118,7 @@ export function Login({ onLogin }) {
               </div>
             </div>
 
-            {/* Floating label contraseña (Facebook Style) */}
+            
             <div className="relative flex h-14 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300">
               <Icon name="lock" className="size-5 text-slate-400 shrink-0 mr-2.5 mt-2" />
               <div className="relative flex-1 h-full flex items-center">

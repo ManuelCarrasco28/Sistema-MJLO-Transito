@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { RegistryHeader } from '../components/ui/RegistryHeader'
+import { Pagination } from '../components/ui/Pagination'
+import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 export function Personas() {
-  const [personas, setPersonas] = useState([])
+  const cached = getCachedData('/personas')
+  const [personas, setPersonas] = useState(cached || [])
+  const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRol, setFilterRol] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(8)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -31,28 +36,40 @@ export function Personas() {
   })
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/personas', { credentials: 'include' })
+    apiFetch('/personas')
       .then((response) => response.ok ? response.json() : Promise.reject(response))
-      .then((payload) => setPersonas(payload.data ?? []))
-      .catch(() => setPersonas([]))
+      .then((payload) => {
+        const data = payload.data ?? []
+        setPersonas(data)
+        setCachedData('/personas', data)
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
   }, [])
 
-  // Métricas estadísticas
   const totalPersonas = personas.length
-  const conductores = personas.filter((p) => p.rol.includes('Conductor')).length
-  const propietarios = personas.filter((p) => p.rol.includes('Propietario')).length
+  const conductores = personas.filter((p) => p.rol?.includes('Conductor')).length
+  const propietarios = personas.filter((p) => p.rol?.includes('Propietario')).length
   const activos = personas.filter((p) => p.estado === 'ACTIVO').length
   const porcentajeActivos = totalPersonas > 0 ? Math.round((activos / totalPersonas) * 100) : 0
 
-  // Filtrado dinámico
   const filteredPersonas = personas.filter((p) => {
-    const fullSearch = `${p.nombres} ${p.apellidoPaterno} ${p.apellidoMaterno} ${p.numeroDocumento} ${p.numeroLicencia}`.toLowerCase()
+    const fullSearch = `${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''} ${p.numeroDocumento || ''} ${p.numeroLicencia || ''}`.toLowerCase()
     const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
-    const matchesRol = filterRol === 'TODOS' || p.rol.includes(filterRol)
+    const matchesRol = filterRol === 'TODOS' || Boolean(p.rol?.includes(filterRol))
     const matchesEstado = filterEstado === 'TODOS' || p.estado === filterEstado
 
     return matchesSearch && matchesRol && matchesEstado
   })
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterRol, filterEstado])
+
+  const paginatedPersonas = filteredPersonas.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const handleOpenCreateModal = () => {
     setFormData({
@@ -87,158 +104,140 @@ export function Personas() {
     setIsDetailModalOpen(true)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro de eliminar a esta persona del padrón municipal?')) {
-      setPersonas(personas.filter((p) => p.id !== id))
+      try {
+        await apiFetch(`/personas/${id}`, { method: 'DELETE' })
+        setPersonas(personas.filter((p) => p.id !== id))
+      } catch (err) {
+        alert('No se pudo eliminar a la persona.')
+      }
     }
   }
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault()
     if (!formData.numeroDocumento.trim() || !formData.nombres.trim() || !formData.apellidoPaterno.trim()) {
       alert('Por favor completa los campos requeridos.')
       return
     }
 
-    if (isEditing) {
-      setPersonas(personas.map((p) => (p.id === selectedPersona.id ? { ...formData, id: p.id } : p)))
-    } else {
-      const newPersona = {
-        ...formData,
-        id: Date.now(),
-        fotoUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
+    try {
+      if (isEditing) {
+        await apiFetch(`/personas/${selectedPersona.id}`, {
+          method: 'PUT',
+          body: formData,
+        })
+        setPersonas(personas.map((p) => (p.id === selectedPersona.id ? { ...formData, id: p.id } : p)))
+      } else {
+        const res = await apiFetch('/personas', {
+          method: 'POST',
+          body: formData,
+        })
+        const resData = await res.json()
+        const newPersona = resData.data || {
+          ...formData,
+          id: Date.now(),
+          fotoUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
+        }
+        setPersonas([newPersona, ...personas])
       }
-      setPersonas([newPersona, ...personas])
+      setIsModalOpen(false)
+    } catch (err) {
+      alert('Error al guardar la persona en el servidor.')
     }
-    setIsModalOpen(false)
   }
 
   return (
-    <div className="space-y-3.5 sm:space-y-4">
-      <RegistryHeader
-        title="Personas"
-        description="Directorio de administrados, conductores autorizados y propietarios vehiculares."
-        icon="people"
-        action="Registrar persona"
-        onCreate={handleOpenCreateModal}
-        area="Tránsito Municipal"
-        badgeText="Padrón Oficial 2026"
-      />
-
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
-          Indicadores del padrón de personas
-        </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Distribución de conductores autorizados, propietarios y situación administrativa.
-        </p>
+    <div className="space-y-6">
+      
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3.5">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30">
+            <Icon name="people" className="size-6" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                Padrón de Conductores y Propietarios
+              </h1>
+            </div>
+            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              Directorio oficial de administrados, conductores autorizados y propietarios vehiculares.
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Tarjetas de Métricas Estadísticas Compactas */}
-      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-        {/* Card 1: Total */}
-        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-cyan-500 dark:border-t-cyan-400 bg-linear-to-br from-white via-white to-cyan-50/80 dark:from-[#0d1e30] dark:via-[#0f172a] dark:to-cyan-900/40">
+      
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="grid size-8.5 place-items-center rounded-lg bg-cyan-50 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300">
-              <Icon name="people" className="size-4.5" />
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-cyan-200/60 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700 shadow-2xs dark:border-cyan-800/60 dark:bg-cyan-950/50 dark:text-cyan-300">
-              Padrón 2026
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Registrados</span>
+            <span className="grid size-10 place-items-center rounded-xl bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
+              <Icon name="people" className="size-5" />
             </span>
           </div>
-          <div className="mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Total Ciudadanos</p>
-            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
-              {new Intl.NumberFormat('es-PE').format(totalPersonas)}
-            </h3>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(totalPersonas)}</p>
+            <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 px-2 py-0.5 rounded-full">Padrón 2026</span>
           </div>
-          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            Registrados en la plataforma
-          </p>
-        </article>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">En la plataforma municipal</p>
+        </div>
 
-        {/* Card 2: Conductores */}
-        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-blue-600 dark:border-t-blue-500 bg-linear-to-br from-white via-white to-blue-50/70 dark:from-[#101a33] dark:via-[#0f172a] dark:to-blue-900/45">
+        
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="grid size-8.5 place-items-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
-              <Icon name="permit" className="size-4.5" />
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-blue-200/60 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 shadow-2xs dark:border-blue-800/60 dark:bg-blue-950/50 dark:text-blue-300">
-              Con Licencia
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Conductores</span>
+            <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+              <Icon name="permit" className="size-5" />
             </span>
           </div>
-          <div className="mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Conductores</p>
-            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
-              {new Intl.NumberFormat('es-PE').format(conductores)}
-            </h3>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(conductores)}</p>
+            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">Con Licencia</span>
           </div>
-          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            Habilitados para transporte
-          </p>
-        </article>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Habilitados para operar</p>
+        </div>
 
-        {/* Card 3: Propietarios */}
-        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-indigo-500 dark:border-t-indigo-400 bg-linear-to-br from-white via-white to-indigo-50/70 dark:from-[#15152f] dark:via-[#0f172a] dark:to-indigo-900/35">
+        
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="grid size-8.5 place-items-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
-              <Icon name="vehicle" className="size-4.5" />
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200/60 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 shadow-2xs dark:border-indigo-800/60 dark:bg-indigo-950/50 dark:text-indigo-300">
-              Titulares
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Propietarios</span>
+            <span className="grid size-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+              <Icon name="vehicle" className="size-5" />
             </span>
           </div>
-          <div className="mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Propietarios</p>
-            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
-              {new Intl.NumberFormat('es-PE').format(propietarios)}
-            </h3>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(propietarios)}</p>
+            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">Titulares</span>
           </div>
-          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            Dueños de unidades móviles
-          </p>
-        </article>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Dueños de unidades móviles</p>
+        </div>
 
-        {/* Card 4: Activos */}
-        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-emerald-600 dark:border-t-emerald-500 bg-linear-to-br from-white via-white to-emerald-50/70 dark:from-[#0d2218] dark:via-[#0f172a] dark:to-emerald-900/35">
+        
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="grid size-8.5 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
-              <Icon name="check" className="size-4.5" />
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-400">
-              {porcentajeActivos}% del total
-            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Estado Activo</span>
+            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">✓</span>
           </div>
-          <div className="mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Estado Activo</p>
-            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
-              {new Intl.NumberFormat('es-PE').format(activos)}
-            </h3>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(activos)}</p>
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">{porcentajeActivos}% Aptos</span>
           </div>
-          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
               className="h-full rounded-full bg-emerald-500 transition-all duration-500"
               style={{ width: `${porcentajeActivos}%` }}
             />
           </div>
-          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            Habilitados sin restricciones
-          </p>
-        </article>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
-          Directorio oficial de personas
-        </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Consulta y administración de conductores acreditados y propietarios vehiculares.
-        </p>
-      </div>
-
-      {/* Tabla y Filtros */}
-      <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
+      
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -293,10 +292,19 @@ export function Personas() {
                 Limpiar Filtros
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-cyan-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-cyan-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <span className="text-base leading-none font-black">+</span>
+              <span>Nueva Persona</span>
+            </button>
           </div>
         </div>
 
-        {/* Indicador de resultados */}
+        
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
           <span>
             Mostrando <strong className="text-slate-800 dark:text-white">{filteredPersonas.length}</strong> de{' '}
@@ -317,11 +325,31 @@ export function Personas() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Contacto</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Rol Municipal</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
-                <th className="px-3.5 py-3.5 text-right whitespace-nowrap">Acciones</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredPersonas.length === 0 ? (
+              {isLoading && personas.length === 0 ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="px-3.5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="size-10 rounded-full bg-slate-200 dark:bg-slate-800 shrink-0" />
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
+                          <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-slate-800/60" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                  </tr>
+                ))
+              ) : filteredPersonas.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
                     <div className="mx-auto max-w-xs space-y-2">
@@ -336,9 +364,9 @@ export function Personas() {
                   </td>
                 </tr>
               ) : (
-                filteredPersonas.map((p) => (
-                  <tr key={p.id} className="transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
-                    <td className="px-3.5 py-3.5 max-w-[220px]">
+                paginatedPersonas.map((p) => (
+                  <tr key={p.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
+                    <td className="px-3.5 py-3.5 max-w-[200px]">
                       <div className="flex items-center gap-3 min-w-0">
                         <img
                           src={p.fotoUrl}
@@ -371,7 +399,7 @@ export function Personas() {
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <p className="font-bold text-slate-700 dark:text-slate-300">{p.celular}</p>
-                      <p className="text-xs text-slate-400 truncate max-w-[150px]" title={p.email}>{p.email}</p>
+                      <p className="text-xs text-slate-400 truncate max-w-[140px]" title={p.email}>{p.email}</p>
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span className="inline-block rounded-lg bg-cyan-50 px-2.5 py-1 text-xs font-extrabold text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
@@ -390,8 +418,8 @@ export function Personas() {
                         {p.estado}
                       </span>
                     </td>
-                    <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-cyan-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                      <div className="flex items-center justify-end gap-1.5 pr-1">
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(p)}
@@ -424,9 +452,20 @@ export function Personas() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredPersonas.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(size) => {
+            setItemsPerPage(size)
+            setCurrentPage(1)
+          }}
+        />
       </div>
 
-      {/* Modal Formulario Estilo Facebook sin asteriscos */}
+      
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
@@ -452,7 +491,7 @@ export function Personas() {
             </div>
 
             <form onSubmit={handleFormSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-              {/* Sección 1: Datos Personales */}
+              
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-3 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-cyan-600" />
@@ -551,7 +590,7 @@ export function Personas() {
                 </div>
               </div>
 
-              {/* Sección 2: Licencia de Conducir */}
+              
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-3 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-blue-500" />
@@ -613,7 +652,7 @@ export function Personas() {
                 </div>
               </div>
 
-              {/* Sección 3: Contacto y Rol */}
+              
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-3 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-emerald-500" />
@@ -676,7 +715,7 @@ export function Personas() {
                 </div>
               </div>
 
-              {/* Botones del Formulario */}
+              
               <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                 <button
                   type="button"
@@ -697,7 +736,7 @@ export function Personas() {
         </div>
       )}
 
-      {/* Modal Ficha Digital del Ciudadano */}
+      
       {isDetailModalOpen && selectedPersona && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
