@@ -17,8 +17,10 @@ class CorsFilter implements FilterInterface
     {
         $response = service('response');
         $origin = $request->getHeaderLine('Origin');
+        $envOrigins = env('app.corsAllowedOrigins');
+        $allowed = $envOrigins ? array_map('trim', explode(',', $envOrigins)) : $this->allowedOrigins;
 
-        if (in_array($origin, $this->allowedOrigins, true)) {
+        if ($origin && (in_array($origin, $allowed, true) || (defined('ENVIRONMENT') && ENVIRONMENT === 'development'))) {
             $response->setHeader('Access-Control-Allow-Origin', $origin);
         }
 
@@ -26,6 +28,7 @@ class CorsFilter implements FilterInterface
         $response->setHeader('Access-Control-Allow-Headers', 'X-API-KEY, Origin, X-Requested-With, Content-Type, Accept, Access-Control-Request-Method, Authorization');
         $response->setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
         $response->setHeader('Access-Control-Allow-Credentials', 'true');
+        $response->setHeader('Connection', 'close');
 
         if ($request->getMethod() === 'options') {
             return $response->setStatusCode(204);
@@ -37,13 +40,16 @@ class CorsFilter implements FilterInterface
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
     {
         $origin = $request->getHeaderLine('Origin');
+        $envOrigins = env('app.corsAllowedOrigins');
+        $allowed = $envOrigins ? array_map('trim', explode(',', $envOrigins)) : $this->allowedOrigins;
 
-        if (in_array($origin, $this->allowedOrigins, true)) {
+        if ($origin && (in_array($origin, $allowed, true) || (defined('ENVIRONMENT') && ENVIRONMENT === 'development'))) {
             $response->setHeader('Access-Control-Allow-Origin', $origin);
         }
 
         $response->setHeader('Vary', 'Origin');
         $response->setHeader('Access-Control-Allow-Credentials', 'true');
+        $response->setHeader('Connection', 'close');
 
         return $response;
     }
