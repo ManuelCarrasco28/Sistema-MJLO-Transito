@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { initialCursos } from '../data/mockData'
 
 export function CursosSeguridad() {
-  const [cursos, setCursos] = useState(initialCursos || [])
+  const [cursos, setCursos] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
@@ -33,20 +33,62 @@ export function CursosSeguridad() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar este curso?')) {
-      setCursos(cursos.filter(c => c.id !== id))
+      try {
+        await fetch(`http://localhost:8080/api/cursos/${id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        })
+        setCursos(cursos.filter(c => c.id !== id))
+      } catch (err) {
+        console.error('Error eliminando curso:', err)
+        alert('Error al eliminar curso')
+      }
     }
   }
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault()
-    if (selectedCurso) {
-      setCursos(cursos.map(c => c.id === selectedCurso.id ? { ...formData, id: c.id } : c))
-    } else {
-      setCursos([{ ...formData, id: Date.now(), inscritos: 0 }, ...cursos])
+    const payload = {
+      ...formData,
+      cuposTotales: formData.capacidad,
+      costo: formData.costo || 0
     }
-    setIsModalOpen(false)
+    try {
+      if (selectedCurso) {
+        const response = await fetch(`http://localhost:8080/api/cursos/${selectedCurso.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        })
+        if (response.ok) {
+          setCursos(cursos.map(c => c.id === selectedCurso.id ? { ...formData, id: c.id } : c))
+        }
+      } else {
+        const response = await fetch('http://localhost:8080/api/cursos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        })
+        const result = await response.json()
+        if (response.ok && result.data) {
+          const newCurso = {
+            ...result.data,
+            capacidad: result.data.cuposTotales,
+            inscritos: result.data.cuposInscritos,
+            tipo: formData.tipo
+          }
+          setCursos([newCurso, ...cursos])
+        }
+      }
+      setIsModalOpen(false)
+    } catch (err) {
+      console.error('Error guardando curso:', err)
+      alert('Error al guardar el curso')
+    }
   }
 
   const totalCursos = cursos.length
@@ -66,6 +108,26 @@ export function CursosSeguridad() {
     const matchesTipo = filterTipo === 'TODOS' || c.tipo === filterTipo
     return matchesSearch && matchesEstado && matchesTipo
   })
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/cursos', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        // Map backend fields to frontend
+        const fetchedCursos = (data.data || []).map(c => ({
+          ...c,
+          capacidad: c.cuposTotales,
+          inscritos: c.cuposInscritos,
+          tipo: 'CERTICAV'
+        }))
+        setCursos(fetchedCursos)
+        setIsLoading(false)
+      })
+      .catch(err => {
+        console.error('Error fetching cursos:', err)
+        setIsLoading(false)
+      })
+  }, [])
 
   return (
     <div className="space-y-6">

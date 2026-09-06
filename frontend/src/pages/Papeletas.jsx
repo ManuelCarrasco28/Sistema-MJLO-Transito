@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { initialPapeletas, tiposInfraccion, initialVehiculos } from '../data/mockData'
+import { tiposInfraccion, initialVehiculos } from '../data/mockData'
 
 export function Papeletas() {
-  const [papeletas, setPapeletas] = useState(initialPapeletas)
+  const [papeletas, setPapeletas] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState('TODOS')
 
@@ -34,6 +35,19 @@ export function Papeletas() {
     const matchesEstado = filterEstado === 'TODOS' || p.estado === filterEstado
     return matchesSearch && matchesEstado
   })
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/papeletas', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        setPapeletas(data.data || [])
+        setIsLoading(false)
+      })
+      .catch(err => {
+        console.error('Error fetching papeletas:', err)
+        setIsLoading(false)
+      })
+  }, [])
 
   const handleOpenCreateModal = () => {
     setFormData({
@@ -72,13 +86,22 @@ export function Papeletas() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro que desea anular esta papeleta? Esta acción es irreversible.')) {
-      setPapeletas(papeletas.map(p => p.id === id ? { ...p, estado: 'ANULADA' } : p))
+      try {
+        await fetch(`http://localhost:8080/api/papeletas/${id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        })
+        setPapeletas(papeletas.map(p => p.id === id ? { ...p, estado: 'ANULADA' } : p))
+      } catch (err) {
+        console.error('Error al anular:', err)
+        alert('Error al anular la papeleta')
+      }
     }
   }
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault()
     if (!formData.vehiculoPlaca.trim() || !formData.infractor.trim() || !formData.lugar.trim()) {
       alert('Por favor complete todos los campos obligatorios.')
@@ -86,25 +109,38 @@ export function Papeletas() {
     }
     const tipoInf = tiposInfraccion.find((t) => t.id === parseInt(formData.tipoInfraccionId))
     
-    if (selectedPapeleta) {
-      setPapeletas(papeletas.map(p => 
-        p.id === selectedPapeleta.id 
-          ? { ...p, ...formData, detalles: [{ tipoInfraccionId: tipoInf ? tipoInf.id : 1, codigo: tipoInf ? tipoInf.codigo : 'G01' }], montoTotal: tipoInf ? tipoInf.montoBase : 0 } 
-          : p
-      ))
-    } else {
-      const newPapeleta = {
-        ...formData,
-        id: Date.now(),
-        numeroPapeleta: `PAP-2026-${String(papeletas.length + 1).padStart(4, '0')}`,
-        fechaHora: new Date().toISOString(),
-        montoTotal: tipoInf ? tipoInf.montoBase : 0,
-        estado: 'PENDIENTE_PAGO',
-        detalles: [{ tipoInfraccionId: tipoInf ? tipoInf.id : 1, codigo: tipoInf ? tipoInf.codigo : 'G01' }],
+    try {
+      if (selectedPapeleta) {
+        const response = await fetch(`http://localhost:8080/api/papeletas/${selectedPapeleta.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(formData)
+        })
+        if (response.ok) {
+          setPapeletas(papeletas.map(p => 
+            p.id === selectedPapeleta.id 
+              ? { ...p, ...formData, detalles: [{ tipoInfraccionId: tipoInf ? tipoInf.id : 1, codigo: tipoInf ? tipoInf.codigo : 'G01' }], montoTotal: tipoInf ? tipoInf.montoBase : 0 } 
+              : p
+          ))
+        }
+      } else {
+        const response = await fetch('http://localhost:8080/api/papeletas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(formData)
+        })
+        const result = await response.json()
+        if (response.ok && result.data) {
+          setPapeletas([result.data, ...papeletas])
+        }
       }
-      setPapeletas([newPapeleta, ...papeletas])
+      setIsModalOpen(false)
+    } catch (err) {
+      console.error('Error al guardar:', err)
+      alert('Hubo un error al guardar.')
     }
-    setIsModalOpen(false)
   }
 
   return (

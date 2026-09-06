@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { initialInspecciones, criteriosInspeccion, initialVehiculos } from '../data/mockData'
+import { criteriosInspeccion, initialVehiculos } from '../data/mockData'
 
 export function Inspecciones() {
-  const [inspecciones, setInspecciones] = useState(initialInspecciones)
+  const [inspecciones, setInspecciones] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterResultado, setFilterResultado] = useState('TODOS')
 
@@ -35,6 +36,23 @@ export function Inspecciones() {
     const matchesResultado = filterResultado === 'TODOS' || i.resultado === filterResultado
     return matchesSearch && matchesResultado
   })
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/inspecciones', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        const fetched = (data.data || []).map(i => ({
+          ...i,
+          detalles: typeof i.detalles === 'string' ? JSON.parse(i.detalles) : i.detalles
+        }))
+        setInspecciones(fetched)
+        setIsLoading(false)
+      })
+      .catch(err => {
+        console.error('Error fetching inspecciones:', err)
+        setIsLoading(false)
+      })
+  }, [])
 
   const handleOpenCreateModal = () => {
     setFormData({
@@ -70,9 +88,18 @@ export function Inspecciones() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro que desea eliminar este registro de inspección?')) {
-      setInspecciones(inspecciones.filter(i => i.id !== id))
+      try {
+        await fetch(`http://localhost:8080/api/inspecciones/${id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        })
+        setInspecciones(inspecciones.filter(i => i.id !== id))
+      } catch (err) {
+        console.error('Error al eliminar:', err)
+        alert('Error al eliminar la inspección')
+      }
     }
   }
 
@@ -83,26 +110,52 @@ export function Inspecciones() {
     }))
   }
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault()
     if (!formData.vehiculoPlaca.trim()) {
       alert('Por favor ingrese la placa del vehículo.')
       return
     }
 
-    if (selectedInspeccion) {
-      setInspecciones(inspecciones.map(i => i.id === selectedInspeccion.id ? { ...i, ...formData } : i))
-    } else {
-      const newInspeccion = {
-        ...formData,
-        id: Date.now(),
-        numeroInspeccion: `INSP-2026-${String(inspecciones.length + 1).padStart(3, '0')}`,
-        fecha: new Date().toISOString(),
-        estado: 'ACTIVO',
-      }
-      setInspecciones([newInspeccion, ...inspecciones])
+    const payload = {
+      ...formData,
+      resultado: formData.resultado,
+      observaciones: formData.observaciones,
+      detalles: JSON.stringify(formData.detalles)
     }
-    setIsModalOpen(false)
+
+    try {
+      if (selectedInspeccion) {
+        const response = await fetch(`http://localhost:8080/api/inspecciones/${selectedInspeccion.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        })
+        if (response.ok) {
+          setInspecciones(inspecciones.map(i => i.id === selectedInspeccion.id ? { ...i, ...formData } : i))
+        }
+      } else {
+        const response = await fetch('http://localhost:8080/api/inspecciones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        })
+        const result = await response.json()
+        if (response.ok && result.data) {
+          const newInspeccion = {
+            ...result.data,
+            detalles: typeof result.data.detalles === 'string' ? JSON.parse(result.data.detalles) : result.data.detalles
+          }
+          setInspecciones([newInspeccion, ...inspecciones])
+        }
+      }
+      setIsModalOpen(false)
+    } catch (err) {
+      console.error('Error guardando inspección:', err)
+      alert('Error al guardar la inspección')
+    }
   }
 
   return (

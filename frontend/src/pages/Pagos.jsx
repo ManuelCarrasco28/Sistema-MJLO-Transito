@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { initialPagos } from '../data/mockData'
 
 export function Pagos() {
-  const [pagos, setPagos] = useState(initialPagos || [])
+  const [pagos, setPagos] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterConcepto, setFilterConcepto] = useState('TODOS')
   
@@ -26,22 +26,53 @@ export function Pagos() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro que desea anular este recibo de pago?')) {
-      setPagos(pagos.filter(p => p.id !== id))
+      try {
+        await fetch(`http://localhost:8080/api/pagos/${id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        })
+        setPagos(pagos.map(p => p.id === id ? { ...p, estado: 'ANULADO' } : p))
+      } catch (err) {
+        console.error('Error al anular:', err)
+        alert('Error al anular el pago')
+      }
     }
   }
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault()
-    const newPago = {
+    const payload = {
       ...formData,
-      id: Date.now(),
-      fecha: new Date().toISOString(),
-      montoNeto: parseFloat(formData.montoNeto) || 0
+      monto: parseFloat(formData.montoNeto) || 0,
+      metodoPago: formData.metodo,
+      documentoIdentidad: formData.dniRuc
     }
-    setPagos([newPago, ...pagos])
-    setIsModalOpen(false)
+    
+    try {
+      const response = await fetch('http://localhost:8080/api/pagos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      })
+      const result = await response.json()
+      if (response.ok && result.data) {
+        // Map backend fields to frontend expected fields if necessary, or just use what backend returned
+        const newPago = {
+          ...result.data,
+          fecha: result.data.fechaHora,
+          metodo: result.data.metodoPago,
+          dniRuc: result.data.documentoIdentidad
+        }
+        setPagos([newPago, ...pagos])
+      }
+      setIsModalOpen(false)
+    } catch (err) {
+      console.error('Error guardando pago:', err)
+      alert('Error al registrar el pago')
+    }
   }
 
   // Stats calculation
@@ -60,6 +91,20 @@ export function Pagos() {
     const matchesConcepto = filterConcepto === 'TODOS' || p.concepto?.includes(filterConcepto)
     return matchesSearch && matchesConcepto
   })
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/pagos', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        setPagos(data.data || [])
+        setIsLoading(false)
+      })
+      .catch(err => {
+        console.error('Error fetching pagos:', err)
+        setIsLoading(false)
+      })
+  }, [])
+
 
   return (
     <div className="space-y-6">
