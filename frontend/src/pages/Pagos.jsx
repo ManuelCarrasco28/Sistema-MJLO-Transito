@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { Pagination } from '../components/ui/Pagination'
+import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 export function Pagos() {
-  const [pagos, setPagos] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  const cached = getCachedData('/pagos')
+  const [pagos, setPagos] = useState(cached || [])
+  const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterConcepto, setFilterConcepto] = useState('TODOS')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(8)
   
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -29,10 +34,7 @@ export function Pagos() {
   const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro que desea anular este recibo de pago?')) {
       try {
-        await fetch(`http://localhost:8080/api/pagos/${id}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        })
+        await apiFetch(`/pagos/${id}`, { method: 'DELETE' })
         setPagos(pagos.map(p => p.id === id ? { ...p, estado: 'ANULADO' } : p))
       } catch (err) {
         console.error('Error al anular:', err)
@@ -51,15 +53,12 @@ export function Pagos() {
     }
     
     try {
-      const response = await fetch('http://localhost:8080/api/pagos', {
+      const response = await apiFetch('/pagos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload)
+        body: payload
       })
       const result = await response.json()
       if (response.ok && result.data) {
-        // Map backend fields to frontend expected fields if necessary, or just use what backend returned
         const newPago = {
           ...result.data,
           fecha: result.data.fechaHora,
@@ -75,7 +74,6 @@ export function Pagos() {
     }
   }
 
-  // Stats calculation
   const totalPagos = pagos.length
   const totalMonto = pagos.reduce((acc, curr) => acc + (curr.montoNeto || 0), 0)
   const pagosHoy = pagos.filter(p => new Date(p.fecha).toDateString() === new Date().toDateString()).length
@@ -93,25 +91,32 @@ export function Pagos() {
   })
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/pagos', { credentials: 'include' })
+    setCurrentPage(1)
+  }, [searchTerm, filterConcepto])
+
+  const paginatedPagos = filteredPagos.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  useEffect(() => {
+    apiFetch('/pagos')
       .then(res => res.json())
       .then(data => {
-        setPagos(data.data || [])
-        setIsLoading(false)
+        const pData = data.data || []
+        setPagos(pData)
+        setCachedData('/pagos', pData)
       })
-      .catch(err => {
-        console.error('Error fetching pagos:', err)
-        setIsLoading(false)
-      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
   }, [])
-
 
   return (
     <div className="space-y-6">
-      {/* Cabecera Principal Mejorada */}
+      
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
-          {/* Contenedor de Ícono Verde*/}
+          
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -139,19 +144,9 @@ export function Pagos() {
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleOpenCreateModal}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-emerald-600/30 active:scale-95 cursor-pointer"
-          >
-            <span className="text-lg leading-none">+</span>
-            <span>Registrar Pago</span>
-          </button>
-        </div>
       </div>
 
-      {/* Tarjetas de Indicadores Rápidos (KPIs) */}
+      
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
@@ -187,9 +182,9 @@ export function Pagos() {
         </div>
       </div>
 
-      {/* Contenido Principal */}
+      
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-        {/* Barra de Búsqueda y Filtros */}
+        
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -212,10 +207,17 @@ export function Pagos() {
               <option value="CURSO">Cursos de Seguridad Vial</option>
               <option value="PERMISO">Permisos y TUC</option>
             </select>
+            <button
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <span className="text-base leading-none font-black">+</span>
+              <span>Registrar Pago</span>
+            </button>
           </div>
         </div>
 
-        {/* Sub-header Contador */}
+        
         <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:text-slate-400">
           <div>
             <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
@@ -228,21 +230,37 @@ export function Pagos() {
           </div>
         </div>
 
-        {/* Tabla de Pagos */}
+        
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-y border-slate-100 bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800/50 dark:bg-[#0f172a] dark:text-slate-400">
               <tr>
-                <th className="px-5 py-3.5 whitespace-nowrap">N° RECIBO</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">FECHA / HORA</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">CONCEPTO / TASA</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">MÉTODO</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">MONTO TOTAL</th>
-                <th className="px-5 py-3.5 text-right whitespace-nowrap">ACCIONES</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">N° RECIBO</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">FECHA / HORA</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">CONCEPTO / TASA</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">MÉTODO</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">MONTO TOTAL</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#0f172a]">
-              {filteredPagos.length === 0 ? (
+              {isLoading && pagos.length === 0 ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="px-4 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-4"><div className="h-4 w-40 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-4">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                  </tr>
+                ))
+              ) : filteredPagos.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="p-12 text-center">
                     <p className="text-4xl mb-2">💸</p>
@@ -251,25 +269,25 @@ export function Pagos() {
                   </td>
                 </tr>
               ) : (
-                filteredPagos.map((p) => (
-                  <tr key={p.id} className="transition-colors hover:bg-emerald-50/30 dark:hover:bg-slate-800/40">
-                    <td className="px-5 py-4 whitespace-nowrap">
+                paginatedPagos.map((p) => (
+                  <tr key={p.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-slate-800/40">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       <p className="font-bold text-slate-900 dark:text-white">{p.numeroRecibo}</p>
                       <span className="mt-0.5 inline-block rounded-md bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                         CAJA MUNICIPAL
                       </span>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       <p className="font-bold text-slate-800 dark:text-slate-200">{new Date(p.fecha || new Date()).toLocaleDateString()}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         {new Date(p.fecha || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HRS
                       </p>
                     </td>
-                    <td className="px-5 py-4 min-w-[260px]">
+                    <td className="px-4 py-3.5 max-w-[220px]">
                       <p className="font-bold text-slate-900 dark:text-white truncate" title={p.concepto}>{p.concepto}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500">TRIBUTO / TASA MUNICIPAL</p>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider ${p.metodo === 'EFECTIVO'
                         ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                         : 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
@@ -277,19 +295,19 @@ export function Pagos() {
                         {p.metodo || 'EFECTIVO'}
                       </span>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       <p className="font-black text-slate-900 dark:text-white">S/ {p.montoNeto?.toFixed(2) || '0.00'}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">CANCELADO</p>
                     </td>
-                    <td className="px-5 py-4 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="rounded-full p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-400 transition-colors cursor-pointer" title="Ver Detalle">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                      <div className="flex items-center justify-end gap-1.5 pr-1">
+                        <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="rounded-xl p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalle">
                           <Icon name="eye" className="size-4" />
                         </button>
-                        <button onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="rounded-full p-2 bg-sky-50 text-sky-600 hover:bg-sky-100 dark:bg-sky-950/60 dark:text-sky-400 transition-colors cursor-pointer" title="Imprimir Ticket">
+                        <button onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="rounded-xl p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/60 dark:text-sky-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Imprimir Ticket">
                           <Icon name="print" className="size-4" />
                         </button>
-                        <button onClick={() => handleDelete(p.id)} className="rounded-full p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-400 transition-colors cursor-pointer" title="Anular Pago">
+                        <button onClick={() => handleDelete(p.id)} className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Anular Pago">
                           <Icon name="trash" className="size-4" />
                         </button>
                       </div>
@@ -300,8 +318,19 @@ export function Pagos() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredPagos.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(size) => {
+            setItemsPerPage(size)
+            setCurrentPage(1)
+          }}
+        />
       </div>
-      {/* Modales */}
+      
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">

@@ -60,6 +60,50 @@ button {
   display: none;
 }
 
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+
+.overflow-x-auto:hover {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+html.dark .overflow-x-auto:hover {
+  scrollbar-color: #334155 transparent;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  height: 5px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.overflow-x-auto:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.overflow-x-auto:hover::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+html.dark .overflow-x-auto:hover::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+html.dark .overflow-x-auto:hover::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
 @keyframes enter-up {
   from {
     opacity: 0;
@@ -164,6 +208,17 @@ button {
   to {
     opacity: 1;
     transform: scale(1) rotate(360deg);
+  }
+}
+
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

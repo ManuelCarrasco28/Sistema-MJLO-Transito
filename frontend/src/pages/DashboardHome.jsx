@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react'
 import { MetricCards } from '../components/dashboard/MetricCards'
 import { QuickActions } from '../components/dashboard/QuickActions'
 import { ChartsSection } from '../components/dashboard/ChartsSection'
+import { Icon } from '../components/ui/Icon'
+import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 export function DashboardHome() {
-  const [dashboardData, setDashboardData] = useState(null)
+  const cached = getCachedData('/dashboard')
+  const [dashboardData, setDashboardData] = useState(cached || null)
   const [error, setError] = useState('')
   const currentDate = new Intl.DateTimeFormat('es-PE', {
     day: '2-digit',
@@ -15,16 +18,19 @@ export function DashboardHome() {
   useEffect(() => {
     let active = true
 
-    fetch('http://localhost:8080/api/dashboard', { credentials: 'include' })
+    apiFetch('/dashboard')
       .then((response) => {
         if (!response.ok) throw new Error('No se pudo cargar el resumen del dashboard.')
         return response.json()
       })
       .then((data) => {
-        if (active) setDashboardData(data)
+        if (active) {
+          setDashboardData(data)
+          setCachedData('/dashboard', data)
+        }
       })
       .catch(() => {
-        if (active) setError('No se pudo cargar información de la base de datos.')
+        if (active && !cached) setError('No se pudo cargar información de la base de datos.')
       })
 
     return () => {
@@ -34,29 +40,31 @@ export function DashboardHome() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-blue-900/10 bg-[#123b6d] p-5 text-white shadow-[0_12px_28px_rgba(15,42,82,0.18)] dark:border-blue-900/40 dark:bg-[#102a4d] sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="border-l-4 border-cyan-300 pl-4">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">
-              Municipalidad Distrital de José Leonardo Ortiz
-            </p>
-            <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-[2rem]">
-              Panel de Control Operativo
-            </h1>
-            <p className="mt-1 text-sm text-blue-50/90">
+      
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3.5">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-lg shadow-blue-500/30">
+            <Icon name="dashboard" className="size-6" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                Panel de Control Operativo
+              </h1>
+            </div>
+            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
               Subgerencia de Tránsito, Transporte y Seguridad Vial · MDJLO
             </p>
           </div>
-          <div className="grid gap-3 text-sm sm:grid-cols-2 lg:min-w-[22rem]">
-            {[
-              ['Área', 'Tránsito Municipal'],
-              ['Fecha', currentDate],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-xl border border-white/15 bg-white/8 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-blue-100/80">{label}</p>
-                <p className="mt-1 font-bold text-white">{value}</p>
-              </div>
-            ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Tránsito Municipal</span>
+          </div>
+          <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 shadow-xs dark:border-slate-800 dark:bg-[#0f172a] dark:text-slate-300">
+            {currentDate}
           </div>
         </div>
       </div>

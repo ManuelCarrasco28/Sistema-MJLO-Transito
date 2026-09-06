@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { RegistryHeader } from '../components/ui/RegistryHeader'
+import { Pagination } from '../components/ui/Pagination'
+import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 export function Documentos() {
-  const [documentos, setDocumentos] = useState([])
-  const [vehiculos, setVehiculos] = useState([])
+  const cachedDocs = getCachedData('/documentos')
+  const cachedVeh = getCachedData('/vehiculos')
+  const [documentos, setDocumentos] = useState(cachedDocs || [])
+  const [vehiculos, setVehiculos] = useState(cachedVeh || [])
+  const [isLoading, setIsLoading] = useState(!cachedDocs)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(8)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
@@ -26,25 +32,26 @@ export function Documentos() {
   })
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/documentos', { credentials: 'include' })
-      .then((response) => response.ok ? response.json() : Promise.reject(response))
-      .then((payload) => setDocumentos(payload.data ?? []))
-      .catch(() => setDocumentos([]))
-
-    fetch('http://localhost:8080/api/vehiculos', { credentials: 'include' })
-      .then((response) => response.ok ? response.json() : Promise.reject(response))
-      .then((payload) => setVehiculos(payload.data ?? []))
-      .catch(() => setVehiculos([]))
+    Promise.all([
+      apiFetch('/documentos').then((response) => response.ok ? response.json() : Promise.reject(response)),
+      apiFetch('/vehiculos').then((response) => response.ok ? response.json() : Promise.reject(response))
+    ]).then(([docsPayload, vehPayload]) => {
+      const dData = docsPayload.data ?? []
+      const vData = vehPayload.data ?? []
+      setDocumentos(dData)
+      setVehiculos(vData)
+      setCachedData('/documentos', dData)
+      setCachedData('/vehiculos', vData)
+    }).catch(() => {})
+      .finally(() => setIsLoading(false))
   }, [])
 
-  // Métricas estadísticas
   const totalDocs = documentos.length
   const vigentes = documentos.filter((d) => d.estado === 'VIGENTE').length
   const enTramite = documentos.filter((d) => d.estado === 'EN_TRAMITE').length
   const vencidos = documentos.filter((d) => d.estado === 'VENCIDO').length
   const porcentajeVigentes = totalDocs > 0 ? Math.round((vigentes / totalDocs) * 100) : 0
 
-  // Filtrado dinámico
   const filteredDocs = documentos.filter((d) => {
     const fullSearch = `${d.codigo} ${d.vehiculoPlaca} ${d.propietario} ${d.asociacion} ${d.tipoDocumento}`.toLowerCase()
     const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
@@ -53,6 +60,15 @@ export function Documentos() {
 
     return matchesSearch && matchesTipo && matchesEstado
   })
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterTipo, filterEstado])
+
+  const paginatedDocs = filteredDocs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const handleOpenCreateModal = () => {
     setFormData({
@@ -81,29 +97,47 @@ export function Documentos() {
     setIsPreviewModalOpen(true)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro de anular o eliminar este documento del sistema?')) {
-      setDocumentos(documentos.filter((d) => d.id !== id))
+      try {
+        await apiFetch(`/documentos/${id}`, { method: 'DELETE' })
+        setDocumentos(documentos.filter((d) => d.id !== id))
+      } catch (err) {
+        alert('No se pudo anular el documento.')
+      }
     }
   }
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault()
     if (!formData.codigo.trim() || !formData.vehiculoPlaca.trim()) {
       alert('Por favor completa los campos requeridos.')
       return
     }
 
-    if (isEditing) {
-      setDocumentos(documentos.map((d) => (d.id === selectedDoc.id ? { ...formData, id: d.id } : d)))
-    } else {
-      const newDoc = {
-        ...formData,
-        id: Date.now(),
+    try {
+      if (isEditing) {
+        await apiFetch(`/documentos/${selectedDoc.id}`, {
+          method: 'PUT',
+          body: formData,
+        })
+        setDocumentos(documentos.map((d) => (d.id === selectedDoc.id ? { ...formData, id: d.id } : d)))
+      } else {
+        const res = await apiFetch('/documentos', {
+          method: 'POST',
+          body: formData,
+        })
+        const resData = await res.json()
+        const newDoc = resData.data || {
+          ...formData,
+          id: Date.now(),
+        }
+        setDocumentos([newDoc, ...documentos])
       }
-      setDocumentos([newDoc, ...documentos])
+      setIsModalOpen(false)
+    } catch (err) {
+      alert('Error al registrar el documento en el servidor.')
     }
-    setIsModalOpen(false)
   }
 
   const getDocTypeBadge = (tipo) => {
@@ -136,131 +170,91 @@ export function Documentos() {
   }
 
   return (
-    <div className="space-y-3.5 sm:space-y-4">
-      <RegistryHeader
-        title="Documentos"
-        description="Control documental, autorizaciones vehiculares (TUC), SOAT y certificados vigentes."
-        icon="document"
-        action="Emitir documento"
-        onCreate={handleOpenCreateModal}
-        area="Tránsito Municipal"
-        badgeText="Padrón Oficial 2026"
-      />
-
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
-          Indicadores de control documental
-        </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Seguimiento de autorizaciones, vigencias y vencimientos de la flota activa.
-        </p>
+    <div className="space-y-6">
+      
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3.5">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/30">
+            <Icon name="document" className="size-6" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                Control de TUCs, SOAT y Revisiones
+              </h1>
+            </div>
+            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              Control documental, autorizaciones vehiculares (TUC), SOAT y certificados vigentes.
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Tarjetas de Métricas Estadísticas Compactas */}
-      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-        {/* Card 1: Total */}
-        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-cyan-500 dark:border-t-cyan-400 bg-linear-to-br from-white via-white to-cyan-50/80 dark:from-[#0d1e30] dark:via-[#0f172a] dark:to-cyan-900/40">
+      
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="grid size-8.5 place-items-center rounded-lg bg-cyan-50 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300">
-              <Icon name="document" className="size-4.5" />
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-cyan-200/60 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700 shadow-2xs dark:border-cyan-800/60 dark:bg-cyan-950/50 dark:text-cyan-300">
-              Expedientes 2026
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Emitidos</span>
+            <span className="grid size-10 place-items-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/60 dark:text-teal-400">
+              <Icon name="document" className="size-5" />
             </span>
           </div>
-          <div className="mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Total Emitidos</p>
-            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
-              {new Intl.NumberFormat('es-PE').format(totalDocs)}
-            </h3>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(totalDocs)}</p>
+            <span className="text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded-full">Padrón 2026</span>
           </div>
-          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            Documentos procesados
-          </p>
-        </article>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Documentos procesados</p>
+        </div>
 
-        {/* Card 2: Vigentes */}
-        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-emerald-600 dark:border-t-emerald-500 bg-linear-to-br from-white via-white to-emerald-50/70 dark:from-[#0d2218] dark:via-[#0f172a] dark:to-emerald-900/35">
+        
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="grid size-8.5 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
-              <Icon name="check" className="size-4.5" />
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-400">
-              {porcentajeVigentes}% al día
-            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Vigentes</span>
+            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">✓</span>
           </div>
-          <div className="mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Vigentes</p>
-            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
-              {new Intl.NumberFormat('es-PE').format(vigentes)}
-            </h3>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(vigentes)}</p>
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">{porcentajeVigentes}% al día</span>
           </div>
-          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div
               className="h-full rounded-full bg-emerald-500 transition-all duration-500"
               style={{ width: `${porcentajeVigentes}%` }}
             />
           </div>
-          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            Autorizaciones habilitadas
-          </p>
-        </article>
+        </div>
 
-        {/* Card 3: En Trámite */}
-        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-amber-500 dark:border-t-amber-400 bg-linear-to-br from-white via-white to-amber-50/80 dark:from-[#1e1a12] dark:via-[#0f172a] dark:to-amber-900/35">
+        
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="grid size-8.5 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
-              <Icon name="clock" className="size-4.5" />
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 shadow-2xs dark:border-amber-800/60 dark:bg-amber-950/50 dark:text-amber-400">
-              Pendientes
-            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">En Trámite</span>
+            <span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold">⏳</span>
           </div>
-          <div className="mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">En Trámite</p>
-            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
-              {new Intl.NumberFormat('es-PE').format(enTramite)}
-            </h3>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(enTramite)}</p>
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">Pendientes</span>
           </div>
-          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            En revisión o firma digital
-          </p>
-        </article>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">En revisión o firma</p>
+        </div>
 
-        {/* Card 4: Vencidos */}
-        <article className="animate-enter rounded-xl border border-t-3 border-slate-200/80 p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 border-t-rose-500 dark:border-t-rose-400 bg-linear-to-br from-white via-white to-rose-50/70 dark:from-[#211528] dark:via-[#0f172a] dark:to-rose-900/35">
+        
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="grid size-8.5 place-items-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
-              <Icon name="alert" className="size-4.5" />
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-rose-200/60 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600 shadow-2xs dark:border-rose-800/60 dark:bg-rose-950/50 dark:text-rose-400">
-              Expirados
-            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-500 dark:text-rose-400">Vencidos / Anulados</span>
+            <span className="grid size-10 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold">✕</span>
           </div>
-          <div className="mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Vencidos</p>
-            <h3 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 dark:text-white sm:text-2xl">
-              {new Intl.NumberFormat('es-PE').format(vencidos)}
-            </h3>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(vencidos)}</p>
+            <span className="text-xs font-bold text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">Expirados</span>
           </div>
-          <p className="mt-2 border-t border-slate-100 dark:border-slate-800/80 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            Requieren renovación inmediata
-          </p>
-        </article>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Requieren renovación</p>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-white">
-          Padrón de documentos y autorizaciones
-        </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Control sistemático de Tarjetas de Operatividad (TUC), SOAT y Certificados de Capacitación.
-        </p>
-      </div>
-
-      {/* Tabla y Filtros */}
-      <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
+      
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -318,10 +312,19 @@ export function Documentos() {
                 Limpiar Filtros
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <span className="text-base leading-none font-black">+</span>
+              <span>Emitir Documento</span>
+            </button>
           </div>
         </div>
 
-        {/* Indicador de resultados */}
+        
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
           <span>
             Mostrando <strong className="text-slate-800 dark:text-white">{filteredDocs.length}</strong> de{' '}
@@ -342,11 +345,23 @@ export function Documentos() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Emisión</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Vencimiento</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
-                <th className="px-3.5 py-3.5 text-right whitespace-nowrap">Acciones</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredDocs.length === 0 ? (
+              {isLoading && documentos.length === 0 ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                  </tr>
+                ))
+              ) : filteredDocs.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
                     <div className="mx-auto max-w-xs space-y-2">
@@ -361,8 +376,8 @@ export function Documentos() {
                   </td>
                 </tr>
               ) : (
-                filteredDocs.map((d) => (
-                  <tr key={d.id} className="transition-colors hover:bg-emerald-50/30 dark:hover:bg-slate-800/40">
+                paginatedDocs.map((d) => (
+                  <tr key={d.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-slate-800/40">
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <div className="space-y-1">
                         <p className="font-mono font-extrabold text-slate-800 dark:text-white">{d.codigo}</p>
@@ -370,16 +385,16 @@ export function Documentos() {
                       </div>
                     </td>
 
-                    {/* Placa Horizontal */}
+                    
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
                         {d.vehiculoPlaca}
                       </span>
                     </td>
 
-                    <td className="px-3.5 py-3.5 max-w-[170px]">
-                      <p className="font-bold text-slate-800 dark:text-slate-100 truncate" title={d.propietario}>{d.propietario}</p>
-                      <p className="text-xs text-slate-400 truncate max-w-[150px]" title={d.asociacion}>{d.asociacion}</p>
+                    <td className="px-3.5 py-3.5 max-w-[160px]">
+                      <p className="font-bold text-slate-800 dark:text-slate-100 truncate text-xs" title={d.propietario}>{d.propietario}</p>
+                      <p className="text-xs text-slate-400 truncate max-w-[140px]" title={d.asociacion}>{d.asociacion}</p>
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <p className="font-mono font-semibold text-slate-700 dark:text-slate-300">{d.fechaExpedicion}</p>
@@ -401,8 +416,8 @@ export function Documentos() {
                         {d.estado}
                       </span>
                     </td>
-                    <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                      <div className="flex items-center justify-end gap-1.5 pr-1">
                         <button
                           type="button"
                           onClick={() => handleOpenPreview(d)}
@@ -435,9 +450,20 @@ export function Documentos() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredDocs.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(size) => {
+            setItemsPerPage(size)
+            setCurrentPage(1)
+          }}
+        />
       </div>
 
-      {/* Formulario Modal Estilo Facebook (Sin Asteriscos) */}
+      
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
@@ -589,7 +615,7 @@ export function Documentos() {
                 </div>
               </div>
 
-              {/* Botones del Formulario */}
+              
               <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                 <button
                   type="button"
@@ -610,7 +636,7 @@ export function Documentos() {
         </div>
       )}
 
-      {/* Modal Previsualización de la TUC / Documento Digital */}
+      
       {isPreviewModalOpen && selectedDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">

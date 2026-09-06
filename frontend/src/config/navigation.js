@@ -11,4 +11,3 @@ export const navigation = [
   ['retention', 'Retenciones'],
   ['permit', 'Permisos'],
 ]
-

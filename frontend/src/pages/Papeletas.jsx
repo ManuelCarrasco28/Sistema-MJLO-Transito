@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
-import { tiposInfraccion, initialVehiculos } from '../data/mockData'
+import { Pagination } from '../components/ui/Pagination'
+import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 export function Papeletas() {
-  const [papeletas, setPapeletas] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  const cachedPapeletas = getCachedData('/papeletas')
+  const cachedTipos = getCachedData('/tipos-infraccion')
+  const cachedVeh = getCachedData('/vehiculos')
+  const [papeletas, setPapeletas] = useState(cachedPapeletas || [])
+  const [tiposInfraccion, setTiposInfraccion] = useState(cachedTipos || [])
+  const [vehiculos, setVehiculos] = useState(cachedVeh || [])
+  const [isLoading, setIsLoading] = useState(!cachedPapeletas)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState('TODOS')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(8)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -14,11 +22,11 @@ export function Papeletas() {
   const [selectedPapeleta, setSelectedPapeleta] = useState(null)
 
   const [formData, setFormData] = useState({
-    vehiculoPlaca: initialVehiculos[0]?.placa || 'M4X-821',
+    vehiculoPlaca: '',
     infractor: '',
-    inspector: 'Suboficial PNP / Inspector Municipal',
+    inspector: 'Inspector Municipal',
     lugar: '',
-    tipoInfraccionId: tiposInfraccion[0]?.id || 1,
+    tipoInfraccionId: 1,
     observacionesAutoridad: '',
     observacionesConductor: '',
   })
@@ -37,28 +45,47 @@ export function Papeletas() {
   })
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/papeletas', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        setPapeletas(data.data || [])
-        setIsLoading(false)
-      })
-      .catch(err => {
-        console.error('Error fetching papeletas:', err)
-        setIsLoading(false)
-      })
+    setCurrentPage(1)
+  }, [searchTerm, filterEstado])
+
+  const paginatedPapeletas = filteredPapeletas.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch('/papeletas').then(res => res.json()).catch(() => ({ data: [] })),
+      apiFetch('/tipos-infraccion').then(res => res.json()).catch(() => ({ data: [] })),
+      apiFetch('/vehiculos').then(res => res.json()).catch(() => ({ data: [] }))
+    ]).then(([papeletasRes, tiposRes, vehiculosRes]) => {
+      const pData = papeletasRes.data || []
+      const tData = tiposRes.data || []
+      const vData = vehiculosRes.data || []
+      setPapeletas(pData)
+      setTiposInfraccion(tData)
+      setVehiculos(vData)
+      setCachedData('/papeletas', pData)
+      setCachedData('/tipos-infraccion', tData)
+      setCachedData('/vehiculos', vData)
+      setIsLoading(false)
+    }).catch(err => {
+      console.error('Error fetching data for papeletas:', err)
+      setIsLoading(false)
+    })
   }, [])
 
   const handleOpenCreateModal = () => {
     setFormData({
-      vehiculoPlaca: initialVehiculos[0]?.placa || 'M4X-821',
+      vehiculoPlaca: vehiculos[0]?.placa || '',
       infractor: '',
-      inspector: 'Suboficial PNP / Inspector Municipal',
+      inspector: 'Inspector Municipal',
       lugar: '',
       tipoInfraccionId: tiposInfraccion[0]?.id || 1,
       observacionesAutoridad: '',
       observacionesConductor: '',
     })
+    setSelectedPapeleta(null)
     setIsModalOpen(true)
   }
 
@@ -89,10 +116,7 @@ export function Papeletas() {
   const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro que desea anular esta papeleta? Esta acción es irreversible.')) {
       try {
-        await fetch(`http://localhost:8080/api/papeletas/${id}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        })
+        await apiFetch(`/papeletas/${id}`, { method: 'DELETE' })
         setPapeletas(papeletas.map(p => p.id === id ? { ...p, estado: 'ANULADA' } : p))
       } catch (err) {
         console.error('Error al anular:', err)
@@ -111,11 +135,9 @@ export function Papeletas() {
     
     try {
       if (selectedPapeleta) {
-        const response = await fetch(`http://localhost:8080/api/papeletas/${selectedPapeleta.id}`, {
+        const response = await apiFetch(`/papeletas/${selectedPapeleta.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(formData)
+          body: formData
         })
         if (response.ok) {
           setPapeletas(papeletas.map(p => 
@@ -125,11 +147,9 @@ export function Papeletas() {
           ))
         }
       } else {
-        const response = await fetch('http://localhost:8080/api/papeletas', {
+        const response = await apiFetch('/papeletas', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(formData)
+          body: formData
         })
         const result = await response.json()
         if (response.ok && result.data) {
@@ -163,14 +183,6 @@ export function Papeletas() {
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleOpenCreateModal}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-rose-600/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-rose-600/30 active:scale-95 cursor-pointer"
-        >
-          <span className="text-lg leading-none">+</span>
-          <span>Emitir Papeleta</span>
-        </button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -249,6 +261,14 @@ export function Papeletas() {
               <option value="PAGADA">Pagadas</option>
               <option value="ANULADA">Anuladas</option>
             </select>
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-rose-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-rose-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <span className="text-base leading-none font-black">+</span>
+              <span>Emitir Papeleta</span>
+            </button>
           </div>
         </div>
 
@@ -262,11 +282,28 @@ export function Papeletas() {
                 <th className="px-4 py-3.5 whitespace-nowrap">Fecha & Hora</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">Infracción / Monto</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">Estado</th>
-                <th className="px-4 py-3.5 text-right whitespace-nowrap">Acciones</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredPapeletas.length === 0 ? (
+              {isLoading && papeletas.length === 0 ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="px-4 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-4"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-4">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-4"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-24 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                  </tr>
+                ))
+              ) : filteredPapeletas.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
                     <p className="text-3xl">🎫</p>
@@ -274,10 +311,10 @@ export function Papeletas() {
                   </td>
                 </tr>
               ) : (
-                filteredPapeletas.map((p) => {
+                paginatedPapeletas.map((p) => {
                   const tipoInf = tiposInfraccion.find((t) => t.id === p.detalles?.[0]?.tipoInfraccionId)
                   return (
-                    <tr key={p.id} className="transition-colors hover:bg-rose-50/30 dark:hover:bg-slate-800/40">
+                    <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-slate-800/40">
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         <span className="font-mono font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
                       </td>
@@ -286,9 +323,9 @@ export function Papeletas() {
                           {p.vehiculoPlaca}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 max-w-[200px]">
+                      <td className="px-4 py-3.5 max-w-[180px]">
                         <p className="font-bold text-slate-800 dark:text-white truncate" title={p.infractor}>{p.infractor}</p>
-                        <p className="text-xs text-slate-400 truncate max-w-[180px]" title={p.lugar}>📍 {p.lugar}</p>
+                        <p className="text-xs text-slate-400 truncate max-w-[160px]" title={p.lugar}>📍 {p.lugar}</p>
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-slate-600 dark:text-slate-400">
                         <p className="font-mono font-semibold text-slate-700 dark:text-slate-300">{new Date(p.fechaHora).toLocaleDateString()}</p>
@@ -308,8 +345,8 @@ export function Papeletas() {
                           {p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="sticky right-0 z-10 bg-white group-hover:bg-rose-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                        <div className="flex items-center justify-end gap-1.5 pr-1">
                           <button onClick={() => handleOpenDetail(p)} className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 transition-all hover:shadow-md cursor-pointer" title="Ver Detalle">
                             <Icon name="eye" className="size-4" />
                           </button>
@@ -333,9 +370,20 @@ export function Papeletas() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredPapeletas.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(size) => {
+            setItemsPerPage(size)
+            setCurrentPage(1)
+          }}
+        />
       </div>
 
-      {/* Modal: Emitir Papeleta */}
+      
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f172a]">
@@ -351,7 +399,20 @@ export function Papeletas() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Placa Vehicular *</label>
-                  <input type="text" required value={formData.vehiculoPlaca} onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                  <input 
+                    type="text" 
+                    required 
+                    list="vehiculos-papeleta-list"
+                    placeholder="Ej. NC-1234"
+                    value={formData.vehiculoPlaca} 
+                    onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })} 
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white" 
+                  />
+                  <datalist id="vehiculos-papeleta-list">
+                    {vehiculos.map((v) => (
+                      <option key={v.id} value={v.placa}>{v.marca} {v.modelo}</option>
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Conductor Infractor *</label>
@@ -387,7 +448,7 @@ export function Papeletas() {
         </div>
       )}
 
-      {/* Modal: Detalle */}
+      
       {isDetailModalOpen && selectedPapeleta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f172a]">
@@ -411,7 +472,7 @@ export function Papeletas() {
         </div>
       )}
 
-      {/* Modal: Preview Boleta */}
+      
       {isPreviewModalOpen && selectedPapeleta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">

@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { Pagination } from '../components/ui/Pagination'
+import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 export function CursosSeguridad() {
-  const [cursos, setCursos] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  const cached = getCachedData('/cursos')
+  const [cursos, setCursos] = useState(cached || [])
+  const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(8)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -36,10 +41,7 @@ export function CursosSeguridad() {
   const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar este curso?')) {
       try {
-        await fetch(`http://localhost:8080/api/cursos/${id}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        })
+        await apiFetch(`/cursos/${id}`, { method: 'DELETE' })
         setCursos(cursos.filter(c => c.id !== id))
       } catch (err) {
         console.error('Error eliminando curso:', err)
@@ -57,21 +59,17 @@ export function CursosSeguridad() {
     }
     try {
       if (selectedCurso) {
-        const response = await fetch(`http://localhost:8080/api/cursos/${selectedCurso.id}`, {
+        const response = await apiFetch(`/cursos/${selectedCurso.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(payload)
+          body: payload
         })
         if (response.ok) {
           setCursos(cursos.map(c => c.id === selectedCurso.id ? { ...formData, id: c.id } : c))
         }
       } else {
-        const response = await fetch('http://localhost:8080/api/cursos', {
+        const response = await apiFetch('/cursos', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(payload)
+          body: payload
         })
         const result = await response.json()
         if (response.ok && result.data) {
@@ -92,7 +90,7 @@ export function CursosSeguridad() {
   }
 
   const totalCursos = cursos.length
-  const cursosActivos = cursos.filter(c => c.estado === 'ACTIVO' || c.estado === 'PROGRAMADO').length
+  const cursosActivos = cursos.filter(c => c.estado === 'ACTIVO' || c.estado === 'PROGRAMADO' || c.estado === 'ABIERTO').length
   const totalInscritos = cursos.reduce((acc, c) => acc + (c.inscritos || 0), 0)
   const cursosFinalizados = cursos.filter(c => c.estado === 'FINALIZADO').length
 
@@ -104,16 +102,25 @@ export function CursosSeguridad() {
       c.instructor?.toLowerCase().includes(search) ||
       c.lugar?.toLowerCase().includes(search)
 
-    const matchesEstado = filterEstado === 'TODOS' || c.estado === filterEstado
+    const matchesEstado = filterEstado === 'TODOS' || 
+      (filterEstado === 'ACTIVO' ? (c.estado === 'ACTIVO' || c.estado === 'PROGRAMADO' || c.estado === 'ABIERTO') : c.estado === filterEstado)
     const matchesTipo = filterTipo === 'TODOS' || c.tipo === filterTipo
     return matchesSearch && matchesEstado && matchesTipo
   })
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/cursos', { credentials: 'include' })
+    setCurrentPage(1)
+  }, [searchTerm, filterEstado, filterTipo])
+
+  const paginatedCursos = filteredCursos.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  useEffect(() => {
+    apiFetch('/cursos')
       .then(res => res.json())
       .then(data => {
-        // Map backend fields to frontend
         const fetchedCursos = (data.data || []).map(c => ({
           ...c,
           capacidad: c.cuposTotales,
@@ -121,17 +128,15 @@ export function CursosSeguridad() {
           tipo: 'CERTICAV'
         }))
         setCursos(fetchedCursos)
-        setIsLoading(false)
+        setCachedData('/cursos', fetchedCursos)
       })
-      .catch(err => {
-        console.error('Error fetching cursos:', err)
-        setIsLoading(false)
-      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
   }, [])
 
   return (
     <div className="space-y-6">
-      {/* Cabecera Principal */}
+      
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-lg shadow-purple-600/25">
@@ -151,16 +156,11 @@ export function CursosSeguridad() {
             </p>
           </div>
         </div>
-
-        <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-purple-600/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-600/30 active:scale-95 cursor-pointer">
-          <span className="text-lg leading-none">+</span>
-          <span>Programar Curso</span>
-        </button>
       </div>
 
-      {/* Tarjetas de Indicadores Rápidos (KPIs) */}
+      
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Cursos */}
+        
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">TOTAL CURSOS</span>
@@ -173,7 +173,7 @@ export function CursosSeguridad() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Cursos registrados</p>
         </div>
 
-        {/* Cursos Activos */}
+        
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">CURSOS ACTIVOS</span>
@@ -186,7 +186,7 @@ export function CursosSeguridad() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Listos para inscripción</p>
         </div>
 
-        {/* Total Inscritos */}
+        
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">TOTAL INSCRITOS</span>
@@ -199,7 +199,7 @@ export function CursosSeguridad() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Conductores en capacitación</p>
         </div>
 
-        {/* Cursos Finalizados */}
+        
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">FINALIZADOS</span>
@@ -213,9 +213,9 @@ export function CursosSeguridad() {
         </div>
       </div>
 
-      {/* Contenido Principal / Tabla */}
+      
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-        {/* Barra de Filtros y Búsqueda */}
+        
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -248,10 +248,14 @@ export function CursosSeguridad() {
               <option value="EN_CURSO">EN CURSO</option>
               <option value="FINALIZADO">FINALIZADO</option>
             </select>
+            <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-purple-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-600/30 active:scale-95 cursor-pointer whitespace-nowrap">
+              <span className="text-base leading-none font-black">+</span>
+              <span>Programar Curso</span>
+            </button>
           </div>
         </div>
 
-        {/* Sub-header Contador */}
+        
         <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:text-slate-400">
           <div>
             <span className="rounded-md bg-purple-100 px-1.5 py-0.5 font-bold text-purple-800 dark:bg-purple-950 dark:text-purple-300">
@@ -264,22 +268,39 @@ export function CursosSeguridad() {
           </div>
         </div>
 
-        {/* Tabla */}
+        
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-y border-slate-100 bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800/50 dark:bg-[#0f172a] dark:text-slate-400">
               <tr>
-                <th className="px-5 py-3.5 whitespace-nowrap">CÓDIGO / TIPO</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">TÍTULO DEL CURSO</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">FECHA PROGRAMADA</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">INSCRITOS / CAPACIDAD</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">INSTRUCTOR / LUGAR</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">ESTADO</th>
-                <th className="px-5 py-3.5 text-right whitespace-nowrap">ACCIONES</th>
+                <th className="px-3 py-3 whitespace-nowrap">CÓDIGO / TIPO</th>
+                <th className="px-3 py-3">TÍTULO DEL CURSO</th>
+                <th className="px-3 py-3 whitespace-nowrap">FECHA PROGRAMADA</th>
+                <th className="px-3 py-3 whitespace-nowrap">INSCRITOS / CAPACIDAD</th>
+                <th className="px-3 py-3">INSTRUCTOR / LUGAR</th>
+                <th className="px-3 py-3 whitespace-nowrap">ESTADO</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#0f172a]">
-              {filteredCursos.length === 0 ? (
+              {isLoading && cursos.length === 0 ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="px-3 py-3"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-44 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                  </tr>
+                ))
+              ) : filteredCursos.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-12 text-center">
                     <p className="text-4xl mb-2">🎓</p>
@@ -287,78 +308,82 @@ export function CursosSeguridad() {
                   </td>
                 </tr>
               ) : (
-                filteredCursos.map((c) => (
-                  <tr key={c.id} className="transition-colors hover:bg-purple-50/30 dark:hover:bg-slate-800/40">
-                    {/* Código / Tipo */}
-                    <td className="px-5 py-4 whitespace-nowrap">
+                paginatedCursos.map((c) => (
+                  <tr key={c.id} className="group transition-colors hover:bg-purple-50/30 dark:hover:bg-slate-800/40">
+                    
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <p className="font-bold text-slate-900 dark:text-white">{c.codigo}</p>
-                      <span className="mt-1 inline-block rounded-md bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
-                        {c.tipoLabel || 'CERTICAV (Capacitación)'}
+                      <span className="mt-0.5 inline-block rounded-md bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+                        {c.tipoLabel || 'CERTICAV'}
                       </span>
                     </td>
 
-                    {/* Título del Curso */}
-                    <td className="px-5 py-4 min-w-[260px]">
-                      <p className="font-bold text-slate-900 dark:text-white">{c.titulo}</p>
-                      <p className="text-xs text-slate-500 line-clamp-1 dark:text-slate-400">
-                        {c.descripcion || 'Educación Vial Obligatoria para Conductores'}
-                      </p>
+                    
+                    <td className="px-3 py-3">
+                      <div className="max-w-[190px] lg:max-w-[230px]">
+                        <p className="font-bold text-slate-900 dark:text-white truncate" title={c.titulo}>{c.titulo}</p>
+                        <p className="text-xs text-slate-500 truncate dark:text-slate-400" title={c.descripcion}>
+                          {c.descripcion || 'Educación Vial Obligatoria para Conductores'}
+                        </p>
+                      </div>
                     </td>
 
-                    {/* Fecha Programada */}
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <p className="font-bold text-slate-800 dark:text-slate-200">{c.fecha}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         {c.horario || '09:00 AM - 12:00 PM'}
                       </p>
                     </td>
 
-                    {/* Inscritos / Capacidad */}
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <p className="font-bold text-slate-900 dark:text-white">
                         {c.inscritos || 0} / {c.capacidad || 50}
                       </p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                        PARTICIPANTES
+                        Inscritos
                       </p>
                     </td>
 
-                    {/* Instructor / Lugar */}
-                    <td className="px-5 py-4 min-w-[200px]">
-                      <p className="font-semibold text-slate-800 dark:text-slate-200">{c.instructor || 'Ing. Fernando Ramos'}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">{c.lugar || 'Auditorio Municipal JLO'}</p>
+                    
+                    <td className="px-3 py-3">
+                      <div className="max-w-[150px] lg:max-w-[180px]">
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={c.instructor}>{c.instructor || 'Ing. Fernando Ramos'}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 truncate" title={c.lugar}>{c.lugar || 'Auditorio Municipal JLO'}</p>
+                      </div>
                     </td>
 
-                    {/* Estado */}
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      {c.estado === 'ACTIVO' || c.estado === 'PROGRAMADO' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
+                    
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {c.estado === 'ACTIVO' || c.estado === 'PROGRAMADO' || c.estado === 'ABIERTO' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
                           <span className="size-1.5 rounded-full bg-emerald-600" />
                           PROGRAMADO
                         </span>
                       ) : c.estado === 'EN_CURSO' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-extrabold text-sky-800 dark:bg-sky-950/60 dark:text-sky-400">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-extrabold text-sky-800 dark:bg-sky-950/60 dark:text-sky-400">
                           <span className="size-1.5 rounded-full bg-sky-600" />
                           EN CURSO
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-extrabold text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-extrabold text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
                           <span className="size-1.5 rounded-full bg-amber-600" />
                           FINALIZADO
                         </span>
                       )}
                     </td>
 
-                    {/* Acciones */}
-                    <td className="px-5 py-4 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button onClick={() => { setSelectedCurso(c); setIsDetailModalOpen(true); }} className="rounded-full p-2 bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-950/60 dark:text-purple-400 transition-colors cursor-pointer" title="Ver Detalles">
+                    
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => { setSelectedCurso(c); setIsDetailModalOpen(true); }} className="rounded-lg p-1.5 bg-purple-50 text-purple-600 hover:bg-purple-500 hover:text-white dark:bg-purple-950/60 dark:text-purple-400 dark:hover:bg-purple-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalles">
                           <Icon name="eye" className="size-4" />
                         </button>
-                        <button onClick={() => handleOpenEditModal(c)} className="rounded-full p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-400 transition-colors cursor-pointer" title="Editar Curso">
+                        <button onClick={() => handleOpenEditModal(c)} className="rounded-lg p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Editar Curso">
                           <Icon name="pencil" className="size-4" />
                         </button>
-                        <button onClick={() => handleDelete(c.id)} className="rounded-full p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-400 transition-colors cursor-pointer" title="Eliminar Curso">
+                        <button onClick={() => handleDelete(c.id)} className="rounded-lg p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Eliminar Curso">
                           <Icon name="trash" className="size-4" />
                         </button>
                       </div>
@@ -369,8 +394,19 @@ export function CursosSeguridad() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredCursos.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(size) => {
+            setItemsPerPage(size)
+            setCurrentPage(1)
+          }}
+        />
       </div>
-      {/* Modales */}
+      
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
