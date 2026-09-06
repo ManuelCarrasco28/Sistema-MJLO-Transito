@@ -8,89 +8,217 @@ class InspeccionesController extends ResourceController
 {
     protected $format = 'json';
 
+    public function criterios()
+    {
+        $db = \Config\Database::connect();
+        try {
+            $rows = $db->table('inspeccion_criterios')
+                ->select('id, codigo, nombre, descripcion, obligatorio, orden, estado')
+                ->where('estado', 'ACTIVO')
+                ->orderBy('orden', 'ASC')
+                ->get()
+                ->getResultArray();
+
+            $data = array_map(static function (array $r) {
+                $r['id'] = (int)$r['id'];
+                $r['obligatorio'] = (bool)$r['obligatorio'];
+                $r['orden'] = (int)$r['orden'];
+                return $r;
+            }, $rows);
+
+            return $this->respond(['data' => $data]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error consultando criterios de inspección: ' . $e->getMessage());
+        }
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
         
         try {
-            $rows = $db->table('inspecciones i')
+            $rows = $db->table('inspecciones_tecnicas i')
                 ->select("
                     i.id,
                     i.numero_inspeccion as numeroInspeccion,
-                    i.vehiculo_placa as vehiculoPlaca,
-                    i.inspector,
-                    i.fecha,
+                    v.placa as vehiculoPlaca,
+                    COALESCE(CONCAT(p.nombres, ' ', p.apellidos), 'Inspector Técnico Municipal') as inspector,
+                    i.fecha_inspeccion as fecha,
                     i.resultado,
                     i.observaciones,
                     i.estado
                 ")
+                ->join('vehiculos v', 'v.id = i.vehiculo_id', 'left')
+                ->join('personal p', 'p.id = i.tecnico_id', 'left')
                 ->orderBy('i.id', 'DESC')
                 ->get()
                 ->getResultArray();
 
-            $data = array_map(static function (array $row) {
-                $row['detalles'] = []; // Array vacío por defecto
-                return $row;
-            }, $rows);
-        } catch (\Exception $e) {
             $data = [];
-        }
+            foreach ($rows as $row) {
+                $row['id'] = (int)$row['id'];
+                
+                
+                $detalles = $db->table('inspeccion_detalles id')
+                    ->select('id.criterio_id as criterioId, id.estado_revision as estado, id.observacion as obs')
+                    ->where('id.inspeccion_id', $row['id'])
+                    ->get()
+                    ->getResultArray();
 
-        return $this->respond(['data' => $data]);
+                $row['detalles'] = array_map(static function (array $d) {
+                    $d['criterioId'] = (int)$d['criterioId'];
+                    return $d;
+                }, $detalles);
+
+                $data[] = $row;
+            }
+
+            return $this->respond(['data' => $data]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error consultando inspecciones: ' . $e->getMessage());
+        }
     }
 
     public function create()
     {
         $db = \Config\Database::connect();
-        $input = $this->request->getJSON(true);
+        try {
+            $input = $this->request->getJSON(true);
+        } catch (\Throwable $e) {
+            $input = null;
+        }
+        if (!is_array($input)) {
+            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
 
-        $data = [
-            'numero_inspeccion' => 'INSP-' . date('Y') . '-' . str_pad(random_int(1, 999), 3, '0', STR_PAD_LEFT),
-            'vehiculo_placa' => $input['vehiculoPlaca'] ?? '',
-            'inspector' => $input['inspector'] ?? 'Inspector Municipal',
-            'fecha' => date('Y-m-d H:i:s'),
-            'resultado' => $input['resultado'] ?? 'OBSERVADO',
-            'observaciones' => $input['observaciones'] ?? '',
-            'estado' => 'ACTIVO',
-        ];
+        $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
+        $resultado = trim($input['resultado'] ?? 'APROBADO');
+        $observaciones = trim($input['observaciones'] ?? '');
+        $detalles = $input['detalles'] ?? [];
 
         try {
-            $db->table('inspecciones')->insert($data);
-            $data['id'] = $db->insertID();
             
-            $response = [
-                'id' => $data['id'],
-                'numeroInspeccion' => $data['numero_inspeccion'],
-                'vehiculoPlaca' => $data['vehiculo_placa'],
-                'inspector' => $data['inspector'],
-                'fecha' => $data['fecha'],
-                'resultado' => $data['resultado'],
-                'observaciones' => $data['observaciones'],
-                'estado' => $data['estado'],
-                'detalles' => [],
+            $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
+            if (!$vehiculo) {
+                $firstVeh = $db->table('vehiculos')->limit(1)->get()->getRowArray();
+                if ($firstVeh) {
+                    $vehiculoId = (int)$firstVeh['id'];
+                    $placa = $firstVeh['placa'];
+                } else {
+                    $db->table('vehiculos')->insert([
+                        'placa' => $placa ?: 'NC-' . rand(1000, 9999),
+                        'tipo_vehiculo_id' => 1,
+                        'estado' => 'ACTIVO'
+                    ]);
+                    $vehiculoId = $db->insertID();
+                }
+            } else {
+                $vehiculoId = (int)$vehiculo['id'];
+            }
+
+            
+            $tecnico = $db->table('personal')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
+            $tecnicoId = $tecnico ? (int)$tecnico['id'] : 1;
+            $tecnicoNombre = $tecnico ? ($tecnico['nombres'] . ' ' . $tecnico['apellidos']) : 'Inspector Técnico Municipal';
+
+            $numeroInspeccion = 'INSP-' . date('Y') . '-' . str_pad((string)random_int(1, 999), 3, '0', STR_PAD_LEFT);
+            $fecha = date('Y-m-d H:i:s');
+
+            
+            $inspData = [
+                'numero_inspeccion' => $numeroInspeccion,
+                'vehiculo_id' => $vehiculoId,
+                'tecnico_id' => $tecnicoId,
+                'fecha_inspeccion' => $fecha,
+                'resultado' => $resultado,
+                'observaciones' => $observaciones,
+                'estado' => 'ACTIVO',
             ];
+            $db->table('inspecciones_tecnicas')->insert($inspData);
+            $inspeccionId = $db->insertID();
+
+            
+            $savedDetalles = [];
+            if (is_array($detalles) && !empty($detalles)) {
+                foreach ($detalles as $det) {
+                    $criterioId = (int)($det['criterioId'] ?? 0);
+                    if ($criterioId <= 0) continue;
+                    $estadoRev = trim($det['estado'] ?? 'BIEN');
+                    $obs = trim($det['obs'] ?? '');
+                    $db->table('inspeccion_detalles')->insert([
+                        'inspeccion_id' => $inspeccionId,
+                        'criterio_id' => $criterioId,
+                        'estado_revision' => $estadoRev,
+                        'observacion' => $obs
+                    ]);
+                    $savedDetalles[] = [
+                        'criterioId' => $criterioId,
+                        'estado' => $estadoRev,
+                        'obs' => $obs
+                    ];
+                }
+            }
+
+            $response = [
+                'id' => $inspeccionId,
+                'numeroInspeccion' => $numeroInspeccion,
+                'vehiculoPlaca' => $placa,
+                'inspector' => $tecnicoNombre,
+                'fecha' => $fecha,
+                'resultado' => $resultado,
+                'observaciones' => $observaciones,
+                'estado' => 'ACTIVO',
+                'detalles' => $savedDetalles,
+            ];
+
             return $this->respondCreated(['status' => 201, 'data' => $response]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error creando la inspección');
+            return $this->failServerError('Error creando la inspección: ' . $e->getMessage());
         }
     }
 
     public function update($id = null)
     {
         $db = \Config\Database::connect();
-        $input = $this->request->getJSON(true);
-
-        $data = [
-            'vehiculo_placa' => $input['vehiculoPlaca'] ?? '',
-            'resultado' => $input['resultado'] ?? '',
-            'observaciones' => $input['observaciones'] ?? '',
-        ];
+        try {
+            $input = $this->request->getJSON(true);
+        } catch (\Throwable $e) {
+            $input = null;
+        }
+        if (!is_array($input)) {
+            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
 
         try {
-            $db->table('inspecciones')->where('id', $id)->update($data);
-            return $this->respond(['status' => 200, 'message' => 'Actualizado correctamente']);
+            $data = [];
+            if (isset($input['resultado'])) {
+                $data['resultado'] = trim($input['resultado']);
+            }
+            if (isset($input['observaciones'])) {
+                $data['observaciones'] = trim($input['observaciones']);
+            }
+
+            if (!empty($data)) {
+                $db->table('inspecciones_tecnicas')->where('id', $id)->update($data);
+            }
+
+            if (isset($input['detalles']) && is_array($input['detalles'])) {
+                $db->table('inspeccion_detalles')->where('inspeccion_id', $id)->delete();
+                foreach ($input['detalles'] as $det) {
+                    $criterioId = (int)($det['criterioId'] ?? 0);
+                    if ($criterioId <= 0) continue;
+                    $db->table('inspeccion_detalles')->insert([
+                        'inspeccion_id' => $id,
+                        'criterio_id' => $criterioId,
+                        'estado_revision' => trim($det['estado'] ?? 'BIEN'),
+                        'observacion' => trim($det['obs'] ?? '')
+                    ]);
+                }
+            }
+
+            return $this->respond(['status' => 200, 'message' => 'Inspección actualizada correctamente']);
         } catch (\Exception $e) {
-            return $this->failServerError('Error actualizando la inspección');
+            return $this->failServerError('Error actualizando la inspección: ' . $e->getMessage());
         }
     }
 
@@ -98,10 +226,10 @@ class InspeccionesController extends ResourceController
     {
         $db = \Config\Database::connect();
         try {
-            $db->table('inspecciones')->where('id', $id)->update(['estado' => 'ANULADO']);
+            $db->table('inspecciones_tecnicas')->where('id', $id)->update(['estado' => 'ANULADO']);
             return $this->respondDeleted(['status' => 200, 'message' => 'Inspección anulada correctamente']);
         } catch (\Exception $e) {
-            return $this->failServerError('Error anulando la inspección');
+            return $this->failServerError('Error anulando la inspección: ' . $e->getMessage());
         }
     }
 }

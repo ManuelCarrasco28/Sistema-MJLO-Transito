@@ -13,102 +13,154 @@ class CursosController extends ResourceController
         $db = \Config\Database::connect();
         
         try {
-            $rows = $db->table('cursos c')
+            $rows = $db->table('cursos_seguridad_vial c')
                 ->select("
                     c.id,
                     c.codigo,
-                    c.titulo,
-                    c.instructor,
-                    c.fecha,
-                    c.horario,
+                    c.nombre as titulo,
+                    c.descripcion,
+                    c.resolucion as instructor,
+                    c.fecha_inicio as fecha,
                     c.lugar,
-                    c.cupos_totales as cuposTotales,
-                    c.cupos_inscritos as cuposInscritos,
+                    c.cupos as cuposTotales,
                     c.estado,
-                    c.costo
+                    c.costo_inscripcion as costo
                 ")
                 ->orderBy('c.id', 'DESC')
                 ->get()
                 ->getResultArray();
 
-            $data = array_map(static function (array $row) {
-                $row['costo'] = (float) $row['costo'];
-                $row['cuposTotales'] = (int) $row['cuposTotales'];
-                $row['cuposInscritos'] = (int) $row['cuposInscritos'];
-                $row['temario'] = []; // Array vacío por defecto
-                $row['participantes'] = []; // Array vacío por defecto
-                return $row;
-            }, $rows);
-        } catch (\Exception $e) {
             $data = [];
-        }
+            foreach ($rows as $row) {
+                $row['id'] = (int)$row['id'];
+                $row['costo'] = (float)$row['costo'];
+                $row['cuposTotales'] = (int)($row['cuposTotales'] ?? 50);
+                $row['horario'] = '09:00 AM - 12:00 PM';
+                try {
+                    $row['cuposInscritos'] = (int)$db->table('inscripciones_curso')
+                        ->where('curso_id', $row['id'])
+                        ->countAllResults();
+                } catch (\Throwable $t) {
+                    $row['cuposInscritos'] = 0;
+                }
 
-        return $this->respond(['data' => $data]);
+                $row['temario'] = [];
+                $row['participantes'] = [];
+                $data[] = $row;
+            }
+
+            return $this->respond(['data' => $data]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error consultando cursos: ' . $e->getMessage());
+        }
     }
 
     public function create()
     {
         $db = \Config\Database::connect();
-        $input = $this->request->getJSON(true);
+        try {
+            $input = $this->request->getJSON(true);
+        } catch (\Throwable $e) {
+            $input = null;
+        }
+        if (!is_array($input)) {
+            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
+
+        $codigo = trim($input['codigo'] ?? ('CUR-' . date('Y') . '-' . str_pad((string)random_int(1, 999), 3, '0', STR_PAD_LEFT)));
+        $titulo = trim($input['titulo'] ?? '');
+        $descripcion = trim($input['descripcion'] ?? '');
+        $instructor = trim($input['instructor'] ?? 'Instructor Certificado');
+        $fecha = trim($input['fecha'] ?? date('Y-m-d'));
+        $lugar = trim($input['lugar'] ?? 'Auditorio Municipal JLO');
+        $cuposTotales = (int)($input['cuposTotales'] ?? 50);
+        $costo = (float)($input['costo'] ?? 0);
+        $estado = trim($input['estado'] ?? 'PROGRAMADO');
 
         $data = [
-            'codigo' => 'CUR-' . date('Y') . '-' . str_pad(random_int(1, 999), 3, '0', STR_PAD_LEFT),
-            'titulo' => $input['titulo'] ?? '',
-            'instructor' => $input['instructor'] ?? '',
-            'fecha' => $input['fecha'] ?? date('Y-m-d'),
-            'horario' => $input['horario'] ?? '',
-            'lugar' => $input['lugar'] ?? '',
-            'cupos_totales' => $input['cuposTotales'] ?? 0,
-            'cupos_inscritos' => 0,
-            'estado' => 'PROGRAMADO',
-            'costo' => $input['costo'] ?? 0,
+            'codigo' => $codigo,
+            'nombre' => $titulo ?: 'Curso de Capacitación Vial',
+            'descripcion' => $descripcion,
+            'resolucion' => $instructor,
+            'fecha_inicio' => $fecha,
+            'fecha_fin' => date('Y-m-d', strtotime($fecha . ' + 3 days')),
+            'lugar' => $lugar,
+            'costo_inscripcion' => $costo,
+            'cupos' => $cuposTotales,
+            'estado' => $estado,
         ];
 
         try {
-            $db->table('cursos')->insert($data);
-            $data['id'] = $db->insertID();
+            $db->table('cursos_seguridad_vial')->insert($data);
+            $newId = $db->insertID();
             
             $response = [
-                'id' => $data['id'],
-                'codigo' => $data['codigo'],
-                'titulo' => $data['titulo'],
-                'instructor' => $data['instructor'],
-                'fecha' => $data['fecha'],
-                'horario' => $data['horario'],
+                'id' => $newId,
+                'codigo' => $codigo,
+                'titulo' => $data['nombre'],
+                'descripcion' => $data['descripcion'],
+                'instructor' => $instructor,
+                'fecha' => $data['fecha_inicio'],
+                'horario' => '09:00 AM - 12:00 PM',
                 'lugar' => $data['lugar'],
-                'cuposTotales' => (int)$data['cupos_totales'],
+                'cuposTotales' => $cuposTotales,
                 'cuposInscritos' => 0,
-                'estado' => $data['estado'],
-                'costo' => (float)$data['costo'],
+                'estado' => $estado,
+                'costo' => $costo,
                 'temario' => [],
                 'participantes' => [],
             ];
             return $this->respondCreated(['status' => 201, 'data' => $response]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error creando el curso');
+            return $this->failServerError('Error creando el curso: ' . $e->getMessage());
         }
     }
 
     public function update($id = null)
     {
         $db = \Config\Database::connect();
-        $input = $this->request->getJSON(true);
+        try {
+            $input = $this->request->getJSON(true);
+        } catch (\Throwable $e) {
+            $input = null;
+        }
+        if (!is_array($input)) {
+            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
 
-        $data = [
-            'titulo' => $input['titulo'] ?? '',
-            'instructor' => $input['instructor'] ?? '',
-            'fecha' => $input['fecha'] ?? '',
-            'horario' => $input['horario'] ?? '',
-            'lugar' => $input['lugar'] ?? '',
-            'cupos_totales' => $input['cuposTotales'] ?? 0,
-            'costo' => $input['costo'] ?? 0,
-        ];
+        $data = [];
+        if (isset($input['titulo'])) {
+            $data['nombre'] = trim($input['titulo']);
+        }
+        if (isset($input['descripcion'])) {
+            $data['descripcion'] = trim($input['descripcion']);
+        }
+        if (isset($input['instructor'])) {
+            $data['resolucion'] = trim($input['instructor']);
+        }
+        if (isset($input['fecha'])) {
+            $data['fecha_inicio'] = trim($input['fecha']);
+        }
+        if (isset($input['lugar'])) {
+            $data['lugar'] = trim($input['lugar']);
+        }
+        if (isset($input['cuposTotales'])) {
+            $data['cupos'] = (int)$input['cuposTotales'];
+        }
+        if (isset($input['costo'])) {
+            $data['costo_inscripcion'] = (float)$input['costo'];
+        }
+        if (isset($input['estado'])) {
+            $data['estado'] = trim($input['estado']);
+        }
 
         try {
-            $db->table('cursos')->where('id', $id)->update($data);
-            return $this->respond(['status' => 200, 'message' => 'Actualizado correctamente']);
+            if (!empty($data)) {
+                $db->table('cursos_seguridad_vial')->where('id', $id)->update($data);
+            }
+            return $this->respond(['status' => 200, 'message' => 'Curso actualizado correctamente']);
         } catch (\Exception $e) {
-            return $this->failServerError('Error actualizando el curso');
+            return $this->failServerError('Error actualizando el curso: ' . $e->getMessage());
         }
     }
 
@@ -116,10 +168,10 @@ class CursosController extends ResourceController
     {
         $db = \Config\Database::connect();
         try {
-            $db->table('cursos')->where('id', $id)->delete();
+            $db->table('cursos_seguridad_vial')->where('id', $id)->delete();
             return $this->respondDeleted(['status' => 200, 'message' => 'Curso eliminado correctamente']);
         } catch (\Exception $e) {
-            return $this->failServerError('Error eliminando el curso');
+            return $this->failServerError('Error eliminando el curso: ' . $e->getMessage());
         }
     }
 }

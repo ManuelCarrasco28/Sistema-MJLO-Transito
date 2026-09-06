@@ -18,16 +18,16 @@ class PagosController extends ResourceController
                     p.id,
                     p.numero_recibo as numeroRecibo,
                     p.concepto,
-                    p.tipo_concepto as tipoConcepto,
-                    p.referencia_codigo as referenciaCodigo,
-                    p.contribuyente,
-                    p.documento_identidad as documentoIdentidad,
-                    p.vehiculo_placa as vehiculoPlaca,
-                    p.monto,
+                    p.numero_voucher as contribuyente,
+                    p.codigo_contribuyente as dniRuc,
+                    p.codigo_contribuyente as documentoIdentidad,
+                    p.subtotal as monto,
                     p.descuento_aplicado as descuentoAplicado,
-                    p.monto_neto as montoNeto,
-                    p.metodo_pago as metodoPago,
-                    p.fecha_hora as fechaHora,
+                    p.total as montoNeto,
+                    p.tipo_pago as metodoPago,
+                    p.tipo_pago as metodo,
+                    CONCAT(p.fecha_pago, ' ', COALESCE(p.hora_pago, '10:00:00')) as fechaHora,
+                    p.fecha_pago as fecha,
                     p.cajero,
                     p.estado
                 ")
@@ -36,69 +36,93 @@ class PagosController extends ResourceController
                 ->getResultArray();
 
             $data = array_map(static function (array $row) {
-                $row['monto'] = (float) $row['monto'];
-                $row['descuentoAplicado'] = (float) $row['descuentoAplicado'];
-                $row['montoNeto'] = (float) $row['montoNeto'];
+                $row['id'] = (int)$row['id'];
+                $row['monto'] = (float)$row['monto'];
+                $row['descuentoAplicado'] = (float)$row['descuentoAplicado'];
+                $row['montoNeto'] = (float)$row['montoNeto'];
+                $row['tipoConcepto'] = 'TRAMITE';
+                $row['vehiculoPlaca'] = '';
+                $row['contribuyente'] = $row['contribuyente'] ?: 'Contribuyente Particular';
+                $row['dniRuc'] = $row['dniRuc'] ?: 'N/A';
+                $row['cajero'] = $row['cajero'] ?: 'Caja Central Municipal';
                 return $row;
             }, $rows);
-        } catch (\Exception $e) {
-            // Fallback en caso de que la tabla de pagos no tenga todos estos campos
-            $data = [];
-        }
 
-        return $this->respond(['data' => $data]);
+            return $this->respond(['data' => $data]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error consultando pagos: ' . $e->getMessage());
+        }
     }
 
     public function create()
     {
         $db = \Config\Database::connect();
-        $input = $this->request->getJSON(true);
+        try {
+            $input = $this->request->getJSON(true);
+        } catch (\Throwable $e) {
+            $input = null;
+        }
+        if (!is_array($input)) {
+            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
 
-        $monto = (float)($input['monto'] ?? 0);
-        $descuentoAplicado = (float)($input['descuentoAplicado'] ?? 0);
-        
+        $monto = (float)($input['monto'] ?? $input['montoNeto'] ?? 0);
+        $descuento = (float)($input['descuentoAplicado'] ?? 0);
+        $total = max(0, $monto - $descuento);
+        $metodo = trim($input['metodoPago'] ?? $input['metodo'] ?? 'EFECTIVO');
+        $contribuyente = trim($input['contribuyente'] ?? 'Contribuyente Particular');
+        $dniRuc = trim($input['documentoIdentidad'] ?? $input['dniRuc'] ?? '');
+        $concepto = trim($input['concepto'] ?? 'Pago de Trámite Municipal');
+        $numeroRecibo = trim($input['numeroRecibo'] ?? ('REC-' . date('Y') . '-' . str_pad((string)random_int(1, 99999), 5, '0', STR_PAD_LEFT)));
+        $fechaPago = date('Y-m-d');
+        $horaPago = date('H:i:s');
+        $cajero = 'Caja Central Municipal';
+
         $data = [
-            'numero_recibo' => 'REC-' . date('Y') . '-' . str_pad(random_int(1, 99999), 5, '0', STR_PAD_LEFT),
-            'concepto' => $input['concepto'] ?? 'Pago General',
-            'tipo_concepto' => $input['tipoConcepto'] ?? 'OTROS',
-            'referencia_codigo' => $input['referenciaCodigo'] ?? '',
-            'contribuyente' => $input['contribuyente'] ?? '',
-            'documento_identidad' => $input['documentoIdentidad'] ?? '',
-            'vehiculo_placa' => $input['vehiculoPlaca'] ?? '',
-            'monto' => $monto,
-            'descuento_aplicado' => $descuentoAplicado,
-            'monto_neto' => $monto - $descuentoAplicado,
-            'metodo_pago' => $input['metodoPago'] ?? 'EFECTIVO',
-            'fecha_hora' => date('Y-m-d H:i:s'),
-            'cajero' => 'Caja Principal',
+            'tipo_pago' => $metodo,
+            'numero_recibo' => $numeroRecibo,
+            'numero_voucher' => $contribuyente,
+            'fecha_pago' => $fechaPago,
+            'hora_pago' => $horaPago,
+            'cajero' => $cajero,
+            'caja' => 'Caja 01',
+            'codigo_contribuyente' => $dniRuc,
+            'concepto' => $concepto,
+            'subtotal' => $monto,
+            'reajuste' => 0.00,
+            'intereses' => 0.00,
+            'descuento_aplicado' => $descuento,
+            'redondeo' => 0.00,
+            'total' => $total,
             'estado' => 'PAGADO',
         ];
 
         try {
             $db->table('pagos')->insert($data);
-            $data['id'] = $db->insertID();
+            $newId = $db->insertID();
             
-            // Format to frontend
             $response = [
-                'id' => $data['id'],
-                'numeroRecibo' => $data['numero_recibo'],
-                'concepto' => $data['concepto'],
-                'tipoConcepto' => $data['tipo_concepto'],
-                'referenciaCodigo' => $data['referencia_codigo'],
-                'contribuyente' => $data['contribuyente'],
-                'documentoIdentidad' => $data['documento_identidad'],
-                'vehiculoPlaca' => $data['vehiculo_placa'],
-                'monto' => $data['monto'],
-                'descuentoAplicado' => $data['descuento_aplicado'],
-                'montoNeto' => $data['monto_neto'],
-                'metodoPago' => $data['metodo_pago'],
-                'fechaHora' => $data['fecha_hora'],
-                'cajero' => $data['cajero'],
-                'estado' => $data['estado'],
+                'id' => $newId,
+                'numeroRecibo' => $numeroRecibo,
+                'concepto' => $concepto,
+                'tipoConcepto' => 'TRAMITE',
+                'contribuyente' => $contribuyente,
+                'dniRuc' => $dniRuc,
+                'documentoIdentidad' => $dniRuc,
+                'vehiculoPlaca' => '',
+                'monto' => $monto,
+                'descuentoAplicado' => $descuento,
+                'montoNeto' => $total,
+                'metodoPago' => $metodo,
+                'metodo' => $metodo,
+                'fechaHora' => "$fechaPago $horaPago",
+                'fecha' => "$fechaPago $horaPago",
+                'cajero' => $cajero,
+                'estado' => 'PAGADO',
             ];
             return $this->respondCreated(['status' => 201, 'data' => $response]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error registrando el pago');
+            return $this->failServerError('Error creando el pago: ' . $e->getMessage());
         }
     }
 
@@ -109,7 +133,7 @@ class PagosController extends ResourceController
             $db->table('pagos')->where('id', $id)->update(['estado' => 'ANULADO']);
             return $this->respondDeleted(['status' => 200, 'message' => 'Pago anulado correctamente']);
         } catch (\Exception $e) {
-            return $this->failServerError('Error anulando el pago');
+            return $this->failServerError('Error anulando el pago: ' . $e->getMessage());
         }
     }
 }
