@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
@@ -143,18 +144,15 @@ export function Vehiculos() {
           method: 'PUT',
           body: formData,
         })
-        setVehiculos(vehiculos.map((v) => (v.id === selectedVehiculo.id ? { ...formData, id: v.id } : v)))
+        setVehiculos(vehiculos.map((v) => (v.id === selectedVehiculo.id ? { ...v, ...formData, id: v.id } : v)))
       } else {
         const res = await apiFetch('/vehiculos', {
           method: 'POST',
           body: formData,
         })
         const resData = await res.json()
-        const newVehiculo = resData.data || {
-          ...formData,
-          id: Date.now(),
-          codigoQr: `QR-VEH-2026-${Math.floor(100 + Math.random() * 900)}`,
-        }
+        if (!res.ok || !resData.data?.id) throw new Error('No se pudo registrar el vehículo.')
+        const newVehiculo = resData.data
         setVehiculos([newVehiculo, ...vehiculos])
       }
       setIsModalOpen(false)
@@ -849,13 +847,17 @@ export function Vehiculos() {
               
               <div className="flex flex-col sm:flex-row items-center gap-6 rounded-2xl border border-slate-100 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-900/60">
                 <div className="flex flex-col items-center justify-center rounded-2xl bg-white p-3 shadow-sm border border-slate-200/80 dark:bg-slate-950 dark:border-slate-800">
-                  <div className="size-24 border-2 border-slate-900 bg-slate-900 p-2 text-white flex flex-col justify-center items-center rounded-xl shadow-inner">
-                    <span className="text-xs font-black text-cyan-400">QR VERIFIED</span>
-                    <span className="text-[8px] text-slate-300 font-mono mt-0.5">MDJLO-TRANSITO</span>
-                    <div className="mt-1 h-1 w-12 bg-cyan-400 rounded-full" />
-                  </div>
+                  <QRCodeSVG
+                    value={`MDJLO - Tránsito Municipal\nVehículo: ${selectedVehiculo.id}\nPlaca: ${selectedVehiculo.placa}${selectedVehiculo.codigoQr ? `\nCódigo: ${selectedVehiculo.codigoQr}` : ''}`}
+                    size={180}
+                    level="M"
+                    marginSize={4}
+                    bgColor="#ffffff"
+                    fgColor="#000000"
+                    title={`Código QR del vehículo ${selectedVehiculo.placa}`}
+                  />
                   <span className="mt-2 font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                    {selectedVehiculo.codigoQr}
+                    Escanea para identificar el vehículo
                   </span>
                 </div>
 

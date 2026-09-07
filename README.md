@@ -71,3 +71,375 @@ php spark serve --port 8080
 
 Disponible en `http://localhost:8080/api/status`.
 
+## Contexto de Base de Datos
+
+Base de datos: `transitomunicipal`
+
+Motor: MySQL / MariaDB
+
+Proyecto: Sistema de Gestion de Transito Municipal de la Municipalidad Distrital de Jose Leonardo Ortiz, Area de Transito, Transporte y Seguridad Vial.
+
+### Regla de documentos del vehiculo
+
+Los documentos asociados al vehiculo se guardan en la tabla `documentos_vehiculo`.
+
+Aqui van:
+
+- SOAT
+- Tarjeta de propiedad
+- Tarjeta de operatividad
+- CERTICAV
+
+La tarjeta de operatividad ya no usa una tabla aparte. Se registra asi:
+
+```text
+documentos_vehiculo
+- id
+- vehiculo_id
+- tipo_documento
+- codigo
+- fecha_expedicion
+- fecha_expiracion
+- estado
+```
+
+Ejemplo:
+
+```text
+vehiculo_id: 5
+tipo_documento: TARJETA_OPERATIVIDAD
+codigo: 034-2023
+fecha_expedicion: 2023-01-01
+fecha_expiracion: 2024-01-01
+estado: VIGENTE
+```
+
+Estados para tarjeta de operatividad:
+
+- VIGENTE
+- VENCIDO
+- ANULADO
+- EN_TRAMITE
+
+No debe existir una tabla separada llamada `tarjetas_operatividad`.
+
+### Tablas finales
+
+#### personal
+
+- id
+- tipo_documento
+- numero_documento
+- nombres
+- apellidos
+- cargo
+- estado
+
+#### usuarios
+
+- id
+- personal_id
+- nombre_usuario
+- password_hash
+- estado
+
+#### personas
+
+- id
+- tipo_documento
+- numero_documento
+- nombres
+- apellido_paterno
+- apellido_materno
+- direccion
+- telefono
+- celular
+- email
+- numero_licencia_conducir
+- foto_url
+- estado
+
+#### organizaciones
+
+- id
+- tipo
+- razon_social
+- ruc
+- partida_registral
+- representante_legal
+- direccion
+- telefono_contacto
+- email_contacto
+- estado
+
+#### tipos_vehiculo
+
+- id
+- nombre
+- descripcion
+- estado
+
+#### vehiculos
+
+- id
+- tipo_vehiculo_id
+- placa
+- marca
+- modelo
+- color
+- anio_fabricacion
+- numero_serie
+- serie_motor
+- partida_registral
+- codigo_qr
+- asociacion_id
+- estado_formalizacion
+
+#### vehiculo_propietarios
+
+- id
+- vehiculo_id
+- persona_id
+- organizacion_id
+- fecha_inicio
+- fecha_fin
+- documento_sustento
+- estado
+
+#### documentos_vehiculo
+
+- id
+- vehiculo_id
+- tipo_documento
+- codigo
+- fecha_expedicion
+- fecha_expiracion
+- estado
+
+Valores de `documentos_vehiculo.tipo_documento`:
+
+- SOAT
+- TARJETA_PROPIEDAD
+- TARJETA_OPERATIVIDAD
+- CERTICAV
+
+#### inspeccion_criterios
+
+- id
+- codigo
+- nombre
+- descripcion
+- obligatorio
+- orden
+- estado
+
+#### inspecciones_tecnicas
+
+- id
+- numero_inspeccion
+- vehiculo_id
+- tecnico_id
+- fecha_inspeccion
+- resultado
+- primera_evaluacion
+- segunda_evaluacion
+- observaciones
+- estado
+
+#### inspeccion_detalles
+
+- id
+- inspeccion_id
+- criterio_id
+- estado_revision
+- observacion
+
+Valores de `inspeccion_detalles.estado_revision`:
+
+- BIEN
+- MAL_ESTADO
+- NO_TIENE
+
+#### cursos_seguridad_vial
+
+- id
+- codigo
+- nombre
+- descripcion
+- resolucion
+- fecha_inicio
+- fecha_fin
+- lugar
+- costo_inscripcion
+- cupos
+- estado
+
+#### inscripciones_curso
+
+- id
+- curso_id
+- persona_id
+- vehiculo_id
+- numero_ri
+- fecha_inscripcion
+- estado_pago
+- asistio
+- estado
+
+#### tramites_documentarios
+
+- id
+- numero_formulario
+- tipo_tramite
+- persona_id
+- organizacion_id
+- vehiculo_id
+- funcionario_dirigido
+- cargo_funcionario
+- detalle_solicitud
+- fecha_solicitud
+- estado
+
+#### tipos_infraccion
+
+- id
+- codigo
+- descripcion
+- gravedad
+- monto_base
+- estado
+
+#### papeletas
+
+- id
+- numero_papeleta
+- vehiculo_id
+- persona_infractor_id
+- inspector_id
+- fecha_hora
+- lugar
+- servicio
+- unidad_autoridad
+- nombre_autoridad
+- observacion_autoridad
+- observaciones_conductor
+- monto_total
+- estado
+
+#### papeleta_detalles
+
+- id
+- papeleta_id
+- tipo_infraccion_id
+- monto
+- descuento
+- monto_final
+
+#### pagos
+
+- id
+- tipo_pago
+- papeleta_id
+- tramite_id
+- numero_recibo
+- numero_voucher
+- fecha_pago
+- hora_pago
+- cajero
+- caja
+- codigo_contribuyente
+- concepto
+- subtotal
+- reajuste
+- intereses
+- descuento_aplicado
+- redondeo
+- total
+- estado
+
+Valores de `pagos.tipo_pago`:
+
+- PAPELETA
+- TRAMITE
+
+#### retenciones_vehiculo
+
+- id
+- papeleta_id
+- fecha_ingreso
+- deposito
+- motivo
+- numero_boleta
+- total_dias
+- estado
+- fecha_salida
+- observaciones
+
+#### ordenes_libertad
+
+- id
+- numero_orden
+- retencion_id
+- pago_id
+- persona_autorizada_id
+- fecha_emision
+- monto_total
+- observaciones
+
+#### permisos_circulacion
+
+- id
+- tramite_id
+- organizacion_id
+- vehiculo_id
+- numero_autorizacion
+- tipo_permiso
+- asunto
+- referencia_sisgedo
+- expediente
+- registro_numero
+- contenido
+- zona_circulacion
+- horario_inicio
+- horario_fin
+- fecha_emision
+- fecha_inicio_vigencia
+- fecha_fin_vigencia
+- estado
+
+Valores de `permisos_circulacion.tipo_permiso`:
+
+- CARGA_DESCARGA
+- CIRCULACION
+- ESTACIONAMIENTO
+
+### Tablas descartadas
+
+Estas tablas no forman parte del modelo final:
+
+- soats
+- tarjetas_operatividad
+- certicaps
+- roles
+- modulos
+- rol_modulos
+- qr_codes
+- lote_qr_detalles
+- lote_impresion
+- conductores
+- vehiculo_conductores
+- organizacion_personas
+- pagos_papeleta
+- pagos_tramite
+- auditoria
+- operativos
+- vistas
+
+### Resumen logico
+
+- SOAT, tarjeta de propiedad, tarjeta de operatividad y CERTICAV se manejan en `documentos_vehiculo`.
+- El curso vial pertenece a personas mediante `inscripciones_curso`.
+- CERTICAV no tiene tabla propia porque se maneja como documento del vehiculo.
+- Los pagos se manejan en una sola tabla: `pagos`.
+- Las papeletas se dividen en `papeletas` y `papeleta_detalles` porque una papeleta puede tener varias infracciones.
+- El QR va como atributo `codigo_qr` dentro de `vehiculos`.
