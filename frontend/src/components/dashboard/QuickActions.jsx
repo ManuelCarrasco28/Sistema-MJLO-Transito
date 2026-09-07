@@ -1,4 +1,5 @@
 import { Icon } from '../ui/Icon'
+import { useNavigate } from 'react-router-dom'
 
 const quickActions = [
   { label: 'Registrar vehículo', description: 'Nueva unidad', icon: 'vehicle', tone: 'blue' },
@@ -8,6 +9,8 @@ const quickActions = [
 ]
 
 export function QuickActions() {
+  const navigate = useNavigate()
+  const routes = { vehicle: '/vehiculos', inspection: '/inspecciones', ticket: '/papeletas', payment: '/pagos' }
   const actionStyles = {
     blue: {
       icon: 'bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300 group-hover:bg-blue-600 group-hover:text-white',
@@ -54,6 +57,7 @@ export function QuickActions() {
             <button
               key={action.label}
               type="button"
+              onClick={() => navigate(`${routes[action.icon]}?accion=registrar`)}
               className={`group relative overflow-hidden rounded-2xl border border-white/70 bg-linear-to-br ${currentStyle.card} p-1 text-left shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-700/70 ${currentStyle.border}`}
             >
               <span className={`absolute inset-x-0 top-0 h-1 bg-linear-to-r ${currentStyle.accent}`} aria-hidden="true" />

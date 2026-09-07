@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
@@ -30,6 +31,8 @@ export function Pagos() {
     })
     setIsModalOpen(true)
   }
+
+  useQuickCreate(handleOpenCreateModal, !isLoading)
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro que desea anular este recibo de pago?')) {
