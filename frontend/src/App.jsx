@@ -6,6 +6,7 @@ import { Header } from './components/layout/Header'
 import { DashboardHome } from './pages/DashboardHome'
 import { Vehiculos } from './pages/Vehiculos'
 import { Personas } from './pages/Personas'
+import { Personal } from './pages/Personal'
 import { Organizaciones } from './pages/Organizaciones'
 import { Documentos } from './pages/Documentos'
 import { Inspecciones } from './pages/Inspecciones'
@@ -23,6 +24,7 @@ function Layout({ onLogout, user }) {
     const path = location.pathname
     if (path.includes('/vehiculos')) return 'Vehículos'
     if (path.includes('/personas')) return 'Personas'
+    if (path.includes('/personal')) return 'Personal'
     if (path.includes('/organizaciones')) return 'Organizaciones'
     if (path.includes('/documentos')) return 'Documentos'
     if (path.includes('/inspecciones')) return 'Inspecciones'
@@ -119,6 +121,7 @@ function Layout({ onLogout, user }) {
             <Route path="/dashboard" element={<DashboardHome />} />
             <Route path="/vehiculos" element={<Vehiculos />} />
             <Route path="/personas" element={<Personas />} />
+            <Route path="/personal" element={<Personal />} />
             <Route path="/organizaciones" element={<Organizaciones />} />
             <Route path="/documentos" element={<Documentos />} />
             <Route path="/inspecciones" element={<Inspecciones />} />

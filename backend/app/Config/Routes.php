@@ -13,6 +13,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     
     $routes->resource('vehiculos', ['controller' => 'VehiculosController']);
     $routes->resource('personas', ['controller' => 'PersonasController']);
+    $routes->resource('personal', ['controller' => 'PersonalController', 'only' => ['index', 'create', 'update']]);
     $routes->resource('organizaciones', ['controller' => 'OrganizacionesController']);
     $routes->resource('documentos', ['controller' => 'DocumentosController']);
     $routes->resource('papeletas', ['controller' => 'PapeletasController']);

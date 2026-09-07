@@ -10,4 +10,5 @@ export const navigation = [
   ['payment', 'Pagos'],
   ['retention', 'Retenciones'],
   ['permit', 'Permisos'],
+  ['people', 'Personal'],
 ]
