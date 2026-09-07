@@ -43,6 +43,7 @@ class PapeletasController extends ResourceController
                     v.placa as vehiculoPlaca,
                     COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(per.nombres, ' ', per.apellido_paterno), 'Conductor No Identificado') as infractor,
                     COALESCE(CONCAT(ins.nombres, ' ', ins.apellidos), 'Inspector Municipal') as inspector,
+                    ins.numero_documento as inspectorCIP,
                     p.fecha_hora as fechaHora,
                     p.lugar,
                     p.observacion_autoridad as observacionesAutoridad,
@@ -64,7 +65,7 @@ class PapeletasController extends ResourceController
                 
                 
                 $detalles = $db->table('papeleta_detalles pd')
-                    ->select('pd.tipo_infraccion_id as tipoInfraccionId, ti.codigo, pd.monto, pd.descuento, pd.monto_final as montoFinal')
+                    ->select('pd.tipo_infraccion_id as tipoInfraccionId, ti.codigo, ti.gravedad, pd.monto, pd.descuento, pd.monto_final as montoFinal')
                     ->join('tipos_infraccion ti', 'ti.id = pd.tipo_infraccion_id', 'left')
                     ->where('pd.papeleta_id', $row['id'])
                     ->get()
