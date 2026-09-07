@@ -86,6 +86,48 @@ export function Vehiculos() {
     currentPage * itemsPerPage
   )
 
+  const getVehiculoDocumento = (vehiculo, tipoDocumento) => (
+    vehiculo?.documentosVehiculo?.find((doc) => doc.tipoDocumento === tipoDocumento)
+  )
+
+  const formatDocumentoQr = (label, documento) => {
+    if (!documento) return `${label}: SIN REGISTRO`
+
+    return `${label}: ${documento.codigo || 'SIN CODIGO'} | Estado: ${documento.estado || 'SIN ESTADO'} | Vence: ${documento.fechaExpiracion || 'SIN FECHA'}`
+  }
+
+  const buildVehiculoQrValue = (vehiculo) => {
+    const tarjetaPropiedad = getVehiculoDocumento(vehiculo, 'TARJETA_PROPIEDAD')
+    const soat = getVehiculoDocumento(vehiculo, 'SOAT')
+    const certicav = getVehiculoDocumento(vehiculo, 'CERTICAV')
+    const papeletas = vehiculo.historialPapeletas || []
+    const papeletasQr = papeletas.length > 0
+      ? papeletas.slice(0, 8).map((papeleta, index) => (
+        `${index + 1}. ${papeleta.numeroPapeleta || 'SIN NUMERO'} | ${papeleta.estado || 'SIN ESTADO'} | S/ ${Number(papeleta.montoTotal || 0).toFixed(2)} | ${papeleta.fechaHora || 'SIN FECHA'}`
+      )).join('\n')
+      : 'SIN PAPELETAS REGISTRADAS'
+
+    return [
+      'MDJLO - Sistema de Gestion de Transito Municipal',
+      `Codigo QR: ${vehiculo.codigoQr || 'SIN CODIGO'}`,
+      `Placa del vehiculo: ${vehiculo.placa || 'SIN PLACA'}`,
+      `Tipo de vehiculo: ${vehiculo.tipo || 'SIN TIPO'}`,
+      `Marca: ${vehiculo.marca || 'SIN MARCA'}`,
+      `Modelo: ${vehiculo.modelo || 'SIN MODELO'}`,
+      `Color: ${vehiculo.color || 'SIN COLOR'}`,
+      `Anio fabricacion: ${vehiculo.anio || 'SIN ANIO'}`,
+      `Propietario: ${vehiculo.propietario || 'SIN PROPIETARIO'}`,
+      `DNI propietario: ${vehiculo.propietarioTipoDocumento === 'DNI' ? vehiculo.propietarioDni || 'SIN DNI' : 'NO APLICA'}`,
+      `RUC organizacion: ${vehiculo.organizacionRuc || 'SIN RUC'}`,
+      `Organizacion vehiculo: ${vehiculo.organizacion || 'INDEPENDIENTE'}`,
+      formatDocumentoQr('Tarjeta de propiedad numero', tarjetaPropiedad),
+      formatDocumentoQr('SOAT', soat),
+      formatDocumentoQr('CERTICAV', certicav),
+      'Historial de papeletas del vehiculo:',
+      papeletasQr,
+    ].join('\n')
+  }
+
   const handleOpenCreateModal = () => {
     setFormData({
       placa: '',
@@ -326,8 +368,17 @@ export function Vehiculos() {
         </div>
 
         
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Listado de vehículos" tabIndex={0}>
+          <table className="w-full min-w-[1160px] table-fixed text-left text-sm">
+            <colgroup>
+              <col className="w-[11%]" />
+              <col className="w-[19%]" />
+              <col className="w-[16%]" />
+              <col className="w-[17%]" />
+              <col className="w-[14%]" />
+              <col className="w-[13%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
               <tr>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Placa</th>
@@ -336,7 +387,7 @@ export function Vehiculos() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Propietario & Titular</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
+                <th className="px-3 py-3.5 text-center whitespace-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -354,7 +405,7 @@ export function Vehiculos() {
                     <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-4"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
                   </tr>
                 ))
               ) : filteredVehiculos.length === 0 ? (
@@ -389,8 +440,8 @@ export function Vehiculos() {
                       <p className="font-extrabold text-slate-800 dark:text-white truncate" title={`${v.marca} ${v.modelo}`}>
                         {v.marca} {v.modelo}
                       </p>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-400">
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300 truncate max-w-[120px]">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-400">
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                           {v.tipo}
                         </span>
                         <span>·</span>
@@ -442,8 +493,8 @@ export function Vehiculos() {
                     </td>
 
                     
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-blue-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
-                      <div className="flex items-center justify-end gap-1.5 pr-1">
+                    <td className="px-3 py-3.5 whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(v)}
@@ -807,21 +858,21 @@ export function Vehiculos() {
 
       
       {isDetailModalOpen && selectedVehiculo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-xs animate-enter sm:p-4">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
             
-            <div className="relative border-b border-slate-800 bg-[#071a2f] p-6 text-white overflow-hidden">
+            <div className="relative overflow-hidden border-b border-slate-800 bg-[#071a2f] px-5 py-4 text-white">
               <div className="absolute right-0 top-0 translate-x-6 -translate-y-6 size-44 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
 
               <div className="flex items-center justify-between relative z-10">
                 <div>
-                  <span className="inline-block rounded-full bg-cyan-500/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-cyan-300 border border-cyan-500/30">
-                    Ficha Técnica Vehicular Municipal · MDJLO
+                  <span className="inline-flex rounded-md border border-cyan-500/30 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-cyan-200">
+                    Ficha vehicular municipal
                   </span>
-                  <div className="flex items-center gap-3 mt-2">
-                    <h3 className="text-2xl font-black tracking-tight">{selectedVehiculo.placa}</h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <h3 className="text-2xl font-black tracking-tight sm:text-3xl">{selectedVehiculo.placa}</h3>
                     <span
-                      className={`rounded-full px-3 py-0.5 text-xs font-black ${
+                      className={`rounded-md px-2.5 py-1 text-xs font-black ${
                         selectedVehiculo.estado === 'FORMALIZADO'
                           ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                           : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
@@ -835,7 +886,7 @@ export function Vehiculos() {
                 <button
                   type="button"
                   onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-full p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+                  className="rounded-lg p-2 text-slate-300 transition-all hover:bg-white/10 hover:text-white cursor-pointer"
                 >
                   ✕
                 </button>
@@ -843,14 +894,14 @@ export function Vehiculos() {
             </div>
 
             
-            <div className="p-6 space-y-6">
+            <div className="max-h-[calc(92vh-84px)] space-y-4 overflow-y-auto p-5">
               
-              <div className="flex flex-col sm:flex-row items-center gap-6 rounded-2xl border border-slate-100 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-900/60">
-                <div className="flex flex-col items-center justify-center rounded-2xl bg-white p-3 shadow-sm border border-slate-200/80 dark:bg-slate-950 dark:border-slate-800">
+              <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+                <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                   <QRCodeSVG
-                    value={`MDJLO - Tránsito Municipal\nVehículo: ${selectedVehiculo.id}\nPlaca: ${selectedVehiculo.placa}${selectedVehiculo.codigoQr ? `\nCódigo: ${selectedVehiculo.codigoQr}` : ''}`}
+                    value={buildVehiculoQrValue(selectedVehiculo)}
                     size={180}
-                    level="M"
+                    level="Q"
                     marginSize={4}
                     bgColor="#ffffff"
                     fgColor="#000000"
@@ -861,55 +912,102 @@ export function Vehiculos() {
                   </span>
                 </div>
 
-                <div className="space-y-2 text-center sm:text-left flex-1">
-                  <span className="inline-block rounded-md bg-blue-100 px-2.5 py-0.5 text-xs font-extrabold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                    {selectedVehiculo.tipo}
-                  </span>
-                  <h4 className="text-xl font-black text-slate-800 dark:text-white">
-                    {selectedVehiculo.marca} {selectedVehiculo.modelo}
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Color: <strong className="text-slate-700 dark:text-slate-200">{selectedVehiculo.color}</strong> · Año de Fab.:{' '}
-                    <strong className="text-slate-700 dark:text-slate-200">{selectedVehiculo.anio}</strong>
-                  </p>
-                  <div className="rounded-xl border border-slate-200/60 bg-white p-2.5 text-xs dark:border-slate-800 dark:bg-slate-950">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Empresa Autorizada</p>
-                    <p className="font-bold text-slate-800 dark:text-cyan-300 truncate">{selectedVehiculo.organizacion}</p>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <span className="inline-flex rounded-md bg-blue-100 px-2.5 py-1 text-xs font-extrabold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                        {selectedVehiculo.tipo}
+                      </span>
+                      <h4 className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                        {selectedVehiculo.marca} {selectedVehiculo.modelo}
+                      </h4>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-right dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Código QR</p>
+                      <p className="font-mono text-xs font-black text-slate-700 dark:text-slate-200">{selectedVehiculo.codigoQr || 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Placa</p>
+                      <p className="font-mono text-lg font-black text-slate-900 dark:text-white">{selectedVehiculo.placa}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Color</p>
+                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.color || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Año fabricación</p>
+                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.anio || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Estado</p>
+                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.estado || 'N/A'}</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               
-              <div className="grid gap-3 text-xs sm:grid-cols-2">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+              <div className="grid gap-3 text-xs lg:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Propietario Registrado</p>
                   <p className="mt-1 text-sm font-extrabold text-slate-800 dark:text-white">{selectedVehiculo.propietario}</p>
-                  <p className="text-slate-500 font-mono">DNI/RUC: {selectedVehiculo.propietarioDni || selectedVehiculo.propietarioRuc || 'N/A'}</p>
+                  <p className="text-slate-500 font-mono">DNI: {selectedVehiculo.propietarioTipoDocumento === 'DNI' ? selectedVehiculo.propietarioDni || 'N/A' : 'N/A'}</p>
+                  <p className="text-slate-500 font-mono">RUC: {selectedVehiculo.organizacionRuc || 'N/A'}</p>
+                  <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                    <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Organización del vehículo</p>
+                    <p className="mt-1 font-bold text-slate-800 dark:text-cyan-300">{selectedVehiculo.organizacion || 'Independiente'}</p>
+                  </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Tarjeta Única de Circulación (TUC)</p>
-                  <p className="mt-1 font-mono text-sm font-extrabold text-blue-600 dark:text-blue-400">{selectedVehiculo.tucNumero}</p>
-                  <p className="text-slate-500 font-semibold">SOAT: {selectedVehiculo.soatEstado}</p>
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Documentos del Vehículo</p>
+                  {[
+                    ['Tarjeta de propiedad', getVehiculoDocumento(selectedVehiculo, 'TARJETA_PROPIEDAD')],
+                    ['SOAT', getVehiculoDocumento(selectedVehiculo, 'SOAT')],
+                    ['CERTICAV', getVehiculoDocumento(selectedVehiculo, 'CERTICAV')],
+                  ].map(([label, documento]) => (
+                    <div key={label} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-900">
+                      <span className="font-bold text-slate-600 dark:text-slate-300">{label}</span>
+                      <span className="text-right font-mono font-black text-slate-800 dark:text-white">
+                        {documento?.codigo || 'N/A'}
+                        <span className="ml-2 text-[10px] font-bold text-slate-400">{documento?.estado || 'SIN_REGISTRO'}</span>
+                      </span>
+                    </div>
+                  ))}
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Número de Serie (Chasis)</p>
-                  <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.numeroSerie}</p>
+                  <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.numeroSerie || 'N/A'}</p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Partida Registral SUNARP</p>
-                  <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.partidaRegistral}</p>
+                  <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.partidaRegistral || 'N/A'}</p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 lg:col-span-2">
+                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Historial de papeletas del vehículo</p>
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm font-extrabold text-slate-800 dark:text-white">
+                      {(selectedVehiculo.historialPapeletas || []).length} papeleta(s) registrada(s)
+                    </p>
+                    <p className="font-semibold text-slate-500">
+                      Última: {selectedVehiculo.historialPapeletas?.[0]?.numeroPapeleta || 'Sin historial'} {selectedVehiculo.historialPapeletas?.[0]?.estado ? `· ${selectedVehiculo.historialPapeletas?.[0]?.estado}` : ''}
+                    </p>
+                  </div>
                 </div>
               </div>
 
               
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end border-t border-slate-100 pt-4 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 transition-all cursor-pointer"
+                  className="rounded-lg bg-slate-900 px-6 py-2.5 text-xs font-extrabold text-white transition-all hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer"
                 >
                   Cerrar Ficha
                 </button>

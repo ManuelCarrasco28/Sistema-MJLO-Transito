@@ -26,6 +26,8 @@ class VehiculosController extends ResourceController
                 COALESCE(v.partida_registral, '') AS partidaRegistral,
                 COALESCE(v.codigo_qr, '') AS codigoQr,
                 COALESCE(o.razon_social, 'Independiente') AS organizacion,
+                COALESCE(o.ruc, '') AS organizacionRuc,
+                COALESCE(p.tipo_documento, 'DNI') AS propietarioTipoDocumento,
                 COALESCE(p.nombres, '') AS propietarioNombres,
                 COALESCE(p.apellido_paterno, '') AS propietarioPaterno,
                 COALESCE(p.apellido_materno, '') AS propietarioMaterno,
@@ -40,13 +42,57 @@ class VehiculosController extends ResourceController
             ->get()
             ->getResultArray();
 
-        $data = array_map(static function (array $row): array {
+        $vehiculoIds = array_map(static fn (array $row): int => (int)$row['id'], $rows);
+        $documentosPorVehiculo = [];
+        $papeletasPorVehiculo = [];
+
+        if (!empty($vehiculoIds)) {
+            $documentos = $db->table('documentos_vehiculo')
+                ->select('vehiculo_id, tipo_documento as tipoDocumento, codigo, fecha_expedicion as fechaExpedicion, fecha_expiracion as fechaExpiracion, estado')
+                ->whereIn('vehiculo_id', $vehiculoIds)
+                ->orderBy('fecha_expiracion', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            foreach ($documentos as $doc) {
+                $vehiculoId = (int)$doc['vehiculo_id'];
+                unset($doc['vehiculo_id']);
+                $documentosPorVehiculo[$vehiculoId][] = $doc;
+            }
+
+            $papeletas = $db->table('papeletas')
+                ->select('vehiculo_id, numero_papeleta as numeroPapeleta, fecha_hora as fechaHora, lugar, monto_total as montoTotal, estado')
+                ->whereIn('vehiculo_id', $vehiculoIds)
+                ->orderBy('fecha_hora', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            foreach ($papeletas as $papeleta) {
+                $vehiculoId = (int)$papeleta['vehiculo_id'];
+                unset($papeleta['vehiculo_id']);
+                $papeleta['montoTotal'] = (float)$papeleta['montoTotal'];
+                $papeletasPorVehiculo[$vehiculoId][] = $papeleta;
+            }
+        }
+
+        $data = array_map(static function (array $row) use ($documentosPorVehiculo, $papeletasPorVehiculo): array {
             $propietario = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
             unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
+            $vehiculoId = (int)$row['id'];
+
+            $soat = null;
+            foreach ($documentosPorVehiculo[$vehiculoId] ?? [] as $doc) {
+                if (($doc['tipoDocumento'] ?? '') === 'SOAT') {
+                    $soat = $doc;
+                    break;
+                }
+            }
 
             return $row + [
                 'propietario' => $propietario ?: 'Sin Propietario Asignado',
-                'soatEstado' => 'VIGENTE',
+                'documentosVehiculo' => $documentosPorVehiculo[$vehiculoId] ?? [],
+                'historialPapeletas' => $papeletasPorVehiculo[$vehiculoId] ?? [],
+                'soatEstado' => $soat['estado'] ?? 'SIN_REGISTRO',
                 'tucNumero' => 'TUC-2026-' . str_pad($row['id'], 3, '0', STR_PAD_LEFT),
             ];
         }, $rows);
