@@ -461,14 +461,93 @@ export function Papeletas() {
               </div>
               <button onClick={() => setIsDetailModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-white cursor-pointer">✕</button>
             </div>
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <p className="font-bold text-slate-700 dark:text-slate-300">Conductor: {selectedPapeleta.infractor}</p>
-                <span className="font-mono font-black text-rose-600">S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
+            <div className="p-6 overflow-y-auto max-h-[80vh]">
+              
+              <div className="space-y-6">
+                
+                {/* Identificación de la falta */}
+                <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-3">Identificación de la falta</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Código Infracción</p>
+                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.detalles?.[0]?.codigo || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Calificación</p>
+                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.detalles?.[0]?.gravedad || 'LEVE'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lugar y Tiempo */}
+                <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-3">Lugar y Tiempo</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Fecha y Hora</p>
+                      <p className="font-bold text-slate-800 dark:text-white">{new Date(selectedPapeleta.fechaHora).toLocaleString()}</p>
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Ubicación</p>
+                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.lugar}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vehículo y Conductor */}
+                <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-3">Identificación</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Placa</p>
+                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.vehiculoPlaca}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Conductor / Propietario</p>
+                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.infractor}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Efectivo Policial / Inspector</p>
+                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.inspector} {selectedPapeleta.inspectorCIP ? `(CIP: ${selectedPapeleta.inspectorCIP})` : ''}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Estado Económico y Legal */}
+                <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-3">Estado Económico y Legal</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Monto Original</p>
+                      <p className="font-bold text-slate-800 dark:text-white">S/ {parseFloat(selectedPapeleta.detalles?.[0]?.monto || selectedPapeleta.montoTotal).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Descuentos</p>
+                      <p className="font-bold text-emerald-600">S/ {parseFloat(selectedPapeleta.detalles?.[0]?.descuento || 0).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Intereses y Gastos</p>
+                      <p className="font-bold text-rose-600">S/ 0.00</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">Estado</p>
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${selectedPapeleta.estado === 'PAGADA' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
+                        {selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-3 mt-3 flex justify-between items-center">
+                    <p className="text-slate-700 dark:text-slate-300 font-black text-xs uppercase">Total a Pagar</p>
+                    <p className="font-mono font-black text-xl text-rose-600">S/ {selectedPapeleta.montoTotal.toFixed(2)}</p>
+                  </div>
+                </div>
+
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => { setIsDetailModalOpen(false); handleOpenPreview(selectedPapeleta); }} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white cursor-pointer">Imprimir Boleta</button>
-                <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 cursor-pointer">Cerrar</button>
+
+              <div className="flex justify-end gap-2 pt-6 mt-2 border-t border-slate-100 dark:border-slate-800">
+                <button onClick={() => { setIsDetailModalOpen(false); handleOpenPreview(selectedPapeleta); }} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white cursor-pointer hover:bg-slate-800 transition">Imprimir Boleta</button>
+                <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-50 transition">Cerrar</button>
               </div>
             </div>
           </div>
@@ -477,21 +556,125 @@ export function Papeletas() {
 
       
       {isPreviewModalOpen && selectedPapeleta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
-            <div className="border-b border-rose-900 bg-[#1c080e] p-6 text-white text-center relative">
-              <button onClick={() => setIsPreviewModalOpen(false)} className="absolute right-4 top-4 rounded-full p-1 text-slate-400 cursor-pointer">✕</button>
-              <h3 className="text-xl font-black mt-1">BOLETA DE INFRACCIÓN</h3>
-              <p className="text-xs font-mono font-bold text-amber-300 mt-0.5">{selectedPapeleta.numeroPapeleta}</p>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-slate-700 dark:text-slate-300">Infractor: {selectedPapeleta.infractor}</p>
-              <p className="text-slate-700 dark:text-slate-300">Placa: {selectedPapeleta.vehiculoPlaca}</p>
-              <p className="font-mono font-black text-rose-600">Total: S/ {selectedPapeleta.montoTotal.toFixed(2)}</p>
-              <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => window.print()} className="rounded-xl bg-rose-600 px-5 py-2.5 text-xs font-extrabold text-white cursor-pointer">Imprimir</button>
-                <button onClick={() => setIsPreviewModalOpen(false)} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-extrabold text-white cursor-pointer">Cerrar</button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-enter print:bg-white print:p-0">
+          
+          {/* Controles (ocultos al imprimir) */}
+          <div className="absolute top-4 right-4 flex gap-3 print:hidden">
+            <button onClick={() => window.print()} className="rounded-xl bg-white px-5 py-2.5 text-xs font-extrabold text-rose-600 shadow-lg hover:bg-rose-50 cursor-pointer flex items-center gap-2">
+              <Icon name="print" className="size-4" /> Imprimir Ticket
+            </button>
+            <button onClick={() => setIsPreviewModalOpen(false)} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-extrabold text-white shadow-lg hover:bg-slate-800 cursor-pointer">
+              Cerrar
+            </button>
+          </div>
+
+          {/* Formato Ticket Termal */}
+          <div className="w-full max-w-[320px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl print:shadow-none print:max-w-full">
+            <div className="p-4 border border-slate-200 print:border-none print:p-0">
+              
+              {/* Encabezado */}
+              <div className="text-center mb-3">
+                <h2 className="text-sm font-black uppercase mb-1">MUNICIPALIDAD DISTRITAL</h2>
+                <h3 className="text-xs font-bold uppercase mb-1">José Leonardo Ortiz</h3>
+                <p className="text-[10px]">Subgerencia de Tránsito</p>
+                <p className="text-[10px]">RUC: 20141234567</p>
               </div>
+
+              <div className="border-t-2 border-dashed border-black my-2"></div>
+
+              <div className="text-center mb-2">
+                <h3 className="font-black text-sm uppercase">BOLETA DE INFRACCIÓN</h3>
+                <p className="font-bold text-sm mt-0.5">{selectedPapeleta.numeroPapeleta}</p>
+              </div>
+
+              <div className="border-t-2 border-dashed border-black my-2"></div>
+
+              {/* Datos de la Falta */}
+              <div className="space-y-1 mb-2">
+                <div className="flex justify-between">
+                  <span className="font-bold">FECHA/HORA:</span>
+                  <span>{new Date(selectedPapeleta.fechaHora).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="font-bold">LUGAR:</span>
+                  <p className="break-words">{selectedPapeleta.lugar}</p>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-dashed border-black my-2"></div>
+
+              {/* Infracción */}
+              <div className="space-y-1 mb-2">
+                <div className="flex justify-between">
+                  <span className="font-bold">CÓDIGO:</span>
+                  <span>{selectedPapeleta.detalles?.[0]?.codigo || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold">FALTA:</span>
+                  <span>{selectedPapeleta.detalles?.[0]?.gravedad || 'LEVE'}</span>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-dashed border-black my-2"></div>
+
+              {/* Vehículo y Conductor */}
+              <div className="space-y-1 mb-2">
+                <div className="flex justify-between">
+                  <span className="font-bold">PLACA:</span>
+                  <span>{selectedPapeleta.vehiculoPlaca}</span>
+                </div>
+                <div>
+                  <span className="font-bold">CONDUCTOR:</span>
+                  <p className="break-words uppercase">{selectedPapeleta.infractor}</p>
+                </div>
+                <div>
+                  <span className="font-bold">INSPECTOR:</span>
+                  <p className="break-words uppercase">
+                    {selectedPapeleta.inspector} {selectedPapeleta.inspectorCIP ? `(CIP: ${selectedPapeleta.inspectorCIP})` : ''}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-dashed border-black my-2"></div>
+
+              {/* Importes */}
+              <div className="space-y-1 mb-2">
+                <div className="flex justify-between">
+                  <span>Monto Base:</span>
+                  <span>S/ {parseFloat(selectedPapeleta.detalles?.[0]?.monto || selectedPapeleta.montoTotal).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Descuento:</span>
+                  <span>- S/ {parseFloat(selectedPapeleta.detalles?.[0]?.descuento || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Gastos/Int:</span>
+                  <span>+ S/ 0.00</span>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-dashed border-black my-2"></div>
+
+              {/* Total */}
+              <div className="flex justify-between items-center my-2">
+                <span className="font-black text-sm uppercase">Total a Pagar:</span>
+                <span className="font-black text-sm">S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
+              </div>
+              
+              <div className="text-center mt-1">
+                <span className="text-[10px] uppercase block">Estado: {selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado}</span>
+              </div>
+
+              <div className="border-t-2 border-dashed border-black my-2"></div>
+
+              {/* Pie de página */}
+              <div className="text-center mt-3 text-[9px] text-slate-800">
+                <p>Tiene 5 días hábiles para acceder</p>
+                <p>al descuento por pronto pago.</p>
+                <p className="mt-2 font-bold">Conserve este ticket</p>
+                <p>www.munijlo.gob.pe/transito</p>
+              </div>
+
             </div>
           </div>
         </div>
