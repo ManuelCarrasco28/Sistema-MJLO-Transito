@@ -45,7 +45,19 @@ class CursosController extends ResourceController
                 }
 
                 $row['temario'] = [];
-                $row['participantes'] = [];
+                
+                try {
+                    $participantes = $db->table('inscripciones_curso ic')
+                        ->select('p.nombres, p.apellido_paterno, p.apellido_materno, ic.estado, ic.asistio')
+                        ->join('personas p', 'p.id = ic.persona_id', 'left')
+                        ->where('ic.curso_id', $row['id'])
+                        ->get()
+                        ->getResultArray();
+                    $row['participantes'] = $participantes;
+                } catch (\Throwable $t) {
+                    $row['participantes'] = [];
+                }
+
                 $data[] = $row;
             }
 
