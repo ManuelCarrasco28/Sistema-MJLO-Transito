@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../components/ui/Icon'
+import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
@@ -149,6 +150,8 @@ export function Vehiculos() {
     setIsEditing(false)
     setIsModalOpen(true)
   }
+
+  useQuickCreate(handleOpenCreateModal, !isLoading)
 
   const handleOpenEditModal = (vehiculo) => {
     setSelectedVehiculo(vehiculo)
