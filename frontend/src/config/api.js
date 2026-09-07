@@ -1,6 +1,7 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const memoryCache = new Map()
+const pendingReads = new Map()
 
 export function getCachedData(key) {
   const item = memoryCache.get(key)
@@ -52,6 +53,20 @@ export async function apiFetch(endpoint, options = {}) {
     method,
     headers,
     body,
+  }
+
+  // Share only default reads while they are in flight. Each caller gets its
+  // own body, and subsequent visits still request fresh server data.
+  if (method === 'GET' && Object.keys(options).length === 0) {
+    let request = pendingReads.get(url)
+    if (!request) {
+      request = fetch(url, config).finally(() => {
+        if (pendingReads.get(url) === request) pendingReads.delete(url)
+      })
+      pendingReads.set(url, request)
+    }
+    const response = await request
+    return response.clone()
   }
 
   const response = await fetch(url, config)

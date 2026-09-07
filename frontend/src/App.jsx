@@ -14,29 +14,11 @@ import { CursosSeguridad } from './pages/CursosSeguridad'
 import { Pagos } from './pages/Pagos'
 import { Retenciones } from './pages/Retenciones'
 import { Permisos } from './pages/Permisos'
-import { apiFetch, getCachedData, setCachedData } from './config/api'
+import { apiFetch } from './config/api'
 
 function Layout({ onLogout, user }) {
   const location = useLocation()
   
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      const endpoints = ['/vehiculos', '/personas', '/organizaciones', '/documentos']
-      for (const ep of endpoints) {
-        if (!getCachedData(ep)) {
-          try {
-            const res = await apiFetch(ep)
-            if (res.ok) {
-              const payload = await res.json()
-              if (payload?.data) setCachedData(ep, payload.data)
-            }
-          } catch (_) {}
-        }
-      }
-    }, 600)
-    return () => clearTimeout(timer)
-  }, [])
-
   const getActiveItem = () => {
     const path = location.pathname
     if (path.includes('/vehiculos')) return 'Vehículos'
