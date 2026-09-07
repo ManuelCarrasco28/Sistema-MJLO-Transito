@@ -32,13 +32,7 @@ class PersonasController extends ResourceController
             ->get()
             ->getResultArray();
 
-        $data = array_map(static fn (array $row): array => $row + [
-            'categoriaLicencia' => $row['numeroLicencia'] ? 'B-IIc (Mototaxi)' : '',
-            'vigenciaLicencia' => $row['numeroLicencia'] ? '2028-12-31' : '',
-            'rol' => $row['numeroLicencia'] ? 'Conductor' : 'Propietario / Administrado',
-        ], $rows);
-
-        return $this->respond(['data' => $data]);
+        return $this->respond(['data' => $rows]);
     }
 
     public function create()
@@ -81,9 +75,6 @@ class PersonasController extends ResourceController
             'email'             => $record['email'],
             'numeroLicencia'    => $record['numero_licencia_conducir'],
             'fotoUrl'           => $record['foto_url'],
-            'categoriaLicencia' => $record['numero_licencia_conducir'] ? 'B-IIc (Mototaxi)' : '',
-            'vigenciaLicencia'  => '2028-12-31',
-            'rol'               => $record['numero_licencia_conducir'] ? 'Conductor' : 'Propietario / Administrado',
             'estado'            => $record['estado'],
         ];
 
@@ -110,6 +101,7 @@ class PersonasController extends ResourceController
         if (isset($input['celular'])) $record['celular'] = trim($input['celular']);
         if (isset($input['email'])) $record['email'] = trim($input['email']);
         if (isset($input['numeroLicencia'])) $record['numero_licencia_conducir'] = trim($input['numeroLicencia']);
+        if (array_key_exists('fotoUrl', $input)) $record['foto_url'] = trim($input['fotoUrl'] ?? '');
         if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
 
         if (!empty($record)) {
