@@ -155,47 +155,90 @@ class PapeletasController extends ResourceController
         $tipoInfraccionId = (int)($input['tipoInfraccionId'] ?? 1);
         $obsAutoridad = trim($input['observacionesAutoridad'] ?? '');
         $obsConductor = trim($input['observacionesConductor'] ?? '');
+        $inputInspectorId = $input['inspectorId'] ?? null;
+        
+        $claseVehiculo = strtoupper(trim($input['claseVehiculo'] ?? ''));
+        $marcaVehiculo = strtoupper(trim($input['marcaVehiculo'] ?? ''));
+        $colorVehiculo = strtoupper(trim($input['colorVehiculo'] ?? ''));
+        $motorVehiculo = strtoupper(trim($input['motorVehiculo'] ?? ''));
 
         try {
             
-            $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
-            if (!$vehiculo) {
-                
-                $firstVeh = $db->table('vehiculos')->limit(1)->get()->getRowArray();
-                if ($firstVeh) {
-                    $vehiculoId = (int)$firstVeh['id'];
-                    $placa = $firstVeh['placa'];
-                } else {
-                    $db->table('vehiculos')->insert([
-                        'placa' => $placa ?: 'NC-' . rand(1000, 9999),
-                        'tipo_vehiculo_id' => 1,
-                        'estado' => 'ACTIVO'
-                    ]);
-                    $vehiculoId = $db->insertID();
+            $vehiculoId = null;
+            if ($placa !== '' && $placa !== 'SIN_PLACA') {
+                $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
+                if ($vehiculo) {
+                    $vehiculoId = (int)$vehiculo['id'];
                 }
-            } else {
-                $vehiculoId = (int)$vehiculo['id'];
+            }
+
+            if (!$vehiculoId) {
+                // Registrar nuevo vehículo (formal o informal)
+                $db->table('vehiculos')->insert([
+                    'placa' => ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . rand(1000, 9999),
+                    'tipo_vehiculo_id' => 1,
+                    'estado_formalizacion' => 'INFORMAL',
+                    'marca' => $marcaVehiculo ?: null,
+                    'color' => $colorVehiculo ?: null,
+                    'modelo' => $motorVehiculo ?: null, // Guardamos el motor/clase aquí si no hay campo exacto
+                    'estado' => 'ACTIVO'
+                ]);
+                $vehiculoId = $db->insertID();
             }
 
             
-            $inspector = $db->table('personal pe')
-                ->select("pe.id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
-                ->join('personas per', 'per.id = pe.persona_id', 'inner')
-                ->where('pe.estado', 'ACTIVO')
-                ->limit(1)
-                ->get()
-                ->getRowArray();
-            $inspectorId = $inspector ? (int)$inspector['id'] : 1;
-            $inspectorNombre = $inspector ? trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? '')) : 'Inspector Municipal';
+            $inspectorId = 1;
+            $inspectorNombre = 'Inspector Municipal';
+            
+            if ($inputInspectorId) {
+                $inspector = $db->table('personal pe')
+                    ->select("pe.id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
+                    ->join('personas per', 'per.id = pe.persona_id', 'inner')
+                    ->where('pe.id', $inputInspectorId)
+                    ->get()
+                    ->getRowArray();
+                if ($inspector) {
+                    $inspectorId = (int)$inspector['id'];
+                    $inspectorNombre = trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? ''));
+                }
+            } else {
+                $inspector = $db->table('personal pe')
+                    ->select("pe.id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
+                    ->join('personas per', 'per.id = pe.persona_id', 'inner')
+                    ->where('pe.estado', 'ACTIVO')
+                    ->limit(1)
+                    ->get()
+                    ->getRowArray();
+                if ($inspector) {
+                    $inspectorId = (int)$inspector['id'];
+                    $inspectorNombre = trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? ''));
+                }
+            }
 
             
             $persona = $db->table('personas')->limit(1)->get()->getRowArray();
             $personaId = $persona ? (int)$persona['id'] : null;
 
             
-            $infraccion = $db->table('tipos_infraccion')->where('id', $tipoInfraccionId)->limit(1)->get()->getRowArray();
-            $monto = $infraccion ? (float)$infraccion['monto_base'] : 350.00;
-            $codigoInfr = $infraccion ? $infraccion['codigo'] : 'G01';
+            $infraccionesIds = $input['infraccionesIds'] ?? [ (int)($input['tipoInfraccionId'] ?? 1) ];
+            if (!is_array($infraccionesIds) || empty($infraccionesIds)) {
+                $infraccionesIds = [1];
+            }
+
+            $montoTotal = 0;
+            $detallesToInsert = [];
+            
+            foreach ($infraccionesIds as $tipoId) {
+                $infraccion = $db->table('tipos_infraccion')->where('id', $tipoId)->limit(1)->get()->getRowArray();
+                $monto = $infraccion ? (float)$infraccion['monto_base'] : 350.00;
+                $montoTotal += $monto;
+                $detallesToInsert[] = [
+                    'tipo_infraccion_id' => $tipoId,
+                    'monto' => $monto,
+                    'descuento' => 0.00,
+                    'monto_final' => $monto,
+                ];
+            }
 
             $numeroPapeleta = 'PAP-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
             $fechaHora = date('Y-m-d H:i:s');
@@ -213,21 +256,17 @@ class PapeletasController extends ResourceController
                 'observacion_autoridad' => $obsAutoridad,
                 'observaciones_conductor' => $obsConductor,
                 'firma_conductor_estado' => 'PENDIENTE',
-                'monto_total' => $monto,
+                'monto_total' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
             ];
             $db->table('papeletas')->insert($papeletaData);
             $papeletaId = $db->insertID();
 
             
-            $detalleData = [
-                'papeleta_id' => $papeletaId,
-                'tipo_infraccion_id' => $tipoInfraccionId,
-                'monto' => $monto,
-                'descuento' => 0.00,
-                'monto_final' => $monto,
-            ];
-            $db->table('papeleta_detalles')->insert($detalleData);
+            foreach ($detallesToInsert as $detalle) {
+                $detalle['papeleta_id'] = $papeletaId;
+                $db->table('papeleta_detalles')->insert($detalle);
+            }
 
             $response = [
                 'id' => $papeletaId,
@@ -239,17 +278,8 @@ class PapeletasController extends ResourceController
                 'lugar' => $lugar,
                 'observacionesAutoridad' => $obsAutoridad,
                 'observacionesConductor' => $obsConductor,
-                'montoTotal' => $monto,
+                'montoTotal' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
-                'detalles' => [
-                    [
-                        'tipoInfraccionId' => $tipoInfraccionId,
-                        'codigo' => $codigoInfr,
-                        'monto' => $monto,
-                        'descuento' => 0.00,
-                        'montoFinal' => $monto
-                    ]
-                ]
             ];
 
             return $this->respondCreated(['status' => 201, 'data' => $response]);
