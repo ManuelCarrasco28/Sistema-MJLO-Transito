@@ -179,7 +179,7 @@ export function Inspecciones() {
 
   return (
     <div className="space-y-6">
-      
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-500/30">
@@ -196,9 +196,9 @@ export function Inspecciones() {
         </div>
       </div>
 
-      
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -217,7 +217,7 @@ export function Inspecciones() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Constataciones registradas</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
@@ -241,7 +241,7 @@ export function Inspecciones() {
           </div>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
@@ -260,7 +260,7 @@ export function Inspecciones() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Deficiencias leves (plazo 48h)</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
@@ -280,7 +280,7 @@ export function Inspecciones() {
         </div>
       </div>
 
-      
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -325,7 +325,7 @@ export function Inspecciones() {
           </div>
         </div>
 
-        
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
@@ -382,14 +382,14 @@ export function Inspecciones() {
                         </span>
                       </td>
 
-                      
+
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
                         <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
                           {i.vehiculoPlaca}
                         </span>
                       </td>
 
-                      
+
                       <td className="px-3.5 py-3.5 max-w-[180px]">
                         <p className="font-bold text-slate-800 dark:text-white truncate" title={`${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`}>
                           {vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : 'Vehículo Registrado'}
@@ -412,7 +412,7 @@ export function Inspecciones() {
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{i.inspector}</p>
                       </td>
 
-                      
+
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${i.resultado === 'APROBADO'
@@ -427,7 +427,7 @@ export function Inspecciones() {
                         </span>
                       </td>
 
-                      
+
                       <td className="sticky right-0 z-10 bg-white group-hover:bg-indigo-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                         <div className="flex items-center justify-end gap-1.5 pr-1">
                           <button
@@ -484,7 +484,7 @@ export function Inspecciones() {
         />
       </div>
 
-      
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
@@ -654,7 +654,7 @@ export function Inspecciones() {
         </div>
       )}
 
-      
+
       {isDetailModalOpen && selectedInspeccion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
@@ -708,7 +708,7 @@ export function Inspecciones() {
                 </div>
               </div>
 
-              
+
               {selectedInspeccion.detalles && selectedInspeccion.detalles.length > 0 && (
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
                   <p className="mb-2.5 font-bold uppercase text-slate-400 text-[11px] tracking-wider">
@@ -779,7 +779,7 @@ export function Inspecciones() {
         </div>
       )}
 
-      
+
       {isPreviewModalOpen && selectedInspeccion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">

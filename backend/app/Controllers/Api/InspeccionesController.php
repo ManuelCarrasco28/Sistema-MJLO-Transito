@@ -37,13 +37,13 @@ class InspeccionesController extends ResourceController
         $db = \Config\Database::connect();
         
         try {
-            $rows = $db->table('inspecciones_tecnicas i')
+            $rows = $db->table('certicav i')
                 ->select("
                     i.id,
-                    i.numero_inspeccion as numeroInspeccion,
+                    i.numero_serie_certicav as numeroInspeccion,
                     v.placa as vehiculoPlaca,
                     COALESCE(CONCAT(p.nombres, ' ', p.apellidos), 'Inspector Técnico Municipal') as inspector,
-                    i.fecha_inspeccion as fecha,
+                    i.fecha,
                     i.resultado,
                     i.observaciones,
                     i.estado
@@ -59,9 +59,9 @@ class InspeccionesController extends ResourceController
                 $row['id'] = (int)$row['id'];
                 
                 
-                $detalles = $db->table('inspeccion_detalles id')
+                $detalles = $db->table('certicav_detalles id')
                     ->select('id.criterio_id as criterioId, id.estado_revision as estado, id.observacion as obs')
-                    ->where('id.inspeccion_id', $row['id'])
+                    ->where('id.certicav_id', $row['id'])
                     ->get()
                     ->getResultArray();
 
@@ -108,7 +108,7 @@ class InspeccionesController extends ResourceController
                     $db->table('vehiculos')->insert([
                         'placa' => $placa ?: 'NC-' . rand(1000, 9999),
                         'tipo_vehiculo_id' => 1,
-                        'estado' => 'ACTIVO'
+                        'estado_formalizacion' => 'INFORMAL'
                     ]);
                     $vehiculoId = $db->insertID();
                 }
@@ -121,20 +121,20 @@ class InspeccionesController extends ResourceController
             $tecnicoId = $tecnico ? (int)$tecnico['id'] : 1;
             $tecnicoNombre = $tecnico ? ($tecnico['nombres'] . ' ' . $tecnico['apellidos']) : 'Inspector Técnico Municipal';
 
-            $numeroInspeccion = 'INSP-' . date('Y') . '-' . str_pad((string)random_int(1, 999), 3, '0', STR_PAD_LEFT);
+            $numeroInspeccion = 'CERT-' . date('Y') . '-' . str_pad((string)random_int(1, 999), 3, '0', STR_PAD_LEFT);
             $fecha = date('Y-m-d H:i:s');
 
             
             $inspData = [
-                'numero_inspeccion' => $numeroInspeccion,
+                'numero_serie_certicav' => $numeroInspeccion,
                 'vehiculo_id' => $vehiculoId,
                 'tecnico_id' => $tecnicoId,
-                'fecha_inspeccion' => $fecha,
+                'fecha' => date('Y-m-d'),
                 'resultado' => $resultado,
                 'observaciones' => $observaciones,
                 'estado' => 'ACTIVO',
             ];
-            $db->table('inspecciones_tecnicas')->insert($inspData);
+            $db->table('certicav')->insert($inspData);
             $inspeccionId = $db->insertID();
 
             
@@ -145,8 +145,8 @@ class InspeccionesController extends ResourceController
                     if ($criterioId <= 0) continue;
                     $estadoRev = trim($det['estado'] ?? 'BIEN');
                     $obs = trim($det['obs'] ?? '');
-                    $db->table('inspeccion_detalles')->insert([
-                        'inspeccion_id' => $inspeccionId,
+                    $db->table('certicav_detalles')->insert([
+                        'certicav_id' => $inspeccionId,
                         'criterio_id' => $criterioId,
                         'estado_revision' => $estadoRev,
                         'observacion' => $obs
@@ -199,16 +199,16 @@ class InspeccionesController extends ResourceController
             }
 
             if (!empty($data)) {
-                $db->table('inspecciones_tecnicas')->where('id', $id)->update($data);
+                $db->table('certicav')->where('id', $id)->update($data);
             }
 
             if (isset($input['detalles']) && is_array($input['detalles'])) {
-                $db->table('inspeccion_detalles')->where('inspeccion_id', $id)->delete();
+                $db->table('certicav_detalles')->where('certicav_id', $id)->delete();
                 foreach ($input['detalles'] as $det) {
                     $criterioId = (int)($det['criterioId'] ?? 0);
                     if ($criterioId <= 0) continue;
-                    $db->table('inspeccion_detalles')->insert([
-                        'inspeccion_id' => $id,
+                    $db->table('certicav_detalles')->insert([
+                        'certicav_id' => $id,
                         'criterio_id' => $criterioId,
                         'estado_revision' => trim($det['estado'] ?? 'BIEN'),
                         'observacion' => trim($det['obs'] ?? '')
@@ -226,7 +226,7 @@ class InspeccionesController extends ResourceController
     {
         $db = \Config\Database::connect();
         try {
-            $db->table('inspecciones_tecnicas')->where('id', $id)->update(['estado' => 'ANULADO']);
+            $db->table('certicav')->where('id', $id)->update(['estado' => 'ANULADO']);
             return $this->respondDeleted(['status' => 200, 'message' => 'Inspección anulada correctamente']);
         } catch (\Exception $e) {
             return $this->failServerError('Error anulando la inspección: ' . $e->getMessage());
