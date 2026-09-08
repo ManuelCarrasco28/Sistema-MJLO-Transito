@@ -25,14 +25,16 @@ class VehiculosController extends ResourceController
                 COALESCE(v.serie_motor, '') AS serieMotor,
                 COALESCE(v.partida_registral, '') AS partidaRegistral,
                 COALESCE(v.codigo_qr, '') AS codigoQr,
-                COALESCE(o.razon_social, 'Independiente') AS organizacion,
+                v.asociacion_id AS asociacionId,
+                o.razon_social AS organizacion,
                 COALESCE(o.ruc, '') AS organizacionRuc,
                 COALESCE(p.tipo_documento, 'DNI') AS propietarioTipoDocumento,
                 COALESCE(p.nombres, '') AS propietarioNombres,
                 COALESCE(p.apellido_paterno, '') AS propietarioPaterno,
                 COALESCE(p.apellido_materno, '') AS propietarioMaterno,
                 COALESCE(p.numero_documento, '') AS propietarioDni,
-                v.estado_formalizacion AS estado
+                v.estado_formalizacion AS estado,
+                CASE WHEN v.asociacion_id IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END AS formalidad
             ", false)
             ->join('tipos_vehiculo tv', 'tv.id = v.tipo_vehiculo_id', 'left')
             ->join('organizaciones o', 'o.id = v.asociacion_id', 'left')
@@ -60,10 +62,23 @@ class VehiculosController extends ResourceController
                 $documentosPorVehiculo[$vehiculoId][] = $doc;
             }
 
-            $papeletas = $db->table('papeletas')
-                ->select('vehiculo_id, numero_papeleta as numeroPapeleta, fecha_hora as fechaHora, lugar, monto_total as montoTotal, estado')
+            $papeletas = $db->table('papeletas p')
+                ->select("
+                    p.vehiculo_id,
+                    p.numero_papeleta as numeroPapeleta,
+                    p.fecha_hora as fechaHora,
+                    p.lugar,
+                    p.monto_total as montoTotal,
+                    p.estado,
+                    COALESCE(ti.codigo, 'SIN CODIGO') as codigoInfraccion,
+                    COALESCE(ti.descripcion, 'Infraccion no especificada') as tipoInfraccion,
+                    COALESCE(ti.gravedad, 'SIN GRAVEDAD') as gravedad
+                ", false)
+                ->join('papeleta_detalles pd', 'pd.papeleta_id = p.id', 'left')
+                ->join('tipos_infraccion ti', 'ti.id = pd.tipo_infraccion_id', 'left')
                 ->whereIn('vehiculo_id', $vehiculoIds)
-                ->orderBy('fecha_hora', 'DESC')
+                ->groupBy('p.id')
+                ->orderBy('p.fecha_hora', 'DESC')
                 ->get()
                 ->getResultArray();
 
@@ -123,15 +138,20 @@ class VehiculosController extends ResourceController
 
         
         $asociacionId = null;
-        if (!empty($input['organizacion'])) {
+        $orgName = trim($input['organizacion'] ?? '');
+        if (!empty($orgName) && !in_array($orgName, ['Sin Organización (Informal)', 'Sin Organización', 'Independiente', 'Independiente / Particular'])) {
             $orgRow = $db->table('organizaciones')
-                ->like('razon_social', trim($input['organizacion']))
+                ->like('razon_social', $orgName)
                 ->get()
                 ->getRowArray();
             if ($orgRow) {
                 $asociacionId = $orgRow['id'];
             }
         }
+
+        $estadoFormalizacion = !empty($input['estado']) && in_array(strtoupper($input['estado']), ['SUSPENDIDO', 'BAJA'])
+            ? strtoupper($input['estado'])
+            : ($asociacionId ? 'FORMAL' : 'INFORMAL');
 
         $qrCode = $input['codigoQr'] ?? ('QR-VEH-' . date('Y') . '-' . str_pad(random_int(100, 999), 3, '0', STR_PAD_LEFT));
 
@@ -147,13 +167,12 @@ class VehiculosController extends ResourceController
             'partida_registral'    => trim($input['partidaRegistral'] ?? ''),
             'codigo_qr'            => $qrCode,
             'asociacion_id'        => $asociacionId,
-            'estado_formalizacion' => strtoupper($input['estado'] ?? 'FORMALIZADO'),
+            'estado_formalizacion' => $estadoFormalizacion,
         ];
 
         $db->table('vehiculos')->insert($record);
         $vehiculoId = (int)$db->insertID();
 
-        
         $propietarioNombre = trim($input['propietario'] ?? '');
         $propietarioDni = trim($input['propietarioDni'] ?? '');
 
@@ -202,10 +221,12 @@ class VehiculosController extends ResourceController
             'serieMotor'       => $record['serie_motor'],
             'partidaRegistral' => $record['partida_registral'],
             'codigoQr'         => $record['codigo_qr'],
-            'organizacion'     => $input['organizacion'] ?? 'Independiente',
+            'asociacionId'     => $asociacionId,
+            'organizacion'     => $asociacionId ? $orgName : null,
             'propietario'      => $propietarioNombre ?: 'Sin Propietario',
             'propietarioDni'   => $propietarioDni,
             'estado'           => $record['estado_formalizacion'],
+            'formalidad'       => $asociacionId ? 'FORMAL' : 'INFORMAL',
             'soatEstado'       => $input['soatEstado'] ?? 'VIGENTE',
             'tucNumero'        => $input['tucNumero'] ?? ('TUC-2026-' . str_pad($vehiculoId, 3, '0', STR_PAD_LEFT)),
         ];
@@ -231,7 +252,28 @@ class VehiculosController extends ResourceController
         if (isset($input['numeroSerie'])) $record['numero_serie'] = trim($input['numeroSerie']);
         if (isset($input['serieMotor'])) $record['serie_motor'] = trim($input['serieMotor']);
         if (isset($input['partidaRegistral'])) $record['partida_registral'] = trim($input['partidaRegistral']);
-        if (isset($input['estado'])) $record['estado_formalizacion'] = strtoupper($input['estado']);
+
+        if (array_key_exists('organizacion', $input)) {
+            $asociacionId = null;
+            $orgName = trim((string)$input['organizacion']);
+            if (!empty($orgName) && !in_array($orgName, ['Sin Organización (Informal)', 'Sin Organización', 'Independiente', 'Independiente / Particular'])) {
+                $orgRow = $db->table('organizaciones')
+                    ->like('razon_social', $orgName)
+                    ->get()
+                    ->getRowArray();
+                if ($orgRow) {
+                    $asociacionId = $orgRow['id'];
+                }
+            }
+            $record['asociacion_id'] = $asociacionId;
+            if (!isset($input['estado']) || !in_array(strtoupper($input['estado']), ['SUSPENDIDO', 'BAJA'])) {
+                $record['estado_formalizacion'] = $asociacionId ? 'FORMAL' : 'INFORMAL';
+            }
+        }
+
+        if (isset($input['estado'])) {
+            $record['estado_formalizacion'] = strtoupper($input['estado']);
+        }
 
         if (!empty($record)) {
             $db->table('vehiculos')->where('id', $id)->update($record);

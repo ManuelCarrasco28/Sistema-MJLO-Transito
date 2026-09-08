@@ -39,7 +39,7 @@ export function Organizaciones() {
         setOrganizaciones(data)
         setCachedData('/organizaciones', data)
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setIsLoading(false))
   }, [])
 
@@ -140,7 +140,7 @@ export function Organizaciones() {
 
   return (
     <div className="space-y-6">
-      
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30">
@@ -159,9 +159,9 @@ export function Organizaciones() {
         </div>
       </div>
 
-      
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Entidades</span>
@@ -176,7 +176,7 @@ export function Organizaciones() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Personas jurídicas activas</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Asociaciones</span>
@@ -191,7 +191,7 @@ export function Organizaciones() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Comités y transportistas</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Empresas S.A.C.</span>
@@ -206,7 +206,7 @@ export function Organizaciones() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Empresas constituidas</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Flota Autorizada</span>
@@ -220,7 +220,7 @@ export function Organizaciones() {
         </div>
       </div>
 
-      
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -289,7 +289,7 @@ export function Organizaciones() {
           </div>
         </div>
 
-        
+
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
           <span>
             Mostrando <strong className="text-slate-800 dark:text-white">{filteredOrgs.length}</strong> de{' '}
@@ -353,11 +353,10 @@ export function Organizaciones() {
                   <tr key={o.id} className="group transition-colors hover:bg-indigo-50/30 dark:hover:bg-slate-800/40">
                     <td className="px-3.5 py-3.5 max-w-[200px]">
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className={`grid size-10 shrink-0 place-items-center rounded-2xl text-lg font-bold shadow-xs ${
-                          o.tipo === 'ASOCIACION'
+                        <span className={`grid size-10 shrink-0 place-items-center rounded-2xl text-lg font-bold shadow-xs ${o.tipo === 'ASOCIACION'
                             ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
                             : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                        }`}>
+                          }`}>
                           {o.tipo === 'ASOCIACION' ? '🛺' : '🏢'}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -372,12 +371,12 @@ export function Organizaciones() {
                       <p className="font-mono font-bold text-slate-800 dark:text-slate-200">RUC: {o.ruc}</p>
                       <p className="text-xs font-mono text-slate-400">{o.partidaRegistral}</p>
                     </td>
-                    <td className="px-3.5 py-3.5 max-w-[160px]">
-                      <p className="font-bold text-slate-800 dark:text-slate-100 truncate text-xs" title={o.representanteLegal}>{o.representanteLegal}</p>
+                    <td className="px-3.5 py-3.5 whitespace-nowrap">
+                      <p className="font-bold text-slate-800 dark:text-slate-100 text-xs" title={o.representanteLegal}>{o.representanteLegal}</p>
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
-                      <p className="font-semibold text-slate-700 dark:text-slate-300">{o.telefono}</p>
-                      <p className="text-xs text-slate-400 truncate max-w-[140px]" title={o.email}>{o.email}</p>
+                      <p className="font-semibold text-slate-700 dark:text-slate-300">{o.telefono || '—'}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium" title={o.email}>{o.email || '—'}</p>
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
@@ -386,11 +385,10 @@ export function Organizaciones() {
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${
-                          o.estado === 'ACTIVO'
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${o.estado === 'ACTIVO'
                             ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
                             : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                        }`}
+                          }`}
                       >
                         <span className="size-1.5 rounded-full bg-current" />
                         {o.estado}
@@ -443,7 +441,7 @@ export function Organizaciones() {
         />
       </div>
 
-      
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
@@ -469,7 +467,7 @@ export function Organizaciones() {
             </div>
 
             <form onSubmit={handleFormSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-              
+
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-indigo-600" />
@@ -549,7 +547,7 @@ export function Organizaciones() {
                 </div>
               </div>
 
-              
+
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-cyan-500" />
@@ -626,7 +624,7 @@ export function Organizaciones() {
                 </div>
               </div>
 
-              
+
               <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                 <button
                   type="button"
@@ -647,7 +645,7 @@ export function Organizaciones() {
         </div>
       )}
 
-      
+
       {isDetailModalOpen && selectedOrg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">

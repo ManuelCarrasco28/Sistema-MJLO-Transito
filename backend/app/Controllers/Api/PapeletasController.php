@@ -40,8 +40,27 @@ class PapeletasController extends ResourceController
                 ->select("
                     p.id,
                     p.numero_papeleta as numeroPapeleta,
-                    v.placa as vehiculoPlaca,
+                    v.id as vehiculoId,
+                    COALESCE(v.placa, 'SIN PLACA') as vehiculoPlaca,
+                    COALESCE(v.marca, '') as vehiculoMarca,
+                    COALESCE(v.modelo, '') as vehiculoModelo,
+                    COALESCE(v.color, '') as vehiculoColor,
+                    v.anio_fabricacion as vehiculoAnio,
+                    COALESCE(v.estado_formalizacion, 'INFORMAL') as vehiculoEstadoFormalizacion,
+                    v.asociacion_id as vehiculoAsociacionId,
+                    aso.razon_social as vehiculoAsociacion,
+                    
+                    COALESCE(per.numero_documento, 'S/D') as conductorDni,
+                    COALESCE(NULLIF(TRIM(CONCAT(per.nombres, ' ', per.apellido_paterno, ' ', COALESCE(per.apellido_materno, ''))), ''), p.nombre_autoridad, 'Conductor No Identificado') as conductorNombre,
                     COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(per.nombres, ' ', per.apellido_paterno), 'Conductor No Identificado') as infractor,
+                    
+                    COALESCE(prop_per.numero_documento, prop_org.ruc, 'S/D') as propietarioDni,
+                    COALESCE(
+                        NULLIF(TRIM(CONCAT(prop_per.nombres, ' ', prop_per.apellido_paterno, ' ', COALESCE(prop_per.apellido_materno, ''))), ''),
+                        prop_org.razon_social,
+                        'No Registrado'
+                    ) as propietarioNombre,
+                    
                     COALESCE(CONCAT(ins.nombres, ' ', ins.apellidos), 'Inspector Municipal') as inspector,
                     ins.numero_documento as inspectorCIP,
                     p.fecha_hora as fechaHora,
@@ -49,11 +68,20 @@ class PapeletasController extends ResourceController
                     p.observacion_autoridad as observacionesAutoridad,
                     p.observaciones_conductor as observacionesConductor,
                     p.monto_total as montoTotal,
-                    p.estado
+                    p.estado,
+                    
+                    ret.id as retencionId,
+                    ret.estado as retencionEstado
                 ")
                 ->join('vehiculos v', 'v.id = p.vehiculo_id', 'left')
+                ->join('organizaciones aso', 'aso.id = v.asociacion_id', 'left')
                 ->join('personas per', 'per.id = p.persona_infractor_id', 'left')
                 ->join('personal ins', 'ins.id = p.inspector_id', 'left')
+                ->join('vehiculo_propietarios vp', 'vp.vehiculo_id = v.id AND vp.estado = "ACTIVO"', 'left')
+                ->join('personas prop_per', 'prop_per.id = vp.persona_id', 'left')
+                ->join('organizaciones prop_org', 'prop_org.id = vp.organizacion_id', 'left')
+                ->join('internamientos ret', 'ret.papeleta_id = p.id', 'left')
+                ->groupBy('p.id')
                 ->orderBy('p.id', 'DESC')
                 ->get()
                 ->getResultArray();
@@ -63,9 +91,21 @@ class PapeletasController extends ResourceController
                 $row['id'] = (int)$row['id'];
                 $row['montoTotal'] = (float)$row['montoTotal'];
                 
+                $isFormal = !empty($row['vehiculoAsociacionId']);
+                $row['tipoInfractor'] = $isFormal ? 'FORMAL' : 'INFORMAL';
+                
+                $isRetenido = (!empty($row['retencionId']) && $row['retencionEstado'] !== 'LIBERADO');
+                $row['vehiculoRetenido'] = $isRetenido ? 'SI' : 'NO';
+                
+                $descPartes = array_filter([$row['vehiculoMarca'] ?? '', $row['vehiculoModelo'] ?? '']);
+                $caract = trim(implode(' ', $descPartes));
+                if (!empty($row['vehiculoColor'])) {
+                    $caract .= ($caract ? ' · ' : '') . $row['vehiculoColor'];
+                }
+                $row['vehiculoCaracteristicas'] = $caract ?: 'Características no especificadas';
                 
                 $detalles = $db->table('papeleta_detalles pd')
-                    ->select('pd.tipo_infraccion_id as tipoInfraccionId, ti.codigo, ti.gravedad, pd.monto, pd.descuento, pd.monto_final as montoFinal')
+                    ->select('pd.tipo_infraccion_id as tipoInfraccionId, ti.codigo, ti.descripcion, ti.gravedad, pd.monto, pd.descuento, pd.monto_final as montoFinal')
                     ->join('tipos_infraccion ti', 'ti.id = pd.tipo_infraccion_id', 'left')
                     ->where('pd.papeleta_id', $row['id'])
                     ->get()
@@ -78,6 +118,10 @@ class PapeletasController extends ResourceController
                     $d['montoFinal'] = (float)$d['montoFinal'];
                     return $d;
                 }, $detalles);
+
+                $row['tipoInfraccionCodigo'] = $row['detalles'][0]['codigo'] ?? 'G01';
+                $row['tipoInfraccionDescripcion'] = $row['detalles'][0]['descripcion'] ?? 'Infracción al Reglamento';
+                $row['tipoInfraccionGravedad'] = $row['detalles'][0]['gravedad'] ?? 'LEVE';
 
                 $data[] = $row;
             }
@@ -256,6 +300,93 @@ class PapeletasController extends ResourceController
             return $this->respondDeleted(['status' => 200, 'message' => 'Papeleta anulada correctamente']);
         } catch (\Exception $e) {
             return $this->failServerError('Error anulando la papeleta: ' . $e->getMessage());
+        }
+    }
+
+    public function pagar($id = null)
+    {
+        $db = \Config\Database::connect();
+        try {
+            $papeleta = $db->table('papeletas')->where('id', $id)->get()->getRowArray();
+            if (!$papeleta) {
+                return $this->failNotFound('Papeleta no encontrada');
+            }
+
+            if ($papeleta['estado'] === 'ANULADA') {
+                return $this->fail('No se puede pagar una papeleta que ha sido anulada', 400);
+            }
+
+            if ($papeleta['estado'] === 'PAGADA') {
+                return $this->fail('Esta papeleta ya se encuentra pagada', 400);
+            }
+
+            $db->table('papeletas')->where('id', $id)->update(['estado' => 'PAGADA']);
+
+            $numRecibo = 'REC-' . date('Y') . '-' . str_pad((string)random_int(1000, 9999), 5, '0', STR_PAD_LEFT);
+            $db->table('pagos')->insert([
+                'tipo_pago' => 'PAPELETA',
+                'papeleta_id' => $id,
+                'numero_recibo' => $numRecibo,
+                'fecha_pago' => date('Y-m-d'),
+                'hora_pago' => date('H:i:s'),
+                'cajero' => 'Caja Central Municipal',
+                'caja' => 'Caja 01',
+                'codigo_contribuyente' => (string)($papeleta['persona_infractor_id'] ?: 'CONTRIB-01'),
+                'concepto' => 'Pago de Papeleta N° ' . $papeleta['numero_papeleta'],
+                'subtotal' => $papeleta['monto_total'],
+                'reajuste' => 0.00,
+                'intereses' => 0.00,
+                'descuento_aplicado' => 0.00,
+                'redondeo' => 0.00,
+                'total' => $papeleta['monto_total'],
+                'estado' => 'REGISTRADO',
+            ]);
+
+            return $this->respond([
+                'status' => 200,
+                'message' => 'Papeleta pagada exitosamente',
+                'numeroRecibo' => $numRecibo
+            ]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error al procesar el pago: ' . $e->getMessage());
+        }
+    }
+
+    public function regularizar($id = null)
+    {
+        $db = \Config\Database::connect();
+        $input = $this->request->getJSON(true) ?? $this->request->getPost();
+
+        try {
+            $papeleta = $db->table('papeletas')->where('id', $id)->get()->getRowArray();
+            if (!$papeleta) {
+                return $this->failNotFound('Papeleta no encontrada');
+            }
+
+            $asociacionId = !empty($input['asociacionId']) ? (int)$input['asociacionId'] : null;
+            $observaciones = trim($input['observaciones'] ?? 'Trámite de formalización y regularización iniciado.');
+
+            if (!empty($papeleta['vehiculo_id'])) {
+                $updateVeh = [
+                    'estado_formalizacion' => 'FORMALIZADO',
+                ];
+                if ($asociacionId) {
+                    $updateVeh['asociacion_id'] = $asociacionId;
+                }
+                $db->table('vehiculos')->where('id', $papeleta['vehiculo_id'])->update($updateVeh);
+            }
+
+            $obsActual = !empty($papeleta['observacion_autoridad']) ? $papeleta['observacion_autoridad'] . ' | ' : '';
+            $db->table('papeletas')->where('id', $id)->update([
+                'observacion_autoridad' => $obsActual . 'REGULARIZADO: ' . $observaciones,
+            ]);
+
+            return $this->respond([
+                'status' => 200,
+                'message' => 'Infractor y vehículo regularizados correctamente'
+            ]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error al regularizar: ' . $e->getMessage());
         }
     }
 }

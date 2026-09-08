@@ -31,7 +31,7 @@ function Layout({ onLogout, user }) {
     if (path.includes('/papeletas')) return 'Papeletas'
     if (path.includes('/cursos')) return 'Cursos'
     if (path.includes('/pagos')) return 'Pagos'
-    if (path.includes('/retenciones')) return 'Retenciones'
+    if (path.includes('/retenciones')) return 'Internamientos'
     if (path.includes('/permisos')) return 'Permisos'
     return 'Dashboard'
   }

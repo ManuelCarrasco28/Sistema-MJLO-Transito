@@ -33,7 +33,7 @@ class DashboardController extends ResourceController
         $documentosPorVencer = (int) ($docRow['por_vencer'] ?? 0);
 
         
-        $inspeccionesPendientes = (int) $db->table('inspecciones_tecnicas')
+        $inspeccionesPendientes = (int) $db->table('certicav')
             ->whereIn('estado', ['PENDIENTE', 'EN_TRAMITE', 'EN TRÁMITE', 'EN TRAMITE'])
             ->countAllResults();
 
@@ -49,7 +49,7 @@ class DashboardController extends ResourceController
         $montoPendiente = (float) ($papRow['monto_pendiente'] ?? 0);
 
         
-        $retRow = $db->table('retenciones_vehiculo')
+        $retRow = $db->table('internamientos')
             ->select("
                 SUM(CASE WHEN estado IN ('EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'ACTIVO') THEN 1 ELSE 0 END) as retenidos,
                 SUM(CASE WHEN estado IN ('LIBERADO', 'LIBERADA') OR fecha_salida IS NOT NULL THEN 1 ELSE 0 END) as liberados
@@ -110,10 +110,10 @@ class DashboardController extends ResourceController
         }
 
         
-        $inspRows = $db->table('inspecciones_tecnicas')
-            ->select('MONTH(fecha_inspeccion) as mes, COUNT(*) as total', false)
-            ->where('YEAR(fecha_inspeccion)', $year)
-            ->groupBy('MONTH(fecha_inspeccion)')
+        $inspRows = $db->table('certicav')
+            ->select('MONTH(fecha) as mes, COUNT(*) as total', false)
+            ->where('YEAR(fecha)', $year)
+            ->groupBy('MONTH(fecha)')
             ->get()->getResultArray();
         $inspPorMes = [];
         foreach ($inspRows as $r) {
