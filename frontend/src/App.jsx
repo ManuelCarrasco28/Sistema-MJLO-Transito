@@ -31,7 +31,7 @@ function Layout({ onLogout, user }) {
     if (path.includes('/papeletas')) return 'Papeletas'
     if (path.includes('/cursos')) return 'Cursos'
     if (path.includes('/pagos')) return 'Pagos'
-    if (path.includes('/retenciones')) return 'Internamientos'
+    if (path.includes('/internamientos') || path.includes('/retenciones')) return 'Internamientos'
     if (path.includes('/permisos')) return 'Permisos'
     return 'Dashboard'
   }
@@ -129,7 +129,8 @@ function Layout({ onLogout, user }) {
             <Route path="/cursos" element={<CursosSeguridad />} />
             <Route path="/cursos-seguridad" element={<CursosSeguridad />} />
             <Route path="/pagos" element={<Pagos />} />
-            <Route path="/retenciones" element={<Retenciones />} />
+            <Route path="/internamientos" element={<Retenciones />} />
+            <Route path="/retenciones" element={<Navigate to="/internamientos" replace />} />
             <Route path="/permisos" element={<Permisos />} />
             <Route path="*" element={
               <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">

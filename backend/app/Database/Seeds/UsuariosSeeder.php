@@ -8,11 +8,20 @@ class UsuariosSeeder extends Seeder
 {
     public function run()
     {
+        $personas = [
+            ['tipo_documento' => 'DNI', 'numero_documento' => '11111111', 'nombres' => 'Diego', 'apellido_paterno' => 'Barturen', 'estado' => 'ACTIVO'],
+            ['tipo_documento' => 'DNI', 'numero_documento' => '22222222', 'nombres' => 'Manuel', 'apellido_paterno' => 'Carrasco', 'estado' => 'ACTIVO'],
+            ['tipo_documento' => 'DNI', 'numero_documento' => '33333333', 'nombres' => 'Milenka', 'apellido_paterno' => 'Segundo', 'estado' => 'ACTIVO'],
+            ['tipo_documento' => 'DNI', 'numero_documento' => '44444444', 'nombres' => 'Angelo', 'apellido_paterno' => 'Saavedra', 'estado' => 'ACTIVO'],
+        ];
+
+        $this->db->table('personas')->insertBatch($personas);
+
         $personal = [
-            ['tipo_documento' => 'DNI', 'numero_documento' => '11111111', 'nombres' => 'Diego', 'apellidos' => 'Barturen', 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
-            ['tipo_documento' => 'DNI', 'numero_documento' => '22222222', 'nombres' => 'Manuel', 'apellidos' => 'Carrasco', 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
-            ['tipo_documento' => 'DNI', 'numero_documento' => '33333333', 'nombres' => 'Milenka', 'apellidos' => 'Segundo', 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
-            ['tipo_documento' => 'DNI', 'numero_documento' => '44444444', 'nombres' => 'Angelo', 'apellidos' => 'Saavedra', 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
+            ['persona_id' => 1, 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
+            ['persona_id' => 2, 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
+            ['persona_id' => 3, 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
+            ['persona_id' => 4, 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
         ];
 
         $this->db->table('personal')->insertBatch($personal);

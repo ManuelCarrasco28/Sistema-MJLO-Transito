@@ -61,12 +61,16 @@ class PapeletasController extends ResourceController
                         'No Registrado'
                     ) as propietarioNombre,
                     
-                    COALESCE(CONCAT(ins.nombres, ' ', ins.apellidos), 'Inspector Municipal') as inspector,
-                    ins.numero_documento as inspectorCIP,
+                    COALESCE(CONCAT(ins_per.nombres, ' ', ins_per.apellido_paterno, ' ', COALESCE(ins_per.apellido_materno, '')), 'Inspector Municipal') as inspector,
+                    ins_per.numero_documento as inspectorCIP,
                     p.fecha_hora as fechaHora,
                     p.lugar,
                     p.observacion_autoridad as observacionesAutoridad,
                     p.observaciones_conductor as observacionesConductor,
+                    p.firma_conductor_img as firmaConductorImg,
+                    p.firma_conductor_fecha as firmaConductorFecha,
+                    p.firma_conductor_estado as firmaConductorEstado,
+                    p.firma_conductor_observacion as firmaConductorObservacion,
                     p.monto_total as montoTotal,
                     p.estado,
                     
@@ -77,6 +81,7 @@ class PapeletasController extends ResourceController
                 ->join('organizaciones aso', 'aso.id = v.asociacion_id', 'left')
                 ->join('personas per', 'per.id = p.persona_infractor_id', 'left')
                 ->join('personal ins', 'ins.id = p.inspector_id', 'left')
+                ->join('personas ins_per', 'ins_per.id = ins.persona_id', 'left')
                 ->join('vehiculo_propietarios vp', 'vp.vehiculo_id = v.id AND vp.estado = "ACTIVO"', 'left')
                 ->join('personas prop_per', 'prop_per.id = vp.persona_id', 'left')
                 ->join('organizaciones prop_org', 'prop_org.id = vp.organizacion_id', 'left')
@@ -173,9 +178,15 @@ class PapeletasController extends ResourceController
             }
 
             
-            $inspector = $db->table('personal')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
+            $inspector = $db->table('personal pe')
+                ->select("pe.id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
+                ->join('personas per', 'per.id = pe.persona_id', 'inner')
+                ->where('pe.estado', 'ACTIVO')
+                ->limit(1)
+                ->get()
+                ->getRowArray();
             $inspectorId = $inspector ? (int)$inspector['id'] : 1;
-            $inspectorNombre = $inspector ? ($inspector['nombres'] . ' ' . $inspector['apellidos']) : 'Inspector Municipal';
+            $inspectorNombre = $inspector ? trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? '')) : 'Inspector Municipal';
 
             
             $persona = $db->table('personas')->limit(1)->get()->getRowArray();
@@ -201,6 +212,7 @@ class PapeletasController extends ResourceController
                 'nombre_autoridad' => $infractor,
                 'observacion_autoridad' => $obsAutoridad,
                 'observaciones_conductor' => $obsConductor,
+                'firma_conductor_estado' => 'PENDIENTE',
                 'monto_total' => $monto,
                 'estado' => 'PENDIENTE_PAGO',
             ];
@@ -327,6 +339,8 @@ class PapeletasController extends ResourceController
                 'tipo_pago' => 'PAPELETA',
                 'papeleta_id' => $id,
                 'numero_recibo' => $numRecibo,
+                'medio_pago' => trim($input['metodoPago'] ?? 'EFECTIVO'),
+                'referencia_pago' => trim($input['referenciaPago'] ?? '') ?: null,
                 'fecha_pago' => date('Y-m-d'),
                 'hora_pago' => date('H:i:s'),
                 'cajero' => 'Caja Central Municipal',
@@ -352,7 +366,7 @@ class PapeletasController extends ResourceController
         }
     }
 
-    public function regularizar($id = null)
+    public function firma($id = null)
     {
         $db = \Config\Database::connect();
         $input = $this->request->getJSON(true) ?? $this->request->getPost();
@@ -363,30 +377,61 @@ class PapeletasController extends ResourceController
                 return $this->failNotFound('Papeleta no encontrada');
             }
 
-            $asociacionId = !empty($input['asociacionId']) ? (int)$input['asociacionId'] : null;
-            $observaciones = trim($input['observaciones'] ?? 'Trámite de formalización y regularización iniciado.');
-
-            if (!empty($papeleta['vehiculo_id'])) {
-                $updateVeh = [
-                    'estado_formalizacion' => 'FORMALIZADO',
-                ];
-                if ($asociacionId) {
-                    $updateVeh['asociacion_id'] = $asociacionId;
-                }
-                $db->table('vehiculos')->where('id', $papeleta['vehiculo_id'])->update($updateVeh);
+            $estado = strtoupper(trim($input['estado'] ?? $input['firmaConductorEstado'] ?? 'FIRMADO'));
+            if (!in_array($estado, ['PENDIENTE', 'FIRMADO', 'SE_NEGO_A_FIRMAR', 'NO_PRESENTE'], true)) {
+                return $this->failValidationErrors('Estado de firma no válido.');
             }
 
-            $obsActual = !empty($papeleta['observacion_autoridad']) ? $papeleta['observacion_autoridad'] . ' | ' : '';
-            $db->table('papeletas')->where('id', $id)->update([
-                'observacion_autoridad' => $obsActual . 'REGULARIZADO: ' . $observaciones,
-            ]);
+            $firmaBase64 = trim($input['firmaBase64'] ?? $input['firmaConductorBase64'] ?? '');
+
+            if ($estado === 'FIRMADO' && $firmaBase64 === '') {
+                return $this->failValidationErrors('La firma capturada en el aplicativo es requerida cuando el estado es FIRMADO.');
+            }
+
+            $firmaUrl = '';
+            if ($firmaBase64 !== '') {
+                if (str_contains($firmaBase64, ',')) {
+                    [, $firmaBase64] = explode(',', $firmaBase64, 2);
+                }
+
+                $binary = base64_decode($firmaBase64, true);
+                if ($binary === false || strlen($binary) < 50) {
+                    return $this->failValidationErrors('La imagen de firma no es válida.');
+                }
+
+                $uploadDir = WRITEPATH . 'uploads/firmas-papeletas';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0775, true);
+                }
+
+                $fileName = 'papeleta-' . (int)$id . '-firma-' . date('YmdHis') . '.png';
+                $filePath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
+                file_put_contents($filePath, $binary);
+                $firmaUrl = 'uploads/firmas-papeletas/' . $fileName;
+            }
+
+            $update = [
+                'firma_conductor_img' => $firmaUrl !== '' ? $firmaUrl : null,
+                'firma_conductor_fecha' => $estado === 'FIRMADO' ? date('Y-m-d H:i:s') : null,
+                'firma_conductor_estado' => $estado,
+                'firma_conductor_observacion' => trim($input['observacion'] ?? $input['firmaConductorObservacion'] ?? '') ?: null,
+            ];
+
+            $db->table('papeletas')->where('id', $id)->update($update);
 
             return $this->respond([
                 'status' => 200,
-                'message' => 'Infractor y vehículo regularizados correctamente'
+                'message' => 'Firma de conductor registrada correctamente',
+                'data' => [
+                    'firmaConductorImg' => $update['firma_conductor_img'],
+                    'firmaConductorFecha' => $update['firma_conductor_fecha'],
+                    'firmaConductorEstado' => $update['firma_conductor_estado'],
+                    'firmaConductorObservacion' => $update['firma_conductor_observacion'],
+                ],
             ]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error al regularizar: ' . $e->getMessage());
+            return $this->failServerError('Error registrando firma: ' . $e->getMessage());
         }
     }
+
 }

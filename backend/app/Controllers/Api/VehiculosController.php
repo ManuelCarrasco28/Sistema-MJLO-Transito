@@ -21,6 +21,10 @@ class VehiculosController extends ResourceController
                 COALESCE(v.modelo, '') AS modelo,
                 COALESCE(v.color, '') AS color,
                 COALESCE(v.anio_fabricacion, '') AS anio,
+                COALESCE(v.categoria, '') AS categoria,
+                COALESCE(v.carroceria, '') AS carroceria,
+                COALESCE(v.sede_registro, '') AS sedeRegistro,
+                COALESCE(v.tipo_carroceria, '') AS tipoCarroceria,
                 COALESCE(v.numero_serie, '') AS numeroSerie,
                 COALESCE(v.serie_motor, '') AS serieMotor,
                 COALESCE(v.partida_registral, '') AS partidaRegistral,
@@ -47,6 +51,7 @@ class VehiculosController extends ResourceController
         $vehiculoIds = array_map(static fn (array $row): int => (int)$row['id'], $rows);
         $documentosPorVehiculo = [];
         $papeletasPorVehiculo = [];
+        $certicavPorVehiculo = [];
 
         if (!empty($vehiculoIds)) {
             $documentos = $db->table('documentos_vehiculo')
@@ -88,9 +93,25 @@ class VehiculosController extends ResourceController
                 $papeleta['montoTotal'] = (float)$papeleta['montoTotal'];
                 $papeletasPorVehiculo[$vehiculoId][] = $papeleta;
             }
+
+            $certicavs = $db->table('certicav')
+                ->select('vehiculo_id, numero_registro as numeroRegistro, numero_serie_certicav as numeroSerieCerticav, fecha, primera_evaluacion as primeraEvaluacion, segunda_evaluacion as segundaEvaluacion, resultado, estado')
+                ->whereIn('vehiculo_id', $vehiculoIds)
+                ->orderBy('fecha', 'DESC')
+                ->orderBy('id', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            foreach ($certicavs as $certicav) {
+                $vehiculoId = (int)$certicav['vehiculo_id'];
+                if (!isset($certicavPorVehiculo[$vehiculoId])) {
+                    unset($certicav['vehiculo_id']);
+                    $certicavPorVehiculo[$vehiculoId] = $certicav;
+                }
+            }
         }
 
-        $data = array_map(static function (array $row) use ($documentosPorVehiculo, $papeletasPorVehiculo): array {
+        $data = array_map(static function (array $row) use ($documentosPorVehiculo, $papeletasPorVehiculo, $certicavPorVehiculo): array {
             $propietario = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
             unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
             $vehiculoId = (int)$row['id'];
@@ -106,6 +127,7 @@ class VehiculosController extends ResourceController
             return $row + [
                 'propietario' => $propietario ?: 'Sin Propietario Asignado',
                 'documentosVehiculo' => $documentosPorVehiculo[$vehiculoId] ?? [],
+                'certicav' => $certicavPorVehiculo[$vehiculoId] ?? null,
                 'historialPapeletas' => $papeletasPorVehiculo[$vehiculoId] ?? [],
                 'soatEstado' => $soat['estado'] ?? 'SIN_REGISTRO',
                 'tucNumero' => 'TUC-2026-' . str_pad($row['id'], 3, '0', STR_PAD_LEFT),
@@ -162,6 +184,10 @@ class VehiculosController extends ResourceController
             'modelo'               => trim($input['modelo'] ?? ''),
             'color'                => trim($input['color'] ?? ''),
             'anio_fabricacion'     => !empty($input['anio']) ? (int)$input['anio'] : date('Y'),
+            'categoria'            => trim($input['categoria'] ?? ''),
+            'carroceria'           => trim($input['carroceria'] ?? ''),
+            'sede_registro'        => trim($input['sedeRegistro'] ?? ''),
+            'tipo_carroceria'      => trim($input['tipoCarroceria'] ?? ''),
             'numero_serie'         => trim($input['numeroSerie'] ?? ''),
             'serie_motor'          => trim($input['serieMotor'] ?? ''),
             'partida_registral'    => trim($input['partidaRegistral'] ?? ''),
@@ -217,6 +243,10 @@ class VehiculosController extends ResourceController
             'modelo'           => $record['modelo'],
             'color'            => $record['color'],
             'anio'             => $record['anio_fabricacion'],
+            'categoria'        => $record['categoria'],
+            'carroceria'       => $record['carroceria'],
+            'sedeRegistro'     => $record['sede_registro'],
+            'tipoCarroceria'   => $record['tipo_carroceria'],
             'numeroSerie'      => $record['numero_serie'],
             'serieMotor'       => $record['serie_motor'],
             'partidaRegistral' => $record['partida_registral'],
@@ -249,6 +279,10 @@ class VehiculosController extends ResourceController
         if (isset($input['modelo'])) $record['modelo'] = trim($input['modelo']);
         if (isset($input['color'])) $record['color'] = trim($input['color']);
         if (isset($input['anio'])) $record['anio_fabricacion'] = (int)$input['anio'];
+        if (isset($input['categoria'])) $record['categoria'] = trim($input['categoria']);
+        if (isset($input['carroceria'])) $record['carroceria'] = trim($input['carroceria']);
+        if (isset($input['sedeRegistro'])) $record['sede_registro'] = trim($input['sedeRegistro']);
+        if (isset($input['tipoCarroceria'])) $record['tipo_carroceria'] = trim($input['tipoCarroceria']);
         if (isset($input['numeroSerie'])) $record['numero_serie'] = trim($input['numeroSerie']);
         if (isset($input['serieMotor'])) $record['serie_motor'] = trim($input['serieMotor']);
         if (isset($input['partidaRegistral'])) $record['partida_registral'] = trim($input['partidaRegistral']);

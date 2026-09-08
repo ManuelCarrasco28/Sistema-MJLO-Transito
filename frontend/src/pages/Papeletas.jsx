@@ -489,6 +489,51 @@ export function Papeletas() {
                     </div>
                   </div>
                 </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Firma del conductor</h4>
+                  <div className="grid gap-3 text-xs sm:grid-cols-2">
+                    <div>
+                      <p className="text-slate-400">Estado</p>
+                      <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${
+                        selectedPapeleta.firmaConductorEstado === 'FIRMADO'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
+                          : selectedPapeleta.firmaConductorEstado === 'SE_NEGO_A_FIRMAR'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
+                            : selectedPapeleta.firmaConductorEstado === 'NO_PRESENTE'
+                              ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                              : 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
+                      }`}>
+                        <span className="size-2 rounded-full bg-current" />
+                        {selectedPapeleta.firmaConductorEstado || 'PENDIENTE'}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-slate-400">Fecha y hora de firma</p>
+                      <p className="font-bold text-slate-800 dark:text-white">
+                        {selectedPapeleta.firmaConductorFecha
+                          ? new Date(selectedPapeleta.firmaConductorFecha).toLocaleString()
+                          : 'Sin fecha registrada'}
+                      </p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <p className="text-slate-400">Observación</p>
+                      <p className="font-medium text-slate-700 dark:text-slate-300">
+                        {selectedPapeleta.firmaConductorObservacion || 'Sin observación'}
+                      </p>
+                    </div>
+                    {selectedPapeleta.firmaConductorImg && (
+                      <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                        <p className="mb-2 text-slate-400">Firma registrada</p>
+                        <img
+                          src={selectedPapeleta.firmaConductorImg}
+                          alt="Firma del conductor"
+                          className="max-h-24 rounded-lg object-contain"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 mt-2 border-t border-slate-100 dark:border-slate-800">

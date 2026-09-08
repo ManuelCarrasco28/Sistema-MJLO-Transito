@@ -29,7 +29,7 @@ export function Personas() {
     email: '',
     numeroLicencia: '',
     estado: 'ACTIVO',
-    fotoUrl: '',
+    fotoImg: '',
   })
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export function Personas() {
       email: '',
       numeroLicencia: '',
       estado: 'ACTIVO',
-      fotoUrl: '',
+      fotoImg: '',
     })
     setIsEditing(false)
     setIsModalOpen(true)
@@ -91,7 +91,7 @@ export function Personas() {
     setFormData({
       ...persona,
       celular: persona.celular || persona.telefono || '',
-      fotoUrl: persona.fotoUrl || '',
+      fotoImg: persona.fotoImg || '',
     })
     setIsEditing(true)
     setIsModalOpen(true)
@@ -110,13 +110,13 @@ export function Personas() {
     }
     const reader = new FileReader()
     reader.onload = (ev) => {
-      setFormData((prev) => ({ ...prev, fotoUrl: ev.target?.result || '' }))
+      setFormData((prev) => ({ ...prev, fotoImg: ev.target?.result || '' }))
     }
     reader.readAsDataURL(file)
   }
 
   const handleClearPhoto = () => {
-    setFormData((prev) => ({ ...prev, fotoUrl: '' }))
+    setFormData((prev) => ({ ...prev, fotoImg: '' }))
   }
 
   const handleOpenDetail = (persona) => {
@@ -375,9 +375,9 @@ export function Personas() {
                   <tr key={p.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
                     <td className="px-3.5 py-3.5 max-w-[200px]">
                       <div className="flex items-center gap-3 min-w-0">
-                        {p.fotoUrl ? (
+                        {p.fotoImg ? (
                           <img
-                            src={p.fotoUrl}
+                            src={p.fotoImg}
                             alt={p.nombres}
                             onError={(e) => {
                               e.currentTarget.onerror = null
@@ -504,9 +504,9 @@ export function Personas() {
               <div className="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3">
                 <div className="flex flex-col sm:flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/40">
                   <div className="shrink-0">
-                    {formData.fotoUrl ? (
+                    {formData.fotoImg ? (
                       <img
-                        src={formData.fotoUrl}
+                        src={formData.fotoImg}
                         alt="Vista previa"
                         onError={(e) => {
                           e.currentTarget.onerror = null
@@ -535,7 +535,7 @@ export function Personas() {
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-100 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer">
                         <Icon name="camera" className="size-4 text-cyan-600" />
-                        <span>{formData.fotoUrl ? 'Cambiar fotografía...' : 'Subir fotografía...'}</span>
+                        <span>{formData.fotoImg ? 'Cambiar fotografía...' : 'Subir fotografía...'}</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -544,7 +544,7 @@ export function Personas() {
                         />
                       </label>
 
-                      {formData.fotoUrl && (
+                      {formData.fotoImg && (
                         <button
                           type="button"
                           onClick={handleClearPhoto}
@@ -780,9 +780,9 @@ export function Personas() {
               >
                 ✕
               </button>
-              {selectedPersona.fotoUrl ? (
+              {selectedPersona.fotoImg ? (
                 <img
-                  src={selectedPersona.fotoUrl}
+                  src={selectedPersona.fotoImg}
                   alt={selectedPersona.nombres}
                   onError={(e) => {
                     e.currentTarget.onerror = null

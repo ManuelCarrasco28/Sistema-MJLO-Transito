@@ -18,7 +18,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->resource('documentos', ['controller' => 'DocumentosController']);
     $routes->resource('papeletas', ['controller' => 'PapeletasController']);
     $routes->post('papeletas/(:num)/pagar', 'PapeletasController::pagar/$1');
-    $routes->post('papeletas/(:num)/regularizar', 'PapeletasController::regularizar/$1');
+    $routes->post('papeletas/(:num)/firma', 'PapeletasController::firma/$1');
     $routes->get('tipos-infraccion', 'PapeletasController::tipos');
     $routes->resource('pagos', ['controller' => 'PagosController']);
     $routes->resource('cursos', ['controller' => 'CursosController']);
