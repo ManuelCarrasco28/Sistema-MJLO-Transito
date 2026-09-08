@@ -26,7 +26,8 @@ class AuthController extends ResourceController
                 usuarios.*,
                 personas.nombres,
                 CONCAT(personas.apellido_paterno, ' ', COALESCE(personas.apellido_materno, '')) AS apellidos,
-                personal.cargo
+                personal.cargo,
+                personal.id AS personal_id
             ", false)
             ->join('personal', 'personal.id = usuarios.personal_id', 'inner')
             ->join('personas', 'personas.id = personal.persona_id', 'inner')
@@ -42,11 +43,12 @@ class AuthController extends ResourceController
         }
 
         $userData = [
-            'id'        => $userRecord['id'],
-            'nombres'   => $userRecord['nombres'],
-            'apellidos' => $userRecord['apellidos'],
-            'usuario'   => $userRecord['nombre_usuario'],
-            'cargo'     => $userRecord['cargo'],
+            'id'          => $userRecord['id'],
+            'nombres'     => $userRecord['nombres'],
+            'apellidos'   => $userRecord['apellidos'],
+            'usuario'     => $userRecord['nombre_usuario'],
+            'cargo'       => $userRecord['cargo'],
+            'personal_id' => $userRecord['personal_id'],
         ];
 
         helper('cookie');
