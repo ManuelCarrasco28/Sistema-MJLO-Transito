@@ -42,7 +42,7 @@ class InspeccionesController extends ResourceController
                     i.id,
                     i.numero_serie_certicav as numeroInspeccion,
                     v.placa as vehiculoPlaca,
-                    COALESCE(CONCAT(p.nombres, ' ', p.apellidos), 'Inspector Técnico Municipal') as inspector,
+                    COALESCE(CONCAT(per.nombres, ' ', per.apellido_paterno, ' ', COALESCE(per.apellido_materno, '')), 'Inspector Técnico Municipal') as inspector,
                     i.fecha,
                     i.resultado,
                     i.observaciones,
@@ -50,6 +50,7 @@ class InspeccionesController extends ResourceController
                 ")
                 ->join('vehiculos v', 'v.id = i.vehiculo_id', 'left')
                 ->join('personal p', 'p.id = i.tecnico_id', 'left')
+                ->join('personas per', 'per.id = p.persona_id', 'left')
                 ->orderBy('i.id', 'DESC')
                 ->get()
                 ->getResultArray();
@@ -117,9 +118,15 @@ class InspeccionesController extends ResourceController
             }
 
             
-            $tecnico = $db->table('personal')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
+            $tecnico = $db->table('personal pe')
+                ->select("pe.id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
+                ->join('personas per', 'per.id = pe.persona_id', 'inner')
+                ->where('pe.estado', 'ACTIVO')
+                ->limit(1)
+                ->get()
+                ->getRowArray();
             $tecnicoId = $tecnico ? (int)$tecnico['id'] : 1;
-            $tecnicoNombre = $tecnico ? ($tecnico['nombres'] . ' ' . $tecnico['apellidos']) : 'Inspector Técnico Municipal';
+            $tecnicoNombre = $tecnico ? trim($tecnico['nombres'] . ' ' . $tecnico['apellido_paterno'] . ' ' . ($tecnico['apellido_materno'] ?? '')) : 'Inspector Técnico Municipal';
 
             $numeroInspeccion = 'CERT-' . date('Y') . '-' . str_pad((string)random_int(1, 999), 3, '0', STR_PAD_LEFT);
             $fecha = date('Y-m-d H:i:s');

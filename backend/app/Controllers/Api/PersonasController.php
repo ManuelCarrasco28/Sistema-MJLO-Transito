@@ -25,7 +25,7 @@ class PersonasController extends ResourceController
                 COALESCE(celular, '') AS celular,
                 COALESCE(email, '') AS email,
                 COALESCE(numero_licencia_conducir, '') AS numeroLicencia,
-                COALESCE(foto_url, '') AS fotoUrl,
+                COALESCE(foto_img, '') AS fotoImg,
                 estado
             ", false)
             ->orderBy('id', 'DESC')
@@ -55,7 +55,7 @@ class PersonasController extends ResourceController
             'celular'                  => trim($input['celular'] ?? ''),
             'email'                    => trim($input['email'] ?? ''),
             'numero_licencia_conducir' => trim($input['numeroLicencia'] ?? ''),
-            'foto_url'                 => trim($input['fotoUrl'] ?? ''),
+            'foto_img'                 => trim($input['fotoImg'] ?? $input['fotoUrl'] ?? ''),
             'estado'                   => strtoupper($input['estado'] ?? 'ACTIVO'),
         ];
 
@@ -74,7 +74,7 @@ class PersonasController extends ResourceController
             'celular'           => $record['celular'],
             'email'             => $record['email'],
             'numeroLicencia'    => $record['numero_licencia_conducir'],
-            'fotoUrl'           => $record['foto_url'],
+            'fotoImg'           => $record['foto_img'],
             'estado'            => $record['estado'],
         ];
 
@@ -101,7 +101,7 @@ class PersonasController extends ResourceController
         if (isset($input['celular'])) $record['celular'] = trim($input['celular']);
         if (isset($input['email'])) $record['email'] = trim($input['email']);
         if (isset($input['numeroLicencia'])) $record['numero_licencia_conducir'] = trim($input['numeroLicencia']);
-        if (array_key_exists('fotoUrl', $input)) $record['foto_url'] = trim($input['fotoUrl'] ?? '');
+        if (array_key_exists('fotoImg', $input) || array_key_exists('fotoUrl', $input)) $record['foto_img'] = trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '');
         if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
 
         if (!empty($record)) {

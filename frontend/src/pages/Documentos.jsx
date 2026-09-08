@@ -154,10 +154,10 @@ export function Documentos() {
             SOAT Vehicular
           </span>
         )
-      case 'CERTICAV':
+      case 'CITV':
         return (
           <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-            CERTICAV (Capacitación)
+            CITV
           </span>
         )
       default:
@@ -284,7 +284,7 @@ export function Documentos() {
               <option value="TODOS">Todos los tipos</option>
               <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
               <option value="SOAT">SOAT Vehicular</option>
-              <option value="CERTICAV">Certificado Capacitación (CERTICAV)</option>
+              <option value="CITV">CITV</option>
               <option value="TARJETA_PROPIEDAD">Tarjeta de Propiedad</option>
             </select>
 
@@ -532,7 +532,7 @@ export function Documentos() {
                     >
                       <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
                       <option value="SOAT">SOAT Vehicular</option>
-                      <option value="CERTICAV">Certificado CERTICAV</option>
+                      <option value="CITV">CITV</option>
                       <option value="TARJETA_PROPIEDAD">Tarjeta de Propiedad</option>
                     </select>
                     <label

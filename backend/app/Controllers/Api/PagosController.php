@@ -19,13 +19,16 @@ class PagosController extends ResourceController
                     p.numero_recibo as numeroRecibo,
                     p.concepto,
                     p.numero_voucher as contribuyente,
+                    p.medio_pago as medioPago,
+                    p.referencia_pago as referenciaPago,
                     p.codigo_contribuyente as dniRuc,
                     p.codigo_contribuyente as documentoIdentidad,
                     p.subtotal as monto,
                     p.descuento_aplicado as descuentoAplicado,
                     p.total as montoNeto,
-                    p.tipo_pago as metodoPago,
-                    p.tipo_pago as metodo,
+                    COALESCE(p.medio_pago, p.tipo_pago) as metodoPago,
+                    COALESCE(p.medio_pago, p.tipo_pago) as metodo,
+                    p.tipo_pago as tipoPago,
                     CONCAT(p.fecha_pago, ' ', COALESCE(p.hora_pago, '10:00:00')) as fechaHora,
                     p.fecha_pago as fecha,
                     p.cajero,
@@ -42,7 +45,7 @@ class PagosController extends ResourceController
                 $row['montoNeto'] = (float)$row['montoNeto'];
                 $row['tipoConcepto'] = 'TRAMITE';
                 $row['vehiculoPlaca'] = '';
-                $row['contribuyente'] = $row['contribuyente'] ?: 'Contribuyente Particular';
+                $row['contribuyente'] = $row['contribuyente'] ?: 'No registrado';
                 $row['dniRuc'] = $row['dniRuc'] ?: 'N/A';
                 $row['cajero'] = $row['cajero'] ?: 'Caja Central Municipal';
                 return $row;
@@ -70,7 +73,8 @@ class PagosController extends ResourceController
         $descuento = (float)($input['descuentoAplicado'] ?? 0);
         $total = max(0, $monto - $descuento);
         $metodo = trim($input['metodoPago'] ?? $input['metodo'] ?? 'EFECTIVO');
-        $contribuyente = trim($input['contribuyente'] ?? 'Contribuyente Particular');
+        $referenciaPago = trim($input['referenciaPago'] ?? '');
+        $contribuyente = trim($input['contribuyente'] ?? '');
         $dniRuc = trim($input['documentoIdentidad'] ?? $input['dniRuc'] ?? '');
         $concepto = trim($input['concepto'] ?? 'Pago de Trámite Municipal');
         $numeroRecibo = trim($input['numeroRecibo'] ?? ('REC-' . date('Y') . '-' . str_pad((string)random_int(1, 99999), 5, '0', STR_PAD_LEFT)));
@@ -79,9 +83,11 @@ class PagosController extends ResourceController
         $cajero = 'Caja Central Municipal';
 
         $data = [
-            'tipo_pago' => $metodo,
+            'tipo_pago' => trim($input['tipoPago'] ?? 'TRAMITE'),
             'numero_recibo' => $numeroRecibo,
             'numero_voucher' => $contribuyente,
+            'medio_pago' => $metodo,
+            'referencia_pago' => $referenciaPago,
             'fecha_pago' => $fechaPago,
             'hora_pago' => $horaPago,
             'cajero' => $cajero,
@@ -115,6 +121,9 @@ class PagosController extends ResourceController
                 'montoNeto' => $total,
                 'metodoPago' => $metodo,
                 'metodo' => $metodo,
+                'medioPago' => $metodo,
+                'referenciaPago' => $referenciaPago,
+                'tipoPago' => $data['tipo_pago'],
                 'fechaHora' => "$fechaPago $horaPago",
                 'fecha' => "$fechaPago $horaPago",
                 'cajero' => $cajero,

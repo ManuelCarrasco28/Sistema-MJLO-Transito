@@ -35,7 +35,7 @@ class DocumentosController extends ResourceController
             ->getResultArray();
 
         $data = array_map(static function (array $row): array {
-            $row['propietario'] = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? '')) ?: 'Propietario Registrado';
+            $row['propietario'] = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? '')) ?: 'No registrado';
             unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
             return $row;
         }, $rows);
@@ -51,6 +51,10 @@ class DocumentosController extends ResourceController
         if (empty($input['codigo'])) {
             return $this->failValidationErrors('El número o código del documento es obligatorio.');
         }
+        $tipoDocumento = strtoupper(trim($input['tipoDocumento'] ?? 'TARJETA_OPERATIVIDAD'));
+        if (!in_array($tipoDocumento, ['TARJETA_OPERATIVIDAD', 'SOAT', 'TARJETA_PROPIEDAD', 'CITV'], true)) {
+            return $this->failValidationErrors('Tipo de documento vehicular no válido.');
+        }
 
         $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
         $vehiculoId = null;
@@ -59,27 +63,16 @@ class DocumentosController extends ResourceController
             $vehiculoRow = $db->table('vehiculos')->where('placa', $placa)->get()->getRowArray();
             if ($vehiculoRow) {
                 $vehiculoId = (int)$vehiculoRow['id'];
-            } else {
-                
-                $tipoRow = $db->table('tipos_vehiculo')->limit(1)->get()->getRowArray();
-                $tipoId = $tipoRow ? $tipoRow['id'] : 1;
-                $db->table('vehiculos')->insert([
-                    'placa'                => $placa,
-                    'tipo_vehiculo_id'     => $tipoId,
-                    'estado_formalizacion' => 'FORMALIZADO',
-                ]);
-                $vehiculoId = (int)$db->insertID();
             }
         }
 
         if (!$vehiculoId) {
-            $firstVehiculo = $db->table('vehiculos')->limit(1)->get()->getRowArray();
-            $vehiculoId = $firstVehiculo ? (int)$firstVehiculo['id'] : 1;
+            return $this->failValidationErrors('Debe seleccionar un vehículo registrado.');
         }
 
         $record = [
             'vehiculo_id'      => $vehiculoId,
-            'tipo_documento'   => $input['tipoDocumento'] ?? 'TARJETA_OPERATIVIDAD',
+            'tipo_documento'   => $tipoDocumento,
             'codigo'           => trim($input['codigo']),
             'fecha_expedicion' => !empty($input['fechaExpedicion']) ? $input['fechaExpedicion'] : date('Y-m-d'),
             'fecha_expiracion' => !empty($input['fechaExpiracion']) ? $input['fechaExpiracion'] : date('Y-m-d', strtotime('+1 year')),
@@ -97,7 +90,7 @@ class DocumentosController extends ResourceController
             'fechaExpedicion' => $record['fecha_expedicion'],
             'fechaExpiracion' => $record['fecha_expiracion'],
             'estado'          => $record['estado'],
-            'propietario'     => $input['propietario'] ?? 'Propietario Registrado',
+            'propietario'     => $input['propietario'] ?? 'No registrado',
             'asociacion'      => $input['asociacion'] ?? 'Independiente',
         ];
 
@@ -114,7 +107,13 @@ class DocumentosController extends ResourceController
         }
 
         $record = [];
-        if (isset($input['tipoDocumento'])) $record['tipo_documento'] = $input['tipoDocumento'];
+        if (isset($input['tipoDocumento'])) {
+            $tipoDocumento = strtoupper(trim($input['tipoDocumento']));
+            if (!in_array($tipoDocumento, ['TARJETA_OPERATIVIDAD', 'SOAT', 'TARJETA_PROPIEDAD', 'CITV'], true)) {
+                return $this->failValidationErrors('Tipo de documento vehicular no válido.');
+            }
+            $record['tipo_documento'] = $tipoDocumento;
+        }
         if (isset($input['codigo'])) $record['codigo'] = trim($input['codigo']);
         if (isset($input['fechaExpedicion'])) $record['fecha_expedicion'] = $input['fechaExpedicion'];
         if (isset($input['fechaExpiracion'])) $record['fecha_expiracion'] = $input['fechaExpiracion'];

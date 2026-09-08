@@ -22,8 +22,14 @@ class AuthController extends ResourceController
 
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()
-            ->select('usuarios.*, personal.nombres, personal.apellidos, personal.cargo')
+            ->select("
+                usuarios.*,
+                personas.nombres,
+                CONCAT(personas.apellido_paterno, ' ', COALESCE(personas.apellido_materno, '')) AS apellidos,
+                personal.cargo
+            ", false)
             ->join('personal', 'personal.id = usuarios.personal_id', 'inner')
+            ->join('personas', 'personas.id = personal.persona_id', 'inner')
             ->where('usuarios.nombre_usuario', $usuario)
             ->first();
 

@@ -30,6 +30,10 @@ export function Vehiculos() {
     modelo: '',
     color: '',
     anio: new Date().getFullYear(),
+    categoria: '',
+    carroceria: '',
+    sedeRegistro: '',
+    tipoCarroceria: '',
     numeroSerie: '',
     serieMotor: '',
     partidaRegistral: '',
@@ -107,10 +111,21 @@ export function Vehiculos() {
     return `${label}: ${documento.codigo || 'SIN CODIGO'} | Estado: ${documento.estado || 'SIN ESTADO'} | Vence: ${documento.fechaExpiracion || 'SIN FECHA'}`
   }
 
+  const formatCerticavQr = (certicav) => {
+    if (!certicav) return 'CERTICAV / Inspeccion tecnica: SIN REGISTRO'
+
+    return [
+      `CERTICAV / Inspeccion tecnica: ${certicav.numeroSerieCerticav || certicav.numeroRegistro || 'SIN NUMERO'}`,
+      `Resultado: ${certicav.resultado || 'SIN RESULTADO'}`,
+      `Estado: ${certicav.estado || 'SIN ESTADO'}`,
+      `Fecha: ${certicav.fecha || 'SIN FECHA'}`,
+    ].join(' | ')
+  }
+
   const buildVehiculoQrValue = (vehiculo) => {
     const tarjetaPropiedad = getVehiculoDocumento(vehiculo, 'TARJETA_PROPIEDAD')
     const soat = getVehiculoDocumento(vehiculo, 'SOAT')
-    const certicav = getVehiculoDocumento(vehiculo, 'CERTICAV')
+    const certicav = vehiculo.certicav
     const papeletas = vehiculo.historialPapeletas || []
     const papeletasQr = papeletas.length > 0
       ? papeletas.slice(0, 8).map((papeleta, index) => (
@@ -127,13 +142,17 @@ export function Vehiculos() {
       `Modelo: ${vehiculo.modelo || 'SIN MODELO'}`,
       `Color: ${vehiculo.color || 'SIN COLOR'}`,
       `Anio fabricacion: ${vehiculo.anio || 'SIN ANIO'}`,
+      `Categoria: ${vehiculo.categoria || 'SIN CATEGORIA'}`,
+      `Carroceria: ${vehiculo.carroceria || 'SIN CARROCERIA'}`,
+      `Sede de registro: ${vehiculo.sedeRegistro || 'SIN SEDE'}`,
+      `Tipo de carroceria: ${vehiculo.tipoCarroceria || 'SIN TIPO CARROCERIA'}`,
       `Propietario: ${vehiculo.propietario || 'SIN PROPIETARIO'}`,
       `DNI propietario: ${vehiculo.propietarioTipoDocumento === 'DNI' ? vehiculo.propietarioDni || 'SIN DNI' : 'NO APLICA'}`,
       `RUC organizacion: ${vehiculo.organizacionRuc || 'SIN RUC'}`,
       `Organizacion vehiculo: ${vehiculo.organizacion || 'INDEPENDIENTE'}`,
       formatDocumentoQr('Tarjeta de propiedad numero', tarjetaPropiedad),
       formatDocumentoQr('SOAT', soat),
-      formatDocumentoQr('CERTICAV', certicav),
+      formatCerticavQr(certicav),
       'Historial de papeletas del vehiculo:',
       papeletasQr,
     ].join('\n')
@@ -147,6 +166,10 @@ export function Vehiculos() {
       modelo: '',
       color: '',
       anio: new Date().getFullYear(),
+      categoria: '',
+      carroceria: '',
+      sedeRegistro: '',
+      tipoCarroceria: '',
       numeroSerie: '',
       serieMotor: '',
       partidaRegistral: '',
@@ -499,10 +522,10 @@ export function Vehiculos() {
 
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <p className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
-                        {v.numeroSerie || 'SN-2026-9912'}
+                        {v.numeroSerie || 'N/A'}
                       </p>
                       <p className="text-[11px] font-mono text-slate-400">
-                        {v.partidaRegistral || 'PR-11029841'}
+                        {v.partidaRegistral || 'N/A'}
                       </p>
                     </td>
 
@@ -709,6 +732,74 @@ export function Vehiculos() {
                       className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
                     >
                       Año de Fabricación
+                    </label>
+                  </div>
+
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
+                    <input
+                      id="veh_categoria"
+                      type="text"
+                      placeholder=" "
+                      value={formData.categoria || ''}
+                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value.toUpperCase() })}
+                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold uppercase text-slate-800 outline-none dark:text-white"
+                    />
+                    <label
+                      htmlFor="veh_categoria"
+                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
+                    >
+                      Categoría SUNARP
+                    </label>
+                  </div>
+
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
+                    <input
+                      id="veh_carroceria"
+                      type="text"
+                      placeholder=" "
+                      value={formData.carroceria || ''}
+                      onChange={(e) => setFormData({ ...formData, carroceria: e.target.value.toUpperCase() })}
+                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold uppercase text-slate-800 outline-none dark:text-white"
+                    />
+                    <label
+                      htmlFor="veh_carroceria"
+                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
+                    >
+                      Carrocería
+                    </label>
+                  </div>
+
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
+                    <input
+                      id="veh_sede"
+                      type="text"
+                      placeholder=" "
+                      value={formData.sedeRegistro || ''}
+                      onChange={(e) => setFormData({ ...formData, sedeRegistro: e.target.value.toUpperCase() })}
+                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold uppercase text-slate-800 outline-none dark:text-white"
+                    />
+                    <label
+                      htmlFor="veh_sede"
+                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
+                    >
+                      Sede de Registro
+                    </label>
+                  </div>
+
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
+                    <input
+                      id="veh_tipo_carroceria"
+                      type="text"
+                      placeholder=" "
+                      value={formData.tipoCarroceria || ''}
+                      onChange={(e) => setFormData({ ...formData, tipoCarroceria: e.target.value.toUpperCase() })}
+                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono uppercase text-slate-800 outline-none dark:text-white"
+                    />
+                    <label
+                      htmlFor="veh_tipo_carroceria"
+                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
+                    >
+                      Tipo de Carrocería
                     </label>
                   </div>
                 </div>
@@ -985,6 +1076,22 @@ export function Vehiculos() {
                       <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.anio || 'N/A'}</p>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Categoría</p>
+                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.categoria || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Carrocería</p>
+                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.carroceria || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sede de registro</p>
+                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.sedeRegistro || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tipo de carrocería</p>
+                      <p className="font-mono text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.tipoCarroceria || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Condición Legal</p>
                       <p className="text-sm font-black text-slate-800 dark:text-slate-100">{isVehiculoFormal(selectedVehiculo) ? 'FORMAL' : 'INFORMAL'}</p>
                     </div>
@@ -1010,7 +1117,6 @@ export function Vehiculos() {
                   {[
                     ['Tarjeta de propiedad', getVehiculoDocumento(selectedVehiculo, 'TARJETA_PROPIEDAD')],
                     ['SOAT', getVehiculoDocumento(selectedVehiculo, 'SOAT')],
-                    ['CERTICAV', getVehiculoDocumento(selectedVehiculo, 'CERTICAV')],
                   ].map(([label, documento]) => (
                     <div key={label} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-900">
                       <span className="font-bold text-slate-600 dark:text-slate-300">{label}</span>
@@ -1020,6 +1126,15 @@ export function Vehiculos() {
                       </span>
                     </div>
                   ))}
+                  <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-cyan-50 px-3 py-2 dark:bg-cyan-950/30">
+                    <span className="font-bold text-slate-600 dark:text-slate-300">CERTICAV / Inspección técnica</span>
+                    <span className="text-right font-mono font-black text-slate-800 dark:text-white">
+                      {selectedVehiculo.certicav?.numeroSerieCerticav || selectedVehiculo.certicav?.numeroRegistro || 'N/A'}
+                      <span className="ml-2 text-[10px] font-bold text-slate-400">
+                        {selectedVehiculo.certicav?.resultado || selectedVehiculo.certicav?.estado || 'SIN_REGISTRO'}
+                      </span>
+                    </span>
+                  </div>
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">

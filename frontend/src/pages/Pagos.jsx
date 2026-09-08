@@ -20,14 +20,14 @@ export function Pagos() {
 
   const [formData, setFormData] = useState({
     numeroRecibo: '', concepto: '', metodo: 'EFECTIVO', montoNeto: 0,
-    contribuyente: '', dniRuc: ''
+    contribuyente: '', dniRuc: '', referenciaPago: ''
   })
 
   const handleOpenCreateModal = () => {
     setFormData({
       numeroRecibo: `REC-2026-${String(pagos.length + 1).padStart(5, '0')}`,
       concepto: '', metodo: 'EFECTIVO', montoNeto: 0,
-      contribuyente: '', dniRuc: ''
+      contribuyente: '', dniRuc: '', referenciaPago: ''
     })
     setIsModalOpen(true)
   }
@@ -143,7 +143,7 @@ export function Pagos() {
               </h1>
             </div>
             <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-              Control de ingresos por papeletas de infracción, licencias, cursos CERTICAV y tasas municipales.
+              Control de ingresos por papeletas de infracción, licencias, cursos de seguridad vial y tasas municipales.
             </p>
           </div>
         </div>
@@ -359,8 +359,12 @@ export function Pagos() {
                 </div>
               </div>
               <div>
+                <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Referencia de pago</label>
+                <input type="text" value={formData.referenciaPago} onChange={e => setFormData({...formData, referenciaPago: e.target.value})} placeholder="N° operación, voucher o referencia POS" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+              </div>
+              <div>
                 <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Concepto *</label>
-                <input type="text" required value={formData.concepto} onChange={e => setFormData({...formData, concepto: e.target.value})} placeholder="Ej. Pago por Curso CERTICAV" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                <input type="text" required value={formData.concepto} onChange={e => setFormData({...formData, concepto: e.target.value})} placeholder="Ej. Pago por curso de seguridad vial" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -396,6 +400,7 @@ export function Pagos() {
               <p><strong>Fecha:</strong> {new Date(selectedPago.fecha).toLocaleString()}</p>
               <p><strong>Concepto:</strong> {selectedPago.concepto}</p>
               <p><strong>Método de Pago:</strong> {selectedPago.metodo}</p>
+              <p><strong>Referencia:</strong> {selectedPago.referenciaPago || 'Sin referencia'}</p>
               <p className="text-emerald-600 font-bold dark:text-emerald-400"><strong>Monto Pagado:</strong> S/ {selectedPago.montoNeto?.toFixed(2)}</p>
             </div>
             <div className="mt-8 flex justify-end gap-2">
