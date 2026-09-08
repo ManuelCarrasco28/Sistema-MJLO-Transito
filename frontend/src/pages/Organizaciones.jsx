@@ -474,7 +474,7 @@ export function Organizaciones() {
                   Identificación Institucional
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
                     <select
                       id="org_tipo"
                       value={formData.tipo}
@@ -492,7 +492,7 @@ export function Organizaciones() {
                     </label>
                   </div>
 
-                  <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
+                  <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
                     <input
                       id="org_razon"
                       type="text"
@@ -510,7 +510,7 @@ export function Organizaciones() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
                     <input
                       id="org_ruc"
                       type="text"
@@ -528,7 +528,7 @@ export function Organizaciones() {
                     </label>
                   </div>
 
-                  <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
+                  <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
                     <input
                       id="org_partida"
                       type="text"
@@ -554,7 +554,7 @@ export function Organizaciones() {
                   Representante & Domicilio
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
                     <input
                       id="org_rep"
                       type="text"
@@ -571,7 +571,7 @@ export function Organizaciones() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
                     <input
                       id="org_dir"
                       type="text"
@@ -588,7 +588,7 @@ export function Organizaciones() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
                     <input
                       id="org_tel"
                       type="text"
@@ -605,7 +605,7 @@ export function Organizaciones() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
                     <input
                       id="org_flota"
                       type="number"
