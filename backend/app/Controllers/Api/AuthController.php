@@ -29,8 +29,8 @@ class AuthController extends ResourceController
                 personal.cargo,
                 personal.id AS personal_id
             ", false)
-            ->join('personal', 'personal.id = usuarios.personal_id', 'inner')
-            ->join('personas', 'personas.id = personal.persona_id', 'inner')
+            ->join('personal', 'personal.id = usuarios.id_personal', 'inner')
+            ->join('personas', 'personas.id = personal.id_persona', 'inner')
             ->where('usuarios.nombre_usuario', $usuario)
             ->first();
 

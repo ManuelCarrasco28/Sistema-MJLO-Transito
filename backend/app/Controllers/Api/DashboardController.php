@@ -49,9 +49,9 @@ class DashboardController extends ResourceController
         $montoPendiente = (float) ($papRow['monto_pendiente'] ?? 0);
 
         
-        $retRow = $db->table('internamientos')
+        $retRow = $db->table('ordenes_internamiento')
             ->select("
-                SUM(CASE WHEN estado IN ('EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'ACTIVO') THEN 1 ELSE 0 END) as retenidos,
+                SUM(CASE WHEN estado IN ('RETENIDO', 'EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'ACTIVO') THEN 1 ELSE 0 END) as retenidos,
                 SUM(CASE WHEN estado IN ('LIBERADO', 'LIBERADA') OR fecha_salida IS NOT NULL THEN 1 ELSE 0 END) as liberados
             ", false)
             ->get()->getRowArray() ?? [];
@@ -147,9 +147,10 @@ class DashboardController extends ResourceController
             ->get()->getResultArray();
 
         
-        $pagosRows = $db->table('pagos')
+        $pagosRows = $db->table('pagos_transito')
             ->select('YEAR(fecha_pago) as anio, MONTH(fecha_pago) as mes, COUNT(*) as total', false)
             ->where('fecha_pago IS NOT NULL', null, false)
+            ->where('estado', 'PAGADO')
             ->groupBy('YEAR(fecha_pago), MONTH(fecha_pago)')
             ->get()->getResultArray();
 
@@ -224,12 +225,13 @@ class DashboardController extends ResourceController
 
     private function operatividad($db): array
     {
-        $permRow = $db->table('permisos_circulacion')
+        $permRow = $db->table('documentos_vehiculo')
             ->select("
-                SUM(CASE WHEN estado = 'ACTIVO' THEN 1 ELSE 0 END) as activas,
+                SUM(CASE WHEN estado = 'VIGENTE' AND (fecha_expiracion IS NULL OR fecha_expiracion >= CURDATE()) THEN 1 ELSE 0 END) as activas,
                 SUM(CASE WHEN estado IN ('EN_TRAMITE', 'EN TRÁMITE', 'EN TRAMITE') THEN 1 ELSE 0 END) as tramite,
-                SUM(CASE WHEN fecha_fin_vigencia < CURDATE() THEN 1 ELSE 0 END) as vencidas
+                SUM(CASE WHEN estado = 'VENCIDO' OR (estado = 'VIGENTE' AND fecha_expiracion < CURDATE()) THEN 1 ELSE 0 END) as vencidas
             ", false)
+            ->where('tipo_documento', 'TARJETA_OPERATIVIDAD')
             ->get()->getRowArray() ?? [];
 
         return $this->withPercents([

@@ -38,7 +38,7 @@ class CursosController extends ResourceController
                 $row['horario'] = '09:00 AM - 12:00 PM';
                 try {
                     $row['cuposInscritos'] = (int)$db->table('inscripciones_curso')
-                        ->where('curso_id', $row['id'])
+                        ->where('id_curso', $row['id'])
                         ->countAllResults();
                 } catch (\Throwable $t) {
                     $row['cuposInscritos'] = 0;
@@ -49,8 +49,8 @@ class CursosController extends ResourceController
                 try {
                     $participantes = $db->table('inscripciones_curso ic')
                         ->select('p.nombres, p.apellido_paterno, p.apellido_materno, ic.estado, ic.asistio')
-                        ->join('personas p', 'p.id = ic.persona_id', 'left')
-                        ->where('ic.curso_id', $row['id'])
+                        ->join('personas p', 'p.id = ic.id_persona', 'left')
+                        ->where('ic.id_curso', $row['id'])
                         ->get()
                         ->getResultArray();
                     $row['participantes'] = $participantes;

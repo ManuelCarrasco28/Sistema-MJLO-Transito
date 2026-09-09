@@ -29,7 +29,7 @@ class VehiculosController extends ResourceController
                 COALESCE(v.serie_motor, '') AS serieMotor,
                 COALESCE(v.partida_registral, '') AS partidaRegistral,
                 COALESCE(v.codigo_qr, '') AS codigoQr,
-                v.asociacion_id AS asociacionId,
+                v.id_asociacion AS asociacionId,
                 o.razon_social AS organizacion,
                 COALESCE(o.ruc, '') AS organizacionRuc,
                 COALESCE(p.tipo_documento, 'DNI') AS propietarioTipoDocumento,
@@ -38,12 +38,12 @@ class VehiculosController extends ResourceController
                 COALESCE(p.apellido_materno, '') AS propietarioMaterno,
                 COALESCE(p.numero_documento, '') AS propietarioDni,
                 v.estado_formalizacion AS estado,
-                CASE WHEN v.asociacion_id IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END AS formalidad
+                CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END AS formalidad
             ", false)
-            ->join('tipos_vehiculo tv', 'tv.id = v.tipo_vehiculo_id', 'left')
-            ->join('organizaciones o', 'o.id = v.asociacion_id', 'left')
-            ->join('vehiculo_propietarios vp', 'vp.vehiculo_id = v.id AND vp.fecha_fin IS NULL', 'left')
-            ->join('personas p', 'p.id = vp.persona_id', 'left')
+            ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
+            ->join('organizaciones o', 'o.id = v.id_asociacion', 'left')
+            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
+            ->join('personas p', 'p.id = vp.id_persona', 'left')
             ->orderBy('v.id', 'DESC')
             ->get()
             ->getResultArray();
@@ -55,21 +55,21 @@ class VehiculosController extends ResourceController
 
         if (!empty($vehiculoIds)) {
             $documentos = $db->table('documentos_vehiculo')
-                ->select('vehiculo_id, tipo_documento as tipoDocumento, codigo, fecha_expedicion as fechaExpedicion, fecha_expiracion as fechaExpiracion, estado')
-                ->whereIn('vehiculo_id', $vehiculoIds)
+                ->select('id_vehiculo, tipo_documento as tipoDocumento, codigo, fecha_expedicion as fechaExpedicion, fecha_expiracion as fechaExpiracion, estado')
+                ->whereIn('id_vehiculo', $vehiculoIds)
                 ->orderBy('fecha_expiracion', 'DESC')
                 ->get()
                 ->getResultArray();
 
             foreach ($documentos as $doc) {
-                $vehiculoId = (int)$doc['vehiculo_id'];
-                unset($doc['vehiculo_id']);
+                $vehiculoId = (int)$doc['id_vehiculo'];
+                unset($doc['id_vehiculo']);
                 $documentosPorVehiculo[$vehiculoId][] = $doc;
             }
 
             $papeletas = $db->table('papeletas p')
                 ->select("
-                    p.vehiculo_id,
+                    p.id_vehiculo,
                     p.numero_papeleta as numeroPapeleta,
                     p.fecha_hora as fechaHora,
                     p.lugar,
@@ -79,33 +79,33 @@ class VehiculosController extends ResourceController
                     COALESCE(ti.descripcion, 'Infraccion no especificada') as tipoInfraccion,
                     COALESCE(ti.gravedad, 'SIN GRAVEDAD') as gravedad
                 ", false)
-                ->join('papeleta_detalles pd', 'pd.papeleta_id = p.id', 'left')
-                ->join('tipos_infraccion ti', 'ti.id = pd.tipo_infraccion_id', 'left')
-                ->whereIn('vehiculo_id', $vehiculoIds)
+                ->join('papeleta_detalles pd', 'pd.id_papeleta = p.id', 'left')
+                ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
+                ->whereIn('id_vehiculo', $vehiculoIds)
                 ->groupBy('p.id')
                 ->orderBy('p.fecha_hora', 'DESC')
                 ->get()
                 ->getResultArray();
 
             foreach ($papeletas as $papeleta) {
-                $vehiculoId = (int)$papeleta['vehiculo_id'];
-                unset($papeleta['vehiculo_id']);
+                $vehiculoId = (int)$papeleta['id_vehiculo'];
+                unset($papeleta['id_vehiculo']);
                 $papeleta['montoTotal'] = (float)$papeleta['montoTotal'];
                 $papeletasPorVehiculo[$vehiculoId][] = $papeleta;
             }
 
             $certicavs = $db->table('certicav')
-                ->select('vehiculo_id, numero_registro as numeroRegistro, numero_serie_certicav as numeroSerieCerticav, fecha, primera_evaluacion as primeraEvaluacion, segunda_evaluacion as segundaEvaluacion, resultado, estado')
-                ->whereIn('vehiculo_id', $vehiculoIds)
+                ->select('id_vehiculo, numero_registro as numeroRegistro, numero_serie_certicav as numeroSerieCerticav, fecha, primera_evaluacion as primeraEvaluacion, segunda_evaluacion as segundaEvaluacion, resultado, estado')
+                ->whereIn('id_vehiculo', $vehiculoIds)
                 ->orderBy('fecha', 'DESC')
                 ->orderBy('id', 'DESC')
                 ->get()
                 ->getResultArray();
 
             foreach ($certicavs as $certicav) {
-                $vehiculoId = (int)$certicav['vehiculo_id'];
+                $vehiculoId = (int)$certicav['id_vehiculo'];
                 if (!isset($certicavPorVehiculo[$vehiculoId])) {
-                    unset($certicav['vehiculo_id']);
+                    unset($certicav['id_vehiculo']);
                     $certicavPorVehiculo[$vehiculoId] = $certicav;
                 }
             }
@@ -179,7 +179,7 @@ class VehiculosController extends ResourceController
 
         $record = [
             'placa'                => $placa,
-            'tipo_vehiculo_id'     => $tipoVehiculoId,
+            'id_tipo_vehiculo'     => $tipoVehiculoId,
             'marca'                => trim($input['marca'] ?? ''),
             'modelo'               => trim($input['modelo'] ?? ''),
             'color'                => trim($input['color'] ?? ''),
@@ -192,7 +192,7 @@ class VehiculosController extends ResourceController
             'serie_motor'          => trim($input['serieMotor'] ?? ''),
             'partida_registral'    => trim($input['partidaRegistral'] ?? ''),
             'codigo_qr'            => $qrCode,
-            'asociacion_id'        => $asociacionId,
+            'id_asociacion'        => $asociacionId,
             'estado_formalizacion' => $estadoFormalizacion,
         ];
 
@@ -227,8 +227,8 @@ class VehiculosController extends ResourceController
 
             if ($personaId) {
                 $db->table('vehiculo_propietarios')->insert([
-                    'vehiculo_id'  => $vehiculoId,
-                    'persona_id'   => $personaId,
+                    'id_vehiculo'  => $vehiculoId,
+                    'id_persona'   => $personaId,
                     'fecha_inicio' => date('Y-m-d'),
                     'estado'       => 'ACTIVO',
                 ]);
@@ -299,14 +299,18 @@ class VehiculosController extends ResourceController
                     $asociacionId = $orgRow['id'];
                 }
             }
-            $record['asociacion_id'] = $asociacionId;
+            $record['id_asociacion'] = $asociacionId;
             if (!isset($input['estado']) || !in_array(strtoupper($input['estado']), ['SUSPENDIDO', 'BAJA'])) {
                 $record['estado_formalizacion'] = $asociacionId ? 'FORMAL' : 'INFORMAL';
             }
         }
 
         if (isset($input['estado'])) {
-            $record['estado_formalizacion'] = strtoupper($input['estado']);
+            $actual = $db->table('vehiculos')->where('id', $id)->get()->getRowArray();
+            if (!$actual) return $this->failNotFound('Vehículo no encontrado.');
+            $association = array_key_exists('id_asociacion', $record) ? $record['id_asociacion'] : $actual['id_asociacion'];
+            $record['estado_formalizacion'] = in_array(strtoupper($input['estado']), ['SUSPENDIDO', 'BAJA'], true)
+                ? strtoupper($input['estado']) : ($association ? 'FORMAL' : 'INFORMAL');
         }
 
         if (!empty($record)) {
@@ -324,8 +328,8 @@ class VehiculosController extends ResourceController
             return $this->failNotFound('ID de vehículo no especificado.');
         }
 
-        $db->table('vehiculo_propietarios')->where('vehiculo_id', $id)->delete();
-        $db->table('documentos_vehiculo')->where('vehiculo_id', $id)->delete();
+        $db->table('vehiculo_propietarios')->where('id_vehiculo', $id)->delete();
+        $db->table('documentos_vehiculo')->where('id_vehiculo', $id)->delete();
         $db->table('vehiculos')->where('id', $id)->delete();
 
         return $this->respondDeleted(['status' => true, 'message' => 'Vehículo eliminado con éxito']);

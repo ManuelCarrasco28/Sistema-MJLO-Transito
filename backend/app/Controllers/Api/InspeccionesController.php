@@ -40,6 +40,7 @@ class InspeccionesController extends ResourceController
             $rows = $db->table('certicav i')
                 ->select("
                     i.id,
+                    i.id_tecnico as tecnicoId,
                     i.numero_serie_certicav as numeroInspeccion,
                     v.placa as vehiculoPlaca,
                     COALESCE(CONCAT(per.nombres, ' ', per.apellido_paterno, ' ', COALESCE(per.apellido_materno, '')), 'Inspector Técnico Municipal') as inspector,
@@ -48,9 +49,9 @@ class InspeccionesController extends ResourceController
                     i.observaciones,
                     i.estado
                 ")
-                ->join('vehiculos v', 'v.id = i.vehiculo_id', 'left')
-                ->join('personal p', 'p.id = i.tecnico_id', 'left')
-                ->join('personas per', 'per.id = p.persona_id', 'left')
+                ->join('vehiculos v', 'v.id = i.id_vehiculo', 'left')
+                ->join('personal p', 'p.id = i.id_tecnico', 'left')
+                ->join('personas per', 'per.id = p.id_persona', 'left')
                 ->orderBy('i.id', 'DESC')
                 ->get()
                 ->getResultArray();
@@ -61,8 +62,8 @@ class InspeccionesController extends ResourceController
                 
                 
                 $detalles = $db->table('certicav_detalles id')
-                    ->select('id.criterio_id as criterioId, id.estado_revision as estado, id.observacion as obs')
-                    ->where('id.certicav_id', $row['id'])
+                    ->select('id.id_criterio as criterioId, id.estado_revision as estado, id.observacion as obs')
+                    ->where('id.id_certicav', $row['id'])
                     ->get()
                     ->getResultArray();
 
@@ -100,33 +101,18 @@ class InspeccionesController extends ResourceController
         try {
             
             $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
-            if (!$vehiculo) {
-                $firstVeh = $db->table('vehiculos')->limit(1)->get()->getRowArray();
-                if ($firstVeh) {
-                    $vehiculoId = (int)$firstVeh['id'];
-                    $placa = $firstVeh['placa'];
-                } else {
-                    $db->table('vehiculos')->insert([
-                        'placa' => $placa ?: 'NC-' . rand(1000, 9999),
-                        'tipo_vehiculo_id' => 1,
-                        'estado_formalizacion' => 'INFORMAL'
-                    ]);
-                    $vehiculoId = $db->insertID();
-                }
-            } else {
-                $vehiculoId = (int)$vehiculo['id'];
-            }
-
-            
+            if (!$vehiculo) throw new \DomainException('Registre o seleccione el vehículo correcto antes de inspeccionarlo.');
+            $vehiculoId = (int)$vehiculo['id'];
             $tecnico = $db->table('personal pe')
-                ->select("pe.id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
-                ->join('personas per', 'per.id = pe.persona_id', 'inner')
-                ->where('pe.estado', 'ACTIVO')
-                ->limit(1)
-                ->get()
-                ->getRowArray();
-            $tecnicoId = $tecnico ? (int)$tecnico['id'] : 1;
-            $tecnicoNombre = $tecnico ? trim($tecnico['nombres'] . ' ' . $tecnico['apellido_paterno'] . ' ' . ($tecnico['apellido_materno'] ?? '')) : 'Inspector Técnico Municipal';
+                ->select('pe.id, per.nombres, per.apellido_paterno')
+                ->join('personas per', 'per.id = pe.id_persona')
+                ->where('pe.id', (int)($input['tecnicoId'] ?? 0))
+                ->where('pe.estado', 'ACTIVO')->get()->getRowArray();
+            if (!$tecnico) throw new \DomainException('Seleccione el técnico responsable.');
+            $tecnicoId = (int)$tecnico['id'];
+            $tecnicoNombre = trim($tecnico['nombres'] . ' ' . $tecnico['apellido_paterno']);
+            $detalles = $this->validarDetalles($db, $detalles);
+            $db->transException(true)->transBegin();
 
             $numeroInspeccion = 'CERT-' . date('Y') . '-' . str_pad((string)random_int(1, 999), 3, '0', STR_PAD_LEFT);
             $fecha = date('Y-m-d H:i:s');
@@ -134,8 +120,8 @@ class InspeccionesController extends ResourceController
             
             $inspData = [
                 'numero_serie_certicav' => $numeroInspeccion,
-                'vehiculo_id' => $vehiculoId,
-                'tecnico_id' => $tecnicoId,
+                'id_vehiculo' => $vehiculoId,
+                'id_tecnico' => $tecnicoId,
                 'fecha' => date('Y-m-d'),
                 'resultado' => $resultado,
                 'observaciones' => $observaciones,
@@ -153,8 +139,8 @@ class InspeccionesController extends ResourceController
                     $estadoRev = trim($det['estado'] ?? 'BIEN');
                     $obs = trim($det['obs'] ?? '');
                     $db->table('certicav_detalles')->insert([
-                        'certicav_id' => $inspeccionId,
-                        'criterio_id' => $criterioId,
+                        'id_certicav' => $inspeccionId,
+                        'id_criterio' => $criterioId,
                         'estado_revision' => $estadoRev,
                         'observacion' => $obs
                     ]);
@@ -178,8 +164,14 @@ class InspeccionesController extends ResourceController
                 'detalles' => $savedDetalles,
             ];
 
+            if (!$db->transStatus()) throw new \RuntimeException('No se pudo guardar la inspección completa.');
+            $db->transCommit();
             return $this->respondCreated(['status' => 201, 'data' => $response]);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
+            $db->transRollback();
             return $this->failServerError('Error creando la inspección: ' . $e->getMessage());
         }
     }
@@ -197,6 +189,9 @@ class InspeccionesController extends ResourceController
         }
 
         try {
+            if (!$db->table('certicav')->where('id', $id)->countAllResults()) return $this->failNotFound('Inspección no encontrada.');
+            if (isset($input['detalles'])) $input['detalles'] = $this->validarDetalles($db, $input['detalles']);
+            $db->transException(true)->transBegin();
             $data = [];
             if (isset($input['resultado'])) {
                 $data['resultado'] = trim($input['resultado']);
@@ -210,21 +205,27 @@ class InspeccionesController extends ResourceController
             }
 
             if (isset($input['detalles']) && is_array($input['detalles'])) {
-                $db->table('certicav_detalles')->where('certicav_id', $id)->delete();
+                $db->table('certicav_detalles')->where('id_certicav', $id)->delete();
                 foreach ($input['detalles'] as $det) {
                     $criterioId = (int)($det['criterioId'] ?? 0);
                     if ($criterioId <= 0) continue;
                     $db->table('certicav_detalles')->insert([
-                        'certicav_id' => $id,
-                        'criterio_id' => $criterioId,
+                        'id_certicav' => $id,
+                        'id_criterio' => $criterioId,
                         'estado_revision' => trim($det['estado'] ?? 'BIEN'),
                         'observacion' => trim($det['obs'] ?? '')
                     ]);
                 }
             }
 
+            if (!$db->transStatus()) throw new \RuntimeException('No se pudo actualizar la inspección completa.');
+            $db->transCommit();
             return $this->respond(['status' => 200, 'message' => 'Inspección actualizada correctamente']);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
+            $db->transRollback();
             return $this->failServerError('Error actualizando la inspección: ' . $e->getMessage());
         }
     }
@@ -238,5 +239,18 @@ class InspeccionesController extends ResourceController
         } catch (\Exception $e) {
             return $this->failServerError('Error anulando la inspección: ' . $e->getMessage());
         }
+    }
+    private function validarDetalles($db, $detalles): array
+    {
+        if (is_string($detalles)) $detalles = json_decode($detalles, true);
+        if (!is_array($detalles)) throw new \DomainException('Los criterios de inspección no son válidos.');
+        $seen = [];
+        foreach ($detalles as $detalle) {
+            $id = (int)($detalle['criterioId'] ?? 0);
+            if ($id <= 0 || isset($seen[$id]) || !$db->table('inspeccion_criterios')->where('id', $id)->countAllResults()) throw new \DomainException('Hay criterios inexistentes o repetidos.');
+            if (!in_array($detalle['estado'] ?? '', ['BIEN','MAL_ESTADO','NO_TIENE'], true)) throw new \DomainException('Estado de revisión inválido.');
+            $seen[$id] = true;
+        }
+        return $detalles;
     }
 }

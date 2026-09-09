@@ -26,10 +26,10 @@ class DocumentosController extends ResourceController
                 COALESCE(p.apellido_paterno, '') AS propietarioPaterno,
                 COALESCE(p.apellido_materno, '') AS propietarioMaterno
             ", false)
-            ->join('vehiculos v', 'v.id = d.vehiculo_id', 'left')
-            ->join('organizaciones o', 'o.id = v.asociacion_id', 'left')
-            ->join('vehiculo_propietarios vp', 'vp.vehiculo_id = v.id AND vp.fecha_fin IS NULL', 'left')
-            ->join('personas p', 'p.id = vp.persona_id', 'left')
+            ->join('vehiculos v', 'v.id = d.id_vehiculo', 'left')
+            ->join('organizaciones o', 'o.id = v.id_asociacion', 'left')
+            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
+            ->join('personas p', 'p.id = vp.id_persona', 'left')
             ->orderBy('d.id', 'DESC')
             ->get()
             ->getResultArray();
@@ -71,7 +71,7 @@ class DocumentosController extends ResourceController
         }
 
         $record = [
-            'vehiculo_id'      => $vehiculoId,
+            'id_vehiculo'      => $vehiculoId,
             'tipo_documento'   => $tipoDocumento,
             'codigo'           => trim($input['codigo']),
             'fecha_expedicion' => !empty($input['fechaExpedicion']) ? $input['fechaExpedicion'] : date('Y-m-d'),

@@ -26,7 +26,7 @@ class OrganizacionesController extends ResourceController
                 o.estado,
                 COUNT(v.id) AS flotaTotal
             ", false)
-            ->join('vehiculos v', 'v.asociacion_id = o.id', 'left')
+            ->join('vehiculos v', 'v.id_asociacion = o.id', 'left')
             ->groupBy('o.id')
             ->orderBy('o.id', 'DESC')
             ->get()

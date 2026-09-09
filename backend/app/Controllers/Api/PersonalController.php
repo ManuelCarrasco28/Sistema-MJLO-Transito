@@ -13,7 +13,7 @@ class PersonalController extends ResourceController
         $rows = \Config\Database::connect()->table('personal pe')
             ->select("
                 pe.id,
-                pe.persona_id,
+                pe.id_persona as persona_id,
                 p.tipo_documento,
                 p.numero_documento,
                 p.nombres,
@@ -24,7 +24,7 @@ class PersonalController extends ResourceController
                 pe.cargo,
                 pe.estado
             ", false)
-            ->join('personas p', 'p.id = pe.persona_id', 'inner')
+            ->join('personas p', 'p.id = pe.id_persona', 'inner')
             ->orderBy('id', 'DESC')->get()->getResultArray();
         return $this->respond(['data' => $rows]);
     }
@@ -70,7 +70,7 @@ class PersonalController extends ResourceController
         $persona = $personaQuery->get()->getRowArray();
 
         $duplicate = $db->table('personal pe')
-            ->join('personas p', 'p.id = pe.persona_id', 'inner')
+            ->join('personas p', 'p.id = pe.id_persona', 'inner')
             ->where('p.tipo_documento', $tipoDocumento)
             ->where('p.numero_documento', $numeroDocumento);
         if ($id !== null) $duplicate->where('pe.id !=', $id);
@@ -97,7 +97,7 @@ class PersonalController extends ResourceController
         }
 
         $record = [
-            'persona_id' => $personaId,
+            'id_persona' => $personaId,
             'cargo' => trim($input['cargo']),
             'estado' => $estado,
         ];
