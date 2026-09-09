@@ -93,10 +93,22 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       String conductorNombre = _conductorEsDueno 
           ? (widget.vehicleData['propietario'] ?? 'Dueño')
           : '${_nombresConductor.text.trim()} ${_apellidosConductor.text.trim()}';
+      String conductorDni = _conductorEsDueno
+          ? (widget.vehicleData['propietarioDni'] ?? '').toString()
+          : _dniConductor.text.trim();
+      String conductorNombres = _conductorEsDueno
+          ? (widget.vehicleData['propietarioNombres'] ?? conductorNombre).toString()
+          : _nombresConductor.text.trim();
+      String conductorApellidos = _conductorEsDueno
+          ? '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim()
+          : _apellidosConductor.text.trim();
 
       final requestData = {
         'vehiculoPlaca': widget.vehicleData['placa'] ?? widget.vehicleData['chasis'],
         'infractor': conductorNombre,
+        'conductorDni': conductorDni,
+        'conductorNombres': conductorNombres,
+        'conductorApellidos': conductorApellidos,
         'lugar': _lugar,
         'infraccionesIds': infraccionesInts,
         'observacionesAutoridad': _observaciones,

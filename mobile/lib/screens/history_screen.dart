@@ -23,7 +23,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final papeletas = await ApiService.getPapeletas();
 
-      final inspectorId = await ApiService.getPersonalId();
+      // final inspectorId = await ApiService.getPersonalId();
       // En la API actual, no filtra por inspector_id en el GET, podríamos filtrarlo localmente si la API no lo hace.
       // O mostramos todo. Por ahora, las mostraremos todas o filtramos si la API trae todo.
       
@@ -181,7 +181,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   const SizedBox(height: 8),
                   Container(
                     decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300)),
-                    child: Image.network('http://10.0.2.2:8080/' + data['firmaConductorImg'], height: 100, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Text('Error al cargar la firma')),
+                    child: Image.network('${ApiService.fileBaseUrl}/${data['firmaConductorImg']}', height: 100, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Text('Error al cargar la firma')),
                   ),
                 ]
               ],

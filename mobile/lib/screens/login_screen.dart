@@ -11,12 +11,12 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
+  final _usuarioController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
   Future<void> _signIn() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+    if (_usuarioController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor llena todos los campos')),
       );
@@ -27,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await ApiService.login(
-        _emailController.text.trim(),
+        _usuarioController.text.trim(),
         _passwordController.text.trim(),
       );
       
@@ -52,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usuarioController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -93,10 +93,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        width: 172,
+                        height: 142,
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.2),
@@ -107,9 +109,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: Image.asset(
                           'assets/images/logo.png',
-                          height: 180, // Logo más grande
+                          fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.security, size: 120, color: Color(0xFF1E3A8A));
+                            return const Icon(Icons.security, size: 84, color: Color(0xFF1E3A8A));
                           },
                         ),
                       ),
@@ -133,12 +135,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       
                       // Formulario
                       TextField(
-                        controller: _emailController,
+                        controller: _usuarioController,
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
-                          labelText: 'Correo Institucional',
+                          labelText: 'Usuario',
                           labelStyle: TextStyle(color: Colors.blue.shade200),
-                          prefixIcon: Icon(Icons.email_outlined, color: Colors.blue.shade200),
+                          prefixIcon: Icon(Icons.person_outline, color: Colors.blue.shade200),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
                             borderSide: BorderSide(color: Colors.blue.shade200),
@@ -150,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           filled: true,
                           fillColor: Colors.black.withOpacity(0.2),
                         ),
-                        keyboardType: TextInputType.emailAddress,
+                        keyboardType: TextInputType.text,
                       ),
                       const SizedBox(height: 16),
                       TextField(

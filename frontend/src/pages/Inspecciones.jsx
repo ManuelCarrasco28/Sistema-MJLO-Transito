@@ -8,6 +8,7 @@ export function Inspecciones() {
   const cachedInsp = getCachedData('/inspecciones')
   const cachedCrit = getCachedData('/inspeccion-criterios')
   const cachedVeh = getCachedData('/vehiculos')
+  const [tecnicos, setTecnicos] = useState([])
   const [inspecciones, setInspecciones] = useState(cachedInsp || [])
   const [criteriosInspeccion, setCriteriosInspeccion] = useState(cachedCrit || [])
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
@@ -24,7 +25,7 @@ export function Inspecciones() {
 
   const [formData, setFormData] = useState({
     vehiculoPlaca: '',
-    inspector: 'Inspector Técnico Municipal',
+    inspector: '', tecnicoId: '',
     resultado: 'APROBADO',
     observaciones: '',
     detalles: [],
@@ -54,6 +55,7 @@ export function Inspecciones() {
   )
 
   useEffect(() => {
+    apiFetch('/personal').then(r => r.json()).then(r => setTecnicos((r.data || []).filter(p => p.estado === 'ACTIVO'))).catch(() => {})
     Promise.all([
       apiFetch('/inspecciones').then(res => res.json()).catch(() => ({ data: [] })),
       apiFetch('/inspeccion-criterios').then(res => res.json()).catch(() => ({ data: [] })),
@@ -80,8 +82,8 @@ export function Inspecciones() {
 
   const handleOpenCreateModal = () => {
     setFormData({
-      vehiculoPlaca: vehiculos[0]?.placa || '',
-      inspector: 'Inspector Técnico Municipal',
+      vehiculoPlaca: '',
+      inspector: '', tecnicoId: '',
       resultado: 'APROBADO',
       observaciones: '',
       detalles: criteriosInspeccion.map((c) => ({ criterioId: c.id, estado: 'BIEN', obs: '' })),
@@ -105,7 +107,7 @@ export function Inspecciones() {
   const handleOpenEditModal = (inspeccion) => {
     setFormData({
       vehiculoPlaca: inspeccion.vehiculoPlaca,
-      inspector: inspeccion.inspector,
+      inspector: inspeccion.inspector, tecnicoId: inspeccion.tecnicoId || '',
       resultado: inspeccion.resultado,
       observaciones: inspeccion.observaciones || '',
       detalles: inspeccion.detalles || criteriosInspeccion.map((c) => ({ criterioId: c.id, estado: 'BIEN', obs: '' })),
@@ -144,7 +146,7 @@ export function Inspecciones() {
       ...formData,
       resultado: formData.resultado,
       observaciones: formData.observaciones,
-      detalles: JSON.stringify(formData.detalles)
+      detalles: formData.detalles
     }
 
     try {
@@ -317,7 +319,7 @@ export function Inspecciones() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-sky-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-sky-600 to-indigo-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-sky-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Registrar Inspección</span>
@@ -390,11 +392,11 @@ export function Inspecciones() {
                       </td>
 
 
-                      <td className="px-3.5 py-3.5 max-w-[180px]">
+                      <td className="px-3.5 py-3.5 max-w-45">
                         <p className="font-bold text-slate-800 dark:text-white truncate" title={`${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`}>
                           {vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : 'Vehículo Registrado'}
                         </p>
-                        <p className="text-xs text-slate-400 truncate max-w-[160px]" title={vehiculo?.propietario || 'No especificado'}>
+                        <p className="text-xs text-slate-400 truncate max-w-40" title={vehiculo?.propietario || 'No especificado'}>
                           {vehiculo?.propietario || 'Propietario no asignado'}
                         </p>
                       </td>
@@ -533,12 +535,16 @@ export function Inspecciones() {
                   <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
                     Inspector Técnico
                   </label>
-                  <input
-                    type="text"
-                    disabled
-                    value={formData.inspector}
-                    className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2.5 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50"
-                  />
+                  <select
+                    required
+                    disabled={!!selectedInspeccion}
+                    value={formData.tecnicoId || ''}
+                    onChange={e => setFormData({ ...formData, tecnicoId: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm dark:bg-slate-800"
+                  >
+                    <option value="">Seleccione el técnico responsable</option>
+                    {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nombres} {t.apellidos}</option>)}
+                  </select>
                 </div>
               </div>
 

@@ -13,19 +13,23 @@ class PapeletasController extends ResourceController
         $db = \Config\Database::connect();
         try {
             $rows = $db->table('tipos_infraccion')
-                ->select('id, codigo, descripcion, gravedad, monto_base as montoBase, estado')
+                ->select('id, codigo, descripcion, gravedad, porcentaje_uit as porcentajeUit, estado')
                 ->where('estado', 'ACTIVO')
                 ->orderBy('id', 'ASC')
                 ->get()
                 ->getResultArray();
 
-            $data = array_map(static function (array $r) {
+            $uit = $rows ? $this->uitActual($db) : 0;
+            $data = array_map(static function (array $r) use ($uit) {
                 $r['id'] = (int)$r['id'];
-                $r['montoBase'] = (float)$r['montoBase'];
+                $r['porcentajeUit'] = (float)$r['porcentajeUit'];
+                $r['montoBase'] = round($uit * ($r['porcentajeUit'] / 100), 2);
                 return $r;
             }, $rows);
 
             return $this->respond(['data' => $data]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
             return $this->failServerError('Error al cargar tipos de infracción: ' . $e->getMessage());
         }
@@ -47,7 +51,7 @@ class PapeletasController extends ResourceController
                     COALESCE(v.color, '') as vehiculoColor,
                     v.anio_fabricacion as vehiculoAnio,
                     COALESCE(v.estado_formalizacion, 'INFORMAL') as vehiculoEstadoFormalizacion,
-                    v.asociacion_id as vehiculoAsociacionId,
+                    v.id_asociacion as vehiculoAsociacionId,
                     aso.razon_social as vehiculoAsociacion,
                     
                     COALESCE(per.numero_documento, 'S/D') as conductorDni,
@@ -77,15 +81,15 @@ class PapeletasController extends ResourceController
                     ret.id as retencionId,
                     ret.estado as retencionEstado
                 ")
-                ->join('vehiculos v', 'v.id = p.vehiculo_id', 'left')
-                ->join('organizaciones aso', 'aso.id = v.asociacion_id', 'left')
-                ->join('personas per', 'per.id = p.persona_infractor_id', 'left')
-                ->join('personal ins', 'ins.id = p.inspector_id', 'left')
-                ->join('personas ins_per', 'ins_per.id = ins.persona_id', 'left')
-                ->join('vehiculo_propietarios vp', 'vp.vehiculo_id = v.id AND vp.estado = "ACTIVO"', 'left')
-                ->join('personas prop_per', 'prop_per.id = vp.persona_id', 'left')
-                ->join('organizaciones prop_org', 'prop_org.id = vp.organizacion_id', 'left')
-                ->join('internamientos ret', 'ret.papeleta_id = p.id', 'left')
+                ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
+                ->join('organizaciones aso', 'aso.id = v.id_asociacion', 'left')
+                ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
+                ->join('personal ins', 'ins.id = p.id_inspector', 'left')
+                ->join('personas ins_per', 'ins_per.id = ins.id_persona', 'left')
+                ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.estado = "ACTIVO"', 'left')
+                ->join('personas prop_per', 'prop_per.id = vp.id_persona', 'left')
+                ->join('organizaciones prop_org', 'prop_org.id = vp.id_organizacion', 'left')
+                ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left')
                 ->groupBy('p.id')
                 ->orderBy('p.id', 'DESC')
                 ->get()
@@ -110,9 +114,9 @@ class PapeletasController extends ResourceController
                 $row['vehiculoCaracteristicas'] = $caract ?: 'Características no especificadas';
                 
                 $detalles = $db->table('papeleta_detalles pd')
-                    ->select('pd.tipo_infraccion_id as tipoInfraccionId, ti.codigo, ti.descripcion, ti.gravedad, pd.monto, pd.descuento, pd.monto_final as montoFinal')
-                    ->join('tipos_infraccion ti', 'ti.id = pd.tipo_infraccion_id', 'left')
-                    ->where('pd.papeleta_id', $row['id'])
+                    ->select('pd.id_tipo_infraccion as tipoInfraccionId, ti.codigo, ti.descripcion, ti.gravedad, pd.monto, pd.descuento, pd.monto_final as montoFinal')
+                    ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
+                    ->where('pd.id_papeleta', $row['id'])
                     ->get()
                     ->getResultArray();
 
@@ -124,9 +128,9 @@ class PapeletasController extends ResourceController
                     return $d;
                 }, $detalles);
 
-                $row['tipoInfraccionCodigo'] = $row['detalles'][0]['codigo'] ?? 'G01';
-                $row['tipoInfraccionDescripcion'] = $row['detalles'][0]['descripcion'] ?? 'Infracción al Reglamento';
-                $row['tipoInfraccionGravedad'] = $row['detalles'][0]['gravedad'] ?? 'LEVE';
+                $row['tipoInfraccionCodigo'] = $row['detalles'][0]['codigo'] ?? 'SIN DETALLE';
+                $row['tipoInfraccionDescripcion'] = $row['detalles'][0]['descripcion'] ?? 'Sin detalle registrado';
+                $row['tipoInfraccionGravedad'] = $row['detalles'][0]['gravedad'] ?? '';
 
                 $data[] = $row;
             }
@@ -140,6 +144,7 @@ class PapeletasController extends ResourceController
     public function create()
     {
         $db = \Config\Database::connect();
+        $txStarted = false;
         try {
             $input = $this->request->getJSON(true);
         } catch (\Throwable $e) {
@@ -151,19 +156,68 @@ class PapeletasController extends ResourceController
 
         $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
         $infractor = trim($input['infractor'] ?? '');
+        $conductorDni = trim($input['conductorDni'] ?? '');
+        $conductorNombres = trim($input['conductorNombres'] ?? '');
+        $conductorApellidos = trim($input['conductorApellidos'] ?? '');
         $lugar = trim($input['lugar'] ?? '');
-        $tipoInfraccionId = (int)($input['tipoInfraccionId'] ?? 1);
         $obsAutoridad = trim($input['observacionesAutoridad'] ?? '');
         $obsConductor = trim($input['observacionesConductor'] ?? '');
-        $inputInspectorId = $input['inspectorId'] ?? null;
+        $inputInspectorId = (int)($input['inspectorId'] ?? 0);
         
         $claseVehiculo = strtoupper(trim($input['claseVehiculo'] ?? ''));
         $marcaVehiculo = strtoupper(trim($input['marcaVehiculo'] ?? ''));
         $colorVehiculo = strtoupper(trim($input['colorVehiculo'] ?? ''));
         $motorVehiculo = strtoupper(trim($input['motorVehiculo'] ?? ''));
+        $fechaHora = date('Y-m-d H:i:s');
 
         try {
-            
+            if ($inputInspectorId <= 0) {
+                throw new \DomainException('Debe iniciar sesión como inspector antes de emitir una papeleta.');
+            }
+
+            $inspector = $db->table('personal pe')
+                ->select("pe.id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
+                ->join('personas per', 'per.id = pe.id_persona', 'inner')
+                ->where('pe.id', $inputInspectorId)
+                ->where('pe.estado', 'ACTIVO')
+                ->get()
+                ->getRowArray();
+            if (!$inspector) {
+                throw new \DomainException('El inspector no existe o está inactivo.');
+            }
+
+            $infraccionesIds = $input['infraccionesIds'] ?? [ (int)($input['tipoInfraccionId'] ?? 0) ];
+            if (!is_array($infraccionesIds)) {
+                $infraccionesIds = [$infraccionesIds];
+            }
+            $infraccionesIds = array_values(array_unique(array_filter(array_map('intval', $infraccionesIds), static fn ($id) => $id > 0)));
+            if (empty($infraccionesIds)) {
+                throw new \DomainException('Seleccione al menos una infracción válida.');
+            }
+
+            $multas = new \App\Services\Multas($db);
+            $anio = (int)date('Y', strtotime($fechaHora));
+            $montoTotal = 0;
+            $detallesToInsert = [];
+
+            foreach ($infraccionesIds as $tipoId) {
+                $infraccion = $db->table('tipos_infraccion')->where('id', $tipoId)->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
+                if (!$infraccion) {
+                    throw new \DomainException('Una infracción seleccionada no existe o está inactiva.');
+                }
+                $monto = $multas->monto($infraccion, $anio);
+                $montoTotal += $monto;
+                $detallesToInsert[] = [
+                    'id_tipo_infraccion' => $tipoId,
+                    'monto' => $monto,
+                    'descuento' => 0.00,
+                    'monto_final' => $monto,
+                ];
+            }
+
+            $db->transException(true)->transBegin();
+            $txStarted = true;
+
             $vehiculoId = null;
             if ($placa !== '' && $placa !== 'SIN_PLACA') {
                 $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
@@ -173,82 +227,47 @@ class PapeletasController extends ResourceController
             }
 
             if (!$vehiculoId) {
-                // Registrar nuevo vehículo (formal o informal)
+                $placaRegistro = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . random_int(1000, 9999);
                 $db->table('vehiculos')->insert([
-                    'placa' => ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . rand(1000, 9999),
-                    'tipo_vehiculo_id' => 1,
+                    'placa' => $placaRegistro,
+                    'id_tipo_vehiculo' => null,
                     'estado_formalizacion' => 'INFORMAL',
                     'marca' => $marcaVehiculo ?: null,
                     'color' => $colorVehiculo ?: null,
-                    'modelo' => $motorVehiculo ?: null, // Guardamos el motor/clase aquí si no hay campo exacto
-                    'estado' => 'ACTIVO'
+                    'modelo' => $claseVehiculo ?: null,
+                    'serie_motor' => $motorVehiculo ?: null,
                 ]);
-                $vehiculoId = $db->insertID();
+                $vehiculoId = (int)$db->insertID();
+                $placa = $placaRegistro;
             }
 
-            
-            $inspectorId = 1;
-            $inspectorNombre = 'Inspector Municipal';
-            
-            if ($inputInspectorId) {
-                $inspector = $db->table('personal pe')
-                    ->select("pe.id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
-                    ->join('personas per', 'per.id = pe.persona_id', 'inner')
-                    ->where('pe.id', $inputInspectorId)
-                    ->get()
-                    ->getRowArray();
-                if ($inspector) {
-                    $inspectorId = (int)$inspector['id'];
-                    $inspectorNombre = trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? ''));
+            $personaId = null;
+            if ($conductorDni !== '') {
+                $persona = $db->table('personas')->where('numero_documento', $conductorDni)->limit(1)->get()->getRowArray();
+                if ($persona) {
+                    $personaId = (int)$persona['id'];
+                } else {
+                    $apellidos = preg_split('/\s+/', trim($conductorApellidos)) ?: [];
+                    $db->table('personas')->insert([
+                        'tipo_documento' => 'DNI',
+                        'numero_documento' => $conductorDni,
+                        'nombres' => $conductorNombres ?: ($infractor ?: 'CONDUCTOR'),
+                        'apellido_paterno' => $apellidos[0] ?? 'NO REGISTRADO',
+                        'apellido_materno' => isset($apellidos[1]) ? implode(' ', array_slice($apellidos, 1)) : null,
+                        'estado' => 'ACTIVO',
+                    ]);
+                    $personaId = (int)$db->insertID();
                 }
-            } else {
-                $inspector = $db->table('personal pe')
-                    ->select("pe.id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
-                    ->join('personas per', 'per.id = pe.persona_id', 'inner')
-                    ->where('pe.estado', 'ACTIVO')
-                    ->limit(1)
-                    ->get()
-                    ->getRowArray();
-                if ($inspector) {
-                    $inspectorId = (int)$inspector['id'];
-                    $inspectorNombre = trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? ''));
-                }
-            }
-
-            
-            $persona = $db->table('personas')->limit(1)->get()->getRowArray();
-            $personaId = $persona ? (int)$persona['id'] : null;
-
-            
-            $infraccionesIds = $input['infraccionesIds'] ?? [ (int)($input['tipoInfraccionId'] ?? 1) ];
-            if (!is_array($infraccionesIds) || empty($infraccionesIds)) {
-                $infraccionesIds = [1];
-            }
-
-            $montoTotal = 0;
-            $detallesToInsert = [];
-            
-            foreach ($infraccionesIds as $tipoId) {
-                $infraccion = $db->table('tipos_infraccion')->where('id', $tipoId)->limit(1)->get()->getRowArray();
-                $monto = $infraccion ? (float)$infraccion['monto_base'] : 350.00;
-                $montoTotal += $monto;
-                $detallesToInsert[] = [
-                    'tipo_infraccion_id' => $tipoId,
-                    'monto' => $monto,
-                    'descuento' => 0.00,
-                    'monto_final' => $monto,
-                ];
             }
 
             $numeroPapeleta = 'PAP-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
-            $fechaHora = date('Y-m-d H:i:s');
+            $inspectorNombre = trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? ''));
 
-            
             $papeletaData = [
                 'numero_papeleta' => $numeroPapeleta,
-                'vehiculo_id' => $vehiculoId,
-                'persona_infractor_id' => $personaId,
-                'inspector_id' => $inspectorId,
+                'id_vehiculo' => $vehiculoId,
+                'id_persona_infractor' => $personaId,
+                'id_inspector' => $inputInspectorId,
                 'fecha_hora' => $fechaHora,
                 'lugar' => $lugar,
                 'servicio' => 'ESPECIAL',
@@ -262,11 +281,15 @@ class PapeletasController extends ResourceController
             $db->table('papeletas')->insert($papeletaData);
             $papeletaId = $db->insertID();
 
-            
             foreach ($detallesToInsert as $detalle) {
-                $detalle['papeleta_id'] = $papeletaId;
+                $detalle['id_papeleta'] = $papeletaId;
                 $db->table('papeleta_detalles')->insert($detalle);
             }
+
+            (new \App\Services\PagosTransito($db))->generar('PAPELETA', (int)$papeletaId);
+
+            $db->transCommit();
+            $txStarted = false;
 
             $response = [
                 'id' => $papeletaId,
@@ -283,7 +306,15 @@ class PapeletasController extends ResourceController
             ];
 
             return $this->respondCreated(['status' => 201, 'data' => $response]);
-        } catch (\Exception $e) {
+        } catch (\DomainException $e) {
+            if ($txStarted) {
+                $db->transRollback();
+            }
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            if ($txStarted) {
+                $db->transRollback();
+            }
             return $this->failServerError('Error creando la papeleta: ' . $e->getMessage());
         }
     }
@@ -291,108 +322,59 @@ class PapeletasController extends ResourceController
     public function update($id = null)
     {
         $db = \Config\Database::connect();
-        $input = $this->request->getJSON(true) ?? $this->request->getPost();
-
         try {
-            $data = [];
-            if (isset($input['infractor'])) {
-                $data['nombre_autoridad'] = trim($input['infractor']);
-            }
-            if (isset($input['lugar'])) {
-                $data['lugar'] = trim($input['lugar']);
-            }
-            if (isset($input['observacionesAutoridad'])) {
-                $data['observacion_autoridad'] = trim($input['observacionesAutoridad']);
-            }
-            if (isset($input['observacionesConductor'])) {
-                $data['observaciones_conductor'] = trim($input['observacionesConductor']);
-            }
+            $input = $this->request->getJSON(true) ?? [];
+            $db->transException(true)->transBegin();
+            $papeleta = $db->query('SELECT * FROM papeletas WHERE id=? FOR UPDATE', [$id])->getRowArray();
+            if (!$papeleta) throw new \DomainException('Papeleta no encontrada.');
+            if ($papeleta['estado'] === 'ANULADA') throw new \DomainException('La papeleta está anulada.');
             if (isset($input['tipoInfraccionId'])) {
-                $tipoInfraccionId = (int)$input['tipoInfraccionId'];
-                $infraccion = $db->table('tipos_infraccion')->where('id', $tipoInfraccionId)->limit(1)->get()->getRowArray();
-                if ($infraccion) {
-                    $monto = (float)$infraccion['monto_base'];
-                    $data['monto_total'] = $monto;
-                    $db->table('papeleta_detalles')->where('papeleta_id', $id)->delete();
-                    $db->table('papeleta_detalles')->insert([
-                        'papeleta_id' => $id,
-                        'tipo_infraccion_id' => $tipoInfraccionId,
-                        'monto' => $monto,
-                        'descuento' => 0.00,
-                        'monto_final' => $monto,
-                    ]);
+                $detalles = $db->table('papeleta_detalles')->where('id_papeleta', $id)->get()->getResultArray();
+                if (count($detalles) !== 1 || (int)$detalles[0]['id_tipo_infraccion'] !== (int)$input['tipoInfraccionId']) {
+                    throw new \DomainException('No se puede sustituir la infracción ni recalcular el importe de una papeleta registrada.');
                 }
             }
-
-            if (!empty($data)) {
-                $db->table('papeletas')->where('id', $id)->update($data);
+            $data = [];
+            foreach (['lugar' => 'lugar', 'observacionesAutoridad' => 'observacion_autoridad', 'observacionesConductor' => 'observaciones_conductor'] as $key => $column) {
+                if (isset($input[$key])) $data[$column] = trim($input[$key]);
             }
-
-            return $this->respond(['status' => 200, 'message' => 'Actualizado correctamente']);
-        } catch (\Exception $e) {
-            return $this->failServerError('Error actualizando la papeleta: ' . $e->getMessage());
+            if ($data) $db->table('papeletas')->where('id', $id)->update($data);
+            $db->transCommit();
+            return $this->respond(['message' => 'Actualizado; se conservaron las infracciones e importes registrados.']);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return $this->failServerError('No se pudo actualizar la papeleta.');
         }
     }
 
     public function delete($id = null)
     {
-        $db = \Config\Database::connect();
         try {
-            $db->table('papeletas')->where('id', $id)->update(['estado' => 'ANULADA']);
-            return $this->respondDeleted(['status' => 200, 'message' => 'Papeleta anulada correctamente']);
-        } catch (\Exception $e) {
-            return $this->failServerError('Error anulando la papeleta: ' . $e->getMessage());
+            (new \App\Services\PagosTransito(\Config\Database::connect()))->anularPapeleta((int)$id);
+            return $this->respond(['message' => 'Papeleta y pagos asociados anulados.']);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            return $this->failServerError('No se pudo anular la papeleta.');
         }
     }
 
     public function pagar($id = null)
     {
-        $db = \Config\Database::connect();
         try {
-            $papeleta = $db->table('papeletas')->where('id', $id)->get()->getRowArray();
-            if (!$papeleta) {
-                return $this->failNotFound('Papeleta no encontrada');
-            }
-
-            if ($papeleta['estado'] === 'ANULADA') {
-                return $this->fail('No se puede pagar una papeleta que ha sido anulada', 400);
-            }
-
-            if ($papeleta['estado'] === 'PAGADA') {
-                return $this->fail('Esta papeleta ya se encuentra pagada', 400);
-            }
-
-            $db->table('papeletas')->where('id', $id)->update(['estado' => 'PAGADA']);
-
-            $numRecibo = 'REC-' . date('Y') . '-' . str_pad((string)random_int(1000, 9999), 5, '0', STR_PAD_LEFT);
-            $db->table('pagos')->insert([
-                'tipo_pago' => 'PAPELETA',
-                'papeleta_id' => $id,
-                'numero_recibo' => $numRecibo,
-                'medio_pago' => trim($input['metodoPago'] ?? 'EFECTIVO'),
-                'referencia_pago' => trim($input['referenciaPago'] ?? '') ?: null,
-                'fecha_pago' => date('Y-m-d'),
-                'hora_pago' => date('H:i:s'),
-                'cajero' => 'Caja Central Municipal',
-                'caja' => 'Caja 01',
-                'codigo_contribuyente' => (string)($papeleta['persona_infractor_id'] ?: 'CONTRIB-01'),
-                'concepto' => 'Pago de Papeleta N° ' . $papeleta['numero_papeleta'],
-                'subtotal' => $papeleta['monto_total'],
-                'reajuste' => 0.00,
-                'intereses' => 0.00,
-                'descuento_aplicado' => 0.00,
-                'redondeo' => 0.00,
-                'total' => $papeleta['monto_total'],
-                'estado' => 'REGISTRADO',
-            ]);
-
-            return $this->respond([
-                'status' => 200,
-                'message' => 'Papeleta pagada exitosamente',
-                'numeroRecibo' => $numRecibo
-            ]);
-        } catch (\Exception $e) {
-            return $this->failServerError('Error al procesar el pago: ' . $e->getMessage());
+            $input = $this->request->getJSON(true) ?? [];
+            if (empty(trim($input['numeroRecibo'] ?? '')) || empty($input['fechaPago'])) throw new \DomainException('Ingrese el recibo real y la fecha de pago.');
+            $service = new \App\Services\PagosTransito(\Config\Database::connect());
+            $pago = $service->generar('PAPELETA', (int)$id);
+            $pago = $service->confirmar((int)$pago['id'], $input);
+            return $this->respond(['message' => 'Pago confirmado.', 'numeroRecibo' => $pago['numero_recibo']]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            return $this->failServerError('No se pudo confirmar el pago. Verifique el recibo.');
         }
     }
 
@@ -464,4 +446,8 @@ class PapeletasController extends ResourceController
         }
     }
 
+    private function uitActual($db): float
+    {
+        return (new \App\Services\Multas($db))->uit((int)date('Y'));
+    }
 }

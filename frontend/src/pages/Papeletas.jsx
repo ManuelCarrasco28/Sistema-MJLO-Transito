@@ -22,6 +22,8 @@ export function Papeletas() {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [isPagarModalOpen, setIsPagarModalOpen] = useState(false)
   const [papeletaToAction, setPapeletaToAction] = useState(null)
+  const [numeroRecibo, setNumeroRecibo] = useState('')
+  const [fechaPago, setFechaPago] = useState('')
   const [metodoPago, setMetodoPago] = useState('EFECTIVO')
   const [isProcessingAction, setIsProcessingAction] = useState(false)
   const [selectedPapeleta, setSelectedPapeleta] = useState(null)
@@ -94,6 +96,8 @@ export function Papeletas() {
       return
     }
     setPapeletaToAction(papeleta)
+    setNumeroRecibo('')
+    setFechaPago('')
     setMetodoPago('EFECTIVO')
     setIsPagarModalOpen(true)
   }
@@ -104,7 +108,7 @@ export function Papeletas() {
     try {
       const res = await apiFetch(`/papeletas/${papeletaToAction.id}/pagar`, {
         method: 'POST',
-        body: { metodoPago }
+        body: { metodoPago, numeroRecibo, fechaPago }
       })
       if (res.ok) {
         setPapeletas(prev => prev.map(p => p.id === papeletaToAction.id ? {
@@ -114,7 +118,8 @@ export function Papeletas() {
         setIsPagarModalOpen(false)
         setPapeletaToAction(null)
       } else {
-        alert('Error al procesar el pago')
+        const error = await res.json()
+        alert(Object.values(error.messages || {}).join(' ') || 'Error al procesar el pago')
       }
     } catch (err) {
       console.error(err)
@@ -581,6 +586,14 @@ export function Papeletas() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-xs font-bold">Recibo real
+                  <input maxLength={50} value={numeroRecibo} onChange={e => setNumeroRecibo(e.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-slate-800" />
+                </label>
+                <label className="text-xs font-bold">Fecha de pago
+                  <input type="date" value={fechaPago} onChange={e => setFechaPago(e.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-slate-800" />
+                </label>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                   Método de Pago:
@@ -607,11 +620,11 @@ export function Papeletas() {
                 <button
                   type="button"
                   onClick={handleConfirmPagar}
-                  disabled={isProcessingAction}
+                  disabled={isProcessingAction || !numeroRecibo.trim() || !fechaPago}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2 text-xs font-black text-white shadow-md hover:from-emerald-700 hover:to-teal-700 transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
                 >
                   <Icon name="payment" className="size-4" />
-                  <span>{isProcessingAction ? 'Procesando...' : 'Confirmar y Pagar'}</span>
+                  <span>{isProcessingAction ? 'Procesando...' : 'Confirmar recibo'}</span>
                 </button>
               </div>
             </div>

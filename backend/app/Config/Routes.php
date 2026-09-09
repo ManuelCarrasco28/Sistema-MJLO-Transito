@@ -20,7 +20,9 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->post('papeletas/(:num)/pagar', 'PapeletasController::pagar/$1');
     $routes->post('papeletas/(:num)/firma', 'PapeletasController::firma/$1');
     $routes->get('tipos-infraccion', 'PapeletasController::tipos');
-    $routes->resource('pagos', ['controller' => 'PagosController']);
+    $routes->get('pagos/origenes', 'PagosController::origenes');
+    $routes->post('pagos/(:num)/confirmar', 'PagosController::confirmar/$1');
+    $routes->resource('pagos', ['controller' => 'PagosController', 'only' => ['index', 'create', 'delete']]);
     $routes->resource('cursos', ['controller' => 'CursosController']);
     $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
     $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
