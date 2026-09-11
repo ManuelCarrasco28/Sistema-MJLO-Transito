@@ -12,11 +12,11 @@ export function Retenciones() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                Depósito y Retenciones Vehiculares
+                Internamientos Vehiculares
               </h1>
             </div>
             <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-              Control de internamiento en depósito municipal, actas de retención y órdenes de liberación.
+              Control de boletas de internamiento al DOV, inventario y órdenes de libertad.
             </p>
           </div>
         </div>
@@ -34,10 +34,10 @@ export function Retenciones() {
           <Icon name="retention" className="size-8" />
         </div>
         <h2 className="mt-4 text-xl font-black tracking-tight text-slate-900 dark:text-white">
-          Registro de Depósito en Implementación
+          Registro de Internamientos en Implementación
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
-          Este módulo está preparado para integrarse con las tablas del depósito municipal y actas de internamiento de trimóviles.
+          Este módulo queda preparado para registrar la boleta de internamiento, su inventario y la posterior orden de libertad.
         </p>
       </div>
     </div>

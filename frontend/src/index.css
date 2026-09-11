@@ -39,8 +39,20 @@ html.dark body {
 }
 
 button,
-input {
+input,
+select,
+option {
   font: inherit;
+}
+
+option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+html.dark option {
+  background-color: #0f172a;
+  color: #f1f5f9;
 }
 
 button {

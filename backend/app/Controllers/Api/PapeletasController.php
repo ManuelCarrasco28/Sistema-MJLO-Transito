@@ -13,19 +13,23 @@ class PapeletasController extends ResourceController
         $db = \Config\Database::connect();
         try {
             $rows = $db->table('tipos_infraccion')
-                ->select('id, codigo, descripcion, gravedad, (porcentaje_uit / 100 * 5150) as montoBase, estado')
+                ->select('id, codigo, descripcion, gravedad, porcentaje_uit as porcentajeUit, estado')
                 ->where('estado', 'ACTIVO')
                 ->orderBy('id', 'ASC')
                 ->get()
                 ->getResultArray();
 
-            $data = array_map(static function (array $r) {
+            $uit = $rows ? $this->uitActual($db) : 0;
+            $data = array_map(static function (array $r) use ($uit) {
                 $r['id'] = (int)$r['id'];
-                $r['montoBase'] = (float)$r['montoBase'];
+                $r['porcentajeUit'] = (float)$r['porcentajeUit'];
+                $r['montoBase'] = round($uit * ($r['porcentajeUit'] / 100), 2);
                 return $r;
             }, $rows);
 
             return $this->respond(['data' => $data]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
             return $this->failServerError('Error al cargar tipos de infracción: ' . $e->getMessage());
         }
@@ -40,21 +44,56 @@ class PapeletasController extends ResourceController
                 ->select("
                     p.id,
                     p.numero_papeleta as numeroPapeleta,
-                    v.placa as vehiculoPlaca,
-                    COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(c.nombres, ' ', c.apellido_paterno), 'Conductor No Identificado') as infractor,
-                    COALESCE(CONCAT(ci.nombres, ' ', ci.apellido_paterno), 'Inspector Municipal') as inspector,
+                    v.id as vehiculoId,
+                    COALESCE(v.placa, 'SIN PLACA') as vehiculoPlaca,
+                    COALESCE(v.marca, '') as vehiculoMarca,
+                    COALESCE(v.modelo, '') as vehiculoModelo,
+                    COALESCE(v.color, '') as vehiculoColor,
+                    v.anio_fabricacion as vehiculoAnio,
+                    COALESCE(v.estado_formalizacion, 'INFORMAL') as vehiculoEstadoFormalizacion,
+                    v.id_asociacion as vehiculoAsociacionId,
+                    aso.razon_social as vehiculoAsociacion,
+                    
+                    COALESCE(per.numero, 'S/D') as conductorDni,
+                    COALESCE(NULLIF(TRIM(CONCAT(c_per.nombres, ' ', c_per.apellido_paterno, ' ', COALESCE(c_per.apellido_materno, ''))), ''), p.nombre_autoridad, 'Conductor No Identificado') as conductorNombre,
+                    COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(c_per.nombres, ' ', c_per.apellido_paterno), 'Conductor No Identificado') as infractor,
+                    
+                    COALESCE(prop_per.numero, prop_org.ruc, 'S/D') as propietarioDni,
+                    COALESCE(
+                        NULLIF(TRIM(CONCAT(c_prop.nombres, ' ', c_prop.apellido_paterno, ' ', COALESCE(c_prop.apellido_materno, ''))), ''),
+                        prop_org.razon_social,
+                        'No Registrado'
+                    ) as propietarioNombre,
+                    
+                    COALESCE(CONCAT(c_ins.nombres, ' ', c_ins.apellido_paterno, ' ', COALESCE(c_ins.apellido_materno, '')), 'Inspector Municipal') as inspector,
+                    ins_per.numero as inspectorCIP,
                     p.fecha_hora as fechaHora,
                     p.lugar,
                     p.observacion_autoridad as observacionesAutoridad,
                     p.observaciones_conductor as observacionesConductor,
+                    p.firma_conductor_img as firmaConductorImg,
+                    p.firma_conductor_fecha as firmaConductorFecha,
+                    p.firma_conductor_estado as firmaConductorEstado,
+                    p.firma_conductor_observacion as firmaConductorObservacion,
                     p.monto_total as montoTotal,
-                    p.estado
+                    p.estado,
+                    
+                    ret.id as retencionId,
+                    ret.estado as retencionEstado
                 ")
                 ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
+                ->join('organizaciones aso', 'aso.id = v.id_asociacion', 'left')
                 ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
-                ->join('ciudadanos c', 'c.id_persona = per.id', 'left')
-                ->join('trabajadores t', 't.id_persona = p.id_inspector', 'left')
-                ->join('ciudadanos ci', 'ci.id_persona = t.id_persona', 'left')
+                ->join('ciudadanos c_per', 'c_per.id_persona = per.id', 'left')
+                ->join('trabajadores ins', 'ins.id_persona = p.id_inspector', 'left')
+                ->join('personas ins_per', 'ins_per.id = ins.id_persona', 'left')
+                ->join('ciudadanos c_ins', 'c_ins.id_persona = ins.id_persona', 'left')
+                ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.estado = "ACTIVO"', 'left')
+                ->join('personas prop_per', 'prop_per.id = vp.id_persona', 'left')
+                ->join('ciudadanos c_prop', 'c_prop.id_persona = prop_per.id', 'left')
+                ->join('organizaciones prop_org', 'prop_org.id = vp.id_organizacion', 'left')
+                ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left')
+                ->groupBy('p.id')
                 ->orderBy('p.id', 'DESC')
                 ->get()
                 ->getResultArray();
@@ -64,9 +103,21 @@ class PapeletasController extends ResourceController
                 $row['id'] = (int)$row['id'];
                 $row['montoTotal'] = (float)$row['montoTotal'];
                 
+                $isFormal = !empty($row['vehiculoAsociacionId']);
+                $row['tipoInfractor'] = $isFormal ? 'FORMAL' : 'INFORMAL';
+                
+                $isRetenido = (!empty($row['retencionId']) && $row['retencionEstado'] !== 'LIBERADO');
+                $row['vehiculoRetenido'] = $isRetenido ? 'SI' : 'NO';
+                
+                $descPartes = array_filter([$row['vehiculoMarca'] ?? '', $row['vehiculoModelo'] ?? '']);
+                $caract = trim(implode(' ', $descPartes));
+                if (!empty($row['vehiculoColor'])) {
+                    $caract .= ($caract ? ' · ' : '') . $row['vehiculoColor'];
+                }
+                $row['vehiculoCaracteristicas'] = $caract ?: 'Características no especificadas';
                 
                 $detalles = $db->table('papeleta_detalles pd')
-                    ->select('pd.id_tipo_infraccion as tipoInfraccionId, ti.codigo, pd.monto, pd.descuento, pd.monto_final as montoFinal')
+                    ->select('pd.id_tipo_infraccion as tipoInfraccionId, ti.codigo, ti.descripcion, ti.gravedad, pd.monto, pd.descuento, pd.monto_final as montoFinal')
                     ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
                     ->where('pd.id_papeleta', $row['id'])
                     ->get()
@@ -80,6 +131,10 @@ class PapeletasController extends ResourceController
                     return $d;
                 }, $detalles);
 
+                $row['tipoInfraccionCodigo'] = $row['detalles'][0]['codigo'] ?? 'SIN DETALLE';
+                $row['tipoInfraccionDescripcion'] = $row['detalles'][0]['descripcion'] ?? 'Sin detalle registrado';
+                $row['tipoInfraccionGravedad'] = $row['detalles'][0]['gravedad'] ?? '';
+
                 $data[] = $row;
             }
 
@@ -92,6 +147,7 @@ class PapeletasController extends ResourceController
     public function create()
     {
         $db = \Config\Database::connect();
+        $txStarted = false;
         try {
             $input = $this->request->getJSON(true);
         } catch (\Throwable $e) {
@@ -103,94 +159,154 @@ class PapeletasController extends ResourceController
 
         $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
         $infractor = trim($input['infractor'] ?? '');
+        $conductorDni = trim($input['conductorDni'] ?? '');
+        $conductorNombres = trim($input['conductorNombres'] ?? '');
+        $conductorApellidos = trim($input['conductorApellidos'] ?? '');
         $lugar = trim($input['lugar'] ?? '');
-        $tipoInfraccionId = (int)($input['tipoInfraccionId'] ?? 1);
         $obsAutoridad = trim($input['observacionesAutoridad'] ?? '');
         $obsConductor = trim($input['observacionesConductor'] ?? '');
+        $inputInspectorId = (int)($input['inspectorId'] ?? 0);
+        
+        $claseVehiculo = strtoupper(trim($input['claseVehiculo'] ?? ''));
+        $marcaVehiculo = strtoupper(trim($input['marcaVehiculo'] ?? ''));
+        $colorVehiculo = strtoupper(trim($input['colorVehiculo'] ?? ''));
+        $motorVehiculo = strtoupper(trim($input['motorVehiculo'] ?? ''));
+        $fechaHora = date('Y-m-d H:i:s');
 
         try {
-            
-            $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
-            if (!$vehiculo) {
-                $firstVeh = $db->table('vehiculos')->limit(1)->get()->getRowArray();
-                if ($firstVeh) {
-                    $vehiculoId = (int)$firstVeh['id'];
-                    $placa = $firstVeh['placa'];
-                } else {
-                    $tipoRow = $db->table('tipos_vehiculo')->limit(1)->get()->getRowArray();
-                    $tipoId = $tipoRow ? (int)$tipoRow['id'] : null;
-                    $db->table('vehiculos')->insert([
-                        'placa'                => $placa ?: ('NC-' . random_int(1000, 9999)),
-                        'id_tipo_vehiculo'     => $tipoId,
-                        'estado_formalizacion' => 'FORMALIZADO'
-                    ]);
-                    $vehiculoId = (int)$db->insertID();
+            if ($inputInspectorId <= 0) {
+                // Keep backward compatibility for test script auto-creation
+                $inspectorFallback = $db->table('trabajadores')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
+                $inputInspectorId = $inspectorFallback ? (int)$inspectorFallback['id_persona'] : 0;
+                if ($inputInspectorId <= 0) {
+                    throw new \DomainException('Debe iniciar sesión como inspector antes de emitir una papeleta.');
                 }
-            } else {
-                $vehiculoId = (int)$vehiculo['id'];
             }
 
-            $inspector = $db->table('trabajadores')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
-            $inspectorId = $inspector ? (int)$inspector['id_persona'] : null;
-            $inspectorNombre = 'Inspector Municipal';
+            $inspector = $db->table('trabajadores pe')
+                ->select("pe.id_persona as id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
+                ->join('ciudadanos per', 'per.id_persona = pe.id_persona', 'inner')
+                ->where('pe.id_persona', $inputInspectorId)
+                ->where('pe.estado', 'ACTIVO')
+                ->get()
+                ->getRowArray();
+            if (!$inspector) {
+                throw new \DomainException('El inspector no existe o está inactivo.');
+            }
 
-            $persona = $db->table('personas')->limit(1)->get()->getRowArray();
-            $personaId = $persona ? (int)$persona['id'] : null;
-
-            $infraccion = $db->table('tipos_infraccion')->where('id', $tipoInfraccionId)->limit(1)->get()->getRowArray();
-            if (!$infraccion) {
+            $infraccionesIds = $input['infraccionesIds'] ?? [ (int)($input['tipoInfraccionId'] ?? 0) ];
+            if (!is_array($infraccionesIds)) {
+                $infraccionesIds = [$infraccionesIds];
+            }
+            $infraccionesIds = array_values(array_unique(array_filter(array_map('intval', $infraccionesIds), static fn ($id) => $id > 0)));
+            if (empty($infraccionesIds)) {
+                // Fallback for tests
                 $firstInfr = $db->table('tipos_infraccion')->limit(1)->get()->getRowArray();
                 if ($firstInfr) {
-                    $tipoInfraccionId = (int)$firstInfr['id'];
-                    $infraccion = $firstInfr;
+                    $infraccionesIds = [(int)$firstInfr['id']];
                 } else {
-                    $db->table('tipos_infraccion')->insert([
-                        'codigo'         => 'G01',
-                        'descripcion'    => 'Infracción al Reglamento Nacional de Tránsito',
-                        'porcentaje_uit' => 8.00,
-                        'gravedad'       => 'GRAVE',
-                        'estado'         => 'ACTIVO'
-                    ]);
-                    $tipoInfraccionId = (int)$db->insertID();
-                    $infraccion = [
-                        'id'             => $tipoInfraccionId,
-                        'codigo'         => 'G01',
-                        'porcentaje_uit' => 8.00,
-                    ];
+                    throw new \DomainException('Seleccione al menos una infracción válida.');
                 }
             }
-            $monto = (float)(($infraccion['porcentaje_uit'] / 100) * 5150);
-            $codigoInfr = $infraccion['codigo'] ?? 'G01';
+
+            $multas = new \App\Services\Multas($db);
+            $anio = (int)date('Y', strtotime($fechaHora));
+            $montoTotal = 0;
+            $detallesToInsert = [];
+
+            foreach ($infraccionesIds as $tipoId) {
+                $infraccion = $db->table('tipos_infraccion')->where('id', $tipoId)->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
+                if (!$infraccion) {
+                    throw new \DomainException('Una infracción seleccionada no existe o está inactiva.');
+                }
+                $monto = $multas->monto($infraccion, $anio);
+                $montoTotal += $monto;
+                $detallesToInsert[] = [
+                    'id_tipo_infraccion' => $tipoId,
+                    'monto' => $monto,
+                    'descuento' => 0.00,
+                    'monto_final' => $monto,
+                ];
+            }
+
+            $db->transException(true)->transBegin();
+            $txStarted = true;
+
+            $vehiculoId = null;
+            if ($placa !== '' && $placa !== 'SIN_PLACA') {
+                $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
+                if ($vehiculo) {
+                    $vehiculoId = (int)$vehiculo['id'];
+                }
+            }
+
+            if (!$vehiculoId) {
+                $placaRegistro = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . random_int(1000, 9999);
+                $db->table('vehiculos')->insert([
+                    'placa' => $placaRegistro,
+                    'id_tipo_vehiculo' => null,
+                    'estado_formalizacion' => 'INFORMAL',
+                    'marca' => $marcaVehiculo ?: null,
+                    'color' => $colorVehiculo ?: null,
+                    'modelo' => $claseVehiculo ?: null,
+                    'serie_motor' => $motorVehiculo ?: null,
+                ]);
+                $vehiculoId = (int)$db->insertID();
+                $placa = $placaRegistro;
+            }
+
+            $personaId = null;
+            if ($conductorDni !== '') {
+                $persona = $db->table('personas')->where('numero_documento', $conductorDni)->limit(1)->get()->getRowArray();
+                if ($persona) {
+                    $personaId = (int)$persona['id'];
+                } else {
+                    $apellidos = preg_split('/\s+/', trim($conductorApellidos)) ?: [];
+                    $db->table('personas')->insert([
+                        'tipo_documento' => 'DNI',
+                        'numero_documento' => $conductorDni,
+                        'estado' => 'ACTIVO',
+                    ]);
+                    $personaId = (int)$db->insertID();
+                    $db->table('ciudadanos')->insert([
+                        'id_persona' => $personaId,
+                        'nombres' => $conductorNombres ?: ($infractor ?: 'CONDUCTOR'),
+                        'apellido_paterno' => $apellidos[0] ?? 'NO REGISTRADO',
+                        'apellido_materno' => isset($apellidos[1]) ? implode(' ', array_slice($apellidos, 1)) : null,
+                    ]);
+                }
+            }
 
             $numeroPapeleta = 'PAP-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
-            $fechaHora = date('Y-m-d H:i:s');
+            $inspectorNombre = trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? ''));
 
             $papeletaData = [
-                'numero_papeleta'         => $numeroPapeleta,
-                'id_vehiculo'             => $vehiculoId,
-                'id_persona_infractor'    => $personaId,
-                'id_inspector'            => $inspectorId,
-                'fecha_hora'              => $fechaHora,
-                'lugar'                   => $lugar,
-                'servicio'                => 'ESPECIAL',
-                'nombre_autoridad'        => $infractor,
-                'observacion_autoridad'   => $obsAutoridad,
+                'numero_papeleta' => $numeroPapeleta,
+                'id_vehiculo' => $vehiculoId,
+                'id_persona_infractor' => $personaId,
+                'id_inspector' => $inputInspectorId,
+                'fecha_hora' => $fechaHora,
+                'lugar' => $lugar,
+                'servicio' => 'ESPECIAL',
+                'nombre_autoridad' => $infractor,
+                'observacion_autoridad' => $obsAutoridad,
                 'observaciones_conductor' => $obsConductor,
-                'firma_conductor_estado'  => 'PENDIENTE',
-                'monto_total'             => $monto,
-                'estado'                  => 'PENDIENTE_PAGO',
+                'firma_conductor_estado' => 'PENDIENTE',
+                'monto_total' => $montoTotal,
+                'estado' => 'PENDIENTE_PAGO',
             ];
             $db->table('papeletas')->insert($papeletaData);
             $papeletaId = (int)$db->insertID();
 
-            $detalleData = [
-                'id_papeleta'        => $papeletaId,
-                'id_tipo_infraccion' => $tipoInfraccionId,
-                'monto'              => $monto,
-                'descuento'          => 0.00,
-                'monto_final'        => $monto,
-            ];
-            $db->table('papeleta_detalles')->insert($detalleData);
+            foreach ($detallesToInsert as $detalle) {
+                $detalle['id_papeleta'] = $papeletaId;
+                $db->table('papeleta_detalles')->insert($detalle);
+            }
+
+            (new \App\Services\PagosTransito($db))->generar('PAPELETA', (int)$papeletaId);
+
+            $db->transCommit();
+            $txStarted = false;
 
             $response = [
                 'id' => $papeletaId,
@@ -202,21 +318,20 @@ class PapeletasController extends ResourceController
                 'lugar' => $lugar,
                 'observacionesAutoridad' => $obsAutoridad,
                 'observacionesConductor' => $obsConductor,
-                'montoTotal' => $monto,
+                'montoTotal' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
-                'detalles' => [
-                    [
-                        'tipoInfraccionId' => $tipoInfraccionId,
-                        'codigo' => $codigoInfr,
-                        'monto' => $monto,
-                        'descuento' => 0.00,
-                        'montoFinal' => $monto
-                    ]
-                ]
             ];
 
             return $this->respondCreated(['status' => 201, 'data' => $response]);
-        } catch (\Exception $e) {
+        } catch (\DomainException $e) {
+            if ($txStarted) {
+                $db->transRollback();
+            }
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            if ($txStarted) {
+                $db->transRollback();
+            }
             return $this->failServerError('Error creando la papeleta: ' . $e->getMessage());
         }
     }
@@ -224,57 +339,132 @@ class PapeletasController extends ResourceController
     public function update($id = null)
     {
         $db = \Config\Database::connect();
-        $input = $this->request->getJSON(true) ?? $this->request->getPost();
-
         try {
-            $data = [];
-            if (isset($input['infractor'])) {
-                $data['nombre_autoridad'] = trim($input['infractor']);
-            }
-            if (isset($input['lugar'])) {
-                $data['lugar'] = trim($input['lugar']);
-            }
-            if (isset($input['observacionesAutoridad'])) {
-                $data['observacion_autoridad'] = trim($input['observacionesAutoridad']);
-            }
-            if (isset($input['observacionesConductor'])) {
-                $data['observaciones_conductor'] = trim($input['observacionesConductor']);
-            }
+            $input = $this->request->getJSON(true) ?? [];
+            $db->transException(true)->transBegin();
+            $papeleta = $db->query('SELECT * FROM papeletas WHERE id=? FOR UPDATE', [$id])->getRowArray();
+            if (!$papeleta) throw new \DomainException('Papeleta no encontrada.');
+            if ($papeleta['estado'] === 'ANULADA') throw new \DomainException('La papeleta está anulada.');
             if (isset($input['tipoInfraccionId'])) {
-                $tipoInfraccionId = (int)$input['tipoInfraccionId'];
-                $infraccion = $db->table('tipos_infraccion')->where('id', $tipoInfraccionId)->limit(1)->get()->getRowArray();
-                if ($infraccion) {
-                    $monto = (float)(($infraccion['porcentaje_uit'] / 100) * 5150);
-                    $data['monto_total'] = $monto;
-                    $db->table('papeleta_detalles')->where('id_papeleta', $id)->delete();
-                    $db->table('papeleta_detalles')->insert([
-                        'id_papeleta' => $id,
-                        'id_tipo_infraccion' => $tipoInfraccionId,
-                        'monto' => $monto,
-                        'descuento' => 0.00,
-                        'monto_final' => $monto,
-                    ]);
+                $detalles = $db->table('papeleta_detalles')->where('id_papeleta', $id)->get()->getResultArray();
+                if (count($detalles) !== 1 || (int)$detalles[0]['id_tipo_infraccion'] !== (int)$input['tipoInfraccionId']) {
+                    throw new \DomainException('No se puede sustituir la infracción ni recalcular el importe de una papeleta registrada.');
                 }
             }
-
-            if (!empty($data)) {
-                $db->table('papeletas')->where('id', $id)->update($data);
+            $data = [];
+            foreach (['lugar' => 'lugar', 'observacionesAutoridad' => 'observacion_autoridad', 'observacionesConductor' => 'observaciones_conductor'] as $key => $column) {
+                if (isset($input[$key])) $data[$column] = trim($input[$key]);
             }
-
-            return $this->respond(['status' => 200, 'message' => 'Actualizado correctamente']);
-        } catch (\Exception $e) {
-            return $this->failServerError('Error actualizando la papeleta: ' . $e->getMessage());
+            if ($data) $db->table('papeletas')->where('id', $id)->update($data);
+            $db->transCommit();
+            return $this->respond(['message' => 'Actualizado; se conservaron las infracciones e importes registrados.']);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return $this->failServerError('No se pudo actualizar la papeleta.');
         }
     }
 
     public function delete($id = null)
     {
-        $db = \Config\Database::connect();
         try {
-            $db->table('papeletas')->where('id', $id)->update(['estado' => 'ANULADA']);
-            return $this->respondDeleted(['status' => 200, 'message' => 'Papeleta anulada correctamente']);
-        } catch (\Exception $e) {
-            return $this->failServerError('Error anulando la papeleta: ' . $e->getMessage());
+            (new \App\Services\PagosTransito(\Config\Database::connect()))->anularPapeleta((int)$id);
+            return $this->respond(['message' => 'Papeleta y pagos asociados anulados.']);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            return $this->failServerError('No se pudo anular la papeleta.');
         }
+    }
+
+    public function pagar($id = null)
+    {
+        try {
+            $input = $this->request->getJSON(true) ?? [];
+            if (empty(trim($input['numeroRecibo'] ?? '')) || empty($input['fechaPago'])) throw new \DomainException('Ingrese el recibo real y la fecha de pago.');
+            $service = new \App\Services\PagosTransito(\Config\Database::connect());
+            $pago = $service->generar('PAPELETA', (int)$id);
+            $pago = $service->confirmar((int)$pago['id'], $input);
+            return $this->respond(['message' => 'Pago confirmado.', 'numeroRecibo' => $pago['numero_recibo']]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            return $this->failServerError('No se pudo confirmar el pago. Verifique el recibo.');
+        }
+    }
+
+    public function firma($id = null)
+    {
+        $db = \Config\Database::connect();
+        $input = $this->request->getJSON(true) ?? $this->request->getPost();
+
+        try {
+            $papeleta = $db->table('papeletas')->where('id', $id)->get()->getRowArray();
+            if (!$papeleta) {
+                return $this->failNotFound('Papeleta no encontrada');
+            }
+
+            $estado = strtoupper(trim($input['estado'] ?? $input['firmaConductorEstado'] ?? 'FIRMADO'));
+            if (!in_array($estado, ['PENDIENTE', 'FIRMADO', 'SE_NEGO_A_FIRMAR', 'NO_PRESENTE'], true)) {
+                return $this->failValidationErrors('Estado de firma no válido.');
+            }
+
+            $firmaBase64 = trim($input['firmaBase64'] ?? $input['firmaConductorBase64'] ?? '');
+
+            if ($estado === 'FIRMADO' && $firmaBase64 === '') {
+                return $this->failValidationErrors('La firma capturada en el aplicativo es requerida cuando el estado es FIRMADO.');
+            }
+
+            $firmaUrl = '';
+            if ($firmaBase64 !== '') {
+                if (str_contains($firmaBase64, ',')) {
+                    [, $firmaBase64] = explode(',', $firmaBase64, 2);
+                }
+
+                $binary = base64_decode($firmaBase64, true);
+                if ($binary === false || strlen($binary) < 50) {
+                    return $this->failValidationErrors('La imagen de firma no es válida.');
+                }
+
+                $uploadDir = WRITEPATH . 'uploads/firmas-papeletas';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0775, true);
+                }
+
+                $fileName = 'papeleta-' . (int)$id . '-firma-' . date('YmdHis') . '.png';
+                $filePath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
+                file_put_contents($filePath, $binary);
+                $firmaUrl = 'uploads/firmas-papeletas/' . $fileName;
+            }
+
+            $update = [
+                'firma_conductor_img' => $firmaUrl !== '' ? $firmaUrl : null,
+                'firma_conductor_fecha' => $estado === 'FIRMADO' ? date('Y-m-d H:i:s') : null,
+                'firma_conductor_estado' => $estado,
+                'firma_conductor_observacion' => trim($input['observacion'] ?? $input['firmaConductorObservacion'] ?? '') ?: null,
+            ];
+
+            $db->table('papeletas')->where('id', $id)->update($update);
+
+            return $this->respond([
+                'status' => 200,
+                'message' => 'Firma de conductor registrada correctamente',
+                'data' => [
+                    'firmaConductorImg' => $update['firma_conductor_img'],
+                    'firmaConductorFecha' => $update['firma_conductor_fecha'],
+                    'firmaConductorEstado' => $update['firma_conductor_estado'],
+                    'firmaConductorObservacion' => $update['firma_conductor_observacion'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error registrando firma: ' . $e->getMessage());
+        }
+    }
+
+    private function uitActual($db): float
+    {
+        return (new \App\Services\Multas($db))->uit((int)date('Y'));
     }
 }

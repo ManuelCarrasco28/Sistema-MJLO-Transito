@@ -42,7 +42,7 @@ export function Documentos() {
       setVehiculos(vData)
       setCachedData('/documentos', dData)
       setCachedData('/vehiculos', vData)
-    }).catch(() => {})
+    }).catch(() => { })
       .finally(() => setIsLoading(false))
   }, [])
 
@@ -154,10 +154,10 @@ export function Documentos() {
             SOAT Vehicular
           </span>
         )
-      case 'CERTICAV':
+      case 'CITV':
         return (
           <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-            CERTICAV (Capacitación)
+            CITV
           </span>
         )
       default:
@@ -171,7 +171,7 @@ export function Documentos() {
 
   return (
     <div className="space-y-6">
-      
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/30">
@@ -190,9 +190,9 @@ export function Documentos() {
         </div>
       </div>
 
-      
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Emitidos</span>
@@ -207,7 +207,7 @@ export function Documentos() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Documentos procesados</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Vigentes</span>
@@ -225,7 +225,7 @@ export function Documentos() {
           </div>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">En Trámite</span>
@@ -238,7 +238,7 @@ export function Documentos() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">En revisión o firma</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-500 dark:text-rose-400">Vencidos / Anulados</span>
@@ -252,7 +252,7 @@ export function Documentos() {
         </div>
       </div>
 
-      
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -284,7 +284,7 @@ export function Documentos() {
               <option value="TODOS">Todos los tipos</option>
               <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
               <option value="SOAT">SOAT Vehicular</option>
-              <option value="CERTICAV">Certificado Capacitación (CERTICAV)</option>
+              <option value="CITV">CITV</option>
               <option value="TARJETA_PROPIEDAD">Tarjeta de Propiedad</option>
             </select>
 
@@ -324,7 +324,7 @@ export function Documentos() {
           </div>
         </div>
 
-        
+
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
           <span>
             Mostrando <strong className="text-slate-800 dark:text-white">{filteredDocs.length}</strong> de{' '}
@@ -385,7 +385,7 @@ export function Documentos() {
                       </div>
                     </td>
 
-                    
+
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
                         {d.vehiculoPlaca}
@@ -404,13 +404,12 @@ export function Documentos() {
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${
-                          d.estado === 'VIGENTE'
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${d.estado === 'VIGENTE'
                             ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
                             : d.estado === 'EN_TRAMITE'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                        }`}
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                          }`}
                       >
                         <span className="size-1.5 rounded-full bg-current" />
                         {d.estado}
@@ -463,7 +462,7 @@ export function Documentos() {
         />
       </div>
 
-      
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
@@ -495,7 +494,7 @@ export function Documentos() {
                   Información del Documento
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
                     <select
                       id="doc_veh"
                       value={formData.vehiculoPlaca}
@@ -524,7 +523,7 @@ export function Documentos() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
                     <select
                       id="doc_tipo"
                       value={formData.tipoDocumento}
@@ -533,7 +532,7 @@ export function Documentos() {
                     >
                       <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
                       <option value="SOAT">SOAT Vehicular</option>
-                      <option value="CERTICAV">Certificado CERTICAV</option>
+                      <option value="CITV">CITV</option>
                       <option value="TARJETA_PROPIEDAD">Tarjeta de Propiedad</option>
                     </select>
                     <label
@@ -544,7 +543,7 @@ export function Documentos() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
                     <input
                       id="doc_codigo"
                       type="text"
@@ -562,7 +561,7 @@ export function Documentos() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
                     <input
                       id="doc_expedicion"
                       type="date"
@@ -578,7 +577,7 @@ export function Documentos() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
                     <input
                       id="doc_expiracion"
                       type="date"
@@ -594,7 +593,7 @@ export function Documentos() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
                     <select
                       id="doc_estado"
                       value={formData.estado}
@@ -615,7 +614,7 @@ export function Documentos() {
                 </div>
               </div>
 
-              
+
               <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                 <button
                   type="button"
@@ -636,7 +635,7 @@ export function Documentos() {
         </div>
       )}
 
-      
+
       {isPreviewModalOpen && selectedDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">

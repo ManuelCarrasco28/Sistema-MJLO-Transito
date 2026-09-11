@@ -26,6 +26,7 @@ class PersonasController extends ResourceController
                 COALESCE(p.email, '') AS email,
                 '' AS numeroLicencia,
                 COALESCE(c.foto, '') AS fotoUrl,
+                COALESCE(c.foto, '') AS fotoImg,
                 p.estado
             ", false)
             ->join('ciudadanos c', 'c.id_persona = p.id', 'inner')
@@ -69,7 +70,7 @@ class PersonasController extends ResourceController
             'nombres'          => trim($input['nombres']),
             'apellido_paterno' => trim($input['apellidoPaterno']),
             'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
-            'foto'             => trim($input['fotoUrl'] ?? ''),
+            'foto'             => trim($input['fotoUrl'] ?? $input['fotoImg'] ?? ''),
         ];
         $db->table('ciudadanos')->insert($cData);
 

@@ -94,7 +94,7 @@ export function Login({ onLogin }) {
 
           <form onSubmit={handleSubmit} className={`space-y-4 ${isShaking ? 'animate-shake' : ''}`} noValidate>
             
-            <div className="relative flex h-14 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300">
+            <div className="relative flex h-14 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 dark:bg-slate-800 dark:border-slate-700 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300">
               <Icon name="user" className="size-5 text-slate-400 shrink-0 mr-2.5 mt-2" />
               <div className="relative flex-1 h-full flex items-center">
                 <input
@@ -119,7 +119,7 @@ export function Login({ onLogin }) {
             </div>
 
             
-            <div className="relative flex h-14 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300">
+            <div className="relative flex h-14 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 dark:bg-slate-800 dark:border-slate-700 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300">
               <Icon name="lock" className="size-5 text-slate-400 shrink-0 mr-2.5 mt-2" />
               <div className="relative flex-1 h-full flex items-center">
                 <input
