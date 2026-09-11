@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -23,10 +24,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final papeletas = await ApiService.getPapeletas();
 
-      // final inspectorId = await ApiService.getPersonalId();
-      // En la API actual, no filtra por id_inspector en el GET, podríamos filtrarlo localmente si la API no lo hace.
-      // O mostramos todo. Por ahora, las mostraremos todas o filtramos si la API trae todo.
-      
       List<dynamic> formales = [];
       List<dynamic> informales = [];
 
@@ -56,15 +53,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: AppTheme.backgroundLight,
         appBar: AppBar(
           title: const Text('Historial de Actividades', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          backgroundColor: const Color(0xFF1E3A8A),
+          backgroundColor: AppTheme.primaryBlue,
           iconTheme: const IconThemeData(color: Colors.white),
           bottom: const TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
-            indicatorColor: Colors.white,
+            indicatorColor: AppTheme.accentYellow,
             tabs: [
               Tab(icon: Icon(Icons.receipt_long), text: 'Formales'),
               Tab(icon: Icon(Icons.report_problem), text: 'Informales'),
@@ -72,7 +69,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ),
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF1E3A8A)))
+            ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
             : TabBarView(
                 children: [
                   _buildList(_multasOficiales, true),

@@ -5,7 +5,7 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/', 'Home::index');
 
 $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($routes): void {
-    $routes->options('login', 'AuthController::options');
+    $routes->options('(:any)', 'AuthController::options');
     $routes->post('login', 'AuthController::login');
 
     $routes->get('status', 'StatusController::index');

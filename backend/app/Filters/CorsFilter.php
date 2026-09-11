@@ -30,7 +30,7 @@ class CorsFilter implements FilterInterface
         $response->setHeader('Access-Control-Allow-Credentials', 'true');
         $response->setHeader('Connection', 'close');
 
-        if ($request->getMethod() === 'options') {
+        if (strtolower($_SERVER['REQUEST_METHOD'] ?? '') === 'options') {
             return $response->setStatusCode(204);
         }
 

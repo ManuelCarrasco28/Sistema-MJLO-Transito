@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme.dart';
 import 'issue_ticket_screen.dart';
 
 class VehicleDetailsScreen extends StatefulWidget {
@@ -88,7 +89,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         title: const Text('Resultados', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF1E3A8A),
+        backgroundColor: AppTheme.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         centerTitle: true,
@@ -130,7 +131,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
               icon: const Icon(Icons.arrow_back),
               label: const Text('Volver a buscar'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E3A8A),
+                backgroundColor: AppTheme.primaryBlue,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -184,7 +185,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF1E3A8A), width: 3),
+                border: Border.all(color: AppTheme.primaryBlue, width: 3),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))
                 ],
@@ -252,7 +253,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
       padding: const EdgeInsets.only(bottom: 12.0, left: 4),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF1E3A8A), size: 22),
+          Icon(icon, color: AppTheme.primaryBlue, size: 22),
           const SizedBox(width: 8),
           Text(
             title,
@@ -298,7 +299,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
             style: TextStyle(
               fontSize: 15,
               fontWeight: isHighlight ? FontWeight.bold : FontWeight.w600,
-              color: isHighlight ? const Color(0xFF1E3A8A) : Colors.black87,
+              color: isHighlight ? AppTheme.primaryBlue : Colors.black87,
             ),
           ),
         ),
