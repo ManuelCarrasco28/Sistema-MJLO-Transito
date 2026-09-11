@@ -10,9 +10,25 @@ class PersonalController extends ResourceController
 
     public function index()
     {
-        $rows = \Config\Database::connect()->table('personal')
-            ->select('id, tipo_documento, numero_documento, nombres, apellidos, cargo, estado')
-            ->orderBy('id', 'DESC')->get()->getResultArray();
+        $db = \Config\Database::connect();
+        $rows = $db->table('trabajadores t')
+            ->select('
+                t.id_persona as id, 
+                COALESCE(td.nombre, \'DNI\') as tipo_documento, 
+                p.numero as numero_documento, 
+                c.nombres, 
+                TRIM(CONCAT(c.apellido_paterno, \' \', IFNULL(c.apellido_materno, \'\'))) as apellidos, 
+                ca.nombre as cargo, 
+                t.estado
+            ')
+            ->join('personas p', 'p.id = t.id_persona', 'inner')
+            ->join('ciudadanos c', 'c.id_persona = t.id_persona', 'inner')
+            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
+            ->join('desplazamiento_oficina dof', 'dof.id_trabajador = t.id_persona AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
+            ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
+            ->orderBy('t.id_persona', 'DESC')
+            ->get()->getResultArray();
+            
         return $this->respond(['data' => $rows]);
     }
 
@@ -39,21 +55,117 @@ class PersonalController extends ResourceController
         if (!in_array($record['estado'], ['ACTIVO', 'INACTIVO'], true)) {
             return $this->failValidationErrors('Estado no válido.');
         }
+
         $db = \Config\Database::connect();
-        if ($id !== null && !$db->table('personal')->where('id', $id)->countAllResults()) {
-            return $this->failNotFound('Trabajador no encontrado.');
+        
+        $db->transStart();
+        
+        // 1. Tipo de documento
+        $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', $record['tipo_documento'])->get()->getRowArray();
+        $tipoDocId = $tipoDocRow ? $tipoDocRow['id'] : 1; // Default to DNI
+
+        // 2. Cargo
+        $cargoRow = $db->table('cargos')->where('nombre', $record['cargo'])->get()->getRowArray();
+        if (!$cargoRow) {
+            $db->table('cargos')->insert(['nombre' => $record['cargo'], 'estado' => 'ACTIVO']);
+            $cargoId = $db->insertID();
+        } else {
+            $cargoId = $cargoRow['id'];
         }
-        $duplicate = $db->table('personal')->where('tipo_documento', $record['tipo_documento'])
-            ->where('numero_documento', $record['numero_documento']);
-        if ($id !== null) $duplicate->where('id !=', $id);
-        if ($duplicate->countAllResults()) {
-            return $this->failValidationErrors('Ya existe un trabajador con ese documento.');
-        }
+
+        // Split apellidos
+        $apellidos = explode(' ', $record['apellidos'], 2);
+        $apePaterno = $apellidos[0];
+        $apeMaterno = $apellidos[1] ?? '';
+
         if ($id === null) {
-            $db->table('personal')->insert($record);
-            return $this->respondCreated(['data' => ['id' => $db->insertID()] + $record]);
+            // Validate duplicate
+            if ($db->table('personas')->where('numero', $record['numero_documento'])->countAllResults() > 0) {
+                return $this->failValidationErrors('Ya existe un trabajador con ese documento.');
+            }
+
+            // Insert Persona
+            $db->table('personas')->insert([
+                'id_tipo_documento' => $tipoDocId,
+                'numero' => $record['numero_documento'],
+                'estado' => 'ACTIVO'
+            ]);
+            $id = $db->insertID();
+
+            // Insert Ciudadano
+            $db->table('ciudadanos')->insert([
+                'id_persona' => $id,
+                'nombres' => $record['nombres'],
+                'apellido_paterno' => $apePaterno,
+                'apellido_materno' => $apeMaterno
+            ]);
+
+            // Insert Trabajador
+            $db->table('trabajadores')->insert([
+                'id_persona' => $id,
+                'tipo' => 'INTERNO',
+                'tiene_cuenta' => 1,
+                'estado' => $record['estado']
+            ]);
+
+            // Insert Desplazamiento
+            $db->table('desplazamiento_oficina')->insert([
+                'id_trabajador' => $id,
+                'id_cargo' => $cargoId,
+                'documento' => 'DESIGNACION-' . date('Y'),
+                'fecha_documento' => date('Y-m-d'),
+                'tipo_funcion' => 'Titular'
+            ]);
+
+        } else {
+            if (!$db->table('trabajadores')->where('id_persona', $id)->countAllResults()) {
+                return $this->failNotFound('Trabajador no encontrado.');
+            }
+            
+            // Update Persona
+            $db->table('personas')->where('id', $id)->update([
+                'id_tipo_documento' => $tipoDocId,
+                'numero' => $record['numero_documento']
+            ]);
+
+            // Update Ciudadano
+            $db->table('ciudadanos')->where('id_persona', $id)->update([
+                'nombres' => $record['nombres'],
+                'apellido_paterno' => $apePaterno,
+                'apellido_materno' => $apeMaterno
+            ]);
+
+            // Update Trabajador
+            $db->table('trabajadores')->where('id_persona', $id)->update([
+                'estado' => $record['estado']
+            ]);
+            
+            // Update Desplazamiento
+            $existDof = $db->table('desplazamiento_oficina')->where('id_trabajador', $id)->get()->getRowArray();
+            if ($existDof) {
+                $db->table('desplazamiento_oficina')->where('id', $existDof['id'])->update([
+                    'id_cargo' => $cargoId
+                ]);
+            } else {
+                $db->table('desplazamiento_oficina')->insert([
+                    'id_trabajador' => $id,
+                    'id_cargo' => $cargoId,
+                    'documento' => 'DESIGNACION-' . date('Y'),
+                    'fecha_documento' => date('Y-m-d'),
+                    'tipo_funcion' => 'Titular'
+                ]);
+            }
         }
-        $db->table('personal')->where('id', $id)->update($record);
+        
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->failServerError('Error guardando trabajador');
+        }
+
+        if (func_num_args() === 0) {
+            return $this->respondCreated(['data' => ['id' => $id] + $record]);
+        }
         return $this->respond(['data' => ['id' => $id] + $record]);
     }
 }

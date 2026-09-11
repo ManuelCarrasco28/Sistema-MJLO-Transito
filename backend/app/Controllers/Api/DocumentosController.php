@@ -22,14 +22,15 @@ class DocumentosController extends ResourceController
                 d.fecha_expiracion AS fechaExpiracion,
                 d.estado,
                 COALESCE(o.razon_social, 'Independiente') AS asociacion,
-                COALESCE(p.nombres, '') AS propietarioNombres,
-                COALESCE(p.apellido_paterno, '') AS propietarioPaterno,
-                COALESCE(p.apellido_materno, '') AS propietarioMaterno
+                COALESCE(c.nombres, '') AS propietarioNombres,
+                COALESCE(c.apellido_paterno, '') AS propietarioPaterno,
+                COALESCE(c.apellido_materno, '') AS propietarioMaterno
             ", false)
-            ->join('vehiculos v', 'v.id = d.vehiculo_id', 'left')
-            ->join('organizaciones o', 'o.id = v.asociacion_id', 'left')
-            ->join('vehiculo_propietarios vp', 'vp.vehiculo_id = v.id AND vp.fecha_fin IS NULL', 'left')
-            ->join('personas p', 'p.id = vp.persona_id', 'left')
+            ->join('vehiculos v', 'v.id = d.id_vehiculo', 'left')
+            ->join('organizaciones o', 'o.id = v.id_asociacion', 'left')
+            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
+            ->join('personas p', 'p.id = vp.id_persona', 'left')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
             ->orderBy('d.id', 'DESC')
             ->get()
             ->getResultArray();
@@ -62,10 +63,10 @@ class DocumentosController extends ResourceController
             } else {
                 
                 $tipoRow = $db->table('tipos_vehiculo')->limit(1)->get()->getRowArray();
-                $tipoId = $tipoRow ? $tipoRow['id'] : 1;
+                $tipoId = $tipoRow ? (int)$tipoRow['id'] : null;
                 $db->table('vehiculos')->insert([
                     'placa'                => $placa,
-                    'tipo_vehiculo_id'     => $tipoId,
+                    'id_tipo_vehiculo'     => $tipoId,
                     'estado_formalizacion' => 'FORMALIZADO',
                 ]);
                 $vehiculoId = (int)$db->insertID();
@@ -74,11 +75,24 @@ class DocumentosController extends ResourceController
 
         if (!$vehiculoId) {
             $firstVehiculo = $db->table('vehiculos')->limit(1)->get()->getRowArray();
-            $vehiculoId = $firstVehiculo ? (int)$firstVehiculo['id'] : 1;
+            if ($firstVehiculo) {
+                $vehiculoId = (int)$firstVehiculo['id'];
+                $placa = $firstVehiculo['placa'];
+            } else {
+                $tipoRow = $db->table('tipos_vehiculo')->limit(1)->get()->getRowArray();
+                $tipoId = $tipoRow ? (int)$tipoRow['id'] : null;
+                $placa = 'M1-' . random_int(1000, 9999);
+                $db->table('vehiculos')->insert([
+                    'placa'                => $placa,
+                    'id_tipo_vehiculo'     => $tipoId,
+                    'estado_formalizacion' => 'FORMALIZADO',
+                ]);
+                $vehiculoId = (int)$db->insertID();
+            }
         }
 
         $record = [
-            'vehiculo_id'      => $vehiculoId,
+            'id_vehiculo'      => $vehiculoId,
             'tipo_documento'   => $input['tipoDocumento'] ?? 'TARJETA_OPERATIVIDAD',
             'codigo'           => trim($input['codigo']),
             'fecha_expedicion' => !empty($input['fechaExpedicion']) ? $input['fechaExpedicion'] : date('Y-m-d'),

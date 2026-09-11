@@ -12,23 +12,25 @@ class PersonasController extends ResourceController
     {
         $db = \Config\Database::connect();
 
-        $rows = $db->table('personas')
+        $rows = $db->table('personas p')
             ->select("
-                id,
-                tipo_documento AS tipoDocumento,
-                numero_documento AS numeroDocumento,
-                nombres,
-                apellido_paterno AS apellidoPaterno,
-                COALESCE(apellido_materno, '') AS apellidoMaterno,
-                COALESCE(direccion, '') AS direccion,
-                COALESCE(telefono, '') AS telefono,
-                COALESCE(celular, '') AS celular,
-                COALESCE(email, '') AS email,
-                COALESCE(numero_licencia_conducir, '') AS numeroLicencia,
-                COALESCE(foto_url, '') AS fotoUrl,
-                estado
+                p.id,
+                COALESCE(td.nombre, 'DNI') AS tipoDocumento,
+                p.numero AS numeroDocumento,
+                c.nombres,
+                c.apellido_paterno AS apellidoPaterno,
+                COALESCE(c.apellido_materno, '') AS apellidoMaterno,
+                COALESCE(p.direccion, '') AS direccion,
+                COALESCE(p.telefono, '') AS telefono,
+                COALESCE(p.celular, '') AS celular,
+                COALESCE(p.email, '') AS email,
+                '' AS numeroLicencia,
+                COALESCE(c.foto, '') AS fotoUrl,
+                p.estado
             ", false)
-            ->orderBy('id', 'DESC')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'inner')
+            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
+            ->orderBy('p.id', 'DESC')
             ->get()
             ->getResultArray();
 
@@ -44,39 +46,44 @@ class PersonasController extends ResourceController
             return $this->failValidationErrors('Número de documento, nombres y apellido paterno son requeridos.');
         }
 
-        $record = [
-            'tipo_documento'           => $input['tipoDocumento'] ?? 'DNI',
-            'numero_documento'         => trim($input['numeroDocumento']),
-            'nombres'                  => trim($input['nombres']),
-            'apellido_paterno'         => trim($input['apellidoPaterno']),
-            'apellido_materno'         => trim($input['apellidoMaterno'] ?? ''),
-            'direccion'                => trim($input['direccion'] ?? ''),
-            'telefono'                 => trim($input['telefono'] ?? ''),
-            'celular'                  => trim($input['celular'] ?? ''),
-            'email'                    => trim($input['email'] ?? ''),
-            'numero_licencia_conducir' => trim($input['numeroLicencia'] ?? ''),
-            'foto_url'                 => trim($input['fotoUrl'] ?? ''),
-            'estado'                   => strtoupper($input['estado'] ?? 'ACTIVO'),
-        ];
+        $db->transStart();
 
-        $db->table('personas')->insert($record);
+        $tipoDocName = $input['tipoDocumento'] ?? 'DNI';
+        $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', $tipoDocName)->get()->getRowArray();
+        $tipoDocId = $tipoDocRow ? $tipoDocRow['id'] : 1;
+
+        $pData = [
+            'id_tipo_documento' => $tipoDocId,
+            'numero'            => trim($input['numeroDocumento']),
+            'direccion'         => trim($input['direccion'] ?? ''),
+            'telefono'          => trim($input['telefono'] ?? ''),
+            'celular'           => trim($input['celular'] ?? ''),
+            'email'             => trim($input['email'] ?? ''),
+            'estado'            => strtoupper($input['estado'] ?? 'ACTIVO'),
+        ];
+        $db->table('personas')->insert($pData);
         $insertId = $db->insertID();
 
-        $newPersona = [
-            'id'                => (int)$insertId,
-            'tipoDocumento'     => $record['tipo_documento'],
-            'numeroDocumento'   => $record['numero_documento'],
-            'nombres'           => $record['nombres'],
-            'apellidoPaterno'   => $record['apellido_paterno'],
-            'apellidoMaterno'   => $record['apellido_materno'],
-            'direccion'         => $record['direccion'],
-            'telefono'          => $record['telefono'],
-            'celular'           => $record['celular'],
-            'email'             => $record['email'],
-            'numeroLicencia'    => $record['numero_licencia_conducir'],
-            'fotoUrl'           => $record['foto_url'],
-            'estado'            => $record['estado'],
+        $cData = [
+            'id_persona'       => $insertId,
+            'nombres'          => trim($input['nombres']),
+            'apellido_paterno' => trim($input['apellidoPaterno']),
+            'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
+            'foto'             => trim($input['fotoUrl'] ?? ''),
         ];
+        $db->table('ciudadanos')->insert($cData);
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->failServerError('Error guardando la persona.');
+        }
+
+        $newPersona = array_merge(['id' => (int)$insertId, 'tipoDocumento' => $tipoDocName, 'numeroDocumento' => $pData['numero'], 'numeroLicencia' => ''], $cData, $pData);
+        unset($newPersona['id_persona'], $newPersona['id_tipo_documento'], $newPersona['numero'], $newPersona['foto']);
+        $newPersona['apellidoPaterno'] = $cData['apellido_paterno'];
+        $newPersona['apellidoMaterno'] = $cData['apellido_materno'];
+        $newPersona['fotoUrl'] = $cData['foto'];
 
         return $this->respondCreated(['status' => true, 'message' => 'Persona registrada con éxito', 'data' => $newPersona]);
     }
@@ -90,22 +97,47 @@ class PersonasController extends ResourceController
             return $this->failNotFound('ID de persona no especificado.');
         }
 
-        $record = [];
-        if (isset($input['tipoDocumento'])) $record['tipo_documento'] = $input['tipoDocumento'];
-        if (isset($input['numeroDocumento'])) $record['numero_documento'] = trim($input['numeroDocumento']);
-        if (isset($input['nombres'])) $record['nombres'] = trim($input['nombres']);
-        if (isset($input['apellidoPaterno'])) $record['apellido_paterno'] = trim($input['apellidoPaterno']);
-        if (isset($input['apellidoMaterno'])) $record['apellido_materno'] = trim($input['apellidoMaterno']);
-        if (isset($input['direccion'])) $record['direccion'] = trim($input['direccion']);
-        if (isset($input['telefono'])) $record['telefono'] = trim($input['telefono']);
-        if (isset($input['celular'])) $record['celular'] = trim($input['celular']);
-        if (isset($input['email'])) $record['email'] = trim($input['email']);
-        if (isset($input['numeroLicencia'])) $record['numero_licencia_conducir'] = trim($input['numeroLicencia']);
-        if (array_key_exists('fotoUrl', $input)) $record['foto_url'] = trim($input['fotoUrl'] ?? '');
-        if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
+        if (!$db->table('personas')->where('id', $id)->countAllResults()) {
+            return $this->failNotFound('Persona no encontrada.');
+        }
 
-        if (!empty($record)) {
-            $db->table('personas')->where('id', $id)->update($record);
+        $db->transStart();
+
+        $pData = [];
+        if (isset($input['tipoDocumento'])) {
+            $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', $input['tipoDocumento'])->get()->getRowArray();
+            $pData['id_tipo_documento'] = $tipoDocRow ? $tipoDocRow['id'] : 1;
+        }
+        if (isset($input['numeroDocumento'])) $pData['numero'] = trim($input['numeroDocumento']);
+        if (isset($input['direccion'])) $pData['direccion'] = trim($input['direccion']);
+        if (isset($input['telefono'])) $pData['telefono'] = trim($input['telefono']);
+        if (isset($input['celular'])) $pData['celular'] = trim($input['celular']);
+        if (isset($input['email'])) $pData['email'] = trim($input['email']);
+        if (isset($input['estado'])) $pData['estado'] = strtoupper($input['estado']);
+
+        if (!empty($pData)) {
+            $db->table('personas')->where('id', $id)->update($pData);
+        }
+
+        $cData = [];
+        if (isset($input['nombres'])) $cData['nombres'] = trim($input['nombres']);
+        if (isset($input['apellidoPaterno'])) $cData['apellido_paterno'] = trim($input['apellidoPaterno']);
+        if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = trim($input['apellidoMaterno']);
+        if (array_key_exists('fotoUrl', $input)) $cData['foto'] = trim($input['fotoUrl'] ?? '');
+
+        if (!empty($cData)) {
+            if ($db->table('ciudadanos')->where('id_persona', $id)->countAllResults()) {
+                $db->table('ciudadanos')->where('id_persona', $id)->update($cData);
+            } else {
+                $cData['id_persona'] = $id;
+                $db->table('ciudadanos')->insert($cData);
+            }
+        }
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->failServerError('Error actualizando la persona.');
         }
 
         return $this->respond(['status' => true, 'message' => 'Persona actualizada con éxito']);
@@ -114,12 +146,17 @@ class PersonasController extends ResourceController
     public function delete($id = null)
     {
         $db = \Config\Database::connect();
-
-        if (!$id) {
-            return $this->failNotFound('ID de persona no especificado.');
-        }
-
+        if (!$id) return $this->failNotFound('ID de persona no especificado.');
+        if (!$db->table('personas')->where('id', $id)->countAllResults()) return $this->failNotFound('Persona no encontrada.');
+        
+        $db->transStart();
+        $db->table('ciudadanos')->where('id_persona', $id)->delete();
         $db->table('personas')->where('id', $id)->delete();
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->failServerError('Error eliminando persona.');
+        }
 
         return $this->respondDeleted(['status' => true, 'message' => 'Persona eliminada del registro']);
     }

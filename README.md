@@ -95,7 +95,7 @@ La tarjeta de operatividad ya no usa una tabla aparte. Se registra asi:
 ```text
 documentos_vehiculo
 - id
-- vehiculo_id
+- id_vehiculo
 - tipo_documento
 - codigo
 - fecha_expedicion
@@ -106,7 +106,7 @@ documentos_vehiculo
 Ejemplo:
 
 ```text
-vehiculo_id: 5
+id_vehiculo: 5
 tipo_documento: TARJETA_OPERATIVIDAD
 codigo: 034-2023
 fecha_expedicion: 2023-01-01
@@ -138,7 +138,7 @@ No debe existir una tabla separada llamada `tarjetas_operatividad`.
 #### usuarios
 
 - id
-- personal_id
+- id_personal
 - nombre_usuario
 - password_hash
 - estado
@@ -182,7 +182,7 @@ No debe existir una tabla separada llamada `tarjetas_operatividad`.
 #### vehiculos
 
 - id
-- tipo_vehiculo_id
+- id_tipo_vehiculo
 - placa
 - marca
 - modelo
@@ -192,15 +192,15 @@ No debe existir una tabla separada llamada `tarjetas_operatividad`.
 - serie_motor
 - partida_registral
 - codigo_qr
-- asociacion_id
+- id_asociacion
 - estado_formalizacion
 
 #### vehiculo_propietarios
 
 - id
-- vehiculo_id
-- persona_id
-- organizacion_id
+- id_vehiculo
+- id_persona
+- id_organizacion
 - fecha_inicio
 - fecha_fin
 - documento_sustento
@@ -209,7 +209,7 @@ No debe existir una tabla separada llamada `tarjetas_operatividad`.
 #### documentos_vehiculo
 
 - id
-- vehiculo_id
+- id_vehiculo
 - tipo_documento
 - codigo
 - fecha_expedicion
@@ -237,8 +237,8 @@ Valores de `documentos_vehiculo.tipo_documento`:
 
 - id
 - numero_inspeccion
-- vehiculo_id
-- tecnico_id
+- id_vehiculo
+- id_tecnico
 - fecha_inspeccion
 - resultado
 - primera_evaluacion
@@ -249,8 +249,8 @@ Valores de `documentos_vehiculo.tipo_documento`:
 #### inspeccion_detalles
 
 - id
-- inspeccion_id
-- criterio_id
+- id_inspeccion
+- id_criterio
 - estado_revision
 - observacion
 
@@ -277,9 +277,9 @@ Valores de `inspeccion_detalles.estado_revision`:
 #### inscripciones_curso
 
 - id
-- curso_id
-- persona_id
-- vehiculo_id
+- id_curso
+- id_persona
+- id_vehiculo
 - numero_ri
 - fecha_inscripcion
 - estado_pago
@@ -291,9 +291,9 @@ Valores de `inspeccion_detalles.estado_revision`:
 - id
 - numero_formulario
 - tipo_tramite
-- persona_id
-- organizacion_id
-- vehiculo_id
+- id_persona
+- id_organizacion
+- id_vehiculo
 - funcionario_dirigido
 - cargo_funcionario
 - detalle_solicitud
@@ -313,9 +313,9 @@ Valores de `inspeccion_detalles.estado_revision`:
 
 - id
 - numero_papeleta
-- vehiculo_id
-- persona_infractor_id
-- inspector_id
+- id_vehiculo
+- id_persona_infractor
+- id_inspector
 - fecha_hora
 - lugar
 - servicio
@@ -329,8 +329,8 @@ Valores de `inspeccion_detalles.estado_revision`:
 #### papeleta_detalles
 
 - id
-- papeleta_id
-- tipo_infraccion_id
+- id_papeleta
+- id_tipo_infraccion
 - monto
 - descuento
 - monto_final
@@ -339,8 +339,8 @@ Valores de `inspeccion_detalles.estado_revision`:
 
 - id
 - tipo_pago
-- papeleta_id
-- tramite_id
+- id_papeleta
+- id_tramite
 - numero_recibo
 - numero_voucher
 - fecha_pago
@@ -365,7 +365,7 @@ Valores de `pagos.tipo_pago`:
 #### retenciones_vehiculo
 
 - id
-- papeleta_id
+- id_papeleta
 - fecha_ingreso
 - deposito
 - motivo
@@ -379,9 +379,9 @@ Valores de `pagos.tipo_pago`:
 
 - id
 - numero_orden
-- retencion_id
-- pago_id
-- persona_autorizada_id
+- id_retencion
+- id_pago
+- id_persona_autorizada
 - fecha_emision
 - monto_total
 - observaciones
@@ -389,9 +389,9 @@ Valores de `pagos.tipo_pago`:
 #### permisos_circulacion
 
 - id
-- tramite_id
-- organizacion_id
-- vehiculo_id
+- id_tramite
+- id_organizacion
+- id_vehiculo
 - numero_autorizacion
 - tipo_permiso
 - asunto
