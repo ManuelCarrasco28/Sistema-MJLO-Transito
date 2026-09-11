@@ -55,7 +55,7 @@ export function Inspecciones() {
   )
 
   useEffect(() => {
-    apiFetch('/personal').then(r => r.json()).then(r => setTecnicos((r.data || []).filter(p => p.estado === 'ACTIVO'))).catch(() => {})
+    apiFetch('/personal').then(r => r.json()).then(r => setTecnicos((r.data || []).filter(p => p.estado === 'ACTIVO'))).catch(() => { })
     Promise.all([
       apiFetch('/inspecciones').then(res => res.json()).catch(() => ({ data: [] })),
       apiFetch('/inspeccion-criterios').then(res => res.json()).catch(() => ({ data: [] })),
@@ -181,10 +181,10 @@ export function Inspecciones() {
 
   return (
     <div className="space-y-6">
-
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-500/30">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#6C4CF1] to-[#9A6CF7] text-white shadow-lg shadow-[#6C4CF1]/30">
             <Icon name="inspection" className="size-6 text-white" />
           </span>
           <div>
@@ -198,92 +198,107 @@ export function Inspecciones() {
         </div>
       </div>
 
-
+      {/* Tarjetas de Métricas - Total Realizadas dividida en Total Realizadas y Aprobados */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 1. Total Realizadas */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#6C4CF1] to-[#956BF6] p-5 text-white shadow-lg shadow-[#6C4CF1]/20 transition-all hover:shadow-xl hover:shadow-[#6C4CF1]/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-black uppercase tracking-wider text-purple-100">
               Total Realizadas
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
-              <Icon name="inspection" className="size-5" />
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                <rect x="9" y="3" width="6" height="4" rx="1.5" />
+                <path d="M9 12l2 2 4-4" />
+              </svg>
             </span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{totales}</p>
-            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
+            <p className="text-3xl font-black">{totales}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">
               Historial
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Constataciones registradas</p>
+          <p className="mt-1 text-xs text-purple-100 font-medium">Constataciones registradas</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 2. Aprobados (Dividido con icono de escudo/aprobación) */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#25BE80] to-[#46DCA0] p-5 text-white shadow-lg shadow-[#25BE80]/20 transition-all hover:shadow-xl hover:shadow-[#25BE80]/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            <span className="text-xs font-black uppercase tracking-wider text-emerald-100">
               Aprobados
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">
-              ✓
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="M9 12l2 2 4-4" />
+              </svg>
             </span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{aprobados}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
+            <p className="text-3xl font-black">{aprobados}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-black text-white">
               {porcentajeAprobados}% Aptos
             </span>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
             <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+              className="h-full rounded-full bg-white transition-all duration-500"
               style={{ width: `${porcentajeAprobados}%` }}
             />
           </div>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 3. Observados */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#FF6F8E] to-[#FF9AA8] p-5 text-white shadow-lg shadow-[#FF6F8E]/20 transition-all hover:shadow-xl hover:shadow-[#FF6F8E]/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+            <span className="text-xs font-black uppercase tracking-wider text-rose-100">
               Observados
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
-              ⚠️
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
             </span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{observados}</p>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">
+            <p className="text-3xl font-black">{observados}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">
               Subsanables
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Deficiencias leves (plazo 48h)</p>
+          <p className="mt-1 text-xs text-rose-100 font-medium">Deficiencias leves (plazo 48h)</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 4. Desaprobados */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#1B1536]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+            <span className="text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
               Desaprobados
             </span>
-            <span className="grid size-10 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
-              ✕
+            <span className="grid size-9 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <circle cx="12" cy="12" r="9" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
             </span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <p className="text-3xl font-black text-slate-800 dark:text-white">{desaprobados}</p>
-            <span className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">
+            <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
               Fallas Críticas
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Peligro para circular</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 font-medium">Peligro para circular</p>
         </div>
       </div>
 
-
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      {/* Tabla Panel */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#1B1536]">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -292,7 +307,7 @@ export function Inspecciones() {
               placeholder="Buscar por código, placa, inspector o datos del vehículo..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900/50 dark:text-white dark:focus:border-indigo-400"
             />
             {searchTerm && (
               <button
@@ -319,14 +334,13 @@ export function Inspecciones() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-sky-600 to-indigo-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-sky-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#6C4CF1] to-[#9A6CF7] px-4 py-2.5 text-xs font-extrabold text-white shadow-md shadow-[#6C4CF1]/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-[#6C4CF1]/30 active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Registrar Inspección</span>
             </button>
           </div>
         </div>
-
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -338,7 +352,9 @@ export function Inspecciones() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Fecha & Hora</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Inspector Asignado</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Resultado</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -356,7 +372,7 @@ export function Inspecciones() {
                     <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1B1536] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
                   </tr>
                 ))
               ) : filteredInspecciones.length === 0 ? (
@@ -377,20 +393,18 @@ export function Inspecciones() {
                 paginatedInspecciones.map((i) => {
                   const vehiculo = vehiculos.find((v) => v.placa === i.vehiculoPlaca)
                   return (
-                    <tr key={i.id} className="group transition-colors hover:bg-indigo-50/30 dark:hover:bg-slate-800/40">
+                    <tr key={i.id} className="group transition-colors hover:bg-[#FAF9FE] dark:hover:bg-slate-800/40">
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        <span className="font-mono font-extrabold text-indigo-700 dark:text-indigo-400">
+                        <span className="font-mono font-extrabold text-[#6C4CF1] dark:text-[#A87EFD]">
                           {i.numeroInspeccion}
                         </span>
                       </td>
 
-
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
+                        <span className="inline-block rounded-lg border border-[#F3DE9E] bg-[#FFF3D6] px-2.5 py-1 font-mono text-xs font-black text-[#8A6A0A] dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-300">
                           {i.vehiculoPlaca}
                         </span>
                       </td>
-
 
                       <td className="px-3.5 py-3.5 max-w-45">
                         <p className="font-bold text-slate-800 dark:text-white truncate" title={`${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`}>
@@ -414,55 +428,82 @@ export function Inspecciones() {
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{i.inspector}</p>
                       </td>
 
-
+                      {/* RESULTADO: Píldora con sombreado acorde al color original */}
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${i.resultado === 'APROBADO'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
-                            : i.resultado === 'OBSERVADO'
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
-                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300'
+                          className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider ${i.resultado === 'APROBADO'
+                              ? 'bg-[#E6FAF0] text-[#0F7547] shadow-[0_3px_10px_rgba(31,181,116,0.22)] dark:bg-emerald-950/40 dark:text-emerald-300'
+                              : i.resultado === 'OBSERVADO'
+                                ? 'bg-[#FFF4E2] text-[#8A5308] shadow-[0_3px_10px_rgba(224,135,18,0.2)] dark:bg-amber-950/40 dark:text-amber-300'
+                                : 'bg-[#FDEAEE] text-[#A22E43] shadow-[0_3px_10px_rgba(240,91,114,0.22)] dark:bg-rose-950/40 dark:text-rose-300'
                             }`}
                         >
-                          <span className="size-2 rounded-full bg-current animate-pulse" />
+                          <span
+                            className={`size-2 rounded-full ${i.resultado === 'APROBADO'
+                                ? 'bg-[#1FB574]'
+                                : i.resultado === 'OBSERVADO'
+                                  ? 'bg-[#E08712]'
+                                  : 'bg-[#F05B72]'
+                              }`}
+                          />
                           {i.resultado}
                         </span>
                       </td>
 
-
-                      <td className="sticky right-0 z-10 bg-white group-hover:bg-indigo-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
-                        <div className="flex items-center justify-end gap-1.5 pr-1">
+                      {/* ACCIONES: Botones circulares con paleta original y sombreado */}
+                      <td className="sticky right-0 z-10 bg-white group-hover:bg-[#FAF9FE] dark:bg-[#1B1536] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                        <div className="flex items-center justify-end gap-2 pr-1">
+                          {/* Ver - Violeta */}
                           <button
                             type="button"
                             onClick={() => handleOpenDetail(i)}
                             title="Ver Ficha Técnica"
-                            className="rounded-xl p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white dark:bg-indigo-950/60 dark:text-indigo-400 transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer"
+                            className="flex size-8.5 items-center justify-center rounded-full bg-[#EDE8FF] text-[#6C4CF1] shadow-[0_4px_10px_rgba(108,76,241,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#6C4CF1]/30 dark:bg-indigo-950/60 dark:text-indigo-400 cursor-pointer"
                           >
-                            <Icon name="eye" className="size-4" />
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
                           </button>
+
+                          {/* Editar - Ámbar */}
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(i)}
                             title="Editar Inspección"
-                            className="rounded-xl p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer"
+                            className="flex size-8.5 items-center justify-center rounded-full bg-[#FFF2D9] text-[#E08712] shadow-[0_4px_10px_rgba(224,135,18,0.2)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#E08712]/30 dark:bg-amber-950/60 dark:text-amber-400 cursor-pointer"
                           >
-                            <Icon name="pencil" className="size-4" />
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+                            </svg>
                           </button>
+
+                          {/* Imprimir - Verde */}
                           <button
                             type="button"
                             onClick={() => handleOpenPreview(i)}
                             title="Imprimir Acta"
-                            className="rounded-xl p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer"
+                            className="flex size-8.5 items-center justify-center rounded-full bg-[#DDF7EC] text-[#1FB574] shadow-[0_4px_10px_rgba(31,181,116,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#1FB574]/30 dark:bg-emerald-950/60 dark:text-emerald-400 cursor-pointer"
                           >
-                            <Icon name="print" className="size-4" />
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                              <path d="M6 9V2h12v7" />
+                              <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
+                              <rect x="6" y="14" width="12" height="8" />
+                            </svg>
                           </button>
+
+                          {/* Eliminar - Rojo/Coral */}
                           <button
                             type="button"
                             onClick={() => handleDelete(i.id)}
                             title="Eliminar Inspección"
-                            className="rounded-xl p-1.5 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white dark:bg-red-950/60 dark:text-red-400 transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer"
+                            className="flex size-8.5 items-center justify-center rounded-full bg-[#FDECEF] text-[#F05B72] shadow-[0_4px_10px_rgba(240,91,114,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#F05B72]/30 dark:bg-rose-950/60 dark:text-rose-400 cursor-pointer"
                           >
-                            <Icon name="trash" className="size-4" />
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                            </svg>
                           </button>
                         </div>
                       </td>
@@ -486,10 +527,10 @@ export function Inspecciones() {
         />
       </div>
 
-
+      {/* Modal Crear / Editar */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#1B1536]">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
               <div>
                 <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">
@@ -576,10 +617,10 @@ export function Inspecciones() {
                               value={detalle?.estado || 'BIEN'}
                               onChange={(e) => handleDetalleChange(criterio.id, 'estado', e.target.value)}
                               className={`rounded-lg border-2 px-3 py-1.5 text-xs font-extrabold outline-none cursor-pointer ${detalle?.estado === 'BIEN'
-                                ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                : detalle?.estado === 'MAL_ESTADO'
-                                  ? 'border-rose-500 bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
-                                  : 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                                  ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                  : detalle?.estado === 'MAL_ESTADO'
+                                    ? 'border-rose-500 bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
+                                    : 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
                                 }`}
                             >
                               <option value="BIEN">BIEN (Apto)</option>
@@ -627,10 +668,10 @@ export function Inspecciones() {
                     value={formData.resultado}
                     onChange={(e) => setFormData({ ...formData, resultado: e.target.value })}
                     className={`w-full rounded-xl border-2 px-3.5 py-2.5 text-sm font-black outline-none cursor-pointer ${formData.resultado === 'APROBADO'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400'
-                      : formData.resultado === 'OBSERVADO'
-                        ? 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400'
-                        : 'border-rose-500 bg-rose-50 text-rose-800 dark:bg-rose-900/20 dark:text-rose-400'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400'
+                        : formData.resultado === 'OBSERVADO'
+                          ? 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400'
+                          : 'border-rose-500 bg-rose-50 text-rose-800 dark:bg-rose-900/20 dark:text-rose-400'
                       }`}
                   >
                     <option value="APROBADO">APROBADO (Apto para Circular)</option>
@@ -650,7 +691,7 @@ export function Inspecciones() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 cursor-pointer"
+                  className="rounded-xl bg-[#6C4CF1] px-5 py-2.5 text-xs font-extrabold text-white shadow-md shadow-[#6C4CF1]/20 hover:bg-[#5A3BD8] cursor-pointer"
                 >
                   {selectedInspeccion ? 'Guardar Cambios' : 'Guardar Inspección'}
                 </button>
@@ -660,19 +701,19 @@ export function Inspecciones() {
         </div>
       )}
 
-
+      {/* Modal Ficha Detalle */}
       {isDetailModalOpen && selectedInspeccion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-[#071a2f] p-5 text-white">
+          <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#1B1536]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-[#241A4A] p-5 text-white">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#B6ADE6]">
                   Ficha de Inspección Técnica
                 </p>
                 <h3 className="text-xl font-black mt-0.5">{selectedInspeccion.numeroInspeccion}</h3>
               </div>
               <div className="flex items-center gap-3">
-                <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs">
+                <span className="inline-block rounded-lg border border-[#F3DE9E] bg-[#FFF3D6] px-3 py-1 font-mono text-xs font-black tracking-widest text-[#8A6A0A]">
                   {selectedInspeccion.vehiculoPlaca}
                 </span>
                 <button
@@ -703,17 +744,16 @@ export function Inspecciones() {
                   <span className="font-bold text-slate-400">Veredicto Técnico</span>
                   <span
                     className={`font-black px-2.5 py-0.5 rounded-full ${selectedInspeccion.resultado === 'APROBADO'
-                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                      : selectedInspeccion.resultado === 'OBSERVADO'
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                        : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                        ? 'bg-[#E6FAF0] text-[#0F7547] dark:bg-emerald-950 dark:text-emerald-300'
+                        : selectedInspeccion.resultado === 'OBSERVADO'
+                          ? 'bg-[#FFF4E2] text-[#8A5308] dark:bg-amber-950 dark:text-amber-300'
+                          : 'bg-[#FDEAEE] text-[#A22E43] dark:bg-rose-950 dark:text-rose-300'
                       }`}
                   >
                     {selectedInspeccion.resultado}
                   </span>
                 </div>
               </div>
-
 
               {selectedInspeccion.detalles && selectedInspeccion.detalles.length > 0 && (
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -736,10 +776,10 @@ export function Inspecciones() {
                           </div>
                           <span
                             className={`rounded-lg px-2.5 py-0.5 text-[11px] font-extrabold ${det.estado === 'BIEN'
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                              : det.estado === 'MAL_ESTADO'
-                                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : det.estado === 'MAL_ESTADO'
+                                  ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                               }`}
                           >
                             {det.estado === 'BIEN' ? 'BIEN' : det.estado === 'MAL_ESTADO' ? 'MAL ESTADO' : 'NO TIENE'}
@@ -767,7 +807,7 @@ export function Inspecciones() {
                     setIsDetailModalOpen(false)
                     handleOpenPreview(selectedInspeccion)
                   }}
-                  className="rounded-xl bg-emerald-600 px-4 py-2.5 font-bold text-white hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1.5"
+                  className="rounded-xl bg-[#1FB574] px-4 py-2.5 font-bold text-white hover:bg-[#17965E] cursor-pointer inline-flex items-center gap-1.5 shadow-sm shadow-[#1FB574]/20"
                 >
                   <Icon name="print" className="size-4" />
                   <span>Imprimir Acta</span>
@@ -785,11 +825,11 @@ export function Inspecciones() {
         </div>
       )}
 
-
+      {/* Modal Previsualización de Acta */}
       {isPreviewModalOpen && selectedInspeccion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
-            <div className="border-b border-slate-100 bg-[#071a2f] p-6 text-white text-center relative">
+          <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1B1536] border border-slate-200 dark:border-slate-800">
+            <div className="border-b border-slate-100 bg-[#241A4A] p-6 text-white text-center relative">
               <button
                 type="button"
                 onClick={() => setIsPreviewModalOpen(false)}
@@ -797,20 +837,20 @@ export function Inspecciones() {
               >
                 ✕
               </button>
-              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#B6ADE6]">
                 MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ
               </p>
               <h3 className="text-xl font-black mt-1">ACTA DE CONSTATACIÓN DE CARACTERÍSTICAS</h3>
-              <p className="text-xs font-mono font-bold text-cyan-300 mt-0.5">
+              <p className="text-xs font-mono font-bold text-purple-200 mt-0.5">
                 {selectedInspeccion.numeroInspeccion}
               </p>
             </div>
 
             <div className="p-6 space-y-4 text-xs">
-              <div className="rounded-2xl border border-slate-200 bg-indigo-50/40 p-5 dark:border-slate-800 dark:bg-slate-900/60 space-y-3">
+              <div className="rounded-2xl border border-slate-200 bg-purple-50/40 p-5 dark:border-slate-800 dark:bg-slate-900/60 space-y-3">
                 <div className="flex justify-between items-center border-b border-slate-200 pb-2 dark:border-slate-800">
                   <span className="font-bold text-slate-500">Placa Autorizada</span>
-                  <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950">
+                  <span className="inline-block rounded-lg border border-[#F3DE9E] bg-[#FFF3D6] px-3 py-1 font-mono text-xs font-black tracking-widest text-[#8A6A0A]">
                     {selectedInspeccion.vehiculoPlaca}
                   </span>
                 </div>
@@ -828,10 +868,10 @@ export function Inspecciones() {
                   <span className="font-bold text-slate-500">Dictamen Oficial</span>
                   <span
                     className={`font-black px-3 py-1 rounded-full text-xs ${selectedInspeccion.resultado === 'APROBADO'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : selectedInspeccion.resultado === 'OBSERVADO'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-rose-100 text-rose-800'
+                        ? 'bg-[#E6FAF0] text-[#0F7547]'
+                        : selectedInspeccion.resultado === 'OBSERVADO'
+                          ? 'bg-[#FFF4E2] text-[#8A5308]'
+                          : 'bg-[#FDEAEE] text-[#A22E43]'
                       }`}
                   >
                     {selectedInspeccion.resultado}
@@ -860,7 +900,7 @@ export function Inspecciones() {
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 cursor-pointer inline-flex items-center gap-1.5"
+                  className="rounded-xl bg-[#1FB574] px-5 py-2.5 text-xs font-extrabold text-white hover:bg-[#17965E] shadow-md shadow-[#1FB574]/20 cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <Icon name="print" className="size-4" />
                   <span>Imprimir Certificado</span>

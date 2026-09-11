@@ -157,61 +157,66 @@ export function CursosSeguridad() {
 
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 1. TOTAL CURSOS */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-purple-800 p-5 text-white shadow-lg shadow-purple-600/20 transition-all hover:shadow-xl hover:shadow-purple-600/30">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">TOTAL CURSOS</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 font-bold text-xs">🎓</span>
+            <span className="text-xs font-black uppercase tracking-wider text-purple-100">Total Cursos</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs">
+              <Icon name="course" className="size-5" />
+            </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{totalCursos}</p>
-            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">Gestión 2026</span>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black">{totalCursos}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">Gestión 2026</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Cursos registrados</p>
+          <p className="mt-1 text-xs text-purple-100 font-medium">Cursos registrados</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 2. CURSOS ACTIVOS */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-xl hover:shadow-emerald-500/30">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">CURSOS ACTIVOS</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">🏫</span>
+            <span className="text-xs font-black uppercase tracking-wider text-emerald-100">Cursos Activos</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs">
+               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+            </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{cursosActivos}</p>
-            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">Vacantes Disponibles</span>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black">{cursosActivos}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">Vacantes Disponibles</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Listos para inscripción</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 3. TOTAL INSCRITOS */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 text-white shadow-lg shadow-indigo-500/20 transition-all hover:shadow-xl hover:shadow-indigo-500/30">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">TOTAL INSCRITOS</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 font-bold text-xs">👥</span>
+            <span className="text-xs font-black uppercase tracking-wider text-indigo-100">Total Inscritos</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{totalInscritos}</p>
-            <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">Participantes</span>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black">{totalInscritos}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">Conductores</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Conductores en capacitación</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 4. FINALIZADOS */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#1B1536]">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">FINALIZADOS</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs">✓</span>
+            <span className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">Finalizados</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{cursosFinalizados}</p>
-            <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-400">Certificados</span>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{cursosFinalizados}</p>
+            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">Certificados</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Capacitaciones concluidas</p>
         </div>
       </div>
 
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#1B1536]">
 
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -268,7 +273,7 @@ export function CursosSeguridad() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-y border-slate-100 bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800/50 dark:bg-[#0f172a] dark:text-slate-400">
+            <thead className="border-y border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800/50 dark:bg-slate-900/60 dark:text-slate-400">
               <tr>
                 <th className="px-3 py-3 whitespace-nowrap">CÓDIGO / TIPO</th>
                 <th className="px-3 py-3">TÍTULO DEL CURSO</th>
@@ -276,10 +281,10 @@ export function CursosSeguridad() {
                 <th className="px-3 py-3 whitespace-nowrap">INSCRITOS / CAPACIDAD</th>
                 <th className="px-3 py-3">INSTRUCTOR / LUGAR</th>
                 <th className="px-3 py-3 whitespace-nowrap">ESTADO</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#0f172a]">
+            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#1B1536]">
               {isLoading && cursos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -294,7 +299,7 @@ export function CursosSeguridad() {
                     <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3 py-3"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1B1536] px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
                   </tr>
                 ))
               ) : filteredCursos.length === 0 ? (
@@ -372,15 +377,15 @@ export function CursosSeguridad() {
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => { setSelectedCurso(c); setIsDetailModalOpen(true); }} className="rounded-lg p-1.5 bg-purple-50 text-purple-600 hover:bg-purple-500 hover:text-white dark:bg-purple-950/60 dark:text-purple-400 dark:hover:bg-purple-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalles">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[#1B1536] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                      <div className="flex items-center justify-end gap-1.5 pr-1">
+                        <button onClick={() => { setSelectedCurso(c); setIsDetailModalOpen(true); }} className="flex size-8.5 items-center justify-center rounded-full bg-[#F3F1FB] text-[#6C4CF1] shadow-[0_4px_10px_rgba(108,76,241,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#6C4CF1]/30 dark:bg-[#6C4CF1]/20 dark:text-[#9A6CF7] cursor-pointer" title="Ver Detalles">
                           <Icon name="eye" className="size-4" />
                         </button>
-                        <button onClick={() => handleOpenEditModal(c)} className="rounded-lg p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Editar Curso">
+                        <button onClick={() => handleOpenEditModal(c)} className="flex size-8.5 items-center justify-center rounded-full bg-[#FFF2D9] text-[#E08712] shadow-[0_4px_10px_rgba(224,135,18,0.2)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#E08712]/30 dark:bg-amber-950/60 dark:text-amber-400 cursor-pointer" title="Editar Curso">
                           <Icon name="pencil" className="size-4" />
                         </button>
-                        <button onClick={() => handleDelete(c.id)} className="rounded-lg p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Eliminar Curso">
+                        <button onClick={() => handleDelete(c.id)} className="flex size-8.5 items-center justify-center rounded-full bg-[#FFE5EB] text-[#FF6F8E] shadow-[0_4px_10px_rgba(255,111,142,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#FF6F8E]/30 dark:bg-rose-950/60 dark:text-rose-400 cursor-pointer" title="Eliminar Curso">
                           <Icon name="trash" className="size-4" />
                         </button>
                       </div>

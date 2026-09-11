@@ -151,42 +151,50 @@ export function Pagos() {
 
       
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 1. Total Recaudado */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 p-5 text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-xl hover:shadow-emerald-500/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-emerald-400">Total Recaudado</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-sm">💰</span>
+            <span className="text-xs font-black uppercase tracking-wider text-emerald-100">Total Recaudado</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs">
+              <span className="font-bold text-sm">💰</span>
+            </span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">S/ {totalMonto.toFixed(2)}</p>
-            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Acumulado</span>
+            <p className="text-3xl font-black">S/ {totalMonto.toFixed(2)}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">Acumulado</span>
+          </div>
+          <p className="mt-1 text-xs text-emerald-100 font-medium">Ingresos de caja</p>
+        </div>
+
+        {/* 2. Operaciones */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 p-5 text-white shadow-lg shadow-sky-500/20 transition-all hover:shadow-xl hover:shadow-sky-500/30">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-sky-100">Operaciones</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs font-bold text-sm">
+              🧾
+            </span>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-black">{totalPagos}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">Registrados</span>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 3. Pagos de Hoy */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#1B1536]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-emerald-400">Operaciones</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 font-bold text-sm">🧾</span>
+            <span className="text-xs font-black uppercase tracking-wider text-purple-600 dark:text-purple-400">Pagos de Hoy</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 font-bold text-sm">📅</span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{totalPagos}</p>
-            <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-950/60 dark:text-sky-300">Pagos registrados</span>
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-emerald-400">Pagos de Hoy</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 font-bold text-sm">📅</span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{pagosHoy}</p>
-            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">Jornada Actual</span>
+            <p className="text-3xl font-black text-slate-800 dark:text-white">{pagosHoy}</p>
+            <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-600 dark:bg-purple-950/40 dark:text-purple-400">Jornada Actual</span>
           </div>
         </div>
       </div>
 
       
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#1B1536]">
         
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -236,17 +244,17 @@ export function Pagos() {
         
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-y border-slate-100 bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800/50 dark:bg-[#0f172a] dark:text-slate-400">
+            <thead className="border-y border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800/50 dark:bg-slate-900/60 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3.5 whitespace-nowrap">N° RECIBO</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">FECHA / HORA</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">TIPO / VOUCHER</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">MÉTODO</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">MONTO TOTAL</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#0f172a]">
+            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#1B1536]">
               {isLoading && pagos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -260,7 +268,7 @@ export function Pagos() {
                       </div>
                     </td>
                     <td className="px-4 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1B1536] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
                   </tr>
                 ))
               ) : filteredPagos.length === 0 ? (
@@ -302,16 +310,16 @@ export function Pagos() {
                       <p className="font-black text-slate-900 dark:text-white">S/ {p.montoTotal?.toFixed(2) || '0.00'}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">{p.estado}</p>
                     </td>
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#1B1536] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-end gap-1.5 pr-1">
-                        {p.estado === 'PENDIENTE' && <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Confirmar recibo</button>}
-                        <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="rounded-xl p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalle">
+                        {p.estado === 'PENDIENTE' && <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-700 hover:scale-105 transition-all">Confirmar recibo</button>}
+                        <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="flex size-8.5 items-center justify-center rounded-full bg-[#E6FAF0] text-[#0F7547] shadow-[0_4px_10px_rgba(16,185,129,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/30 dark:bg-emerald-950/60 dark:text-emerald-400 cursor-pointer" title="Ver Detalle">
                           <Icon name="eye" className="size-4" />
                         </button>
-                        <button disabled={p.estado !== 'PAGADO'} onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="rounded-xl p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/60 dark:text-sky-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Imprimir Ticket">
+                        <button disabled={p.estado !== 'PAGADO'} onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="flex size-8.5 items-center justify-center rounded-full bg-[#E0F2FE] text-[#0284C7] shadow-[0_4px_10px_rgba(2,132,199,0.2)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-sky-500/30 dark:bg-sky-950/60 dark:text-sky-400 cursor-pointer disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0" title="Imprimir Ticket">
                           <Icon name="print" className="size-4" />
                         </button>
-                        <button disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Anular Pago">
+                        <button disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="flex size-8.5 items-center justify-center rounded-full bg-[#FFE5EB] text-[#FF6F8E] shadow-[0_4px_10px_rgba(255,111,142,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#FF6F8E]/30 dark:bg-rose-950/60 dark:text-rose-400 cursor-pointer disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0" title="Anular Pago">
                           <Icon name="trash" className="size-4" />
                         </button>
                       </div>

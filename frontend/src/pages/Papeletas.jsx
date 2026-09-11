@@ -152,54 +152,55 @@ export function Papeletas() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 p-5 text-white shadow-lg shadow-rose-500/20 transition-all hover:shadow-xl hover:shadow-rose-500/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Impuestas</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-400">
+            <span className="text-xs font-black uppercase tracking-wider text-rose-100">Total Impuestas</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs">
               <Icon name="ticket" className="size-5" />
             </span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{totales}</p>
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Histórico</span>
+            <p className="text-3xl font-black">{totales}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">Histórico</span>
           </div>
+          <p className="mt-1 text-xs text-rose-100 font-medium">Papeletas registradas</p>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 p-5 text-white shadow-lg shadow-amber-500/20 transition-all hover:shadow-xl hover:shadow-amber-500/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pendientes</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold">⏳</span>
+            <span className="text-xs font-black uppercase tracking-wider text-amber-100">Pendientes</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs font-bold">⏳</span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{pendientes}</p>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">Por Cobrar</span>
+            <p className="text-3xl font-black">{pendientes}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">Por Cobrar</span>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-xl hover:shadow-emerald-500/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Pagadas</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">✓</span>
+            <span className="text-xs font-black uppercase tracking-wider text-emerald-100">Pagadas</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-xs font-bold">✓</span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{pagadas}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">S/ {montoRecaudado.toFixed(2)}</span>
+            <p className="text-3xl font-black">{pagadas}</p>
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold text-white">S/ {montoRecaudado.toFixed(2)}</span>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#1B1536]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Anuladas</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">✕</span>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Anuladas</span>
+            <span className="grid size-9 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">✕</span>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <p className="text-3xl font-black text-slate-800 dark:text-white">{anuladas}</p>
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Prescritas</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">Prescritas</span>
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#1B1536]">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -232,7 +233,7 @@ export function Papeletas() {
 
         <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Listado de papeletas" tabIndex={0}>
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+            <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800/50 dark:bg-slate-900/60 dark:text-slate-400">
               <tr>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">N° Papeleta</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Propietario</th>
@@ -243,10 +244,10 @@ export function Papeletas() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Fecha & Hora</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap text-right">Monto</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Estado Pago</th>
-                <th className="px-3.5 py-3.5 text-right whitespace-nowrap">Acciones</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-3.5 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#1B1536]">
               {isLoading && papeletas.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -259,7 +260,7 @@ export function Papeletas() {
                     <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4 text-right"><div className="h-4 w-16 ml-auto rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4 text-center"><div className="h-5 w-16 mx-auto rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4 text-right"><div className="h-7 w-28 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1B1536] px-3.5 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-28 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
                   </tr>
                 ))
               ) : filteredPapeletas.length === 0 ? (
@@ -320,13 +321,28 @@ export function Papeletas() {
                         )}
                       </td>
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-                            {p.tipoInfraccionCodigo || tipoInf?.codigo || 'G01'}
-                          </span>
-                          <span className="text-xs text-slate-700 dark:text-slate-300 font-medium max-w-[200px] truncate" title={p.tipoInfraccionDescripcion || tipoInf?.descripcion}>
-                            {p.tipoInfraccionDescripcion || tipoInf?.descripcion || 'Infracción al Reglamento'}
-                          </span>
+                        <div className="flex flex-col gap-1.5">
+                          {p.detalles?.length > 0 ? (
+                            p.detalles.map((d, i) => (
+                              <div key={i} className="flex items-center gap-1.5">
+                                <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                                  {d.codigo || 'G01'}
+                                </span>
+                                <span className="text-xs text-slate-700 dark:text-slate-300 font-medium max-w-[200px] truncate" title={d.descripcion}>
+                                  {d.descripcion || 'Infracción al Reglamento'}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                                {p.tipoInfraccionCodigo || tipoInf?.codigo || 'G01'}
+                              </span>
+                              <span className="text-xs text-slate-700 dark:text-slate-300 font-medium max-w-[200px] truncate" title={p.tipoInfraccionDescripcion || tipoInf?.descripcion}>
+                                {p.tipoInfraccionDescripcion || tipoInf?.descripcion || 'Infracción al Reglamento'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="px-3.5 py-3.5 whitespace-nowrap text-slate-600 dark:text-slate-400">
@@ -342,13 +358,13 @@ export function Papeletas() {
                           {p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado}
                         </span>
                       </td>
-                      <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="sticky right-0 z-10 bg-white group-hover:bg-rose-50/40 dark:bg-[#1B1536] dark:group-hover:bg-slate-800/60 px-3 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                        <div className="flex items-center justify-end gap-1.5 pr-1">
                           {p.estado === 'ANULADA' ? (
                             <button
                               type="button"
                               disabled
-                              className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-400 shadow-xs cursor-not-allowed dark:bg-slate-800 dark:text-slate-500"
+                              className="grid size-8.5 place-items-center rounded-full bg-slate-100 text-slate-400 shadow-xs cursor-not-allowed dark:bg-slate-800 dark:text-slate-500"
                               title="Papeleta anulada - No se puede pagar"
                             >
                               <Icon name="payment" className="size-4" />
@@ -358,20 +374,20 @@ export function Papeletas() {
                               type="button"
                               onClick={() => handleOpenPagar(p)}
                               disabled={p.estado === 'PAGADA'}
-                              className={`grid size-9 place-items-center rounded-full shadow-xs transition-all ${
+                              className={`flex size-8.5 items-center justify-center rounded-full shadow-[0_4px_10px_rgba(16,185,129,0.25)] transition-all duration-200 ${
                                 p.estado === 'PAGADA'
-                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-800 dark:text-slate-500'
-                                  : 'bg-emerald-600 text-white hover:bg-emerald-700 hover:scale-105 active:scale-95 cursor-pointer'
+                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none dark:bg-slate-800 dark:text-slate-500'
+                                  : 'bg-[#E6FAF0] text-[#0F7547] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/30 dark:bg-emerald-950/60 dark:text-emerald-400 cursor-pointer'
                               }`}
                               title={p.estado === 'PAGADA' ? 'Papeleta ya pagada' : 'Pagar papeleta'}
                             >
                               <Icon name="payment" className="size-4" />
                             </button>
                           )}
-                          <button onClick={() => handleOpenDetail(p)} className="grid size-9 place-items-center rounded-full bg-rose-50 text-rose-600 transition-all hover:bg-rose-500 hover:text-white hover:shadow-md dark:bg-rose-950/60 dark:text-rose-400 cursor-pointer" title="Ver Detalle">
+                          <button onClick={() => handleOpenDetail(p)} className="flex size-8.5 items-center justify-center rounded-full bg-[#FFE5EB] text-[#FF6F8E] shadow-[0_4px_10px_rgba(255,111,142,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#FF6F8E]/30 dark:bg-rose-950/60 dark:text-rose-400 cursor-pointer" title="Ver Detalle">
                             <Icon name="eye" className="size-4" />
                           </button>
-                          <button onClick={() => handleOpenPreview(p)} className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition-all hover:bg-slate-800 hover:text-white hover:shadow-md dark:bg-slate-800 dark:text-slate-300 cursor-pointer" title="Imprimir Boleta">
+                          <button onClick={() => handleOpenPreview(p)} className="flex size-8.5 items-center justify-center rounded-full bg-slate-100 text-slate-600 shadow-[0_4px_10px_rgba(0,0,0,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-500/30 dark:bg-slate-800 dark:text-slate-300 cursor-pointer" title="Imprimir Boleta">
                             <Icon name="print" className="size-4" />
                           </button>
                         </div>
@@ -676,14 +692,20 @@ export function Papeletas() {
               <div className="border-t-2 border-dashed border-black my-2"></div>
 
               <div className="space-y-1 mb-2">
-                <div className="flex justify-between">
-                  <span className="font-bold">CÓDIGO:</span>
-                  <span>{selectedPapeleta.detalles?.[0]?.codigo || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-bold">FALTA:</span>
-                  <span>{selectedPapeleta.detalles?.[0]?.gravedad || 'LEVE'}</span>
-                </div>
+                <span className="font-bold">INFRACCIONES:</span>
+                {selectedPapeleta.detalles?.length > 0 ? (
+                  selectedPapeleta.detalles.map((d, i) => (
+                    <div key={i} className="flex justify-between pl-2">
+                      <span>{d.codigo} ({d.gravedad || 'LEVE'})</span>
+                      <span>S/ {parseFloat(d.monto || selectedPapeleta.montoTotal).toFixed(2)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex justify-between pl-2">
+                    <span>{selectedPapeleta.tipoInfraccionCodigo || 'N/A'}</span>
+                    <span>S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t-2 border-dashed border-black my-2"></div>
@@ -710,11 +732,11 @@ export function Papeletas() {
               <div className="space-y-1 mb-2">
                 <div className="flex justify-between">
                   <span>Monto Base:</span>
-                  <span>S/ {parseFloat(selectedPapeleta.detalles?.[0]?.monto || selectedPapeleta.montoTotal).toFixed(2)}</span>
+                  <span>S/ {parseFloat(selectedPapeleta.montoTotal).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Descuento:</span>
-                  <span>- S/ {parseFloat(selectedPapeleta.detalles?.[0]?.descuento || 0).toFixed(2)}</span>
+                  <span>- S/ 0.00</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Gastos/Int:</span>
@@ -732,6 +754,16 @@ export function Papeletas() {
               <div className="text-center mt-1">
                 <span className="text-[10px] uppercase block">Estado: {selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado}</span>
               </div>
+
+              {selectedPapeleta.firmaConductorImg && (
+                <>
+                  <div className="border-t-2 border-dashed border-black my-2"></div>
+                  <div className="text-center mt-2 flex flex-col items-center">
+                    <img src={selectedPapeleta.firmaConductorImg} alt="Firma Conductor" className="max-h-16 object-contain" />
+                    <span className="text-[10px] uppercase font-bold mt-1">Firma del Infractor</span>
+                  </div>
+                </>
+              )}
 
               <div className="border-t-2 border-dashed border-black my-2"></div>
 

@@ -176,7 +176,10 @@ class PapeletasController extends ResourceController
         $marcaVehiculo = strtoupper(trim($input['marcaVehiculo'] ?? ''));
         $colorVehiculo = strtoupper(trim($input['colorVehiculo'] ?? ''));
         $motorVehiculo = strtoupper(trim($input['motorVehiculo'] ?? ''));
-        $fechaHora = date('Y-m-d H:i:s');
+        
+        $tz = new \DateTimeZone('America/Lima');
+        $dt = new \DateTime('now', $tz);
+        $fechaHora = $dt->format('Y-m-d H:i:s');
 
         try {
             if ($inputInspectorId <= 0) {
@@ -433,7 +436,7 @@ class PapeletasController extends ResourceController
                     return $this->failValidationErrors('La imagen de firma no es válida.');
                 }
 
-                $uploadDir = WRITEPATH . 'uploads/firmas-papeletas';
+                $uploadDir = FCPATH . 'uploads/firmas-papeletas';
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0775, true);
                 }
@@ -441,12 +444,12 @@ class PapeletasController extends ResourceController
                 $fileName = 'papeleta-' . (int)$id . '-firma-' . date('YmdHis') . '.png';
                 $filePath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
                 file_put_contents($filePath, $binary);
-                $firmaUrl = 'uploads/firmas-papeletas/' . $fileName;
+                $firmaUrl = base_url('uploads/firmas-papeletas/' . $fileName);
             }
 
             $update = [
                 'firma_conductor_img' => $firmaUrl !== '' ? $firmaUrl : null,
-                'firma_conductor_fecha' => $estado === 'FIRMADO' ? date('Y-m-d H:i:s') : null,
+                'firma_conductor_fecha' => $estado === 'FIRMADO' ? (new \DateTime('now', new \DateTimeZone('America/Lima')))->format('Y-m-d H:i:s') : null,
                 'firma_conductor_estado' => $estado,
                 'firma_conductor_observacion' => trim($input['observacion'] ?? $input['firmaConductorObservacion'] ?? '') ?: null,
             ];
