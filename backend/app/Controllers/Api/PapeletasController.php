@@ -19,7 +19,14 @@ class PapeletasController extends ResourceController
                 ->get()
                 ->getResultArray();
 
-            $uit = $rows ? $this->uitActual($db) : 0;
+            $uit = 0;
+            if ($rows) {
+                try {
+                    $uit = $this->uitActual($db);
+                } catch (\DomainException $e) {
+                    $uit = 0;
+                }
+            }
             $data = array_map(static function (array $r) use ($uit) {
                 $r['id'] = (int)$r['id'];
                 $r['porcentajeUit'] = (float)$r['porcentajeUit'];
@@ -28,8 +35,6 @@ class PapeletasController extends ResourceController
             }, $rows);
 
             return $this->respond(['data' => $data]);
-        } catch (\DomainException $e) {
-            return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
             return $this->failServerError('Error al cargar tipos de infracción: ' . $e->getMessage());
         }
@@ -55,17 +60,17 @@ class PapeletasController extends ResourceController
                     aso.razon_social as vehiculoAsociacion,
                     
                     COALESCE(per.numero, 'S/D') as conductorDni,
-                    COALESCE(NULLIF(TRIM(CONCAT(c_per.nombres, ' ', c_per.apellido_paterno, ' ', COALESCE(c_per.apellido_materno, ''))), ''), p.nombre_autoridad, 'Conductor No Identificado') as conductorNombre,
-                    COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(c_per.nombres, ' ', c_per.apellido_paterno), 'Conductor No Identificado') as infractor,
+                    COALESCE(NULLIF(TRIM(CONCAT(per_c.nombres, ' ', per_c.apellido_paterno, ' ', COALESCE(per_c.apellido_materno, ''))), ''), p.nombre_autoridad, 'Conductor No Identificado') as conductorNombre,
+                    COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(per_c.nombres, ' ', per_c.apellido_paterno), 'Conductor No Identificado') as infractor,
                     
                     COALESCE(prop_per.numero, prop_org.ruc, 'S/D') as propietarioDni,
                     COALESCE(
-                        NULLIF(TRIM(CONCAT(c_prop.nombres, ' ', c_prop.apellido_paterno, ' ', COALESCE(c_prop.apellido_materno, ''))), ''),
+                        NULLIF(TRIM(CONCAT(prop_c.nombres, ' ', prop_c.apellido_paterno, ' ', COALESCE(prop_c.apellido_materno, ''))), ''),
                         prop_org.razon_social,
                         'No Registrado'
                     ) as propietarioNombre,
                     
-                    COALESCE(CONCAT(c_ins.nombres, ' ', c_ins.apellido_paterno, ' ', COALESCE(c_ins.apellido_materno, '')), 'Inspector Municipal') as inspector,
+                    COALESCE(CONCAT(ins_c.nombres, ' ', ins_c.apellido_paterno, ' ', COALESCE(ins_c.apellido_materno, '')), 'Inspector Municipal') as inspector,
                     ins_per.numero as inspectorCIP,
                     p.fecha_hora as fechaHora,
                     p.lugar,
@@ -84,13 +89,13 @@ class PapeletasController extends ResourceController
                 ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
                 ->join('organizaciones aso', 'aso.id = v.id_asociacion', 'left')
                 ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
-                ->join('ciudadanos c_per', 'c_per.id_persona = per.id', 'left')
+                ->join('ciudadanos per_c', 'per_c.id_persona = per.id', 'left')
                 ->join('trabajadores ins', 'ins.id_persona = p.id_inspector', 'left')
                 ->join('personas ins_per', 'ins_per.id = ins.id_persona', 'left')
-                ->join('ciudadanos c_ins', 'c_ins.id_persona = ins.id_persona', 'left')
+                ->join('ciudadanos ins_c', 'ins_c.id_persona = ins_per.id', 'left')
                 ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.estado = "ACTIVO"', 'left')
                 ->join('personas prop_per', 'prop_per.id = vp.id_persona', 'left')
-                ->join('ciudadanos c_prop', 'c_prop.id_persona = prop_per.id', 'left')
+                ->join('ciudadanos prop_c', 'prop_c.id_persona = prop_per.id', 'left')
                 ->join('organizaciones prop_org', 'prop_org.id = vp.id_organizacion', 'left')
                 ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left')
                 ->groupBy('p.id')
@@ -165,7 +170,7 @@ class PapeletasController extends ResourceController
         $lugar = trim($input['lugar'] ?? '');
         $obsAutoridad = trim($input['observacionesAutoridad'] ?? '');
         $obsConductor = trim($input['observacionesConductor'] ?? '');
-        $inputInspectorId = (int)($input['inspectorId'] ?? 0);
+        $inputInspectorId = (int)($input['id_inspector'] ?? $input['inspectorId'] ?? 0);
         
         $claseVehiculo = strtoupper(trim($input['claseVehiculo'] ?? ''));
         $marcaVehiculo = strtoupper(trim($input['marcaVehiculo'] ?? ''));
@@ -184,8 +189,8 @@ class PapeletasController extends ResourceController
             }
 
             $inspector = $db->table('trabajadores pe')
-                ->select("pe.id_persona as id, per.nombres, per.apellido_paterno, per.apellido_materno", false)
-                ->join('ciudadanos per', 'per.id_persona = pe.id_persona', 'inner')
+                ->select("pe.id_persona AS id, c.nombres, c.apellido_paterno, c.apellido_materno", false)
+                ->join('ciudadanos c', 'c.id_persona = pe.id_persona', 'left')
                 ->where('pe.id_persona', $inputInspectorId)
                 ->where('pe.estado', 'ACTIVO')
                 ->get()
@@ -257,22 +262,22 @@ class PapeletasController extends ResourceController
 
             $personaId = null;
             if ($conductorDni !== '') {
-                $persona = $db->table('personas')->where('numero_documento', $conductorDni)->limit(1)->get()->getRowArray();
+                $persona = $db->table('personas')->where('numero', substr($conductorDni, 0, 11))->limit(1)->get()->getRowArray();
                 if ($persona) {
                     $personaId = (int)$persona['id'];
                 } else {
                     $apellidos = preg_split('/\s+/', trim($conductorApellidos)) ?: [];
                     $db->table('personas')->insert([
-                        'tipo_documento' => 'DNI',
-                        'numero_documento' => $conductorDni,
+                        'id_tipo_documento' => 1,
+                        'numero' => substr($conductorDni, 0, 11),
                         'estado' => 'ACTIVO',
                     ]);
                     $personaId = (int)$db->insertID();
                     $db->table('ciudadanos')->insert([
                         'id_persona' => $personaId,
-                        'nombres' => $conductorNombres ?: ($infractor ?: 'CONDUCTOR'),
-                        'apellido_paterno' => $apellidos[0] ?? 'NO REGISTRADO',
-                        'apellido_materno' => isset($apellidos[1]) ? implode(' ', array_slice($apellidos, 1)) : null,
+                        'nombres' => substr($conductorNombres ?: ($infractor ?: 'CONDUCTOR'), 0, 50),
+                        'apellido_paterno' => substr($apellidos[0] ?? 'NO REGISTRADO', 0, 50),
+                        'apellido_materno' => isset($apellidos[1]) ? substr(implode(' ', array_slice($apellidos, 1)), 0, 50) : null,
                     ]);
                 }
             }
@@ -468,3 +473,4 @@ class PapeletasController extends ResourceController
         return (new \App\Services\Multas($db))->uit((int)date('Y'));
     }
 }
+

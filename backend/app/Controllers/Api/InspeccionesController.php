@@ -50,7 +50,8 @@ class InspeccionesController extends ResourceController
                     i.estado
                 ")
                 ->join('vehiculos v', 'v.id = i.id_vehiculo', 'left')
-                ->join('ciudadanos c', 'c.id_persona = i.id_tecnico', 'left')
+                ->join('trabajadores p', 'p.id_persona = i.id_tecnico', 'left')
+                ->join('ciudadanos c', 'c.id_persona = p.id_persona', 'left')
                 ->orderBy('i.id', 'DESC')
                 ->get()
                 ->getResultArray();
@@ -99,38 +100,17 @@ class InspeccionesController extends ResourceController
 
         try {
             $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
-            if (!$vehiculo) {
-                // Keep backward compatibility for test script auto-creation
-                $firstVeh = $db->table('vehiculos')->limit(1)->get()->getRowArray();
-                if ($firstVeh) {
-                    $vehiculoId = (int)$firstVeh['id'];
-                    $placa = $firstVeh['placa'];
-                } else {
-                    $tipoRow = $db->table('tipos_vehiculo')->limit(1)->get()->getRowArray();
-                    $tipoId = $tipoRow ? (int)$tipoRow['id'] : null;
-                    $db->table('vehiculos')->insert([
-                        'placa'                => $placa ?: ('NC-' . random_int(1000, 9999)),
-                        'id_tipo_vehiculo'     => $tipoId,
-                        'estado_formalizacion' => 'FORMALIZADO'
-                    ]);
-                    $vehiculoId = (int)$db->insertID();
-                }
-            } else {
-                $vehiculoId = (int)$vehiculo['id'];
-            }
-
-            $tecnicoId = (int)($input['tecnicoId'] ?? 0);
-            if ($tecnicoId > 0) {
-                $tecnico = $db->table('trabajadores pe')->where('id_persona', $tecnicoId)->where('estado', 'ACTIVO')->get()->getRowArray();
-                if (!$tecnico) throw new \DomainException('Seleccione el técnico responsable válido.');
-            } else {
-                $tecnico = $db->table('trabajadores')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
-                $tecnicoId = $tecnico ? (int)$tecnico['id_persona'] : null;
-            }
-
-            if (method_exists($this, 'validarDetalles')) {
-                $detalles = $this->validarDetalles($db, $detalles);
-            }
+            if (!$vehiculo) throw new \DomainException('Registre o seleccione el vehículo correcto antes de inspeccionarlo.');
+            $vehiculoId = (int)$vehiculo['id'];
+            $tecnico = $db->table('trabajadores pe')
+                ->select('pe.id_persona AS id, c.nombres, c.apellido_paterno')
+                ->join('ciudadanos c', 'c.id_persona = pe.id_persona', 'left')
+                ->where('pe.id_persona', (int)($input['tecnicoId'] ?? 0))
+                ->where('pe.estado', 'ACTIVO')->get()->getRowArray();
+            if (!$tecnico) throw new \DomainException('Seleccione el técnico responsable.');
+            $tecnicoId = (int)$tecnico['id'];
+            $tecnicoNombre = trim($tecnico['nombres'] . ' ' . $tecnico['apellido_paterno']);
+            $detalles = $this->validarDetalles($db, $detalles);
             $db->transException(true)->transBegin();
 
             $numeroInspeccion = 'INSP-' . date('Y') . '-' . str_pad((string)random_int(1, 999), 3, '0', STR_PAD_LEFT);
@@ -295,3 +275,4 @@ class InspeccionesController extends ResourceController
         return $detalles;
     }
 }
+

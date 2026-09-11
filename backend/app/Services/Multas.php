@@ -11,12 +11,14 @@ class Multas
 
     public function uit(int $anio): float
     {
-        if (!$this->db->tableExists('uits')) {
-            return 5150.0;
+        $configuredYear = (int) env('multas.uit.anio', 0);
+        $configuredValue = (float) env('multas.uit.valor', 0);
+
+        if ($configuredYear !== $anio || $configuredValue <= 0) {
+            throw new DomainException("Falta configurar la UIT del año $anio.");
         }
-        $row = $this->db->table('uits')->where('anio', $anio)->get()->getRowArray();
-        if (!$row || (float)$row['valor'] <= 0) throw new DomainException("Falta configurar la UIT del año $anio.");
-        return (float)$row['valor'];
+
+        return $configuredValue;
     }
 
     public function monto(array $infraccion, int $anio): float

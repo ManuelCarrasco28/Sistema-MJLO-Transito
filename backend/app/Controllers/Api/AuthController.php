@@ -13,7 +13,7 @@ class AuthController extends ResourceController
     {
         $json = $this->request->getJSON();
 
-        $usuario = trim($json->usuario ?? '');
+        $usuario = trim($json->usuario ?? $json->username ?? '');
         $password = $json->password ?? '';
 
         if ($usuario === '' || $password === '') {
@@ -22,9 +22,17 @@ class AuthController extends ResourceController
 
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()
-            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, cargos.nombre as cargo, trabajadores.id_persona as personal_id')
+            ->select("
+                usuarios.*,
+                ciudadanos.nombres,
+                CONCAT(ciudadanos.apellido_paterno, ' ', COALESCE(ciudadanos.apellido_materno, '')) AS apellidos,
+                COALESCE(cargos.nombre, 'Inspector Municipal') AS cargo,
+                trabajadores.id_persona AS id_persona,
+                usuarios.id_trabajador AS id_trabajador
+            ", false)
             ->join('trabajadores', 'trabajadores.id_persona = usuarios.id_trabajador', 'inner')
-            ->join('ciudadanos', 'ciudadanos.id_persona = trabajadores.id_persona', 'inner')
+            ->join('personas', 'personas.id = trabajadores.id_persona', 'inner')
+            ->join('ciudadanos', 'ciudadanos.id_persona = personas.id', 'left')
             ->join('desplazamiento_oficina', 'desplazamiento_oficina.id_trabajador = trabajadores.id_persona AND (desplazamiento_oficina.fecha_termino IS NULL OR desplazamiento_oficina.fecha_termino > CURDATE())', 'left')
             ->join('cargos', 'cargos.id = desplazamiento_oficina.id_cargo', 'left')
             ->where('usuarios.nombre_usuario', $usuario)
@@ -44,7 +52,8 @@ class AuthController extends ResourceController
             'apellidos'   => $userRecord['apellidos'],
             'usuario'     => $userRecord['nombre_usuario'],
             'cargo'       => $userRecord['cargo'],
-            'personal_id' => $userRecord['personal_id'],
+            'id_persona'  => (int)$userRecord['id_persona'],
+            'id_trabajador' => (int)$userRecord['id_trabajador'],
         ];
 
         helper('cookie');

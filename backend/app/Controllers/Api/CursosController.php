@@ -48,9 +48,9 @@ class CursosController extends ResourceController
                 
                 try {
                     $participantes = $db->table('inscripciones_curso ic')
-                        ->select('c.nombres, c.apellido_paterno, c.apellido_materno, ic.estado, ic.asistio')
+                        ->select('ci.nombres, ci.apellido_paterno, ci.apellido_materno, ic.estado, ic.asistio')
                         ->join('personas p', 'p.id = ic.id_persona', 'left')
-                        ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                        ->join('ciudadanos ci', 'ci.id_persona = p.id', 'left')
                         ->where('ic.id_curso', $row['id'])
                         ->get()
                         ->getResultArray();
@@ -188,3 +188,4 @@ class CursosController extends ResourceController
         }
     }
 }
+

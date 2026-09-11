@@ -24,10 +24,10 @@ class ApiService {
       if (data['status'] == true) {
         final prefs = await SharedPreferences.getInstance();
         
-        final personalId = data['data']['personal_id'];
-        final int parsedId = personalId is int ? personalId : int.parse(personalId.toString());
+        final idPersona = data['data']['id_persona'] ?? data['data']['id_trabajador'];
+        final int parsedId = idPersona is int ? idPersona : int.parse(idPersona.toString());
         
-        await prefs.setInt('personal_id', parsedId);
+        await prefs.setInt('id_persona', parsedId);
         await prefs.setString('nombres', data['data']['nombres']);
         await prefs.setString('apellidos', data['data']['apellidos']);
         return data;
@@ -38,7 +38,7 @@ class ApiService {
 
   static Future<int?> getPersonalId() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('personal_id');
+    return prefs.getInt('id_persona');
   }
 
   static Future<void> logout() async {

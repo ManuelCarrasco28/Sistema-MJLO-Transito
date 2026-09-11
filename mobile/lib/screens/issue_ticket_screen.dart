@@ -112,7 +112,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'lugar': _lugar,
         'infraccionesIds': infraccionesInts,
         'observacionesAutoridad': _observaciones,
-        'inspectorId': inspectorId,
+        'id_inspector': inspectorId,
       };
 
       final result = await ApiService.createPapeleta(requestData);

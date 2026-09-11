@@ -25,7 +25,7 @@ export function Header({
     .join('')
     .slice(0, 2)
     .toUpperCase() || 'US'
-  const userEmail = user?.usuario ? `${user.usuario}@mdjlo.gob.pe` : 'usuario@mdjlo.gob.pe'
+  const usernameLabel = user?.usuario ? `Usuario: ${user.usuario}` : 'Usuario municipal'
   const userRole = user?.cargo || 'Trabajador municipal'
   const currentDate = new Intl.DateTimeFormat('es-PE', {
     weekday: 'long',
@@ -195,7 +195,7 @@ export function Header({
             <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] p-2 shadow-xl animate-enter">
               <div className="border-b border-slate-100 dark:border-slate-800 px-3 py-2.5">
                 <p className="text-sm font-bold text-slate-800 dark:text-white">{userFullName}</p>
-                <p className="text-xs text-slate-400 truncate">{userEmail}</p>
+                <p className="text-xs text-slate-400 truncate">{usernameLabel}</p>
                 <span className="mt-1.5 inline-block rounded-md bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
                   {userRole}
                 </span>

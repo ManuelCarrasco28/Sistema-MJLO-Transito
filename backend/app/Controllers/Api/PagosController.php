@@ -73,8 +73,9 @@ class PagosController extends ResourceController
         $db = \Config\Database::connect();
         return $this->respond(['data' => [
             'PAPELETA' => $db->table('papeletas')->select('id, numero_papeleta AS nombre')->where('estado', 'PENDIENTE_PAGO')->get()->getResultArray(),
-            'TRAMITE' => $db->table('tramites_documentarios')->select('id, numero_formulario AS nombre')->where('id_procedimiento_admin IS NOT NULL', null, false)->whereNotIn('estado', ['ANULADO','ANULADA'])->get()->getResultArray(),
-            'CURSO' => $db->table('inscripciones_curso i')->select("i.id, CONCAT(c.nombre, ' — ', p.nombres, ' ', p.apellido_paterno) AS nombre", false)->join('cursos_seguridad_vial c', 'c.id=i.id_curso')->join('personas p', 'p.id=i.id_persona')->where('i.estado_pago !=', 'PAGADO')->whereNotIn('i.estado', ['ANULADO','CANCELADO'])->get()->getResultArray(),
+            'TRAMITE' => $db->table('tramites_documentarios')->select('id, numero_expediente AS nombre')->where('id_procedimiento_admin IS NOT NULL', null, false)->whereNotIn('estado', ['ANULADO','ANULADA'])->get()->getResultArray(),
+            'CURSO' => $db->table('inscripciones_curso i')->select("i.id, CONCAT(c.nombre, ' — ', ci.nombres, ' ', ci.apellido_paterno) AS nombre", false)->join('cursos_seguridad_vial c', 'c.id=i.id_curso')->join('personas p', 'p.id=i.id_persona')->join('ciudadanos ci', 'ci.id_persona=p.id', 'left')->where('i.estado_pago !=', 'PAGADO')->whereNotIn('i.estado', ['ANULADO','CANCELADO'])->get()->getResultArray(),
         ]]);
     }
 }
+

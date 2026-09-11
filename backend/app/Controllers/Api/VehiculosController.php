@@ -208,20 +208,20 @@ class VehiculosController extends ResourceController
         if ($propietarioDni !== '' || $propietarioNombre !== '') {
             $personaId = null;
             if ($propietarioDni !== '') {
-                $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
+                $personaRow = $db->table('personas')->where('numero', substr($propietarioDni, 0, 11))->get()->getRowArray();
                 if ($personaRow) {
                     $personaId = (int)$personaRow['id'];
                 }
             }
 
             if (!$personaId && ($propietarioNombre !== '' || $propietarioDni !== '')) {
-                $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', 'DNI')->get()->getRowArray();
+                $tipoDocRow = $db->table('tipo_documentos_identidad')->where('codigo', 'DNI')->get()->getRowArray();
                 $tipoDocId = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
 
                 $numDoc = $propietarioDni ?: (string)random_int(10000000, 99999999);
                 $db->table('personas')->insert([
                     'id_tipo_documento' => $tipoDocId,
-                    'numero'            => $numDoc,
+                    'numero'            => substr($numDoc, 0, 11),
                     'estado'            => 'ACTIVO',
                 ]);
                 $personaId = (int)$db->insertID();
@@ -232,8 +232,8 @@ class VehiculosController extends ResourceController
 
                 $db->table('ciudadanos')->insert([
                     'id_persona'       => $personaId,
-                    'nombres'          => $nombres,
-                    'apellido_paterno' => $paterno,
+                    'nombres' => substr($nombres, 0, 50),
+                    'apellido_paterno' => substr($paterno ?: 'Titular', 0, 50),
                     'apellido_materno' => '',
                 ]);
             }
@@ -359,7 +359,7 @@ class VehiculosController extends ResourceController
                 if ($personaRow) $personaId = (int)$personaRow['id'];
             }
             if (!$personaId && ($propietarioNombre !== '' || $propietarioDni !== '')) {
-                $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', 'DNI')->get()->getRowArray();
+                $tipoDocRow = $db->table('tipo_documentos_identidad')->where('codigo', 'DNI')->get()->getRowArray();
                 $tipoDocId = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
                 $numDoc = $propietarioDni ?: (string)random_int(10000000, 99999999);
                 $db->table('personas')->insert([
@@ -408,3 +408,4 @@ class VehiculosController extends ResourceController
         return $this->respondDeleted(['status' => true, 'message' => 'Vehículo eliminado con éxito']);
     }
 }
+

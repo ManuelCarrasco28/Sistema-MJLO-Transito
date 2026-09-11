@@ -141,3 +141,4 @@ class DocumentosController extends ResourceController
         return $this->respondDeleted(['status' => true, 'message' => 'Documento anulado con éxito']);
     }
 }
+

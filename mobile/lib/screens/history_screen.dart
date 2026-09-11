@@ -24,7 +24,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final papeletas = await ApiService.getPapeletas();
 
       // final inspectorId = await ApiService.getPersonalId();
-      // En la API actual, no filtra por inspector_id en el GET, podríamos filtrarlo localmente si la API no lo hace.
+      // En la API actual, no filtra por id_inspector en el GET, podríamos filtrarlo localmente si la API no lo hace.
       // O mostramos todo. Por ahora, las mostraremos todas o filtramos si la API trae todo.
       
       List<dynamic> formales = [];

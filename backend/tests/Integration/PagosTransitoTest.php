@@ -67,8 +67,9 @@ scenario('Anular un pago restaura la deuda', function ($db, $service, $ticket, $
     check($db->table('papeletas')->where('id', $ticket)->get()->getRow('estado') === 'PENDIENTE_PAGO', 'Deuda no restaurada.');
 });
 scenario('Curso: monto del catálogo y vínculo con inscripción', function ($db, $service, $ticket, $token) {
-    $db->table('personas')->insert(['numero_documento' => 'TEST-' . $token, 'nombres' => 'Prueba transaccional', 'apellido_paterno' => 'Temporal']);
+    $db->table('personas')->insert(['id_tipo_documento' => 1, 'numero' => substr(preg_replace('/\D/', '', $token . '123456789'), 0, 11), 'estado' => 'ACTIVO']);
     $person = $db->insertID();
+    $db->table('ciudadanos')->insert(['id_persona' => $person, 'nombres' => 'Prueba transaccional', 'apellido_paterno' => 'Temporal']);
     $db->table('cursos_seguridad_vial')->insert(['nombre' => 'Prueba transaccional', 'costo_inscripcion' => 25]);
     $course = $db->insertID();
     $db->table('inscripciones_curso')->insert(['id_curso' => $course, 'id_persona' => $person, 'fecha_inscripcion' => date('Y-m-d')]);
@@ -85,8 +86,9 @@ scenario('Trámite: importe del procedimiento administrativo', function ($db, $s
     $pago = $service->generar('TRAMITE', (int)$db->insertID());
     check((float)$pago['total'] === 45.0 && $pago['id_papeleta'] === null, 'Origen de trámite incorrecto.');
 });
-scenario('UIT exige el año exacto y no utiliza otro año silenciosamente', function ($db) {
-    $db->table('uits')->insert(['anio' => 2200, 'valor' => 1000]);
+scenario('UIT exige configuración externa y no consulta tabla local', function ($db) {
+    $_ENV['multas.uit.anio'] = '2200';
+    $_ENV['multas.uit.valor'] = '1000';
     $service = new \App\Services\Multas($db);
     check($service->monto(['porcentaje_uit' => 1.5], 2200) === 15.0, 'Cálculo incorrecto.');
     rejects(fn() => $service->uit(2201));

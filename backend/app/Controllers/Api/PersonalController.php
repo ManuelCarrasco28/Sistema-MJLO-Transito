@@ -10,28 +10,29 @@ class PersonalController extends ResourceController
 
     public function index()
     {
-        $db = \Config\Database::connect();
-        $rows = $db->table('trabajadores pe')
+        $rows = \Config\Database::connect()->table('trabajadores t')
             ->select("
-                pe.id_persona as id,
-                pe.id_persona as persona_id,
-                COALESCE(td.nombre, 'DNI') as tipo_documento,
-                p.numero as numero_documento,
-                c.nombres,
-                c.apellido_paterno,
-                c.apellido_materno,
-                CONCAT(c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')) AS apellidos,
-                '' as email,
-                ca.nombre as cargo,
-                pe.estado
+                t.id_persona AS id,
+                t.id_persona AS id_persona,
+                COALESCE(tdi.codigo, 'DNI') AS tipo_documento,
+                p.numero AS numero_documento,
+                COALESCE(c.nombres, '') AS nombres,
+                COALESCE(c.apellido_paterno, '') AS apellido_paterno,
+                COALESCE(c.apellido_materno, '') AS apellido_materno,
+                CONCAT(COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, '')) AS apellidos,
+                p.email,
+                COALESCE(ca.nombre, 'Sin cargo') AS cargo,
+                t.estado
             ", false)
-            ->join('personas p', 'p.id = pe.id_persona', 'inner')
-            ->join('ciudadanos c', 'c.id_persona = pe.id_persona', 'inner')
-            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
-            ->join('desplazamiento_oficina dof', 'dof.id_trabajador = pe.id_persona AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
-            ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
-            ->orderBy('pe.id_persona', 'DESC')
-            ->get()->getResultArray();
+            ->join('personas p', 'p.id = t.id_persona', 'inner')
+            ->join('tipo_documentos_identidad tdi', 'tdi.id = p.id_tipo_documento', 'left')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->join('desplazamiento_oficina d', 'd.id_trabajador = t.id_persona AND (d.fecha_termino IS NULL OR d.fecha_termino > CURDATE())', 'left')
+            ->join('cargos ca', 'ca.id = d.id_cargo', 'left')
+            ->orderBy('t.id_persona', 'DESC')
+            ->get()
+            ->getResultArray();
+
         return $this->respond(['data' => $rows]);
     }
 
@@ -48,126 +49,114 @@ class PersonalController extends ResourceController
     private function saveRecord($id = null)
     {
         $input = $this->request->getJSON(true) ?: [];
-        foreach (['tipo_documento', 'numero_documento', 'nombres', 'apellidos', 'cargo', 'estado'] as $field) {
+        foreach (['numero_documento', 'nombres', 'apellidos', 'cargo', 'estado'] as $field) {
             if (!isset($input[$field]) || !is_string($input[$field]) || trim($input[$field]) === '') {
                 return $this->failValidationErrors('Complete todos los campos del trabajador.');
             }
         }
 
-        $estado = trim($input['estado']);
+        $estado = strtoupper(trim($input['estado']));
         if (!in_array($estado, ['ACTIVO', 'INACTIVO'], true)) {
             return $this->failValidationErrors('Estado no válido.');
         }
 
         $db = \Config\Database::connect();
-        $db->transStart();
-        
-        // 1. Tipo de documento
-        $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', $input['tipo_documento'])->get()->getRowArray();
-        $tipoDocId = $tipoDocRow ? $tipoDocRow['id'] : 1; // Default to DNI
+        $numero = substr(trim($input['numero_documento']), 0, 11);
+        $apellidos = preg_split('/\s+/', trim($input['apellidos']), 2);
 
-        // 2. Cargo
-        $cargoRow = $db->table('cargos')->where('nombre', $input['cargo'])->get()->getRowArray();
-        if (!$cargoRow) {
-            $db->table('cargos')->insert(['nombre' => $input['cargo'], 'estado' => 'ACTIVO']);
-            $cargoId = $db->insertID();
-        } else {
-            $cargoId = $cargoRow['id'];
-        }
+        $db->transException(true)->transBegin();
+        try {
+            $persona = $id !== null
+                ? $db->table('personas')->where('id', $id)->get()->getRowArray()
+                : $db->table('personas')->where('numero', $numero)->get()->getRowArray();
 
-        // Split apellidos
-        $apellidos = explode(' ', $input['apellidos'], 2);
-        $apePaterno = $apellidos[0];
-        $apeMaterno = $apellidos[1] ?? '';
-
-        if ($id === null) {
-            // Validate duplicate
-            if ($db->table('personas')->where('numero', $input['numero_documento'])->countAllResults() > 0) {
-                return $this->failValidationErrors('Ya existe un trabajador con ese documento.');
+            if ($id !== null && !$persona) {
+                throw new \DomainException('Trabajador no encontrado.');
             }
 
-            // Insert Persona
-            $db->table('personas')->insert([
-                'id_tipo_documento' => $tipoDocId,
-                'numero' => $input['numero_documento'],
-                'estado' => 'ACTIVO'
-            ]);
-            $id = $db->insertID();
+            $personaData = [
+                'id_tipo_documento' => $this->tipoDocumentoId($db, $input['tipo_documento'] ?? 'DNI'),
+                'numero' => $numero,
+                'estado' => 'ACTIVO',
+            ];
 
-            // Insert Ciudadano
-            $db->table('ciudadanos')->insert([
-                'id_persona' => $id,
-                'nombres' => $input['nombres'],
-                'apellido_paterno' => $apePaterno,
-                'apellido_materno' => $apeMaterno
-            ]);
-
-            // Insert Trabajador
-            $db->table('trabajadores')->insert([
-                'id_persona' => $id,
-                'tipo' => 'INTERNO',
-                'tiene_cuenta' => 1,
-                'estado' => $input['estado']
-            ]);
-
-            // Insert Desplazamiento
-            $db->table('desplazamiento_oficina')->insert([
-                'id_trabajador' => $id,
-                'id_cargo' => $cargoId,
-                'documento' => 'DESIGNACION-' . date('Y'),
-                'fecha_documento' => date('Y-m-d'),
-                'tipo_funcion' => 'Titular'
-            ]);
-
-        } else {
-            if (!$db->table('trabajadores')->where('id_persona', $id)->countAllResults()) {
-                return $this->failNotFound('Trabajador no encontrado.');
+            if ($persona) {
+                $personaId = (int)$persona['id'];
+                $db->table('personas')->where('id', $personaId)->update($personaData);
+            } else {
+                $db->table('personas')->insert($personaData);
+                $personaId = (int)$db->insertID();
             }
-            
-            // Update Persona
-            $db->table('personas')->where('id', $id)->update([
-                'id_tipo_documento' => $tipoDocId,
-                'numero' => $input['numero_documento']
-            ]);
 
-            // Update Ciudadano
-            $db->table('ciudadanos')->where('id_persona', $id)->update([
-                'nombres' => $input['nombres'],
-                'apellido_paterno' => $apePaterno,
-                'apellido_materno' => $apeMaterno
-            ]);
+            $ciudadanoData = [
+                'id_persona' => $personaId,
+                'nombres' => substr(trim($input['nombres']), 0, 50),
+                'apellido_paterno' => substr($apellidos[0] ?? 'Municipal', 0, 50),
+                'apellido_materno' => isset($apellidos[1]) ? substr($apellidos[1], 0, 50) : null,
+            ];
+            if ($db->table('ciudadanos')->where('id_persona', $personaId)->countAllResults() > 0) {
+                $db->table('ciudadanos')->where('id_persona', $personaId)->update($ciudadanoData);
+            } else {
+                $db->table('ciudadanos')->insert($ciudadanoData);
+            }
 
-            // Update Trabajador
-            $db->table('trabajadores')->where('id_persona', $id)->update([
-                'estado' => $input['estado']
-            ]);
-            
-            // Update Desplazamiento
-            $existDof = $db->table('desplazamiento_oficina')->where('id_trabajador', $id)->get()->getRowArray();
-            if ($existDof) {
-                $db->table('desplazamiento_oficina')->where('id', $existDof['id'])->update([
-                    'id_cargo' => $cargoId
+            if ($db->table('trabajadores')->where('id_persona', $personaId)->countAllResults() > 0) {
+                $db->table('trabajadores')->where('id_persona', $personaId)->update([
+                    'tipo' => 'INTERNO',
+                    'estado' => $estado,
                 ]);
             } else {
-                $db->table('desplazamiento_oficina')->insert([
-                    'id_trabajador' => $id,
-                    'id_cargo' => $cargoId,
-                    'documento' => 'DESIGNACION-' . date('Y'),
-                    'fecha_documento' => date('Y-m-d'),
-                    'tipo_funcion' => 'Titular'
+                $db->table('trabajadores')->insert([
+                    'id_persona' => $personaId,
+                    'tipo' => 'INTERNO',
+                    'tiene_cuenta' => 0,
+                    'estado' => $estado,
                 ]);
             }
-        }
-        
-        $db->transComplete();
 
-        if ($db->transStatus() === false) {
-            return $this->failServerError('Error guardando trabajador');
-        }
+            $cargoNombre = substr(trim($input['cargo']), 0, 50);
+            $cargo = $db->table('cargos')->where('nombre', $cargoNombre)->get()->getRowArray();
+            if (!$cargo) {
+                $db->table('cargos')->insert(['nombre' => $cargoNombre, 'estado' => 'ACTIVO']);
+                $cargoId = (int)$db->insertID();
+            } else {
+                $cargoId = (int)$cargo['id'];
+            }
 
-        if (func_num_args() === 0) {
-            return $this->respondCreated(['data' => ['id' => $id] + $input]);
+            $db->table('desplazamiento_oficina')
+                ->where('id_trabajador', $personaId)
+                ->where('fecha_termino IS NULL', null, false)
+                ->update(['fecha_termino' => date('Y-m-d')]);
+            $db->table('desplazamiento_oficina')->insert([
+                'id_trabajador' => $personaId,
+                'id_cargo' => $cargoId,
+                'documento' => 'REGISTRO SISTEMA TRANSITO',
+                'fecha_documento' => date('Y-m-d'),
+                'tipo_funcion' => 'Operador',
+            ]);
+
+            $db->transCommit();
+            $payload = ['id' => $personaId] + $input + ['id_persona' => $personaId];
+            return $id === null ? $this->respondCreated(['data' => $payload]) : $this->respond(['data' => $payload]);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return $this->failServerError('No se pudo guardar el trabajador: ' . $e->getMessage());
         }
-        return $this->respond(['data' => ['id' => $id] + $input]);
+    }
+
+    private function tipoDocumentoId($db, string $codigo): int
+    {
+        $codigo = strtoupper(trim($codigo ?: 'DNI'));
+        $row = $db->table('tipo_documentos_identidad')
+            ->select('id')
+            ->where('codigo', $codigo)
+            ->where('estado', 'ACTIVO')
+            ->get()
+            ->getRowArray();
+
+        return (int)($row['id'] ?? 1);
     }
 }
