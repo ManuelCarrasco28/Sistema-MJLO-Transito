@@ -18,7 +18,7 @@ export function CursosSeguridad() {
   const [selectedCurso, setSelectedCurso] = useState(null)
   const [formData, setFormData] = useState({
     codigo: '', titulo: '', descripcion: '', fecha: '', horario: '',
-    instructor: '', lugar: '', capacidad: 50, estado: 'PROGRAMADO', tipo: 'CERTICAV'
+    instructor: '', lugar: '', capacidad: 50, estado: 'PROGRAMADO', tipo: 'SEGURIDAD_VIAL'
   })
 
   const handleOpenCreateModal = () => {
@@ -26,7 +26,7 @@ export function CursosSeguridad() {
       codigo: `CUR-2026-${String(cursos.length + 1).padStart(3, '0')}`,
       titulo: '', descripcion: '', fecha: new Date().toISOString().split('T')[0],
       horario: '09:00 AM - 12:00 PM', instructor: '', lugar: 'Auditorio Municipal JLO',
-      capacidad: 50, estado: 'PROGRAMADO', tipo: 'CERTICAV'
+      capacidad: 50, estado: 'PROGRAMADO', tipo: 'SEGURIDAD_VIAL'
     })
     setSelectedCurso(null)
     setIsModalOpen(true)
@@ -125,7 +125,7 @@ export function CursosSeguridad() {
           ...c,
           capacidad: c.cuposTotales,
           inscritos: c.cuposInscritos,
-          tipo: 'CERTICAV'
+          tipo: c.tipo || 'SEGURIDAD_VIAL'
         }))
         setCursos(fetchedCursos)
         setCachedData('/cursos', fetchedCursos)
@@ -149,7 +149,7 @@ export function CursosSeguridad() {
               </h1>
             </div>
             <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-              Programa de educación vial obligatoria y certificación municipal (CERTICAV).
+              Programa municipal de capacitación y seguridad vial.
             </p>
           </div>
         </div>
@@ -231,7 +231,7 @@ export function CursosSeguridad() {
               className="rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-xs font-bold text-slate-700 outline-none transition focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 cursor-pointer"
             >
               <option value="TODOS">Todos los tipos</option>
-              <option value="CERTICAV">CERTICAV (Capacitación)</option>
+              <option value="SEGURIDAD_VIAL">Seguridad Vial</option>
               <option value="MOTOTAXI">Transporte Menor (Mototaxis)</option>
               <option value="MANEJO_DEFENSIVO">Manejo Defensivo</option>
             </select>
@@ -261,7 +261,7 @@ export function CursosSeguridad() {
             de {cursos.length} cursos registrados
           </div>
           <div className="text-[11px] font-medium text-slate-400">
-            Programa Municipal CERTICAV - 2026
+            Programa Municipal de Seguridad Vial - 2026
           </div>
         </div>
 
@@ -311,7 +311,7 @@ export function CursosSeguridad() {
                     <td className="px-3 py-3 whitespace-nowrap">
                       <p className="font-bold text-slate-900 dark:text-white">{c.codigo}</p>
                       <span className="mt-0.5 inline-block rounded-md bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
-                        {c.tipoLabel || 'CERTICAV'}
+                        {c.tipoLabel || 'SEGURIDAD VIAL'}
                       </span>
                     </td>
 

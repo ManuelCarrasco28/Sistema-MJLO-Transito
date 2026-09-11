@@ -22,7 +22,7 @@ class AuthController extends ResourceController
 
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()
-            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, cargos.nombre as cargo')
+            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, cargos.nombre as cargo, trabajadores.id_persona as personal_id')
             ->join('trabajadores', 'trabajadores.id_persona = usuarios.id_trabajador', 'inner')
             ->join('ciudadanos', 'ciudadanos.id_persona = trabajadores.id_persona', 'inner')
             ->join('desplazamiento_oficina', 'desplazamiento_oficina.id_trabajador = trabajadores.id_persona AND (desplazamiento_oficina.fecha_termino IS NULL OR desplazamiento_oficina.fecha_termino > CURDATE())', 'left')
@@ -39,11 +39,12 @@ class AuthController extends ResourceController
         }
 
         $userData = [
-            'id'        => $userRecord['id'],
-            'nombres'   => $userRecord['nombres'],
-            'apellidos' => $userRecord['apellidos'],
-            'usuario'   => $userRecord['nombre_usuario'],
-            'cargo'     => $userRecord['cargo'],
+            'id'          => $userRecord['id'],
+            'nombres'     => $userRecord['nombres'],
+            'apellidos'   => $userRecord['apellidos'],
+            'usuario'     => $userRecord['nombre_usuario'],
+            'cargo'       => $userRecord['cargo'],
+            'personal_id' => $userRecord['personal_id'],
         ];
 
         helper('cookie');

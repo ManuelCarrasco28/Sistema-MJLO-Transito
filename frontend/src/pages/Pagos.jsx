@@ -9,26 +9,38 @@ export function Pagos() {
   const [pagos, setPagos] = useState(cached || [])
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterConcepto, setFilterConcepto] = useState('TODOS')
+  const [filterTipoPago, setFilterTipoPago] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(8)
   
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [origenes, setOrigenes] = useState({ PAPELETA: [], TRAMITE: [], CURSO: [] })
+  const [pagoToConfirm, setPagoToConfirm] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedPago, setSelectedPago] = useState(null)
 
   const [formData, setFormData] = useState({
-    numeroRecibo: '', concepto: '', metodo: 'EFECTIVO', montoNeto: 0,
-    contribuyente: '', dniRuc: ''
+    numeroRecibo: '', tipoPago: 'TRAMITE', metodo: 'EFECTIVO', montoTotal: 0,
+    numeroVoucher: '', referenciaPago: '', origenId: '', fechaPago: ''
   })
 
-  const handleOpenCreateModal = () => {
-    setFormData({
-      numeroRecibo: `REC-2026-${String(pagos.length + 1).padStart(5, '0')}`,
-      concepto: '', metodo: 'EFECTIVO', montoNeto: 0,
-      contribuyente: '', dniRuc: ''
-    })
+  const handleOpenCreateModal = async () => {
+    setPagoToConfirm(null)
+    setFormData({ numeroRecibo: '', tipoPago: 'TRAMITE', metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: '', fechaPago: '' })
+    setIsModalOpen(true)
+    try {
+      const res = await apiFetch('/pagos/origenes')
+      const data = await res.json()
+      if (!res.ok) throw new Error('No se pudieron cargar los registros de origen.')
+      setOrigenes(data.data)
+    } catch (error) { alert(error.message) }
+  }
+
+  const handleConfirm = (pago) => {
+    setPagoToConfirm(pago)
+    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', fechaPago: '' })
     setIsModalOpen(true)
   }
 
@@ -37,7 +49,8 @@ export function Pagos() {
   const handleDelete = async (id) => {
     if (window.confirm('¿Está seguro que desea anular este recibo de pago?')) {
       try {
-        await apiFetch(`/pagos/${id}`, { method: 'DELETE' })
+        const response = await apiFetch(`/pagos/${id}`, { method: 'DELETE' })
+        if (!response.ok) throw new Error('No se pudo anular el pago')
         setPagos(pagos.map(p => p.id === id ? { ...p, estado: 'ANULADO' } : p))
       } catch (err) {
         console.error('Error al anular:', err)
@@ -48,54 +61,41 @@ export function Pagos() {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
-    const payload = {
-      ...formData,
-      monto: parseFloat(formData.montoNeto) || 0,
-      metodoPago: formData.metodo,
-      documentoIdentidad: formData.dniRuc
-    }
-    
+    if (isSaving) return
+    setIsSaving(true)
     try {
-      const response = await apiFetch('/pagos', {
+      const key = { PAPELETA: 'papeletaId', TRAMITE: 'tramiteId', CURSO: 'inscripcionId' }[formData.tipoPago]
+      const response = await apiFetch(pagoToConfirm ? `/pagos/${pagoToConfirm.id}/confirmar` : '/pagos', {
         method: 'POST',
-        body: payload
+        body: pagoToConfirm ? { ...formData, metodoPago: formData.metodo } : { tipoPago: formData.tipoPago, [key]: Number(formData.origenId) }
       })
       const result = await response.json()
-      if (response.ok && result.data) {
-        const newPago = {
-          ...result.data,
-          fecha: result.data.fechaHora,
-          metodo: result.data.metodoPago,
-          dniRuc: result.data.documentoIdentidad
-        }
-        setPagos([newPago, ...pagos])
-      }
+      if (!response.ok) throw new Error(Object.values(result.messages || {}).join(' ') || result.message || 'No se pudo guardar el pago.')
+      setPagos(prev => [result.data, ...prev.filter(p => p.id !== result.data.id)])
       setIsModalOpen(false)
-    } catch (err) {
-      console.error('Error guardando pago:', err)
-      alert('Error al registrar el pago')
-    }
+    } catch (err) { alert(err.message) }
+    finally { setIsSaving(false) }
   }
 
   const totalPagos = pagos.length
-  const totalMonto = pagos.reduce((acc, curr) => acc + (curr.montoNeto || 0), 0)
-  const pagosHoy = pagos.filter(p => new Date(p.fecha).toDateString() === new Date().toDateString()).length
+  const totalMonto = pagos.filter(p => p.estado === 'PAGADO').reduce((acc, curr) => acc + (curr.montoTotal || 0), 0)
+  const pagosHoy = pagos.filter(p => p.estado === 'PAGADO' && p.fecha && new Date(p.fecha).toDateString() === new Date().toDateString()).length
 
   const filteredPagos = pagos.filter((p) => {
     const search = searchTerm.toLowerCase()
     const matchesSearch =
-      p.numeroRecibo?.toLowerCase().includes(search) ||
-      p.concepto?.toLowerCase().includes(search) ||
-      p.contribuyente?.toLowerCase().includes(search) ||
-      p.dniRuc?.toLowerCase().includes(search)
+      (p.numeroRecibo || String(p.id)).toLowerCase().includes(search) ||
+      p.numeroVoucher?.toLowerCase().includes(search) ||
+      p.referenciaPago?.toLowerCase().includes(search) ||
+      p.tipoPago?.toLowerCase().includes(search)
 
-    const matchesConcepto = filterConcepto === 'TODOS' || p.concepto?.includes(filterConcepto)
-    return matchesSearch && matchesConcepto
+    const matchesTipoPago = filterTipoPago === 'TODOS' || p.tipoPago === filterTipoPago
+    return matchesSearch && matchesTipoPago
   })
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterConcepto])
+  }, [searchTerm, filterTipoPago])
 
   const paginatedPagos = filteredPagos.slice(
     (currentPage - 1) * itemsPerPage,
@@ -139,11 +139,11 @@ export function Pagos() {
           <div>
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                Caja y Recaudación
+                Pagos de Tránsito
               </h1>
             </div>
             <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-              Control de ingresos por papeletas de infracción, licencias, cursos CERTICAV y tasas municipales.
+              Control de ingresos por papeletas de infracción, licencias, cursos de seguridad vial y tasas municipales.
             </p>
           </div>
         </div>
@@ -169,7 +169,7 @@ export function Pagos() {
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <p className="text-3xl font-black text-slate-900 dark:text-white">{totalPagos}</p>
-            <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-950/60 dark:text-sky-300">Recibos Emitidos</span>
+            <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-950/60 dark:text-sky-300">Pagos registrados</span>
           </div>
         </div>
 
@@ -193,7 +193,7 @@ export function Pagos() {
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por N° Recibo, contribuyente, DNI/RUC o concepto..."
+              placeholder="Buscar por N° recibo, voucher, referencia o tipo de pago..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-emerald-200/80 bg-emerald-50/20 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-emerald-400"
@@ -201,14 +201,14 @@ export function Pagos() {
           </div>
           <div className="flex items-center gap-2">
             <select
-              value={filterConcepto}
-              onChange={(e) => setFilterConcepto(e.target.value)}
+              value={filterTipoPago}
+              onChange={(e) => setFilterTipoPago(e.target.value)}
               className="rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-xs font-bold text-slate-700 outline-none transition focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 cursor-pointer"
             >
-              <option value="TODOS">Todos los Conceptos</option>
-              <option value="PAPELETA">Papeletas de Infracción</option>
-              <option value="CURSO">Cursos de Seguridad Vial</option>
-              <option value="PERMISO">Permisos y TUC</option>
+              <option value="TODOS">Todos los pagos</option>
+              <option value="PAPELETA">Papeletas</option>
+              <option value="TRAMITE">Trámites</option>
+              <option value="CURSO">Cursos</option>
             </select>
             <button
               onClick={handleOpenCreateModal}
@@ -226,7 +226,7 @@ export function Pagos() {
             <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
               Mostrando {filteredPagos.length}
             </span>{" "}
-            de {pagos.length} recibos registrados
+            de {pagos.length} pagos registrados
           </div>
           <div className="text-[11px] font-medium text-slate-400">
             Cierre Diario Municipal - 2026
@@ -240,7 +240,7 @@ export function Pagos() {
               <tr>
                 <th className="px-4 py-3.5 whitespace-nowrap">N° RECIBO</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">FECHA / HORA</th>
-                <th className="px-4 py-3.5 whitespace-nowrap">CONCEPTO / TASA</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">TIPO / VOUCHER</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">MÉTODO</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">MONTO TOTAL</th>
                 <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
@@ -275,42 +275,43 @@ export function Pagos() {
                 paginatedPagos.map((p) => (
                   <tr key={p.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-slate-800/40">
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className="font-bold text-slate-900 dark:text-white">{p.numeroRecibo}</p>
+                      <p className="font-bold text-slate-900 dark:text-white">{p.numeroRecibo || 'Pendiente de recibo'}</p>
                       <span className="mt-0.5 inline-block rounded-md bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                         CAJA MUNICIPAL
                       </span>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">{new Date(p.fecha || new Date()).toLocaleDateString()}</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{p.fecha ? new Date(p.fecha + 'T00:00:00').toLocaleDateString() : 'Sin fecha de pago'}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                        {new Date(p.fecha || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HRS
+                        {p.tipoPago} #{p.papeletaId || p.tramiteId || p.inscripcionId}
                       </p>
                     </td>
                     <td className="px-4 py-3.5 max-w-[220px]">
-                      <p className="font-bold text-slate-900 dark:text-white truncate" title={p.concepto}>{p.concepto}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">TRIBUTO / TASA MUNICIPAL</p>
+                      <p className="font-bold text-slate-900 dark:text-white">{p.tipoPago || 'TRAMITE'}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">{p.numeroVoucher || 'Sin voucher'}</p>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider ${p.metodo === 'EFECTIVO'
                         ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                         : 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
                         }`}>
-                        {p.metodo || 'EFECTIVO'}
+                        {p.metodo || 'Sin confirmar'}
                       </span>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className="font-black text-slate-900 dark:text-white">S/ {p.montoNeto?.toFixed(2) || '0.00'}</p>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">CANCELADO</p>
+                      <p className="font-black text-slate-900 dark:text-white">S/ {p.montoTotal?.toFixed(2) || '0.00'}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">{p.estado}</p>
                     </td>
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-end gap-1.5 pr-1">
+                        {p.estado === 'PENDIENTE' && <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Confirmar recibo</button>}
                         <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="rounded-xl p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalle">
                           <Icon name="eye" className="size-4" />
                         </button>
-                        <button onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="rounded-xl p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/60 dark:text-sky-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Imprimir Ticket">
+                        <button disabled={p.estado !== 'PAGADO'} onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="rounded-xl p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/60 dark:text-sky-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Imprimir Ticket">
                           <Icon name="print" className="size-4" />
                         </button>
-                        <button onClick={() => handleDelete(p.id)} className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Anular Pago">
+                        <button disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Anular Pago">
                           <Icon name="trash" className="size-4" />
                         </button>
                       </div>
@@ -339,46 +340,49 @@ export function Pagos() {
           <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
               <div>
-                <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">Registrar Recaudación</h3>
+                <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">{pagoToConfirm ? 'Confirmar recibo de pago' : 'Generar pago pendiente'}</h3>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 cursor-pointer">✕</button>
             </div>
             <form onSubmit={handleFormSubmit} className="flex-1 space-y-4 overflow-y-auto p-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">N° Recibo</label>
-                  <input type="text" value={formData.numeroRecibo} disabled className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2 text-sm text-slate-500 outline-none dark:border-slate-700 dark:bg-slate-800" />
+              {pagoToConfirm ? (
+                <div className="space-y-4">
+                  <p className="font-bold">Monto: S/ {pagoToConfirm.montoTotal.toFixed(2)}</p>
+                  <label className="block text-sm">Número real del recibo
+                    <input required maxLength={50} value={formData.numeroRecibo} onChange={e => setFormData({ ...formData, numeroRecibo: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
+                  </label>
+                  <label className="block text-sm">Fecha que figura en el recibo
+                    <input required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
+                  </label>
+                  <label className="block text-sm">Método de pago
+                    <select value={formData.metodo} onChange={e => setFormData({ ...formData, metodo: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800">
+                      <option value="EFECTIVO">Efectivo</option><option value="TARJETA">Tarjeta</option><option value="TRANSFERENCIA">Transferencia</option>
+                    </select>
+                  </label>
+                  <label className="block text-sm">Voucher o referencia (opcional)
+                    <input maxLength={100} value={formData.referenciaPago} onChange={e => setFormData({ ...formData, referenciaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
+                  </label>
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Método de Pago</label>
-                  <select required value={formData.metodo} onChange={e => setFormData({...formData, metodo: e.target.value})} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
-                    <option value="EFECTIVO">Efectivo</option>
-                    <option value="TARJETA">Tarjeta (POS)</option>
-                    <option value="TRANSFERENCIA">Transferencia Bancaria</option>
-                  </select>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-500">El importe se obtiene del registro seleccionado. El recibo se ingresa después de realizar el pago.</p>
+                  <label className="block text-sm">Tipo de pago
+                    <select value={formData.tipoPago} onChange={e => setFormData({ ...formData, tipoPago: e.target.value, origenId: '' })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800">
+                      <option value="TRAMITE">Trámite</option><option value="PAPELETA">Papeleta</option><option value="CURSO">Inscripción a curso</option>
+                    </select>
+                  </label>
+                  <label className="block text-sm">Registro asociado
+                    <select required value={formData.origenId || ''} onChange={e => setFormData({ ...formData, origenId: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800">
+                      <option value="">Seleccione un registro</option>
+                      {(origenes[formData.tipoPago] || []).map(o => <option key={o.id} value={o.id}>{o.nombre || formData.tipoPago} — #{o.id}</option>)}
+                    </select>
+                  </label>
+                  {!(origenes[formData.tipoPago] || []).length && <p className="text-sm text-amber-700">No hay registros disponibles para este tipo de pago.</p>}
                 </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Concepto *</label>
-                <input type="text" required value={formData.concepto} onChange={e => setFormData({...formData, concepto: e.target.value})} placeholder="Ej. Pago por Curso CERTICAV" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Contribuyente *</label>
-                  <input type="text" required value={formData.contribuyente} onChange={e => setFormData({...formData, contribuyente: e.target.value})} placeholder="Ej. Juan Pérez" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">DNI / RUC *</label>
-                  <input type="text" required value={formData.dniRuc} onChange={e => setFormData({...formData, dniRuc: e.target.value})} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Monto Total (S/) *</label>
-                <input type="number" step="0.01" required value={formData.montoNeto} onChange={e => setFormData({...formData, montoNeto: e.target.value})} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-              </div>
+              )}
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancelar</button>
-                <button type="submit" className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-extrabold text-white shadow-md hover:bg-emerald-700 cursor-pointer">Registrar Pago</button>
+                <button type="submit" disabled={isSaving} className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-extrabold text-white shadow-md hover:bg-emerald-700 cursor-pointer">{isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pendiente'}</button>
               </div>
             </form>
           </div>
@@ -391,15 +395,15 @@ export function Pagos() {
             <h3 className="text-xl font-black mb-2 text-slate-800 dark:text-white">Detalle del Recibo</h3>
             <p className="text-xs text-slate-500 mb-6">{selectedPago.numeroRecibo}</p>
             <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
-              <p><strong>Contribuyente:</strong> {selectedPago.contribuyente || 'No registrado'}</p>
-              <p><strong>DNI/RUC:</strong> {selectedPago.dniRuc || 'No registrado'}</p>
-              <p><strong>Fecha:</strong> {new Date(selectedPago.fecha).toLocaleString()}</p>
-              <p><strong>Concepto:</strong> {selectedPago.concepto}</p>
+              <p><strong>Fecha:</strong> {selectedPago.fecha ? new Date(selectedPago.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente'}</p>
+              <p><strong>Tipo de pago:</strong> {selectedPago.tipoPago || 'TRAMITE'}</p>
               <p><strong>Método de Pago:</strong> {selectedPago.metodo}</p>
-              <p className="text-emerald-600 font-bold dark:text-emerald-400"><strong>Monto Pagado:</strong> S/ {selectedPago.montoNeto?.toFixed(2)}</p>
+              <p><strong>N° Voucher:</strong> {selectedPago.numeroVoucher || 'Sin voucher'}</p>
+              <p><strong>Referencia:</strong> {selectedPago.referenciaPago || 'Sin referencia'}</p>
+              <p className="text-emerald-600 font-bold dark:text-emerald-400"><strong>Monto ({selectedPago.estado}):</strong> S/ {selectedPago.montoTotal?.toFixed(2)}</p>
             </div>
             <div className="mt-8 flex justify-end gap-2">
-              <button onClick={() => { setIsDetailModalOpen(false); setIsPreviewModalOpen(true); }} className="rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-sky-700 cursor-pointer inline-flex items-center gap-1.5"><Icon name="print" className="size-4" /> Imprimir</button>
+              <button disabled={selectedPago.estado !== 'PAGADO'} onClick={() => { setIsDetailModalOpen(false); setIsPreviewModalOpen(true); }} className="rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-sky-700 cursor-pointer inline-flex items-center gap-1.5"><Icon name="print" className="size-4" /> Imprimir</button>
               <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800 cursor-pointer">Cerrar</button>
             </div>
           </div>
@@ -413,14 +417,13 @@ export function Pagos() {
             <p className="mb-4">TICKET DE PAGO MUNICIPAL</p>
             <p className="text-left"><strong>N° RECIBO:</strong> {selectedPago.numeroRecibo}</p>
             <p className="text-left"><strong>FECHA:</strong> {new Date(selectedPago.fecha).toLocaleString()}</p>
-            <p className="text-left mt-2 border-t border-slate-300 pt-2"><strong>CLIENTE:</strong> {selectedPago.contribuyente || '---'}</p>
-            <p className="text-left"><strong>DNI/RUC:</strong> {selectedPago.dniRuc || '---'}</p>
             <div className="my-4 border-y border-dashed border-slate-400 py-2 text-left">
-              <p className="font-bold mb-1">{selectedPago.concepto}</p>
+              <p className="font-bold mb-1">TIPO: {selectedPago.tipoPago || 'TRAMITE'}</p>
+              <p>VOUCHER: {selectedPago.numeroVoucher || '---'}</p>
               <p>MÉTODO: {selectedPago.metodo}</p>
             </div>
             <div className="text-right text-sm">
-              <p><strong>TOTAL: S/ {selectedPago.montoNeto?.toFixed(2)}</strong></p>
+              <p><strong>TOTAL: S/ {selectedPago.montoTotal?.toFixed(2)}</strong></p>
             </div>
             <div className="mt-8 pt-4 border-t border-slate-300 flex justify-between print:hidden">
               <button onClick={() => window.print()} className="bg-emerald-600 text-white px-4 py-2 rounded font-sans font-bold hover:bg-emerald-700">Imprimir</button>

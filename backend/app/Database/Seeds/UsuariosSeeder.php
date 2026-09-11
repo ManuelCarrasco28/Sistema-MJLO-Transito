@@ -15,7 +15,8 @@ class UsuariosSeeder extends Seeder
                 'apellido_materno' => '',
                 'numero' => '11111111',
                 'usuario' => 'diegobarturen',
-                'password' => 'diego123'
+                'password' => 'diego123',
+                'cargo' => 'Administrador'
             ],
             [
                 'nombres' => 'Manuel',
@@ -23,7 +24,8 @@ class UsuariosSeeder extends Seeder
                 'apellido_materno' => '',
                 'numero' => '22222222',
                 'usuario' => 'manuelcarrasco',
-                'password' => 'manuel123'
+                'password' => 'manuel123',
+                'cargo' => 'Administrador'
             ],
             [
                 'nombres' => 'Milenka',
@@ -31,7 +33,8 @@ class UsuariosSeeder extends Seeder
                 'apellido_materno' => '',
                 'numero' => '33333333',
                 'usuario' => 'milenkasegundo',
-                'password' => 'milenka123'
+                'password' => 'milenka123',
+                'cargo' => 'Administrador'
             ],
             [
                 'nombres' => 'Angelo',
@@ -39,7 +42,17 @@ class UsuariosSeeder extends Seeder
                 'apellido_materno' => '',
                 'numero' => '44444444',
                 'usuario' => 'angelosaavedra',
-                'password' => 'angelo123'
+                'password' => 'angelo123',
+                'cargo' => 'Administrador'
+            ],
+            [
+                'nombres' => 'Inspector',
+                'apellido_paterno' => 'Municipal',
+                'apellido_materno' => '',
+                'numero' => '99999999',
+                'usuario' => 'inspector',
+                'password' => 'inspector123',
+                'cargo' => 'Inspector de Tránsito'
             ],
         ];
 
@@ -66,6 +79,22 @@ class UsuariosSeeder extends Seeder
                 'tipo' => 'INTERNO',
                 'tiene_cuenta' => 1,
                 'estado' => 'ACTIVO'
+            ]);
+
+            // 3b. Create cargo / desplazamiento
+            $cargoRow = $this->db->table('cargos')->where('nombre', $u['cargo'])->get()->getRowArray();
+            if (!$cargoRow) {
+                $this->db->table('cargos')->insert(['nombre' => $u['cargo'], 'estado' => 'ACTIVO']);
+                $cargoId = $this->db->insertID();
+            } else {
+                $cargoId = $cargoRow['id'];
+            }
+            $this->db->table('desplazamiento_oficina')->insert([
+                'id_trabajador' => $idPersona,
+                'id_cargo' => $cargoId,
+                'documento' => 'DESIGNACION-' . date('Y'),
+                'fecha_documento' => date('Y-m-d'),
+                'tipo_funcion' => 'Titular'
             ]);
 
             // 4. Crear en `usuarios`

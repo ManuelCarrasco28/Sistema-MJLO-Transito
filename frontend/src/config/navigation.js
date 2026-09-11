@@ -8,7 +8,7 @@ export const navigation = [
   ['course', 'Cursos'],
   ['ticket', 'Papeletas'],
   ['payment', 'Pagos'],
-  ['retention', 'Retenciones'],
+  ['retention', 'Internamientos'],
   ['permit', 'Permisos'],
   ['people', 'Personal'],
 ]

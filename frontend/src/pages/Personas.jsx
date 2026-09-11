@@ -29,7 +29,7 @@ export function Personas() {
     email: '',
     numeroLicencia: '',
     estado: 'ACTIVO',
-    fotoUrl: '',
+    fotoImg: '',
   })
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export function Personas() {
         setPersonas(data)
         setCachedData('/personas', data)
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setIsLoading(false))
   }, [])
 
@@ -80,7 +80,7 @@ export function Personas() {
       email: '',
       numeroLicencia: '',
       estado: 'ACTIVO',
-      fotoUrl: '',
+      fotoImg: '',
     })
     setIsEditing(false)
     setIsModalOpen(true)
@@ -91,7 +91,7 @@ export function Personas() {
     setFormData({
       ...persona,
       celular: persona.celular || persona.telefono || '',
-      fotoUrl: persona.fotoUrl || '',
+      fotoImg: persona.fotoImg || '',
     })
     setIsEditing(true)
     setIsModalOpen(true)
@@ -110,13 +110,13 @@ export function Personas() {
     }
     const reader = new FileReader()
     reader.onload = (ev) => {
-      setFormData((prev) => ({ ...prev, fotoUrl: ev.target?.result || '' }))
+      setFormData((prev) => ({ ...prev, fotoImg: ev.target?.result || '' }))
     }
     reader.readAsDataURL(file)
   }
 
   const handleClearPhoto = () => {
-    setFormData((prev) => ({ ...prev, fotoUrl: '' }))
+    setFormData((prev) => ({ ...prev, fotoImg: '' }))
   }
 
   const handleOpenDetail = (persona) => {
@@ -169,7 +169,7 @@ export function Personas() {
 
   return (
     <div className="space-y-6">
-      
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30">
@@ -188,9 +188,9 @@ export function Personas() {
         </div>
       </div>
 
-      
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Registrados</span>
@@ -205,7 +205,7 @@ export function Personas() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">En la plataforma municipal</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Con licencia</span>
@@ -220,7 +220,7 @@ export function Personas() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Habilitados para operar</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Sin licencia</span>
@@ -235,7 +235,7 @@ export function Personas() {
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Dueños de unidades móviles</p>
         </div>
 
-        
+
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Estado Activo</span>
@@ -254,7 +254,7 @@ export function Personas() {
         </div>
       </div>
 
-      
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -313,7 +313,7 @@ export function Personas() {
           </div>
         </div>
 
-        
+
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
           <span>
             Mostrando <strong className="text-slate-800 dark:text-white">{filteredPersonas.length}</strong> de{' '}
@@ -375,9 +375,9 @@ export function Personas() {
                   <tr key={p.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
                     <td className="px-3.5 py-3.5 max-w-[200px]">
                       <div className="flex items-center gap-3 min-w-0">
-                        {p.fotoUrl ? (
+                        {p.fotoImg ? (
                           <img
-                            src={p.fotoUrl}
+                            src={p.fotoImg}
                             alt={p.nombres}
                             onError={(e) => {
                               e.currentTarget.onerror = null
@@ -419,11 +419,10 @@ export function Personas() {
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${
-                          p.estado === 'ACTIVO'
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${p.estado === 'ACTIVO'
                             ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
                             : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                        }`}
+                          }`}
                       >
                         <span className="size-1.5 rounded-full bg-current" />
                         {p.estado}
@@ -476,7 +475,7 @@ export function Personas() {
         />
       </div>
 
-      
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
           <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
@@ -503,251 +502,251 @@ export function Personas() {
 
             <form onSubmit={handleFormSubmit} className="flex min-h-0 flex-col">
               <div className="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3">
-              <div className="flex flex-col sm:flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/40">
-                <div className="shrink-0">
-                  {formData.fotoUrl ? (
-                    <img
-                      src={formData.fotoUrl}
-                      alt="Vista previa"
-                      onError={(e) => {
-                        e.currentTarget.onerror = null
-                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.nombres || 'P')}+${encodeURIComponent(formData.apellidoPaterno || 'P')}&background=0284c7&color=fff&bold=true`
-                      }}
-                      className="size-14 rounded-2xl object-cover border-2 border-cyan-500 shadow-md"
-                    />
-                  ) : (
-                    <div className="size-14 rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-700 text-white font-black flex items-center justify-center text-xl shadow-md border-2 border-slate-200 dark:border-slate-700 uppercase select-none">
-                      {formData.nombres?.[0] || '?'}{formData.apellidoPaterno?.[0] || ''}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 w-full space-y-2">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      <span>Fotografía del Administrado / Conductor</span>
-                      <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">(Opcional)</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Formatos permitidos: JPG, PNG, WebP (máx. 2 MB)
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-100 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer">
-                      <Icon name="camera" className="size-4 text-cyan-600" />
-                      <span>{formData.fotoUrl ? 'Cambiar fotografía...' : 'Subir fotografía...'}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePhotoUpload}
-                        className="hidden"
+                <div className="flex flex-col sm:flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                  <div className="shrink-0">
+                    {formData.fotoImg ? (
+                      <img
+                        src={formData.fotoImg}
+                        alt="Vista previa"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null
+                          e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.nombres || 'P')}+${encodeURIComponent(formData.apellidoPaterno || 'P')}&background=0284c7&color=fff&bold=true`
+                        }}
+                        className="size-14 rounded-2xl object-cover border-2 border-cyan-500 shadow-md"
                       />
-                    </label>
-
-                    {formData.fotoUrl && (
-                      <button
-                        type="button"
-                        onClick={handleClearPhoto}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 transition-all cursor-pointer"
-                      >
-                        <Icon name="trash" className="size-3.5" />
-                        <span>Quitar foto</span>
-                      </button>
+                    ) : (
+                      <div className="size-14 rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-700 text-white font-black flex items-center justify-center text-xl shadow-md border-2 border-slate-200 dark:border-slate-700 uppercase select-none">
+                        {formData.nombres?.[0] || '?'}{formData.apellidoPaterno?.[0] || ''}
+                      </div>
                     )}
                   </div>
-                </div>
-              </div>
 
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-cyan-600" />
-                  Datos Personales & Documentos
-                </h4>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                    <select
-                      id="per_tipo_doc"
-                      value={formData.tipoDocumento}
-                      onChange={(e) => setFormData({ ...formData, tipoDocumento: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
-                    >
-                      <option value="DNI">DNI (Documento Nacional)</option>
-                      <option value="CE">Carnet de Extranjería</option>
-                      <option value="PASAPORTE">Pasaporte</option>
-                    </select>
-                    <label
-                      htmlFor="per_tipo_doc"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Tipo de Documento
-                    </label>
-                  </div>
+                  <div className="flex-1 w-full space-y-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <span>Fotografía del Administrado / Conductor</span>
+                        <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">(Opcional)</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Formatos permitidos: JPG, PNG, WebP (máx. 2 MB)
+                      </p>
+                    </div>
 
-                  <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                    <input
-                      id="per_num_doc"
-                      type="text"
-                      required
-                      placeholder=" "
-                      value={formData.numeroDocumento}
-                      onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="per_num_doc"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                    >
-                      Número de Documento
-                    </label>
-                  </div>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-100 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer">
+                        <Icon name="camera" className="size-4 text-cyan-600" />
+                        <span>{formData.fotoImg ? 'Cambiar fotografía...' : 'Subir fotografía...'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                    <input
-                      id="per_nombres"
-                      type="text"
-                      required
-                      placeholder=" "
-                      value={formData.nombres}
-                      onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="per_nombres"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                    >
-                      Nombres Completo
-                    </label>
-                  </div>
-
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                    <input
-                      id="per_paterno"
-                      type="text"
-                      required
-                      placeholder=" "
-                      value={formData.apellidoPaterno}
-                      onChange={(e) => setFormData({ ...formData, apellidoPaterno: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="per_paterno"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                    >
-                      Apellido Paterno
-                    </label>
-                  </div>
-
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                    <input
-                      id="per_materno"
-                      type="text"
-                      placeholder=" "
-                      value={formData.apellidoMaterno}
-                      onChange={(e) => setFormData({ ...formData, apellidoMaterno: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="per_materno"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                    >
-                      Apellido Materno
-                    </label>
+                      {formData.fotoImg && (
+                        <button
+                          type="button"
+                          onClick={handleClearPhoto}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 transition-all cursor-pointer"
+                        >
+                          <Icon name="trash" className="size-3.5" />
+                          <span>Quitar foto</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-blue-500" />
-                  Licencia de Conducir
-                </h4>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                    <input
-                      id="per_licencia"
-                      type="text"
-                      placeholder=" "
-                      value={formData.numeroLicencia}
-                      onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="per_licencia"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                    >
-                      Número de Licencia
-                    </label>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-cyan-600" />
+                    Datos Personales & Documentos
+                  </h4>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
+                      <select
+                        id="per_tipo_doc"
+                        value={formData.tipoDocumento}
+                        onChange={(e) => setFormData({ ...formData, tipoDocumento: e.target.value })}
+                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
+                      >
+                        <option value="DNI">DNI (Documento Nacional)</option>
+                        <option value="CE">Carnet de Extranjería</option>
+                        <option value="PASAPORTE">Pasaporte</option>
+                      </select>
+                      <label
+                        htmlFor="per_tipo_doc"
+                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
+                      >
+                        Tipo de Documento
+                      </label>
+                    </div>
+
+                    <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
+                      <input
+                        id="per_num_doc"
+                        type="text"
+                        required
+                        placeholder=" "
+                        value={formData.numeroDocumento}
+                        onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
+                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
+                      />
+                      <label
+                        htmlFor="per_num_doc"
+                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
+                      >
+                        Número de Documento
+                      </label>
+                    </div>
+
+                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
+                      <input
+                        id="per_nombres"
+                        type="text"
+                        required
+                        placeholder=" "
+                        value={formData.nombres}
+                        onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
+                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
+                      />
+                      <label
+                        htmlFor="per_nombres"
+                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
+                      >
+                        Nombres Completo
+                      </label>
+                    </div>
+
+                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
+                      <input
+                        id="per_paterno"
+                        type="text"
+                        required
+                        placeholder=" "
+                        value={formData.apellidoPaterno}
+                        onChange={(e) => setFormData({ ...formData, apellidoPaterno: e.target.value })}
+                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
+                      />
+                      <label
+                        htmlFor="per_paterno"
+                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
+                      >
+                        Apellido Paterno
+                      </label>
+                    </div>
+
+                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
+                      <input
+                        id="per_materno"
+                        type="text"
+                        placeholder=" "
+                        value={formData.apellidoMaterno}
+                        onChange={(e) => setFormData({ ...formData, apellidoMaterno: e.target.value })}
+                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
+                      />
+                      <label
+                        htmlFor="per_materno"
+                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
+                      >
+                        Apellido Materno
+                      </label>
+                    </div>
                   </div>
-
-
-
-
                 </div>
-              </div>
 
-              
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-emerald-500" />
-                  Contacto y estado
-                </h4>
-                <div className="mb-3 grid gap-3 sm:grid-cols-2">
-                  {[
-                    ['direccion', 'Dirección', 250, 'text'],
-                    ['email', 'Correo electrónico', 150, 'email'],
-                  ].map(([field, label, maxLength, type]) => (
-                    <label key={field} className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      {label}
-                      <input type={type} maxLength={maxLength} value={formData[field] || ''}
-                        onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
-                        className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm outline-none focus:border-cyan-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                    </label>
-                  ))}
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                    <input
-                      id="per_celular"
-                      type="tel"
-                      maxLength={20}
-                      placeholder=" "
-                      value={formData.celular}
-                      onChange={(e) => setFormData({ ...formData, celular: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="per_celular"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                    >
-                      Teléfono / celular de contacto
-                    </label>
-                  </div>
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-blue-500" />
+                    Licencia de Conducir
+                  </h4>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
+                      <input
+                        id="per_licencia"
+                        type="text"
+                        placeholder=" "
+                        value={formData.numeroLicencia}
+                        onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() })}
+                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
+                      />
+                      <label
+                        htmlFor="per_licencia"
+                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
+                      >
+                        Número de Licencia
+                      </label>
+                    </div>
 
 
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                    <select
-                      id="per_estado"
-                      value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
-                    >
-                      <option value="ACTIVO">ACTIVO</option>
-                      <option value="INACTIVO">INACTIVO</option>
-                    </select>
-                    <label
-                      htmlFor="per_estado"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Estado del Registro
-                    </label>
+
                   </div>
                 </div>
-              </div>
 
-              
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-500" />
+                    Contacto y estado
+                  </h4>
+                  <div className="mb-3 grid gap-3 sm:grid-cols-2">
+                    {[
+                      ['direccion', 'Dirección', 250, 'text'],
+                      ['email', 'Correo electrónico', 150, 'email'],
+                    ].map(([field, label, maxLength, type]) => (
+                      <label key={field} className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        {label}
+                        <input type={type} maxLength={maxLength} value={formData[field] || ''}
+                          onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
+                          className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm outline-none focus:border-cyan-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                      </label>
+                    ))}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
+                      <input
+                        id="per_celular"
+                        type="tel"
+                        maxLength={20}
+                        placeholder=" "
+                        value={formData.celular}
+                        onChange={(e) => setFormData({ ...formData, celular: e.target.value })}
+                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
+                      />
+                      <label
+                        htmlFor="per_celular"
+                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
+                      >
+                        Teléfono / celular de contacto
+                      </label>
+                    </div>
+
+
+
+                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
+                      <select
+                        id="per_estado"
+                        value={formData.estado}
+                        onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
+                      >
+                        <option value="ACTIVO">ACTIVO</option>
+                        <option value="INACTIVO">INACTIVO</option>
+                      </select>
+                      <label
+                        htmlFor="per_estado"
+                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
+                      >
+                        Estado del Registro
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+
               </div>
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-white px-5 py-3 dark:border-slate-800 dark:bg-[#0f172a]">
                 <button
@@ -769,7 +768,7 @@ export function Personas() {
         </div>
       )}
 
-      
+
       {isDetailModalOpen && selectedPersona && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
@@ -781,9 +780,9 @@ export function Personas() {
               >
                 ✕
               </button>
-              {selectedPersona.fotoUrl ? (
+              {selectedPersona.fotoImg ? (
                 <img
-                  src={selectedPersona.fotoUrl}
+                  src={selectedPersona.fotoImg}
                   alt={selectedPersona.nombres}
                   onError={(e) => {
                     e.currentTarget.onerror = null
