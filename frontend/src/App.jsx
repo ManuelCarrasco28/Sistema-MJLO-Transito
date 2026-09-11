@@ -24,12 +24,12 @@ function Layout({ onLogout, user }) {
     const path = location.pathname
     if (path.includes('/vehiculos')) return 'Vehículos'
     if (path.includes('/personas')) return 'Personas'
-    if (path.includes('/personal')) return 'Personal'
+    if (path.includes('/personal')) return 'Trabajadores'
     if (path.includes('/organizaciones')) return 'Organizaciones'
-    if (path.includes('/documentos')) return 'Documentos'
-    if (path.includes('/inspecciones')) return 'Inspecciones'
+    if (path.includes('/documentos')) return 'Documentos vehículo'
+    if (path.includes('/inspecciones')) return 'Certicav'
     if (path.includes('/papeletas')) return 'Papeletas'
-    if (path.includes('/cursos')) return 'Cursos'
+    if (path.includes('/cursos')) return 'Cursos viales'
     if (path.includes('/pagos')) return 'Pagos'
     if (path.includes('/internamientos') || path.includes('/retenciones')) return 'Internamientos'
     if (path.includes('/permisos')) return 'Permisos'
@@ -38,7 +38,7 @@ function Layout({ onLogout, user }) {
 
   const [activeItem, setActiveItem] = useState(getActiveItem())
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [sidebarHidden, setSidebarHidden] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -84,8 +84,8 @@ function Layout({ onLogout, user }) {
 
   return (
     <main
-      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-colors duration-200 dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden ${
-        sidebarHidden ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[17rem_minmax(0,1fr)]'
+      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden ${
+        sidebarCollapsed ? 'lg:grid-cols-[4.75rem_minmax(0,1fr)]' : 'lg:grid-cols-[17rem_minmax(0,1fr)]'
       }`}
     >
       <Sidebar
@@ -94,13 +94,14 @@ function Layout({ onLogout, user }) {
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         onLogout={onLogout}
-        hiddenOnDesktop={sidebarHidden}
+        collapsedOnDesktop={sidebarCollapsed}
+        onExpandDesktop={() => setSidebarCollapsed(false)}
       />
       <div className="min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col">
         <Header
           onOpenMobile={() => setMobileOpen(true)}
-          sidebarHidden={sidebarHidden}
-          onToggleSidebar={() => setSidebarHidden((current) => !current)}
+          sidebarHidden={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
           darkMode={darkMode}
           setDarkMode={setDarkMode}
           notifications={notifications}
