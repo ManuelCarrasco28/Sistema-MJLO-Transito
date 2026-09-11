@@ -40,7 +40,6 @@ php spark db:seed DatabaseSeeder
 
 ```powershell
 cd backend
-copy .env.example .env
 composer install
 php spark serve --host 0.0.0.0 --port 8080
 ```
