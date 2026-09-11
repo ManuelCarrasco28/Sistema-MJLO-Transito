@@ -13,7 +13,7 @@ class PapeletasController extends ResourceController
         $db = \Config\Database::connect();
         try {
             $rows = $db->table('tipos_infraccion')
-                ->select('id, codigo, descripcion, gravedad, monto_base as montoBase, estado')
+                ->select('id, codigo, descripcion, gravedad, (porcentaje_uit / 100 * 5150) as montoBase, estado')
                 ->where('estado', 'ACTIVO')
                 ->orderBy('id', 'ASC')
                 ->get()
@@ -41,8 +41,8 @@ class PapeletasController extends ResourceController
                     p.id,
                     p.numero_papeleta as numeroPapeleta,
                     v.placa as vehiculoPlaca,
-                    COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(per.nombres, ' ', per.apellido_paterno), 'Conductor No Identificado') as infractor,
-                    COALESCE(CONCAT(ins.nombres, ' ', ins.apellidos), 'Inspector Municipal') as inspector,
+                    COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(c.nombres, ' ', c.apellido_paterno), 'Conductor No Identificado') as infractor,
+                    COALESCE(CONCAT(ci.nombres, ' ', ci.apellido_paterno), 'Inspector Municipal') as inspector,
                     p.fecha_hora as fechaHora,
                     p.lugar,
                     p.observacion_autoridad as observacionesAutoridad,
@@ -50,9 +50,11 @@ class PapeletasController extends ResourceController
                     p.monto_total as montoTotal,
                     p.estado
                 ")
-                ->join('vehiculos v', 'v.id = p.vehiculo_id', 'left')
-                ->join('personas per', 'per.id = p.persona_infractor_id', 'left')
-                ->join('personal ins', 'ins.id = p.inspector_id', 'left')
+                ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
+                ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
+                ->join('ciudadanos c', 'c.id_persona = per.id', 'left')
+                ->join('trabajadores t', 't.id_persona = p.id_inspector', 'left')
+                ->join('ciudadanos ci', 'ci.id_persona = t.id_persona', 'left')
                 ->orderBy('p.id', 'DESC')
                 ->get()
                 ->getResultArray();
@@ -64,9 +66,9 @@ class PapeletasController extends ResourceController
                 
                 
                 $detalles = $db->table('papeleta_detalles pd')
-                    ->select('pd.tipo_infraccion_id as tipoInfraccionId, ti.codigo, pd.monto, pd.descuento, pd.monto_final as montoFinal')
-                    ->join('tipos_infraccion ti', 'ti.id = pd.tipo_infraccion_id', 'left')
-                    ->where('pd.papeleta_id', $row['id'])
+                    ->select('pd.id_tipo_infraccion as tipoInfraccionId, ti.codigo, pd.monto, pd.descuento, pd.monto_final as montoFinal')
+                    ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
+                    ->where('pd.id_papeleta', $row['id'])
                     ->get()
                     ->getResultArray();
 
@@ -110,65 +112,83 @@ class PapeletasController extends ResourceController
             
             $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
             if (!$vehiculo) {
-                
                 $firstVeh = $db->table('vehiculos')->limit(1)->get()->getRowArray();
                 if ($firstVeh) {
                     $vehiculoId = (int)$firstVeh['id'];
                     $placa = $firstVeh['placa'];
                 } else {
+                    $tipoRow = $db->table('tipos_vehiculo')->limit(1)->get()->getRowArray();
+                    $tipoId = $tipoRow ? (int)$tipoRow['id'] : null;
                     $db->table('vehiculos')->insert([
-                        'placa' => $placa ?: 'NC-' . rand(1000, 9999),
-                        'tipo_vehiculo_id' => 1,
-                        'estado' => 'ACTIVO'
+                        'placa'                => $placa ?: ('NC-' . random_int(1000, 9999)),
+                        'id_tipo_vehiculo'     => $tipoId,
+                        'estado_formalizacion' => 'FORMALIZADO'
                     ]);
-                    $vehiculoId = $db->insertID();
+                    $vehiculoId = (int)$db->insertID();
                 }
             } else {
                 $vehiculoId = (int)$vehiculo['id'];
             }
 
-            
-            $inspector = $db->table('personal')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
-            $inspectorId = $inspector ? (int)$inspector['id'] : 1;
-            $inspectorNombre = $inspector ? ($inspector['nombres'] . ' ' . $inspector['apellidos']) : 'Inspector Municipal';
+            $inspector = $db->table('trabajadores')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
+            $inspectorId = $inspector ? (int)$inspector['id_persona'] : null;
+            $inspectorNombre = 'Inspector Municipal';
 
-            
             $persona = $db->table('personas')->limit(1)->get()->getRowArray();
             $personaId = $persona ? (int)$persona['id'] : null;
 
-            
             $infraccion = $db->table('tipos_infraccion')->where('id', $tipoInfraccionId)->limit(1)->get()->getRowArray();
-            $monto = $infraccion ? (float)$infraccion['monto_base'] : 350.00;
-            $codigoInfr = $infraccion ? $infraccion['codigo'] : 'G01';
+            if (!$infraccion) {
+                $firstInfr = $db->table('tipos_infraccion')->limit(1)->get()->getRowArray();
+                if ($firstInfr) {
+                    $tipoInfraccionId = (int)$firstInfr['id'];
+                    $infraccion = $firstInfr;
+                } else {
+                    $db->table('tipos_infraccion')->insert([
+                        'codigo'         => 'G01',
+                        'descripcion'    => 'Infracción al Reglamento Nacional de Tránsito',
+                        'porcentaje_uit' => 8.00,
+                        'gravedad'       => 'GRAVE',
+                        'estado'         => 'ACTIVO'
+                    ]);
+                    $tipoInfraccionId = (int)$db->insertID();
+                    $infraccion = [
+                        'id'             => $tipoInfraccionId,
+                        'codigo'         => 'G01',
+                        'porcentaje_uit' => 8.00,
+                    ];
+                }
+            }
+            $monto = (float)(($infraccion['porcentaje_uit'] / 100) * 5150);
+            $codigoInfr = $infraccion['codigo'] ?? 'G01';
 
             $numeroPapeleta = 'PAP-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
             $fechaHora = date('Y-m-d H:i:s');
 
-            
             $papeletaData = [
-                'numero_papeleta' => $numeroPapeleta,
-                'vehiculo_id' => $vehiculoId,
-                'persona_infractor_id' => $personaId,
-                'inspector_id' => $inspectorId,
-                'fecha_hora' => $fechaHora,
-                'lugar' => $lugar,
-                'servicio' => 'ESPECIAL',
-                'nombre_autoridad' => $infractor,
-                'observacion_autoridad' => $obsAutoridad,
+                'numero_papeleta'         => $numeroPapeleta,
+                'id_vehiculo'             => $vehiculoId,
+                'id_persona_infractor'    => $personaId,
+                'id_inspector'            => $inspectorId,
+                'fecha_hora'              => $fechaHora,
+                'lugar'                   => $lugar,
+                'servicio'                => 'ESPECIAL',
+                'nombre_autoridad'        => $infractor,
+                'observacion_autoridad'   => $obsAutoridad,
                 'observaciones_conductor' => $obsConductor,
-                'monto_total' => $monto,
-                'estado' => 'PENDIENTE_PAGO',
+                'firma_conductor_estado'  => 'PENDIENTE',
+                'monto_total'             => $monto,
+                'estado'                  => 'PENDIENTE_PAGO',
             ];
             $db->table('papeletas')->insert($papeletaData);
-            $papeletaId = $db->insertID();
+            $papeletaId = (int)$db->insertID();
 
-            
             $detalleData = [
-                'papeleta_id' => $papeletaId,
-                'tipo_infraccion_id' => $tipoInfraccionId,
-                'monto' => $monto,
-                'descuento' => 0.00,
-                'monto_final' => $monto,
+                'id_papeleta'        => $papeletaId,
+                'id_tipo_infraccion' => $tipoInfraccionId,
+                'monto'              => $monto,
+                'descuento'          => 0.00,
+                'monto_final'        => $monto,
             ];
             $db->table('papeleta_detalles')->insert($detalleData);
 
@@ -224,12 +244,12 @@ class PapeletasController extends ResourceController
                 $tipoInfraccionId = (int)$input['tipoInfraccionId'];
                 $infraccion = $db->table('tipos_infraccion')->where('id', $tipoInfraccionId)->limit(1)->get()->getRowArray();
                 if ($infraccion) {
-                    $monto = (float)$infraccion['monto_base'];
+                    $monto = (float)(($infraccion['porcentaje_uit'] / 100) * 5150);
                     $data['monto_total'] = $monto;
-                    $db->table('papeleta_detalles')->where('papeleta_id', $id)->delete();
+                    $db->table('papeleta_detalles')->where('id_papeleta', $id)->delete();
                     $db->table('papeleta_detalles')->insert([
-                        'papeleta_id' => $id,
-                        'tipo_infraccion_id' => $tipoInfraccionId,
+                        'id_papeleta' => $id,
+                        'id_tipo_infraccion' => $tipoInfraccionId,
                         'monto' => $monto,
                         'descuento' => 0.00,
                         'monto_final' => $monto,

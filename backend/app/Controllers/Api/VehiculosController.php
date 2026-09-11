@@ -27,17 +27,19 @@ class VehiculosController extends ResourceController
                 COALESCE(v.codigo_qr, '') AS codigoQr,
                 COALESCE(o.razon_social, 'Independiente') AS organizacion,
                 COALESCE(o.ruc, '') AS organizacionRuc,
-                COALESCE(p.tipo_documento, 'DNI') AS propietarioTipoDocumento,
-                COALESCE(p.nombres, '') AS propietarioNombres,
-                COALESCE(p.apellido_paterno, '') AS propietarioPaterno,
-                COALESCE(p.apellido_materno, '') AS propietarioMaterno,
-                COALESCE(p.numero_documento, '') AS propietarioDni,
+                COALESCE(td.nombre, 'DNI') AS propietarioTipoDocumento,
+                COALESCE(c.nombres, '') AS propietarioNombres,
+                COALESCE(c.apellido_paterno, '') AS propietarioPaterno,
+                COALESCE(c.apellido_materno, '') AS propietarioMaterno,
+                COALESCE(p.numero, '') AS propietarioDni,
                 v.estado_formalizacion AS estado
             ", false)
-            ->join('tipos_vehiculo tv', 'tv.id = v.tipo_vehiculo_id', 'left')
-            ->join('organizaciones o', 'o.id = v.asociacion_id', 'left')
-            ->join('vehiculo_propietarios vp', 'vp.vehiculo_id = v.id AND vp.fecha_fin IS NULL', 'left')
-            ->join('personas p', 'p.id = vp.persona_id', 'left')
+            ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
+            ->join('organizaciones o', 'o.id = v.id_asociacion', 'left')
+            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
+            ->join('personas p', 'p.id = vp.id_persona', 'left')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
             ->orderBy('v.id', 'DESC')
             ->get()
             ->getResultArray();
@@ -48,28 +50,28 @@ class VehiculosController extends ResourceController
 
         if (!empty($vehiculoIds)) {
             $documentos = $db->table('documentos_vehiculo')
-                ->select('vehiculo_id, tipo_documento as tipoDocumento, codigo, fecha_expedicion as fechaExpedicion, fecha_expiracion as fechaExpiracion, estado')
-                ->whereIn('vehiculo_id', $vehiculoIds)
+                ->select('id_vehiculo, tipo_documento as tipoDocumento, codigo, fecha_expedicion as fechaExpedicion, fecha_expiracion as fechaExpiracion, estado')
+                ->whereIn('id_vehiculo', $vehiculoIds)
                 ->orderBy('fecha_expiracion', 'DESC')
                 ->get()
                 ->getResultArray();
 
             foreach ($documentos as $doc) {
-                $vehiculoId = (int)$doc['vehiculo_id'];
-                unset($doc['vehiculo_id']);
+                $vehiculoId = (int)$doc['id_vehiculo'];
+                unset($doc['id_vehiculo']);
                 $documentosPorVehiculo[$vehiculoId][] = $doc;
             }
 
             $papeletas = $db->table('papeletas')
-                ->select('vehiculo_id, numero_papeleta as numeroPapeleta, fecha_hora as fechaHora, lugar, monto_total as montoTotal, estado')
-                ->whereIn('vehiculo_id', $vehiculoIds)
+                ->select('id_vehiculo, numero_papeleta as numeroPapeleta, fecha_hora as fechaHora, lugar, monto_total as montoTotal, estado')
+                ->whereIn('id_vehiculo', $vehiculoIds)
                 ->orderBy('fecha_hora', 'DESC')
                 ->get()
                 ->getResultArray();
 
             foreach ($papeletas as $papeleta) {
-                $vehiculoId = (int)$papeleta['vehiculo_id'];
-                unset($papeleta['vehiculo_id']);
+                $vehiculoId = (int)$papeleta['id_vehiculo'];
+                unset($papeleta['id_vehiculo']);
                 $papeleta['montoTotal'] = (float)$papeleta['montoTotal'];
                 $papeletasPorVehiculo[$vehiculoId][] = $papeleta;
             }
@@ -137,7 +139,7 @@ class VehiculosController extends ResourceController
 
         $record = [
             'placa'                => $placa,
-            'tipo_vehiculo_id'     => $tipoVehiculoId,
+            'id_tipo_vehiculo'     => $tipoVehiculoId,
             'marca'                => trim($input['marca'] ?? ''),
             'modelo'               => trim($input['modelo'] ?? ''),
             'color'                => trim($input['color'] ?? ''),
@@ -146,44 +148,54 @@ class VehiculosController extends ResourceController
             'serie_motor'          => trim($input['serieMotor'] ?? ''),
             'partida_registral'    => trim($input['partidaRegistral'] ?? ''),
             'codigo_qr'            => $qrCode,
-            'asociacion_id'        => $asociacionId,
+            'id_asociacion'        => $asociacionId,
             'estado_formalizacion' => strtoupper($input['estado'] ?? 'FORMALIZADO'),
         ];
 
         $db->table('vehiculos')->insert($record);
         $vehiculoId = (int)$db->insertID();
 
-        
+               // Propietario
         $propietarioNombre = trim($input['propietario'] ?? '');
         $propietarioDni = trim($input['propietarioDni'] ?? '');
 
         if ($propietarioDni !== '' || $propietarioNombre !== '') {
             $personaId = null;
             if ($propietarioDni !== '') {
-                $personaRow = $db->table('personas')->where('numero_documento', $propietarioDni)->get()->getRowArray();
+                $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
                 if ($personaRow) {
-                    $personaId = $personaRow['id'];
+                    $personaId = (int)$personaRow['id'];
                 }
             }
 
-            if (!$personaId && $propietarioNombre !== '') {
-                $names = explode(' ', $propietarioNombre);
-                $paterno = count($names) > 1 ? array_pop($names) : '';
-                $nombres = implode(' ', $names) ?: $propietarioNombre;
+            if (!$personaId && ($propietarioNombre !== '' || $propietarioDni !== '')) {
+                $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', 'DNI')->get()->getRowArray();
+                $tipoDocId = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
+
+                $numDoc = $propietarioDni ?: (string)random_int(10000000, 99999999);
                 $db->table('personas')->insert([
-                    'tipo_documento'   => 'DNI',
-                    'numero_documento' => $propietarioDni ?: str_pad(random_int(10000000, 99999999), 8, '0', STR_PAD_LEFT),
-                    'nombres'          => $nombres,
-                    'apellido_paterno' => $paterno ?: 'Titular',
-                    'estado'           => 'ACTIVO',
+                    'id_tipo_documento' => $tipoDocId,
+                    'numero'            => $numDoc,
+                    'estado'            => 'ACTIVO',
                 ]);
-                $personaId = $db->insertID();
+                $personaId = (int)$db->insertID();
+
+                $names = preg_split('/\s+/', $propietarioNombre ?: 'Ciudadano Titular');
+                $paterno = count($names) > 1 ? array_pop($names) : 'Titular';
+                $nombres = implode(' ', $names) ?: ($propietarioNombre ?: 'Ciudadano');
+
+                $db->table('ciudadanos')->insert([
+                    'id_persona'       => $personaId,
+                    'nombres'          => $nombres,
+                    'apellido_paterno' => $paterno,
+                    'apellido_materno' => '',
+                ]);
             }
 
             if ($personaId) {
                 $db->table('vehiculo_propietarios')->insert([
-                    'vehiculo_id'  => $vehiculoId,
-                    'persona_id'   => $personaId,
+                    'id_vehiculo'  => $vehiculoId,
+                    'id_persona'   => $personaId,
                     'fecha_inicio' => date('Y-m-d'),
                     'estado'       => 'ACTIVO',
                 ]);
@@ -233,8 +245,68 @@ class VehiculosController extends ResourceController
         if (isset($input['partidaRegistral'])) $record['partida_registral'] = trim($input['partidaRegistral']);
         if (isset($input['estado'])) $record['estado_formalizacion'] = strtoupper($input['estado']);
 
+        if (!empty($input['tipo'])) {
+            $tipoNombre = trim($input['tipo']);
+            $tipoRow = $db->table('tipos_vehiculo')->where('nombre', $tipoNombre)->get()->getRowArray();
+            if (!$tipoRow) {
+                $db->table('tipos_vehiculo')->insert(['nombre' => $tipoNombre, 'estado' => 'ACTIVO']);
+                $record['id_tipo_vehiculo'] = $db->insertID();
+            } else {
+                $record['id_tipo_vehiculo'] = $tipoRow['id'];
+            }
+        }
+        if (isset($input['organizacion'])) {
+            $orgNombre = trim($input['organizacion']);
+            if ($orgNombre !== '') {
+                $orgRow = $db->table('organizaciones')->like('razon_social', $orgNombre)->get()->getRowArray();
+                $record['id_asociacion'] = $orgRow ? $orgRow['id'] : null;
+            } else {
+                $record['id_asociacion'] = null;
+            }
+        }
+
         if (!empty($record)) {
             $db->table('vehiculos')->where('id', $id)->update($record);
+        }
+
+        $propietarioNombre = trim($input['propietario'] ?? '');
+        $propietarioDni = trim($input['propietarioDni'] ?? '');
+        if ($propietarioDni !== '' || $propietarioNombre !== '') {
+            $personaId = null;
+            if ($propietarioDni !== '') {
+                $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
+                if ($personaRow) $personaId = (int)$personaRow['id'];
+            }
+            if (!$personaId && ($propietarioNombre !== '' || $propietarioDni !== '')) {
+                $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', 'DNI')->get()->getRowArray();
+                $tipoDocId = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
+                $numDoc = $propietarioDni ?: (string)random_int(10000000, 99999999);
+                $db->table('personas')->insert([
+                    'id_tipo_documento' => $tipoDocId,
+                    'numero'            => $numDoc,
+                    'estado'            => 'ACTIVO',
+                ]);
+                $personaId = (int)$db->insertID();
+
+                $names = preg_split('/\s+/', $propietarioNombre ?: 'Ciudadano Titular');
+                $paterno = count($names) > 1 ? array_pop($names) : 'Titular';
+                $nombres = implode(' ', $names) ?: ($propietarioNombre ?: 'Ciudadano');
+                $db->table('ciudadanos')->insert([
+                    'id_persona'       => $personaId,
+                    'nombres'          => $nombres,
+                    'apellido_paterno' => $paterno,
+                    'apellido_materno' => '',
+                ]);
+            }
+            if ($personaId) {
+                $db->table('vehiculo_propietarios')->where('id_vehiculo', $id)->delete();
+                $db->table('vehiculo_propietarios')->insert([
+                    'id_vehiculo'  => $id,
+                    'id_persona'   => $personaId,
+                    'fecha_inicio' => date('Y-m-d'),
+                    'estado'       => 'ACTIVO',
+                ]);
+            }
         }
 
         return $this->respond(['status' => true, 'message' => 'Vehículo actualizado con éxito']);
@@ -248,8 +320,8 @@ class VehiculosController extends ResourceController
             return $this->failNotFound('ID de vehículo no especificado.');
         }
 
-        $db->table('vehiculo_propietarios')->where('vehiculo_id', $id)->delete();
-        $db->table('documentos_vehiculo')->where('vehiculo_id', $id)->delete();
+        $db->table('vehiculo_propietarios')->where('id_vehiculo', $id)->delete();
+        $db->table('documentos_vehiculo')->where('id_vehiculo', $id)->delete();
         $db->table('vehiculos')->where('id', $id)->delete();
 
         return $this->respondDeleted(['status' => true, 'message' => 'Vehículo eliminado con éxito']);

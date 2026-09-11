@@ -13,24 +13,24 @@ class PagosController extends ResourceController
         $db = \Config\Database::connect();
         
         try {
-            $rows = $db->table('pagos p')
+            $rows = $db->table('pagos_transito p')
                 ->select("
                     p.id,
                     p.numero_recibo as numeroRecibo,
-                    p.concepto,
-                    p.numero_voucher as contribuyente,
-                    p.codigo_contribuyente as dniRuc,
-                    p.codigo_contribuyente as documentoIdentidad,
-                    p.subtotal as monto,
-                    p.descuento_aplicado as descuentoAplicado,
+                    'Pago de Trámite/Multa' as concepto,
+                    COALESCE(p.numero_voucher, 'Contribuyente Particular') as contribuyente,
+                    'N/A' as dniRuc,
+                    'N/A' as documentoIdentidad,
+                    p.total as monto,
+                    0.00 as descuentoAplicado,
                     p.total as montoNeto,
                     p.tipo_pago as metodoPago,
                     p.tipo_pago as metodo,
                     CONCAT(p.fecha_pago, ' ', COALESCE(p.hora_pago, '10:00:00')) as fechaHora,
                     p.fecha_pago as fecha,
-                    p.cajero,
+                    'Caja Central Municipal' as cajero,
                     p.estado
-                ")
+                ", false)
                 ->orderBy('p.id', 'DESC')
                 ->get()
                 ->getResultArray();
@@ -42,9 +42,6 @@ class PagosController extends ResourceController
                 $row['montoNeto'] = (float)$row['montoNeto'];
                 $row['tipoConcepto'] = 'TRAMITE';
                 $row['vehiculoPlaca'] = '';
-                $row['contribuyente'] = $row['contribuyente'] ?: 'Contribuyente Particular';
-                $row['dniRuc'] = $row['dniRuc'] ?: 'N/A';
-                $row['cajero'] = $row['cajero'] ?: 'Caja Central Municipal';
                 return $row;
             }, $rows);
 
@@ -79,26 +76,19 @@ class PagosController extends ResourceController
         $cajero = 'Caja Central Municipal';
 
         $data = [
-            'tipo_pago' => $metodo,
+            'tipo_pago' => 'PAGO_TRAMITE',
             'numero_recibo' => $numeroRecibo,
             'numero_voucher' => $contribuyente,
+            'medio_pago' => $metodo,
+            'referencia_pago' => $dniRuc,
             'fecha_pago' => $fechaPago,
             'hora_pago' => $horaPago,
-            'cajero' => $cajero,
-            'caja' => 'Caja 01',
-            'codigo_contribuyente' => $dniRuc,
-            'concepto' => $concepto,
-            'subtotal' => $monto,
-            'reajuste' => 0.00,
-            'intereses' => 0.00,
-            'descuento_aplicado' => $descuento,
-            'redondeo' => 0.00,
             'total' => $total,
             'estado' => 'PAGADO',
         ];
 
         try {
-            $db->table('pagos')->insert($data);
+            $db->table('pagos_transito')->insert($data);
             $newId = $db->insertID();
             
             $response = [
@@ -130,7 +120,7 @@ class PagosController extends ResourceController
     {
         $db = \Config\Database::connect();
         try {
-            $db->table('pagos')->where('id', $id)->update(['estado' => 'ANULADO']);
+            $db->table('pagos_transito')->where('id', $id)->update(['estado' => 'ANULADO']);
             return $this->respondDeleted(['status' => 200, 'message' => 'Pago anulado correctamente']);
         } catch (\Exception $e) {
             return $this->failServerError('Error anulando el pago: ' . $e->getMessage());

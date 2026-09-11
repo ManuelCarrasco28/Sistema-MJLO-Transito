@@ -15,7 +15,9 @@ class DashboardController extends ResourceController
 
         
         $vehTotal = (int) $db->table('vehiculos')->countAllResults();
-        $vehMes = 0;
+        $vehMes = (int) $db->table('vehiculos')
+            ->where('anio_fabricacion', (int) date('Y'))
+            ->countAllResults();
 
         
         $docRow = $db->table('documentos_vehiculo')
@@ -33,15 +35,15 @@ class DashboardController extends ResourceController
         $documentosPorVencer = (int) ($docRow['por_vencer'] ?? 0);
 
         
-        $inspeccionesPendientes = (int) $db->table('inspecciones_tecnicas')
-            ->whereIn('estado', ['PENDIENTE', 'EN_TRAMITE', 'EN TRÁMITE', 'EN TRAMITE'])
+        $inspeccionesPendientes = (int) $db->table('certicav')
+            ->whereIn('estado', ['PENDIENTE', 'EN_TRAMITE'])
             ->countAllResults();
 
         
         $papRow = $db->table('papeletas')
             ->select("
-                SUM(CASE WHEN estado IN ('PENDIENTE', 'POR_PAGAR', 'POR PAGAR', 'PENDIENTE_PAGO') THEN 1 ELSE 0 END) as pendientes,
-                SUM(CASE WHEN estado IN ('PENDIENTE', 'POR_PAGAR', 'POR PAGAR', 'PENDIENTE_PAGO') THEN monto_total ELSE 0 END) as monto_pendiente
+                SUM(CASE WHEN estado IN ('PENDIENTE', 'POR_PAGAR', 'PENDIENTE_PAGO') THEN 1 ELSE 0 END) as pendientes,
+                SUM(CASE WHEN estado IN ('PENDIENTE', 'POR_PAGAR', 'PENDIENTE_PAGO') THEN monto_total ELSE 0 END) as monto_pendiente
             ", false)
             ->get()->getRowArray() ?? [];
 
@@ -49,10 +51,10 @@ class DashboardController extends ResourceController
         $montoPendiente = (float) ($papRow['monto_pendiente'] ?? 0);
 
         
-        $retRow = $db->table('retenciones_vehiculo')
+        $retRow = $db->table('ordenes_internamiento')
             ->select("
-                SUM(CASE WHEN estado IN ('EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'ACTIVO') THEN 1 ELSE 0 END) as retenidos,
-                SUM(CASE WHEN estado IN ('LIBERADO', 'LIBERADA') OR fecha_salida IS NOT NULL THEN 1 ELSE 0 END) as liberados
+                SUM(CASE WHEN estado IN ('EN_DEPOSITO', 'ACTIVO') THEN 1 ELSE 0 END) as retenidos,
+                SUM(CASE WHEN estado IN ('LIBERADO', 'INACTIVO') THEN 1 ELSE 0 END) as liberados
             ", false)
             ->get()->getRowArray() ?? [];
 
@@ -110,10 +112,10 @@ class DashboardController extends ResourceController
         }
 
         
-        $inspRows = $db->table('inspecciones_tecnicas')
-            ->select('MONTH(fecha_inspeccion) as mes, COUNT(*) as total', false)
-            ->where('YEAR(fecha_inspeccion)', $year)
-            ->groupBy('MONTH(fecha_inspeccion)')
+        $inspRows = $db->table('certicav')
+            ->select('MONTH(fecha) as mes, COUNT(*) as total', false)
+            ->where('YEAR(fecha)', $year)
+            ->groupBy('MONTH(fecha)')
             ->get()->getResultArray();
         $inspPorMes = [];
         foreach ($inspRows as $r) {
@@ -139,15 +141,14 @@ class DashboardController extends ResourceController
                 YEAR(fecha_hora) as anio,
                 MONTH(fecha_hora) as mes,
                 COUNT(*) as total,
-                SUM(CASE WHEN estado IN ('PENDIENTE', 'POR_PAGAR', 'POR PAGAR', 'PENDIENTE_PAGO') THEN monto_total ELSE 0 END) as pendiente
+                SUM(CASE WHEN estado IN ('PENDIENTE', 'POR_PAGAR', 'PENDIENTE_PAGO') THEN monto_total ELSE 0 END) as pendiente
             ", false)
-
             ->where('fecha_hora IS NOT NULL', null, false)
             ->groupBy('YEAR(fecha_hora), MONTH(fecha_hora)')
             ->get()->getResultArray();
 
         
-        $pagosRows = $db->table('pagos')
+        $pagosRows = $db->table('pagos_transito')
             ->select('YEAR(fecha_pago) as anio, MONTH(fecha_pago) as mes, COUNT(*) as total', false)
             ->where('fecha_pago IS NOT NULL', null, false)
             ->groupBy('YEAR(fecha_pago), MONTH(fecha_pago)')

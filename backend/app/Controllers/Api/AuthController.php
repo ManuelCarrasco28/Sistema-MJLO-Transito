@@ -22,8 +22,11 @@ class AuthController extends ResourceController
 
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()
-            ->select('usuarios.*, personal.nombres, personal.apellidos, personal.cargo')
-            ->join('personal', 'personal.id = usuarios.personal_id', 'inner')
+            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, cargos.nombre as cargo')
+            ->join('trabajadores', 'trabajadores.id_persona = usuarios.id_trabajador', 'inner')
+            ->join('ciudadanos', 'ciudadanos.id_persona = trabajadores.id_persona', 'inner')
+            ->join('desplazamiento_oficina', 'desplazamiento_oficina.id_trabajador = trabajadores.id_persona AND (desplazamiento_oficina.fecha_termino IS NULL OR desplazamiento_oficina.fecha_termino > CURDATE())', 'left')
+            ->join('cargos', 'cargos.id = desplazamiento_oficina.id_cargo', 'left')
             ->where('usuarios.nombre_usuario', $usuario)
             ->first();
 

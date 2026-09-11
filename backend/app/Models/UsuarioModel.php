@@ -9,7 +9,7 @@ class UsuarioModel extends Model
     protected $table = 'usuarios';
     protected $primaryKey = 'id';
     protected $allowedFields = [
-        'personal_id',
+        'id_trabajador',
         'nombre_usuario',
         'password_hash',
         'estado',

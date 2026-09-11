@@ -8,22 +8,73 @@ class UsuariosSeeder extends Seeder
 {
     public function run()
     {
-        $personal = [
-            ['tipo_documento' => 'DNI', 'numero_documento' => '11111111', 'nombres' => 'Diego', 'apellidos' => 'Barturen', 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
-            ['tipo_documento' => 'DNI', 'numero_documento' => '22222222', 'nombres' => 'Manuel', 'apellidos' => 'Carrasco', 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
-            ['tipo_documento' => 'DNI', 'numero_documento' => '33333333', 'nombres' => 'Milenka', 'apellidos' => 'Segundo', 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
-            ['tipo_documento' => 'DNI', 'numero_documento' => '44444444', 'nombres' => 'Angelo', 'apellidos' => 'Saavedra', 'cargo' => 'Administrador', 'estado' => 'ACTIVO'],
+        $usersData = [
+            [
+                'nombres' => 'Diego',
+                'apellido_paterno' => 'Barturen',
+                'apellido_materno' => '',
+                'numero' => '11111111',
+                'usuario' => 'diegobarturen',
+                'password' => 'diego123'
+            ],
+            [
+                'nombres' => 'Manuel',
+                'apellido_paterno' => 'Carrasco',
+                'apellido_materno' => '',
+                'numero' => '22222222',
+                'usuario' => 'manuelcarrasco',
+                'password' => 'manuel123'
+            ],
+            [
+                'nombres' => 'Milenka',
+                'apellido_paterno' => 'Segundo',
+                'apellido_materno' => '',
+                'numero' => '33333333',
+                'usuario' => 'milenkasegundo',
+                'password' => 'milenka123'
+            ],
+            [
+                'nombres' => 'Angelo',
+                'apellido_paterno' => 'Saavedra',
+                'apellido_materno' => '',
+                'numero' => '44444444',
+                'usuario' => 'angelosaavedra',
+                'password' => 'angelo123'
+            ],
         ];
 
-        $this->db->table('personal')->insertBatch($personal);
+        foreach ($usersData as $u) {
+            // 1. Crear en `personas`
+            $this->db->table('personas')->insert([
+                'id_tipo_documento' => 1, // Asumimos 1 = DNI
+                'numero' => $u['numero'],
+                'estado' => 'ACTIVO'
+            ]);
+            $idPersona = $this->db->insertID();
 
-        $usuarios = [
-            ['personal_id' => 1, 'nombre_usuario' => 'diegobarturen', 'password_hash' => password_hash('diego123', PASSWORD_BCRYPT), 'estado' => 'ACTIVO'],
-            ['personal_id' => 2, 'nombre_usuario' => 'manuelcarrasco', 'password_hash' => password_hash('manuel123', PASSWORD_BCRYPT), 'estado' => 'ACTIVO'],
-            ['personal_id' => 3, 'nombre_usuario' => 'milenkasegundo', 'password_hash' => password_hash('milenka123', PASSWORD_BCRYPT), 'estado' => 'ACTIVO'],
-            ['personal_id' => 4, 'nombre_usuario' => 'angelosaavedra', 'password_hash' => password_hash('angelo123', PASSWORD_BCRYPT), 'estado' => 'ACTIVO'],
-        ];
+            // 2. Crear en `ciudadanos`
+            $this->db->table('ciudadanos')->insert([
+                'id_persona' => $idPersona,
+                'nombres' => $u['nombres'],
+                'apellido_paterno' => $u['apellido_paterno'],
+                'apellido_materno' => $u['apellido_materno']
+            ]);
 
-        $this->db->table('usuarios')->insertBatch($usuarios);
+            // 3. Crear en `trabajadores`
+            $this->db->table('trabajadores')->insert([
+                'id_persona' => $idPersona,
+                'tipo' => 'INTERNO',
+                'tiene_cuenta' => 1,
+                'estado' => 'ACTIVO'
+            ]);
+
+            // 4. Crear en `usuarios`
+            $this->db->table('usuarios')->insert([
+                'id_trabajador' => $idPersona,
+                'nombre_usuario' => $u['usuario'],
+                'password_hash' => password_hash($u['password'], PASSWORD_BCRYPT),
+                'estado' => 'ACTIVO'
+            ]);
+        }
     }
 }
