@@ -22,7 +22,7 @@ class PersonasController extends ResourceController
                 COALESCE(p.telefono, '') AS telefono,
                 COALESCE(p.celular, '') AS celular,
                 COALESCE(p.email, '') AS email,
-                '' AS numeroLicencia,
+                COALESCE(c.numero_licencia, '') AS numeroLicencia,
                 COALESCE(c.foto, '') AS fotoUrl,
                 COALESCE(c.foto, '') AS fotoImg,
                 COALESCE(p.estado, 'ACTIVO') AS estado
@@ -66,7 +66,8 @@ class PersonasController extends ResourceController
                 'nombres'          => substr(trim($input['nombres']), 0, 50),
                 'apellido_paterno' => substr(trim($input['apellidoPaterno']), 0, 50),
                 'apellido_materno' => substr(trim($input['apellidoMaterno'] ?? ''), 0, 50) ?: null,
-                'foto'             => substr(trim($input['fotoImg'] ?? $input['fotoUrl'] ?? ''), 0, 100) ?: null,
+                'numero_licencia'  => substr(strtoupper(trim($input['numeroLicencia'] ?? '')), 0, 30) ?: null,
+                'foto'             => trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '') ?: null,
             ];
             $db->table('ciudadanos')->insert($ciudadano);
 
@@ -86,7 +87,7 @@ class PersonasController extends ResourceController
                     'telefono' => $persona['telefono'],
                     'celular' => $persona['celular'],
                     'email' => $persona['email'],
-                    'numeroLicencia' => '',
+                    'numeroLicencia' => $ciudadano['numero_licencia'] ?? '',
                     'fotoUrl' => $ciudadano['foto'] ?? '',
                     'fotoImg' => $ciudadano['foto'] ?? '',
                     'estado' => $persona['estado'],
@@ -123,8 +124,11 @@ class PersonasController extends ResourceController
         if (isset($input['nombres'])) $ciudadano['nombres'] = substr(trim($input['nombres']), 0, 50);
         if (isset($input['apellidoPaterno'])) $ciudadano['apellido_paterno'] = substr(trim($input['apellidoPaterno']), 0, 50);
         if (isset($input['apellidoMaterno'])) $ciudadano['apellido_materno'] = substr(trim($input['apellidoMaterno']), 0, 50) ?: null;
+        if (array_key_exists('numeroLicencia', $input)) {
+            $ciudadano['numero_licencia'] = substr(strtoupper(trim($input['numeroLicencia'] ?? '')), 0, 30) ?: null;
+        }
         if (array_key_exists('fotoImg', $input) || array_key_exists('fotoUrl', $input)) {
-            $ciudadano['foto'] = substr(trim($input['fotoImg'] ?? $input['fotoUrl'] ?? ''), 0, 100) ?: null;
+            $ciudadano['foto'] = trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '') ?: null;
         }
 
         $db->transException(true)->transBegin();

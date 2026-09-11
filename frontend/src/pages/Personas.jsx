@@ -104,13 +104,36 @@ export function Personas() {
       alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP).')
       return
     }
-    if (file.size > 2 * 1024 * 1024) {
-      alert('La imagen seleccionada es demasiado pesada (máximo 2 MB).')
-      return
-    }
     const reader = new FileReader()
     reader.onload = (ev) => {
-      setFormData((prev) => ({ ...prev, fotoImg: ev.target?.result || '' }))
+      const rawData = ev.target?.result
+      if (!rawData) return
+      const img = new Image()
+      img.onload = () => {
+        const maxDim = 400
+        let width = img.width
+        let height = img.height
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width)
+            width = maxDim
+          } else {
+            width = Math.round((width * maxDim) / height)
+            height = maxDim
+          }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        const compressed = canvas.toDataURL('image/jpeg', 0.85)
+        setFormData((prev) => ({ ...prev, fotoImg: compressed }))
+      }
+      img.onerror = () => {
+        setFormData((prev) => ({ ...prev, fotoImg: rawData }))
+      }
+      img.src = rawData
     }
     reader.readAsDataURL(file)
   }

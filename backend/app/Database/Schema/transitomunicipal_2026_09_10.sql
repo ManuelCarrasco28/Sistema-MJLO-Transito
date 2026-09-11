@@ -113,7 +113,8 @@ CREATE TABLE `ciudadanos` (
   `fecha_nacimiento` date DEFAULT NULL,
   `estado_civil` enum('SOLTERO(A)','CASADO(A)','CONVIVIENTE','DIVORCIADO(A)','VIUDO(A)') DEFAULT NULL,
   `profesion` varchar(50) DEFAULT NULL,
-  `foto` varchar(100) DEFAULT NULL,
+  `numero_licencia` varchar(30) DEFAULT NULL,
+  `foto` mediumtext DEFAULT NULL,
   `ruc` varchar(11) DEFAULT NULL,
   `razon_social` varchar(250) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
