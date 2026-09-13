@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../config/api'
 import { Pagination } from '../components/ui/Pagination'
+import { Icon } from '../components/ui/Icon'
 
 const emptyForm = { tipo_documento: 'DNI', numero_documento: '', nombres: '', apellidos: '', cargo: '', estado: 'ACTIVO' }
 const fieldClass = 'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900'
@@ -47,8 +48,22 @@ export function Personal() {
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div><h1 className="text-2xl font-bold">Personal municipal</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Trabajadores del área de Tránsito, Transporte y Seguridad Vial.</p></div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3.5">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30">
+            <Icon name="workerBadge" className="size-6" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                Personal municipal
+              </h1>
+            </div>
+            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              Trabajadores del área de Tránsito, Transporte y Seguridad Vial.
+            </p>
+          </div>
+        </div>
         <button onClick={() => openForm(emptyForm)} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Registrar trabajador</button>
       </div>
       <div className="grid gap-4 sm:grid-cols-3">

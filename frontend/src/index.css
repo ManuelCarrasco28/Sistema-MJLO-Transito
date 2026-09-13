@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-50: #F4F7FE;
+  --color-brand-100: #E9EDF7;
+  --color-brand-200: #D3DAEF;
+  --color-brand-500: #4318FF;
+  --color-brand-600: #3311DB;
+  --color-brand-700: #2A0CBE;
+  --color-brand-purple: #4318FF;
+  --color-brand-secondary: #7551FF;
+  --color-brand-dark: #2B3674;
+  --color-brand-muted: #A3AED0;
+  --color-brand-gray: #707EAE;
+
+  --color-horizon-green: #01B574;
+  --color-horizon-orange: #FFB547;
+  --color-horizon-red: #EE5D50;
+  --color-horizon-cyan: #39B8FF;
+  --color-horizon-lightgray: #F4F7FE;
+
+  --shadow-horizon: 0px 18px 40px rgba(112, 144, 176, 0.12);
+  --shadow-horizon-hover: 0px 20px 45px rgba(112, 144, 176, 0.20);
+  --shadow-horizon-pill: 0px 10px 25px rgba(112, 144, 176, 0.10);
+  --shadow-horizon-btn: 0px 14px 28px rgba(67, 24, 255, 0.24);
+
+  --font-sans: "Plus Jakarta Sans", "DM Sans", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {

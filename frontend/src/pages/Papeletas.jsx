@@ -676,14 +676,20 @@ export function Papeletas() {
               <div className="border-t-2 border-dashed border-black my-2"></div>
 
               <div className="space-y-1 mb-2">
-                <div className="flex justify-between">
-                  <span className="font-bold">CÓDIGO:</span>
-                  <span>{selectedPapeleta.detalles?.[0]?.codigo || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-bold">FALTA:</span>
-                  <span>{selectedPapeleta.detalles?.[0]?.gravedad || 'LEVE'}</span>
-                </div>
+                <span className="font-bold">INFRACCIONES:</span>
+                {selectedPapeleta.detalles?.length > 0 ? (
+                  selectedPapeleta.detalles.map((d, i) => (
+                    <div key={i} className="flex justify-between pl-2">
+                      <span>{d.codigo} ({d.gravedad || 'LEVE'})</span>
+                      <span>S/ {parseFloat(d.monto || selectedPapeleta.montoTotal).toFixed(2)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex justify-between pl-2">
+                    <span>{selectedPapeleta.tipoInfraccionCodigo || 'N/A'}</span>
+                    <span>S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t-2 border-dashed border-black my-2"></div>
@@ -732,6 +738,16 @@ export function Papeletas() {
               <div className="text-center mt-1">
                 <span className="text-[10px] uppercase block">Estado: {selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado}</span>
               </div>
+
+              {selectedPapeleta.firmaConductorImg && (
+                <>
+                  <div className="border-t-2 border-dashed border-black my-2"></div>
+                  <div className="text-center mt-2 flex flex-col items-center">
+                    <img src={selectedPapeleta.firmaConductorImg} alt="Firma Conductor" className="max-h-16 object-contain" />
+                    <span className="text-[10px] uppercase font-bold mt-1">Firma del Infractor</span>
+                  </div>
+                </>
+              )}
 
               <div className="border-t-2 border-dashed border-black my-2"></div>
 

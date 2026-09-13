@@ -5,7 +5,7 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/', 'Home::index');
 
 $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($routes): void {
-    $routes->options('login', 'AuthController::options');
+    $routes->options('(:any)', 'AuthController::options');
     $routes->post('login', 'AuthController::login');
 
     $routes->get('status', 'StatusController::index');
@@ -26,4 +26,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->resource('cursos', ['controller' => 'CursosController']);
     $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
     $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
+    $routes->resource('internamientos', ['controller' => 'InternamientosController']);
+    $routes->get('inventario-criterios', 'InternamientosController::criterios');
+    $routes->resource('permisos', ['controller' => 'PermisosController']);
+    $routes->get('procedimientos-admin', 'PermisosController::procedimientos');
 });

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 import '../services/api_service.dart';
+import '../theme.dart';
 
 class IssueTicketInformalScreen extends StatefulWidget {
   final Map<String, dynamic> reporteData;
@@ -98,7 +99,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
         'lugar': _lugar,
         'infraccionesIds': infraccionesInts,
         'observacionesAutoridad': _observaciones,
-        'inspectorId': inspectorId,
+        'id_inspector': inspectorId,
       };
 
       final result = await ApiService.createPapeleta(requestData);
@@ -144,7 +145,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Multar Vehículo Informal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: Colors.red.shade700,
+        backgroundColor: AppTheme.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: _isLoading

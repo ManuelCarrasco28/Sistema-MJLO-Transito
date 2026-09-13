@@ -1,68 +1,52 @@
 import { Icon } from '../ui/Icon'
 
 export function MetricCards({ cards = [], loading = false }) {
-  const themeStyles = {
-    blue: {
-      iconBox: 'bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300',
-      card: 'border-t-blue-600 dark:border-t-blue-500 bg-linear-to-br from-white via-white to-blue-50/70 dark:from-[#101a33] dark:via-[#0f172a] dark:to-blue-900/45',
-      badge: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/60',
-    },
-    cyan: {
-      iconBox: 'bg-cyan-50 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-300',
-      card: 'border-t-cyan-500 dark:border-t-cyan-400 bg-linear-to-br from-white via-white to-cyan-50/80 dark:from-[#0d1e30] dark:via-[#0f172a] dark:to-cyan-900/40',
-      badge: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200/60 dark:border-slate-700',
-    },
-    amber: {
-      iconBox: 'bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-300',
-      card: 'border-t-amber-500 dark:border-t-amber-400 bg-linear-to-br from-white via-white to-amber-50/80 dark:from-[#1e1a12] dark:via-[#0f172a] dark:to-amber-900/35',
-      badge: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/60',
-    },
-    slate: {
-      iconBox: 'bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300',
-      card: 'border-t-rose-500 dark:border-t-rose-400 bg-linear-to-br from-white via-white to-rose-50/70 dark:from-[#211528] dark:via-[#0f172a] dark:to-rose-900/35',
-      badge: 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-200/60 dark:border-rose-800/60',
-    },
-  }
+  const horizonStyles = [
+    { bg: 'bg-[#F4F7FE] dark:bg-[#4318FF]/20', text: 'text-[#4318FF] dark:text-[#E0E7FF]', icon: 'vehicle' },
+    { bg: 'bg-[#E6F9F0] dark:bg-[#01B574]/20', text: 'text-[#01B574] dark:text-[#E6F9F0]', icon: 'document' },
+    { bg: 'bg-[#EBF7FF] dark:bg-[#39B8FF]/20', text: 'text-[#39B8FF] dark:text-[#EBF7FF]', icon: 'inspection' },
+    { bg: 'bg-[#FFF5E6] dark:bg-[#FFB547]/20', text: 'text-[#FFB547] dark:text-[#FFF5E6]', icon: 'ticket' },
+    { bg: 'bg-[#FEEFEE] dark:bg-[#EE5D50]/20', text: 'text-[#EE5D50] dark:text-[#FEEFEE]', icon: 'payment' },
+  ]
+
   const displayCards = loading
     ? [
-        { label: 'Vehículos registrados', value: '...', detail: 'Cargando', change: '', positive: null, icon: 'vehicle', tone: 'blue' },
-        { label: 'Documentos vigentes', value: '...', detail: 'Cargando', change: '', positive: null, icon: 'document', tone: 'cyan' },
-        { label: 'Inspecciones pendientes', value: '...', detail: 'Cargando', change: '', positive: null, icon: 'inspection', tone: 'amber' },
-        { label: 'Papeletas pendientes', value: '...', detail: 'Cargando', change: '', positive: null, icon: 'ticket', tone: 'slate' },
+        { label: 'Vehículos Registrados', value: '...', detail: 'Cargando', change: '' },
+        { label: 'Recaudación Hoy', value: '...', detail: 'Cargando', change: '' },
+        { label: 'Documentos Activos', value: '...', detail: 'Cargando', change: '' },
+        { label: 'Inspecciones Hoy', value: '...', detail: 'Cargando', change: '' },
+        { label: 'Papeletas Pendientes', value: '...', detail: 'Cargando', change: '' },
       ]
     : cards
 
   return (
-    <section aria-label="Resumen de indicadores" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 mb-8" data-purpose="kpi-metric-cards">
       {displayCards.map((card, index) => {
-        const currentTheme = themeStyles[card.tone]
-        const trendIcon = card.positive === true ? 'trendUp' : card.positive === false ? 'trendDown' : 'trendFlat'
-
+        const style = horizonStyles[index % horizonStyles.length]
+        
         return (
-          <article
-            key={card.label}
-            style={{ animationDelay: `${index * 80 + 80}ms` }}
-            className={`animate-enter rounded-2xl border border-t-4 border-slate-200/80 p-5 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:shadow-lg dark:border-slate-800 ${currentTheme.card}`}
-          >
-            <div className="flex items-center justify-between">
-              <span className={`grid size-12 place-items-center rounded-xl ${currentTheme.iconBox}`}>
-                <Icon name={card.icon} className="size-5.5" />
-              </span>
-              {card.change !== '' && (
-                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold shadow-sm transition-colors ${currentTheme.badge}`}>
-                  <Icon name={trendIcon} className="size-3 animate-pulse" />
-                  {card.change}
-                </span>
-              )}
+          <div key={index} className="bg-white dark:bg-[#111C44] rounded-[20px] p-5 shadow-horizon dark:shadow-none border border-transparent dark:border-white/10 hover:shadow-horizon-hover transition-all duration-300 hover:-translate-y-1 flex items-center gap-4">
+            <div className={`w-14 h-14 rounded-full ${style.bg} flex items-center justify-center ${style.text} flex-shrink-0`}>
+              <Icon name={card.icon || style.icon} className="w-7 h-7" />
             </div>
-            <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-400">{card.label}</p>
-              <h3 className="mt-1 text-2xl font-bold tracking-tight text-slate-800 dark:text-white lg:text-3xl">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#A3AED0] dark:text-white/60">{card.label}</p>
+              <h3 className="text-2xl font-extrabold text-[#2B3674] dark:text-white tracking-tight">
                 {typeof card.value === 'number' ? new Intl.NumberFormat('es-PE').format(card.value) : card.value}
               </h3>
+              {card.change && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className={`text-[11px] font-bold flex items-center ${card.positive ? 'text-[#01B574] dark:text-emerald-400' : 'text-[#EE5D50] dark:text-rose-400'}`}>
+                    {card.change}
+                  </span>
+                  <span className="text-[10px] text-[#A3AED0] dark:text-white/50 truncate">{card.detail}</span>
+                </div>
+              )}
+              {!card.change && card.detail && (
+                <p className={`text-[10px] font-bold mt-0.5 ${style.text}`}>{card.detail}</p>
+              )}
             </div>
-            <p className="mt-3 border-t border-slate-100 dark:border-slate-800 pt-2.5 text-xs text-slate-500 dark:text-slate-400">{card.detail}</p>
-          </article>
+          </div>
         )
       })}
     </section>

@@ -5,9 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
-  static const String _pcWifiBaseUrl = 'http://192.168.137.44:8080/api';
+  static const String _pcWifiBaseUrl = 'http://10.207.78.109:8080/api';
   static const String baseUrl = kIsWeb ? 'http://127.0.0.1:8080/api' : _pcWifiBaseUrl;
-  static const String fileBaseUrl = kIsWeb ? 'http://127.0.0.1:8080' : 'http://192.168.137.44:8080';
+  static const String fileBaseUrl = kIsWeb ? 'http://127.0.0.1:8080' : 'http://10.207.78.109:8080';
 
   static Future<Map<String, dynamic>> login(String username, String password) async {
     final response = await http.post(
@@ -24,10 +24,10 @@ class ApiService {
       if (data['status'] == true) {
         final prefs = await SharedPreferences.getInstance();
         
-        final personalId = data['data']['personal_id'];
-        final int parsedId = personalId is int ? personalId : int.parse(personalId.toString());
+        final idPersona = data['data']['id_persona'] ?? data['data']['id_trabajador'];
+        final int parsedId = idPersona is int ? idPersona : int.parse(idPersona.toString());
         
-        await prefs.setInt('personal_id', parsedId);
+        await prefs.setInt('id_persona', parsedId);
         await prefs.setString('nombres', data['data']['nombres']);
         await prefs.setString('apellidos', data['data']['apellidos']);
         return data;
@@ -38,7 +38,7 @@ class ApiService {
 
   static Future<int?> getPersonalId() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('personal_id');
+    return prefs.getInt('id_persona');
   }
 
   static Future<void> logout() async {

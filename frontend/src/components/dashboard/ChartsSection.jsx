@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '../ui/Icon'
+import { QuickActions } from './QuickActions'
 
 export function ChartsSection({ data, loading = false }) {
   const [expandedChart, setExpandedChart] = useState(null)
@@ -9,9 +10,9 @@ export function ChartsSection({ data, loading = false }) {
   const operationsChartRef = useRef(null)
   const emptyMonths = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep'].map((month) => ({ month, multas: 0, pagos: 0 }))
   const expedientesBreakdown = data?.expedientes ?? [
-    { label: 'Vigentes', value: 0, percent: '0%', color: 'bg-blue-600', progress: '0%' },
-    { label: 'Observados', value: 0, percent: '0%', color: 'bg-cyan-400', progress: '0%' },
-    { label: 'Por vencer', value: 0, percent: '0%', color: 'bg-amber-500', progress: '0%' },
+    { label: 'Vigentes', value: 0, percent: '0%', color: 'bg-[#4318FF]', progress: '0%' },
+    { label: 'Observados', value: 0, percent: '0%', color: 'bg-[#39B8FF]', progress: '0%' },
+    { label: 'Por vencer', value: 0, percent: '0%', color: 'bg-[#FFB547]', progress: '0%' },
   ]
   const multasPagosPorAnio = data?.multasPagosPorAnio ?? {
     2026: { totals: { multas: 0, pagos: 0, pendiente: 0 }, months: emptyMonths },
@@ -21,17 +22,17 @@ export function ChartsSection({ data, loading = false }) {
   const formatNumber = (value) => new Intl.NumberFormat('es-PE').format(value)
   const selectedDataYear = multasPagosPorAnio[selectedYear] ? selectedYear : availableYears[0]
   const isAllYearsSelected = selectedYear === 'todos'
-  const multasPagos = multasPagosPorAnio[isAllYearsSelected ? selectedDataYear : selectedDataYear]
-  const totalMultasHistorico = Object.values(multasPagosPorAnio).reduce((sum, data) => sum + parseNumber(data.totals.multas), 0)
-  const totalPagosHistorico = Object.values(multasPagosPorAnio).reduce((sum, data) => sum + parseNumber(data.totals.pagos), 0)
-  const totalPendienteHistorico = Object.values(multasPagosPorAnio).reduce((sum, data) => sum + parseNumber(data.totals.pendiente), 0)
+  const multasPagos = multasPagosPorAnio[isAllYearsSelected ? selectedDataYear : selectedDataYear] || { totals: { multas: 0, pagos: 0, pendiente: 0 }, months: emptyMonths }
+  const totalMultasHistorico = Object.values(multasPagosPorAnio).reduce((sum, data) => sum + parseNumber(data.totals?.multas || 0), 0)
+  const totalPagosHistorico = Object.values(multasPagosPorAnio).reduce((sum, data) => sum + parseNumber(data.totals?.pagos || 0), 0)
+  const totalPendienteHistorico = Object.values(multasPagosPorAnio).reduce((sum, data) => sum + parseNumber(data.totals?.pendiente || 0), 0)
   const multasPagosResumen = isAllYearsSelected
     ? { multas: formatNumber(totalMultasHistorico), pagos: formatNumber(totalPagosHistorico), pendiente: `S/ ${formatNumber(totalPendienteHistorico)}` }
-    : multasPagos.totals
+    : (multasPagos.totals || { multas: 0, pagos: 0, pendiente: 0 })
   const getMonthlyValues = (year, data) => {
-    const totalMultas = parseNumber(data.totals.multas)
-    const totalPagos = parseNumber(data.totals.pagos)
-    const rawItems = data.months.map((monthItem) => ({
+    const totalMultas = parseNumber(data.totals?.multas || 0)
+    const totalPagos = parseNumber(data.totals?.pagos || 0)
+    const rawItems = (data.months || []).map((monthItem) => ({
       type: 'month',
       title: `${monthItem.month} ${year}`,
       period: year === '2026' ? 'Año actual' : 'Periodo anual',
@@ -48,7 +49,7 @@ export function ChartsSection({ data, loading = false }) {
       pagosHeight: `${Math.max(12, Math.round((item.pagos / maxValue) * 100))}%`,
     }))
   }
-  const yearlyMax = Math.max(1, ...Object.values(multasPagosPorAnio).flatMap((data) => [parseNumber(data.totals.multas), parseNumber(data.totals.pagos)]))
+  const yearlyMax = Math.max(1, ...Object.values(multasPagosPorAnio).flatMap((data) => [parseNumber(data.totals?.multas || 0), parseNumber(data.totals?.pagos || 0)]))
   const yearlyMultasPagos = Object.entries(multasPagosPorAnio)
     .sort(([a], [b]) => Number(a) - Number(b))
     .map(([year, data]) => ({
@@ -56,16 +57,16 @@ export function ChartsSection({ data, loading = false }) {
       title: year,
       year,
       label: year === '2026' ? 'Ene - Sep' : 'Ene - Dic',
-      multas: parseNumber(data.totals.multas),
-      pagos: parseNumber(data.totals.pagos),
-      pendiente: parseNumber(data.totals.pendiente),
-      multasHeight: `${Math.max(8, Math.round((parseNumber(data.totals.multas) / yearlyMax) * 100))}%`,
-      pagosHeight: `${Math.max(8, Math.round((parseNumber(data.totals.pagos) / yearlyMax) * 100))}%`,
+      multas: parseNumber(data.totals?.multas || 0),
+      pagos: parseNumber(data.totals?.pagos || 0),
+      pendiente: parseNumber(data.totals?.pendiente || 0),
+      multasHeight: `${Math.max(8, Math.round((parseNumber(data.totals?.multas || 0) / yearlyMax) * 100))}%`,
+      pagosHeight: `${Math.max(8, Math.round((parseNumber(data.totals?.pagos || 0) / yearlyMax) * 100))}%`,
     }))
   const monthlyMultasPagos = getMonthlyValues(selectedDataYear, multasPagos)
   const vehiculosDeposito = data?.vehiculosDeposito ?? [
-    { label: 'En depósito', value: 0, percent: '0%', color: 'bg-orange-500', progress: '0%' },
-    { label: 'Liberados', value: 0, percent: '0%', color: 'bg-emerald-500', progress: '0%' },
+    { label: 'En depósito', value: 62, percent: '78%', color: 'bg-orange-500', progress: '78%' },
+    { label: 'Liberados', value: 18, percent: '22%', color: 'bg-[#01B574]', progress: '22%' },
   ]
   const organizaciones = data?.organizaciones ?? []
   const operatividad = data?.operatividad ?? []
@@ -73,6 +74,9 @@ export function ChartsSection({ data, loading = false }) {
   const operationsData = data?.operacionesMensuales ?? emptyMonths.map(({ month }) => ({ month, registros: 0, inspecciones: 0 }))
   const totalExpedientes = expedientesBreakdown.reduce((sum, item) => sum + parseNumber(item.value), 0)
   const totalVehiculosDeposito = vehiculosDeposito.reduce((sum, item) => sum + parseNumber(item.value), 0)
+  const enDepositoValue = vehiculosDeposito.find(v => v.label === 'En depósito')?.value || 0
+  const liberadosValue = vehiculosDeposito.find(v => v.label === 'Liberados')?.value || 0
+  const depositoPercent = vehiculosDeposito.find(v => v.label === 'En depósito')?.percent?.replace('%', '') || 0
   const zoomWindows = [9, 6, 4, 3]
   const visibleOperations = operationsData.slice(-zoomWindows[operationsZoom])
   const chartWidth = 600
@@ -93,8 +97,8 @@ export function ChartsSection({ data, loading = false }) {
       subtitle: 'Distribución ampliada de documentos vigentes y observados',
       total: formatNumber(totalExpedientes),
       unit: 'expedientes',
-      background: 'conic-gradient(#1a73e8 0 68%, #22d3ee 68% 88%, #f59e0b 88% 100%)',
-      ring: 'border-blue-300/50',
+      background: 'conic-gradient(#4318FF 0 68%, #39B8FF 68% 88%, #FFB547 88% 100%)',
+      ring: 'border-[#4318FF]/20',
       items: expedientesBreakdown,
     },
     deposito: {
@@ -142,637 +146,720 @@ export function ChartsSection({ data, loading = false }) {
 
   return (
     <>
-    <section aria-label="Gráficos de gestión" className="grid gap-6 xl:grid-cols-[1.65fr_1fr]">
-      <article
-        className="chart-panel animate-enter rounded-2xl border border-blue-100 dark:border-slate-800 bg-linear-to-br from-white via-white to-blue-50/60 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-blue-950/20 p-5 shadow-xs sm:p-6"
-        style={{ animationDelay: '460ms' }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Operaciones mensuales</h2>
-            <p className="mt-0.5 text-xs text-slate-400">Trámites e inspecciones registradas en la base de datos</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              <span className="chart-legend-item flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-blue-600" />
-                Registros
-              </span>
-              <span className="chart-legend-item flex items-center gap-1.5 [animation-delay:180ms]">
-                <span className="size-2 rounded-full bg-cyan-400" />
-                Inspecciones
-              </span>
-            </div>
-            <span className="rounded-lg border border-slate-200/80 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              {visibleOperations.length} meses
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <div ref={operationsChartRef} className="relative h-52 w-full overscroll-contain">
-            <div className="absolute inset-0 flex flex-col justify-between text-xs text-slate-300 dark:text-slate-700" aria-hidden="true">
-              {[80, 60, 40, 20, 0].map((value) => (
-                <div key={value} className="flex items-center gap-3">
-                  <span className="w-5 text-right font-medium text-slate-400 dark:text-slate-500">{Math.round((chartMax * value) / 80)}</span>
-                  <span className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
-                </div>
-              ))}
-            </div>
-            <svg
-              role="img"
-              aria-label="Gráfico de operaciones mensuales"
-              viewBox="0 0 600 180"
-              preserveAspectRatio="none"
-              className="absolute inset-x-8 bottom-3 top-2 h-[calc(100%-1.25rem)] w-[calc(100%-3rem)] overflow-visible"
-            >
-              <defs>
-                <linearGradient id="tailAreaBlue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#1a73e8" stopOpacity="0.22" />
-                  <stop offset="1" stopColor="#1a73e8" stopOpacity="0.0" />
-                </linearGradient>
-                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="4" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-              </defs>
-              <path key={`area-${operationsZoom}`} className="chart-area" d={`M${areaPoints} Z`} fill="url(#tailAreaBlue)" />
-              <polyline
-                key={`registros-${operationsZoom}`}
-                className="chart-line"
-                points={registrosPoints}
-                fill="none"
-                stroke="#1a73e8"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                filter="url(#glow)"
-              />
-              <polyline
-                key={`inspecciones-${operationsZoom}`}
-                className="chart-line chart-line-delayed"
-                points={inspeccionesPoints}
-                fill="none"
-                stroke="#22d3ee"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeDasharray="6 6"
-                filter="url(#glow)"
-              />
-              {visibleOperations.map((item, index) => {
-                const [cx, cy] = toPoint(item, index, 'registros').split(',')
-                return (
-                  <circle
-                    key={`${operationsZoom}-${item.month}`}
-                    className="chart-point"
-                    style={{ animationDelay: `${900 + index * 90}ms` }}
-                    cx={cx}
-                    cy={cy}
-                    r="4.5"
-                    fill="white"
-                    stroke="#1a73e8"
-                    strokeWidth="2.5"
-                  />
-                )
-              })}
-            </svg>
-          </div>
-          <div className="ml-8 flex justify-between text-center text-xs font-semibold text-slate-400 dark:text-slate-500">
-            {visibleOperations.map((item) => (
-              <span key={item.month}>{item.month}</span>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center justify-end rounded-xl border border-blue-100 bg-white/70 px-3 py-2 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
-            <span>
-              {visibleOperations[0].month} - {visibleOperations[visibleOperations.length - 1].month} {new Date().getFullYear()}
-            </span>
-          </div>
-        </div>
-      </article>
-
-      <article
-        className="chart-panel animate-enter flex flex-col rounded-2xl border border-cyan-100 dark:border-slate-800 bg-linear-to-br from-white via-white to-cyan-50/70 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-cyan-950/20 p-5 shadow-xs sm:p-6"
-        style={{ animationDelay: '540ms' }}
-      >
-        <div className="border-b border-slate-100 dark:border-slate-800 pb-4">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white">Estado de expedientes</h2>
-          <p className="mt-0.5 text-xs text-slate-400">Distribución de documentos vigentes y observados</p>
-        </div>
-
-        <div className="my-auto flex flex-col items-center gap-6 pt-6 sm:flex-row xl:flex-col 2xl:flex-row">
-          <button
-            type="button"
-            onClick={() => setExpandedChart('expedientes')}
-            aria-label="Ampliar gráfico de estado de expedientes"
-            className="donut-pop relative grid size-36 shrink-0 place-items-center rounded-full shadow-[0_8px_20px_rgba(26,115,232,0.15)] transition-transform duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
-            style={{ background: 'conic-gradient(#1a73e8 0 68%, #22d3ee 68% 88%, #f59e0b 88% 100%)' }}
-          >
-            <span className="donut-ring-pulse absolute inset-0 rounded-full border border-blue-300/50" aria-hidden="true" />
-            <div className="grid size-25 place-items-center rounded-full bg-white dark:bg-[#0f172a] text-center shadow-inner">
-              <span>
-                <strong className="block text-2xl font-extrabold text-slate-800 dark:text-white">{formatNumber(totalExpedientes)}</strong>
-                <span className="text-[11px] font-medium text-slate-400">expedientes</span>
-              </span>
-            </div>
-          </button>
-
-          <div className="w-full space-y-3">
-            {expedientesBreakdown.map((item) => (
-              <div key={item.label} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-2 font-semibold text-slate-600 dark:text-slate-300">
-                    <span className={`size-2 rounded-full ${item.color}`} />
-                    {item.label}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-7 items-start">
+        {/* LEFT COLUMN (2/3 width on large screens) */}
+        <div className="lg:col-span-2 space-y-7">
+          
+          {/* 1. Operaciones mensuales (Restaurado interactivo svg) */}
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '460ms' }}>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <div>
+                <h3 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Operaciones mensuales</h3>
+                <p className="mt-0.5 text-xs text-[#A3AED0]">Trámites e inspecciones registradas en la base de datos</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 text-xs font-semibold text-[#A3AED0]">
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full bg-[#4318FF]" />
+                    Registros
                   </span>
-                  <span className="font-bold text-slate-800 dark:text-white">
-                    {item.value} <span className="font-normal text-slate-400">({item.percent})</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full bg-[#39B8FF]" />
+                    Inspecciones
                   </span>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div
-                    className={`chart-progress h-full rounded-full ${item.color}`}
-                    style={{ '--progress-width': item.progress }}
+                <span className="rounded-lg bg-[#F4F7FE] dark:bg-white/5 px-2.5 py-1 text-xs font-bold text-[#707EAE]">
+                  {visibleOperations.length} meses
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div ref={operationsChartRef} className="relative h-52 w-full overscroll-contain">
+                <div className="absolute inset-0 flex flex-col justify-between text-xs text-[#A3AED0]" aria-hidden="true">
+                  {[80, 60, 40, 20, 0].map((value) => (
+                    <div key={value} className="flex items-center gap-3">
+                      <span className="w-5 text-right font-medium">{Math.round((chartMax * value) / 80)}</span>
+                      <span className="h-px flex-1 bg-[#F4F7FE] dark:bg-white/5" />
+                    </div>
+                  ))}
+                </div>
+                <svg
+                  role="img"
+                  aria-label="Gráfico de operaciones mensuales"
+                  viewBox="0 0 600 180"
+                  preserveAspectRatio="none"
+                  className="absolute inset-x-8 bottom-3 top-2 h-[calc(100%-1.25rem)] w-[calc(100%-3rem)] overflow-visible"
+                >
+                  <defs>
+                    <linearGradient id="tailAreaBlue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stopColor="#4318FF" stopOpacity="0.22" />
+                      <stop offset="1" stopColor="#4318FF" stopOpacity="0.0" />
+                    </linearGradient>
+                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="4" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
+                  <path key={`area-${operationsZoom}`} className="chart-area transition-all duration-300" d={`M${areaPoints} Z`} fill="url(#tailAreaBlue)" />
+                  <polyline
+                    key={`registros-${operationsZoom}`}
+                    className="chart-line transition-all duration-300"
+                    points={registrosPoints}
+                    fill="none"
+                    stroke="#4318FF"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#glow)"
                   />
+                  <polyline
+                    key={`inspecciones-${operationsZoom}`}
+                    className="chart-line transition-all duration-300"
+                    points={inspeccionesPoints}
+                    fill="none"
+                    stroke="#39B8FF"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="6 6"
+                    filter="url(#glow)"
+                  />
+                  {visibleOperations.map((item, index) => {
+                    const [cx, cy] = toPoint(item, index, 'registros').split(',')
+                    return (
+                      <circle
+                        key={`${operationsZoom}-${item.month}`}
+                        className="chart-point transition-all duration-300"
+                        style={{ animationDelay: `${900 + index * 90}ms` }}
+                        cx={cx}
+                        cy={cy}
+                        r="4.5"
+                        fill="white"
+                        stroke="#4318FF"
+                        strokeWidth="2.5"
+                      />
+                    )
+                  })}
+                </svg>
+              </div>
+              <div className="ml-8 flex justify-between text-center text-xs font-semibold text-[#A3AED0]">
+                {visibleOperations.map((item) => (
+                  <span key={item.month}>{item.month}</span>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center justify-end rounded-xl bg-[#F4F7FE] dark:bg-white/5 px-3 py-2 text-xs font-bold text-[#707EAE]">
+                <span>
+                  {visibleOperations[0]?.month} - {visibleOperations[visibleOperations.length - 1]?.month} {new Date().getFullYear()}
+                </span>
+              </div>
+            </div>
+          </article>
+
+          {/* Quick Actions (Inyectado como parte del layout) */}
+          <QuickActions />
+
+          {/* Multas y pagos registrados (Restaurado interactivo) */}
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '610ms' }}>
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
+              <div>
+                <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Multas y pagos registrados</h2>
+                <p className="mt-0.5 text-xs text-[#A3AED0]">Comparativo anual por meses de papeletas emitidas y pagos atendidos</p>
+              </div>
+              <div className="flex items-center gap-2 rounded-full bg-[#F4F7FE] dark:bg-white/5 px-3 py-1.5 text-xs font-bold text-[#707EAE]">
+                <label htmlFor="filtro-anio-multas" className="uppercase tracking-wider">Año</label>
+                <select
+                  id="filtro-anio-multas"
+                  value={selectedYear}
+                  onChange={(event) => setSelectedYear(event.target.value)}
+                  className="bg-transparent font-extrabold text-[#2B3674] dark:text-white border-none outline-none focus:ring-0 p-0 text-xs"
+                >
+                  <option value="todos">Todos</option>
+                  {availableYears.map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 mb-6">
+              <div className="rounded-xl border border-[#EE5D50]/10 bg-[#FEEFEE] dark:bg-rose-500/20 px-3 py-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#EE5D50]">Multas</p>
+                <p className="text-lg font-extrabold text-[#2B3674] dark:text-white">{multasPagosResumen.multas}</p>
+              </div>
+              <div className="rounded-xl border border-[#01B574]/10 bg-[#E6F9F0] dark:bg-emerald-500/20 px-3 py-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#01B574]">Pagos</p>
+                <p className="text-lg font-extrabold text-[#2B3674] dark:text-white">{multasPagosResumen.pagos}</p>
+              </div>
+              <div className="rounded-xl border border-[#FFB547]/10 bg-[#FFF5E6] dark:bg-amber-500/20 px-3 py-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#FFB547]">Pendiente</p>
+                <p className="text-lg font-extrabold text-[#2B3674] dark:text-white">{multasPagosResumen.pendiente}</p>
+              </div>
+            </div>
+
+            {isAllYearsSelected ? (
+              <div className="mt-4 rounded-2xl border border-[#F4F7FE] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#F4F7FE] pb-3 mb-4">
+                  <div>
+                    <h3 className="text-base font-extrabold text-[#2B3674] dark:text-white">Comparativo por años</h3>
+                    <p className="mt-0.5 text-xs text-[#A3AED0]">Vista general de multas emitidas y pagos registrados</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {yearlyMultasPagos.map((item, index) => (
+                    <button
+                      type="button"
+                      key={item.year}
+                      onClick={() => setExpandedMultasPagos(item)}
+                      className="group rounded-2xl border border-[#F4F7FE] bg-white dark:bg-[#111C44] hover:border-[#4318FF]/30 p-4 transition duration-300 hover:-translate-y-1 hover:shadow-horizon dark:shadow-none text-left cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="text-xl font-black text-[#2B3674] dark:text-white">{item.year}</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#A3AED0]">{item.label}</p>
+                        </div>
+                        <Icon name="arrow" className="size-4 text-[#A3AED0] transition group-hover:translate-x-1 group-hover:text-[#4318FF]" />
+                      </div>
+
+                      <div className="flex h-24 items-end justify-center gap-4 border-b border-[#F4F7FE] pb-2 mb-3">
+                        <div className="flex h-full w-8 items-end rounded-t-xl bg-[#FEEFEE] dark:bg-rose-500/20">
+                          <span
+                            className="block w-full rounded-t-xl bg-[#EE5D50]"
+                            style={{ height: item.multasHeight, transition: 'height 0.5s ease-out' }}
+                          />
+                        </div>
+                        <div className="flex h-full w-8 items-end rounded-t-xl bg-[#E6F9F0] dark:bg-emerald-500/20">
+                          <span
+                            className="block w-full rounded-t-xl bg-[#01B574]"
+                            style={{ height: item.pagosHeight, transition: 'height 0.5s ease-out' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-xl bg-[#F4F7FE] dark:bg-white/5 px-2 py-1.5">
+                          <p className="font-bold text-[#EE5D50] text-[10px]">Multas</p>
+                          <p className="text-sm font-black text-[#2B3674] dark:text-white">{formatNumber(item.multas)}</p>
+                        </div>
+                        <div className="rounded-xl bg-[#F4F7FE] dark:bg-white/5 px-2 py-1.5">
+                          <p className="font-bold text-[#01B574] text-[10px]">Pagos</p>
+                          <p className="text-sm font-black text-[#2B3674] dark:text-white">{formatNumber(item.pagos)}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </article>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 mt-4">
+                {monthlyMultasPagos.map((item, index) => (
+                  <button
+                    type="button"
+                    key={`${selectedDataYear}-${item.month}`}
+                    onClick={() => setExpandedMultasPagos(item)}
+                    className="rounded-xl border border-[#F4F7FE] bg-white dark:bg-[#111C44] p-3 text-left transition hover:-translate-y-1 hover:border-[#4318FF]/30 hover:shadow-horizon dark:shadow-none cursor-pointer"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-sm font-bold text-[#2B3674] dark:text-white">{item.month}</span>
+                      <span className="rounded-md bg-[#F4F7FE] dark:bg-white/5 px-2 py-0.5 text-[10px] font-bold text-[#A3AED0]">
+                        {selectedDataYear}
+                      </span>
+                    </div>
+                    <div className="flex h-24 items-end justify-center gap-3 border-b border-[#F4F7FE] pb-2 mb-2">
+                      <div className="flex h-full w-6 items-end rounded-t-lg bg-[#FEEFEE] dark:bg-rose-500/20">
+                        <span
+                          className="block w-full rounded-t-lg bg-[#EE5D50]"
+                          style={{ height: item.multasHeight, transition: 'height 0.5s ease-out' }}
+                        />
+                      </div>
+                      <div className="flex h-full w-6 items-end rounded-t-lg bg-[#E6F9F0] dark:bg-emerald-500/20">
+                        <span
+                          className="block w-full rounded-t-lg bg-[#01B574]"
+                          style={{ height: item.pagosHeight, transition: 'height 0.5s ease-out' }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-center gap-3 text-[10px] font-bold text-[#707EAE]">
+                      <span className="flex items-center gap-1">
+                        <span className="size-2 rounded-full bg-[#EE5D50]" />
+                        {formatNumber(item.multas)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="size-2 rounded-full bg-[#01B574]" />
+                        {formatNumber(item.pagos)}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </article>
 
-      <article
-        className="chart-panel animate-enter rounded-2xl border border-amber-100 bg-linear-to-br from-white via-white to-amber-50/70 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-amber-950/20 sm:p-6 xl:col-span-2"
-        style={{ animationDelay: '610ms' }}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-4 dark:border-slate-800">
-          <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Multas y pagos registrados</h2>
-            <p className="mt-0.5 text-xs text-slate-400">Comparativo anual por meses de papeletas emitidas y pagos atendidos</p>
-          </div>
-          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-            <label htmlFor="filtro-anio-multas" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-              Año
-            </label>
-            <select
-              id="filtro-anio-multas"
-              value={selectedYear}
-              onChange={(event) => setSelectedYear(event.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-extrabold text-slate-800 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-            >
-              <option value="todos">Todos los años</option>
-              {availableYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 dark:border-rose-900/50 dark:bg-rose-950/30">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-rose-500">Multas</p>
-            <p className="text-lg font-extrabold text-rose-700 dark:text-rose-300">{multasPagosResumen.multas}</p>
-          </div>
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 dark:border-emerald-900/50 dark:bg-emerald-950/30">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Pagos</p>
-            <p className="text-lg font-extrabold text-emerald-700 dark:text-emerald-300">{multasPagosResumen.pagos}</p>
-          </div>
-          <div className="rounded-xl border border-orange-100 bg-orange-50 px-3 py-2 dark:border-orange-900/50 dark:bg-orange-950/30">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-orange-600">Pendiente</p>
-            <p className="text-lg font-extrabold text-orange-700 dark:text-orange-300">{multasPagosResumen.pendiente}</p>
-          </div>
-        </div>
-
-        {isAllYearsSelected ? (
-        <div className="mt-5 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900/50">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-800 dark:text-white">Comparativo por años</h3>
-              <p className="mt-0.5 text-xs text-slate-400">Vista general de multas emitidas y pagos registrados</p>
+          {/* Modern Data Table */}
+          <div className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white" data-purpose="horizon-data-table">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+              <div>
+                <h3 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Últimos Movimientos e Intervenciones</h3>
+                <p className="text-xs font-semibold text-[#A3AED0]">Registros procesados por el equipo de fiscalizadores en tiempo real</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#F4F7FE] dark:bg-white/5 text-[#707EAE] hover:text-[#2B3674] dark:text-white transition-colors cursor-pointer">
+                  Exportar CSV
+                </button>
+                <button className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#4318FF] text-white shadow-horizon dark:shadow-none-btn hover:bg-[#3311DB] transition-all cursor-pointer">
+                  Ver todos
+                </button>
+              </div>
             </div>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/50">
-              2026 acumulado hasta septiembre
-            </span>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-[#707EAE]">
+                <thead className="text-[11px] font-extrabold text-[#A3AED0] uppercase tracking-wider border-b border-[#F4F7FE]">
+                  <tr>
+                    <th className="pb-3 px-3">Conductor / Administrado</th>
+                    <th className="pb-3 px-3">Unidad / Placa</th>
+                    <th className="pb-3 px-3">Trámite / Infracción</th>
+                    <th className="pb-3 px-3">Fecha & Hora</th>
+                    <th className="pb-3 px-3 text-center">Estado</th>
+                    <th className="pb-3 px-3 text-right">Monto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F4F7FE] font-medium">
+                  <tr className="hover:bg-[#F4F7FE] dark:bg-white/10 transition-colors">
+                    <td className="py-3.5 px-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-[#4318FF]/10 text-[#4318FF] font-black flex items-center justify-center text-xs">MG</div>
+                        <div>
+                          <div className="font-extrabold text-[#2B3674] dark:text-white">Manuel Gonzales R.</div>
+                          <div className="text-[10px] text-[#A3AED0]">DNI: 45892147</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-3">
+                      <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-black bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white border border-[#E9EDF7]">NC-4821-M</span>
+                      <div className="text-[10px] text-[#A3AED0] mt-0.5">Bajaj Torito · Azul</div>
+                    </td>
+                    <td className="py-3.5 px-3">
+                      <div className="font-bold text-[#2B3674] dark:text-white">Papeleta G-40</div>
+                      <div className="text-[10px] text-[#A3AED0]">Circular sin SOAT</div>
+                    </td>
+                    <td className="py-3.5 px-3 font-semibold text-[#707EAE]">11/09 · 11:20 AM</td>
+                    <td className="py-3.5 px-3 text-center">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#FFF5E6] dark:bg-amber-500/20 text-[#FFB547]">En Proceso</span>
+                    </td>
+                    <td className="py-3.5 px-3 text-right font-black text-[#2B3674] dark:text-white">S/ 412.00</td>
+                  </tr>
+                  <tr className="hover:bg-[#F4F7FE] dark:bg-white/10 transition-colors">
+                    <td className="py-3.5 px-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-[#01B574]/15 text-[#01B574] font-black flex items-center justify-center text-xs">SL</div>
+                        <div>
+                          <div className="font-extrabold text-[#2B3674] dark:text-white">Asoc. San Lorenzo</div>
+                          <div className="text-[10px] text-[#A3AED0]">RUC: 20601827361</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-3">
+                      <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-black bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white border border-[#E9EDF7]">M8-9921</span>
+                      <div className="text-[10px] text-[#A3AED0] mt-0.5">TVS King · Rojo</div>
+                    </td>
+                    <td className="py-3.5 px-3">
+                      <div className="font-bold text-[#2B3674] dark:text-white">Inspección Técnica</div>
+                      <div className="text-[10px] text-[#A3AED0]">Acreditación 2026</div>
+                    </td>
+                    <td className="py-3.5 px-3 font-semibold text-[#707EAE]">11/09 · 10:45 AM</td>
+                    <td className="py-3.5 px-3 text-center">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#E6F9F0] dark:bg-emerald-500/20 text-[#01B574]">Aprobado</span>
+                    </td>
+                    <td className="py-3.5 px-3 text-right font-black text-[#2B3674] dark:text-white">S/ 35.00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {yearlyMultasPagos.map((item, index) => (
+          {/* Operatividad de permisos (Restaurado interactivo) */}
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '830ms' }}>
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#F4F7FE] pb-4 mb-5">
+              <div>
+                <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Operatividad de permisos</h2>
+                <p className="mt-0.5 text-xs text-[#A3AED0]">Estado general de autorizaciones activas, en trámite y vencidas</p>
+              </div>
+              <div className="rounded-xl border border-[#F4F7FE] bg-[#F4F7FE] dark:bg-white/10 px-4 py-2 text-right">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#707EAE]">Total evaluado</p>
+                <p className="text-xl font-black text-[#2B3674] dark:text-white">{totalOperatividad}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1.05fr_1.4fr] lg:items-center">
+              <div className="rounded-2xl border border-[#F4F7FE] bg-[#F4F7FE] dark:bg-white/10 p-4">
+                <div className="flex h-48 items-end justify-center gap-8 border-b border-[#F4F7FE] pb-4">
+                  {operatividad.map((item, index) => (
+                    <div key={item.label} className="flex h-full flex-col items-center justify-end gap-2">
+                      <div className="flex h-36 w-10 items-end rounded-t-2xl bg-[#F4F7FE] dark:bg-white/5">
+                        <span
+                          className={`block w-full rounded-t-2xl bg-gradient-to-t ${item.color || ''} shadow-sm`}
+                          style={{ height: item.progress, transition: 'height 0.8s ease-out' }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-extrabold text-[#707EAE]">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                  {operatividad.map((item) => (
+                    <div key={item.label} className={`rounded-xl px-2 py-2 ${item.chip}`}>
+                      <p className="text-sm font-black">{item.value}</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wider">{item.progress}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {operatividad.map((item, index) => (
+                  <div key={item.label} className="rounded-2xl border border-[#F4F7FE] bg-white dark:bg-[#111C44] p-4 shadow-sm">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-extrabold text-[#2B3674] dark:text-white">{item.label}</p>
+                        <p className="mt-0.5 text-xs text-[#A3AED0]">{item.detail}</p>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-[10px] font-black ${item.chip}`}>
+                        {item.value}
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-[#F4F7FE] dark:bg-white/5">
+                      <div
+                        className={`h-full rounded-full bg-gradient-to-r ${item.color || ''}`}
+                        style={{ width: item.progress, transition: 'width 0.8s ease-out' }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </article>
+        </div>
+
+        {/* RIGHT COLUMN (1/3 width on large screens) */}
+        <div className="space-y-7">
+          {/* Mini Calendar Widget */}
+          <div className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white">Setiembre 2026</h4>
+              <div className="flex items-center gap-1">
+                <button className="w-8 h-8 rounded-full bg-[#F4F7FE] dark:bg-white/5 hover:bg-[#E9EDF7] text-[#2B3674] dark:text-white flex items-center justify-center transition-colors cursor-pointer">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                </button>
+                <button className="w-8 h-8 rounded-full bg-[#F4F7FE] dark:bg-white/5 hover:bg-[#E9EDF7] text-[#2B3674] dark:text-white flex items-center justify-center transition-colors cursor-pointer">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 text-center text-xs font-bold text-[#A3AED0] gap-y-2 mb-2">
+              <span>Do</span><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span>
+            </div>
+            <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#2B3674] dark:text-white gap-y-2.5">
+              <span className="text-[#A3AED0]/40">30</span><span className="text-[#A3AED0]/40">31</span>
+              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+              <div className="flex flex-col items-center justify-center">
+                <span className="w-7 h-7 rounded-full bg-[#4318FF] text-white flex items-center justify-center font-black shadow-md shadow-[#4318FF]/40">11</span>
+              </div>
+              <span>12</span><span>13</span><span>14</span>
+              <div className="relative flex justify-center">
+                <span>15</span><span className="w-1.5 h-1.5 rounded-full bg-[#FFB547] absolute -bottom-1"></span>
+              </div>
+              <span>16</span><span>17</span>
+              <div className="relative flex justify-center">
+                <span>18</span><span className="w-1.5 h-1.5 rounded-full bg-[#01B574] absolute -bottom-1"></span>
+              </div>
+              <span>19</span><span>20</span><span>21</span><span>22</span><span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span><span>29</span><span>30</span>
+            </div>
+            <div className="mt-4 pt-3 border-t border-[#F4F7FE] flex items-center justify-between">
+              <span className="text-xs font-bold text-[#707EAE]">Próxima Campaña:</span>
+              <span className="text-[10px] font-extrabold text-[#4318FF] bg-[#4318FF]/10 px-2 py-0.5 rounded-full">15 Set · Educación</span>
+            </div>
+          </div>
+
+          {/* Estado de expedientes (Restaurado interactivo) */}
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '540ms' }}>
+            <div className="border-b border-[#F4F7FE] pb-4 mb-5">
+              <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Estado de expedientes</h2>
+              <p className="mt-0.5 text-xs text-[#A3AED0]">Distribución de documentos vigentes y observados</p>
+            </div>
+
+            <div className="flex flex-col items-center gap-6">
               <button
                 type="button"
-                key={item.year}
-                onClick={() => setExpandedMultasPagos(item)}
-                aria-label={`Ver detalle de multas y pagos del año ${item.year}`}
-                className={`group rounded-2xl border p-4 transition duration-300 hover:-translate-y-1 hover:shadow-lg ${
-                  item.year === '2026'
-                    ? 'border-blue-200 bg-linear-to-br from-blue-50 to-cyan-50 text-left dark:border-blue-900/60 dark:from-blue-950/30 dark:to-cyan-950/20'
-                    : 'border-slate-200/80 bg-slate-50/70 text-left dark:border-slate-800 dark:bg-slate-950/30'
-                }`}
+                onClick={() => setExpandedChart('expedientes')}
+                aria-label="Ampliar gráfico de estado de expedientes"
+                className="donut-pop relative grid size-36 shrink-0 place-items-center rounded-full shadow-[0_8px_20px_rgba(67,24,255,0.15)] transition-transform duration-300 hover:scale-105 cursor-pointer"
+                style={{ background: 'conic-gradient(#4318FF 0 68%, #39B8FF 68% 88%, #FFB547 88% 100%)' }}
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xl font-black text-slate-900 dark:text-white">{item.year}</p>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{item.label}</p>
-                  </div>
-                  <Icon name="arrow" className="size-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-blue-600 dark:text-slate-600" />
-                </div>
-
-                <div className="mt-4 flex h-32 items-end justify-center gap-4 border-b border-slate-200/70 pb-3 dark:border-slate-800">
-                  <div className="flex h-full w-10 items-end rounded-t-xl bg-rose-100 dark:bg-rose-950/50">
-                    <span
-                      className="chart-bar block w-full rounded-t-xl bg-linear-to-t from-rose-600 via-red-500 to-orange-400 shadow-[0_10px_22px_rgba(225,29,72,0.22)]"
-                      style={{ '--bar-height': item.multasHeight, animationDelay: `${260 + index * 90}ms` }}
-                    />
-                  </div>
-                  <div className="flex h-full w-10 items-end rounded-t-xl bg-emerald-100 dark:bg-emerald-950/50">
-                    <span
-                      className="chart-bar block w-full rounded-t-xl bg-linear-to-t from-emerald-700 via-teal-500 to-cyan-400 shadow-[0_10px_22px_rgba(5,150,105,0.2)]"
-                      style={{ '--bar-height': item.pagosHeight, animationDelay: `${340 + index * 90}ms` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-xl bg-white/80 px-3 py-2 ring-1 ring-slate-200/70 dark:bg-slate-900/70 dark:ring-slate-800">
-                    <p className="font-bold text-rose-500">Multas</p>
-                    <p className="text-base font-black text-slate-900 dark:text-white">{formatNumber(item.multas)}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/80 px-3 py-2 ring-1 ring-slate-200/70 dark:bg-slate-900/70 dark:ring-slate-800">
-                    <p className="font-bold text-emerald-600">Pagos</p>
-                    <p className="text-base font-black text-slate-900 dark:text-white">{formatNumber(item.pagos)}</p>
-                  </div>
+                <span className="donut-ring-pulse absolute inset-0 rounded-full border border-[#4318FF]/30" aria-hidden="true" />
+                <div className="grid size-28 place-items-center rounded-full bg-white dark:bg-[#111C44] text-center shadow-inner">
+                  <span>
+                    <strong className="block text-2xl font-black text-[#2B3674] dark:text-white">{formatNumber(totalExpedientes)}</strong>
+                    <span className="text-[10px] font-bold text-[#A3AED0] uppercase">expedientes</span>
+                  </span>
                 </div>
               </button>
-            ))}
-          </div>
-        </div>
-        ) : (
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          {monthlyMultasPagos.map((item, index) => (
-            <button
-              type="button"
-              key={`${selectedDataYear}-${item.month}`}
-              onClick={() => setExpandedMultasPagos(item)}
-              aria-label={`Ver detalle de multas y pagos de ${item.month} ${selectedDataYear}`}
-              className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-left shadow-xs transition hover:-translate-y-1 hover:border-amber-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50 dark:hover:border-amber-800"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{item.month}</span>
-                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                  {selectedDataYear}
-                </span>
+
+              <div className="w-full space-y-3">
+                {expedientesBreakdown.map((item) => (
+                  <div key={item.label} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-2 font-bold text-[#707EAE]">
+                        <span className={`size-2.5 rounded-full ${item.color}`} />
+                        {item.label}
+                      </span>
+                      <span className="font-extrabold text-[#2B3674] dark:text-white">
+                        {item.value} <span className="font-semibold text-[#A3AED0]">({item.percent})</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F4F7FE] dark:bg-white/5">
+                      <div
+                        className={`h-full rounded-full ${item.color}`}
+                        style={{ width: item.progress, transition: 'width 0.8s ease-out' }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex h-32 items-end justify-center gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
-                <div className="flex h-full w-7 items-end rounded-t-lg bg-rose-100 dark:bg-rose-950/50">
-                  <span
-                    className="chart-bar block w-full rounded-t-lg bg-linear-to-t from-rose-600 to-orange-400 shadow-[0_8px_18px_rgba(225,29,72,0.22)]"
-                    style={{ '--bar-height': item.multasHeight, animationDelay: `${260 + index * 55}ms` }}
-                  />
+            </div>
+          </article>
+
+          {/* Organizaciones registradas (Restaurado interactivo) */}
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '760ms' }}>
+            <div className="border-b border-[#F4F7FE] pb-4 mb-5">
+              <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Organizaciones</h2>
+              <p className="mt-0.5 text-xs text-[#A3AED0]">Estado visual de empresas y comités</p>
+            </div>
+
+            <div className="flex flex-col justify-between gap-4">
+              {organizaciones.map((item, index) => (
+                <div key={item.label} className="rounded-xl border border-[#F4F7FE] bg-[#F4F7FE] dark:bg-white/10 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#707EAE]">{item.label}</span>
+                    <span className="rounded-lg bg-white dark:bg-[#111C44] shadow-sm px-2 py-0.5 text-[10px] font-extrabold text-[#2B3674] dark:text-white">
+                      {item.value}
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[#E9EDF7]">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r ${item.color || ''}`}
+                      style={{ width: item.progress, transition: 'width 0.8s ease-out', animationDelay: `${820 + index * 100}ms` }}
+                    />
+                  </div>
                 </div>
-                <div className="flex h-full w-7 items-end rounded-t-lg bg-emerald-100 dark:bg-emerald-950/50">
-                  <span
-                    className="chart-bar block w-full rounded-t-lg bg-linear-to-t from-emerald-600 to-cyan-400 shadow-[0_8px_18px_rgba(5,150,105,0.2)]"
-                    style={{ '--bar-height': item.pagosHeight, animationDelay: `${340 + index * 55}ms` }}
-                  />
-                </div>
-              </div>
-              <div className="mt-2 flex justify-center gap-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                <span className="flex items-center gap-1">
-                  <span className="size-2 rounded-full bg-rose-500" />
-                  {formatNumber(item.multas)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="size-2 rounded-full bg-emerald-500" />
-                  {formatNumber(item.pagos)}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-        )}
+              ))}
+            </div>
+          </article>
 
-      </article>
-
-      <article
-        className="chart-panel animate-enter flex h-full flex-col rounded-2xl border border-orange-100 bg-linear-to-br from-white via-white to-orange-50/70 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-orange-950/20 sm:p-6"
-        style={{ animationDelay: '690ms' }}
-      >
-        <div className="border-b border-slate-100 pb-4 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white">Vehículos en depósito</h2>
-          <p className="mt-0.5 text-xs text-slate-400">Comparativo de unidades retenidas y liberadas</p>
-        </div>
-
-        <div className="mt-5 grid flex-1 gap-5 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-center">
-          <button
-            type="button"
-            onClick={() => setExpandedChart('deposito')}
-            aria-label="Ampliar gráfico de vehículos en depósito"
-            className="donut-pop relative mx-auto grid size-36 place-items-center rounded-full shadow-[0_10px_24px_rgba(249,115,22,0.16)] transition-transform duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-500"
-            style={{ background: 'conic-gradient(#f97316 0 58%, #10b981 58% 100%)' }}
-          >
-            <span className="donut-ring-pulse absolute inset-0 rounded-full border border-orange-300/50" aria-hidden="true" />
-            <div className="grid size-24 place-items-center rounded-full bg-white text-center shadow-inner dark:bg-[#0f172a]">
-              <span>
-                <strong className="block text-2xl font-extrabold text-slate-800 dark:text-white">{formatNumber(totalVehiculosDeposito)}</strong>
-                <span className="text-[11px] font-medium text-slate-400">unidades</span>
+          {/* Vehículos en depósito (Restaurado interactivo) */}
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '690ms' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white">Depósito Municipal</h4>
+              <span className="text-[10px] font-bold text-[#EE5D50] bg-[#FEEFEE] dark:bg-rose-500/20 px-2 py-0.5 rounded-full">
+                {depositoPercent}% Ocupado
               </span>
             </div>
-          </button>
-
-          <div className="space-y-3">
-            {vehiculosDeposito.map((item) => (
-              <div key={item.label} className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-900/50">
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-200">
-                    <span className={`size-2.5 rounded-full ${item.color}`} />
-                    {item.label}
-                  </span>
-                  <span className="font-extrabold text-slate-900 dark:text-white">
-                    {item.value} <span className="text-xs font-semibold text-slate-400">({item.percent})</span>
-                  </span>
+            
+            <div className="flex items-center justify-between gap-4">
+              <button
+                type="button"
+                onClick={() => setExpandedChart('deposito')}
+                className="w-20 h-20 relative flex items-center justify-center flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
+              >
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                  <path className="text-[#F4F7FE]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5"></path>
+                  <path className="text-[#FFB547]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray={`${depositoPercent}, 100`} strokeLinecap="round" strokeWidth="3.5"></path>
+                </svg>
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-sm font-extrabold text-[#2B3674] dark:text-white">{depositoPercent}%</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div className={`chart-progress h-full rounded-full ${item.color}`} style={{ '--progress-width': item.progress }} />
+              </button>
+              <div className="space-y-1.5 flex-1 text-xs">
+                <div className="flex justify-between font-bold text-[#707EAE]">
+                  <span>En depósito:</span>
+                  <span className="font-extrabold text-[#2B3674] dark:text-white">{enDepositoValue} und</span>
+                </div>
+                <div className="flex justify-between font-bold text-[#707EAE]">
+                  <span>Liberados:</span>
+                  <span className="font-extrabold text-[#01B574]">{liberadosValue} und</span>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-[#F4F7FE]">
+              <a className="text-[11px] font-extrabold text-[#4318FF] hover:underline flex items-center justify-center gap-1 cursor-pointer">
+                Inventario de internamiento →
+              </a>
+            </div>
+          </article>
         </div>
+      </div>
 
-        <div className="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-center dark:border-slate-800 sm:grid-cols-3">
-          <div className="rounded-xl bg-white/70 px-3 py-3 ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:ring-slate-800">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Promedio retiro</p>
-            <p className="mt-1 text-lg font-extrabold text-slate-800 dark:text-white">2.4 días</p>
-          </div>
-          <div className="rounded-xl bg-white/70 px-3 py-3 ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:ring-slate-800">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Actas activas</p>
-            <p className="mt-1 text-lg font-extrabold text-orange-600 dark:text-orange-300">37</p>
-          </div>
-          <div className="rounded-xl bg-white/70 px-3 py-3 ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:ring-slate-800">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Liberación</p>
-            <p className="mt-1 text-lg font-extrabold text-emerald-600 dark:text-emerald-300">42%</p>
-          </div>
-        </div>
-      </article>
-
-      <article
-        className="chart-panel animate-enter flex h-full flex-col rounded-2xl border border-indigo-100 bg-linear-to-br from-white via-white to-indigo-50/70 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-indigo-950/20 sm:p-6"
-        style={{ animationDelay: '760ms' }}
-      >
-        <div className="border-b border-slate-100 pb-4 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white">Organizaciones registradas</h2>
-          <p className="mt-0.5 text-xs text-slate-400">Estado visual de empresas, asociaciones y comités</p>
-        </div>
-
-        <div className="mt-6 flex flex-1 flex-col justify-between gap-4">
-          {organizaciones.map((item, index) => (
-            <div key={item.label} className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-900/50">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{item.label}</span>
-                <span className="rounded-lg bg-slate-100 px-2 py-0.5 text-xs font-extrabold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                  {item.value}
-                </span>
+      {/* MODALS */}
+      {currentExpanded && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="expanded-chart-title"
+          onMouseDown={() => setExpandedChart(null)}
+        >
+          <div
+            className="modal-enter w-full max-w-3xl overflow-hidden rounded-[30px] bg-white dark:bg-[#111C44] shadow-horizon dark:shadow-none"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[#F4F7FE] bg-[#F4F7FE] dark:bg-white/10 px-6 py-5">
+              <div>
+                <h2 id="expanded-chart-title" className="text-xl font-extrabold text-[#2B3674] dark:text-white">
+                  {currentExpanded.title}
+                </h2>
+                <p className="mt-1 text-sm font-medium text-[#A3AED0]">{currentExpanded.subtitle}</p>
               </div>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                <div
-                  className={`chart-progress h-full rounded-full bg-linear-to-r ${item.color}`}
-                  style={{ '--progress-width': item.progress, animationDelay: `${820 + index * 100}ms` }}
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedChart(null)}
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-white dark:bg-[#111C44] shadow-sm text-[#A3AED0] transition hover:bg-[#F4F7FE] dark:bg-white/5 hover:text-[#2B3674] dark:text-white cursor-pointer"
+              >
+                <Icon name="close" className="size-5" />
+              </button>
             </div>
-          ))}
-        </div>
-      </article>
 
-      <article
-        className="chart-panel animate-enter rounded-2xl border border-emerald-100 bg-linear-to-br from-white via-white to-emerald-50/60 p-5 shadow-xs dark:border-slate-800 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-emerald-950/20 sm:p-6 xl:col-span-2"
-        style={{ animationDelay: '830ms' }}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-4 dark:border-slate-800">
-          <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Operatividad de permisos</h2>
-            <p className="mt-0.5 text-xs text-slate-400">Estado general de autorizaciones activas, en trámite y vencidas</p>
-          </div>
-          <div className="rounded-xl border border-slate-200/80 bg-white/80 px-4 py-2 text-right shadow-xs dark:border-slate-800 dark:bg-slate-900/60">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total evaluado</p>
-            <p className="text-xl font-black text-slate-900 dark:text-white">{totalOperatividad}</p>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_1.4fr] lg:items-center">
-          <div className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-            <div className="flex h-56 items-end justify-center gap-8 border-b border-slate-100 pb-4 dark:border-slate-800">
-              {operatividad.map((item, index) => (
-                <div key={item.label} className="flex h-full flex-col items-center justify-end gap-2">
-                  <div className="flex h-40 w-12 items-end rounded-t-2xl bg-slate-100 dark:bg-slate-800">
-                    <span
-                      className={`chart-bar block w-full rounded-t-2xl bg-linear-to-t ${item.color} shadow-[0_10px_24px_rgba(15,23,42,0.14)]`}
-                      style={{ '--bar-height': item.progress, animationDelay: `${260 + index * 120}ms` }}
-                    />
-                  </div>
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{item.label}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              {operatividad.map((item) => (
-                <div key={item.label} className={`rounded-xl px-2 py-2 ${item.chip}`}>
-                  <p className="text-lg font-black">{item.value}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-wider">{item.progress}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {operatividad.map((item, index) => (
-              <div key={item.label} className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-extrabold text-slate-800 dark:text-white">{item.label}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">{item.detail}</p>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-black ${item.chip}`}>
-                    {item.value}
+            <div className="grid gap-8 p-6 md:grid-cols-[18rem_minmax(0,1fr)] md:items-center">
+              <div
+                className="donut-modal-spin relative mx-auto grid size-64 place-items-center rounded-full shadow-horizon dark:shadow-none-btn"
+                style={{ background: currentExpanded.background }}
+              >
+                <span className={`donut-ring-pulse absolute inset-0 rounded-full border ${currentExpanded.ring}`} aria-hidden="true" />
+                <div className="grid size-40 place-items-center rounded-full bg-white dark:bg-[#111C44] text-center shadow-inner">
+                  <span>
+                    <strong className="block text-5xl font-black tracking-tight text-[#2B3674] dark:text-white">
+                      {currentExpanded.total}
+                    </strong>
+                    <span className="text-sm font-bold text-[#A3AED0] uppercase">{currentExpanded.unit}</span>
                   </span>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+              </div>
+
+              <div className="space-y-4">
+                {currentExpanded.items.map((item, index) => (
                   <div
-                    className={`chart-progress h-full rounded-full bg-linear-to-r ${item.color}`}
-                    style={{ '--progress-width': item.progress, animationDelay: `${560 + index * 120}ms` }}
-                  />
-                </div>
+                    key={item.label}
+                    className="rounded-2xl border border-[#F4F7FE] bg-[#F4F7FE] dark:bg-white/10 p-4"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-base font-bold text-[#707EAE]">
+                        <span className={`size-3 rounded-full ${item.color}`} />
+                        {item.label}
+                      </span>
+                      <span className="text-xl font-black text-[#2B3674] dark:text-white">
+                        {item.value} <span className="text-sm font-semibold text-[#A3AED0]">({item.percent})</span>
+                      </span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-white dark:bg-[#111C44]">
+                      <div
+                        className={`h-full rounded-full ${item.color}`}
+                        style={{ width: item.progress, transition: 'width 0.8s ease-out', animationDelay: `${280 + index * 120}ms` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
-      </article>
-    </section>
+      )}
 
-    {currentExpanded && (
-      <div
-        className="fixed inset-0 z-80 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="expanded-chart-title"
-        onMouseDown={() => setExpandedChart(null)}
-      >
+      {expandedMultasPagos && (
         <div
-          className="modal-enter w-full max-w-3xl overflow-hidden rounded-3xl border border-white/40 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.35)] dark:border-slate-700 dark:bg-[#0f172a]"
-          onMouseDown={(event) => event.stopPropagation()}
+          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="expanded-multas-pagos-title"
+          onMouseDown={() => setExpandedMultasPagos(null)}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-linear-to-r from-blue-50 to-cyan-50 px-6 py-5 dark:border-slate-800 dark:from-slate-900 dark:to-cyan-950/30">
-            <div>
-              <h2 id="expanded-chart-title" className="text-xl font-extrabold text-slate-900 dark:text-white">
-                {currentExpanded.title}
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{currentExpanded.subtitle}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setExpandedChart(null)}
-              aria-label="Cerrar gráfico ampliado"
-              className="grid size-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-xs transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            >
-              <Icon name="close" className="size-5" />
-            </button>
-          </div>
-
-          <div className="grid gap-8 p-6 md:grid-cols-[18rem_minmax(0,1fr)] md:items-center">
-            <div
-              className="donut-modal-spin relative mx-auto grid size-64 place-items-center rounded-full shadow-[0_18px_40px_rgba(30,64,175,0.18)]"
-              style={{ background: currentExpanded.background }}
-            >
-              <span className={`donut-ring-pulse absolute inset-0 rounded-full border ${currentExpanded.ring}`} aria-hidden="true" />
-              <div className="grid size-40 place-items-center rounded-full bg-white text-center shadow-inner dark:bg-[#0f172a]">
-                <span>
-                  <strong className="block text-5xl font-black tracking-tight text-slate-900 dark:text-white">
-                    {currentExpanded.total}
-                  </strong>
-                  <span className="text-sm font-semibold text-slate-400">{currentExpanded.unit}</span>
-                </span>
+          <div
+            className="modal-enter w-full max-w-2xl overflow-hidden rounded-[30px] bg-white dark:bg-[#111C44] shadow-horizon dark:shadow-none"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[#F4F7FE] bg-[#F4F7FE] dark:bg-white/10 px-6 py-5">
+              <div>
+                <h2 id="expanded-multas-pagos-title" className="text-xl font-extrabold text-[#2B3674] dark:text-white">
+                  Multas y pagos registrados
+                </h2>
+                <p className="mt-1 text-sm font-medium text-[#A3AED0]">
+                  {expandedMultasPagos.type === 'year'
+                    ? `Detalle acumulado del año ${expandedMultasPagos.year}`
+                    : `Detalle del mes de ${expandedMultasPagos.month} ${expandedMultasPagos.year}`}
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setExpandedMultasPagos(null)}
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-white dark:bg-[#111C44] shadow-sm text-[#A3AED0] transition hover:bg-[#F4F7FE] dark:bg-white/5 hover:text-[#2B3674] dark:text-white cursor-pointer"
+              >
+                <Icon name="close" className="size-5" />
+              </button>
             </div>
 
-            <div className="space-y-4">
-              {currentExpanded.items.map((item, index) => (
-                <div
-                  key={item.label}
-                  className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/50"
-                >
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-base font-bold text-slate-700 dark:text-slate-200">
-                      <span className={`size-3 rounded-full ${item.color}`} />
-                      {item.label}
-                    </span>
-                    <span className="text-xl font-black text-slate-900 dark:text-white">
-                      {item.value} <span className="text-sm font-semibold text-slate-400">({item.percent})</span>
-                    </span>
+            <div className="p-6">
+              <div className="mb-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-[#EE5D50]/10 bg-[#FEEFEE] dark:bg-rose-500/20 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-[#EE5D50]">Multas</p>
+                  <p className="mt-1 text-3xl font-black text-[#2B3674] dark:text-white">
+                    {formatNumber(expandedMultasPagos.multas)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[#01B574]/10 bg-[#E6F9F0] dark:bg-emerald-500/20 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-[#01B574]">Pagos</p>
+                  <p className="mt-1 text-3xl font-black text-[#2B3674] dark:text-white">
+                    {formatNumber(expandedMultasPagos.pagos)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[#FFB547]/10 bg-[#FFF5E6] dark:bg-amber-500/20 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-[#FFB547]">Pendiente</p>
+                  <p className="mt-1 text-3xl font-black text-[#2B3674] dark:text-white">
+                    {expandedMultasPagos.type === 'year'
+                      ? `S/ ${formatNumber(expandedMultasPagos.pendiente)}`
+                      : formatNumber(expandedMultasPagos.pendiente)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#F4F7FE] bg-[#F4F7FE] dark:bg-white/10 p-5">
+                <div className="flex h-64 items-end justify-center gap-12 border-b border-[#F4F7FE] pb-4">
+                  <div className="flex h-full w-20 items-end rounded-t-2xl bg-[#FEEFEE] dark:bg-rose-500/20">
+                    <span
+                      key={`modal-multas-${expandedMultasPagos.title}`}
+                      className="block w-full rounded-t-2xl bg-[#EE5D50]"
+                      style={{ height: expandedMultasPagos.multasHeight, transition: 'height 0.5s ease-out' }}
+                    />
                   </div>
-                  <div className="h-3 overflow-hidden rounded-full bg-white dark:bg-slate-800">
-                    <div
-                      className={`chart-progress h-full rounded-full ${item.color}`}
-                      style={{ '--progress-width': item.progress, animationDelay: `${280 + index * 120}ms` }}
+                  <div className="flex h-full w-20 items-end rounded-t-2xl bg-[#E6F9F0] dark:bg-emerald-500/20">
+                    <span
+                      key={`modal-pagos-${expandedMultasPagos.title}`}
+                      className="block w-full rounded-t-2xl bg-[#01B574]"
+                      style={{ height: expandedMultasPagos.pagosHeight, transition: 'height 0.5s ease-out' }}
                     />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {expandedMultasPagos && (
-      <div
-        className="fixed inset-0 z-85 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="expanded-multas-pagos-title"
-        onMouseDown={() => setExpandedMultasPagos(null)}
-      >
-        <div
-          className="modal-enter w-full max-w-2xl overflow-hidden rounded-3xl border border-white/40 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.35)] dark:border-slate-700 dark:bg-[#0f172a]"
-          onMouseDown={(event) => event.stopPropagation()}
-        >
-          <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-linear-to-r from-rose-50 via-white to-emerald-50 px-6 py-5 dark:border-slate-800 dark:from-rose-950/25 dark:via-slate-900 dark:to-emerald-950/25">
-            <div>
-              <h2 id="expanded-multas-pagos-title" className="text-xl font-extrabold text-slate-900 dark:text-white">
-                Multas y pagos registrados
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {expandedMultasPagos.type === 'year'
-                  ? `Detalle acumulado del año ${expandedMultasPagos.year}`
-                  : `Detalle del mes de ${expandedMultasPagos.month} ${expandedMultasPagos.year}`}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setExpandedMultasPagos(null)}
-              aria-label="Cerrar detalle de multas y pagos"
-              className="grid size-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-xs transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            >
-              <Icon name="close" className="size-5" />
-            </button>
-          </div>
-
-          <div className="p-6">
-            <div className="mb-6 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 dark:border-rose-900/50 dark:bg-rose-950/30">
-                <p className="text-xs font-bold uppercase tracking-wider text-rose-500">Multas</p>
-                <p className="mt-1 text-3xl font-black text-rose-700 dark:text-rose-300">
-                  {formatNumber(expandedMultasPagos.multas)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
-                <p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Pagos</p>
-                <p className="mt-1 text-3xl font-black text-emerald-700 dark:text-emerald-300">
-                  {formatNumber(expandedMultasPagos.pagos)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-orange-100 bg-orange-50 p-4 dark:border-orange-900/50 dark:bg-orange-950/30">
-                <p className="text-xs font-bold uppercase tracking-wider text-orange-600">Pendiente</p>
-                <p className="mt-1 text-3xl font-black text-orange-700 dark:text-orange-300">
-                  {expandedMultasPagos.type === 'year'
-                    ? `S/ ${formatNumber(expandedMultasPagos.pendiente)}`
-                    : formatNumber(expandedMultasPagos.pendiente)}
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-900/50">
-              <div className="flex h-64 items-end justify-center gap-12 border-b border-slate-200 pb-4 dark:border-slate-800">
-                <div className="flex h-full w-20 items-end rounded-t-2xl bg-rose-100 dark:bg-rose-950/50">
-                  <span
-                    key={`modal-multas-${expandedMultasPagos.title}`}
-                    className="chart-bar block w-full rounded-t-2xl bg-linear-to-t from-rose-700 via-red-500 to-orange-400 shadow-[0_16px_34px_rgba(225,29,72,0.25)]"
-                    style={{ '--bar-height': expandedMultasPagos.multasHeight, animationDelay: '120ms' }}
-                  />
-                </div>
-                <div className="flex h-full w-20 items-end rounded-t-2xl bg-emerald-100 dark:bg-emerald-950/50">
-                  <span
-                    key={`modal-pagos-${expandedMultasPagos.title}`}
-                    className="chart-bar block w-full rounded-t-2xl bg-linear-to-t from-emerald-700 via-teal-500 to-cyan-400 shadow-[0_16px_34px_rgba(5,150,105,0.22)]"
-                    style={{ '--bar-height': expandedMultasPagos.pagosHeight, animationDelay: '260ms' }}
-                  />
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-4 text-center">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-rose-500">Multas</p>
-                  <p className="text-lg font-black text-slate-900 dark:text-white">{formatNumber(expandedMultasPagos.multas)}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Pagos</p>
-                  <p className="text-lg font-black text-slate-900 dark:text-white">{formatNumber(expandedMultasPagos.pagos)}</p>
+                <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                  <p className="font-extrabold text-[#EE5D50]">Total Multas</p>
+                  <p className="font-extrabold text-[#01B574]">Total Pagos</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
     </>
   )
 }

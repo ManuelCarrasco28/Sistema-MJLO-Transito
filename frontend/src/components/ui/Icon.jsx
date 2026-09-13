@@ -74,6 +74,65 @@ const iconPaths = {
       <path d="M4 21a8 8 0 0 1 16 0" />
     </>
   ),
+  idCard: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <circle cx="9" cy="11" r="2.2" />
+      <path d="M6.5 16c.6-1.5 1.7-2.3 2.5-2.3s1.9.8 2.5 2.3M14 10h4M14 14h3" />
+    </>
+  ),
+  workerBadge: (
+    <>
+      <path d="M12 3 5 6.5v5.2c0 4 2.8 7.4 7 8.8 4.2-1.4 7-4.8 7-8.8V6.5L12 3Z" />
+      <circle cx="12" cy="10" r="2.3" />
+      <path d="M8.5 16c.8-1.8 2.1-2.7 3.5-2.7s2.7.9 3.5 2.7" />
+    </>
+  ),
+  office: (
+    <>
+      <path d="M4 21V4.8A1.8 1.8 0 0 1 5.8 3h8.4A1.8 1.8 0 0 1 16 4.8V21" />
+      <path d="M16 9h2.2A1.8 1.8 0 0 1 20 10.8V21M2 21h20M8 7h4M8 11h4M8 15h4" />
+    </>
+  ),
+  motoTaxi: (
+    <>
+      <path d="M4 15h9l2.5-4H20l1 4" />
+      <path d="M5 15l2-5h4l2 5M9 10V7h4l2.5 4" />
+      <circle cx="6" cy="17" r="2" />
+      <circle cx="18" cy="17" r="2" />
+    </>
+  ),
+  folderShield: (
+    <>
+      <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+      <path d="M12 10.5 9.5 12v2.2c0 1.8 1 3.3 2.5 3.8 1.5-.5 2.5-2 2.5-3.8V12L12 10.5Z" />
+    </>
+  ),
+  certificate: (
+    <>
+      <path d="M7 3h10v7a5 5 0 0 1-10 0Z" />
+      <path d="M9 17 8 22l4-2 4 2-1-5M10 8h4M10 11h4" />
+    </>
+  ),
+  routePermit: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="2.5" />
+      <path d="M8 8h3a2 2 0 1 1 0 4H9a2 2 0 1 0 0 4h7M16 8h.01M16 16h.01" />
+    </>
+  ),
+  receiptCheck: (
+    <>
+      <path d="M6 3h12v18l-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+      <path d="M9 8h6M9 12h3M14 13l1.2 1.2L18 11.5" />
+    </>
+  ),
+  garage: (
+    <>
+      <path d="M3 21V9l9-6 9 6v12" />
+      <path d="M7 21v-8h10v8M7 16h10" />
+      <path d="M9 13h6" />
+    </>
+  ),
   lock: (
     <>
       <rect x="4" y="10" width="16" height="11" rx="2" />
@@ -124,6 +183,22 @@ const iconPaths = {
     </>
   ),
   chevronDown: <path d="m6 9 6 6 6-6" />,
+  chevronRight: <path d="m9 18 6-6-6-6" />,
+  calendar: (
+    <>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </>
+  ),
+  command: <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z" />,
+  shieldCheck: (
+    <>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
   trendUp: (
     <>
       <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
@@ -158,6 +233,27 @@ const iconPaths = {
     </>
   ),
   filter: <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />,
+  battery: (
+    <>
+      <rect x="2" y="7" width="18" height="10" rx="2" />
+      <path d="M22 11v2" strokeWidth="2.5" strokeLinecap="round" />
+    </>
+  ),
+  batteryCharging: (
+    <>
+      <path d="M5 7h4l-2 5h3l-4 5" />
+      <rect x="2" y="7" width="18" height="10" rx="2" />
+      <path d="M22 11v2" strokeWidth="2.5" strokeLinecap="round" />
+    </>
+  ),
+  batteryLow: (
+    <>
+      <rect x="2" y="7" width="18" height="10" rx="2" />
+      <rect x="3.5" y="8.5" width="3" height="7" rx="0.5" fill="currentColor" stroke="none" />
+      <path d="M22 11v2" strokeWidth="2.5" strokeLinecap="round" />
+    </>
+  ),
+
   plus: <path d="M5 12h14M12 5v14" />,
   camera: (
     <>

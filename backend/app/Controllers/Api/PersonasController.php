@@ -24,7 +24,7 @@ class PersonasController extends ResourceController
                 COALESCE(p.telefono, '') AS telefono,
                 COALESCE(p.celular, '') AS celular,
                 COALESCE(p.email, '') AS email,
-                '' AS numeroLicencia,
+                COALESCE(c.numero_licencia, '') AS numeroLicencia,
                 COALESCE(c.foto, '') AS fotoUrl,
                 COALESCE(c.foto, '') AS fotoImg,
                 p.estado
@@ -70,7 +70,8 @@ class PersonasController extends ResourceController
             'nombres'          => trim($input['nombres']),
             'apellido_paterno' => trim($input['apellidoPaterno']),
             'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
-            'foto'             => trim($input['fotoUrl'] ?? $input['fotoImg'] ?? ''),
+            'numero_licencia'  => strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null,
+            'foto'             => trim($input['fotoUrl'] ?? $input['fotoImg'] ?? '') ?: null,
         ];
         $db->table('ciudadanos')->insert($cData);
 
@@ -80,7 +81,7 @@ class PersonasController extends ResourceController
             return $this->failServerError('Error guardando la persona.');
         }
 
-        $newPersona = array_merge(['id' => (int)$insertId, 'tipoDocumento' => $tipoDocName, 'numeroDocumento' => $pData['numero'], 'numeroLicencia' => ''], $cData, $pData);
+        $newPersona = array_merge(['id' => (int)$insertId, 'tipoDocumento' => $tipoDocName, 'numeroDocumento' => $pData['numero'], 'numeroLicencia' => $cData['numero_licencia'] ?? ''], $cData, $pData);
         unset($newPersona['id_persona'], $newPersona['id_tipo_documento'], $newPersona['numero'], $newPersona['foto']);
         $newPersona['apellidoPaterno'] = $cData['apellido_paterno'];
         $newPersona['apellidoMaterno'] = $cData['apellido_materno'];
@@ -124,7 +125,8 @@ class PersonasController extends ResourceController
         if (isset($input['nombres'])) $cData['nombres'] = trim($input['nombres']);
         if (isset($input['apellidoPaterno'])) $cData['apellido_paterno'] = trim($input['apellidoPaterno']);
         if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = trim($input['apellidoMaterno']);
-        if (array_key_exists('fotoUrl', $input)) $cData['foto'] = trim($input['fotoUrl'] ?? '');
+        if (array_key_exists('numeroLicencia', $input)) $cData['numero_licencia'] = strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null;
+        if (array_key_exists('fotoUrl', $input) || array_key_exists('fotoImg', $input)) $cData['foto'] = trim($input['fotoUrl'] ?? $input['fotoImg'] ?? '') ?: null;
 
         if (!empty($cData)) {
             if ($db->table('ciudadanos')->where('id_persona', $id)->countAllResults()) {

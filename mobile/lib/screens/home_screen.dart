@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../theme.dart';
 import 'vehicle_details_screen.dart';
-import 'register_vehicle_screen.dart';
 import 'history_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
 
   void _logout(BuildContext context) async {
     await ApiService.logout();
@@ -15,13 +22,16 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
-  void _showSearchDialog(BuildContext context, String title, String label, String searchType) {
+  void _showSearchDialog(BuildContext context, String searchType) {
     final controller = TextEditingController();
+    String title = searchType == 'PLACA' ? 'Buscar Placa' : 'Buscar DNI';
+    String label = searchType == 'PLACA' ? 'Número de Placa' : 'Número de Documento';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
         content: TextField(
           controller: controller,
           decoration: InputDecoration(
@@ -39,7 +49,7 @@ class HomeScreen extends StatelessWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E3A8A),
+              backgroundColor: AppTheme.primaryBlue,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -66,167 +76,195 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 220.0,
-            floating: false,
-            pinned: true,
-            backgroundColor: const Color(0xFF1E3A8A),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white),
-                onPressed: () => _logout(context),
-              )
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white, // Fondo completamente blanco para el logo oscuro
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  )
-                                ]
-                              ),
-                              child: Image.asset(
-                                'assets/images/logo.png',
-                                height: 70, 
-                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.security, color: Color(0xFF1E3A8A), size: 50),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Bienvenido',
-                                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                                ),
-                                FutureBuilder<SharedPreferences>(
-                                  future: SharedPreferences.getInstance(),
-                                  builder: (context, snapshot) {
-                                    final prefs = snapshot.data;
-                                    final nombre = prefs?.getString('nombres') ?? 'Inspector';
-                                    final apellido = prefs?.getString('apellidos') ?? '';
-                                    final fullName = '$nombre $apellido'.trim();
-                                    return Text(
-                                      fullName.isEmpty ? 'Inspector' : fullName,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    );
-                                  }
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
+      backgroundColor: AppTheme.backgroundLight,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(context),
+            _buildAlertBanner(),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSummaryCards(),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Acciones de Control',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.primaryBlue,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    _buildActionGrid(context),
+                  ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showSearchDialog(context, 'PLACA'),
+        backgroundColor: AppTheme.accentYellow,
+        elevation: 4,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.add, color: AppTheme.primaryBlue, size: 32),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8.0,
+        color: Colors.white,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildBottomNavItem(Icons.home, 'Inicio', 0),
+              const SizedBox(width: 40), // Spacing for FAB
+              _buildBottomNavItem(Icons.settings, 'Ajustes', 1),
+            ],
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Acciones de Inspección',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavItem(IconData icon, String label, int index) {
+    final isSelected = _selectedIndex == index;
+    return InkWell(
+      onTap: () {
+        if (index == 1) {
+          // Placeholder for settings
+          _logout(context);
+        } else {
+          setState(() => _selectedIndex = index);
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? AppTheme.primaryBlue : Colors.grey,
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isSelected ? AppTheme.primaryBlue : Colors.grey,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      color: AppTheme.primaryBlue,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: AppTheme.accentYellow,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.person_outline, color: AppTheme.primaryBlue, size: 28),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FutureBuilder<SharedPreferences>(
+              future: SharedPreferences.getInstance(),
+              builder: (context, snapshot) {
+                final prefs = snapshot.data;
+                final nombre = prefs?.getString('nombres')?.split(' ').first ?? 'Inspector';
+                final apellido = prefs?.getString('apellidos')?.split(' ').first ?? '';
+                final id = prefs?.getInt('id_persona') ?? 0;
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Insp. $nombre $apellido',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
+                    Text(
+                      'CIP-$id • ZONA CENTRAL',
+                      style: const TextStyle(
+                        color: AppTheme.accentYellow,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 20),
-                  _buildActionCard(
-                    context: context,
-                    icon: Icons.qr_code_scanner,
-                    color: Colors.purple,
-                    title: 'Escanear código QR',
-                    subtitle: 'Escaneo rápido por cámara',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Abriendo cámara... (Falta pantalla QR)')),
-                      );
-                    },
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'SINC.',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
-                  const SizedBox(height: 16),
-                  _buildActionCard(
-                    context: context,
-                    icon: Icons.directions_car,
-                    color: Colors.blue,
-                    title: 'Buscar por Placa',
-                    subtitle: 'Ingresar la placa vehicular',
-                    onTap: () => _showSearchDialog(context, 'Buscar Vehículo', 'Placa (Ej: M1-1234)', 'PLACA'),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildActionCard(
-                    context: context,
-                    icon: Icons.badge,
-                    color: Colors.orange,
-                    title: 'Buscar por DNI',
-                    subtitle: 'Ingresar DNI del conductor',
-                    onTap: () => _showSearchDialog(context, 'Buscar Conductor', 'Número de Documento', 'DNI'),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildActionCard(
-                    context: context,
-                    icon: Icons.add_circle_outline,
-                    color: Colors.teal,
-                    title: 'Reportar Vehículo Informal',
-                    subtitle: 'Multar y enviar reporte a la oficina',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildActionCard(
-                    context: context,
-                    icon: Icons.history,
-                    color: Colors.indigo,
-                    title: 'Historial de Actividades',
-                    subtitle: 'Ver multas y reportes emitidos',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                      );
-                    },
-                  ),
-                ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: const Color(0xFFFFF9E6), // Light yellow
+      child: Row(
+        children: [
+          const Icon(Icons.shield_outlined, color: AppTheme.accentYellow, size: 20),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Alerta: Operativo en Av. Principal en curso.',
+              style: TextStyle(
+                color: AppTheme.primaryBlue,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
               ),
             ),
           ),
@@ -235,73 +273,208 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActionCard({
-    required BuildContext context,
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          splashColor: color.withOpacity(0.1),
-          highlightColor: color.withOpacity(0.05),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
+  Widget _buildSummaryCards() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(icon, size: 32, color: color),
+                Text('Registradas hoy', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    const Text('14', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primaryBlue)),
+                    const SizedBox(width: 4),
+                    Text('papeletas', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+                  ],
                 ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios, color: Colors.grey.shade300, size: 20),
               ],
             ),
           ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Pendientes Sinc.', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Text('0', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Sincronizado', style: TextStyle(fontSize: 13, color: Colors.green, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionGrid(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      childAspectRatio: 0.9,
+      children: [
+        _buildActionCard(
+          title: 'Nueva Papeleta',
+          subtitle: 'Generar infracción\nvehicular en tiempo real.',
+          icon: Icons.edit_document,
+          isPrimary: true,
+          badge: 'NUEVO',
+          onTap: () => _showSearchDialog(context, 'PLACA'),
+        ),
+        _buildActionCard(
+          title: 'Escáner',
+          subtitle: 'Escaneo de código QR en\nDNI o placas.',
+          icon: Icons.qr_code_scanner,
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Función de escáner en desarrollo')),
+            );
+          },
+        ),
+        _buildActionCard(
+          title: 'Consultas SAT',
+          subtitle: 'Búsqueda de deudas,\nórdenes de captura.',
+          icon: Icons.manage_search,
+          badge: 'ONLINE',
+          badgeColor: Colors.blue.shade100,
+          badgeTextColor: Colors.blue.shade800,
+          onTap: () => _showSearchDialog(context, 'DNI'),
+        ),
+        _buildActionCard(
+          title: 'Historial',
+          subtitle: 'Revisar papeletas del\nturno e informes.',
+          icon: Icons.history,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HistoryScreen()),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    bool isPrimary = false,
+    String? badge,
+    Color? badgeColor,
+    Color? badgeTextColor,
+    required VoidCallback onTap,
+  }) {
+    final bgColor = isPrimary ? AppTheme.primaryBlue : Colors.white;
+    final textColor = isPrimary ? Colors.white : AppTheme.primaryBlue;
+    final iconBgColor = isPrimary ? AppTheme.accentYellow : AppTheme.backgroundLight;
+    final iconColor = AppTheme.primaryBlue;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          border: isPrimary ? null : Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            if (isPrimary)
+              BoxShadow(
+                color: AppTheme.primaryBlue.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              )
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: iconColor),
+                ),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: badgeColor ?? Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        color: badgeTextColor ?? Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              title,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: isPrimary ? Colors.white70 : Colors.grey.shade600,
+                fontSize: 11,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );

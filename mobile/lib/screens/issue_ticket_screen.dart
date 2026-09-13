@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 import '../services/api_service.dart';
+import '../theme.dart';
 
 class IssueTicketScreen extends StatefulWidget {
   final Map<String, dynamic> vehicleData;
@@ -161,7 +162,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Generar Multa Oficial', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.red.shade700,
+        backgroundColor: AppTheme.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
