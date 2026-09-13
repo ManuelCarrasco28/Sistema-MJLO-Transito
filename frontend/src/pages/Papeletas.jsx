@@ -534,6 +534,9 @@ export function Papeletas() {
                           src={selectedPapeleta.firmaConductorImg}
                           alt="Firma del conductor"
                           className="max-h-24 rounded-lg object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
                       </div>
                     )}
@@ -743,7 +746,14 @@ export function Papeletas() {
                 <>
                   <div className="border-t-2 border-dashed border-black my-2"></div>
                   <div className="text-center mt-2 flex flex-col items-center">
-                    <img src={selectedPapeleta.firmaConductorImg} alt="Firma Conductor" className="max-h-16 object-contain" />
+                    <img
+                      src={selectedPapeleta.firmaConductorImg}
+                      alt="Firma Conductor"
+                      className="max-h-16 object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                     <span className="text-[10px] uppercase font-bold mt-1">Firma del Infractor</span>
                   </div>
                 </>
