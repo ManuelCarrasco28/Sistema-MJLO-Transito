@@ -6,6 +6,7 @@ export function ChartsSection({ data, loading = false }) {
   const [expandedMultasPagos, setExpandedMultasPagos] = useState(null)
   const [selectedYear, setSelectedYear] = useState('2026')
   const [operationsZoom, setOperationsZoom] = useState(0)
+  const [calendarDate, setCalendarDate] = useState(new Date())
   const operationsChartRef = useRef(null)
   const emptyMonths = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep'].map((month) => ({ month, multas: 0, pagos: 0 }))
   const expedientesBreakdown = data?.expedientes ?? [
@@ -142,6 +143,23 @@ export function ChartsSection({ data, loading = false }) {
     chartElement.addEventListener('wheel', handleWheel, { passive: false })
     return () => chartElement.removeEventListener('wheel', handleWheel)
   }, [zoomWindows.length])
+
+  // Calendar Logic
+  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate()
+  const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay()
+  const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre']
+  
+  const currentYear = calendarDate.getFullYear()
+  const currentMonth = calendarDate.getMonth()
+  const daysInMonth = getDaysInMonth(currentYear, currentMonth)
+  const firstDay = getFirstDayOfMonth(currentYear, currentMonth)
+  const prevMonthDays = getDaysInMonth(currentYear, currentMonth - 1)
+  
+  const today = new Date()
+  const isCurrentMonth = today.getMonth() === currentMonth && today.getFullYear() === currentYear
+  
+  const handlePrevMonth = () => setCalendarDate(new Date(currentYear, currentMonth - 1, 1))
+  const handleNextMonth = () => setCalendarDate(new Date(currentYear, currentMonth + 1, 1))
 
   return (
     <>
@@ -542,14 +560,14 @@ export function ChartsSection({ data, loading = false }) {
           {/* Mini Calendar Widget */}
           <div className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white">Setiembre 2026</h4>
+              <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white">{monthNames[currentMonth]} {currentYear}</h4>
               <div className="flex items-center gap-1">
-                <button className="w-8 h-8 rounded-full bg-[#F4F7FE] dark:bg-white/5 hover:bg-[#E9EDF7] text-[#2B3674] dark:text-white flex items-center justify-center transition-colors cursor-pointer">
+                <button type="button" onClick={handlePrevMonth} className="w-8 h-8 rounded-full bg-[#F4F7FE] dark:bg-white/5 hover:bg-[#E9EDF7] text-[#2B3674] dark:text-white flex items-center justify-center transition-colors cursor-pointer">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                   </svg>
                 </button>
-                <button className="w-8 h-8 rounded-full bg-[#F4F7FE] dark:bg-white/5 hover:bg-[#E9EDF7] text-[#2B3674] dark:text-white flex items-center justify-center transition-colors cursor-pointer">
+                <button type="button" onClick={handleNextMonth} className="w-8 h-8 rounded-full bg-[#F4F7FE] dark:bg-white/5 hover:bg-[#E9EDF7] text-[#2B3674] dark:text-white flex items-center justify-center transition-colors cursor-pointer">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                   </svg>
@@ -560,24 +578,25 @@ export function ChartsSection({ data, loading = false }) {
               <span>Do</span><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span>
             </div>
             <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#2B3674] dark:text-white gap-y-2.5">
-              <span className="text-[#A3AED0]/40">30</span><span className="text-[#A3AED0]/40">31</span>
-              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
-              <div className="flex flex-col items-center justify-center">
-                <span className="w-7 h-7 rounded-full bg-[#4318FF] text-white flex items-center justify-center font-black shadow-md shadow-[#4318FF]/40">11</span>
-              </div>
-              <span>12</span><span>13</span><span>14</span>
-              <div className="relative flex justify-center">
-                <span>15</span><span className="w-1.5 h-1.5 rounded-full bg-[#FFB547] absolute -bottom-1"></span>
-              </div>
-              <span>16</span><span>17</span>
-              <div className="relative flex justify-center">
-                <span>18</span><span className="w-1.5 h-1.5 rounded-full bg-[#01B574] absolute -bottom-1"></span>
-              </div>
-              <span>19</span><span>20</span><span>21</span><span>22</span><span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span><span>29</span><span>30</span>
+              {Array.from({ length: firstDay }).map((_, i) => (
+                <span key={`prev-${i}`} className="text-[#A3AED0]/40">{prevMonthDays - firstDay + i + 1}</span>
+              ))}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1
+                const isToday = isCurrentMonth && day === today.getDate()
+                if (isToday) {
+                  return (
+                    <div key={`day-${day}`} className="flex flex-col items-center justify-center">
+                      <span className="w-7 h-7 rounded-full bg-[#4318FF] text-white flex items-center justify-center font-black shadow-md shadow-[#4318FF]/40">{day}</span>
+                    </div>
+                  )
+                }
+                return <span key={`day-${day}`} className="flex items-center justify-center w-7 h-7">{day}</span>
+              })}
             </div>
             <div className="mt-4 pt-3 border-t border-[#F4F7FE] flex items-center justify-between">
-              <span className="text-xs font-bold text-[#707EAE]">Próxima Campaña:</span>
-              <span className="text-[10px] font-extrabold text-[#4318FF] bg-[#4318FF]/10 px-2 py-0.5 rounded-full">15 Set · Educación</span>
+              <span className="text-xs font-bold text-[#707EAE]">Hoy:</span>
+              <span className="text-[10px] font-extrabold text-[#4318FF] bg-[#4318FF]/10 px-2 py-0.5 rounded-full">{today.toLocaleDateString()}</span>
             </div>
           </div>
 
