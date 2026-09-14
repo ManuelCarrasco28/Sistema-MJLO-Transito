@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../ui/Icon'
 import { useLocation } from 'react-router-dom'
+import { apiFetch } from '../../config/api'
 
 export function Header({
   onOpenMobile,
@@ -28,6 +29,72 @@ export function Header({
   }).format(new Date())
   const currentDate = rawDate.charAt(0).toUpperCase() + rawDate.slice(1)
   
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [profileForm, setProfileForm] = useState({
+    password_actual: '',
+    password_nuevo: '',
+    password_confirmacion: '',
+  })
+  const [profileError, setProfileError] = useState('')
+  const [profileSuccess, setProfileSuccess] = useState('')
+  const [savingProfile, setSavingProfile] = useState(false)
+
+  const handleProfileSubmit = async (event) => {
+    event.preventDefault()
+    setProfileError('')
+    setProfileSuccess('')
+
+    const wantsPasswordChange = profileForm.password_actual || profileForm.password_nuevo || profileForm.password_confirmacion
+
+    if (wantsPasswordChange) {
+      if (!profileForm.password_actual || !profileForm.password_nuevo || !profileForm.password_confirmacion) {
+        setProfileError('Completa la contraseña actual, nueva contraseña y confirmación.')
+        return
+      }
+      if (profileForm.password_nuevo.length < 6) {
+        setProfileError('La nueva contraseña debe tener al menos 6 caracteres.')
+        return
+      }
+      if (profileForm.password_nuevo !== profileForm.password_confirmacion) {
+        setProfileError('La nueva contraseña y confirmación no coinciden.')
+        return
+      }
+      if (!user?.id) {
+        setProfileError('No se encontró el ID del usuario.')
+        return
+      }
+    }
+
+    setSavingProfile(true)
+    try {
+      if (wantsPasswordChange) {
+        const response = await apiFetch('/perfil/password', {
+          method: 'POST',
+          body: {
+            id_usuario: user.id,
+            password_actual: profileForm.password_actual,
+            password_nuevo: profileForm.password_nuevo,
+          },
+        })
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}))
+          const message = data.messages?.error || data.messages || data.message || 'Error al cambiar contraseña.'
+          setProfileError(Array.isArray(message) ? message.join(' ') : message)
+          return
+        }
+      }
+      setProfileSuccess('Contraseña actualizada correctamente.')
+      setProfileForm({
+        password_actual: '',
+        password_nuevo: '',
+        password_confirmacion: '',
+      })
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
   const formatTime = (d) =>
     new Intl.DateTimeFormat('es-PE', {
       hour: '2-digit',
@@ -54,6 +121,7 @@ export function Header({
     .toUpperCase() || 'US'
   const userEmail = user?.usuario ? `${user.usuario}@mdjlo.gob.pe` : 'usuario@mdjlo.gob.pe'
   const userRole = user?.cargo || 'Trabajador municipal'
+  const avatarImage = user?.foto_img || ''
 
   return (
     <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6 px-4 sm:px-6 lg:px-8" data-purpose="horizon-topbar">
@@ -208,9 +276,13 @@ export function Header({
             }}
           >
             <div className="relative">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#4318FF] to-[#39B8FF] flex items-center justify-center font-extrabold text-white text-xs shadow-sm">
-                {userInitials}
-              </div>
+              {avatarImage ? (
+                <img src={avatarImage} alt={userFullName} className="h-9 w-9 rounded-full object-cover shadow-sm ring-2 ring-white dark:ring-[#111C44]" />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#4318FF] to-[#39B8FF] flex items-center justify-center font-extrabold text-white text-xs shadow-sm">
+                  {userInitials}
+                </div>
+              )}
               <span className="w-2.5 h-2.5 bg-[#01B574] rounded-full border-2 border-white dark:border-[#111C44] absolute bottom-0 right-0"></span>
             </div>
             <div className="hidden xl:block text-left leading-tight">
@@ -233,6 +305,20 @@ export function Header({
                   type="button"
                   onClick={() => {
                     setUserMenuOpen(false)
+                    setProfileModalOpen(true)
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-[#2B3674] dark:text-blue-200 transition hover:bg-blue-50 dark:hover:bg-blue-500/20 cursor-pointer"
+                >
+                  <svg className="size-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 7.125 16.875 4.5M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                  </svg>
+                  <span>Editar perfil</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false)
                     onLogout()
                   }}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 transition hover:bg-red-50 dark:hover:bg-red-500/20 cursor-pointer"
@@ -246,6 +332,100 @@ export function Header({
         </div>
 
       </div>
+
+      {profileModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <form
+            onSubmit={handleProfileSubmit}
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[#111C44]"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-700">
+              <div>
+                <h3 className="text-lg font-black text-[#2B3674] dark:text-white">Editar perfil</h3>
+                <p className="text-xs font-semibold text-slate-400">Tu foto viene del registro de ciudadano. Aquí solo puedes cambiar tu contraseña.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfileModalOpen(false)}
+                className="grid size-9 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+              >
+                <Icon name="close" className="size-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-[#0B1437]">
+                {avatarImage ? (
+                  <img src={avatarImage} alt="Foto de perfil" className="h-16 w-16 rounded-2xl object-cover shadow-sm" />
+                ) : (
+                  <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-tr from-[#4318FF] to-[#39B8FF] text-lg font-black text-white">
+                    {userInitials}
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-black text-slate-700 dark:text-slate-100">Foto del ciudadano</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+                <p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-300">Cambiar contraseña</p>
+                <div className="space-y-3">
+                  <input
+                    type="password"
+                    value={profileForm.password_actual}
+                    onChange={(event) => setProfileForm((prev) => ({ ...prev, password_actual: event.target.value }))}
+                    placeholder="Contraseña actual"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#4318FF] focus:ring-2 focus:ring-[#4318FF]/10 dark:border-slate-700 dark:bg-[#0B1437] dark:text-white"
+                  />
+                  <input
+                    type="password"
+                    value={profileForm.password_nuevo}
+                    onChange={(event) => setProfileForm((prev) => ({ ...prev, password_nuevo: event.target.value }))}
+                    placeholder="Nueva contraseña"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#4318FF] focus:ring-2 focus:ring-[#4318FF]/10 dark:border-slate-700 dark:bg-[#0B1437] dark:text-white"
+                  />
+                  <input
+                    type="password"
+                    value={profileForm.password_confirmacion}
+                    onChange={(event) => setProfileForm((prev) => ({ ...prev, password_confirmacion: event.target.value }))}
+                    placeholder="Confirmar nueva contraseña"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#4318FF] focus:ring-2 focus:ring-[#4318FF]/10 dark:border-slate-700 dark:bg-[#0B1437] dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {profileError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                  {profileError}
+                </div>
+              )}
+
+              {profileSuccess && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                  {profileSuccess}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setProfileModalOpen(false)}
+                className="rounded-xl px-4 py-2 text-sm font-bold text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={savingProfile}
+                className="rounded-xl bg-[#4318FF] px-4 py-2 text-sm font-bold text-white shadow-lg shadow-[#4318FF]/20 transition hover:bg-[#3311DB] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingProfile ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </header>
   )
 }

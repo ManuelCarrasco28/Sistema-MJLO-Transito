@@ -1,11 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { navigationGroups } from '../../config/navigation'
 import { Icon } from '../ui/Icon'
 
 export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, collapsedOnDesktop }) {
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const isItemSelected = (item) => {
+    if (!item) return false
+    if (activeItem === item.label || activeItem === item.id) return true
+    if (location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path + '/'))) return true
+    if (item.path === '/cursos' && location.pathname.includes('/cursos')) return true
+    if (item.path === '/internamientos' && location.pathname.includes('/retenciones')) return true
+    return false
+  }
 
   const [expandedGroups, setExpandedGroups] = useState({
     'Principal': true,
@@ -106,7 +116,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
               const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-500/10 dark:bg-blue-500/20' }
               const isSingle = group.items.length === 1
               const mainItem = group.items[0]
-              const groupSelected = group.items.some(item => item.label === activeItem)
+              const groupSelected = group.items.some(item => isItemSelected(item))
 
               if (collapsedOnDesktop) {
                 return (
@@ -141,7 +151,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
               }
 
               if (isSingle) {
-                const selected = activeItem === mainItem.label
+                const selected = isItemSelected(mainItem)
                 return (
                   <button
                     key={group.name}
@@ -189,7 +199,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                   <div className={`grid transition-all duration-300 ease-in-out ${expandedGroups[group.name] ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                     <div className="overflow-hidden space-y-1 pl-10 pr-2 pt-1">
                       {group.items.map((item) => {
-                        const selected = activeItem === item.label
+                        const selected = isItemSelected(item)
                         return (
                           <button
                             key={item.id}
@@ -231,7 +241,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           </p>
           <div className="space-y-1">
             {activeFlyoutGroup.items.map((item) => {
-              const selected = activeItem === item.label
+              const selected = isItemSelected(item)
               return (
                 <button
                   key={item.id}

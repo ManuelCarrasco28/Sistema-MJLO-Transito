@@ -22,7 +22,7 @@ class AuthController extends ResourceController
 
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()
-            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, cargos.nombre as cargo, trabajadores.id_persona as personal_id')
+            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, COALESCE(ciudadanos.foto, "") as foto_img, cargos.nombre as cargo, trabajadores.id_persona as id_persona')
             ->join('trabajadores', 'trabajadores.id_persona = usuarios.id_trabajador', 'inner')
             ->join('ciudadanos', 'ciudadanos.id_persona = trabajadores.id_persona', 'inner')
             ->join('desplazamiento_oficina', 'desplazamiento_oficina.id_trabajador = trabajadores.id_persona AND (desplazamiento_oficina.fecha_termino IS NULL OR desplazamiento_oficina.fecha_termino > CURDATE())', 'left')
@@ -44,13 +44,17 @@ class AuthController extends ResourceController
             'apellidos'   => $userRecord['apellidos'],
             'usuario'     => $userRecord['nombre_usuario'],
             'cargo'       => $userRecord['cargo'],
-            'personal_id' => $userRecord['personal_id'],
+            'id_persona'  => (int) $userRecord['id_persona'],
+            'foto_img'    => $userRecord['foto_img'] ?? '',
         ];
+
+        $cookieUserData = $userData;
+        unset($cookieUserData['foto_img']);
 
         helper('cookie');
         set_cookie(
             'session_user',
-            json_encode($userData),
+            json_encode($cookieUserData),
             7200,
             '',
             '/',
@@ -63,6 +67,39 @@ class AuthController extends ResourceController
             'status'  => true,
             'message' => 'Inicio de sesión exitoso',
             'data'    => $userData,
+        ]);
+    }
+
+    public function cambiarPassword()
+    {
+        $json = $this->request->getJSON();
+
+        $userId = (int) ($json->id_usuario ?? 0);
+        $actual = $json->password_actual ?? '';
+        $nuevo = $json->password_nuevo ?? '';
+
+        if ($userId <= 0 || $actual === '' || $nuevo === '') {
+            return $this->failValidationErrors('Debe proporcionar usuario, contraseña actual y nueva contraseña.');
+        }
+
+        if (strlen($nuevo) < 6) {
+            return $this->failValidationErrors('La nueva contraseña debe tener al menos 6 caracteres.');
+        }
+
+        $usuarioModel = new UsuarioModel();
+        $userRecord = $usuarioModel->asArray()->find($userId);
+
+        if (!$userRecord || !password_verify($actual, $userRecord['password_hash'])) {
+            return $this->failUnauthorized('La contraseña actual es incorrecta.');
+        }
+
+        $usuarioModel->update($userId, [
+            'password_hash' => password_hash($nuevo, PASSWORD_DEFAULT),
+        ]);
+
+        return $this->respond([
+            'status'  => true,
+            'message' => 'Contraseña actualizada correctamente.',
         ]);
     }
 

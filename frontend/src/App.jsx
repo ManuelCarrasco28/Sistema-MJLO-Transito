@@ -16,8 +16,14 @@ import { Pagos } from './pages/Pagos'
 import { Retenciones } from './pages/Retenciones'
 import { Permisos } from './pages/Permisos'
 import { apiFetch } from './config/api'
+const DEFAULT_USER = {
+  nombres: 'Usuario',
+  apellidos: 'Municipal',
+  usuario: 'usuario',
+  cargo: 'Trabajador municipal',
+}
 
-function Layout({ onLogout, user }) {
+function Layout({ onLogout, user, onUserUpdate }) {
   const location = useLocation()
   
   const getActiveItem = () => {
@@ -120,7 +126,7 @@ function Layout({ onLogout, user }) {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardHome />} />
             <Route path="/vehiculos" element={<Vehiculos />} />
-            <Route path="/personas" element={<Personas />} />
+            <Route path="/personas" element={<Personas user={user} onUserUpdate={onUserUpdate} />} />
             <Route path="/personal" element={<Personal />} />
             <Route path="/organizaciones" element={<Organizaciones />} />
             <Route path="/documentos" element={<Documentos />} />
@@ -147,32 +153,41 @@ function Layout({ onLogout, user }) {
 
 function App() {
   const [user, setUser] = useState(() => {
-    if (typeof window === 'undefined') return null
+    if (typeof window === 'undefined') return DEFAULT_USER
+
+    if (localStorage.getItem('logged_out') === 'true') return null
 
     const savedUser = localStorage.getItem('user')
-    if (!savedUser) return null
+    if (!savedUser) return DEFAULT_USER
 
     try {
       return JSON.parse(savedUser)
     } catch {
       localStorage.removeItem('user')
-      return null
+      return DEFAULT_USER
     }
   })
 
   const handleLogin = (userData) => {
+    localStorage.removeItem('logged_out')
     setUser(userData)
   }
 
   const handleLogout = () => {
     localStorage.removeItem('user')
+    localStorage.setItem('logged_out', 'true')
     setUser(null)
+  }
+
+  const handleUserUpdate = (nextUser) => {
+    setUser(nextUser)
+    localStorage.setItem('user', JSON.stringify(nextUser))
   }
   
   return (
     <BrowserRouter>
       {user ? (
-        <Layout onLogout={handleLogout} user={user} />
+        <Layout onLogout={handleLogout} user={user} onUserUpdate={handleUserUpdate} />
       ) : (
         <Login onLogin={handleLogin} />
       )}

@@ -7,6 +7,7 @@ $routes->get('/', 'Home::index');
 $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($routes): void {
     $routes->options('(:any)', 'AuthController::options');
     $routes->post('login', 'AuthController::login');
+    $routes->post('perfil/password', 'AuthController::cambiarPassword');
 
     $routes->get('status', 'StatusController::index');
     $routes->get('dashboard', 'DashboardController::index');

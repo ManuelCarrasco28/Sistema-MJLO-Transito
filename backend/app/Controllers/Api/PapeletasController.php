@@ -419,30 +419,16 @@ class PapeletasController extends ResourceController
                 return $this->failValidationErrors('La firma capturada en el aplicativo es requerida cuando el estado es FIRMADO.');
             }
 
-            $firmaUrl = '';
+            $firmaImg = null;
             if ($firmaBase64 !== '') {
-                if (str_contains($firmaBase64, ',')) {
-                    [, $firmaBase64] = explode(',', $firmaBase64, 2);
+                if (!str_starts_with($firmaBase64, 'data:image/')) {
+                    $firmaBase64 = 'data:image/png;base64,' . $firmaBase64;
                 }
-
-                $binary = base64_decode($firmaBase64, true);
-                if ($binary === false || strlen($binary) < 50) {
-                    return $this->failValidationErrors('La imagen de firma no es válida.');
-                }
-
-                $uploadDir = FCPATH . 'uploads/firmas-papeletas';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0775, true);
-                }
-
-                $fileName = 'papeleta-' . (int)$id . '-firma-' . date('YmdHis') . '.png';
-                $filePath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
-                file_put_contents($filePath, $binary);
-                $firmaUrl = base_url('uploads/firmas-papeletas/' . $fileName);
+                $firmaImg = $firmaBase64;
             }
 
             $update = [
-                'firma_conductor_img' => $firmaUrl !== '' ? $firmaUrl : null,
+                'firma_conductor_img' => $firmaImg,
                 'firma_conductor_fecha' => $estado === 'FIRMADO' ? (new \DateTime('now', new \DateTimeZone('America/Lima')))->format('Y-m-d H:i:s') : null,
                 'firma_conductor_estado' => $estado,
                 'firma_conductor_observacion' => trim($input['observacion'] ?? $input['firmaConductorObservacion'] ?? '') ?: null,
