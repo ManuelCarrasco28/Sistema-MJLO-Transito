@@ -161,6 +161,12 @@ const iconPaths = {
     </>
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  sidebarToggle: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <line x1="9" y1="3" x2="9" y2="21" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="7" />

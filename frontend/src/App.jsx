@@ -15,9 +15,15 @@ import { CursosSeguridad } from './pages/CursosSeguridad'
 import { Pagos } from './pages/Pagos'
 import { Retenciones } from './pages/Retenciones'
 import { Permisos } from './pages/Permisos'
-import { apiFetch } from './config/api'
 
-function Layout({ onLogout, user }) {
+const DEFAULT_USER = {
+  nombres: 'Usuario',
+  apellidos: 'Municipal',
+  usuario: 'usuario',
+  cargo: 'Trabajador municipal',
+}
+
+function Layout({ onLogout, user, onUserUpdate }) {
   const location = useLocation()
   
   const getActiveItem = () => {
@@ -83,11 +89,7 @@ function Layout({ onLogout, user }) {
   }, [])
 
   return (
-    <main
-      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden ${
-        sidebarCollapsed ? 'lg:grid-cols-[5.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[17rem_minmax(0,1fr)]'
-      }`}
-    >
+    <main className="min-h-dvh bg-[#eef6fb] text-slate-900 dark:bg-[#0b1120] dark:text-slate-100 lg:flex lg:h-dvh lg:overflow-hidden">
       <Sidebar
         activeItem={activeItem}
         onSelect={setActiveItem}
@@ -95,8 +97,9 @@ function Layout({ onLogout, user }) {
         onClose={() => setMobileOpen(false)}
         onLogout={onLogout}
         collapsedOnDesktop={sidebarCollapsed}
+        onToggleDesktop={() => setSidebarCollapsed((current) => !current)}
       />
-      <div className="min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col">
+      <div className="no-scrollbar min-w-0 flex-1 lg:h-dvh lg:overflow-y-auto flex flex-col">
         <Header
           onOpenMobile={() => setMobileOpen(true)}
           sidebarCollapsed={sidebarCollapsed}
@@ -120,7 +123,7 @@ function Layout({ onLogout, user }) {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardHome />} />
             <Route path="/vehiculos" element={<Vehiculos />} />
-            <Route path="/personas" element={<Personas />} />
+            <Route path="/personas" element={<Personas user={user} onUserUpdate={onUserUpdate} />} />
             <Route path="/personal" element={<Personal />} />
             <Route path="/organizaciones" element={<Organizaciones />} />
             <Route path="/documentos" element={<Documentos />} />
@@ -147,32 +150,41 @@ function Layout({ onLogout, user }) {
 
 function App() {
   const [user, setUser] = useState(() => {
-    if (typeof window === 'undefined') return null
+    if (typeof window === 'undefined') return DEFAULT_USER
+
+    if (localStorage.getItem('logged_out') === 'true') return null
 
     const savedUser = localStorage.getItem('user')
-    if (!savedUser) return null
+    if (!savedUser) return DEFAULT_USER
 
     try {
       return JSON.parse(savedUser)
     } catch {
       localStorage.removeItem('user')
-      return null
+      return DEFAULT_USER
     }
   })
 
   const handleLogin = (userData) => {
+    localStorage.removeItem('logged_out')
     setUser(userData)
   }
 
   const handleLogout = () => {
     localStorage.removeItem('user')
+    localStorage.setItem('logged_out', 'true')
     setUser(null)
   }
-  
+
+  const handleUserUpdate = (nextUser) => {
+    setUser(nextUser)
+    localStorage.setItem('user', JSON.stringify(nextUser))
+  }
+
   return (
     <BrowserRouter>
       {user ? (
-        <Layout onLogout={handleLogout} user={user} />
+        <Layout onLogout={handleLogout} user={user} onUserUpdate={handleUserUpdate} />
       ) : (
         <Login onLogin={handleLogin} />
       )}

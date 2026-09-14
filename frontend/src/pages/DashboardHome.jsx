@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MetricCards } from '../components/dashboard/MetricCards'
 import { ChartsSection } from '../components/dashboard/ChartsSection'
+import { QuickActions } from '../components/dashboard/QuickActions'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { Icon } from '../components/ui/Icon'
 
@@ -56,6 +57,8 @@ export function DashboardHome() {
           {error}
         </div>
       )}
+
+      <QuickActions compact />
 
       {/* KPI Metric Cards */}
       <MetricCards cards={dashboardData?.summaryCards} loading={!dashboardData && !error} />

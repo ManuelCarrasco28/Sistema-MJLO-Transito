@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '../ui/Icon'
-import { QuickActions } from './QuickActions'
 
 export function ChartsSection({ data, loading = false }) {
   const [expandedChart, setExpandedChart] = useState(null)
@@ -151,7 +150,7 @@ export function ChartsSection({ data, loading = false }) {
         <div className="lg:col-span-2 space-y-7">
           
           {/* 1. Operaciones mensuales (Restaurado interactivo svg) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '460ms' }}>
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '0ms' }}>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
               <div>
                 <h3 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Operaciones mensuales</h3>
@@ -256,11 +255,8 @@ export function ChartsSection({ data, loading = false }) {
             </div>
           </article>
 
-          {/* Quick Actions (Inyectado como parte del layout) */}
-          <QuickActions />
-
           {/* Multas y pagos registrados (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '610ms' }}>
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '50ms' }}>
             <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
               <div>
                 <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Multas y pagos registrados</h2>
@@ -479,7 +475,7 @@ export function ChartsSection({ data, loading = false }) {
           </div>
 
           {/* Operatividad de permisos (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '830ms' }}>
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '100ms' }}>
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#F4F7FE] pb-4 mb-5">
               <div>
                 <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Operatividad de permisos</h2>
@@ -586,7 +582,7 @@ export function ChartsSection({ data, loading = false }) {
           </div>
 
           {/* Estado de expedientes (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '540ms' }}>
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '50ms' }}>
             <div className="border-b border-[#F4F7FE] pb-4 mb-5">
               <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Estado de expedientes</h2>
               <p className="mt-0.5 text-xs text-[#A3AED0]">Distribución de documentos vigentes y observados</p>
@@ -634,7 +630,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Organizaciones registradas (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '760ms' }}>
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '100ms' }}>
             <div className="border-b border-[#F4F7FE] pb-4 mb-5">
               <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Organizaciones</h2>
               <p className="mt-0.5 text-xs text-[#A3AED0]">Estado visual de empresas y comités</p>
@@ -661,7 +657,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Vehículos en depósito (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '690ms' }}>
+          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '150ms' }}>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white">Depósito Municipal</h4>
               <span className="text-[10px] font-bold text-[#EE5D50] bg-[#FEEFEE] dark:bg-rose-500/20 px-2 py-0.5 rounded-full">
