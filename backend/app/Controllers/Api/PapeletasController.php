@@ -259,14 +259,14 @@ class PapeletasController extends ResourceController
 
             $personaId = null;
             if ($conductorDni !== '') {
-                $persona = $db->table('personas')->where('numero_documento', $conductorDni)->limit(1)->get()->getRowArray();
+                $persona = $db->table('personas')->where('numero', $conductorDni)->limit(1)->get()->getRowArray();
                 if ($persona) {
                     $personaId = (int)$persona['id'];
                 } else {
                     $apellidos = preg_split('/\s+/', trim($conductorApellidos)) ?: [];
                     $db->table('personas')->insert([
-                        'tipo_documento' => 'DNI',
-                        'numero_documento' => $conductorDni,
+                        'id_tipo_documento' => 1,
+                        'numero' => $conductorDni,
                         'estado' => 'ACTIVO',
                     ]);
                     $personaId = (int)$db->insertID();

@@ -107,17 +107,6 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.orange.shade200)),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.orange),
-                  SizedBox(width: 12),
-                  Expanded(child: Text('Los vehículos registrados aquí se enviarán a la oficina en un reporte separado y no se mezclarán con la base oficial.', style: TextStyle(color: Colors.orange))),
-                ],
-              ),
-            ),
             const SizedBox(height: 24),
             
             const Text('1. Datos del Conductor', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
@@ -142,11 +131,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             
             if (!_conductorEsDueno) ...[
               const SizedBox(height: 24),
-              const Text('2. Datos del Dueño (Opcional)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
-              const Padding(
-                padding: EdgeInsets.only(top: 4, bottom: 12),
-                child: Text('Si el conductor se niega a dar los datos del dueño, deje estos campos vacíos.', style: TextStyle(fontSize: 13, color: Colors.grey)),
-              ),
+              const Text('2. Datos del Dueño', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
               _buildTextField(_dniDueno, 'DNI del Dueño', Icons.badge, TextInputType.number),
               const SizedBox(height: 12),
               _buildTextField(_nombresDueno, 'Nombres', Icons.person, TextInputType.name),
