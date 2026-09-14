@@ -14,7 +14,7 @@ class PersonalController extends ResourceController
         $rows = $db->table('trabajadores pe')
             ->select("
                 pe.id_persona as id,
-                pe.id_persona as persona_id,
+                pe.id_persona as id_persona,
                 COALESCE(td.nombre, 'DNI') as tipo_documento,
                 p.numero as numero_documento,
                 c.nombres,

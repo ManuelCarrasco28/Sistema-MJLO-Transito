@@ -50,6 +50,11 @@ class DashboardController extends ResourceController
         $papeletasPendientes = (int) ($papRow['pendientes'] ?? 0);
         $montoPendiente = (float) ($papRow['monto_pendiente'] ?? 0);
 
+        $tramitesTotal = (int) $db->table('tramites_documentarios')->countAllResults();
+        $tramitesActivos = (int) $db->table('tramites_documentarios')
+            ->whereNotIn('estado', ['ANULADO', 'ANULADA', 'CANCELADO', 'CANCELADA'])
+            ->countAllResults();
+
         
         $retRow = $db->table('ordenes_internamiento')
             ->select("
@@ -73,6 +78,7 @@ class DashboardController extends ResourceController
                 ['label' => 'Documentos vigentes', 'value' => $documentosVigentes, 'detail' => $documentosTotal > 0 ? round(($documentosVigentes / $documentosTotal) * 100, 1) . '% del total' : '0% del total', 'change' => '', 'positive' => null, 'icon' => 'document', 'tone' => 'cyan'],
                 ['label' => 'Inspecciones pendientes', 'value' => $inspeccionesPendientes, 'detail' => 'pendientes', 'change' => '', 'positive' => null, 'icon' => 'inspection', 'tone' => 'amber'],
                 ['label' => 'Papeletas pendientes', 'value' => $papeletasPendientes, 'detail' => 'S/ ' . number_format($montoPendiente, 2) . ' por cobrar', 'change' => '', 'positive' => null, 'icon' => 'ticket', 'tone' => 'slate'],
+                ['label' => 'Trámites documentarios', 'value' => $tramitesTotal, 'detail' => $tramitesActivos . ' activos', 'change' => '', 'positive' => null, 'icon' => 'document', 'tone' => 'purple'],
             ],
             'expedientes' => $this->withPercents($expedientes),
             'vehiculosDeposito' => $this->withPercents([

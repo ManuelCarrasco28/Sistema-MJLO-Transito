@@ -8,6 +8,34 @@ class PersonasController extends ResourceController
 {
     protected $format = 'json';
 
+    private function findPersona($id)
+    {
+        $db = \Config\Database::connect();
+
+        return $db->table('personas p')
+            ->select("
+                p.id,
+                COALESCE(td.nombre, 'DNI') AS tipoDocumento,
+                p.numero AS numeroDocumento,
+                c.nombres,
+                c.apellido_paterno AS apellidoPaterno,
+                COALESCE(c.apellido_materno, '') AS apellidoMaterno,
+                COALESCE(p.direccion, '') AS direccion,
+                COALESCE(p.telefono, '') AS telefono,
+                COALESCE(p.celular, '') AS celular,
+                COALESCE(p.email, '') AS email,
+                COALESCE(c.numero_licencia, '') AS numeroLicencia,
+                COALESCE(c.foto, '') AS fotoUrl,
+                COALESCE(c.foto, '') AS fotoImg,
+                p.estado
+            ", false)
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'inner')
+            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
+            ->where('p.id', $id)
+            ->get()
+            ->getRowArray();
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
@@ -71,7 +99,7 @@ class PersonasController extends ResourceController
             'apellido_paterno' => trim($input['apellidoPaterno']),
             'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
             'numero_licencia'  => strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null,
-            'foto'             => trim($input['fotoUrl'] ?? $input['fotoImg'] ?? '') ?: null,
+            'foto'             => trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '') ?: null,
         ];
         $db->table('ciudadanos')->insert($cData);
 
@@ -86,6 +114,7 @@ class PersonasController extends ResourceController
         $newPersona['apellidoPaterno'] = $cData['apellido_paterno'];
         $newPersona['apellidoMaterno'] = $cData['apellido_materno'];
         $newPersona['fotoUrl'] = $cData['foto'];
+        $newPersona['fotoImg'] = $cData['foto'];
 
         return $this->respondCreated(['status' => true, 'message' => 'Persona registrada con éxito', 'data' => $newPersona]);
     }
@@ -126,7 +155,7 @@ class PersonasController extends ResourceController
         if (isset($input['apellidoPaterno'])) $cData['apellido_paterno'] = trim($input['apellidoPaterno']);
         if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = trim($input['apellidoMaterno']);
         if (array_key_exists('numeroLicencia', $input)) $cData['numero_licencia'] = strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null;
-        if (array_key_exists('fotoUrl', $input) || array_key_exists('fotoImg', $input)) $cData['foto'] = trim($input['fotoUrl'] ?? $input['fotoImg'] ?? '') ?: null;
+        if (array_key_exists('fotoUrl', $input) || array_key_exists('fotoImg', $input)) $cData['foto'] = trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '') ?: null;
 
         if (!empty($cData)) {
             if ($db->table('ciudadanos')->where('id_persona', $id)->countAllResults()) {
@@ -143,7 +172,13 @@ class PersonasController extends ResourceController
             return $this->failServerError('Error actualizando la persona.');
         }
 
-        return $this->respond(['status' => true, 'message' => 'Persona actualizada con éxito']);
+        $persona = $this->findPersona($id);
+
+        return $this->respond([
+            'status'  => true,
+            'message' => 'Persona actualizada con éxito',
+            'data'    => $persona,
+        ]);
     }
 
     public function delete($id = null)
