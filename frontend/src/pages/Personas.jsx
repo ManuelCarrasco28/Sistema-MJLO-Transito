@@ -3,7 +3,7 @@ import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
-export function Personas() {
+export function Personas({ user, onUserUpdate }) {
   const cached = getCachedData('/personas')
   const [personas, setPersonas] = useState(cached || [])
   const [isLoading, setIsLoading] = useState(!cached)
@@ -16,6 +16,7 @@ export function Personas() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedPersona, setSelectedPersona] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [toast, setToast] = useState(null)
 
   const [formData, setFormData] = useState({
     tipoDocumento: 'DNI',
@@ -32,14 +33,18 @@ export function Personas() {
     fotoImg: '',
   })
 
+  const loadPersonas = async () => {
+    const response = await apiFetch('/personas')
+    if (!response.ok) throw response
+    const payload = await response.json()
+    const data = payload.data ?? []
+    setPersonas(data)
+    setCachedData('/personas', data)
+    return data
+  }
+
   useEffect(() => {
-    apiFetch('/personas')
-      .then((response) => response.ok ? response.json() : Promise.reject(response))
-      .then((payload) => {
-        const data = payload.data ?? []
-        setPersonas(data)
-        setCachedData('/personas', data)
-      })
+    loadPersonas()
       .catch(() => { })
       .finally(() => setIsLoading(false))
   }, [])
@@ -61,6 +66,20 @@ export function Personas() {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, filterEstado])
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = window.setTimeout(() => setToast(null), 3000)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const showToast = (message, type = 'success') => {
+    setToast({
+      id: Date.now(),
+      message,
+      type,
+    })
+  }
 
   const paginatedPersonas = filteredPersonas.slice(
     (currentPage - 1) * itemsPerPage,
@@ -128,10 +147,10 @@ export function Personas() {
         const ctx = canvas.getContext('2d')
         ctx.drawImage(img, 0, 0, width, height)
         const compressed = canvas.toDataURL('image/jpeg', 0.85)
-        setFormData((prev) => ({ ...prev, fotoImg: compressed }))
+        setFormData((prev) => ({ ...prev, fotoImg: compressed, fotoUrl: compressed }))
       }
       img.onerror = () => {
-        setFormData((prev) => ({ ...prev, fotoImg: rawData }))
+        setFormData((prev) => ({ ...prev, fotoImg: rawData, fotoUrl: rawData }))
       }
       img.src = rawData
     }
@@ -139,7 +158,7 @@ export function Personas() {
   }
 
   const handleClearPhoto = () => {
-    setFormData((prev) => ({ ...prev, fotoImg: '' }))
+    setFormData((prev) => ({ ...prev, fotoImg: '', fotoUrl: '' }))
   }
 
   const handleOpenDetail = (persona) => {
@@ -151,7 +170,10 @@ export function Personas() {
     if (window.confirm('¿Está seguro de eliminar a esta persona del padrón municipal?')) {
       try {
         await apiFetch(`/personas/${id}`, { method: 'DELETE' })
-        setPersonas(personas.filter((p) => p.id !== id))
+        const nextPersonas = personas.filter((p) => p.id !== id)
+        setPersonas(nextPersonas)
+        setCachedData('/personas', nextPersonas)
+        showToast('Se ha eliminado')
       } catch (err) {
         alert('No se pudo eliminar a la persona.')
       }
@@ -167,31 +189,71 @@ export function Personas() {
 
     try {
       if (isEditing) {
-        await apiFetch(`/personas/${selectedPersona.id}`, {
+        const response = await apiFetch(`/personas/${selectedPersona.id}`, {
           method: 'PUT',
           body: formData,
         })
-        setPersonas(personas.map((p) => (p.id === selectedPersona.id ? { ...formData, id: p.id } : p)))
+        if (!response.ok) throw response
+        const resData = await response.json()
+        const updatedPersona = resData.data || { ...selectedPersona, ...formData }
+        const nextPersonas = personas.map((persona) =>
+          persona.id === selectedPersona.id ? updatedPersona : persona
+        )
+        setPersonas(nextPersonas)
+        setCachedData('/personas', nextPersonas)
+        if (Number(user?.id_persona) === Number(updatedPersona.id) && onUserUpdate) {
+          onUserUpdate({
+            ...user,
+            nombres: updatedPersona.nombres || user.nombres,
+            apellidos: [updatedPersona.apellidoPaterno, updatedPersona.apellidoMaterno].filter(Boolean).join(' ') || user.apellidos,
+            foto_img: updatedPersona.fotoImg || '',
+          })
+        }
+        showToast('Se ha actualizado')
       } else {
         const res = await apiFetch('/personas', {
           method: 'POST',
           body: formData,
         })
+        if (!res.ok) throw res
         const resData = await res.json()
         const newPersona = resData.data || {
           ...formData,
           id: Date.now(),
         }
-        setPersonas([newPersona, ...personas])
+        const nextPersonas = [newPersona, ...personas]
+        setPersonas(nextPersonas)
+        setCachedData('/personas', nextPersonas)
+        showToast('Se ha agregado')
       }
       setIsModalOpen(false)
     } catch (err) {
-      alert('Error al guardar la persona en el servidor.')
+      let message = 'Error al guardar la persona en el servidor.'
+      if (err?.json) {
+        try {
+          const errorData = await err.json()
+          message = errorData?.message || errorData?.error || message
+        } catch (_) {
+          message = err.statusText || message
+        }
+      }
+      alert(message)
     }
   }
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div
+          key={toast.id}
+          className="fixed right-6 top-6 z-[80] flex items-center gap-3 rounded-[1.4rem] border border-white/70 bg-white/95 px-5 py-3.5 text-sm font-black text-slate-800 shadow-2xl shadow-cyan-900/15 ring-1 ring-slate-900/5 backdrop-blur-md animate-enter dark:border-slate-700 dark:bg-slate-900/95 dark:text-white"
+        >
+          <span className="grid size-9 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-base text-white shadow-lg shadow-cyan-500/25">
+            ✓
+          </span>
+          <span>{toast.message}</span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
@@ -423,7 +485,7 @@ export function Personas() {
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 font-mono text-xs font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-200">
-                        <span>{p.tipoDocumento}:</span>
+                        <span>{p.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : p.tipoDocumento}:</span>
                         <span>{p.numeroDocumento}</span>
                       </span>
                     </td>
@@ -820,7 +882,7 @@ export function Personas() {
               )}
               <h3 className="mt-3 text-xl font-black">{selectedPersona.nombres} {selectedPersona.apellidoPaterno} {selectedPersona.apellidoMaterno}</h3>
               <span className="mt-1 inline-block rounded-full bg-cyan-500/20 px-3 py-0.5 text-xs font-bold text-cyan-300 border border-cyan-500/30">
-                {selectedPersona.tipoDocumento}: {selectedPersona.numeroDocumento}
+                {selectedPersona.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : selectedPersona.tipoDocumento}: {selectedPersona.numeroDocumento}
               </span>
             </div>
 
