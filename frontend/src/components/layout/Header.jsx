@@ -28,7 +28,7 @@ export function Header({
     timeZone: 'America/Lima',
   }).format(new Date())
   const currentDate = rawDate.charAt(0).toUpperCase() + rawDate.slice(1)
-  
+
   const formatTime = (d) =>
     new Intl.DateTimeFormat('es-PE', {
       hour: '2-digit',
@@ -37,7 +37,7 @@ export function Header({
       hour12: true,
       timeZone: 'America/Lima',
     }).format(d)
-    
+
   const [currentTime, setCurrentTime] = useState(() => formatTime(new Date()))
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [profileForm, setProfileForm] = useState({
@@ -48,7 +48,7 @@ export function Header({
   const [profileError, setProfileError] = useState('')
   const [profileSuccess, setProfileSuccess] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
-  
+
   useEffect(() => {
     const id = setInterval(() => setCurrentTime(formatTime(new Date())), 1000)
     return () => clearInterval(id)
@@ -155,7 +155,7 @@ export function Header({
       </div>
 
       <div className="hidden lg:block"></div>
-      
+
       {/* Right Horizon Floating Search & Control Capsule */}
       <div className="flex flex-wrap md:flex-nowrap items-center gap-3 bg-white dark:bg-[#111C44] p-2 sm:p-2.5 rounded-[30px] shadow-[0px_18px_40px_rgba(112,144,176,0.12)] dark:shadow-none border border-white/60 dark:border-none">
 
@@ -174,8 +174,8 @@ export function Header({
 
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>
-          <button 
-            className="relative p-2.5 rounded-full text-[#A3AED0] dark:text-white/70 hover:text-[#2B3674] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/10 transition-colors cursor-pointer" 
+          <button
+            className="relative p-2.5 rounded-full text-[#A3AED0] dark:text-white/70 hover:text-[#2B3674] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/10 transition-colors cursor-pointer"
             title="Notificaciones"
             onClick={() => {
               setNotifOpen(!notifOpen)
@@ -187,7 +187,7 @@ export function Header({
             </svg>
             {unreadCount > 0 && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#EE5D50]"></span>}
           </button>
-          
+
           {notifOpen && (
             <div className="absolute right-0 top-full mt-2.5 z-50 w-80 sm:w-96 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111C44] shadow-xl overflow-hidden animate-enter">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 px-4 py-3 bg-slate-50/70 dark:bg-[#0B1437]/50">
@@ -226,11 +226,10 @@ export function Header({
                           prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item))
                         )
                       }
-                      className={`flex items-start gap-3.5 p-3.5 transition-colors cursor-pointer ${
-                        n.unread
-                          ? 'bg-blue-50/40 hover:bg-blue-50/70'
-                          : 'hover:bg-slate-50'
-                      }`}
+                      className={`flex items-start gap-3.5 p-3.5 transition-colors cursor-pointer ${n.unread
+                        ? 'bg-blue-50/40 hover:bg-blue-50/70'
+                        : 'hover:bg-slate-50'
+                        }`}
                     >
                       <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${tones[n.tone]}`}>
                         <Icon name={n.icon} className="size-4.5" />
@@ -254,8 +253,8 @@ export function Header({
         </div>
 
         {/* Dark Mode Toggle Button */}
-        <button 
-          className="p-2.5 rounded-full text-[#A3AED0] dark:text-white/70 hover:text-[#2B3674] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/10 transition-colors cursor-pointer" 
+        <button
+          className="p-2.5 rounded-full text-[#A3AED0] dark:text-white/70 hover:text-[#2B3674] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/10 transition-colors cursor-pointer"
           title="Modo Claro/Oscuro"
           onClick={() => setDarkMode(!darkMode)}
         >
@@ -271,7 +270,7 @@ export function Header({
 
         {/* User Profile Pill */}
         <div className="relative" ref={userMenuRef}>
-          <div 
+          <div
             className="flex items-center gap-2.5 pl-1 pr-2 cursor-pointer"
             onClick={() => {
               setUserMenuOpen(!userMenuOpen)
@@ -367,7 +366,6 @@ export function Header({
                 )}
                 <div>
                   <p className="text-sm font-black text-slate-700 dark:text-slate-100">Foto del ciudadano</p>
-                  <p className="mt-0.5 text-xs font-semibold text-slate-400">Se toma automáticamente de la tabla ciudadanos.</p>
                 </div>
               </div>
 

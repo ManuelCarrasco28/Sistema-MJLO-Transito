@@ -15,6 +15,7 @@ import { CursosSeguridad } from './pages/CursosSeguridad'
 import { Pagos } from './pages/Pagos'
 import { Retenciones } from './pages/Retenciones'
 import { Permisos } from './pages/Permisos'
+import { navigationGroups } from './config/navigation'
 
 const DEFAULT_USER = {
   nombres: 'Usuario',
@@ -28,17 +29,16 @@ function Layout({ onLogout, user, onUserUpdate }) {
   
   const getActiveItem = () => {
     const path = location.pathname
-    if (path.includes('/vehiculos')) return 'Vehículos'
-    if (path.includes('/personas')) return 'Personas'
-    if (path.includes('/personal')) return 'Personal'
-    if (path.includes('/organizaciones')) return 'Organizaciones'
-    if (path.includes('/documentos')) return 'Documentos'
-    if (path.includes('/inspecciones')) return 'Inspecciones'
-    if (path.includes('/papeletas')) return 'Papeletas'
-    if (path.includes('/cursos')) return 'Cursos'
-    if (path.includes('/pagos')) return 'Pagos'
-    if (path.includes('/internamientos') || path.includes('/retenciones')) return 'Internamientos'
-    if (path.includes('/permisos')) return 'Permisos'
+    if (path.includes('/retenciones')) return 'Internamientos'
+    if (path.includes('/cursos-seguridad')) return 'Cursos viales'
+
+    for (const group of navigationGroups) {
+      for (const item of group.items) {
+        if (path === item.path || path.startsWith(item.path + '/')) {
+          return item.label
+        }
+      }
+    }
     return 'Dashboard'
   }
 

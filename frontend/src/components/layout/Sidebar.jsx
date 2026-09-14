@@ -1,11 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { navigationGroups } from '../../config/navigation'
 import { Icon } from '../ui/Icon'
 
 export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, collapsedOnDesktop, onToggleDesktop }) {
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const isItemSelected = (item) => {
+    if (!item) return false
+    if (activeItem === item.label || activeItem === item.id) return true
+    if (location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path + '/'))) return true
+    if (item.path === '/cursos' && location.pathname.includes('/cursos')) return true
+    if (item.path === '/internamientos' && location.pathname.includes('/retenciones')) return true
+    return false
+  }
 
   const [expandedGroups, setExpandedGroups] = useState({
     'Principal': true,
@@ -17,11 +27,11 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
 
   useEffect(() => {
     navigationGroups.forEach((group) => {
-      if (group.items.some((item) => item.label === activeItem)) {
+      if (group.items.some((item) => isItemSelected(item))) {
         setExpandedGroups((prev) => ({ ...prev, [group.name]: true }))
       }
     })
-  }, [activeItem])
+  }, [activeItem, location.pathname])
 
   const [activeFlyoutGroup, setActiveFlyoutGroup] = useState(null)
   const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 })
@@ -158,7 +168,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
             const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30' }
             const isSingle = group.items.length === 1
             const mainItem = group.items[0]
-            const groupSelected = group.items.some(item => item.label === activeItem)
+            const groupSelected = group.items.some(item => isItemSelected(item))
 
             if (collapsedOnDesktop) {
               return (
@@ -195,7 +205,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
             }
 
             if (isSingle) {
-              const selected = activeItem === mainItem.label
+              const selected = isItemSelected(mainItem)
               return (
                 <button
                   key={group.name}
@@ -243,7 +253,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 <div className={`grid transition-all duration-150 ease-in-out ${expandedGroups[group.name] ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                   <div className="overflow-hidden space-y-0.5 pl-3 ml-3 border-l-2 border-slate-100 dark:border-white/10 pt-0.5 pb-0.5">
                     {group.items.map((item) => {
-                      const selected = activeItem === item.label
+                      const selected = isItemSelected(item)
                       return (
                         <button
                           key={item.id}
@@ -253,9 +263,9 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                             navigate(item.path)
                             if (mobileOpen) onClose()
                           }}
-                          className={`group/sub flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] font-semibold transition-all duration-150 cursor-pointer ${
+                          className={`group/sub flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-semibold transition-all duration-150 cursor-pointer ${
                             selected
-                              ? 'bg-[#4318FF] text-white shadow-[0_3px_10px_rgba(67,24,255,0.3)]'
+                              ? 'bg-[#4318FF] text-white shadow-[0_3px_10px_rgba(67,24,255,0.3)] font-bold'
                               : 'text-[#2B3674]/85 dark:text-white/85 hover:bg-[#F4F7FE] dark:hover:bg-white/5 hover:text-[#4318FF] dark:hover:text-white'
                           }`}
                         >
@@ -305,7 +315,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           </p>
           <div className="space-y-1">
             {activeFlyoutGroup.items.map((item) => {
-              const selected = activeItem === item.label
+              const selected = isItemSelected(item)
               return (
                 <button
                   key={item.id}
