@@ -255,7 +255,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 final prefs = snapshot.data;
                 final nombre = prefs?.getString('nombres')?.split(' ').first ?? 'Inspector';
                 final apellido = prefs?.getString('apellidos')?.split(' ').first ?? '';
-                final id = prefs?.getInt('id_persona') ?? 0;
                 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
