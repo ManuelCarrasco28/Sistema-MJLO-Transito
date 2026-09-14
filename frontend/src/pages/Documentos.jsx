@@ -115,6 +115,12 @@ export function Documentos() {
       return
     }
 
+    // Validaciones
+    if (new Date(formData.fechaExpiracion) < new Date(formData.fechaExpedicion)) {
+      alert('La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
+      return
+    }
+
     try {
       if (isEditing) {
         await apiFetch(`/documentos/${selectedDoc.id}`, {

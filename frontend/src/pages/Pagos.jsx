@@ -62,6 +62,24 @@ export function Pagos() {
   const handleFormSubmit = async (e) => {
     e.preventDefault()
     if (isSaving) return
+    
+    // Validaciones
+    if (pagoToConfirm) {
+      if (!formData.numeroRecibo.trim() || !formData.fechaPago) {
+        alert('Por favor ingresa el número de recibo y la fecha de pago.')
+        return
+      }
+      if (new Date(formData.fechaPago) > new Date()) {
+        alert('La fecha de pago no puede ser futura.')
+        return
+      }
+    } else {
+      if (!formData.origenId) {
+        alert('Por favor selecciona un registro asociado para generar el pago.')
+        return
+      }
+    }
+
     setIsSaving(true)
     try {
       const key = { PAPELETA: 'papeletaId', TRAMITE: 'tramiteId', CURSO: 'inscripcionId' }[formData.tipoPago]

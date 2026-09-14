@@ -182,8 +182,26 @@ export function Personas({ user, onUserUpdate }) {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
+    // Validaciones
+    const docLen = formData.numeroDocumento.trim().length
     if (!formData.numeroDocumento.trim() || !formData.nombres.trim() || !formData.apellidoPaterno.trim()) {
-      alert('Por favor completa los campos requeridos.')
+      alert('Por favor completa los campos requeridos (Documento, Nombres, Apellido Paterno).')
+      return
+    }
+    if (formData.tipoDocumento === 'DNI' && (docLen !== 8 || !/^\d{8}$/.test(formData.numeroDocumento.trim()))) {
+      alert('El DNI debe tener exactamente 8 dígitos numéricos.')
+      return
+    }
+    if (formData.tipoDocumento !== 'DNI' && (docLen < 8 || docLen > 12)) {
+      alert('El número de documento debe tener entre 8 y 12 caracteres.')
+      return
+    }
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      alert('Por favor ingresa un correo electrónico válido.')
+      return
+    }
+    if (formData.celular && !/^\d{9}$/.test(formData.celular)) {
+      alert('El número de celular debe tener exactamente 9 dígitos numéricos.')
       return
     }
 
