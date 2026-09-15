@@ -274,6 +274,12 @@ const iconPaths = {
       <path d="m9 12 2 2 4-4" />
     </>
   ),
+  sidebarRight: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <line x1="15" y1="3" x2="15" y2="21" />
+    </>
+  ),
 }
 
 export function Icon({ name, className = 'size-5' }) {

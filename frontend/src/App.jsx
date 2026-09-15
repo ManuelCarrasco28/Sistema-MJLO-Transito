@@ -110,6 +110,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
         onLogout={onLogout}
         collapsedOnDesktop={sidebarCollapsed}
         user={user}
+        onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
       />
       <div className="min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col">
         <Header

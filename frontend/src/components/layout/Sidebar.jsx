@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { navigationGroups } from '../../config/navigation'
 import { Icon } from '../ui/Icon'
 
-export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, collapsedOnDesktop, user }) {
+export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, collapsedOnDesktop, user, onToggleSidebar }) {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -111,6 +111,19 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 <span className="text-[26px] font-black text-[#2B3674] dark:text-white">JLO</span>
               </div>
             )}
+            
+            {/* Collapse sidebar button (desktop only, when expanded) */}
+            {!collapsedOnDesktop && onToggleSidebar && (
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className="hidden lg:block rounded-lg p-1.5 text-[#A3AED0] hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                title="Contraer menú"
+              >
+                <Icon name="sidebarRight" className="size-5" />
+              </button>
+            )}
+
             {/* Close button for mobile */}
             <button
               type="button"
@@ -239,6 +252,34 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
             })}
           </nav>
         </div>
+
+        {/* Logout Button (Bottom of Sidebar) */}
+        {!collapsedOnDesktop && (
+          <div className="px-5 mt-auto pb-4">
+            <button
+              onClick={onLogout}
+              className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left transition-all duration-200 cursor-pointer text-[#EE5D50] hover:bg-[#EE5D50]/10"
+            >
+              <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-[#EE5D50]/10">
+                <Icon name="logout" className="size-4" />
+              </span>
+              <span className="text-sm font-bold truncate flex-1">Cerrar sesión</span>
+            </button>
+          </div>
+        )}
+        {collapsedOnDesktop && (
+          <div className="flex justify-center mb-4 mt-auto">
+            <button
+              onClick={onLogout}
+              className="group flex size-11 items-center justify-center rounded-[14px] transition-all duration-200 cursor-pointer bg-[#F4F7FE] dark:bg-white/5 hover:bg-[#EE5D50] hover:text-white"
+              title="Cerrar sesión"
+            >
+              <span className="grid size-6 place-items-center rounded-lg text-[#EE5D50] group-hover:text-white">
+                <Icon name="logout" className="size-5" />
+              </span>
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* Flyout Menu for Collapsed Desktop Sidebar */}
