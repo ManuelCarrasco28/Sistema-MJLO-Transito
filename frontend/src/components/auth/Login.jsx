@@ -11,7 +11,6 @@ export function Login({ onLogin }) {
   const [rememberMe, setRememberMe] = useState(() => {
     return typeof window !== 'undefined' && Boolean(localStorage.getItem('remember_username'))
   })
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isShaking, setIsShaking] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
