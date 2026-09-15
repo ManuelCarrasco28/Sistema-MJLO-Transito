@@ -135,17 +135,6 @@ export function Header({
           <Icon name="menu" className="size-5" />
         </button>
       </div>
-
-      <div className="flex items-center gap-4">
-        {/* Desktop Sidebar Toggle */}
-        <button
-          type="button"
-          onClick={onToggleSidebar}
-          className="hidden lg:flex p-2.5 rounded-[15px] bg-white dark:bg-[#111C44] text-[#2B3674] dark:text-white shadow-[0px_18px_40px_rgba(112,144,176,0.12)] dark:shadow-none border border-white/60 dark:border-none hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
-        >
-          <Icon name="menu" className="size-5" />
-        </button>
-      </div>
       
       {/* Right Horizon Floating Search & Control Capsule */}
       <div className="flex flex-wrap md:flex-nowrap items-center gap-3 bg-white dark:bg-[#111C44] p-2 sm:p-2.5 rounded-[30px] shadow-[0px_18px_40px_rgba(112,144,176,0.12)] dark:shadow-none border border-white/60 dark:border-none">
