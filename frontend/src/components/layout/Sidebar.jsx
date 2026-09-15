@@ -148,7 +148,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           </div>
 
           {/* Navigation Menu */}
-          <nav className={`mt-6 space-y-4 mb-6 ${collapsedOnDesktop ? 'lg:px-3' : 'px-5'}`}>
+          <nav className={`mt-6 space-y-1.5 mb-6 ${collapsedOnDesktop ? 'lg:px-3' : 'px-5'}`}>
             {visibleNavigationGroups.map((group) => {
               const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-500/10 dark:bg-blue-500/20' }
               const isSingle = group.items.length === 1
@@ -157,7 +157,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
 
               if (collapsedOnDesktop) {
                 return (
-                  <div key={group.name} className="flex justify-center mb-2">
+                  <div key={group.name} className="flex justify-center">
                     <button
                       type="button"
                       onClick={(e) => {
