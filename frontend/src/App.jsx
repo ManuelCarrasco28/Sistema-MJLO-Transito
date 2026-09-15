@@ -166,7 +166,9 @@ function App() {
   const [user, setUser] = useState(() => {
     if (typeof window === 'undefined') return null
 
-    if (localStorage.getItem('logged_out') === 'true') return null
+    if (window.location.pathname === '/login' || localStorage.getItem('logged_out') === 'true') {
+      return null
+    }
 
     const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user')
     if (!savedUser) return null
@@ -190,6 +192,9 @@ function App() {
       localStorage.removeItem('user')
     }
     setUser(userData)
+    if (window.location.pathname === '/login') {
+      window.history.replaceState(null, '', '/dashboard')
+    }
   }
 
   const handleLogout = () => {
