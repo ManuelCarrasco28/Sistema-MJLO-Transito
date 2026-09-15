@@ -23,6 +23,15 @@ class PersonalController extends ResourceController
                 CONCAT(c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')) AS apellidos,
                 '' as email,
                 ca.nombre as cargo,
+                dof.id_unidad_organica,
+                uo.nombre as unidad_organica,
+                jo.nombre as jerarquia,
+                dof.tipo_funcion,
+                dof.solicitud,
+                dof.documento,
+                dof.fecha_documento,
+                dof.firma_documento,
+                dof.fecha_termino,
                 pe.estado
             ", false)
             ->join('personas p', 'p.id = pe.id_persona', 'inner')
@@ -30,9 +39,37 @@ class PersonalController extends ResourceController
             ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
             ->join('desplazamiento_oficina dof', 'dof.id_trabajador = pe.id_persona AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
             ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
+            ->join('unidades_organicas uo', 'uo.id = dof.id_unidad_organica', 'left')
+            ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
             ->orderBy('pe.id_persona', 'DESC')
             ->get()->getResultArray();
+
+        foreach ($rows as &$row) {
+            $row['historial'] = $db->table('desplazamiento_oficina dof')
+                ->select('dof.solicitud, dof.documento, dof.fecha_documento, dof.firma_documento, dof.tipo_funcion, dof.fecha_created, dof.fecha_termino, ca.nombre as cargo, uo.nombre as unidad_organica, jo.nombre as jerarquia', false)
+                ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
+                ->join('unidades_organicas uo', 'uo.id = dof.id_unidad_organica', 'left')
+                ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
+                ->where('dof.id_trabajador', $row['id'])
+                ->orderBy('dof.fecha_created', 'DESC')
+                ->get()->getResultArray();
+        }
+
         return $this->respond(['data' => $rows]);
+    }
+
+    public function catalogos()
+    {
+        $db = \Config\Database::connect();
+        return $this->respond([
+            'cargos' => $db->table('cargos')->select('id, nombre')->where('estado', 'ACTIVO')->orderBy('nombre')->get()->getResultArray(),
+            'unidades' => $db->table('unidades_organicas uo')
+                ->select('uo.id, uo.nombre, uo.siglas, jo.nombre as jerarquia', false)
+                ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
+                ->where('uo.estado', 'ACTIVO')
+                ->orderBy('uo.nombre')
+                ->get()->getResultArray(),
+        ]);
     }
 
     public function create()
@@ -74,6 +111,13 @@ class PersonalController extends ResourceController
         } else {
             $cargoId = $cargoRow['id'];
         }
+        $unidadId = !empty($input['id_unidad_organica']) ? (int)$input['id_unidad_organica'] : null;
+        $tipoFuncion = trim($input['tipo_funcion'] ?? 'Titular') ?: 'Titular';
+        $solicitud = trim($input['solicitud'] ?? '');
+        $documento = trim($input['documento'] ?? ('DESIGNACION-' . date('Y'))) ?: ('DESIGNACION-' . date('Y'));
+        $fechaDocumento = trim($input['fecha_documento'] ?? date('Y-m-d')) ?: date('Y-m-d');
+        $firmaDocumento = trim($input['firma_documento'] ?? '');
+        $fechaTermino = !empty($input['fecha_termino']) ? $input['fecha_termino'] : null;
 
         // Split apellidos
         $apellidos = explode(' ', $input['apellidos'], 2);
@@ -112,11 +156,15 @@ class PersonalController extends ResourceController
 
             // Insert Desplazamiento
             $db->table('desplazamiento_oficina')->insert([
+                'id_unidad_organica' => $unidadId,
                 'id_trabajador' => $id,
                 'id_cargo' => $cargoId,
-                'documento' => 'DESIGNACION-' . date('Y'),
-                'fecha_documento' => date('Y-m-d'),
-                'tipo_funcion' => 'Titular'
+                'solicitud' => $solicitud,
+                'documento' => $documento,
+                'fecha_documento' => $fechaDocumento,
+                'firma_documento' => $firmaDocumento,
+                'tipo_funcion' => $tipoFuncion,
+                'fecha_termino' => $fechaTermino,
             ]);
 
         } else {
@@ -143,18 +191,36 @@ class PersonalController extends ResourceController
             ]);
             
             // Update Desplazamiento
-            $existDof = $db->table('desplazamiento_oficina')->where('id_trabajador', $id)->get()->getRowArray();
+            $existDof = $db->table('desplazamiento_oficina')
+                ->where('id_trabajador', $id)
+                ->groupStart()
+                    ->where('fecha_termino IS NULL', null, false)
+                    ->orWhere('fecha_termino >', date('Y-m-d'))
+                ->groupEnd()
+                ->orderBy('fecha_created', 'DESC')
+                ->get()->getRowArray();
             if ($existDof) {
                 $db->table('desplazamiento_oficina')->where('id', $existDof['id'])->update([
-                    'id_cargo' => $cargoId
+                    'id_unidad_organica' => $unidadId,
+                    'id_cargo' => $cargoId,
+                    'solicitud' => $solicitud,
+                    'documento' => $documento,
+                    'fecha_documento' => $fechaDocumento,
+                    'firma_documento' => $firmaDocumento,
+                    'tipo_funcion' => $tipoFuncion,
+                    'fecha_termino' => $fechaTermino,
                 ]);
             } else {
                 $db->table('desplazamiento_oficina')->insert([
+                    'id_unidad_organica' => $unidadId,
                     'id_trabajador' => $id,
                     'id_cargo' => $cargoId,
-                    'documento' => 'DESIGNACION-' . date('Y'),
-                    'fecha_documento' => date('Y-m-d'),
-                    'tipo_funcion' => 'Titular'
+                    'solicitud' => $solicitud,
+                    'documento' => $documento,
+                    'fecha_documento' => $fechaDocumento,
+                    'firma_documento' => $firmaDocumento,
+                    'tipo_funcion' => $tipoFuncion,
+                    'fecha_termino' => $fechaTermino,
                 ]);
             }
         }

@@ -9,8 +9,8 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const location = useLocation()
 
   const isAdmin = Boolean(
-    user?.cargo?.toLowerCase()?.includes('admin') || 
-    user?.usuario?.toLowerCase()?.includes('admin') || 
+    user?.cargo?.toLowerCase()?.includes('admin') ||
+    user?.usuario?.toLowerCase()?.includes('admin') ||
     user?.usuario === 'diegobarturen'
   )
 
@@ -28,7 +28,6 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   }
 
   const [expandedGroups, setExpandedGroups] = useState({
-    'Administración': true,
     'Principal': true,
     'Padrón municipal': true,
     'Documentación': true,
@@ -36,22 +35,38 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
     'Fiscalización': true
   })
 
+  useEffect(() => {
+    visibleNavigationGroups.forEach((group) => {
+      if (group.items.some((item) => isItemSelected(item))) {
+        setExpandedGroups((prev) => ({ ...prev, [group.name]: true }))
+      }
+    })
+  }, [activeItem, location.pathname, isAdmin])
+
   const [activeFlyoutGroup, setActiveFlyoutGroup] = useState(null)
   const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 })
   const flyoutRef = useRef(null)
 
+  const [hoveredGroup, setHoveredGroup] = useState(null)
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 })
+  const tooltipTimeoutRef = useRef(null)
+
   const groupIconConfig = {
-    'Administración': { icon: 'shieldCheck', color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-500/10 dark:bg-emerald-500/20' },
-    'Principal': { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-500/10 dark:bg-blue-500/20' },
-    'Padrón municipal': { icon: 'people', color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-500/10 dark:bg-indigo-500/20' },
-    'Documentación': { icon: 'document', color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500/10 dark:bg-amber-500/20' },
-    'Trámites': { icon: 'document', color: 'text-purple-500 dark:text-purple-400', bg: 'bg-purple-500/10 dark:bg-purple-500/20' },
-    'Fiscalización': { icon: 'ticket', color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-500/10 dark:bg-rose-500/20' },
+    'Administración': { icon: 'shieldCheck', color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+    'Principal': { icon: 'dashboard', color: 'text-[#4318FF]', bg: 'bg-[#EEF2FF] dark:bg-blue-950/40' },
+    'Padrón municipal': { icon: 'people', color: 'text-[#4318FF] dark:text-indigo-400', bg: 'bg-[#EEF2FF] dark:bg-indigo-950/40' },
+    'Documentación': { icon: 'document', color: 'text-[#FFB547] dark:text-amber-400', bg: 'bg-[#FFF9EC] dark:bg-amber-950/40' },
+    'Trámites': { icon: 'document', color: 'text-[#7551FF] dark:text-purple-400', bg: 'bg-[#F4F0FF] dark:bg-purple-950/40' },
+    'Fiscalización': { icon: 'ticket', color: 'text-[#EE5D50] dark:text-rose-400', bg: 'bg-[#FEEFEE] dark:bg-rose-950/40' },
   }
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (flyoutRef.current && !flyoutRef.current.contains(event.target)) {
+        // Ignoramos si el clic fue en un botón que abre/cierra el menú flotante
+        if (event.target.closest('[data-flyout-trigger="true"]')) {
+          return
+        }
         setActiveFlyoutGroup(null)
       }
     }
@@ -62,7 +77,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   }, [])
 
   const toggleGroup = (groupName) => {
-    setExpandedGroups(prev => ({
+    setExpandedGroups((prev) => ({
       ...prev,
       [groupName]: !prev[groupName]
     }))
@@ -79,6 +94,24 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
       left: rect.right + 12
     })
     setActiveFlyoutGroup(group)
+    setHoveredGroup(null) // Hide tooltip when opening flyout
+  }
+
+  const handleMouseEnter = (label, e, groupName) => {
+    if (activeFlyoutGroup?.name === groupName) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current)
+    
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setTooltipPos({ top: rect.top + rect.height / 2, left: rect.right + 12 })
+      setHoveredGroup(label)
+    }, 150)
+  }
+
+  const handleMouseLeave = () => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current)
+    setHoveredGroup(null)
   }
 
   return (
@@ -92,206 +125,193 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
         />
       )}
       <aside
-        className={`bg-white dark:bg-[#111C44] flex flex-col justify-between select-none z-50 transition-all duration-300 border-r border-[#E9EDF7]/60 dark:border-none shadow-[14px_0_30px_rgba(112,144,176,0.06)] min-h-screen py-7 fixed lg:static left-0 top-0 bottom-0 ${
-          collapsedOnDesktop ? 'lg:w-[5.5rem] w-72' : 'w-72'
+        style={{ height: '100%', maxHeight: '100dvh' }}
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen max-h-screen h-dvh max-h-dvh flex-col overflow-hidden bg-white dark:bg-[#111C44] text-slate-800 dark:text-slate-100 border-r border-slate-200/80 dark:border-white/10 shadow-2xl transition-all duration-300 lg:relative lg:z-auto lg:h-full lg:max-h-full lg:translate-x-0 lg:shadow-none shrink-0 ${
+          collapsedOnDesktop ? 'w-20' : 'w-72'
         } ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
         data-purpose="sidebar-navigation"
       >
-        <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar">
-          {/* Brand Header */}
-          <div 
-            className={`px-5 pb-8 pt-2 flex items-center justify-between gap-3 border-b border-[#F4F7FE] dark:border-white/10 ${collapsedOnDesktop ? 'lg:justify-center relative group/header cursor-pointer' : ''}`}
-            onClick={() => { if (collapsedOnDesktop && onToggleSidebar) onToggleSidebar() }}
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-3.5 relative group/header">
+          {/* Logo Container */}
+          <div className={`flex items-center transition-opacity duration-200 ${
+            collapsedOnDesktop 
+              ? 'justify-center w-full absolute inset-0 opacity-100 group-hover/header:opacity-0 pointer-events-none' 
+              : 'w-full justify-center pr-2'
+          }`}>
+            {collapsedOnDesktop ? (
+              <span className="text-xl font-black text-[#2B3674] dark:text-white">JLO</span>
+            ) : (
+              <>
+                <img src="/img/logo-mjlo.png" alt="Logo Municipalidad JLO" className="h-9 w-auto object-contain dark:hidden block" />
+                <img src="/img/logo-mjlo-blanco.png" alt="Logo Municipalidad JLO" className="h-9 w-auto object-contain dark:block hidden" />
+              </>
+            )}
+          </div>
+          
+          {/* Mobile close button */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar menú"
+            className="rounded-lg p-1 text-slate-400 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 lg:hidden ml-auto relative z-10"
           >
-            <div className={`flex items-center justify-center w-full px-2 ${collapsedOnDesktop ? 'lg:hidden' : ''}`}>
-              <img src="/img/logo-mjlo.png" alt="Logo Municipalidad JLO" className="h-12 object-contain dark:hidden block" />
-              <img src="/img/logo-mjlo-blanco.png" alt="Logo Municipalidad JLO" className="h-12 object-contain dark:block hidden" />
-            </div>
-            {collapsedOnDesktop && (
-              <div className="hidden lg:flex items-center justify-center w-full h-12">
-                <span className="text-[26px] font-black text-[#2B3674] dark:text-white group-hover/header:hidden transition-all">JLO</span>
-                <div className="hidden group-hover/header:flex relative items-center justify-center">
-                  <div className="rounded-xl p-2 bg-[#F4F7FE] dark:bg-white/10 text-[#2B3674] dark:text-white transition-colors">
-                    <Icon name="sidebarRight" className="size-5" />
-                  </div>
-                  {/* Tooltip */}
-                  <div className="absolute left-full ml-4 px-3 py-1.5 bg-[#2B3674] text-white text-xs font-bold rounded-lg whitespace-nowrap z-[100] shadow-lg">
-                    Expandir panel
+            <Icon name="close" />
+          </button>
+
+          {/* Desktop toggle button */}
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className={`hidden lg:flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all duration-200 p-1.5 cursor-pointer relative z-10 ${
+              collapsedOnDesktop ? 'mx-auto opacity-0 group-hover/header:opacity-100' : 'ml-auto'
+            }`}
+            onMouseEnter={(e) => handleMouseEnter(collapsedOnDesktop ? "Expandir panel" : "Ocultar panel", e, null)}
+            onMouseLeave={handleMouseLeave}
+          >
+            <Icon name="sidebarRight" className="size-5" />
+          </button>
+        </div>
+
+        <nav className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1 py-2 px-3 ${collapsedOnDesktop ? 'lg:px-2 px-3' : 'px-3'}`} aria-label="Navegación principal">
+          {visibleNavigationGroups.map((group) => {
+            const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30' }
+            const isSingle = group.items.length === 1
+            const mainItem = group.items[0]
+            const groupSelected = group.items.some(item => isItemSelected(item))
+
+            if (collapsedOnDesktop) {
+              return (
+                <div key={group.name} className="flex justify-center mb-0.5">
+                  <button
+                    type="button"
+                    data-flyout-trigger="true"
+                    onMouseEnter={(e) => handleMouseEnter(isSingle ? mainItem.label : group.name, e, group.name)}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={(e) => {
+                      if (isSingle) {
+                        onSelect(mainItem.label)
+                        navigate(mainItem.path)
+                        if (mobileOpen) onClose()
+                      } else {
+                        openFlyout(group, e)
+                      }
+                    }}
+                    className={`group flex size-8 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
+                      groupSelected || activeFlyoutGroup?.name === group.name
+                        ? 'bg-[#4318FF] text-white shadow-md'
+                        : `${grpCfg.bg} hover:brightness-95 dark:hover:brightness-110`
+                    }`}
+                  >
+                    <span className={`grid size-6 place-items-center rounded-lg ${groupSelected || activeFlyoutGroup?.name === group.name ? 'text-white' : grpCfg.color}`}>
+                      <Icon
+                        name={isSingle ? mainItem.icon : grpCfg.icon}
+                          className="size-3.5"
+                      />
+                    </span>
+                  </button>
+                </div>
+              )
+            }
+
+            if (isSingle) {
+              const selected = isItemSelected(mainItem)
+              return (
+                <button
+                  key={group.name}
+                  type="button"
+                  onClick={() => {
+                    onSelect(mainItem.label)
+                    navigate(mainItem.path)
+                    if (mobileOpen) onClose()
+                  }}
+                  className={`group flex w-full items-center gap-2 rounded-xl px-2.5 py-1 text-left transition-all duration-200 cursor-pointer ${
+                    selected
+                      ? 'bg-[#4318FF] text-white shadow-[0_6px_16px_rgba(67,24,255,0.25)]'
+                      : 'text-[#2B3674] dark:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/5'
+                  }`}
+                >
+                  <span className={`grid size-6 shrink-0 place-items-center rounded-lg transition-all duration-200 ${selected ? 'bg-white/20 text-white' : `${grpCfg.bg} ${grpCfg.color}`}`}>
+                    <Icon name={mainItem.icon} className="size-3.5" />
+                  </span>
+                  <span className="text-[12.5px] font-bold tracking-tight truncate flex-1">{mainItem.label}</span>
+                </button>
+              )
+            }
+
+            return (
+              <div key={group.name} className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.name)}
+                  className={`group flex w-full items-center gap-2 rounded-xl px-2.5 py-1 text-left transition-all duration-200 cursor-pointer ${
+                    groupSelected && !expandedGroups[group.name]
+                      ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white'
+                      : 'text-[#2B3674] dark:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/5'
+                  }`}
+                >
+                  <span className={`grid size-6 shrink-0 place-items-center rounded-lg transition-transform duration-200 group-hover:scale-105 ${grpCfg.bg} ${grpCfg.color}`}>
+                    <Icon name={grpCfg.icon} className="size-3.5" />
+                  </span>
+                  <span className="text-[12.5px] font-bold tracking-tight truncate flex-1 text-[#2B3674] dark:text-white">{group.name}</span>
+                  <Icon
+                    name="chevronDown"
+                    className={`size-3 text-slate-400 dark:text-slate-500 transition-transform duration-200 shrink-0 ${expandedGroups[group.name] ? 'rotate-180 text-[#4318FF]' : ''}`}
+                  />
+                </button>
+
+                <div className={`grid transition-all duration-150 ease-in-out ${expandedGroups[group.name] ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                  <div className="overflow-hidden space-y-0.5 pl-2.5 ml-2.5 border-l-2 border-slate-100 dark:border-white/10 pt-0.5 pb-0.5">
+                    {group.items.map((item) => {
+                      const selected = isItemSelected(item)
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            onSelect(item.label)
+                            navigate(item.path)
+                            if (mobileOpen) onClose()
+                          }}
+                          className={`group/sub flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left text-[12px] font-bold tracking-tight transition-all duration-150 cursor-pointer ${
+                            selected
+                              ? 'bg-[#4318FF] text-white shadow-[0_3px_10px_rgba(67,24,255,0.3)] font-bold'
+                              : 'text-[#2B3674]/85 dark:text-white/85 hover:bg-[#F4F7FE] dark:hover:bg-white/5 hover:text-[#4318FF] dark:hover:text-white'
+                          }`}
+                        >
+                          <Icon name={item.icon} className={`size-3.5 shrink-0 transition-transform duration-150 group-hover/sub:scale-110 ${selected ? 'text-white' : `${grpCfg.color} opacity-75 group-hover/sub:opacity-100`}`} />
+                          <span className="truncate flex-1">{item.label}</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
-            )}
-            
-            {/* Collapse sidebar button (desktop only, when expanded) */}
-            {!collapsedOnDesktop && onToggleSidebar && (
-              <button
-                type="button"
-                onClick={onToggleSidebar}
-                className="hidden lg:block rounded-lg p-1.5 text-[#A3AED0] hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
-                title="Contraer menú"
-              >
-                <Icon name="sidebarRight" className="size-5" />
-              </button>
-            )}
+            )
+          })}
+        </nav>
 
-            {/* Close button for mobile */}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Cerrar menú"
-              className="rounded-lg p-1.5 text-slate-400 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 lg:hidden"
-            >
-              <Icon name="close" />
-            </button>
-          </div>
-
-          {/* Navigation Menu */}
-          <nav className={`mt-6 space-y-1.5 mb-6 ${collapsedOnDesktop ? 'lg:px-3' : 'px-5'}`}>
-            {visibleNavigationGroups.map((group) => {
-              const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-500/10 dark:bg-blue-500/20' }
-              const isSingle = group.items.length === 1
-              const mainItem = group.items[0]
-              const groupSelected = group.items.some(item => isItemSelected(item))
-
-              if (collapsedOnDesktop) {
-                return (
-                  <div key={group.name} className="flex justify-center">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        if (isSingle) {
-                          onSelect(mainItem.label)
-                          navigate(mainItem.path)
-                          if (mobileOpen) onClose()
-                        } else {
-                          openFlyout(group, e)
-                        }
-                      }}
-                      title={isSingle ? mainItem.label : group.name}
-                      className={`group flex size-11 items-center justify-center rounded-[14px] transition-all duration-200 cursor-pointer ${
-                        groupSelected || activeFlyoutGroup?.name === group.name
-                          ? 'bg-[#4318FF] text-white shadow-md'
-                          : 'bg-[#F4F7FE] dark:bg-white/5 hover:bg-[#E9EDF7] dark:hover:bg-white/10'
-                      }`}
-                    >
-                      <span className={`grid size-6 place-items-center rounded-lg ${groupSelected || activeFlyoutGroup?.name === group.name ? 'text-white' : grpCfg.color}`}>
-                        <Icon
-                          name={isSingle ? mainItem.icon : grpCfg.icon}
-                          className="size-5"
-                        />
-                      </span>
-                    </button>
-                  </div>
-                )
-              }
-
-              if (isSingle) {
-                const selected = isItemSelected(mainItem)
-                return (
-                  <button
-                    key={group.name}
-                    type="button"
-                    onClick={() => {
-                      onSelect(mainItem.label)
-                      navigate(mainItem.path)
-                      if (mobileOpen) onClose()
-                    }}
-                    className={`group flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left transition-all duration-200 cursor-pointer ${
-                      selected
-                        ? 'bg-[#4318FF] text-white shadow-md'
-                        : 'text-[#A3AED0] dark:text-white/60 hover:bg-[#F4F7FE] dark:hover:bg-white/5 hover:text-[#2B3674] dark:hover:text-white'
-                    }`}
-                  >
-                    <span className={`grid size-7 shrink-0 place-items-center rounded-lg ${selected ? 'bg-white/20' : grpCfg.bg}`}>
-                      <Icon name={mainItem.icon} className={`size-4 ${selected ? 'text-white' : grpCfg.color}`} />
-                    </span>
-                    <span className="text-sm font-bold truncate flex-1">{mainItem.label}</span>
-                  </button>
-                )
-              }
-
-              return (
-                <div key={group.name} className="space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group.name)}
-                    className={`group flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left transition-all duration-200 cursor-pointer ${
-                      groupSelected && !expandedGroups[group.name]
-                        ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white'
-                        : 'text-[#A3AED0] dark:text-white/60 hover:bg-[#F4F7FE] dark:hover:bg-white/5 hover:text-[#2B3674] dark:hover:text-white'
-                    }`}
-                  >
-                    <span className={`grid size-7 shrink-0 place-items-center rounded-lg ${grpCfg.bg}`}>
-                      <Icon name={grpCfg.icon} className={`size-4 ${grpCfg.color}`} />
-                    </span>
-                    <span className={`text-sm font-bold truncate flex-1 ${groupSelected ? 'text-[#2B3674] dark:text-white' : ''}`}>{group.name}</span>
-                    <Icon
-                      name="chevronDown"
-                      className={`size-3.5 transition-transform duration-200 ${expandedGroups[group.name] ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-
-                  <div className={`grid transition-all duration-300 ease-in-out ${expandedGroups[group.name] ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                    <div className="overflow-hidden space-y-1 pl-10 pr-2 pt-1">
-                      {group.items.map((item) => {
-                        const selected = isItemSelected(item)
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              onSelect(item.label)
-                              navigate(item.path)
-                              if (mobileOpen) onClose()
-                            }}
-                            className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                              selected
-                                ? 'bg-[#4318FF]/10 dark:bg-[#4318FF]/20 text-[#4318FF] dark:text-white font-bold'
-                                : 'text-[#A3AED0] dark:text-white/50 hover:bg-[#F4F7FE] dark:hover:bg-white/5 hover:text-[#2B3674] dark:hover:text-white'
-                            }`}
-                          >
-                            <Icon name={item.icon} className={`size-3.5 ${selected ? 'text-[#4318FF] dark:text-white' : ''}`} />
-                            <span className="truncate">{item.label}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </nav>
+        <div className="mt-auto shrink-0 border-t border-slate-100 dark:border-white/10 px-3 py-2 bg-white dark:bg-[#111C44]">
+          <button
+            type="button"
+            onClick={onLogout}
+            onMouseEnter={(e) => collapsedOnDesktop ? handleMouseEnter("Cerrar sesión", e, null) : null}
+            onMouseLeave={handleMouseLeave}
+            className={`group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[12.5px] font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all duration-200 cursor-pointer ${
+              collapsedOnDesktop
+                ? 'lg:justify-center lg:size-8 mx-auto w-full'
+                : 'w-full'
+            }`}
+          >
+            <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-red-50 dark:bg-red-950/30 text-red-500 transition-transform duration-150 group-hover:scale-105">
+              <Icon name="logout" className="size-3.5" />
+            </span>
+            <span className={`text-[12.5px] font-bold tracking-tight truncate flex-1 text-red-600 dark:text-red-400 ${collapsedOnDesktop ? 'lg:hidden' : ''}`}>
+              Cerrar sesión
+            </span>
+          </button>
         </div>
-
-        {/* Logout Button (Bottom of Sidebar) */}
-        {!collapsedOnDesktop && (
-          <div className="px-5 mt-auto pb-4">
-            <button
-              onClick={onLogout}
-              className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left transition-all duration-200 cursor-pointer text-[#EE5D50] hover:bg-[#EE5D50]/10"
-            >
-              <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-[#EE5D50]/10">
-                <Icon name="logout" className="size-4" />
-              </span>
-              <span className="text-sm font-bold truncate flex-1">Cerrar sesión</span>
-            </button>
-          </div>
-        )}
-        {collapsedOnDesktop && (
-          <div className="flex justify-center mb-4 mt-auto">
-            <button
-              onClick={onLogout}
-              className="group flex size-11 items-center justify-center rounded-[14px] transition-all duration-200 cursor-pointer bg-[#F4F7FE] dark:bg-white/5 hover:bg-[#EE5D50] hover:text-white"
-              title="Cerrar sesión"
-            >
-              <span className="grid size-6 place-items-center rounded-lg text-[#EE5D50] group-hover:text-white">
-                <Icon name="logout" className="size-5" />
-              </span>
-            </button>
-          </div>
-        )}
       </aside>
 
       {/* Flyout Menu for Collapsed Desktop Sidebar */}
@@ -301,7 +321,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           style={{ position: 'fixed', top: flyoutPos.top, left: flyoutPos.left, zIndex: 9999 }}
           className="min-w-[13rem] rounded-[16px] border border-[#E9EDF7]/60 dark:border-white/10 bg-white dark:bg-[#111C44] p-2.5 shadow-[0_20px_60px_rgba(112,144,176,0.15)] dark:shadow-none animate-enter"
         >
-          <p className="px-2 pb-2 pt-0.5 text-[10px] font-black uppercase tracking-widest text-[#A3AED0] dark:text-white/50">
+          <p className="px-2 pb-2 pt-0.5 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/60">
             {activeFlyoutGroup.name}
           </p>
           <div className="space-y-1">
@@ -316,17 +336,30 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                     navigate(item.path)
                     setActiveFlyoutGroup(null)
                   }}
-                  className={`flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-left text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  className={`flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-left text-[13px] font-bold transition-all duration-200 cursor-pointer ${
                     selected
                       ? 'bg-[#4318FF] text-white shadow-md'
-                      : 'text-[#A3AED0] dark:text-white/60 hover:bg-[#F4F7FE] dark:hover:bg-white/5 hover:text-[#2B3674] dark:hover:text-white'
+                      : 'text-slate-800 dark:text-white/80 hover:bg-[#F4F7FE] dark:hover:bg-white/5 hover:text-black dark:hover:text-white'
                   }`}
                 >
-                  <Icon name={item.icon} className={`size-3.5 ${selected ? 'text-white' : ''}`} />
+                  <Icon name={item.icon} className={`size-3.5 ${selected ? 'text-white' : (groupIconConfig[activeFlyoutGroup.name]?.color || 'text-blue-500')}`} />
                   <span>{item.label}</span>
                 </button>
               )
             })}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Custom Tooltip for Collapsed Sidebar */}
+      {hoveredGroup && createPortal(
+        <div 
+          style={{ position: 'fixed', top: tooltipPos.top, left: tooltipPos.left, transform: 'translateY(-50%)', zIndex: 10000 }}
+          className="pointer-events-none"
+        >
+          <div className="px-3 py-1.5 bg-[#2B3674] dark:bg-slate-700 text-white text-[13px] font-bold rounded-[8px] shadow-lg whitespace-nowrap animate-tooltip-slide-in">
+            {hoveredGroup}
           </div>
         </div>,
         document.body

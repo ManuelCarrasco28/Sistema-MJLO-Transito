@@ -7,6 +7,7 @@ export function Login({ onLogin }) {
     return (typeof window !== 'undefined' && localStorage.getItem('remember_username')) || ''
   })
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(() => {
     return typeof window !== 'undefined' && Boolean(localStorage.getItem('remember_username'))
   })
