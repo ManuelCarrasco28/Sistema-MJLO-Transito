@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../theme.dart';
 import 'vehicle_details_screen.dart';
 import 'history_screen.dart';
+import 'register_vehicle_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +21,60 @@ class _HomeScreenState extends State<HomeScreen> {
     if (context.mounted) {
       Navigator.pushReplacementNamed(context, '/');
     }
+  }
+
+  void _showSearchTypeSelectionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Tipo de Búsqueda', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('¿Qué dato tienes del infractor o vehículo?'),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.pin),
+                    label: const Text('Placa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showSearchDialog(context, 'PLACA');
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.badge),
+                    label: const Text('DNI', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showSearchDialog(context, 'DNI');
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSearchDialog(BuildContext context, String searchType) {
@@ -82,7 +137,6 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(context),
-            _buildAlertBanner(),
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
@@ -109,27 +163,28 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showSearchDialog(context, 'PLACA'),
-        backgroundColor: AppTheme.accentYellow,
-        elevation: 4,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, color: AppTheme.primaryBlue, size: 32),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8.0,
-        color: Colors.white,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildBottomNavItem(Icons.home, 'Inicio', 0),
-              const SizedBox(width: 40), // Spacing for FAB
-              _buildBottomNavItem(Icons.settings, 'Ajustes', 1),
-            ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: SizedBox(
+            height: 60,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildBottomNavItem(Icons.home_rounded, 'Inicio', 0),
+                _buildBottomNavItem(Icons.history_rounded, 'Historial', 1),
+                _buildBottomNavItem(Icons.logout_rounded, 'Salir', 2),
+              ],
+            ),
           ),
         ),
       ),
@@ -141,29 +196,39 @@ class _HomeScreenState extends State<HomeScreen> {
     return InkWell(
       onTap: () {
         if (index == 1) {
-          // Placeholder for settings
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const HistoryScreen()),
+          );
+        } else if (index == 2) {
           _logout(context);
         } else {
           setState(() => _selectedIndex = index);
         }
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? AppTheme.primaryBlue : Colors.grey,
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isSelected ? AppTheme.primaryBlue : Colors.grey,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppTheme.primaryBlue : Colors.grey.shade500,
+              size: 24,
             ),
-          )
-        ],
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? AppTheme.primaryBlue : Colors.grey.shade600,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -190,7 +255,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 final prefs = snapshot.data;
                 final nombre = prefs?.getString('nombres')?.split(' ').first ?? 'Inspector';
                 final apellido = prefs?.getString('apellidos')?.split(' ').first ?? '';
-                final id = prefs?.getInt('id_persona') ?? 0;
                 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,69 +267,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontSize: 16,
                       ),
                     ),
-                    Text(
-                      'CIP-$id • ZONA CENTRAL',
-                      style: const TextStyle(
-                        color: AppTheme.accentYellow,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                   ],
                 );
               },
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.green,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Text(
-                  'SINC.',
-                  style: TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAlertBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: const Color(0xFFFFF9E6), // Light yellow
-      child: Row(
-        children: [
-          const Icon(Icons.shield_outlined, color: AppTheme.accentYellow, size: 20),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Alerta: Operativo en Av. Principal en curso.',
-              style: TextStyle(
-                color: AppTheme.primaryBlue,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
             ),
           ),
         ],
@@ -354,7 +358,7 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.edit_document,
           isPrimary: true,
           badge: 'NUEVO',
-          onTap: () => _showSearchDialog(context, 'PLACA'),
+          onTap: () => _showSearchTypeSelectionDialog(context),
         ),
         _buildActionCard(
           title: 'Escáner',
@@ -367,13 +371,15 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
         _buildActionCard(
-          title: 'Consultas SAT',
-          subtitle: 'Búsqueda de deudas,\nórdenes de captura.',
-          icon: Icons.manage_search,
-          badge: 'ONLINE',
-          badgeColor: Colors.blue.shade100,
-          badgeTextColor: Colors.blue.shade800,
-          onTap: () => _showSearchDialog(context, 'DNI'),
+          title: 'Registrar Informal',
+          subtitle: 'Registrar vehículo sin\nplaca o mototaxi.',
+          icon: Icons.motorcycle,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
+            );
+          },
         ),
         _buildActionCard(
           title: 'Historial',

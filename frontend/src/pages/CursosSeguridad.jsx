@@ -52,6 +52,25 @@ export function CursosSeguridad() {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
+
+    if (!formData.titulo.trim() || !formData.fecha) {
+      alert('Por favor completa los campos requeridos.')
+      return
+    }
+
+    if (formData.capacidad < 1 || formData.capacidad > 100) {
+      alert('El aforo del curso debe ser entre 1 y 100 personas.')
+      return
+    }
+
+    const courseDate = new Date(formData.fecha + 'T00:00:00')
+    const today = new Date()
+    today.setHours(0,0,0,0)
+    if (courseDate < today && !selectedCurso) {
+      alert('La fecha del nuevo curso no puede estar en el pasado.')
+      return
+    }
+
     const payload = {
       ...formData,
       cuposTotales: formData.capacidad,

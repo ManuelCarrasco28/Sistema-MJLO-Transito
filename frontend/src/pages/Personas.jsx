@@ -16,6 +16,7 @@ export function Personas({ user, onUserUpdate }) {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedPersona, setSelectedPersona] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [toast, setToast] = useState(null)
 
   const [formData, setFormData] = useState({
     tipoDocumento: 'DNI',
@@ -32,14 +33,18 @@ export function Personas({ user, onUserUpdate }) {
     fotoImg: '',
   })
 
+  const loadPersonas = async () => {
+    const response = await apiFetch('/personas')
+    if (!response.ok) throw response
+    const payload = await response.json()
+    const data = payload.data ?? []
+    setPersonas(data)
+    setCachedData('/personas', data)
+    return data
+  }
+
   useEffect(() => {
-    apiFetch('/personas')
-      .then((response) => response.ok ? response.json() : Promise.reject(response))
-      .then((payload) => {
-        const data = payload.data ?? []
-        setPersonas(data)
-        setCachedData('/personas', data)
-      })
+    loadPersonas()
       .catch(() => { })
       .finally(() => setIsLoading(false))
   }, [])
@@ -62,8 +67,6 @@ export function Personas({ user, onUserUpdate }) {
     setCurrentPage(1)
   }, [searchTerm, filterEstado])
 
-  const [toast, setToast] = useState(null)
-  
   useEffect(() => {
     if (!toast) return undefined
     const timer = window.setTimeout(() => setToast(null), 3000)
@@ -77,10 +80,6 @@ export function Personas({ user, onUserUpdate }) {
       type,
     })
   }
-
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, filterEstado])
 
   const paginatedPersonas = filteredPersonas.slice(
     (currentPage - 1) * itemsPerPage,
@@ -183,8 +182,26 @@ export function Personas({ user, onUserUpdate }) {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
+    // Validaciones
+    const docLen = formData.numeroDocumento.trim().length
     if (!formData.numeroDocumento.trim() || !formData.nombres.trim() || !formData.apellidoPaterno.trim()) {
-      alert('Por favor completa los campos requeridos.')
+      alert('Por favor completa los campos requeridos (Documento, Nombres, Apellido Paterno).')
+      return
+    }
+    if (formData.tipoDocumento === 'DNI' && (docLen !== 8 || !/^\d{8}$/.test(formData.numeroDocumento.trim()))) {
+      alert('El DNI debe tener exactamente 8 dígitos numéricos.')
+      return
+    }
+    if (formData.tipoDocumento !== 'DNI' && (docLen < 8 || docLen > 12)) {
+      alert('El número de documento debe tener entre 8 y 12 caracteres.')
+      return
+    }
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      alert('Por favor ingresa un correo electrónico válido.')
+      return
+    }
+    if (formData.celular && !/^\d{9}$/.test(formData.celular)) {
+      alert('El número de celular debe tener exactamente 9 dígitos numéricos.')
       return
     }
 
@@ -486,7 +503,7 @@ export function Personas({ user, onUserUpdate }) {
                     </td>
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 font-mono text-xs font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-200">
-                        <span>{p.tipoDocumento}:</span>
+                        <span>{p.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : p.tipoDocumento}:</span>
                         <span>{p.numeroDocumento}</span>
                       </span>
                     </td>

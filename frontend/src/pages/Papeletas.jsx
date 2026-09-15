@@ -104,6 +104,17 @@ export function Papeletas() {
 
   const handleConfirmPagar = async () => {
     if (!papeletaToAction) return
+    
+    // Validaciones
+    if (!numeroRecibo.trim() || !fechaPago) {
+      alert('Por favor ingresa el número de recibo y la fecha de pago.')
+      return
+    }
+    if (new Date(fechaPago) > new Date()) {
+      alert('La fecha de pago no puede ser futura.')
+      return
+    }
+    
     setIsProcessingAction(true)
     try {
       const res = await apiFetch(`/papeletas/${papeletaToAction.id}/pagar`, {

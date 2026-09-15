@@ -1,5 +1,12 @@
 export const navigationGroups = [
   {
+    name: 'Administración',
+    adminOnly: true,
+    items: [
+      { id: 'admin', label: 'Panel Administración', icon: 'shieldCheck', path: '/admin' }
+    ]
+  },
+  {
     name: 'Principal',
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/dashboard' }

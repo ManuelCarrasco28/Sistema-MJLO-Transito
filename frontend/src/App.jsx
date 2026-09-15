@@ -15,6 +15,7 @@ import { CursosSeguridad } from './pages/CursosSeguridad'
 import { Pagos } from './pages/Pagos'
 import { Retenciones } from './pages/Retenciones'
 import { Permisos } from './pages/Permisos'
+import { AdminPanel } from './pages/AdminPanel'
 import { apiFetch } from './config/api'
 const DEFAULT_USER = {
   nombres: 'Usuario',
@@ -28,6 +29,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
   
   const getActiveItem = () => {
     const path = location.pathname
+    if (path.includes('/admin')) return 'Panel Administración'
     if (path.includes('/vehiculos')) return 'Vehículos'
     if (path.includes('/personas')) return 'Personas'
     if (path.includes('/personal')) return 'Personal'
@@ -88,6 +90,12 @@ function Layout({ onLogout, user, onUserUpdate }) {
     }
   }, [])
 
+  const isAdmin = Boolean(
+    user?.cargo?.toLowerCase()?.includes('admin') || 
+    user?.usuario?.toLowerCase()?.includes('admin') || 
+    user?.usuario === 'diegobarturen'
+  )
+
   return (
     <main
       className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden ${
@@ -101,6 +109,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
         onClose={() => setMobileOpen(false)}
         onLogout={onLogout}
         collapsedOnDesktop={sidebarCollapsed}
+        user={user}
       />
       <div className="min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col">
         <Header
@@ -123,7 +132,8 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
         <div className="mx-auto w-full max-w-[96rem] flex-1 space-y-6 p-4 sm:p-6 lg:p-7 xl:p-8">
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />} />
+            <Route path="/admin" element={isAdmin ? <AdminPanel /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardHome />} />
             <Route path="/vehiculos" element={<Vehiculos />} />
             <Route path="/personas" element={<Personas user={user} onUserUpdate={onUserUpdate} />} />
@@ -153,35 +163,49 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
 function App() {
   const [user, setUser] = useState(() => {
-    if (typeof window === 'undefined') return DEFAULT_USER
+    if (typeof window === 'undefined') return null
 
     if (localStorage.getItem('logged_out') === 'true') return null
 
-    const savedUser = localStorage.getItem('user')
-    if (!savedUser) return DEFAULT_USER
+    const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user')
+    if (!savedUser) return null
 
     try {
       return JSON.parse(savedUser)
     } catch {
       localStorage.removeItem('user')
-      return DEFAULT_USER
+      sessionStorage.removeItem('user')
+      return null
     }
   })
 
-  const handleLogin = (userData) => {
+  const handleLogin = (userData, remember = false) => {
     localStorage.removeItem('logged_out')
+    if (remember) {
+      localStorage.setItem('user', JSON.stringify(userData))
+      sessionStorage.removeItem('user')
+    } else {
+      sessionStorage.setItem('user', JSON.stringify(userData))
+      localStorage.removeItem('user')
+    }
     setUser(userData)
   }
 
   const handleLogout = () => {
     localStorage.removeItem('user')
+    sessionStorage.removeItem('user')
     localStorage.setItem('logged_out', 'true')
     setUser(null)
   }
 
   const handleUserUpdate = (nextUser) => {
     setUser(nextUser)
-    localStorage.setItem('user', JSON.stringify(nextUser))
+    if (localStorage.getItem('user')) {
+      localStorage.setItem('user', JSON.stringify(nextUser))
+    }
+    if (sessionStorage.getItem('user')) {
+      sessionStorage.setItem('user', JSON.stringify(nextUser))
+    }
   }
   
   return (

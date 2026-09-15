@@ -31,4 +31,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->get('inventario-criterios', 'InternamientosController::criterios');
     $routes->resource('permisos', ['controller' => 'PermisosController']);
     $routes->get('procedimientos-admin', 'PermisosController::procedimientos');
+    $routes->get('usuarios', 'UsuariosController::index');
+    $routes->post('usuarios', 'UsuariosController::create');
+    $routes->put('usuarios/(:num)', 'UsuariosController::update/$1');
+    $routes->put('usuarios/(:num)/password', 'UsuariosController::updatePassword/$1');
 });

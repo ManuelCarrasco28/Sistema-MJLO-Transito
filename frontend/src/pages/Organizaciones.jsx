@@ -113,6 +113,12 @@ export function Organizaciones() {
       return
     }
 
+    // Validaciones
+    if (formData.ruc.trim().length !== 11 || !/^\d{11}$/.test(formData.ruc.trim())) {
+      alert('El RUC debe tener exactamente 11 dígitos numéricos.')
+      return
+    }
+
     try {
       if (isEditing) {
         await apiFetch(`/organizaciones/${selectedOrg.id}`, {

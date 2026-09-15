@@ -217,8 +217,19 @@ export function Vehiculos() {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
-    if (!formData.placa.trim() || !formData.propietario.trim()) {
-      alert('Por favor completa los campos requeridos.')
+    // Validaciones
+    const placaClean = formData.placa.trim().toUpperCase()
+    if (!placaClean || !formData.propietario.trim()) {
+      alert('Por favor completa los campos requeridos (Placa y Propietario).')
+      return
+    }
+    if (placaClean.length < 6) {
+      alert('La placa debe tener al menos 6 caracteres.')
+      return
+    }
+    const anioActual = new Date().getFullYear()
+    if (formData.anio && (formData.anio < 1950 || formData.anio > anioActual + 1)) {
+      alert(`El año de fabricación debe ser válido (entre 1950 y ${anioActual + 1}).`)
       return
     }
 

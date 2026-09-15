@@ -4,9 +4,19 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { navigationGroups } from '../../config/navigation'
 import { Icon } from '../ui/Icon'
 
-export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, collapsedOnDesktop }) {
+export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, collapsedOnDesktop, user }) {
   const navigate = useNavigate()
   const location = useLocation()
+
+  const isAdmin = Boolean(
+    user?.cargo?.toLowerCase()?.includes('admin') || 
+    user?.usuario?.toLowerCase()?.includes('admin') || 
+    user?.usuario === 'diegobarturen'
+  )
+
+  const visibleNavigationGroups = navigationGroups.filter(
+    (group) => !group.adminOnly || isAdmin
+  )
 
   const isItemSelected = (item) => {
     if (!item) return false
@@ -18,6 +28,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   }
 
   const [expandedGroups, setExpandedGroups] = useState({
+    'Administración': true,
     'Principal': true,
     'Padrón municipal': true,
     'Documentación': true,
@@ -30,6 +41,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const flyoutRef = useRef(null)
 
   const groupIconConfig = {
+    'Administración': { icon: 'shieldCheck', color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-500/10 dark:bg-emerald-500/20' },
     'Principal': { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-500/10 dark:bg-blue-500/20' },
     'Padrón municipal': { icon: 'people', color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-500/10 dark:bg-indigo-500/20' },
     'Documentación': { icon: 'document', color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500/10 dark:bg-amber-500/20' },
@@ -112,7 +124,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
 
           {/* Navigation Menu */}
           <nav className={`mt-6 space-y-4 mb-6 ${collapsedOnDesktop ? 'lg:px-3' : 'px-5'}`}>
-            {navigationGroups.map((group) => {
+            {visibleNavigationGroups.map((group) => {
               const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-500/10 dark:bg-blue-500/20' }
               const isSingle = group.items.length === 1
               const mainItem = group.items[0]
