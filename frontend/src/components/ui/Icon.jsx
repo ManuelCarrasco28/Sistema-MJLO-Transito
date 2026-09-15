@@ -50,6 +50,13 @@ const iconPaths = {
       <path d="M12 7v2M12 12v1M12 16v1" />
     </>
   ),
+  operations: (
+    <>
+      <path d="M9 3h6l1 3h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l1-3Z" />
+      <path d="M9 13l2 2 4-5" />
+      <path d="M8 6h8" />
+    </>
+  ),
   payment: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />

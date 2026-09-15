@@ -31,6 +31,7 @@ export const navigationGroups = [
   {
     name: 'Fiscalización',
     items: [
+      { id: 'operativos', label: 'Operativos', icon: 'operations', path: '/operativos' },
       { id: 'papeletas', label: 'Papeletas', icon: 'ticket', path: '/papeletas' },
       { id: 'pagos', label: 'Pagos', icon: 'receiptCheck', path: '/pagos' },
       { id: 'internamientos', label: 'Internamientos', icon: 'garage', path: '/internamientos' },
