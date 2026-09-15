@@ -3,6 +3,7 @@ import { MetricCards } from '../components/dashboard/MetricCards'
 import { ChartsSection } from '../components/dashboard/ChartsSection'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { Icon } from '../components/ui/Icon'
+import { QuickActions } from '../components/dashboard/QuickActions'
 
 export function DashboardHome() {
   const cached = getCachedData('/dashboard')
@@ -36,7 +37,7 @@ export function DashboardHome() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="flex items-center gap-3.5">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#0075FF] text-white shadow-lg shadow-[#0075FF]/30">
             <Icon name="dashboard" className="size-6" />
           </span>
           <div>
@@ -56,6 +57,9 @@ export function DashboardHome() {
           {error}
         </div>
       )}
+
+      {/* Quick Actions (Accesos rápidos) */}
+      <QuickActions />
 
       {/* KPI Metric Cards */}
       <MetricCards cards={dashboardData?.summaryCards} loading={!dashboardData && !error} />

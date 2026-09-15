@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '../ui/Icon'
-import { QuickActions } from './QuickActions'
 
 export function ChartsSection({ data, loading = false }) {
   const [expandedChart, setExpandedChart] = useState(null)
@@ -273,9 +272,6 @@ export function ChartsSection({ data, loading = false }) {
               </div>
             </div>
           </article>
-
-          {/* Quick Actions (Inyectado como parte del layout) */}
-          <QuickActions />
 
           {/* Multas y pagos registrados (Restaurado interactivo) */}
           <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '610ms' }}>
