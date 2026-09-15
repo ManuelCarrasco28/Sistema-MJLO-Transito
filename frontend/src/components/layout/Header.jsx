@@ -137,7 +137,7 @@ export function Header({
       </div>
       
       {/* Right Horizon Floating Search & Control Capsule */}
-      <div className="flex flex-wrap md:flex-nowrap items-center gap-3 bg-white dark:bg-[#111C44] p-2 sm:p-2.5 rounded-[30px] shadow-[0px_18px_40px_rgba(112,144,176,0.12)] dark:shadow-none border border-white/60 dark:border-none">
+      <div className="ml-auto flex flex-wrap md:flex-nowrap items-center gap-3 bg-white dark:bg-[#111C44] p-2 sm:p-2.5 rounded-[30px] shadow-[0px_18px_40px_rgba(112,144,176,0.12)] dark:shadow-none border border-white/60 dark:border-none">
 
         {/* Date and Time Pill */}
         <div className="hidden xl:flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-slate-200/60 dark:border-white/10 bg-white/50 dark:bg-white/5">
