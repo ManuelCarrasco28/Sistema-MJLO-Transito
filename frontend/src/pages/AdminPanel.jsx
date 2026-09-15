@@ -23,7 +23,7 @@ export function AdminPanel() {
     apellido_materno: '',
     nombre_usuario: '',
     password: '',
-    cargo: 'Inspector de Tránsito',
+    cargo: 'INSPECTOR DE TRÁNSITO MUNICIPAL',
     estado: 'ACTIVO'
   })
 
@@ -56,7 +56,7 @@ export function AdminPanel() {
 
   const openEditModal = (user) => {
     setSelectedUser(user)
-    setEditForm({ cargo: user.cargo || 'Inspector de Tránsito', estado: user.usuario_estado || 'ACTIVO' })
+    setEditForm({ cargo: user.cargo || 'INSPECTOR DE TRÁNSITO MUNICIPAL', estado: user.usuario_estado || 'ACTIVO' })
     setIsEditModalOpen(true)
   }
 
@@ -130,7 +130,7 @@ export function AdminPanel() {
           apellido_materno: '',
           nombre_usuario: '',
           password: '',
-          cargo: 'Inspector de Tránsito',
+          cargo: 'INSPECTOR DE TRÁNSITO MUNICIPAL',
           estado: 'ACTIVO'
         })
         alert('Usuario creado exitosamente.')
@@ -507,8 +507,13 @@ export function AdminPanel() {
                   onChange={(e) => setEditForm({...editForm, cargo: e.target.value})}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                 >
-                  <option value="Administrador">Administrador</option>
-                  <option value="Inspector de Tránsito">Inspector de Tránsito</option>
+                  <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+                  <option value="SUBGERENTE DE TRÁNSITO Y TRANSPORTE">SUBGERENTE DE TRÁNSITO Y TRANSPORTE</option>
+                  <option value="INSPECTOR DE TRÁNSITO MUNICIPAL">INSPECTOR DE TRÁNSITO MUNICIPAL</option>
+                  <option value="INSPECTOR TÉCNICO VEHICULAR">INSPECTOR TÉCNICO VEHICULAR</option>
+                  <option value="ADMINISTRADOR DE DEPÓSITO MUNICIPAL">ADMINISTRADOR DE DEPÓSITO MUNICIPAL</option>
+                  <option value="ESPECIALISTA EN EDUCACIÓN VIAL">ESPECIALISTA EN EDUCACIÓN VIAL</option>
+                  <option value="CAJERO DE RECAUDACIÓN">CAJERO DE RECAUDACIÓN</option>
                 </select>
               </div>
               <div>
@@ -679,10 +684,13 @@ export function AdminPanel() {
                     onChange={(e) => setCreateForm({...createForm, cargo: e.target.value})}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   >
-                    <option value="Inspector de Tránsito">Inspector de Tránsito</option>
-                    <option value="Administrador">Administrador</option>
-                    <option value="Fiscalizador de Tránsito">Fiscalizador de Tránsito</option>
-                    <option value="Operador de Sistema">Operador de Sistema</option>
+                    <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+                    <option value="SUBGERENTE DE TRÁNSITO Y TRANSPORTE">SUBGERENTE DE TRÁNSITO Y TRANSPORTE</option>
+                    <option value="INSPECTOR DE TRÁNSITO MUNICIPAL">INSPECTOR DE TRÁNSITO MUNICIPAL</option>
+                    <option value="INSPECTOR TÉCNICO VEHICULAR">INSPECTOR TÉCNICO VEHICULAR</option>
+                    <option value="ADMINISTRADOR DE DEPÓSITO MUNICIPAL">ADMINISTRADOR DE DEPÓSITO MUNICIPAL</option>
+                    <option value="ESPECIALISTA EN EDUCACIÓN VIAL">ESPECIALISTA EN EDUCACIÓN VIAL</option>
+                    <option value="CAJERO DE RECAUDACIÓN">CAJERO DE RECAUDACIÓN</option>
                   </select>
                 </div>
                 <div>
