@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { apiFetch } from '../../config/api'
 
 export function Login({ onLogin }) {
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -9,6 +10,9 @@ export function Login({ onLogin }) {
   const [isShaking, setIsShaking] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [showForgotModal, setShowForgotModal] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const turnstileContainerRef = useRef(null)
+  const turnstileWidgetRef = useRef(null)
 
   useEffect(() => {
     if (isShaking) {
@@ -17,11 +21,60 @@ export function Login({ onLogin }) {
     }
   }, [isShaking])
 
+  useEffect(() => {
+    if (!turnstileSiteKey || !turnstileContainerRef.current) return undefined
+
+    const renderTurnstile = () => {
+      if (!window.turnstile || !turnstileContainerRef.current || turnstileWidgetRef.current) return
+
+      turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: turnstileSiteKey,
+        theme: 'light',
+        callback: (token) => setCaptchaToken(token),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => setCaptchaToken(''),
+      })
+    }
+
+    if (window.turnstile) {
+      renderTurnstile()
+      return undefined
+    }
+
+    const existingScript = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]')
+    if (existingScript) {
+      existingScript.addEventListener('load', renderTurnstile)
+      return () => existingScript.removeEventListener('load', renderTurnstile)
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+    script.async = true
+    script.defer = true
+    script.addEventListener('load', renderTurnstile)
+    document.body.appendChild(script)
+
+    return () => script.removeEventListener('load', renderTurnstile)
+  }, [turnstileSiteKey])
+
+  const resetCaptcha = () => {
+    setCaptchaToken('')
+    if (window.turnstile && turnstileWidgetRef.current) {
+      window.turnstile.reset(turnstileWidgetRef.current)
+    }
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
 
     if (!username.trim() || !password) {
       setError('Por favor, ingresa tu usuario y contraseña.')
+      setIsShaking(true)
+      return
+    }
+
+    if (turnstileSiteKey && !captchaToken) {
+      setError('Completa la verificación de seguridad.')
       setIsShaking(true)
       return
     }
@@ -35,6 +88,7 @@ export function Login({ onLogin }) {
         body: {
           usuario: username.trim(),
           password,
+          captchaToken,
         },
       })
 
@@ -44,6 +98,7 @@ export function Login({ onLogin }) {
         const message = data.messages?.error || data.messages || data.message || 'El usuario o la contraseña son incorrectos.'
         setError(Array.isArray(message) ? message.join(' ') : message)
         setIsShaking(true)
+        resetCaptcha()
         return
       }
 
@@ -52,6 +107,7 @@ export function Login({ onLogin }) {
     } catch (err) {
       setError('No se pudo conectar con el servidor. Verifica tu conexión.')
       setIsShaking(true)
+      resetCaptcha()
     } finally {
       setIsLoading(false)
     }
@@ -174,6 +230,12 @@ export function Login({ onLogin }) {
               </button>
             </div>
           </div>
+
+          {turnstileSiteKey && (
+            <div className="flex justify-center rounded-xl border border-slate-200 bg-slate-50 p-2">
+              <div ref={turnstileContainerRef} />
+            </div>
+          )}
 
           {/* ALERTA DE ERROR */}
           {error && (
