@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { apiFetch } from '../../config/api'
 
 export function Login({ onLogin }) {
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
   const [username, setUsername] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('remember_username')) || ''
   })
@@ -13,6 +14,9 @@ export function Login({ onLogin }) {
   const [isShaking, setIsShaking] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [showForgotModal, setShowForgotModal] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const turnstileContainerRef = useRef(null)
+  const turnstileWidgetRef = useRef(null)
 
   useEffect(() => {
     if (isShaking) {
@@ -21,11 +25,60 @@ export function Login({ onLogin }) {
     }
   }, [isShaking])
 
+  useEffect(() => {
+    if (!turnstileSiteKey || !turnstileContainerRef.current) return undefined
+
+    const renderTurnstile = () => {
+      if (!window.turnstile || !turnstileContainerRef.current || turnstileWidgetRef.current) return
+
+      turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: turnstileSiteKey,
+        theme: 'light',
+        callback: (token) => setCaptchaToken(token),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => setCaptchaToken(''),
+      })
+    }
+
+    if (window.turnstile) {
+      renderTurnstile()
+      return undefined
+    }
+
+    const existingScript = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]')
+    if (existingScript) {
+      existingScript.addEventListener('load', renderTurnstile)
+      return () => existingScript.removeEventListener('load', renderTurnstile)
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+    script.async = true
+    script.defer = true
+    script.addEventListener('load', renderTurnstile)
+    document.body.appendChild(script)
+
+    return () => script.removeEventListener('load', renderTurnstile)
+  }, [turnstileSiteKey])
+
+  const resetCaptcha = () => {
+    setCaptchaToken('')
+    if (window.turnstile && turnstileWidgetRef.current) {
+      window.turnstile.reset(turnstileWidgetRef.current)
+    }
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
 
     if (!username.trim() || !password) {
       setError('Por favor, ingresa tu usuario y contraseña.')
+      setIsShaking(true)
+      return
+    }
+
+    if (turnstileSiteKey && !captchaToken) {
+      setError('Completa la verificación de seguridad.')
       setIsShaking(true)
       return
     }
@@ -39,6 +92,7 @@ export function Login({ onLogin }) {
         body: {
           usuario: username.trim(),
           password,
+          captchaToken,
         },
       })
 
@@ -48,6 +102,7 @@ export function Login({ onLogin }) {
         const message = data.messages?.error || data.messages || data.message || 'El usuario o la contraseña son incorrectos.'
         setError(Array.isArray(message) ? message.join(' ') : message)
         setIsShaking(true)
+        resetCaptcha()
         return
       }
 
@@ -61,6 +116,7 @@ export function Login({ onLogin }) {
     } catch (err) {
       setError('No se pudo conectar con el servidor. Verifica tu conexión.')
       setIsShaking(true)
+      resetCaptcha()
     } finally {
       setIsLoading(false)
     }
@@ -198,6 +254,14 @@ export function Login({ onLogin }) {
               <span className="font-medium text-slate-700">Recordar sesión</span>
             </label>
           </div>
+
+          {turnstileSiteKey && (
+            <div className="flex justify-center rounded-xl border border-slate-200 bg-slate-50 p-2">
+              <div ref={turnstileContainerRef} />
+            </div>
+          )}
+
+          {/* ALERTA DE ERROR */}
           {error && (
             <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 shadow-xs">
               <svg className="size-4.5 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
