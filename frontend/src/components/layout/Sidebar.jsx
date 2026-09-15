@@ -101,14 +101,26 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
       >
         <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar">
           {/* Brand Header */}
-          <div className={`px-5 pb-8 pt-2 flex items-center justify-between gap-3 border-b border-[#F4F7FE] dark:border-white/10 ${collapsedOnDesktop ? 'lg:justify-center' : ''}`}>
+          <div 
+            className={`px-5 pb-8 pt-2 flex items-center justify-between gap-3 border-b border-[#F4F7FE] dark:border-white/10 ${collapsedOnDesktop ? 'lg:justify-center relative group/header cursor-pointer' : ''}`}
+            onClick={() => { if (collapsedOnDesktop && onToggleSidebar) onToggleSidebar() }}
+          >
             <div className={`flex items-center justify-center w-full px-2 ${collapsedOnDesktop ? 'lg:hidden' : ''}`}>
               <img src="/img/logo-mjlo.png" alt="Logo Municipalidad JLO" className="h-12 object-contain dark:hidden block" />
               <img src="/img/logo-mjlo-blanco.png" alt="Logo Municipalidad JLO" className="h-12 object-contain dark:block hidden" />
             </div>
             {collapsedOnDesktop && (
-              <div className="hidden lg:flex items-center justify-center w-full">
-                <span className="text-[26px] font-black text-[#2B3674] dark:text-white">JLO</span>
+              <div className="hidden lg:flex items-center justify-center w-full h-12">
+                <span className="text-[26px] font-black text-[#2B3674] dark:text-white group-hover/header:hidden transition-all">JLO</span>
+                <div className="hidden group-hover/header:flex relative items-center justify-center">
+                  <div className="rounded-xl p-2 bg-[#F4F7FE] dark:bg-white/10 text-[#2B3674] dark:text-white transition-colors">
+                    <Icon name="sidebarRight" className="size-5" />
+                  </div>
+                  {/* Tooltip */}
+                  <div className="absolute left-full ml-4 px-3 py-1.5 bg-[#2B3674] text-white text-xs font-bold rounded-lg whitespace-nowrap z-[100] shadow-lg">
+                    Expandir panel
+                  </div>
+                </div>
               </div>
             )}
             
