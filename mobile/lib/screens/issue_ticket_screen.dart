@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 
@@ -23,6 +26,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
 
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _permitePapeletaMovil = true;
   List<dynamic> _tiposInfraccion = [];
   
   // Lista dinámica de infracciones seleccionadas
@@ -30,6 +34,12 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   
   String _lugar = '';
   String _observaciones = '';
+  
+  List<XFile> _fotos = [];
+  Position? _currentPosition;
+  final ImagePicker _picker = ImagePicker();
+  
+  late TextEditingController _lugarController;
 
   // Datos del Conductor (si es distinto al dueño)
   bool _conductorEsDueno = true;
@@ -68,13 +78,16 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   @override
   void initState() {
     super.initState();
+    _lugarController = TextEditingController(text: _lugar);
     _loadTiposInfraccion();
   }
 
   Future<void> _loadTiposInfraccion() async {
     try {
-      final response = await ApiService.getTiposInfraccion();
+      final permite = await ApiService.permiteAplicarPapeletaMovil();
+      final response = permite ? await ApiService.getTiposInfraccion() : <dynamic>[];
       setState(() {
+        _permitePapeletaMovil = permite;
         _tiposInfraccion = response;
         _isLoading = false;
       });
@@ -84,6 +97,75 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error cargando infracciones: $e')),
         );
+      }
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+      if (photo != null) {
+        setState(() {
+          _fotos.add(photo);
+        });
+      }
+    } catch (e) {
+      _showError('Error al tomar la foto: $e');
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showError('Los servicios de ubicación están desactivados.');
+        return;
+      }
+
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showError('Los permisos de ubicación fueron denegados.');
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _showError('Los permisos de ubicación están denegados permanentemente.');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _currentPosition = position;
+        if (_lugar.trim().isEmpty) {
+          _lugar = '${position.latitude}, ${position.longitude}';
+          _lugarController.text = _lugar;
+        }
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ubicación obtenida correctamente')),
+        );
+      }
+    } catch (e) {
+      _showError('Error al obtener la ubicación: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -100,6 +182,11 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   }
 
   Future<void> _submitTicket() async {
+    if (!_permitePapeletaMovil) {
+      await _submitOnlyReport();
+      return;
+    }
+
     final validInfracciones = _selectedInfraccionesIds.where((id) => id != null).toList();
 
     if (validInfracciones.isEmpty) {
@@ -169,6 +256,47 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
     }
   }
 
+  Future<void> _submitOnlyReport() async {
+    if (_lugar.trim().isEmpty || _observaciones.trim().isEmpty) {
+      _showError('Ingrese lugar y observaciones del reporte');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final inspectorId = await ApiService.getPersonalId();
+      final String placa = (widget.vehicleData['placa'] != null && widget.vehicleData['placa'].toString().trim().isNotEmpty)
+          ? widget.vehicleData['placa'].toString().trim().toUpperCase()
+          : '';
+
+      List<String> fotosBase64 = [];
+      for (var foto in _fotos) {
+        final bytes = await foto.readAsBytes();
+        fotosBase64.add(base64Encode(bytes));
+      }
+
+      await ApiService.createReporteIntervencion({
+        'inspectorId': inspectorId,
+        'placa': placa,
+        'lugar': _lugar,
+        'observaciones': _observaciones,
+        'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : '',
+        'fotos': fotosBase64,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reporte enviado a administración para revisión.'), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context); // Volver al detalle
+      }
+    } catch (e) {
+      _showError('Error al guardar reporte: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
   void _showError(String msg) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
@@ -179,6 +307,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
     _dniConductor.dispose();
     _nombresConductor.dispose();
     _apellidosConductor.dispose();
+    _lugarController.dispose();
     super.dispose();
   }
 
@@ -249,6 +378,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                   ],
 
                   const SizedBox(height: 24),
+                  if (_permitePapeletaMovil) ...[
                   _buildSectionTitle('Infracciones a Aplicar'),
                   Container(
                     decoration: BoxDecoration(
@@ -333,6 +463,22 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
                     ),
                   ),
+                  ] else ...[
+                    _buildSectionTitle('Reporte para administración'),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.amber.shade200),
+                      ),
+                      child: const Text(
+                        'El permiso móvil para aplicar papeletas está desactivado. Este registro será enviado como evidencia; administración decidirá si genera la papeleta.',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.brown),
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 24),
                   Container(
@@ -347,12 +493,17 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                     child: Column(
                       children: [
                         TextFormField(
+                          controller: _lugarController,
                           decoration: InputDecoration(
                             labelText: 'Lugar de Intervención',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             filled: true,
                             fillColor: Colors.grey.shade50,
                             prefixIcon: const Icon(Icons.location_on, color: Colors.grey),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.my_location, color: Colors.blue),
+                              onPressed: _getCurrentLocation,
+                            ),
                           ),
                           onChanged: (val) => _lugar = val,
                         ),
@@ -368,11 +519,69 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                           maxLines: 3,
                           onChanged: (val) => _observaciones = val,
                         ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Text('Evidencia (Fotos):', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                            const Spacer(),
+                            ElevatedButton.icon(
+                              onPressed: _takePhoto,
+                              icon: const Icon(Icons.camera_alt),
+                              label: const Text('Tomar Foto'),
+                            ),
+                          ],
+                        ),
+                        if (_fotos.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 100,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _fotos.length,
+                              itemBuilder: (context, index) {
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(right: 8, top: 8),
+                                      width: 100,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(8),
+                                        image: DecorationImage(
+                                          image: FileImage(File(_fotos[index].path)),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _fotos.removeAt(index);
+                                          });
+                                        },
+                                        child: Container(
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.close, color: Colors.white, size: 20),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
 
                   const SizedBox(height: 32),
+                  if (_permitePapeletaMovil) ...[
                   _buildSectionTitle('Firma del Conductor Actual'),
                   Container(
                     decoration: BoxDecoration(
@@ -413,6 +622,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                       label: const Text('Limpiar Firma', style: TextStyle(color: Colors.grey)),
                     ),
                   ),
+                  ],
 
                 ],
               ),
@@ -433,10 +643,10 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                       elevation: 5,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    icon: _isSubmitting ? const SizedBox() : const Icon(Icons.gavel),
+                    icon: _isSubmitting ? const SizedBox() : Icon(_permitePapeletaMovil ? Icons.gavel : Icons.send),
                     label: _isSubmitting
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('Emitir Multas Oficiales', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        : Text(_permitePapeletaMovil ? 'Emitir Multas Oficiales' : 'Enviar Reporte a Administración', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),

@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 
@@ -31,6 +34,12 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   
   String _lugar = '';
   String _observaciones = '';
+  
+  List<XFile> _fotos = [];
+  Position? _currentPosition;
+  final ImagePicker _picker = ImagePicker();
+  
+  late TextEditingController _lugarController;
 
   @override
   void initState() {
@@ -44,6 +53,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
     } else if (widget.reporteData['fuga'] == true) {
       _observaciones = 'FUGA DEL CONDUCTOR.';
     }
+    _lugarController = TextEditingController(text: _lugar);
   }
 
   Future<void> _loadTiposInfraccion() async {
@@ -61,6 +71,75 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error cargando infracciones: $e')),
         );
+      }
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+      if (photo != null) {
+        setState(() {
+          _fotos.add(photo);
+        });
+      }
+    } catch (e) {
+      _showError('Error al tomar la foto: $e');
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showError('Los servicios de ubicación están desactivados.');
+        return;
+      }
+
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showError('Los permisos de ubicación fueron denegados.');
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _showError('Los permisos de ubicación están denegados permanentemente.');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _currentPosition = position;
+        if (_lugar.trim().isEmpty) {
+          _lugar = '${position.latitude}, ${position.longitude}';
+          _lugarController.text = _lugar;
+        }
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ubicación obtenida correctamente')),
+        );
+      }
+    } catch (e) {
+      _showError('Error al obtener la ubicación: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -163,12 +242,19 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
           ? widget.reporteData['placa'].toString().trim().toUpperCase()
           : '';
 
+      List<String> fotosBase64 = [];
+      for (var foto in _fotos) {
+        final bytes = await foto.readAsBytes();
+        fotosBase64.add(base64Encode(bytes));
+      }
+
       await ApiService.createReporteIntervencion({
         'inspectorId': inspectorId,
         'placa': placa,
         'lugar': _lugar,
         'observaciones': _observaciones,
-        'fotos': <String>[],
+        'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : '',
+        'fotos': fotosBase64,
       });
 
       if (mounted) {
@@ -191,6 +277,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   @override
   void dispose() {
     _signatureController.dispose();
+    _lugarController.dispose();
     super.dispose();
   }
 
@@ -357,13 +444,17 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                     child: Column(
                       children: [
                         TextFormField(
-                          initialValue: _lugar,
+                          controller: _lugarController,
                           decoration: InputDecoration(
                             labelText: 'Lugar de Intervención',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             filled: true,
                             fillColor: Colors.grey.shade50,
                             prefixIcon: const Icon(Icons.location_on, color: Colors.grey),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.my_location, color: Colors.blue),
+                              onPressed: _getCurrentLocation,
+                            ),
                           ),
                           onChanged: (val) => _lugar = val,
                         ),
@@ -380,6 +471,63 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                           maxLines: 3,
                           onChanged: (val) => _observaciones = val,
                         ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Text('Evidencia (Fotos):', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                            const Spacer(),
+                            ElevatedButton.icon(
+                              onPressed: _takePhoto,
+                              icon: const Icon(Icons.camera_alt),
+                              label: const Text('Tomar Foto'),
+                            ),
+                          ],
+                        ),
+                        if (_fotos.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 100,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _fotos.length,
+                              itemBuilder: (context, index) {
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(right: 8, top: 8),
+                                      width: 100,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(8),
+                                        image: DecorationImage(
+                                          image: FileImage(File(_fotos[index].path)),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _fotos.removeAt(index);
+                                          });
+                                        },
+                                        child: Container(
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.close, color: Colors.white, size: 20),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
