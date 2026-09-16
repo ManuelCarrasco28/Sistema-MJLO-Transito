@@ -40,7 +40,7 @@ export function Papeletas() {
   const [papeletaToAction, setPapeletaToAction] = useState(null)
   const [reporteToConvert, setReporteToConvert] = useState(null)
   const [reporteToReject, setReporteToReject] = useState(null)
-  const [convertForm, setConvertForm] = useState({ tipoInfraccionId: '', vehiculoId: '', conductorDni: '', observacionesAutoridad: '' })
+  const [convertForm, setConvertForm] = useState({ infraccionesIds: [''], vehiculoId: '', conductorDni: '', observacionesAutoridad: '' })
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [numeroRecibo, setNumeroRecibo] = useState('')
   const [fechaPago, setFechaPago] = useState('')
@@ -271,8 +271,9 @@ export function Papeletas() {
   const handleConvertReporte = async (event) => {
     event.preventDefault()
     if (!reporteToConvert) return
-    if (!convertForm.tipoInfraccionId) {
-      alert('Selecciona una infracción.')
+    const validInfracciones = convertForm.infraccionesIds.filter(id => id).map(Number)
+    if (validInfracciones.length === 0) {
+      alert('Selecciona al menos una infracción.')
       return
     }
     if (!convertForm.vehiculoId) {
@@ -284,7 +285,7 @@ export function Papeletas() {
       const res = await apiFetch(`/reportes-intervencion/${reporteToConvert.id}/convertir`, {
         method: 'POST',
         body: {
-          tipoInfraccionId: Number(convertForm.tipoInfraccionId),
+          infraccionesIds: validInfracciones,
           vehiculoId: Number(convertForm.vehiculoId),
           conductorDni: convertForm.conductorDni,
           observacionesAutoridad: convertForm.observacionesAutoridad
@@ -956,15 +957,35 @@ export function Papeletas() {
                   ))}
                 </select>
               </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-black uppercase text-slate-400">Infracción</span>
-                <select required value={convertForm.tipoInfraccionId} onChange={(e) => setConvertForm({ ...convertForm, tipoInfraccionId: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold">
-                  <option value="">Selecciona infracción</option>
-                  {tiposInfraccion.map((tipo) => (
-                    <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="space-y-2">
+                <span className="text-xs font-black uppercase text-slate-400">Infracciones a Aplicar</span>
+                {convertForm.infraccionesIds.map((infId, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <select required value={infId} onChange={(e) => {
+                      const newIds = [...convertForm.infraccionesIds]
+                      newIds[idx] = e.target.value
+                      setConvertForm({ ...convertForm, infraccionesIds: newIds })
+                    }} className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold">
+                      <option value="">Selecciona infracción</option>
+                      {tiposInfraccion.map((tipo) => (
+                        <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
+                      ))}
+                    </select>
+                    {convertForm.infraccionesIds.length > 1 && (
+                      <button type="button" onClick={() => {
+                        const newIds = [...convertForm.infraccionesIds]
+                        newIds.splice(idx, 1)
+                        setConvertForm({ ...convertForm, infraccionesIds: newIds })
+                      }} className="flex items-center justify-center rounded-xl bg-rose-100 px-3 py-2 text-rose-600 hover:bg-rose-200">
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={() => setConvertForm({ ...convertForm, infraccionesIds: [...convertForm.infraccionesIds, ''] })} className="text-sm font-bold text-emerald-600 hover:text-emerald-700">
+                  + Añadir otra infracción
+                </button>
+              </div>
               <label className="block space-y-1">
                 <span className="text-xs font-black uppercase text-slate-400">DNI del infractor/intervenido opcional</span>
                 <input value={convertForm.conductorDni} onChange={(e) => setConvertForm({ ...convertForm, conductorDni: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="Vacío = CONDUCTOR NO PRESENTE" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold" />
