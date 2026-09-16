@@ -11,6 +11,7 @@ import { Asociaciones } from './pages/Asociaciones'
 import { Documentos } from './pages/Documentos'
 import { Inspecciones } from './pages/Inspecciones'
 import { Papeletas } from './pages/Papeletas'
+import { Reportes } from './pages/Reportes'
 import { CursosSeguridad } from './pages/CursosSeguridad'
 import { Pagos } from './pages/Pagos'
 import { Retenciones } from './pages/Retenciones'
@@ -42,6 +43,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (path.includes('/asociaciones')) return 'Asociaciones'
     if (path.includes('/documentos')) return 'Documentos'
     if (path.includes('/inspecciones')) return 'Inspecciones'
+    if (path.includes('/reportes')) return 'Reportes de Evidencia'
     if (path.includes('/papeletas')) return 'Papeletas'
     if (path.includes('/operativos')) return 'Operativos'
     if (path.includes('/cursos')) return 'Cursos'
@@ -149,6 +151,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
             <Route path="/documentos" element={onlyNormalUser(<Documentos />)} />
             <Route path="/inspecciones" element={onlyNormalUser(<Inspecciones />)} />
             <Route path="/papeletas" element={onlyNormalUser(<Papeletas />)} />
+            <Route path="/reportes" element={onlyNormalUser(<Reportes />)} />
             <Route path="/operativos" element={onlyNormalUser(<Operativos user={user} />)} />
             <Route path="/cursos" element={onlyNormalUser(<CursosSeguridad />)} />
             <Route path="/cursos-seguridad" element={onlyNormalUser(<CursosSeguridad />)} />
