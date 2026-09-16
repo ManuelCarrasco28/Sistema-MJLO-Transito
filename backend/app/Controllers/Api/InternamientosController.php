@@ -23,7 +23,7 @@ class InternamientosController extends ResourceController
                     COALESCE(v.modelo, '') as vehiculoModelo,
                     COALESCE(v.color, '') as vehiculoColor,
                     COALESCE(v.estado_formalizacion, 'INFORMAL') as vehiculoFormalidad,
-                    COALESCE(aso.razon_social, 'Sin Organización (Informal)') as vehiculoAsociacion,
+                    COALESCE(aso.razon_social, 'Sin Asociación (Informal)') as vehiculoAsociacion,
                     p.numero_papeleta as numeroPapeleta,
                     p.monto_total as montoPapeleta,
                     oi.fecha_ingreso as fechaIngreso,
@@ -48,7 +48,7 @@ class InternamientosController extends ResourceController
                     ol.monto_total as montoTotalLiberacion
                 ", false)
                 ->join('vehiculos v', 'v.id = oi.id_vehiculo', 'left')
-                ->join('organizaciones aso', 'aso.id = v.id_asociacion', 'left')
+                ->join('asociaciones aso', 'aso.id = v.id_asociacion', 'left')
                 ->join('papeletas p', 'p.id = oi.id_papeleta', 'left')
                 ->join('personas rem', 'rem.id = oi.id_remisor', 'left')
                 ->join('ciudadanos rem_c', 'rem_c.id_persona = rem.id', 'left')

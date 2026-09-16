@@ -44,6 +44,12 @@ class PapeletasController extends ResourceController
                 ->select("
                     p.id,
                     p.numero_papeleta as numeroPapeleta,
+                    p.id_operativo,
+                    p.id_operativo as operativoId,
+                    CASE WHEN p.id_operativo IS NULL THEN 'RUTINA' ELSE 'OPERATIVO' END as origen,
+                    COALESCE(op.nombre, '') as operativoNombre,
+                    COALESCE(op.lugar, '') as operativoLugar,
+                    COALESCE(op.fecha, '') as operativoFecha,
                     v.id as vehiculoId,
                     COALESCE(v.placa, 'SIN PLACA') as vehiculoPlaca,
                     COALESCE(v.marca, '') as vehiculoMarca,
@@ -81,8 +87,9 @@ class PapeletasController extends ResourceController
                     ret.id as retencionId,
                     ret.estado as retencionEstado
                 ")
+                ->join('operativos op', 'op.id = p.id_operativo', 'left')
                 ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
-                ->join('organizaciones aso', 'aso.id = v.id_asociacion', 'left')
+                ->join('asociaciones aso', 'aso.id = v.id_asociacion', 'left')
                 ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
                 ->join('ciudadanos c_per', 'c_per.id_persona = per.id', 'left')
                 ->join('trabajadores ins', 'ins.id_persona = p.id_inspector', 'left')
@@ -91,7 +98,7 @@ class PapeletasController extends ResourceController
                 ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.estado = "ACTIVO"', 'left')
                 ->join('personas prop_per', 'prop_per.id = vp.id_persona', 'left')
                 ->join('ciudadanos c_prop', 'c_prop.id_persona = prop_per.id', 'left')
-                ->join('organizaciones prop_org', 'prop_org.id = vp.id_organizacion', 'left')
+                ->join('asociaciones prop_org', 'prop_org.id = vp.id_asociacion', 'left')
                 ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left')
                 ->groupBy('p.id')
                 ->orderBy('p.id', 'DESC')
@@ -289,7 +296,6 @@ class PapeletasController extends ResourceController
                 'id_inspector' => $inputInspectorId,
                 'fecha_hora' => $fechaHora,
                 'lugar' => $lugar,
-                'servicio' => 'ESPECIAL',
                 'nombre_autoridad' => $infractor,
                 'observacion_autoridad' => $obsAutoridad,
                 'observaciones_conductor' => $obsConductor,

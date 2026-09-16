@@ -36,7 +36,7 @@ export function Pagination({
   const pages = getPageNumbers()
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-3.5 text-xs text-slate-600 dark:border-slate-800 dark:bg-[#0f172a] dark:text-slate-400">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-2.5 text-xs text-slate-600 dark:border-slate-800 dark:bg-[#0f172a] dark:text-slate-400">
       <div className="flex flex-wrap items-center gap-3">
         <span aria-live="polite" className="text-slate-500 dark:text-slate-400">
           Mostrando{' '}

@@ -102,45 +102,41 @@ button {
 
 .overflow-x-auto {
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.2s ease;
+  scrollbar-color: #cbd5e1 rgba(0, 0, 0, 0.04);
 }
 
-.overflow-x-auto:hover {
-  scrollbar-color: #cbd5e1 transparent;
-}
-
-html.dark .overflow-x-auto:hover {
-  scrollbar-color: #334155 transparent;
+html.dark .overflow-x-auto {
+  scrollbar-color: #334155 rgba(255, 255, 255, 0.04);
 }
 
 .overflow-x-auto::-webkit-scrollbar {
-  height: 5px;
+  height: 7px;
 }
 
 .overflow-x-auto::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 9999px;
 }
 
 .overflow-x-auto::-webkit-scrollbar-thumb {
-  background: transparent;
+  background: #cbd5e1;
   border-radius: 9999px;
   transition: background-color 0.2s ease;
 }
 
-.overflow-x-auto:hover::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-
-.overflow-x-auto:hover::-webkit-scrollbar-thumb:hover {
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 
-html.dark .overflow-x-auto:hover::-webkit-scrollbar-thumb {
+html.dark .overflow-x-auto::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+html.dark .overflow-x-auto::-webkit-scrollbar-thumb {
   background: #334155;
 }
 
-html.dark .overflow-x-auto:hover::-webkit-scrollbar-thumb:hover {
+html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
 

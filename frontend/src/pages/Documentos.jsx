@@ -79,7 +79,7 @@ export function Documentos() {
       fechaExpiracion: '2027-12-31',
       estado: 'VIGENTE',
       propietario: vehiculos[0]?.propietario || '',
-      asociacion: vehiculos[0]?.organizacion || '',
+      asociacion: vehiculos[0]?.asociacion || '',
     })
     setIsEditing(false)
     setIsModalOpen(true)
@@ -510,7 +510,7 @@ export function Documentos() {
                           ...formData,
                           vehiculoPlaca: e.target.value,
                           propietario: veh ? veh.propietario : formData.propietario,
-                          asociacion: veh ? veh.organizacion : formData.asociacion,
+                          asociacion: veh ? veh.asociacion : formData.asociacion,
                         })
                       }}
                       className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"

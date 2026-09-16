@@ -7,7 +7,7 @@ import { DashboardHome } from './pages/DashboardHome'
 import { Vehiculos } from './pages/Vehiculos'
 import { Personas } from './pages/Personas'
 import { Personal } from './pages/Personal'
-import { Organizaciones } from './pages/Organizaciones'
+import { Asociaciones } from './pages/Asociaciones'
 import { Documentos } from './pages/Documentos'
 import { Inspecciones } from './pages/Inspecciones'
 import { Papeletas } from './pages/Papeletas'
@@ -31,7 +31,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (path.includes('/vehiculos')) return 'Vehículos'
     if (path.includes('/personas')) return 'Personas'
     if (path.includes('/personal')) return 'Personal'
-    if (path.includes('/organizaciones')) return 'Organizaciones'
+    if (path.includes('/asociaciones')) return 'Asociaciones'
     if (path.includes('/documentos')) return 'Documentos'
     if (path.includes('/inspecciones')) return 'Inspecciones'
     if (path.includes('/papeletas')) return 'Papeletas'
@@ -111,7 +111,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
         user={user}
         onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
       />
-      <div className="min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col">
+      <div className="no-scrollbar min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col">
         <Header
           onOpenMobile={() => setMobileOpen(true)}
           sidebarCollapsed={sidebarCollapsed}
@@ -130,7 +130,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
           user={user}
         />
 
-        <div className="mx-auto w-full max-w-[96rem] flex-1 space-y-6 p-4 sm:p-6 lg:p-7 xl:p-8">
+        <div className="mx-auto w-full max-w-[96rem] flex-1 space-y-4 p-3.5 sm:p-5 lg:p-6">
           <Routes>
             <Route path="/" element={<Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />} />
             <Route path="/admin" element={isAdmin ? <AdminPanel /> : <Navigate to="/dashboard" replace />} />
@@ -138,7 +138,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
             <Route path="/vehiculos" element={<Vehiculos />} />
             <Route path="/personas" element={<Personas user={user} onUserUpdate={onUserUpdate} />} />
             <Route path="/personal" element={<Personal />} />
-            <Route path="/organizaciones" element={<Organizaciones />} />
+            <Route path="/asociaciones" element={<Asociaciones />} />
             <Route path="/documentos" element={<Documentos />} />
             <Route path="/inspecciones" element={<Inspecciones />} />
             <Route path="/papeletas" element={<Papeletas />} />
@@ -194,34 +194,17 @@ function App() {
     let cancelled = false
 
     async function checkSession() {
-      if (localStorage.getItem('logged_out') === 'true') {
-        if (!cancelled) setCheckingSession(false)
-        return
-      }
-
       try {
         const response = await apiFetch('/me')
         if (!response.ok) throw response
         const payload = await response.json()
         if (!cancelled) {
           setUser(payload.data)
-          localStorage.setItem('user', JSON.stringify(payload.data))
         }
       } catch (_) {
-        const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user')
-        if (savedUser) {
-          try {
-            if (!cancelled) setUser(JSON.parse(savedUser))
-          } catch {
-            localStorage.removeItem('user')
-            sessionStorage.removeItem('user')
-            if (!cancelled) setUser(null)
-          }
-        } else {
-          localStorage.removeItem('user')
-          sessionStorage.removeItem('user')
-          if (!cancelled) setUser(null)
-        }
+        localStorage.removeItem('user')
+        sessionStorage.removeItem('user')
+        if (!cancelled) setUser(null)
       } finally {
         if (!cancelled) setCheckingSession(false)
       }
@@ -234,15 +217,9 @@ function App() {
     }
   }, [])
 
-  const handleLogin = (userData, remember = false) => {
-    localStorage.removeItem('logged_out')
-    if (remember) {
-      localStorage.setItem('user', JSON.stringify(userData))
-      sessionStorage.removeItem('user')
-    } else {
-      sessionStorage.setItem('user', JSON.stringify(userData))
-      localStorage.removeItem('user')
-    }
+  const handleLogin = (userData) => {
+    localStorage.removeItem('user')
+    sessionStorage.removeItem('user')
     setUser(userData)
   }
 
@@ -254,18 +231,11 @@ function App() {
     }
     localStorage.removeItem('user')
     sessionStorage.removeItem('user')
-    localStorage.setItem('logged_out', 'true')
     setUser(null)
   }
 
   const handleUserUpdate = (nextUser) => {
     setUser(nextUser)
-    if (localStorage.getItem('user')) {
-      localStorage.setItem('user', JSON.stringify(nextUser))
-    }
-    if (sessionStorage.getItem('user')) {
-      sessionStorage.setItem('user', JSON.stringify(nextUser))
-    }
   }
   useEffect(() => {
     if (!user) {

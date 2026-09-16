@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
@@ -7,26 +7,73 @@ export function Papeletas() {
   const cachedPapeletas = getCachedData('/papeletas')
   const cachedTipos = getCachedData('/tipos-infraccion')
   const cachedVeh = getCachedData('/vehiculos')
-  const cachedOrgs = getCachedData('/organizaciones')
-  const [papeletas, setPapeletas] = useState(cachedPapeletas || [])
+  const cachedOrgs = getCachedData('/asociaciones')
+  const normalizePapeleta = (p) => {
+    const operativoId = p.operativoId ?? p.id_operativo ?? null
+    return {
+      ...p,
+      operativoId,
+      origen: operativoId ? 'OPERATIVO' : 'RUTINA',
+    }
+  }
+
+  const [papeletas, setPapeletas] = useState((cachedPapeletas || []).map(normalizePapeleta))
   const [tiposInfraccion, setTiposInfraccion] = useState(cachedTipos || [])
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
-  const [organizaciones, setOrganizaciones] = useState(cachedOrgs || [])
+  const [asociaciones, setAsociaciones] = useState(cachedOrgs || [])
   const [isLoading, setIsLoading] = useState(!cachedPapeletas)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState('TODOS')
+  const [filterOrigen, setFilterOrigen] = useState('TODOS')
+  const [filterFormalidad, setFilterFormalidad] = useState('TODOS')
+  const [filterTipoInfraccion, setFilterTipoInfraccion] = useState('TODOS')
+  const [filterFecha, setFilterFecha] = useState('TODAS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(8)
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [isPagarModalOpen, setIsPagarModalOpen] = useState(false)
+  const [selectedInfraccion, setSelectedInfraccion] = useState(null)
   const [papeletaToAction, setPapeletaToAction] = useState(null)
   const [numeroRecibo, setNumeroRecibo] = useState('')
   const [fechaPago, setFechaPago] = useState('')
   const [metodoPago, setMetodoPago] = useState('EFECTIVO')
   const [isProcessingAction, setIsProcessingAction] = useState(false)
   const [selectedPapeleta, setSelectedPapeleta] = useState(null)
+
+  const tableContainerRef = useRef(null)
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleMouseDown = (e) => {
+    // Si hace click en botones, enlaces o controles, no iniciar arrastre
+    if (e.target.closest('button, a, input, select, textarea, [role="button"]')) {
+      return
+    }
+    const container = tableContainerRef.current
+    if (!container) return
+    if (e.button !== 0) return // Solo clic izquierdo
+
+    const startX = e.pageX - container.offsetLeft
+    const scrollLeft = container.scrollLeft
+    setIsDragging(true)
+
+    const onMouseMove = (moveEvent) => {
+      moveEvent.preventDefault()
+      const x = moveEvent.pageX - container.offsetLeft
+      const walk = (x - startX) * 1.5
+      container.scrollLeft = scrollLeft - walk
+    }
+
+    const onMouseUp = () => {
+      setIsDragging(false)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
 
   const totales = papeletas.length
   const pendientes = papeletas.filter((p) => p.estado === 'PENDIENTE_PAGO').length
@@ -38,37 +85,93 @@ export function Papeletas() {
     const fullSearch = `${p.numeroPapeleta || ''} ${p.vehiculoPlaca || ''} ${p.vehiculoCaracteristicas || ''} ${p.conductorNombre || p.infractor || ''} ${p.conductorDni || ''} ${p.propietarioNombre || ''} ${p.propietarioDni || ''} ${p.lugar || ''} ${p.tipoInfractor || ''} ${p.tipoInfraccionCodigo || ''} ${p.inspector || ''}`.toLowerCase()
     const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
     const matchesEstado = filterEstado === 'TODOS' || p.estado === filterEstado
-    return matchesSearch && matchesEstado
+
+    // Filtro por Origen (Operativo vs Rutina)
+    const isOp = p.origen === 'OPERATIVO' || Boolean(p.operativoId)
+    const matchesOrigen = filterOrigen === 'TODOS'
+      || (filterOrigen === 'OPERATIVO' && isOp)
+      || (filterOrigen === 'RUTINA' && !isOp)
+
+    // Filtro por Formalidad (Formal vs Informal)
+    const matchesFormalidad = filterFormalidad === 'TODOS' || p.tipoInfractor === filterFormalidad
+
+    // Filtro por Tipo de Infracción
+    const matchesTipo = filterTipoInfraccion === 'TODOS'
+      || String(p.tipoInfraccionCodigo) === String(filterTipoInfraccion)
+      || String(p.detalles?.[0]?.tipoInfraccionId) === String(filterTipoInfraccion)
+
+    // Filtro por Fecha
+    let matchesFecha = true
+    if (filterFecha !== 'TODAS' && p.fechaHora) {
+      const pDate = new Date(p.fechaHora)
+      const now = new Date()
+      if (filterFecha === 'HOY') {
+        matchesFecha = pDate.toDateString() === now.toDateString()
+      } else if (filterFecha === 'SEMANA') {
+        const diffMs = now.getTime() - pDate.getTime()
+        const diffDays = diffMs / (1000 * 60 * 60 * 24)
+        matchesFecha = diffDays >= 0 && diffDays <= 7
+      } else if (filterFecha === 'MES') {
+        matchesFecha = pDate.getMonth() === now.getMonth() && pDate.getFullYear() === now.getFullYear()
+      }
+    }
+
+    return matchesSearch && matchesEstado && matchesOrigen && matchesFormalidad && matchesTipo && matchesFecha
   })
+
+  const hasActiveFilters = searchTerm !== '' || filterEstado !== 'TODOS' || filterOrigen !== 'TODOS' || filterFormalidad !== 'TODOS' || filterTipoInfraccion !== 'TODOS' || filterFecha !== 'TODAS'
+
+  const handleClearFilters = () => {
+    setSearchTerm('')
+    setFilterEstado('TODOS')
+    setFilterOrigen('TODOS')
+    setFilterFormalidad('TODOS')
+    setFilterTipoInfraccion('TODOS')
+    setFilterFecha('TODAS')
+  }
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterEstado])
+  }, [searchTerm, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha])
 
   const paginatedPapeletas = filteredPapeletas.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
 
+  const renderOrigen = (p) => {
+    const isOperativo = p.origen === 'OPERATIVO' || p.operativoId
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wide uppercase leading-none ${
+        isOperativo
+          ? 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/70 dark:text-fuchsia-300'
+          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+      }`}>
+        <span className="size-1 rounded-full bg-current" />
+        {isOperativo ? 'OPERATIVO' : 'RUTINA'}
+      </span>
+    )
+  }
+
   useEffect(() => {
     Promise.all([
       apiFetch('/papeletas').then(res => res.json()).catch(() => ({ data: [] })),
       apiFetch('/tipos-infraccion').then(res => res.json()).catch(() => ({ data: [] })),
       apiFetch('/vehiculos').then(res => res.json()).catch(() => ({ data: [] })),
-      apiFetch('/organizaciones').then(res => res.json()).catch(() => ({ data: [] }))
+      apiFetch('/asociaciones').then(res => res.json()).catch(() => ({ data: [] }))
     ]).then(([papeletasRes, tiposRes, vehiculosRes, orgsRes]) => {
-      const pData = papeletasRes.data || []
+      const pData = (papeletasRes.data || []).map(normalizePapeleta)
       const tData = tiposRes.data || []
       const vData = vehiculosRes.data || []
       const oData = orgsRes.data || []
       setPapeletas(pData)
       setTiposInfraccion(tData)
       setVehiculos(vData)
-      setOrganizaciones(oData)
+      setAsociaciones(oData)
       setCachedData('/papeletas', pData)
       setCachedData('/tipos-infraccion', tData)
       setCachedData('/vehiculos', vData)
-      setCachedData('/organizaciones', oData)
+      setCachedData('/asociaciones', oData)
       setIsLoading(false)
     }).catch(err => {
       console.error('Error fetching data for papeletas:', err)
@@ -211,37 +314,119 @@ export function Papeletas() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative flex-1 min-w-[220px]">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por código PAP, placa o infractor..."
+              placeholder="Buscar por código PAP, placa, infractor, DNI..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white focus:ring-2 focus:ring-rose-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-rose-400"
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 cursor-pointer">
+              <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                 ✕
               </button>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <select
+              value={filterOrigen}
+              onChange={(e) => setFilterOrigen(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+            >
+              <option value="TODOS">Todos los orígenes</option>
+              <option value="OPERATIVO">🚨 Solo Operativos</option>
+              <option value="RUTINA">📋 Solo Rutina</option>
+            </select>
+
+            <select
               value={filterEstado}
               onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs font-semibold text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
             >
-              <option value="TODOS">Todos los Estados</option>
+              <option value="TODOS">Todos los estados</option>
               <option value="PENDIENTE_PAGO">Pendientes de Pago</option>
               <option value="PAGADA">Pagadas</option>
               <option value="ANULADA">Anuladas</option>
             </select>
+
+            <select
+              value={filterFormalidad}
+              onChange={(e) => setFilterFormalidad(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+            >
+              <option value="TODOS">Formal / Informal</option>
+              <option value="FORMAL">Formales</option>
+              <option value="INFORMAL">Informales</option>
+            </select>
+
+            {tiposInfraccion.length > 0 && (
+              <select
+                value={filterTipoInfraccion}
+                onChange={(e) => setFilterTipoInfraccion(e.target.value)}
+                className="max-w-[170px] truncate rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+              >
+                <option value="TODOS">Todas las infracciones</option>
+                {tiposInfraccion.map((t) => (
+                  <option key={t.id} value={t.codigo || t.id}>
+                    {t.codigo} - {t.descripcion}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <select
+              value={filterFecha}
+              onChange={(e) => setFilterFecha(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+            >
+              <option value="TODAS">Todas las fechas</option>
+              <option value="HOY">Hoy</option>
+              <option value="SEMANA">Últimos 7 días</option>
+              <option value="MES">Este mes</option>
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors"
+              >
+                Limpiar Filtros
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Listado de papeletas" tabIndex={0}>
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
+          <span>
+            Mostrando <strong className="text-slate-800 dark:text-white">{filteredPapeletas.length}</strong> de{' '}
+            <strong className="text-slate-800 dark:text-white">{papeletas.length}</strong> papeletas
+          </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500 select-none">
+              <span className="text-xs">✋</span> Arrastra para ver más columnas
+            </span>
+            {hasActiveFilters && (
+              <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                Filtros activos
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div
+          ref={tableContainerRef}
+          onMouseDown={handleMouseDown}
+          className={`overflow-x-auto overscroll-x-contain transition-colors ${
+            isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
+          }`}
+          role="region"
+          aria-label="Listado de papeletas"
+          tabIndex={0}
+        >
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
               <tr>
@@ -250,7 +435,7 @@ export function Papeletas() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Conductor</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Vehículo</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Tipo Infractor</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Tipo Infracción</th>
+                <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Infracción</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Fecha & Hora</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap text-right">Monto</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Estado Pago</th>
@@ -287,6 +472,7 @@ export function Papeletas() {
                     <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-slate-800/40">
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
                         <span className="font-mono font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
+                        <div className="mt-0.5">{renderOrigen(p)}</div>
                       </td>
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
                         <p className="font-bold text-slate-800 dark:text-slate-100 text-xs">{p.propietarioNombre || 'No Registrado'}</p>
@@ -330,15 +516,28 @@ export function Papeletas() {
                           </span>
                         )}
                       </td>
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-                            {p.tipoInfraccionCodigo || tipoInf?.codigo || 'G01'}
-                          </span>
-                          <span className="text-xs text-slate-700 dark:text-slate-300 font-medium max-w-[200px] truncate" title={p.tipoInfraccionDescripcion || tipoInf?.descripcion}>
-                            {p.tipoInfraccionDescripcion || tipoInf?.descripcion || 'Infracción al Reglamento'}
-                          </span>
-                        </div>
+                      <td className="px-3.5 py-3.5 whitespace-nowrap text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const codigo = p.tipoInfraccionCodigo || tipoInf?.codigo || 'Infracción'
+                            const descripcion = p.tipoInfraccionDescripcion || tipoInf?.descripcion || 'Infracción según Reglamento Nacional de Tránsito y Transporte.'
+                            const gravedad = tipoInf?.gravedad || p.tipoInfraccionGravedad || (codigo.startsWith('M') ? 'MUY GRAVE' : codigo.startsWith('G') ? 'GRAVE' : 'LEVE')
+                            const porcentajeUit = tipoInf?.porcentajeUit ?? null
+                            setSelectedInfraccion({
+                              codigo,
+                              descripcion,
+                              gravedad,
+                              monto: p.montoTotal || tipoInf?.montoBase || 0,
+                              porcentajeUit,
+                              numeroPapeleta: p.numeroPapeleta,
+                            })
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 font-mono text-xs font-black text-rose-700 border border-rose-200/70 transition-all hover:scale-105 hover:bg-rose-100 hover:border-rose-300 hover:shadow-xs active:scale-95 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/60 dark:hover:bg-rose-900/60 cursor-pointer"
+                          title="Clic para ver detalle de la infracción"
+                        >
+                          <span>{p.tipoInfraccionCodigo || tipoInf?.codigo || 'G01'}</span>
+                        </button>
                       </td>
                       <td className="px-3.5 py-3.5 whitespace-nowrap text-slate-600 dark:text-slate-400">
                         <p className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-xs">{new Date(p.fechaHora).toLocaleDateString()}</p>
@@ -447,6 +646,10 @@ export function Papeletas() {
                     <div>
                       <p className="text-slate-400">Ubicación</p>
                       <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.lugar}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-slate-400">Origen</p>
+                      <div className="mt-1">{renderOrigen(selectedPapeleta)}</div>
                     </div>
                   </div>
                 </div>
@@ -768,7 +971,115 @@ export function Papeletas() {
                 <p className="mt-2 font-bold">Conserve este ticket</p>
                 <p>www.munijlo.gob.pe/transito</p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {selectedInfraccion && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter"
+          onClick={() => setSelectedInfraccion(null)}
+        >
+          <div 
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-rose-100 bg-rose-50/80 px-5 py-4 dark:border-rose-950/60 dark:bg-rose-950/40">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-9 place-items-center rounded-xl bg-rose-600 text-white font-black text-sm shadow-sm shadow-rose-500/30">
+                  ⚖️
+                </span>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                    Detalle de Infracción
+                  </h3>
+                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    Reglamento de Tránsito Municipal
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedInfraccion(null)}
+                className="rounded-full p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 border border-slate-100 dark:bg-slate-900/50 dark:border-slate-800">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Código</span>
+                  <p className="text-2xl font-black font-mono text-rose-700 dark:text-rose-400">
+                    {selectedInfraccion.codigo}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Gravedad</span>
+                  <div className="mt-0.5">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black ${
+                      selectedInfraccion.gravedad === 'MUY GRAVE'
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-900'
+                        : selectedInfraccion.gravedad === 'GRAVE'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-900'
+                        : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-900'
+                    }`}>
+                      {selectedInfraccion.gravedad}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Descripción
+                </h4>
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 text-xs font-medium leading-relaxed text-slate-800 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200">
+                  {selectedInfraccion.descripcion}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {selectedInfraccion.monto > 0 && (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Monto Multa</span>
+                    <p className="text-base font-black font-mono text-slate-900 dark:text-white">
+                      S/ {Number(selectedInfraccion.monto).toFixed(2)}
+                    </p>
+                  </div>
+                )}
+                {selectedInfraccion.porcentajeUit && (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Sanción UIT</span>
+                    <p className="text-base font-black font-mono text-slate-900 dark:text-white">
+                      {selectedInfraccion.porcentajeUit}% UIT
+                    </p>
+                  </div>
+                )}
+                {selectedInfraccion.numeroPapeleta && (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40 col-span-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Papeleta Asociada</span>
+                    <p className="text-xs font-bold font-mono text-rose-700 dark:text-rose-400">
+                      {selectedInfraccion.numeroPapeleta}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end border-t border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+              <button
+                type="button"
+                onClick={() => setSelectedInfraccion(null)}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white transition cursor-pointer"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>

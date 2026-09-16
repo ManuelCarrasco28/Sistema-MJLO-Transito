@@ -19,11 +19,16 @@ class OperativosController extends ResourceController
         $row = $db->table('operativos o')
             ->select("
                 o.*,
-                COALESCE(u.nombre_usuario, '') AS usuario_registra,
+                COALESCE(
+                    NULLIF(TRIM(CONCAT(cu.nombres, ' ', cu.apellido_paterno, ' ', COALESCE(cu.apellido_materno, ''))), ''),
+                    u.nombre_usuario,
+                    ''
+                ) AS usuario_registra,
                 COUNT(DISTINCT oi.id_inspector) AS total_inspectores,
                 COUNT(DISTINCT p.id) AS total_papeletas
             ", false)
             ->join('usuarios u', 'u.id = o.id_usuario_registra', 'left')
+            ->join('ciudadanos cu', 'cu.id_persona = u.id_trabajador', 'left')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id AND oi.estado = "ASIGNADO"', 'left')
             ->join('papeletas p', 'p.id_operativo = o.id', 'left')
             ->where('o.id', $id)
@@ -60,13 +65,35 @@ class OperativosController extends ResourceController
                 p.lugar,
                 p.monto_total,
                 p.estado,
-                CONCAT(ci.nombres, ' ', ci.apellido_paterno, ' ', COALESCE(ci.apellido_materno, '')) AS inspector
+                COALESCE(v.placa, 'SIN PLACA') AS placa,
+                COALESCE(per.numero, 'S/D') AS conductor_dni,
+                COALESCE(
+                    NULLIF(TRIM(CONCAT(cper.nombres, ' ', cper.apellido_paterno, ' ', COALESCE(cper.apellido_materno, ''))), ''),
+                    p.nombre_autoridad,
+                    'Conductor no identificado'
+                ) AS intervenido,
+                COALESCE(CONCAT(ci.nombres, ' ', ci.apellido_paterno, ' ', COALESCE(ci.apellido_materno, '')), 'Inspector Municipal') AS inspector,
+                GROUP_CONCAT(DISTINCT ti.codigo ORDER BY ti.codigo SEPARATOR ', ') AS infracciones
             ", false)
+            ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
+            ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
+            ->join('ciudadanos cper', 'cper.id_persona = per.id', 'left')
             ->join('ciudadanos ci', 'ci.id_persona = p.id_inspector', 'left')
+            ->join('papeleta_detalles pd', 'pd.id_papeleta = p.id', 'left')
+            ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
             ->where('p.id_operativo', $id)
+            ->groupBy('p.id')
             ->orderBy('p.fecha_hora', 'DESC')
             ->get()
             ->getResultArray();
+
+        $row['reporte'] = [
+            'total_papeletas' => count($row['papeletas']),
+            'monto_total' => array_reduce($row['papeletas'], static fn ($sum, $p) => $sum + (float) ($p['monto_total'] ?? 0), 0.0),
+            'pendientes' => count(array_filter($row['papeletas'], static fn ($p) => in_array($p['estado'] ?? '', ['PENDIENTE', 'POR_PAGAR', 'PENDIENTE_PAGO'], true))),
+            'pagadas' => count(array_filter($row['papeletas'], static fn ($p) => ($p['estado'] ?? '') === 'PAGADA')),
+            'anuladas' => count(array_filter($row['papeletas'], static fn ($p) => ($p['estado'] ?? '') === 'ANULADA')),
+        ];
 
         return $row;
     }
@@ -77,11 +104,16 @@ class OperativosController extends ResourceController
         $rows = $db->table('operativos o')
             ->select("
                 o.*,
-                COALESCE(u.nombre_usuario, '') AS usuario_registra,
+                COALESCE(
+                    NULLIF(TRIM(CONCAT(cu.nombres, ' ', cu.apellido_paterno, ' ', COALESCE(cu.apellido_materno, ''))), ''),
+                    u.nombre_usuario,
+                    ''
+                ) AS usuario_registra,
                 COUNT(DISTINCT oi.id_inspector) AS total_inspectores,
                 COUNT(DISTINCT p.id) AS total_papeletas
             ", false)
             ->join('usuarios u', 'u.id = o.id_usuario_registra', 'left')
+            ->join('ciudadanos cu', 'cu.id_persona = u.id_trabajador', 'left')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id AND oi.estado = "ASIGNADO"', 'left')
             ->join('papeletas p', 'p.id_operativo = o.id', 'left')
             ->groupBy('o.id')
@@ -105,13 +137,15 @@ class OperativosController extends ResourceController
         }
 
         $db->transStart();
+        $estado = $input['estado'] ?? 'PROGRAMADO';
+
         $db->table('operativos')->insert([
             'nombre' => trim($input['nombre']),
             'lugar' => trim($input['lugar']),
             'fecha' => $input['fecha'],
             'hora_inicio' => $input['hora_inicio'],
-            'hora_fin' => $input['hora_fin'] ?: null,
-            'estado' => $input['estado'] ?? 'PROGRAMADO',
+            'hora_fin' => $estado === 'FINALIZADO' ? date('H:i:s') : null,
+            'estado' => $estado,
             'observacion' => trim($input['observacion'] ?? ''),
             'id_usuario_registra' => $input['id_usuario_registra'] ?? null,
         ]);
@@ -141,14 +175,25 @@ class OperativosController extends ResourceController
         $input = $this->parseInput();
         $id = (int) $id;
 
-        if (!$id || !$db->table('operativos')->where('id', $id)->countAllResults()) {
+        $current = $db->table('operativos')->where('id', $id)->get()->getRowArray();
+        if (!$id || !$current) {
             return $this->failNotFound('Operativo no encontrado.');
         }
 
         $data = [];
-        foreach (['nombre', 'lugar', 'fecha', 'hora_inicio', 'hora_fin', 'estado', 'observacion'] as $field) {
+        foreach (['nombre', 'lugar', 'fecha', 'hora_inicio', 'estado', 'observacion'] as $field) {
             if (array_key_exists($field, $input)) {
                 $data[$field] = $input[$field] === '' ? null : $input[$field];
+            }
+        }
+
+        if (array_key_exists('estado', $data)) {
+            if ($data['estado'] === 'FINALIZADO') {
+                $data['hora_fin'] = ($current['estado'] === 'FINALIZADO' && !empty($current['hora_fin']))
+                    ? $current['hora_fin']
+                    : date('H:i:s');
+            } else {
+                $data['hora_fin'] = null;
             }
         }
 
@@ -188,6 +233,10 @@ class OperativosController extends ResourceController
         $db = \Config\Database::connect();
         if (!$id || !$db->table('operativos')->where('id', $id)->countAllResults()) {
             return $this->failNotFound('Operativo no encontrado.');
+        }
+
+        if ($db->table('papeletas')->where('id_operativo', $id)->countAllResults() > 0) {
+            return $this->failValidationErrors('No se puede eliminar un operativo con papeletas vinculadas. Cambie su estado a CANCELADO o FINALIZADO.');
         }
 
         $db->table('operativos')->where('id', $id)->delete();

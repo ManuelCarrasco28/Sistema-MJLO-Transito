@@ -19,7 +19,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('personas', ['controller' => 'PersonasController']);
         $routes->get('personal/catalogos', 'PersonalController::catalogos');
         $routes->resource('personal', ['controller' => 'PersonalController', 'only' => ['index', 'create', 'update']]);
-        $routes->resource('organizaciones', ['controller' => 'OrganizacionesController']);
+        $routes->resource('asociaciones', ['controller' => 'AsociacionesController']);
         $routes->resource('documentos', ['controller' => 'DocumentosController']);
         $routes->resource('papeletas', ['controller' => 'PapeletasController']);
         $routes->resource('operativos', ['controller' => 'OperativosController']);

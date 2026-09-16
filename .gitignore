@@ -39,3 +39,4 @@ desktop.ini
 Database/
 *.sql
 
+*.img/

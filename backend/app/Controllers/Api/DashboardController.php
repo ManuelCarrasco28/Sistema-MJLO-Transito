@@ -85,7 +85,7 @@ class DashboardController extends ResourceController
                 ['label' => 'En depósito', 'value' => $retenidos, 'color' => 'bg-orange-500'],
                 ['label' => 'Liberados', 'value' => $liberados, 'color' => 'bg-emerald-500'],
             ]),
-            'organizaciones' => $this->organizaciones($db),
+            'asociaciones' => $this->asociaciones($db),
             'operatividad' => $this->operatividad($db),
             'operacionesMensuales' => $this->operacionesMensuales($db, $currentYear),
             'multasPagosPorAnio' => $this->multasPagosPorAnio($db),
@@ -211,9 +211,9 @@ class DashboardController extends ResourceController
         return $result;
     }
 
-    private function organizaciones($db): array
+    private function asociaciones($db): array
     {
-        $orgRow = $db->table('organizaciones')
+        $orgRow = $db->table('asociaciones')
             ->select("
                 SUM(CASE WHEN tipo = 'EMPRESA' THEN 1 ELSE 0 END) as empresas,
                 SUM(CASE WHEN tipo = 'ASOCIACION' THEN 1 ELSE 0 END) as asociaciones,

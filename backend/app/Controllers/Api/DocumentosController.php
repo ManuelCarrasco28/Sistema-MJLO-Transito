@@ -27,7 +27,7 @@ class DocumentosController extends ResourceController
                 COALESCE(c.apellido_materno, '') AS propietarioMaterno
             ", false)
             ->join('vehiculos v', 'v.id = d.id_vehiculo', 'left')
-            ->join('organizaciones o', 'o.id = v.id_asociacion', 'left')
+            ->join('asociaciones o', 'o.id = v.id_asociacion', 'left')
             ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
             ->join('personas p', 'p.id = vp.id_persona', 'left')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')

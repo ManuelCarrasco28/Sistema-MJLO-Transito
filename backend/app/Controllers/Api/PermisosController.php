@@ -41,7 +41,7 @@ class PermisosController extends ResourceController
                 ", false)
                 ->join('tramites_documentarios td', 'td.id = pc.id_tramite', 'left')
                 ->join('procedimientos_administrativos pa', 'pa.id = td.id_procedimiento_admin', 'left')
-                ->join('organizaciones o', 'o.id = td.id_organizacion', 'left')
+                ->join('asociaciones o', 'o.id = td.id_asociacion', 'left')
                 ->join('personas p', 'p.id = td.id_persona', 'left')
                 ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
                 ->orderBy('pc.id', 'DESC')

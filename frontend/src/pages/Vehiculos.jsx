@@ -7,9 +7,9 @@ import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 export function Vehiculos() {
   const cachedVeh = getCachedData('/vehiculos')
-  const cachedOrg = getCachedData('/organizaciones')
+  const cachedOrg = getCachedData('/asociaciones')
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
-  const [organizaciones, setOrganizaciones] = useState(cachedOrg || [])
+  const [asociaciones, setAsociaciones] = useState(cachedOrg || [])
   const [isLoading, setIsLoading] = useState(!cachedVeh)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
@@ -37,7 +37,7 @@ export function Vehiculos() {
     numeroSerie: '',
     serieMotor: '',
     partidaRegistral: '',
-    organizacion: '',
+    asociacion: '',
     propietario: '',
     propietarioDni: '',
     estado: 'FORMALIZADO',
@@ -48,21 +48,21 @@ export function Vehiculos() {
   useEffect(() => {
     Promise.all([
       apiFetch('/vehiculos').then((response) => response.ok ? response.json() : Promise.reject(response)),
-      apiFetch('/organizaciones').then((response) => response.ok ? response.json() : Promise.reject(response))
+      apiFetch('/asociaciones').then((response) => response.ok ? response.json() : Promise.reject(response))
     ]).then(([vehPayload, orgPayload]) => {
       const vData = vehPayload.data ?? []
       const oData = orgPayload.data ?? []
       setVehiculos(vData)
-      setOrganizaciones(oData)
+      setAsociaciones(oData)
       setCachedData('/vehiculos', vData)
-      setCachedData('/organizaciones', oData)
+      setCachedData('/asociaciones', oData)
     }).catch(() => { })
       .finally(() => setIsLoading(false))
   }, [])
 
   const isVehiculoFormal = (v) => Boolean(
     v?.asociacionId || 
-    (v?.organizacion && v.organizacion !== 'Sin Organización' && v.organizacion !== 'Independiente' && v.organizacion !== 'Independiente / Particular')
+    (v?.asociacion && v.asociacion !== 'Sin Asociación' && v.asociacion !== 'Independiente' && v.asociacion !== 'Independiente / Particular')
   )
 
   const totalVehiculos = vehiculos.length
@@ -78,7 +78,7 @@ export function Vehiculos() {
       v.marca.toLowerCase().includes(searchTerm.toLowerCase()) ||
       v.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       v.propietario.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.organizacion && v.organizacion.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (v.asociacion && v.asociacion.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (v.propietarioDni && v.propietarioDni.includes(searchTerm))
 
     const matchesTipo = filterTipo === 'TODOS' || v.tipo === filterTipo
@@ -148,8 +148,8 @@ export function Vehiculos() {
       `Tipo de carroceria: ${vehiculo.tipoCarroceria || 'SIN TIPO CARROCERIA'}`,
       `Propietario: ${vehiculo.propietario || 'SIN PROPIETARIO'}`,
       `DNI propietario: ${vehiculo.propietarioTipoDocumento === 'DNI' ? vehiculo.propietarioDni || 'SIN DNI' : 'NO APLICA'}`,
-      `RUC organizacion: ${vehiculo.organizacionRuc || 'SIN RUC'}`,
-      `Organizacion vehiculo: ${vehiculo.organizacion || 'INDEPENDIENTE'}`,
+      `RUC asociacion: ${vehiculo.asociacionRuc || 'SIN RUC'}`,
+      `Asociacion vehiculo: ${vehiculo.asociacion || 'INDEPENDIENTE'}`,
       formatDocumentoQr('Tarjeta de propiedad numero', tarjetaPropiedad),
       formatDocumentoQr('SOAT', soat),
       formatCerticavQr(certicav),
@@ -173,10 +173,10 @@ export function Vehiculos() {
       numeroSerie: '',
       serieMotor: '',
       partidaRegistral: '',
-      organizacion: organizaciones[0]?.razonSocial || '',
+      asociacion: asociaciones[0]?.razonSocial || '',
       propietario: '',
       propietarioDni: '',
-      estado: organizaciones[0]?.razonSocial ? 'FORMAL' : 'INFORMAL',
+      estado: asociaciones[0]?.razonSocial ? 'FORMAL' : 'INFORMAL',
       soatEstado: 'VIGENTE',
       tucNumero: `TUC-2026-${Math.floor(100 + Math.random() * 900)}`,
     })
@@ -190,7 +190,7 @@ export function Vehiculos() {
     setSelectedVehiculo(vehiculo)
     setFormData({ 
       ...vehiculo,
-      organizacion: isVehiculoFormal(vehiculo) ? (vehiculo.organizacion || '') : '',
+      asociacion: isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '',
       estado: vehiculo.estado === 'SUSPENDIDO' || vehiculo.estado === 'BAJA' 
         ? vehiculo.estado 
         : (isVehiculoFormal(vehiculo) ? 'FORMAL' : 'INFORMAL')
@@ -302,7 +302,7 @@ export function Vehiculos() {
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(formales)}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">{porcentajeFormales}% En Organización</span>
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">{porcentajeFormales}% En Asociación</span>
           </div>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${porcentajeFormales}%` }} />
@@ -317,7 +317,7 @@ export function Vehiculos() {
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(informales)}</p>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">Sin Organización</span>
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">Sin Asociación</span>
           </div>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Vehículos independientes no afiliados</p>
         </div>
@@ -379,8 +379,8 @@ export function Vehiculos() {
               className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="TODOS">Todos los estados</option>
-              <option value="FORMAL">Formales (En Organización)</option>
-              <option value="INFORMAL">Informales (Sin Organización)</option>
+              <option value="FORMAL">Formales (En Asociación)</option>
+              <option value="INFORMAL">Informales (Sin Asociación)</option>
               <option value="SUSPENDIDO">Inhabilitados (Suspendidos/Baja)</option>
             </select>
 
@@ -436,7 +436,7 @@ export function Vehiculos() {
               <tr>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Placa</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Vehículo & Modelo</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Organización / Empresa</th>
+                <th className="px-3.5 py-3.5 whitespace-nowrap">Asociación / Empresa</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Propietario & Titular</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
@@ -507,15 +507,15 @@ export function Vehiculos() {
                     <td className="px-3.5 py-3.5 max-w-[160px]">
                       {isVehiculoFormal(v) ? (
                         <>
-                          <p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200" title={v.organizacion}>
-                            {v.organizacion}
+                          <p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200" title={v.asociacion}>
+                            {v.asociacion}
                           </p>
                           <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">MDJLO-AUTORIZADO</span>
                         </>
                       ) : (
                         <>
                           <p className="truncate text-xs font-bold text-slate-500 dark:text-slate-400">
-                            Sin Organización
+                            Sin Asociación
                           </p>
                           <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold">INFORMAL</span>
                         </>
@@ -880,7 +880,7 @@ export function Vehiculos() {
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-emerald-500" />
-                  Titular & Empresa Autorizada
+                  Titular & Asociación Autorizada
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
@@ -921,13 +921,13 @@ export function Vehiculos() {
                   <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
                     <select
                       id="veh_org"
-                      value={formData.organizacion || ''}
+                      value={formData.asociacion || ''}
                       onChange={(e) => {
                         const val = e.target.value
-                        const formal = Boolean(val && val !== 'Sin Organización (Informal)')
+                        const formal = Boolean(val && val !== 'Sin Asociación (Informal)')
                         setFormData({
                           ...formData,
-                          organizacion: val,
+                          asociacion: val,
                           estado: formData.estado === 'SUSPENDIDO' || formData.estado === 'BAJA'
                             ? formData.estado
                             : (formal ? 'FORMAL' : 'INFORMAL')
@@ -935,8 +935,8 @@ export function Vehiculos() {
                       }}
                       className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                     >
-                      <option value="">Sin Organización (Informal)</option>
-                      {organizaciones.map((org) => (
+                      <option value="">Sin Asociación (Informal)</option>
+                      {asociaciones.map((org) => (
                         <option key={org.id} value={org.razonSocial}>
                           {org.razonSocial} ({org.siglas})
                         </option>
@@ -946,7 +946,7 @@ export function Vehiculos() {
                       htmlFor="veh_org"
                       className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
                     >
-                      Empresa u Organización (Define Formal / Informal)
+                      Empresa o Asociación (Define Formal / Informal)
                     </label>
                   </div>
                 </div>
@@ -967,7 +967,7 @@ export function Vehiculos() {
                       className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
                     >
                       <option value="FORMAL">FORMAL (Autorizado)</option>
-                      <option value="INFORMAL">INFORMAL (Sin Organización)</option>
+                      <option value="INFORMAL">INFORMAL (Sin Asociación)</option>
                       <option value="SUSPENDIDO">SUSPENDIDO</option>
                       <option value="BAJA">BAJA</option>
                     </select>
@@ -1116,10 +1116,10 @@ export function Vehiculos() {
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Propietario Registrado</p>
                   <p className="mt-1 text-sm font-extrabold text-slate-800 dark:text-white">{selectedVehiculo.propietario}</p>
                   <p className="text-slate-500 font-mono">DNI: {selectedVehiculo.propietarioTipoDocumento === 'DNI' ? selectedVehiculo.propietarioDni || 'N/A' : 'N/A'}</p>
-                  <p className="text-slate-500 font-mono">RUC: {selectedVehiculo.organizacionRuc || 'N/A'}</p>
+                  <p className="text-slate-500 font-mono">RUC: {selectedVehiculo.asociacionRuc || 'N/A'}</p>
                   <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                    <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Organización del vehículo</p>
-                    <p className="mt-1 font-bold text-slate-800 dark:text-cyan-300">{isVehiculoFormal(selectedVehiculo) ? selectedVehiculo.organizacion : 'Sin Organización (Vehículo Informal)'}</p>
+                    <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Asociación del vehículo</p>
+                    <p className="mt-1 font-bold text-slate-800 dark:text-cyan-300">{isVehiculoFormal(selectedVehiculo) ? selectedVehiculo.asociacion : 'Sin Asociación (Vehículo Informal)'}</p>
                   </div>
                 </div>
 

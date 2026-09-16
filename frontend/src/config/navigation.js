@@ -17,7 +17,7 @@ export const navigationGroups = [
     items: [
       { id: 'personas', label: 'Personas', icon: 'idCard', path: '/personas' },
       { id: 'personal', label: 'Trabajadores', icon: 'workerBadge', path: '/personal' },
-      { id: 'organizaciones', label: 'Organizaciones', icon: 'office', path: '/organizaciones' },
+      { id: 'asociaciones', label: 'Asociaciones', icon: 'office', path: '/asociaciones' },
       { id: 'vehiculos', label: 'Vehículos', icon: 'motoTaxi', path: '/vehiculos' },
     ]
   },

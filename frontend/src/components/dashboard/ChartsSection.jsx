@@ -68,7 +68,7 @@ export function ChartsSection({ data, loading = false }) {
     { label: 'En depósito', value: 62, percent: '78%', color: 'bg-orange-500', progress: '78%' },
     { label: 'Liberados', value: 18, percent: '22%', color: 'bg-[#01B574]', progress: '22%' },
   ]
-  const organizaciones = data?.organizaciones ?? []
+  const asociaciones = data?.asociaciones ?? []
   const operatividad = data?.operatividad ?? []
   const totalOperatividad = operatividad.reduce((sum, item) => sum + item.value, 0)
   const operationsData = data?.operacionesMensuales ?? emptyMonths.map(({ month }) => ({ month, registros: 0, inspecciones: 0 }))
@@ -648,15 +648,15 @@ export function ChartsSection({ data, loading = false }) {
             </div>
           </article>
 
-          {/* Organizaciones registradas (Restaurado interactivo) */}
+          {/* Asociaciones registradas (Restaurado interactivo) */}
           <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '760ms' }}>
             <div className="border-b border-[#F4F7FE] pb-4 mb-5">
-              <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Organizaciones</h2>
+              <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Asociaciones</h2>
               <p className="mt-0.5 text-xs text-[#A3AED0]">Estado visual de empresas y comités</p>
             </div>
 
             <div className="flex flex-col justify-between gap-4">
-              {organizaciones.map((item, index) => (
+              {asociaciones.map((item, index) => (
                 <div key={item.label} className="rounded-xl border border-[#F4F7FE] bg-[#F4F7FE] dark:bg-white/10 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-[#707EAE]">{item.label}</span>
