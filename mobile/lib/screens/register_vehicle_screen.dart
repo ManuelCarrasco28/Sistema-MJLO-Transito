@@ -97,9 +97,9 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
           nomCtrl.text = persona['nombres'] ?? '';
           apeCtrl.text = '${persona['apellidoPaterno'] ?? ''} ${persona['apellidoMaterno'] ?? ''}'.trim();
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datos encontrados'), backgroundColor: Colors.green));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datos encontrados'), backgroundColor: Colors.green));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Persona no encontrada. Puede ingresar los datos manualmente.'), backgroundColor: Colors.orange));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Persona no encontrada. Puede ingresar los datos manualmente.'), backgroundColor: Colors.orange));
         nomCtrl.clear();
         apeCtrl.clear();
       }

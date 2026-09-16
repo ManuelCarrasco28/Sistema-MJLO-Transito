@@ -23,7 +23,7 @@ class _FugaCaptureScreenState extends State<FugaCaptureScreen> {
   final TextEditingController _direccionController = TextEditingController();
   
   LatLng? _currentLocation;
-  MapController _mapController = MapController();
+  final MapController _mapController = MapController();
   bool _isLoadingLocation = true;
 
   @override
@@ -39,7 +39,7 @@ class _FugaCaptureScreenState extends State<FugaCaptureScreen> {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Los servicios de ubicación están desactivados.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Los servicios de ubicación están desactivados.')));
       setState(() => _isLoadingLocation = false);
       return;
     }
@@ -48,14 +48,14 @@ class _FugaCaptureScreenState extends State<FugaCaptureScreen> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permiso de ubicación denegado.')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permiso de ubicación denegado.')));
         setState(() => _isLoadingLocation = false);
         return;
       }
     }
     
     if (permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permiso de ubicación denegado permanentemente.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permiso de ubicación denegado permanentemente.')));
       setState(() => _isLoadingLocation = false);
       return;
     } 
@@ -85,7 +85,7 @@ class _FugaCaptureScreenState extends State<FugaCaptureScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al tomar foto: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al tomar foto: $e')));
     }
   }
 

@@ -39,7 +39,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
       _lugar = widget.reporteData['fuga_direccion'];
     }
     if (widget.reporteData['fuga_observaciones'] != null && widget.reporteData['fuga_observaciones'].toString().isNotEmpty) {
-      _observaciones = 'FUGA DEL CONDUCTOR. ' + widget.reporteData['fuga_observaciones'];
+      _observaciones = 'FUGA DEL CONDUCTOR. ${widget.reporteData['fuga_observaciones']}';
     } else if (widget.reporteData['fuga'] == true) {
       _observaciones = 'FUGA DEL CONDUCTOR.';
     }

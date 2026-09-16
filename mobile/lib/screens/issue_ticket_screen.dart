@@ -54,7 +54,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
           nomCtrl.text = persona['nombres'] ?? '';
           apeCtrl.text = '${persona['apellidoPaterno'] ?? ''} ${persona['apellidoMaterno'] ?? ''}'.trim();
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datos encontrados')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datos encontrados')));
       } else {
         _showError('No se encontró a la persona en la base de datos');
       }

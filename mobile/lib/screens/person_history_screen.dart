@@ -196,13 +196,13 @@ class _PersonHistoryScreenState extends State<PersonHistoryScreen> {
                             base64Decode(data['firmaConductorImg'].toString().split(',').last),
                             height: 100,
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Text('Error al cargar la firma'),
+                            errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
                           )
                         : Image.network(
                             '${ApiService.fileBaseUrl}/${data['firmaConductorImg']}',
                             height: 100,
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Text('Error al cargar la firma'),
+                            errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
                           ),
                   ),
                 ]
