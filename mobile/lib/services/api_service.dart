@@ -63,6 +63,15 @@ class ApiService {
     throw Exception('Error al cargar historial');
   }
 
+  static Future<bool> permiteAplicarPapeletaMovil() async {
+    final response = await http.get(Uri.parse('$baseUrl/mobile/config'));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data']?['permite_aplicar_papeleta'] == true;
+    }
+    return true;
+  }
+
   static Future<Map<String, dynamic>> createPapeleta(Map<String, dynamic> data) async {
     final response = await http.post(
       Uri.parse('$baseUrl/papeletas'),
@@ -74,6 +83,19 @@ class ApiService {
       return jsonDecode(response.body);
     }
     throw Exception(_extractError(response.body, 'Error al registrar papeleta'));
+  }
+
+  static Future<Map<String, dynamic>> createReporteIntervencion(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/reportes-intervencion'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception(_extractError(response.body, 'Error al registrar reporte'));
   }
 
   static Future<void> uploadFirma(int papeletaId, String firmaBase64) async {

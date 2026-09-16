@@ -193,14 +193,12 @@ No debe existir una tabla separada llamada `tarjetas_operatividad`.
 - partida_registral
 - codigo_qr
 - id_asociacion
-- estado_formalizacion
 
 #### vehiculo_propietarios
 
 - id
 - id_vehiculo
 - id_persona
-- id_organizacion
 - fecha_inicio
 - fecha_fin
 - documento_sustento
@@ -292,7 +290,7 @@ Valores de `inspeccion_detalles.estado_revision`:
 - numero_formulario
 - tipo_tramite
 - id_persona
-- id_organizacion
+- id_asociacion
 - id_vehiculo
 - funcionario_dirigido
 - cargo_funcionario
@@ -390,8 +388,6 @@ Valores de `pagos.tipo_pago`:
 
 - id
 - id_tramite
-- id_organizacion
-- id_vehiculo
 - numero_autorizacion
 - tipo_permiso
 - asunto

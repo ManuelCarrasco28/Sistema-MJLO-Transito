@@ -56,18 +56,18 @@ class PapeletasController extends ResourceController
                     COALESCE(v.modelo, '') as vehiculoModelo,
                     COALESCE(v.color, '') as vehiculoColor,
                     v.anio_fabricacion as vehiculoAnio,
-                    COALESCE(v.estado_formalizacion, 'INFORMAL') as vehiculoEstadoFormalizacion,
+                    CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END as vehiculoEstadoFormalizacion,
                     v.id_asociacion as vehiculoAsociacionId,
                     aso.razon_social as vehiculoAsociacion,
                     
                     COALESCE(per.numero, 'S/D') as conductorDni,
-                    COALESCE(NULLIF(TRIM(CONCAT(c_per.nombres, ' ', c_per.apellido_paterno, ' ', COALESCE(c_per.apellido_materno, ''))), ''), p.nombre_autoridad, 'Conductor No Identificado') as conductorNombre,
-                    COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(c_per.nombres, ' ', c_per.apellido_paterno), 'Conductor No Identificado') as infractor,
+                    COALESCE(NULLIF(TRIM(CONCAT(c_per.nombres, ' ', c_per.apellido_paterno, ' ', COALESCE(c_per.apellido_materno, ''))), ''), p.nombre_autoridad, 'Infractor No Identificado') as conductorNombre,
+                    COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(c_per.nombres, ' ', c_per.apellido_paterno), 'Infractor No Identificado') as infractor,
                     
-                    COALESCE(prop_per.numero, prop_org.ruc, 'S/D') as propietarioDni,
+                    COALESCE(prop_per.numero, aso.ruc, 'S/D') as propietarioDni,
                     COALESCE(
                         NULLIF(TRIM(CONCAT(c_prop.nombres, ' ', c_prop.apellido_paterno, ' ', COALESCE(c_prop.apellido_materno, ''))), ''),
-                        prop_org.razon_social,
+                        aso.razon_social,
                         'No Registrado'
                     ) as propietarioNombre,
                     
@@ -98,7 +98,6 @@ class PapeletasController extends ResourceController
                 ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.estado = "ACTIVO"', 'left')
                 ->join('personas prop_per', 'prop_per.id = vp.id_persona', 'left')
                 ->join('ciudadanos c_prop', 'c_prop.id_persona = prop_per.id', 'left')
-                ->join('asociaciones prop_org', 'prop_org.id = vp.id_asociacion', 'left')
                 ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left')
                 ->groupBy('p.id')
                 ->orderBy('p.id', 'DESC')
@@ -254,7 +253,6 @@ class PapeletasController extends ResourceController
                 $db->table('vehiculos')->insert([
                     'placa' => $placaRegistro,
                     'id_tipo_vehiculo' => null,
-                    'estado_formalizacion' => 'INFORMAL',
                     'marca' => $marcaVehiculo ?: null,
                     'color' => $colorVehiculo ?: null,
                     'modelo' => $claseVehiculo ?: null,
@@ -314,7 +312,7 @@ class PapeletasController extends ResourceController
                     $personaId = (int)$db->insertID();
                     $db->table('ciudadanos')->insert([
                         'id_persona' => $personaId,
-                        'nombres' => $conductorNombres ?: ($infractor ?: 'CONDUCTOR'),
+                        'nombres' => $conductorNombres ?: ($infractor ?: 'INFRACTOR'),
                         'apellido_paterno' => $apellidos[0] ?? 'NO REGISTRADO',
                         'apellido_materno' => isset($apellidos[1]) ? implode(' ', array_slice($apellidos, 1)) : null,
                     ]);
@@ -479,7 +477,7 @@ class PapeletasController extends ResourceController
 
             return $this->respond([
                 'status' => 200,
-                'message' => 'Firma de conductor registrada correctamente',
+                'message' => 'Firma del conductor registrada correctamente',
                 'data' => [
                     'firmaConductorImg' => $update['firma_conductor_img'],
                     'firmaConductorFecha' => $update['firma_conductor_fecha'],

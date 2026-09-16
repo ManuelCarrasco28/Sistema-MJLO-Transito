@@ -18,11 +18,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   int _registradasHoy = 0;
+  bool _permitePapeletaMovil = true;
 
   @override
   void initState() {
     super.initState();
     _loadDashboardData();
+    _loadMobileConfig();
   }
 
   Future<void> _loadDashboardData() async {
@@ -45,6 +47,13 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       // Ignorar errores silenciosamente para el dashboard
+    }
+  }
+
+  Future<void> _loadMobileConfig() async {
+    final permitido = await ApiService.permiteAplicarPapeletaMovil();
+    if (mounted) {
+      setState(() => _permitePapeletaMovil = permitido);
     }
   }
 
@@ -412,12 +421,23 @@ class _HomeScreenState extends State<HomeScreen> {
       childAspectRatio: 0.9,
       children: [
         _buildActionCard(
-          title: 'Nueva Papeleta',
-          subtitle: 'Generar infracción\nvehicular en tiempo real.',
-          icon: Icons.edit_document,
+          title: _permitePapeletaMovil ? 'Nueva Papeleta' : 'Registrar Evidencia',
+          subtitle: _permitePapeletaMovil
+              ? 'Generar infracción\nvehicular en tiempo real.'
+              : 'Enviar reporte para\nrevisión administrativa.',
+          icon: _permitePapeletaMovil ? Icons.edit_document : Icons.camera_alt,
           isPrimary: true,
-          badge: 'NUEVO',
-          onTap: () => _showSearchTypeSelectionDialog(context),
+          badge: _permitePapeletaMovil ? 'NUEVO' : 'REPORTE',
+          onTap: () {
+            if (_permitePapeletaMovil) {
+              _showSearchTypeSelectionDialog(context);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
+              );
+            }
+          },
         ),
         _buildActionCard(
           title: 'Escáner',

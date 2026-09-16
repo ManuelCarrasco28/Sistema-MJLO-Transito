@@ -15,19 +15,27 @@ import { CursosSeguridad } from './pages/CursosSeguridad'
 import { Pagos } from './pages/Pagos'
 import { Retenciones } from './pages/Retenciones'
 import { Permisos } from './pages/Permisos'
-import { AdminPanel } from './pages/AdminPanel'
+import { SuperAdminDashboard } from './pages/SuperAdminDashboard'
 import { Operativos } from './pages/Operativos'
 import { navigationGroups } from './config/navigation'
 import { apiFetch } from './config/api'
 
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000
 
+const isSuperAdminUser = (user) => user?.usuario?.toLowerCase() === 'superadmin'
+
 function Layout({ onLogout, user, onUserUpdate }) {
   const location = useLocation()
   
   const getActiveItem = () => {
     const path = location.pathname
-    if (path.includes('/admin')) return 'Panel Administración'
+    if (path.includes('/superadmin/respaldo')) return 'Respaldo'
+    if (path.includes('/superadmin/catalogos')) return 'Catálogos maestros'
+    if (path.includes('/superadmin/auditoria')) return 'Auditoría y logs'
+    if (path.includes('/superadmin/configuracion')) return 'Configuración'
+    if (path.includes('/superadmin/roles')) return 'Roles y permisos'
+    if (path.includes('/superadmin/usuarios')) return 'Gestión de usuarios'
+    if (path.includes('/superadmin')) return 'Dashboard Super Admin'
     if (path.includes('/vehiculos')) return 'Vehículos'
     if (path.includes('/personas')) return 'Personas'
     if (path.includes('/personal')) return 'Personal'
@@ -89,11 +97,8 @@ function Layout({ onLogout, user, onUserUpdate }) {
     }
   }, [])
 
-  const isAdmin = Boolean(
-    user?.cargo?.toLowerCase()?.includes('admin') || 
-    user?.usuario?.toLowerCase()?.includes('admin') || 
-    user?.usuario === 'diegobarturen'
-  )
+  const isSuperAdmin = isSuperAdminUser(user)
+  const onlyNormalUser = (element) => isSuperAdmin ? <Navigate to="/superadmin" replace /> : element
 
   return (
     <main
@@ -132,23 +137,25 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
         <div className="mx-auto w-full max-w-[96rem] flex-1 space-y-4 p-3.5 sm:p-5 lg:p-6">
           <Routes>
-            <Route path="/" element={<Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />} />
-            <Route path="/admin" element={isAdmin ? <AdminPanel /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardHome />} />
-            <Route path="/vehiculos" element={<Vehiculos />} />
-            <Route path="/personas" element={<Personas user={user} onUserUpdate={onUserUpdate} />} />
-            <Route path="/personal" element={<Personal />} />
-            <Route path="/asociaciones" element={<Asociaciones />} />
-            <Route path="/documentos" element={<Documentos />} />
-            <Route path="/inspecciones" element={<Inspecciones />} />
-            <Route path="/papeletas" element={<Papeletas />} />
-            <Route path="/operativos" element={<Operativos user={user} />} />
-            <Route path="/cursos" element={<CursosSeguridad />} />
-            <Route path="/cursos-seguridad" element={<CursosSeguridad />} />
-            <Route path="/pagos" element={<Pagos />} />
-            <Route path="/internamientos" element={<Retenciones />} />
-            <Route path="/retenciones" element={<Navigate to="/internamientos" replace />} />
-            <Route path="/permisos" element={<Permisos />} />
+            <Route path="/" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
+            <Route path="/superadmin" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/superadmin/:moduleId" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/admin" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
+            <Route path="/dashboard" element={onlyNormalUser(<DashboardHome />)} />
+            <Route path="/vehiculos" element={onlyNormalUser(<Vehiculos />)} />
+            <Route path="/personas" element={onlyNormalUser(<Personas user={user} onUserUpdate={onUserUpdate} />)} />
+            <Route path="/personal" element={onlyNormalUser(<Personal />)} />
+            <Route path="/asociaciones" element={onlyNormalUser(<Asociaciones />)} />
+            <Route path="/documentos" element={onlyNormalUser(<Documentos />)} />
+            <Route path="/inspecciones" element={onlyNormalUser(<Inspecciones />)} />
+            <Route path="/papeletas" element={onlyNormalUser(<Papeletas />)} />
+            <Route path="/operativos" element={onlyNormalUser(<Operativos user={user} />)} />
+            <Route path="/cursos" element={onlyNormalUser(<CursosSeguridad />)} />
+            <Route path="/cursos-seguridad" element={onlyNormalUser(<CursosSeguridad />)} />
+            <Route path="/pagos" element={onlyNormalUser(<Pagos />)} />
+            <Route path="/internamientos" element={onlyNormalUser(<Retenciones />)} />
+            <Route path="/retenciones" element={onlyNormalUser(<Navigate to="/internamientos" replace />)} />
+            <Route path="/permisos" element={onlyNormalUser(<Permisos />)} />
             <Route path="*" element={
               <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">
                 <h2 className="text-xl font-bold">Módulo en desarrollo</h2>
@@ -169,7 +176,8 @@ function LoginRoute({ onLogin }) {
 
   const handleLogin = (userData, remember = false) => {
     onLogin(userData, remember)
-    navigate(from, { replace: true })
+    const target = from === '/dashboard' && isSuperAdminUser(userData) ? '/superadmin' : from
+    navigate(target, { replace: true })
   }
 
   return <Login onLogin={handleLogin} />
@@ -284,7 +292,7 @@ function App() {
         <Routes>
           <Route
             path="/login"
-            element={user ? <Navigate to="/dashboard" replace /> : <LoginRoute onLogin={handleLogin} />}
+            element={user ? <Navigate to={isSuperAdminUser(user) ? "/superadmin" : "/dashboard"} replace /> : <LoginRoute onLogin={handleLogin} />}
           />
           <Route
             path="/*"

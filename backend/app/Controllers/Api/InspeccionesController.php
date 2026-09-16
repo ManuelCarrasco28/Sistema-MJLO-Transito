@@ -110,8 +110,7 @@ class InspeccionesController extends ResourceController
                     $tipoId = $tipoRow ? (int)$tipoRow['id'] : null;
                     $db->table('vehiculos')->insert([
                         'placa'                => $placa ?: ('NC-' . random_int(1000, 9999)),
-                        'id_tipo_vehiculo'     => $tipoId,
-                        'estado_formalizacion' => 'FORMALIZADO'
+                        'id_tipo_vehiculo'     => $tipoId
                     ]);
                     $vehiculoId = (int)$db->insertID();
                 }

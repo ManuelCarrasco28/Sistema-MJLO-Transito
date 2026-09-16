@@ -100,7 +100,7 @@ class AsociacionesController extends ResourceController
                 COALESCE(v.marca, '') AS marca,
                 COALESCE(v.modelo, '') AS modelo,
                 COALESCE(v.color, '') AS color,
-                COALESCE(v.estado_formalizacion, '') AS estado,
+                CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END AS estado,
                 COALESCE(p.numero, '') AS propietarioDocumento,
                 TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) AS propietario
             ", false)

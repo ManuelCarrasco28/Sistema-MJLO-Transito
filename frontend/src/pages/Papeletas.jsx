@@ -18,6 +18,8 @@ export function Papeletas() {
   }
 
   const [papeletas, setPapeletas] = useState((cachedPapeletas || []).map(normalizePapeleta))
+  const [activeView, setActiveView] = useState('PAPELETAS')
+  const [reportes, setReportes] = useState([])
   const [tiposInfraccion, setTiposInfraccion] = useState(cachedTipos || [])
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
   const [asociaciones, setAsociaciones] = useState(cachedOrgs || [])
@@ -36,6 +38,10 @@ export function Papeletas() {
   const [isPagarModalOpen, setIsPagarModalOpen] = useState(false)
   const [selectedInfraccion, setSelectedInfraccion] = useState(null)
   const [papeletaToAction, setPapeletaToAction] = useState(null)
+  const [reporteToConvert, setReporteToConvert] = useState(null)
+  const [reporteToReject, setReporteToReject] = useState(null)
+  const [convertForm, setConvertForm] = useState({ tipoInfraccionId: '', vehiculoId: '', conductorDni: '', observacionesAutoridad: '' })
+  const [motivoRechazo, setMotivoRechazo] = useState('')
   const [numeroRecibo, setNumeroRecibo] = useState('')
   const [fechaPago, setFechaPago] = useState('')
   const [metodoPago, setMetodoPago] = useState('EFECTIVO')
@@ -76,6 +82,7 @@ export function Papeletas() {
   }
 
   const totales = papeletas.length
+  const reportesPendientes = reportes.filter((r) => r.estado === 'PENDIENTE').length
   const pendientes = papeletas.filter((p) => p.estado === 'PENDIENTE_PAGO').length
   const pagadas = papeletas.filter((p) => p.estado === 'PAGADA').length
   const anuladas = papeletas.filter((p) => p.estado === 'ANULADA').length
@@ -142,32 +149,35 @@ export function Papeletas() {
   const renderOrigen = (p) => {
     const isOperativo = p.origen === 'OPERATIVO' || p.operativoId
     return (
-      <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wide uppercase leading-none ${
-        isOperativo
+      <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wide uppercase leading-none ${isOperativo
           ? 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/70 dark:text-fuchsia-300'
           : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-      }`}>
+        }`}>
         <span className="size-1 rounded-full bg-current" />
         {isOperativo ? 'OPERATIVO' : 'RUTINA'}
       </span>
     )
   }
 
-  useEffect(() => {
+  const loadData = () => {
+    setIsLoading(true)
     Promise.all([
       apiFetch('/papeletas').then(res => res.json()).catch(() => ({ data: [] })),
       apiFetch('/tipos-infraccion').then(res => res.json()).catch(() => ({ data: [] })),
       apiFetch('/vehiculos').then(res => res.json()).catch(() => ({ data: [] })),
-      apiFetch('/asociaciones').then(res => res.json()).catch(() => ({ data: [] }))
-    ]).then(([papeletasRes, tiposRes, vehiculosRes, orgsRes]) => {
+      apiFetch('/asociaciones').then(res => res.json()).catch(() => ({ data: [] })),
+      apiFetch('/reportes-intervencion').then(res => res.json()).catch(() => ({ data: [] }))
+    ]).then(([papeletasRes, tiposRes, vehiculosRes, orgsRes, reportesRes]) => {
       const pData = (papeletasRes.data || []).map(normalizePapeleta)
       const tData = tiposRes.data || []
       const vData = vehiculosRes.data || []
       const oData = orgsRes.data || []
+      const rData = reportesRes.data || []
       setPapeletas(pData)
       setTiposInfraccion(tData)
       setVehiculos(vData)
       setAsociaciones(oData)
+      setReportes(rData)
       setCachedData('/papeletas', pData)
       setCachedData('/tipos-infraccion', tData)
       setCachedData('/vehiculos', vData)
@@ -177,6 +187,10 @@ export function Papeletas() {
       console.error('Error fetching data for papeletas:', err)
       setIsLoading(false)
     })
+  }
+
+  useEffect(() => {
+    loadData()
   }, [])
 
   const handleOpenDetail = (papeleta) => {
@@ -207,7 +221,7 @@ export function Papeletas() {
 
   const handleConfirmPagar = async () => {
     if (!papeletaToAction) return
-    
+
     // Validaciones
     if (!numeroRecibo.trim() || !fechaPago) {
       alert('Por favor ingresa el número de recibo y la fecha de pago.')
@@ -217,7 +231,7 @@ export function Papeletas() {
       alert('La fecha de pago no puede ser futura.')
       return
     }
-    
+
     setIsProcessingAction(true)
     try {
       const res = await apiFetch(`/papeletas/${papeletaToAction.id}/pagar`, {
@@ -238,6 +252,76 @@ export function Papeletas() {
     } catch (err) {
       console.error(err)
       alert('Error de conexión al procesar el pago')
+    } finally {
+      setIsProcessingAction(false)
+    }
+  }
+
+  const openConvertReporte = (reporte) => {
+    const matchVehiculo = vehiculos.find((v) => String(v.placa || '').toUpperCase() === String(reporte.placa || reporte.placa_visual || '').toUpperCase())
+    setReporteToConvert(reporte)
+    setConvertForm({
+      tipoInfraccionId: '',
+      vehiculoId: String(reporte.id_vehiculo || matchVehiculo?.id || ''),
+      conductorDni: '',
+      observacionesAutoridad: reporte.observaciones || ''
+    })
+  }
+
+  const handleConvertReporte = async (event) => {
+    event.preventDefault()
+    if (!reporteToConvert) return
+    if (!convertForm.tipoInfraccionId) {
+      alert('Selecciona una infracción.')
+      return
+    }
+    if (!convertForm.vehiculoId) {
+      alert('Para generar papeleta primero debes identificar o registrar el vehículo.')
+      return
+    }
+    setIsProcessingAction(true)
+    try {
+      const res = await apiFetch(`/reportes-intervencion/${reporteToConvert.id}/convertir`, {
+        method: 'POST',
+        body: {
+          tipoInfraccionId: Number(convertForm.tipoInfraccionId),
+          vehiculoId: Number(convertForm.vehiculoId),
+          conductorDni: convertForm.conductorDni,
+          observacionesAutoridad: convertForm.observacionesAutoridad
+        }
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo convertir el reporte.')
+      setReporteToConvert(null)
+      loadData()
+      alert(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim())
+    } catch (error) {
+      alert(error.message || 'Error al convertir reporte.')
+    } finally {
+      setIsProcessingAction(false)
+    }
+  }
+
+  const handleRejectReporte = async (event) => {
+    event.preventDefault()
+    if (!reporteToReject) return
+    if (!motivoRechazo.trim()) {
+      alert('Ingresa el motivo de rechazo.')
+      return
+    }
+    setIsProcessingAction(true)
+    try {
+      const res = await apiFetch(`/reportes-intervencion/${reporteToReject.id}/rechazar`, {
+        method: 'POST',
+        body: { motivo_rechazo: motivoRechazo }
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo rechazar el reporte.')
+      setReporteToReject(null)
+      setMotivoRechazo('')
+      loadData()
+    } catch (error) {
+      alert(error.message || 'Error al rechazar reporte.')
     } finally {
       setIsProcessingAction(false)
     }
@@ -313,7 +397,92 @@ export function Papeletas() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <button
+          type="button"
+          onClick={() => setActiveView('PAPELETAS')}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'PAPELETAS' ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+        >
+          Papeletas registradas
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveView('REPORTES')}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'REPORTES' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+        >
+          Reportes móviles
+          <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">{reportesPendientes}</span>
+        </button>
+      </div>
+
+      {activeView === 'REPORTES' && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+            <div>
+              <h2 className="text-lg font-black text-slate-900 dark:text-white">Reportes móviles / evidencias</h2>
+              <p className="text-xs font-semibold text-slate-500">No son papeletas. Administración decide si procede o no.</p>
+            </div>
+            <button onClick={loadData} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white">Actualizar</button>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {reportes.length ? reportes.map((reporte) => (
+              <div key={reporte.id} className="grid gap-4 p-5 lg:grid-cols-[1fr_220px] lg:items-center">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${reporte.estado === 'PENDIENTE' ? 'bg-amber-100 text-amber-800' : reporte.estado === 'CONVERTIDO_PAPELETA' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
+                      {reporte.estado}
+                    </span>
+                    <span className="font-mono text-xs font-black text-slate-500">#{reporte.id}</span>
+                    {reporte.numero_papeleta && <span className="rounded-full bg-rose-100 px-2 py-1 text-[11px] font-black text-rose-700">{reporte.numero_papeleta}</span>}
+                  </div>
+                  <h3 className="mt-2 text-base font-black text-slate-900 dark:text-white">
+                    {reporte.placa_visual || 'SIN PLACA'} · {reporte.lugar}
+                  </h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">{reporte.observaciones}</p>
+                  <div className="mt-2 grid gap-1 text-xs font-semibold text-slate-500 sm:grid-cols-3">
+                    <span>Inspector: {reporte.inspector_nombre}</span>
+                    <span>Fecha: {new Date(reporte.fecha_hora).toLocaleString()}</span>
+                    <span>GPS: {reporte.coordenadas || 'S/D'}</span>
+                  </div>
+                  {!!reporte.fotos?.length && (
+                    <div className="mt-3 flex gap-2 overflow-x-auto">
+                      {reporte.fotos.map((foto) => (
+                        <img key={foto.id} src={foto.foto} alt="Evidencia" className="h-20 w-28 rounded-xl border border-slate-200 object-cover" />
+                      ))}
+                    </div>
+                  )}
+                  {reporte.motivo_rechazo && <p className="mt-2 text-xs font-bold text-rose-600">Motivo: {reporte.motivo_rechazo}</p>}
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={reporte.estado !== 'PENDIENTE'}
+                    onClick={() => openConvertReporte(reporte)}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                  >
+                    Generar papeleta
+                  </button>
+                  <button
+                    type="button"
+                    disabled={reporte.estado !== 'PENDIENTE'}
+                    onClick={() => { setReporteToReject(reporte); setMotivoRechazo('') }}
+                    className="rounded-xl bg-rose-50 px-4 py-2 text-xs font-black text-rose-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    Rechazar
+                  </button>
+                </div>
+              </div>
+            )) : (
+              <div className="px-5 py-12 text-center text-slate-400">
+                <p className="text-3xl">📷</p>
+                <p className="font-bold text-slate-600 dark:text-slate-300">Aún no hay reportes móviles.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeView === 'PAPELETAS' && <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative flex-1 min-w-[220px]">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -420,9 +589,8 @@ export function Papeletas() {
         <div
           ref={tableContainerRef}
           onMouseDown={handleMouseDown}
-          className={`overflow-x-auto overscroll-x-contain transition-colors ${
-            isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
-          }`}
+          className={`overflow-x-auto overscroll-x-contain transition-colors ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
+            }`}
           role="region"
           aria-label="Listado de papeletas"
           tabIndex={0}
@@ -432,7 +600,7 @@ export function Papeletas() {
               <tr>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">N° Papeleta</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Propietario</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Conductor</th>
+                <th className="px-3.5 py-3.5 whitespace-nowrap">Infractor</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Vehículo</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Tipo Infractor</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Infracción</th>
@@ -568,11 +736,10 @@ export function Papeletas() {
                               type="button"
                               onClick={() => handleOpenPagar(p)}
                               disabled={p.estado === 'PAGADA'}
-                              className={`grid size-9 place-items-center rounded-full shadow-xs transition-all ${
-                                p.estado === 'PAGADA'
+                              className={`grid size-9 place-items-center rounded-full shadow-xs transition-all ${p.estado === 'PAGADA'
                                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-800 dark:text-slate-500'
                                   : 'bg-emerald-600 text-white hover:bg-emerald-700 hover:scale-105 active:scale-95 cursor-pointer'
-                              }`}
+                                }`}
                               title={p.estado === 'PAGADA' ? 'Papeleta ya pagada' : 'Pagar papeleta'}
                             >
                               <Icon name="payment" className="size-4" />
@@ -605,6 +772,7 @@ export function Papeletas() {
           }}
         />
       </div>
+      }
 
       {isDetailModalOpen && selectedPapeleta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
@@ -616,7 +784,7 @@ export function Papeletas() {
               <button onClick={() => setIsDetailModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-white cursor-pointer">✕</button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[80vh]">
-              
+
               <div className="space-y-4">
                 <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
                   <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Identificación de la Falta</h4>
@@ -663,7 +831,7 @@ export function Papeletas() {
                       <p className="font-mono text-[11px] text-slate-400">DNI/RUC: {selectedPapeleta.propietarioDni || 'S/D'}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400">Conductor Infractor</p>
+                      <p className="text-slate-400">Infractor</p>
                       <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.conductorNombre || selectedPapeleta.infractor}</p>
                       <p className="font-mono text-[11px] text-slate-400">DNI: {selectedPapeleta.conductorDni || 'S/D'}</p>
                     </div>
@@ -714,15 +882,14 @@ export function Papeletas() {
                   <div className="grid gap-3 text-xs sm:grid-cols-2">
                     <div>
                       <p className="text-slate-400">Estado</p>
-                      <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${
-                        selectedPapeleta.firmaConductorEstado === 'FIRMADO'
+                      <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${selectedPapeleta.firmaConductorEstado === 'FIRMADO'
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
                           : selectedPapeleta.firmaConductorEstado === 'SE_NEGO_A_FIRMAR'
                             ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
                             : selectedPapeleta.firmaConductorEstado === 'NO_PRESENTE'
                               ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                               : 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
-                      }`}>
+                        }`}>
                         <span className="size-2 rounded-full bg-current" />
                         {selectedPapeleta.firmaConductorEstado || 'PENDIENTE'}
                       </span>
@@ -764,6 +931,78 @@ export function Papeletas() {
         </div>
       )}
 
+      {reporteToConvert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <form onSubmit={handleConvertReporte} className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-emerald-50 px-6 py-4 dark:border-slate-800 dark:bg-emerald-950/30">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">Generar papeleta desde reporte</h3>
+                <p className="text-xs font-bold text-slate-500">Si no ingresas DNI, quedará como CONDUCTOR NO PRESENTE.</p>
+              </div>
+              <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-full p-1 text-slate-400 hover:bg-white">✕</button>
+            </div>
+            <div className="space-y-4 p-6">
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                <p><strong>Reporte:</strong> #{reporteToConvert.id} · {reporteToConvert.placa_visual || 'SIN PLACA'}</p>
+                <p><strong>Lugar:</strong> {reporteToConvert.lugar}</p>
+                <p><strong>Observación:</strong> {reporteToConvert.observaciones}</p>
+              </div>
+              <label className="block space-y-1">
+                <span className="text-xs font-black uppercase text-slate-400">Vehículo identificado</span>
+                <select required value={convertForm.vehiculoId} onChange={(e) => setConvertForm({ ...convertForm, vehiculoId: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold">
+                  <option value="">Selecciona vehículo</option>
+                  {vehiculos.map((v) => (
+                    <option key={v.id} value={v.id}>{v.placa} — {v.marca || ''} {v.modelo || ''}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-black uppercase text-slate-400">Infracción</span>
+                <select required value={convertForm.tipoInfraccionId} onChange={(e) => setConvertForm({ ...convertForm, tipoInfraccionId: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold">
+                  <option value="">Selecciona infracción</option>
+                  {tiposInfraccion.map((tipo) => (
+                    <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-black uppercase text-slate-400">DNI del infractor/intervenido opcional</span>
+                <input value={convertForm.conductorDni} onChange={(e) => setConvertForm({ ...convertForm, conductorDni: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="Vacío = CONDUCTOR NO PRESENTE" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold" />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-black uppercase text-slate-400">Observación de autoridad</span>
+                <textarea value={convertForm.observacionesAutoridad} onChange={(e) => setConvertForm({ ...convertForm, observacionesAutoridad: e.target.value })} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold" />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+              <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600">Cancelar</button>
+              <button disabled={isProcessingAction} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white disabled:opacity-60">Generar papeleta</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {reporteToReject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <form onSubmit={handleRejectReporte} className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-rose-50 px-6 py-4 dark:border-slate-800 dark:bg-rose-950/30">
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Rechazar reporte #{reporteToReject.id}</h3>
+              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-full p-1 text-slate-400 hover:bg-white">✕</button>
+            </div>
+            <div className="space-y-3 p-6">
+              <label className="block space-y-1">
+                <span className="text-xs font-black uppercase text-slate-400">Motivo</span>
+                <textarea required value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} rows={4} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold" placeholder="Ej. Foto insuficiente, placa ilegible, no procede..." />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600">Cancelar</button>
+              <button disabled={isProcessingAction} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-black text-white disabled:opacity-60">Rechazar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {isPagarModalOpen && papeletaToAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-emerald-500/30 dark:border-emerald-500/20">
@@ -783,7 +1022,7 @@ export function Papeletas() {
             <div className="p-6 space-y-4">
               <div className="rounded-2xl bg-emerald-50/50 p-4 border border-emerald-200/60 dark:bg-emerald-950/20 dark:border-emerald-900/40 text-xs space-y-2">
                 <div className="flex justify-between">
-                  <span className="font-bold text-slate-500 dark:text-slate-400">Conductor:</span>
+                  <span className="font-bold text-slate-500 dark:text-slate-400">Infractor:</span>
                   <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.conductorNombre || papeletaToAction.infractor}</span>
                 </div>
                 <div className="flex justify-between">
@@ -914,7 +1153,7 @@ export function Papeletas() {
                   <span>{selectedPapeleta.vehiculoPlaca}</span>
                 </div>
                 <div>
-                  <span className="font-bold">CONDUCTOR:</span>
+                  <span className="font-bold">INFRACTOR:</span>
                   <p className="break-words uppercase">{selectedPapeleta.infractor}</p>
                 </div>
                 <div>
@@ -948,7 +1187,7 @@ export function Papeletas() {
                 <span className="font-black text-sm uppercase">Total a Pagar:</span>
                 <span className="font-black text-sm">S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
               </div>
-              
+
               <div className="text-center mt-1">
                 <span className="text-[10px] uppercase block">Estado: {selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado}</span>
               </div>
@@ -977,11 +1216,11 @@ export function Papeletas() {
       )}
 
       {selectedInfraccion && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter"
           onClick={() => setSelectedInfraccion(null)}
         >
-          <div 
+          <div
             className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1021,13 +1260,12 @@ export function Papeletas() {
                 <div className="text-right">
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Gravedad</span>
                   <div className="mt-0.5">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black ${
-                      selectedInfraccion.gravedad === 'MUY GRAVE'
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black ${selectedInfraccion.gravedad === 'MUY GRAVE'
                         ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-900'
                         : selectedInfraccion.gravedad === 'GRAVE'
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-900'
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-900'
-                    }`}>
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-900'
+                          : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-900'
+                      }`}>
                       {selectedInfraccion.gravedad}
                     </span>
                   </div>

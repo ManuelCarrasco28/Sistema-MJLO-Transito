@@ -86,7 +86,20 @@ scenario('Trámite: importe del procedimiento administrativo', function ($db, $s
     check((float)$pago['total'] === 45.0 && $pago['id_papeleta'] === null, 'Origen de trámite incorrecto.');
 });
 scenario('UIT exige el año exacto y no utiliza otro año silenciosamente', function ($db) {
-    $db->table('uits')->insert(['anio' => 2200, 'valor' => 1000]);
+    $db->table('municipalidad')->insert([
+        'ruc' => '20999999991',
+        'razon_social' => 'Municipalidad de prueba',
+        'direccion_fiscal' => 'Dirección de prueba',
+        'departamento' => 'Lambayeque',
+        'provincia' => 'Chiclayo',
+        'distrito' => 'José Leonardo Ortiz',
+        'telefono' => '000000000',
+        'email' => 'prueba@muni.gob.pe',
+        'mesa_partes' => 'Mesa de partes',
+        'estado' => 'ACTIVO',
+    ]);
+    $municipalidad = $db->insertID();
+    $db->table('municipalidad_anio')->insert(['id_municipalidad' => $municipalidad, 'nombre' => 'Año prueba', 'anio' => '2200', 'uit' => 1000]);
     $service = new \App\Services\Multas($db);
     check($service->monto(['porcentaje_uit' => 1.5], 2200) === 15.0, 'Cálculo incorrecto.');
     rejects(fn() => $service->uit(2201));

@@ -37,7 +37,7 @@ class VehiculosController extends ResourceController
                 COALESCE(c.apellido_paterno, '') AS propietarioPaterno,
                 COALESCE(c.apellido_materno, '') AS propietarioMaterno,
                 COALESCE(p.numero, '') AS propietarioDni,
-                v.estado_formalizacion AS estado,
+                CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END AS estado,
                 CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END AS formalidad
             ", false)
             ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
@@ -173,10 +173,6 @@ class VehiculosController extends ResourceController
             }
         }
 
-        $estadoFormalizacion = !empty($input['estado']) && in_array(strtoupper($input['estado']), ['SUSPENDIDO', 'BAJA'])
-            ? strtoupper($input['estado'])
-            : ($asociacionId ? 'FORMAL' : 'INFORMAL');
-
         $qrCode = $input['codigoQr'] ?? ('QR-VEH-' . date('Y') . '-' . str_pad(random_int(100, 999), 3, '0', STR_PAD_LEFT));
 
         $record = [
@@ -195,58 +191,30 @@ class VehiculosController extends ResourceController
             'partida_registral'    => trim($input['partidaRegistral'] ?? ''),
             'codigo_qr'            => $qrCode,
             'id_asociacion'        => $asociacionId,
-            'estado_formalizacion' => $estadoFormalizacion,
         ];
-
-        $db->table('vehiculos')->insert($record);
-        $vehiculoId = (int)$db->insertID();
-
 
         $propietarioNombre = trim($input['propietario'] ?? '');
         $propietarioDni = trim($input['propietarioDni'] ?? '');
 
-        if ($propietarioDni !== '' || $propietarioNombre !== '') {
-            $personaId = null;
-            if ($propietarioDni !== '') {
-                $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
-                if ($personaRow) {
-                    $personaId = (int)$personaRow['id'];
-                }
-            }
-
-            if (!$personaId && ($propietarioNombre !== '' || $propietarioDni !== '')) {
-                $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', 'DNI')->get()->getRowArray();
-                $tipoDocId = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
-
-                $numDoc = $propietarioDni ?: (string)random_int(10000000, 99999999);
-                $db->table('personas')->insert([
-                    'id_tipo_documento' => $tipoDocId,
-                    'numero'            => $numDoc,
-                    'estado'            => 'ACTIVO',
-                ]);
-                $personaId = (int)$db->insertID();
-
-                $names = preg_split('/\s+/', $propietarioNombre ?: 'Ciudadano Titular');
-                $paterno = count($names) > 1 ? array_pop($names) : 'Titular';
-                $nombres = implode(' ', $names) ?: ($propietarioNombre ?: 'Ciudadano');
-
-                $db->table('ciudadanos')->insert([
-                    'id_persona'       => $personaId,
-                    'nombres'          => $nombres,
-                    'apellido_paterno' => $paterno,
-                    'apellido_materno' => '',
-                ]);
-            }
-
-            if ($personaId) {
-                $db->table('vehiculo_propietarios')->insert([
-                    'id_vehiculo'  => $vehiculoId,
-                    'id_persona'   => $personaId,
-                    'fecha_inicio' => date('Y-m-d'),
-                    'estado'       => 'ACTIVO',
-                ]);
-            }
+        if ($propietarioDni === '') {
+            return $this->failValidationErrors('Debe seleccionar un propietario registrado en Personas.');
         }
+
+        $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
+        if (!$personaRow) {
+            return $this->failValidationErrors('El propietario no existe. Regístrelo primero en el módulo Personas.');
+        }
+        $personaId = (int)$personaRow['id'];
+
+        $db->table('vehiculos')->insert($record);
+        $vehiculoId = (int)$db->insertID();
+
+        $db->table('vehiculo_propietarios')->insert([
+            'id_vehiculo'  => $vehiculoId,
+            'id_persona'   => $personaId,
+            'fecha_inicio' => date('Y-m-d'),
+            'estado'       => 'ACTIVO',
+        ]);
 
         $newVehiculo = [
             'id'               => $vehiculoId,
@@ -268,7 +236,7 @@ class VehiculosController extends ResourceController
             'asociacion'     => $asociacionId ? $orgName : null,
             'propietario'      => $propietarioNombre ?: 'Sin Propietario',
             'propietarioDni'   => $propietarioDni,
-            'estado'           => $record['estado_formalizacion'],
+            'estado'           => $asociacionId ? 'FORMAL' : 'INFORMAL',
             'formalidad'       => $asociacionId ? 'FORMAL' : 'INFORMAL',
             'soatEstado'       => $input['soatEstado'] ?? 'VIGENTE',
             'tucNumero'        => $input['tucNumero'] ?? ('TUC-2026-' . str_pad($vehiculoId, 3, '0', STR_PAD_LEFT)),
@@ -313,17 +281,6 @@ class VehiculosController extends ResourceController
                 }
             }
             $record['id_asociacion'] = $asociacionId;
-            if (!isset($input['estado']) || !in_array(strtoupper($input['estado']), ['SUSPENDIDO', 'BAJA'])) {
-                $record['estado_formalizacion'] = $asociacionId ? 'FORMAL' : 'INFORMAL';
-            }
-        }
-
-        if (isset($input['estado'])) {
-            $actual = $db->table('vehiculos')->where('id', $id)->get()->getRowArray();
-            if (!$actual) return $this->failNotFound('Vehículo no encontrado.');
-            $association = array_key_exists('id_asociacion', $record) ? $record['id_asociacion'] : $actual['id_asociacion'];
-            $record['estado_formalizacion'] = in_array(strtoupper($input['estado']), ['SUSPENDIDO', 'BAJA'], true)
-                ? strtoupper($input['estado']) : ($association ? 'FORMAL' : 'INFORMAL');
         }
 
         if (!empty($input['tipo'])) {
@@ -352,42 +309,19 @@ class VehiculosController extends ResourceController
 
         $propietarioNombre = trim($input['propietario'] ?? '');
         $propietarioDni = trim($input['propietarioDni'] ?? '');
-        if ($propietarioDni !== '' || $propietarioNombre !== '') {
-            $personaId = null;
-            if ($propietarioDni !== '') {
-                $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
-                if ($personaRow) $personaId = (int)$personaRow['id'];
+        if ($propietarioDni !== '') {
+            $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
+            if (!$personaRow) {
+                return $this->failValidationErrors('El propietario no existe. Regístrelo primero en el módulo Personas.');
             }
-            if (!$personaId && ($propietarioNombre !== '' || $propietarioDni !== '')) {
-                $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', 'DNI')->get()->getRowArray();
-                $tipoDocId = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
-                $numDoc = $propietarioDni ?: (string)random_int(10000000, 99999999);
-                $db->table('personas')->insert([
-                    'id_tipo_documento' => $tipoDocId,
-                    'numero'            => $numDoc,
-                    'estado'            => 'ACTIVO',
-                ]);
-                $personaId = (int)$db->insertID();
-
-                $names = preg_split('/\s+/', $propietarioNombre ?: 'Ciudadano Titular');
-                $paterno = count($names) > 1 ? array_pop($names) : 'Titular';
-                $nombres = implode(' ', $names) ?: ($propietarioNombre ?: 'Ciudadano');
-                $db->table('ciudadanos')->insert([
-                    'id_persona'       => $personaId,
-                    'nombres'          => $nombres,
-                    'apellido_paterno' => $paterno,
-                    'apellido_materno' => '',
-                ]);
-            }
-            if ($personaId) {
-                $db->table('vehiculo_propietarios')->where('id_vehiculo', $id)->delete();
-                $db->table('vehiculo_propietarios')->insert([
-                    'id_vehiculo'  => $id,
-                    'id_persona'   => $personaId,
-                    'fecha_inicio' => date('Y-m-d'),
-                    'estado'       => 'ACTIVO',
-                ]);
-            }
+            $personaId = (int)$personaRow['id'];
+            $db->table('vehiculo_propietarios')->where('id_vehiculo', $id)->delete();
+            $db->table('vehiculo_propietarios')->insert([
+                'id_vehiculo'  => $id,
+                'id_persona'   => $personaId,
+                'fecha_inicio' => date('Y-m-d'),
+                'estado'       => 'ACTIVO',
+            ]);
         }
 
         return $this->respond(['status' => true, 'message' => 'Vehículo actualizado con éxito']);

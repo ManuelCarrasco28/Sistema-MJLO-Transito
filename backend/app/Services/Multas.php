@@ -11,12 +11,24 @@ class Multas
 
     public function uit(int $anio): float
     {
-        if (!$this->db->tableExists('uits')) {
-            return 5150.0;
+        if (!$this->db->tableExists('municipalidad_anio')) {
+            throw new DomainException('Falta crear la tabla municipalidad_anio para configurar la UIT.');
         }
-        $row = $this->db->table('uits')->where('anio', $anio)->get()->getRowArray();
-        if (!$row || (float)$row['valor'] <= 0) throw new DomainException("Falta configurar la UIT del año $anio.");
-        return (float)$row['valor'];
+
+        $row = $this->db->table('municipalidad_anio ma')
+            ->select('ma.uit')
+            ->join('municipalidad m', 'm.id = ma.id_municipalidad', 'inner')
+            ->where('ma.anio', (string)$anio)
+            ->where('m.estado', 'ACTIVO')
+            ->orderBy('ma.id', 'DESC')
+            ->get()
+            ->getRowArray();
+
+        if (!$row || (float)$row['uit'] <= 0) {
+            throw new DomainException("Falta configurar la UIT del año $anio.");
+        }
+
+        return (float)$row['uit'];
     }
 
     public function monto(array $infraccion, int $anio): float

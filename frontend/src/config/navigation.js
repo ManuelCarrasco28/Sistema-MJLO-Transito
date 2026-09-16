@@ -1,9 +1,15 @@
 export const navigationGroups = [
   {
-    name: 'Administración',
-    adminOnly: true,
+    name: 'Super Admin',
+    superAdminOnly: true,
     items: [
-      { id: 'admin', label: 'Panel Administración', icon: 'shieldCheck', path: '/admin' }
+      { id: 'superadmin', label: 'Dashboard Super Admin', icon: 'shieldCheck', path: '/superadmin' },
+      { id: 'superadmin-usuarios', label: 'Gestión de usuarios', icon: 'people', path: '/superadmin/usuarios' },
+      { id: 'superadmin-roles', label: 'Roles y permisos', icon: 'shieldCheck', path: '/superadmin/roles' },
+      { id: 'superadmin-configuracion', label: 'Configuración', icon: 'settings', path: '/superadmin/configuracion' },
+      { id: 'superadmin-auditoria', label: 'Auditoría y logs', icon: 'document', path: '/superadmin/auditoria' },
+      { id: 'superadmin-catalogos', label: 'Catálogos maestros', icon: 'folderShield', path: '/superadmin/catalogos' },
+      { id: 'superadmin-respaldo', label: 'Respaldo', icon: 'lock', path: '/superadmin/respaldo' }
     ]
   },
   {

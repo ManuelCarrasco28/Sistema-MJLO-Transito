@@ -8,10 +8,16 @@ import { apiFetch, getCachedData, setCachedData } from '../config/api'
 export function Vehiculos() {
   const cachedVeh = getCachedData('/vehiculos')
   const cachedOrg = getCachedData('/asociaciones')
+  const cachedPersonas = getCachedData('/personas')
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
   const [asociaciones, setAsociaciones] = useState(cachedOrg || [])
+  const [personas, setPersonas] = useState(cachedPersonas || [])
   const [isLoading, setIsLoading] = useState(!cachedVeh)
   const [searchTerm, setSearchTerm] = useState('')
+  const [propietarioSearch, setPropietarioSearch] = useState('')
+  const [showPropietarioResults, setShowPropietarioResults] = useState(false)
+  const [asociacionSearch, setAsociacionSearch] = useState('')
+  const [showAsociacionResults, setShowAsociacionResults] = useState(false)
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
@@ -48,17 +54,77 @@ export function Vehiculos() {
   useEffect(() => {
     Promise.all([
       apiFetch('/vehiculos').then((response) => response.ok ? response.json() : Promise.reject(response)),
-      apiFetch('/asociaciones').then((response) => response.ok ? response.json() : Promise.reject(response))
-    ]).then(([vehPayload, orgPayload]) => {
+      apiFetch('/asociaciones').then((response) => response.ok ? response.json() : Promise.reject(response)),
+      apiFetch('/personas').then((response) => response.ok ? response.json() : Promise.reject(response))
+    ]).then(([vehPayload, orgPayload, personasPayload]) => {
       const vData = vehPayload.data ?? []
       const oData = orgPayload.data ?? []
+      const pData = personasPayload.data ?? []
       setVehiculos(vData)
       setAsociaciones(oData)
+      setPersonas(pData)
       setCachedData('/vehiculos', vData)
       setCachedData('/asociaciones', oData)
+      setCachedData('/personas', pData)
     }).catch(() => { })
       .finally(() => setIsLoading(false))
   }, [])
+
+  const getPersonaNombre = (persona) => (
+    persona.nombreCompleto ||
+    `${persona.nombres || ''} ${persona.apellidoPaterno || persona.apellido_paterno || ''} ${persona.apellidoMaterno || persona.apellido_materno || ''}`.trim()
+  )
+
+  const propietarioResults = personas
+    .filter((persona) => {
+      const query = propietarioSearch.trim().toLowerCase()
+      if (!query) return true
+      const documento = String(persona.numeroDocumento || '').toLowerCase()
+      const nombre = getPersonaNombre(persona).toLowerCase()
+      return documento.includes(query) || nombre.includes(query)
+    })
+    .slice(0, 8)
+
+  const selectPropietario = (persona) => {
+    const documento = String(persona.numeroDocumento || '')
+    const nombre = getPersonaNombre(persona)
+    setFormData({
+      ...formData,
+      propietarioDni: documento,
+      propietario: nombre
+    })
+    setPropietarioSearch(`${documento} — ${nombre}`)
+    setShowPropietarioResults(false)
+  }
+
+  const asociacionResults = asociaciones
+    .filter((org) => {
+      const query = asociacionSearch.trim().toLowerCase()
+      if (!query) return true
+      return `${org.razonSocial || ''} ${org.ruc || ''} ${org.partidaRegistral || ''}`.toLowerCase().includes(query)
+    })
+    .slice(0, 8)
+
+  const selectAsociacion = (org) => {
+    const nombre = org?.razonSocial || ''
+    setFormData({
+      ...formData,
+      asociacion: nombre,
+      estado: formData.estado === 'SUSPENDIDO' || formData.estado === 'BAJA' ? formData.estado : (nombre ? 'FORMAL' : 'INFORMAL')
+    })
+    setAsociacionSearch(nombre)
+    setShowAsociacionResults(false)
+  }
+
+  const clearAsociacion = () => {
+    setFormData({
+      ...formData,
+      asociacion: '',
+      estado: formData.estado === 'SUSPENDIDO' || formData.estado === 'BAJA' ? formData.estado : 'INFORMAL'
+    })
+    setAsociacionSearch('')
+    setShowAsociacionResults(false)
+  }
 
   const isVehiculoFormal = (v) => Boolean(
     v?.asociacionId || 
@@ -159,6 +225,10 @@ export function Vehiculos() {
   }
 
   const handleOpenCreateModal = () => {
+    setPropietarioSearch('')
+    setShowPropietarioResults(false)
+    setAsociacionSearch('')
+    setShowAsociacionResults(false)
     setFormData({
       placa: '',
       tipo: 'Mototaxi (Trimovil)',
@@ -173,10 +243,10 @@ export function Vehiculos() {
       numeroSerie: '',
       serieMotor: '',
       partidaRegistral: '',
-      asociacion: asociaciones[0]?.razonSocial || '',
+      asociacion: '',
       propietario: '',
       propietarioDni: '',
-      estado: asociaciones[0]?.razonSocial ? 'FORMAL' : 'INFORMAL',
+      estado: 'INFORMAL',
       soatEstado: 'VIGENTE',
       tucNumero: `TUC-2026-${Math.floor(100 + Math.random() * 900)}`,
     })
@@ -188,9 +258,15 @@ export function Vehiculos() {
 
   const handleOpenEditModal = (vehiculo) => {
     setSelectedVehiculo(vehiculo)
+    setPropietarioSearch(vehiculo.propietarioDni ? `${vehiculo.propietarioDni} — ${vehiculo.propietario || ''}` : '')
+    setShowPropietarioResults(false)
+    setAsociacionSearch(isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '')
+    setShowAsociacionResults(false)
     setFormData({ 
       ...vehiculo,
       asociacion: isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '',
+      propietarioDni: vehiculo.propietarioDni || '',
+      propietario: vehiculo.propietario || '',
       estado: vehiculo.estado === 'SUSPENDIDO' || vehiculo.estado === 'BAJA' 
         ? vehiculo.estado 
         : (isVehiculoFormal(vehiculo) ? 'FORMAL' : 'INFORMAL')
@@ -219,8 +295,8 @@ export function Vehiculos() {
     e.preventDefault()
     // Validaciones
     const placaClean = formData.placa.trim().toUpperCase()
-    if (!placaClean || !formData.propietario.trim()) {
-      alert('Por favor completa los campos requeridos (Placa y Propietario).')
+    if (!placaClean || !formData.propietarioDni.trim()) {
+      alert('Por favor completa los campos requeridos (Placa y Propietario registrado).')
       return
     }
     if (placaClean.length < 6) {
@@ -235,24 +311,26 @@ export function Vehiculos() {
 
     try {
       if (isEditing) {
-        await apiFetch(`/vehiculos/${selectedVehiculo.id}`, {
+        const res = await apiFetch(`/vehiculos/${selectedVehiculo.id}`, {
           method: 'PUT',
           body: formData,
         })
+        const resData = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(resData.messages?.error || resData.message || 'No se pudo actualizar el vehículo.')
         setVehiculos(vehiculos.map((v) => (v.id === selectedVehiculo.id ? { ...v, ...formData, id: v.id } : v)))
       } else {
         const res = await apiFetch('/vehiculos', {
           method: 'POST',
           body: formData,
         })
-        const resData = await res.json()
-        if (!res.ok || !resData.data?.id) throw new Error('No se pudo registrar el vehículo.')
+        const resData = await res.json().catch(() => ({}))
+        if (!res.ok || !resData.data?.id) throw new Error(resData.messages?.error || resData.message || 'No se pudo registrar el vehículo.')
         const newVehiculo = resData.data
         setVehiculos([newVehiculo, ...vehiculos])
       }
       setIsModalOpen(false)
     } catch (err) {
-      alert('Error al guardar el vehículo en el servidor.')
+      alert(err.message || 'Error al guardar el vehículo en el servidor.')
     }
   }
 
@@ -610,8 +688,8 @@ export function Vehiculos() {
 
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-slate-950/70 backdrop-blur-xs animate-enter sm:p-4">
+          <div className="w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between border-b border-blue-900/20 bg-[#123b6d] px-6 py-4.5 text-white dark:border-slate-800 dark:bg-[#102a4d]">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-cyan-300">
@@ -633,7 +711,16 @@ export function Vehiculos() {
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+            <form
+              onSubmit={handleFormSubmit}
+              onMouseDown={(event) => {
+                if (!event.target.closest('[data-combobox="vehiculo"]')) {
+                  setShowPropietarioResults(false)
+                  setShowAsociacionResults(false)
+                }
+              }}
+              className="no-scrollbar max-h-[calc(96vh-88px)] space-y-5 overflow-y-auto p-5 sm:p-6"
+            >
 
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3 flex items-center gap-2">
@@ -641,7 +728,7 @@ export function Vehiculos() {
                   Identificación de la Unidad
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
+                  <div data-combobox="vehiculo" className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
                     <input
                       id="veh_placa"
                       type="text"
@@ -659,7 +746,7 @@ export function Vehiculos() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
+                  <div data-combobox="vehiculo" className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
                     <select
                       id="veh_tipo"
                       value={formData.tipo}
@@ -678,7 +765,7 @@ export function Vehiculos() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
+                  <div data-combobox="vehiculo" className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
                     <input
                       id="veh_marca"
                       type="text"
@@ -695,7 +782,7 @@ export function Vehiculos() {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
+                  <div data-combobox="vehiculo" className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
                     <input
                       id="veh_modelo"
                       type="text"
@@ -882,72 +969,140 @@ export function Vehiculos() {
                   <span className="size-2 rounded-full bg-emerald-500" />
                   Titular & Asociación Autorizada
                 </h4>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-2">
                   <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
                     <input
                       id="veh_propietario"
-                      type="text"
                       required
-                      placeholder=" "
-                      value={formData.propietario}
-                      onChange={(e) => setFormData({ ...formData, propietario: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
+                      type="text"
+                      placeholder="Escribe DNI o nombre del propietario..."
+                      value={propietarioSearch}
+                      onFocus={() => setShowPropietarioResults(true)}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setPropietarioSearch(value)
+                        setFormData({
+                          ...formData,
+                          propietarioDni: '',
+                          propietario: ''
+                        })
+                        setShowPropietarioResults(true)
+                      }}
+                      className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 text-sm font-bold text-slate-800 outline-none dark:text-white"
                     />
                     <label
                       htmlFor="veh_propietario"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
+                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
                     >
-                      Nombre Completo del Propietario
+                      Propietario registrado en Personas
                     </label>
+                    {showPropietarioResults && (
+                      <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                        {propietarioResults.length ? (
+                          propietarioResults.map((persona) => {
+                            const documento = persona.numeroDocumento || ''
+                            const nombre = getPersonaNombre(persona)
+                            return (
+                              <button
+                                key={persona.id || documento}
+                                type="button"
+                                onMouseDown={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  selectPropietario(persona)
+                                }}
+                                className="flex w-full flex-col rounded-xl px-3 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-slate-800"
+                              >
+                                <span className="font-mono text-xs font-black text-blue-700 dark:text-blue-300">{documento}</span>
+                                <span className="truncate text-sm font-bold text-slate-800 dark:text-white">{nombre || 'Sin nombre'}</span>
+                              </button>
+                            )
+                          })
+                        ) : (
+                          <div className="px-3 py-3 text-sm font-semibold text-amber-600">
+                            No se encontró una persona con ese DNI o nombre. Regístrala primero en Personas.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {formData.propietarioDni && (
+                      <p className="px-3.5 pb-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                        Seleccionado: {formData.propietarioDni} — {formData.propietario}
+                      </p>
+                    )}
+                    {!personas.length && (
+                      <p className="px-3.5 pb-2 text-xs font-semibold text-amber-600">
+                        No hay personas cargadas. Registra primero al propietario en el módulo Personas.
+                      </p>
+                    )}
                   </div>
 
                   <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
                     <input
-                      id="veh_dni"
-                      type="text"
-                      placeholder=" "
-                      value={formData.propietarioDni}
-                      onChange={(e) => setFormData({ ...formData, propietarioDni: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_dni"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      DNI / RUC del Propietario
-                    </label>
-                  </div>
-
-                  <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <select
                       id="veh_org"
-                      value={formData.asociacion || ''}
+                      type="text"
+                      placeholder="Escribe nombre o RUC de la asociación..."
+                      value={asociacionSearch}
+                      onFocus={() => setShowAsociacionResults(true)}
                       onChange={(e) => {
-                        const val = e.target.value
-                        const formal = Boolean(val && val !== 'Sin Asociación (Informal)')
+                        const value = e.target.value
+                        setAsociacionSearch(value)
                         setFormData({
                           ...formData,
-                          asociacion: val,
-                          estado: formData.estado === 'SUSPENDIDO' || formData.estado === 'BAJA'
-                            ? formData.estado
-                            : (formal ? 'FORMAL' : 'INFORMAL')
+                          asociacion: '',
+                          estado: formData.estado === 'SUSPENDIDO' || formData.estado === 'BAJA' ? formData.estado : 'INFORMAL'
                         })
+                        setShowAsociacionResults(true)
                       }}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    >
-                      <option value="">Sin Asociación (Informal)</option>
-                      {asociaciones.map((org) => (
-                        <option key={org.id} value={org.razonSocial}>
-                          {org.razonSocial} ({org.siglas})
-                        </option>
-                      ))}
-                    </select>
+                      className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 text-sm font-semibold text-slate-800 outline-none dark:text-white"
+                    />
                     <label
                       htmlFor="veh_org"
                       className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
                     >
                       Empresa o Asociación (Define Formal / Informal)
                     </label>
+                    {showAsociacionResults && (
+                      <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-40 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                        {asociacionResults.length ? (
+                          asociacionResults.map((org) => (
+                            <button
+                              key={org.id || org.ruc || org.razonSocial}
+                              type="button"
+                              onMouseDown={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                selectAsociacion(org)
+                              }}
+                              className="flex w-full flex-col rounded-xl px-3 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-slate-800"
+                            >
+                              <span className="truncate text-sm font-bold text-slate-800 dark:text-white">{org.razonSocial}</span>
+                              <span className="font-mono text-xs font-black text-blue-700 dark:text-blue-300">RUC: {org.ruc || 'S/D'}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-3 text-sm font-semibold text-amber-600">
+                            No se encontró asociación. Si el vehículo no pertenece a una asociación, déjalo vacío.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-2 px-3.5 pb-2 text-xs">
+                      {formData.asociacion ? (
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                          Formal: {formData.asociacion}
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-amber-600">
+                          Sin asociación: vehículo informal
+                        </span>
+                      )}
+                      {formData.asociacion && (
+                        <button type="button" onClick={clearAsociacion} className="font-bold text-rose-500 hover:text-rose-700">
+                          Quitar asociación
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -982,7 +1137,7 @@ export function Vehiculos() {
               </div>
 
 
-              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div className="sticky bottom-0 z-30 -mx-5 flex items-center justify-end gap-3 border-t border-slate-100 bg-white/95 px-5 pt-4 pb-1 backdrop-blur-sm dark:border-slate-800 dark:bg-[#0f172a]/95 sm:-mx-6 sm:px-6">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}

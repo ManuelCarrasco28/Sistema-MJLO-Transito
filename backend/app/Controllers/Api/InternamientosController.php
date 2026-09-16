@@ -22,7 +22,7 @@ class InternamientosController extends ResourceController
                     COALESCE(v.marca, '') as vehiculoMarca,
                     COALESCE(v.modelo, '') as vehiculoModelo,
                     COALESCE(v.color, '') as vehiculoColor,
-                    COALESCE(v.estado_formalizacion, 'INFORMAL') as vehiculoFormalidad,
+                    CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END as vehiculoFormalidad,
                     COALESCE(aso.razon_social, 'Sin Asociación (Informal)') as vehiculoAsociacion,
                     p.numero_papeleta as numeroPapeleta,
                     p.monto_total as montoPapeleta,
