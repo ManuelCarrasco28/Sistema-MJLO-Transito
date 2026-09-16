@@ -146,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 24),
 
                     Text(
-                      'CÓDIGO DE INSPECTOR (CIP)',
+                      'Usuario',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

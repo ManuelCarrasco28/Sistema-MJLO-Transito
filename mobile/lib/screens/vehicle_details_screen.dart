@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 import 'issue_ticket_screen.dart';
+import 'person_history_screen.dart';
 
 class VehicleDetailsScreen extends StatefulWidget {
   final String searchQuery;
@@ -109,10 +110,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
 
   Widget _buildErrorState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(24),
@@ -139,6 +141,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
             )
           ],
         ),
+      ),
       ),
     );
   }
@@ -203,6 +206,25 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
             _buildInfoRow('Nombre', _vehicleData!['propietario']),
             _buildDivider(),
             _buildInfoRow('Documento', _vehicleData!['propietarioDni']),
+            _buildDivider(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: const Icon(Icons.history, color: AppTheme.primaryBlue),
+                label: const Text('Ver Historial de Multas', style: TextStyle(color: AppTheme.primaryBlue, fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PersonHistoryScreen(
+                        dni: _vehicleData!['propietarioDni'].toString(),
+                        nombre: _vehicleData!['propietario'].toString(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ]),
 
           const SizedBox(height: 24),

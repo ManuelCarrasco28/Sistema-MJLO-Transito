@@ -262,10 +262,45 @@ class PapeletasController extends ResourceController
                 ]);
                 $vehiculoId = (int)$db->insertID();
                 $placa = $placaRegistro;
+
+                // Si se proporcionaron datos del dueño, vincularlo al vehículo
+                $duenoDni = trim($input['duenoDni'] ?? '');
+                if ($duenoDni !== '') {
+                    $duenoPersona = $db->table('personas')->where('numero', $duenoDni)->limit(1)->get()->getRowArray();
+                    $duenoId = null;
+                    if ($duenoPersona) {
+                        $duenoId = (int)$duenoPersona['id'];
+                    } else {
+                        $duenoApellidos = preg_split('/\s+/', trim($input['duenoApellidos'] ?? '')) ?: [];
+                        $db->table('personas')->insert([
+                            'id_tipo_documento' => 1,
+                            'numero' => $duenoDni,
+                            'estado' => 'ACTIVO',
+                        ]);
+                        $duenoId = (int)$db->insertID();
+                        $db->table('ciudadanos')->insert([
+                            'id_persona' => $duenoId,
+                            'nombres' => trim($input['duenoNombres'] ?? 'NO REGISTRADO'),
+                            'apellido_paterno' => $duenoApellidos[0] ?? 'NO REGISTRADO',
+                            'apellido_materno' => isset($duenoApellidos[1]) ? implode(' ', array_slice($duenoApellidos, 1)) : null,
+                        ]);
+                    }
+                    $db->table('vehiculo_propietarios')->insert([
+                        'id_vehiculo'  => $vehiculoId,
+                        'id_persona'   => $duenoId,
+                        'fecha_inicio' => date('Y-m-d'),
+                        'estado'       => 'ACTIVO',
+                    ]);
+                }
             }
 
             $personaId = null;
-            if ($conductorDni !== '') {
+            $fuga = $input['fuga'] ?? false;
+            
+            if ($fuga) {
+                // Si hubo fuga, el infractor pasa a ser el dueño (si se registró)
+                $personaId = $duenoId ?? null;
+            } else if ($conductorDni !== '') {
                 $persona = $db->table('personas')->where('numero', $conductorDni)->limit(1)->get()->getRowArray();
                 if ($persona) {
                     $personaId = (int)$persona['id'];

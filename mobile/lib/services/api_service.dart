@@ -8,7 +8,7 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Local / Wi-Fi: Cambia esta IP si tu amigo o tú tienen otra IP en la red
   // 2. Producción: Puedes pasar --dart-define=API_URL=https://api.tudominio.com/api
-  static const String _defaultUrl = 'http://127.0.0.1:8080/api';
+  static const String _defaultUrl = 'http://10.207.78.109:8080/api';
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb ? 'http://127.0.0.1:8080/api' : _configuredUrl;
@@ -107,6 +107,18 @@ class ApiService {
       return data['data'] ?? [];
     }
     return [];
+  }
+
+  static Future<Map<String, dynamic>?> getPersonaByDni(String dni) async {
+    final response = await http.get(Uri.parse('$baseUrl/personas?numeroDocumento=$dni'));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final List<dynamic> list = data['data'] ?? [];
+      if (list.isNotEmpty) {
+        return list.first;
+      }
+    }
+    return null;
   }
 
   static String _extractError(String body, String fallback) {

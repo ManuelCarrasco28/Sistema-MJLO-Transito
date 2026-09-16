@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
@@ -178,7 +179,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   const SizedBox(height: 8),
                   Container(
                     decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300)),
-                    child: Image.network('${ApiService.fileBaseUrl}/${data['firmaConductorImg']}', height: 100, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Text('Error al cargar la firma')),
+                    child: data['firmaConductorImg'].toString().startsWith('data:image')
+                        ? Image.memory(
+                            base64Decode(data['firmaConductorImg'].toString().split(',').last),
+                            height: 100,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Text('Error al cargar la firma'),
+                          )
+                        : Image.network(
+                            '${ApiService.fileBaseUrl}/${data['firmaConductorImg']}',
+                            height: 100,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Text('Error al cargar la firma'),
+                          ),
                   ),
                 ]
               ],

@@ -37,6 +37,34 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   final _nombresConductor = TextEditingController();
   final _apellidosConductor = TextEditingController();
 
+  bool _isSearching = false;
+
+  Future<void> _searchPersona(TextEditingController dniCtrl, TextEditingController nomCtrl, TextEditingController apeCtrl) async {
+    final dni = dniCtrl.text.trim();
+    if (dni.isEmpty) {
+      _showError('Ingrese un DNI para buscar');
+      return;
+    }
+
+    setState(() => _isSearching = true);
+    try {
+      final persona = await ApiService.getPersonaByDni(dni);
+      if (persona != null) {
+        setState(() {
+          nomCtrl.text = persona['nombres'] ?? '';
+          apeCtrl.text = '${persona['apellidoPaterno'] ?? ''} ${persona['apellidoMaterno'] ?? ''}'.trim();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datos encontrados')));
+      } else {
+        _showError('No se encontró a la persona en la base de datos');
+      }
+    } catch (e) {
+      _showError('Error al buscar persona: $e');
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -213,7 +241,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                   ),
                   if (!_conductorEsDueno) ...[
                     const SizedBox(height: 16),
-                    _buildTextField(_dniConductor, 'DNI del Conductor actual', Icons.badge, TextInputType.number),
+                    _buildTextField(_dniConductor, 'DNI del Conductor actual', Icons.badge, TextInputType.number, hasSearch: true, onSearch: () => _searchPersona(_dniConductor, _nombresConductor, _apellidosConductor)),
                     const SizedBox(height: 12),
                     _buildTextField(_nombresConductor, 'Nombres', Icons.person, TextInputType.name),
                     const SizedBox(height: 12),
@@ -253,7 +281,11 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                                       ),
                                       value: _selectedInfraccionesIds[index],
                                       isExpanded: true,
-                                      items: _tiposInfraccion.map((tipo) {
+                                      menuMaxHeight: 400,
+                                      items: _tiposInfraccion.where((tipo) {
+                                        String idStr = tipo['id'].toString();
+                                        return !_selectedInfraccionesIds.contains(idStr) || _selectedInfraccionesIds[index] == idStr;
+                                      }).map((tipo) {
                                         return DropdownMenuItem<String>(
                                           value: tipo['id'].toString(),
                                           child: Text('${tipo['codigo']} - ${tipo['descripcion']} (S/ ${tipo['montoBase']})', overflow: TextOverflow.ellipsis),
@@ -382,31 +414,37 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton.icon(
-                      onPressed: _isSubmitting ? null : _submitTicket,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade700,
-                        foregroundColor: Colors.white,
-                        elevation: 5,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      icon: _isSubmitting ? const SizedBox() : const Icon(Icons.gavel),
-                      label: _isSubmitting
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Emitir Multas Oficiales', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
                 ],
+              ),
+            ),
+      bottomNavigationBar: _isLoading 
+          ? null 
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSubmitting ? null : _submitTicket,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade700,
+                      foregroundColor: Colors.white,
+                      elevation: 5,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    icon: _isSubmitting ? const SizedBox() : const Icon(Icons.gavel),
+                    label: _isSubmitting
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('Emitir Multas Oficiales', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ),
+                ),
               ),
             ),
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, TextInputType type) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, TextInputType type, {bool hasSearch = false, VoidCallback? onSearch}) {
     return TextField(
       controller: controller,
       keyboardType: type,
@@ -414,6 +452,12 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey.shade600),
+        suffixIcon: hasSearch
+            ? IconButton(
+                icon: _isSearching ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(Icons.search, color: AppTheme.primaryBlue),
+                onPressed: _isSearching ? null : onSearch,
+              )
+            : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.white,

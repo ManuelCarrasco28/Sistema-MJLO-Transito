@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
-import 'vehicle_details_screen.dart';
-import 'history_screen.dart';
+import 'qr_scanner_screen.dart';
 import 'register_vehicle_screen.dart';
+import 'history_screen.dart';
+import 'vehicle_details_screen.dart';
+import 'person_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,6 +17,36 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  int _registradasHoy = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      final papeletas = await ApiService.getPapeletas();
+      final todayStr = DateTime.now().toIso8601String().split('T').first;
+      
+      int count = 0;
+      for (var p in papeletas) {
+        final date = p['fechaHora']?.toString() ?? p['fecha_hora']?.toString() ?? p['created_at']?.toString() ?? '';
+        if (date.startsWith(todayStr)) {
+          count++;
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _registradasHoy = count;
+        });
+      }
+    } catch (e) {
+      // Ignorar errores silenciosamente para el dashboard
+    }
+  }
 
   void _logout(BuildContext context) async {
     await ApiService.logout();
@@ -122,6 +154,66 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
             child: const Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPersonHistoryDialog(BuildContext context) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Consulta Historial', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Ingrese el DNI de la persona para buscar su historial de infracciones.', style: TextStyle(color: Colors.black87)),
+            const SizedBox(height: 24),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Número de DNI',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                prefixIcon: const Icon(Icons.badge, color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar', style: TextStyle(color: Colors.grey.shade600)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryBlue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              if (controller.text.trim().isEmpty) return;
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PersonHistoryScreen(
+                    dni: controller.text.trim(),
+                    nombre: 'Consulta por DNI',
+                  ),
+                ),
+              );
+            },
+            child: const Text('Consultar', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -297,42 +389,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    const Text('14', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primaryBlue)),
+                    Text('$_registradasHoy', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primaryBlue)),
                     const SizedBox(width: 4),
                     Text('papeletas', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Pendientes Sinc.', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Text('0', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text('Sincronizado', style: TextStyle(fontSize: 13, color: Colors.green, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ],
@@ -365,14 +424,15 @@ class _HomeScreenState extends State<HomeScreen> {
           subtitle: 'Escaneo de código QR en\nDNI o placas.',
           icon: Icons.qr_code_scanner,
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Función de escáner en desarrollo')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const QrScannerScreen()),
             );
           },
         ),
         _buildActionCard(
           title: 'Registrar Informal',
-          subtitle: 'Registrar vehículo sin\nplaca o mototaxi.',
+          subtitle: 'Registrar vehículo sin\nplaca.',
           icon: Icons.motorcycle,
           onTap: () {
             Navigator.push(
@@ -382,15 +442,10 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
         _buildActionCard(
-          title: 'Historial',
-          subtitle: 'Revisar papeletas del\nturno e informes.',
-          icon: Icons.history,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const HistoryScreen()),
-            );
-          },
+          title: 'Consulta Historial',
+          subtitle: 'Consultar papeletas por persona.',
+          icon: Icons.person_search,
+          onTap: () => _showPersonHistoryDialog(context),
         ),
       ],
     );

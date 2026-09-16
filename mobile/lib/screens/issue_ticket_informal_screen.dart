@@ -35,6 +35,14 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   void initState() {
     super.initState();
     _loadTiposInfraccion();
+    if (widget.reporteData['fuga_direccion'] != null) {
+      _lugar = widget.reporteData['fuga_direccion'];
+    }
+    if (widget.reporteData['fuga_observaciones'] != null && widget.reporteData['fuga_observaciones'].toString().isNotEmpty) {
+      _observaciones = 'FUGA DEL CONDUCTOR. ' + widget.reporteData['fuga_observaciones'];
+    } else if (widget.reporteData['fuga'] == true) {
+      _observaciones = 'FUGA DEL CONDUCTOR.';
+    }
   }
 
   Future<void> _loadTiposInfraccion() async {
@@ -92,14 +100,21 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
         'marcaVehiculo': widget.reporteData['marca_vehiculo'] ?? '',
         'colorVehiculo': widget.reporteData['color_vehiculo'] ?? '',
         'motorVehiculo': widget.reporteData['motor_vehiculo'] ?? '',
-        'infractor': conductorNombre,
+        'infractor': widget.reporteData['fuga'] == true ? 'CONDUCTOR FUGADO / DUEÑO' : (conductorNombre.trim().isEmpty ? 'CONDUCTOR NO IDENTIFICADO' : conductorNombre),
         'conductorDni': widget.reporteData['dni_conductor'] ?? '',
         'conductorNombres': widget.reporteData['nombres_conductor'] ?? '',
         'conductorApellidos': widget.reporteData['apellidos_conductor'] ?? '',
+        'duenoDni': widget.reporteData['dni_dueno'] ?? '',
+        'duenoNombres': widget.reporteData['nombres_dueno'] ?? '',
+        'duenoApellidos': widget.reporteData['apellidos_dueno'] ?? '',
         'lugar': _lugar,
         'infraccionesIds': infraccionesInts,
         'observacionesAutoridad': _observaciones,
         'id_inspector': inspectorId,
+        'fuga': widget.reporteData['fuga'] ?? false,
+        'fugaLatitud': widget.reporteData['fuga_latitud'],
+        'fugaLongitud': widget.reporteData['fuga_longitud'],
+        // 'fugaImagenes': widget.reporteData['fuga_imagenes'], // Pendiente de implementación en backend
       };
 
       final result = await ApiService.createPapeleta(requestData);
@@ -217,7 +232,11 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                                       ),
                                       value: _selectedInfraccionesIds[index],
                                       isExpanded: true,
-                                      items: _tiposInfraccion.map((tipo) {
+                                      menuMaxHeight: 400,
+                                      items: _tiposInfraccion.where((tipo) {
+                                        String idStr = tipo['id'].toString();
+                                        return !_selectedInfraccionesIds.contains(idStr) || _selectedInfraccionesIds[index] == idStr;
+                                      }).map((tipo) {
                                         return DropdownMenuItem<String>(
                                           value: tipo['id'].toString(),
                                           child: Text('${tipo['codigo']} - ${tipo['descripcion']} (S/ ${tipo['montoBase']})', overflow: TextOverflow.ellipsis),
@@ -279,6 +298,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                     child: Column(
                       children: [
                         TextFormField(
+                          initialValue: _lugar,
                           decoration: InputDecoration(
                             labelText: 'Lugar de Intervención',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -290,6 +310,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
+                          initialValue: _observaciones,
                           decoration: InputDecoration(
                             labelText: 'Observaciones',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -343,25 +364,31 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton.icon(
-                      onPressed: _isSubmitting ? null : _submitReportAndTicket,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade700,
-                        foregroundColor: Colors.white,
-                        elevation: 5,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      icon: _isSubmitting ? const SizedBox() : const Icon(Icons.gavel),
-                      label: _isSubmitting
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Guardar Reporte y Multas', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
                 ],
+              ),
+            ),
+      bottomNavigationBar: _isLoading
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSubmitting ? null : _submitReportAndTicket,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade700,
+                      foregroundColor: Colors.white,
+                      elevation: 5,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    icon: _isSubmitting ? const SizedBox() : const Icon(Icons.gavel),
+                    label: _isSubmitting
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('Guardar Reporte y Multas', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  ),
+                ),
               ),
             ),
     );

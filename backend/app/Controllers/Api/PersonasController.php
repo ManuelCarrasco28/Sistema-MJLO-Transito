@@ -40,7 +40,7 @@ class PersonasController extends ResourceController
     {
         $db = \Config\Database::connect();
 
-        $rows = $db->table('personas p')
+        $builder = $db->table('personas p')
             ->select("
                 p.id,
                 COALESCE(td.nombre, 'DNI') AS tipoDocumento,
@@ -58,10 +58,14 @@ class PersonasController extends ResourceController
                 p.estado
             ", false)
             ->join('ciudadanos c', 'c.id_persona = p.id', 'inner')
-            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
-            ->orderBy('p.id', 'DESC')
-            ->get()
-            ->getResultArray();
+            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left');
+
+        $numero = $this->request->getGet('numeroDocumento');
+        if ($numero) {
+            $builder->where('p.numero', trim($numero));
+        }
+
+        $rows = $builder->orderBy('p.id', 'DESC')->get()->getResultArray();
 
         return $this->respond(['data' => $rows]);
     }
