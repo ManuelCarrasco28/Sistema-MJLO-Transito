@@ -369,3 +369,60 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
 .animate-shake {
   animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
 }
+
+/* ==========================================================================
+   ESTILOS DE IMPRESIÓN OFICIAL (TUC DIGITAL / CERTICAV / CARNET)
+   ========================================================================== */
+@media print {
+  /* Forzar impresión de colores exactos y fondos */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Ocultar toda la interfaz web del dashboard (sidebar, header, modales, botones) */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Mostrar ÚNICAMENTE el contenedor del documento oficial / carnet a imprimir */
+  #seccion-impresion,
+  #seccion-impresion *,
+  #seccion-impresion-tuc,
+  #seccion-impresion-tuc * {
+    visibility: visible !important;
+  }
+
+  /* Posicionar el documento en la esquina superior de la hoja */
+  #seccion-impresion,
+  #seccion-impresion-tuc {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  /* Evitar saltos de página indeseados dentro del carnet u hoja oficial */
+  .print-card-container {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  @page {
+    size: auto;
+    margin: 6mm;
+  }
+}

@@ -1,0 +1,427 @@
+/* ==========================================================================
+   ESTILOS DE IMPRESIÓN OFICIAL: TARJETAS DE OPERATIVIDAD & CARNETS VIALES
+   Municipalidad Distrital de José Leonardo Ortiz - Subgerencia de Tránsito
+   ========================================================================== */
+
+/* Estilos normales de pantalla (Vista previa) */
+#seccion-impresion {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  background-color: #f0f2f5;
+  border-radius: 16px;
+}
+
+.carnet-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  justify-content: center;
+  align-items: center;
+}
+
+.carnet-box {
+  width: 85.6mm;
+  height: 53.98mm;
+  min-width: 85.6mm;
+  min-height: 53.98mm;
+  max-width: 85.6mm;
+  max-height: 53.98mm;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ===================================================
+   TARJETA DE OPERATIVIDAD (TUC) - CARA ANVERSO
+   =================================================== */
+.carnet-box.anverso {
+  background: linear-gradient(135deg, #0b0f19 0%, #171d2d 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+.header-carnet {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: #000;
+  border-bottom: 1.5px solid #ffcc00;
+}
+
+.escudo {
+  width: 11mm;
+  height: 10mm;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.header-text {
+  flex: 1;
+  line-height: 1.1;
+}
+
+.header-text h2 {
+  font-size: 5.5pt;
+  margin: 0;
+  color: #ffcc00;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 800;
+}
+
+.header-text h1 {
+  font-size: 8pt;
+  margin: 1px 0 0 0;
+  color: #ffffff;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+.asociacion-banner {
+  background: #d9251d;
+  color: #fff;
+  font-size: 6.5pt;
+  font-weight: bold;
+  text-align: center;
+  padding: 2px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.body-carnet {
+  display: flex;
+  padding: 4px 6px;
+  gap: 6px;
+  flex: 1;
+}
+
+.foto-container {
+  width: 22mm;
+  height: 28mm;
+  flex-shrink: 0;
+  border: 1px solid #fff;
+  background: #2a2e3d;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.foto-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.datos-container {
+  flex: 1;
+  font-size: 5.8pt;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  line-height: 1.25;
+  color: #ffffff;
+  min-width: 0;
+}
+
+.row-flex {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.row-single {
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.label {
+  color: #a0aec0;
+  font-weight: bold;
+  font-size: 5.5pt;
+  text-transform: uppercase;
+}
+
+.val-yellow {
+  background: #ffcc00;
+  color: #000;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 5.8pt;
+  font-family: monospace;
+}
+
+.val-text {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 5.6pt;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nombres-box {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 2px;
+  margin-top: 2px;
+}
+
+.val-nombres {
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 7pt;
+  text-transform: uppercase;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.footer-carnet-anverso {
+  position: absolute;
+  bottom: 2px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tuc-numero {
+  color: #00e6ff;
+  font-weight: 900;
+  font-size: 9pt;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+}
+
+/* ===================================================
+   TARJETA DE OPERATIVIDAD (TUC) - CARA REVERSO
+   =================================================== */
+.carnet-box.reverso {
+  background: #eef1f5;
+  color: #000;
+  padding: 3.5mm;
+  display: flex;
+  flex-direction: column;
+}
+
+.reverso-grid {
+  display: flex;
+  height: 100%;
+  gap: 4px;
+}
+
+.reverso-info {
+  width: 65%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.5mm;
+}
+
+.field-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.field-block label {
+  font-size: 5pt;
+  font-weight: 800;
+  color: #334155;
+  text-transform: uppercase;
+  margin-bottom: 1px;
+}
+
+.box-val {
+  background: #fff;
+  border: 1px solid #94a3b8;
+  font-size: 6.8pt;
+  font-weight: 800;
+  padding: 1px 3px;
+  font-family: monospace;
+  color: #0f172a;
+  border-radius: 2px;
+}
+
+.box-val-sm {
+  background: #fff;
+  border: 1px solid #94a3b8;
+  font-size: 5.5pt;
+  font-weight: 700;
+  padding: 1px 3px;
+  color: #0f172a;
+  border-radius: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.highlight-red {
+  color: #d9251d !important;
+}
+
+.reverso-lateral {
+  width: 35%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 2px;
+}
+
+.qr-container {
+  background: #fff;
+  padding: 2px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-container img,
+.qr-container svg {
+  width: 18mm !important;
+  height: 18mm !important;
+  display: block;
+}
+
+.firma-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  text-align: center;
+}
+
+.linea-firma {
+  width: 90%;
+  border-bottom: 1px solid #0f172a;
+  margin-bottom: 2px;
+}
+
+.firma-container span {
+  font-size: 4.8pt;
+  font-weight: 800;
+  color: #1e293b;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+/* ===================================================
+   CARNET DE SEGURIDAD VIAL (CURSO VIAL)
+   =================================================== */
+.carnet-box.curso-vial-anverso {
+  background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+.banner-curso {
+  background: #047857;
+  color: #ffffff;
+  font-size: 6pt;
+  font-weight: 800;
+  text-align: center;
+  padding: 2px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ===================================================
+   HOJA A4 OFICIAL: FICHA CERTICAV (INSPECCIÓN TÉCNICA)
+   =================================================== */
+.ficha-certicav-a4 {
+  width: 190mm;
+  min-height: 265mm;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 10mm 12mm;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  font-family: Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+/* ===================================================
+   REGLAS EXCLUSIVAS PARA IMPRESIÓN (CSS PRINT)
+   =================================================== */
+@media print {
+  /* Forzar impresión exacta de colores y fondos gráficos */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ocultar toda la interfaz del software administrativo */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Hacer visible únicamente el componente montado para impresión */
+  #seccion-impresion,
+  #seccion-impresion * {
+    visibility: visible !important;
+  }
+
+  #seccion-impresion {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10mm !important;
+    align-items: center !important;
+    box-shadow: none !important;
+  }
+
+  .carnet-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12mm !important;
+    align-items: center !important;
+  }
+
+  .carnet-box {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-shadow: none !important;
+    border: 0.2pt solid #000 !important; /* Borde fino de corte guiado */
+  }
+
+  .ficha-certicav-a4 {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+}
