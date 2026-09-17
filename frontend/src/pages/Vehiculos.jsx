@@ -733,9 +733,14 @@ export function Vehiculos() {
                       id="veh_placa"
                       type="text"
                       required
+                      maxLength={15}
                       placeholder=" "
                       value={formData.placa}
-                      onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        if (/[^A-Z0-9-]/.test(val)) return;
+                        setFormData({ ...formData, placa: val });
+                      }}
                       className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-black uppercase text-slate-800 outline-none dark:text-white"
                     />
                     <label

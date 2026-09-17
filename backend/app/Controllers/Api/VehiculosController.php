@@ -200,6 +200,9 @@ class VehiculosController extends ResourceController
         }
 
         $placa = strtoupper(trim($input['placa']));
+        if ($db->table('vehiculos')->where('placa', $placa)->countAllResults() > 0) {
+            return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
+        }
 
         
         $tipoNombre = !empty($input['tipo']) ? trim($input['tipo']) : 'Mototaxi (Trimovil)';
@@ -306,7 +309,15 @@ class VehiculosController extends ResourceController
         }
 
         $record = [];
-        if (isset($input['placa'])) $record['placa'] = strtoupper(trim($input['placa']));
+        if (isset($input['placa'])) {
+            $placa = strtoupper(trim($input['placa']));
+            if ($placa !== '') {
+                if ($db->table('vehiculos')->where('placa', $placa)->where('id !=', $id)->countAllResults() > 0) {
+                    return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
+                }
+            }
+            $record['placa'] = $placa;
+        }
         if (isset($input['marca'])) $record['marca'] = trim($input['marca']);
         if (isset($input['modelo'])) $record['modelo'] = trim($input['modelo']);
         if (isset($input['color'])) $record['color'] = trim($input['color']);

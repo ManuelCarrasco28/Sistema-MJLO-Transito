@@ -559,9 +559,14 @@ export function Asociaciones() {
                         id="org_ruc"
                         type="text"
                         required
+                        maxLength={11}
                         placeholder=" "
                         value={formData.ruc}
-                        onChange={(e) => setFormData({ ...formData, ruc: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!/^\d*$/.test(val)) return;
+                          setFormData({ ...formData, ruc: val });
+                        }}
                         className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
                       />
                       <label
@@ -668,9 +673,14 @@ export function Asociaciones() {
                     <input
                       id="org_tel"
                       type="text"
+                      maxLength={9}
                       placeholder=" "
                       value={formData.telefono}
-                      onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!/^\d*$/.test(val)) return;
+                        setFormData({ ...formData, telefono: val });
+                      }}
                       className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                     />
                     <label
