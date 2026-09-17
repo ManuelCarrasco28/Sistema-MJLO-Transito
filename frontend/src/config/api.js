@@ -1,4 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const DEFAULT_TIMEOUT_MS = 15000
 
 const memoryCache = new Map()
 const pendingReads = new Map()
@@ -30,34 +31,39 @@ export function invalidateCache(keyPrefix = null) {
 }
 
 export async function apiFetch(endpoint, options = {}) {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options
   const url = endpoint.startsWith('http://') || endpoint.startsWith('https://')
     ? endpoint
     : `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`
 
   const headers = {
     Accept: 'application/json',
-    ...(options.headers || {}),
+    ...(fetchOptions.headers || {}),
   }
 
-  let body = options.body
+  let body = fetchOptions.body
   if (body && typeof body === 'object' && !(body instanceof FormData)) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json'
     body = JSON.stringify(body)
   }
 
-  const method = (options.method || 'GET').toUpperCase()
+  const method = (fetchOptions.method || 'GET').toUpperCase()
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
 
   const config = {
     credentials: 'include',
-    ...options,
+    ...fetchOptions,
     method,
     headers,
     body,
+    signal: fetchOptions.signal || controller.signal,
   }
 
   // Share only default reads while they are in flight. Each caller gets its
   // own body, and subsequent visits still request fresh server data.
-  if (method === 'GET' && Object.keys(options).length === 0) {
+  try {
+  if (method === 'GET' && Object.keys(fetchOptions).length === 0) {
     let request = pendingReads.get(url)
     if (!request) {
       request = fetch(url, config).finally(() => {
@@ -79,4 +85,7 @@ export async function apiFetch(endpoint, options = {}) {
   }
 
   return response
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
 }

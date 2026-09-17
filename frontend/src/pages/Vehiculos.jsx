@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../components/ui/Icon'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
@@ -22,6 +23,7 @@ export function Vehiculos() {
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [loadError, setLoadError] = useState('')
 
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -52,6 +54,7 @@ export function Vehiculos() {
   })
 
   useEffect(() => {
+    setLoadError('')
     Promise.all([
       apiFetch('/vehiculos').then((response) => response.ok ? response.json() : Promise.reject(response)),
       apiFetch('/asociaciones').then((response) => response.ok ? response.json() : Promise.reject(response)),
@@ -66,7 +69,9 @@ export function Vehiculos() {
       setCachedData('/vehiculos', vData)
       setCachedData('/asociaciones', oData)
       setCachedData('/personas', pData)
-    }).catch(() => { })
+    }).catch(() => {
+      setLoadError('No se pudo cargar el padrón vehicular.')
+    })
       .finally(() => setIsLoading(false))
   }, [])
 
@@ -336,6 +341,7 @@ export function Vehiculos() {
 
   return (
     <div className="space-y-6">
+      {loadError && <PageLoadError message={loadError} />}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">

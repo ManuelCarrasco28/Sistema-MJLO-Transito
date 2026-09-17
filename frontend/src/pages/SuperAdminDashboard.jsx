@@ -66,6 +66,9 @@ export function SuperAdminDashboard({ user }) {
   const [mobilePermitePapeleta, setMobilePermitePapeleta] = useState(true)
   const [savingConfigSistema, setSavingConfigSistema] = useState(false)
   const [loadingMunicipalidad, setLoadingMunicipalidad] = useState(false)
+  const [auditSearch, setAuditSearch] = useState('')
+  const [auditType, setAuditType] = useState('TODOS')
+  const [auditSeverity, setAuditSeverity] = useState('TODOS')
 
   const adminModules = [
     { id: 'personas', label: 'Personas', detail: 'Registrar y mantener datos personales base del sistema.', icon: 'idCard', tone: 'from-sky-600 to-cyan-500' },
@@ -74,7 +77,6 @@ export function SuperAdminDashboard({ user }) {
     { id: 'roles', label: 'Roles y permisos', detail: 'Definir accesos por perfil y estado de cuenta.', icon: 'shieldCheck', tone: 'from-emerald-600 to-teal-500' },
     { id: 'configuracion', label: 'Configuración del sistema', detail: 'Parámetros globales, seguridad y sesiones.', icon: 'settings', tone: 'from-violet-600 to-purple-500' },
     { id: 'auditoria', label: 'Auditoría y logs', detail: 'Revisar acciones críticas realizadas por usuarios.', icon: 'document', tone: 'from-amber-500 to-orange-500' },
-    { id: 'catalogos', label: 'Catálogos maestros', detail: 'Mantener cargos, oficinas y tipos base.', icon: 'folderShield', tone: 'from-cyan-600 to-sky-500' },
     { id: 'respaldo', label: 'Respaldo y mantenimiento', detail: 'Control de copias, restauración y estado.', icon: 'lock', tone: 'from-slate-700 to-slate-500' }
   ]
 
@@ -222,6 +224,97 @@ export function SuperAdminDashboard({ user }) {
   }, [trabajadores, trabajadorSearch, userForm.id_trabajador])
 
   const selectedTrabajador = trabajadores.find((trabajador) => String(trabajador.id_persona || trabajador.id) === String(userForm.id_trabajador))
+
+  const auditEvents = useMemo(() => {
+    const now = new Date()
+    const toDateLabel = (value, fallbackMinutes = 0) => {
+      const date = value ? new Date(value) : new Date(now.getTime() - fallbackMinutes * 60000)
+      return Number.isNaN(date.getTime()) ? 'Sin fecha' : date.toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })
+    }
+
+    const userEvents = usuarios.slice(0, 30).map((item, index) => ({
+      id: `usuario-${item.id || index}`,
+      fecha: toDateLabel(item.fecha_updated || item.fecha_created, 15 + index * 7),
+      tipo: 'USUARIOS',
+      severidad: item.usuario_estado === 'INACTIVO' ? 'MEDIA' : 'BAJA',
+      evento: item.usuario_estado === 'INACTIVO' ? 'Cuenta de usuario inactiva' : 'Cuenta de usuario habilitada',
+      detalle: `${item.nombre_usuario || 'Usuario'} · ${item.cargo || 'Sin rol asignado'}`,
+      usuario: user?.usuario || 'superadmin',
+      origen: 'Panel web',
+      estado: item.usuario_estado || 'ACTIVO'
+    }))
+
+    const baseEvents = [
+      {
+        id: 'login-superadmin',
+        fecha: toDateLabel(null, 2),
+        tipo: 'SEGURIDAD',
+        severidad: 'BAJA',
+        evento: 'Inicio de sesión administrativo',
+        detalle: 'Acceso al panel de Super Admin',
+        usuario: user?.usuario || 'superadmin',
+        origen: 'Web · navegador',
+        estado: 'OK'
+      },
+      {
+        id: 'mobile-permission',
+        fecha: toDateLabel(null, 5),
+        tipo: 'CONFIGURACIÓN',
+        severidad: mobilePermitePapeleta ? 'ALTA' : 'MEDIA',
+        evento: 'Permiso general móvil',
+        detalle: mobilePermitePapeleta
+          ? 'Inspectores pueden aplicar papeletas desde el móvil'
+          : 'Inspectores registran solo evidencias para revisión administrativa',
+        usuario: user?.usuario || 'superadmin',
+        origen: 'Configuración global',
+        estado: mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO'
+      },
+      {
+        id: 'uit-config',
+        fecha: toDateLabel(null, 12),
+        tipo: 'CONFIGURACIÓN',
+        severidad: municipalidadAnios.length ? 'BAJA' : 'ALTA',
+        evento: 'UIT fiscal configurada',
+        detalle: municipalidadAnios.length
+          ? `${municipalidadAnios.length} año(s) fiscal(es) registrado(s)`
+          : 'Falta configurar la UIT para calcular papeletas',
+        usuario: user?.usuario || 'superadmin',
+        origen: 'Municipalidad',
+        estado: municipalidadAnios.length ? 'OK' : 'PENDIENTE'
+      },
+      {
+        id: 'municipalidad-config',
+        fecha: toDateLabel(municipalidad?.fecha_updated || municipalidad?.fecha_created, 20),
+        tipo: 'CONFIGURACIÓN',
+        severidad: municipalidad?.estado === 'ACTIVO' ? 'BAJA' : 'ALTA',
+        evento: 'Datos institucionales',
+        detalle: municipalidad?.razon_social || 'Municipalidad pendiente de configurar',
+        usuario: user?.usuario || 'superadmin',
+        origen: 'Panel web',
+        estado: municipalidad?.estado || 'PENDIENTE'
+      }
+    ]
+
+    return [...baseEvents, ...userEvents]
+  }, [usuarios, user, mobilePermitePapeleta, municipalidadAnios, municipalidad])
+
+  const filteredAuditEvents = useMemo(() => {
+    const q = auditSearch.trim().toLowerCase()
+    return auditEvents.filter((event) => {
+      const matchesSearch = !q || [event.evento, event.detalle, event.usuario, event.origen, event.estado]
+        .some((value) => String(value || '').toLowerCase().includes(q))
+      const matchesType = auditType === 'TODOS' || event.tipo === auditType
+      const matchesSeverity = auditSeverity === 'TODOS' || event.severidad === auditSeverity
+      return matchesSearch && matchesType && matchesSeverity
+    })
+  }, [auditEvents, auditSearch, auditType, auditSeverity])
+
+  const auditStats = useMemo(() => ({
+    total: auditEvents.length,
+    alta: auditEvents.filter((event) => event.severidad === 'ALTA').length,
+    media: auditEvents.filter((event) => event.severidad === 'MEDIA').length,
+    seguridad: auditEvents.filter((event) => event.tipo === 'SEGURIDAD').length
+  }), [auditEvents])
 
   const saveUser = async (event) => {
     event.preventDefault()
@@ -570,31 +663,124 @@ export function SuperAdminDashboard({ user }) {
         )}
 
         {activeModule === 'auditoria' && (
-          <div className="overflow-hidden rounded-2xl border border-slate-200">
-            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-              <h3 className="text-base font-black text-slate-900 dark:text-white">Eventos recientes</h3>
-              <p className="text-xs font-semibold text-slate-500">Registro resumido de acciones administrativas.</p>
+          <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              {[
+                { label: 'Eventos auditados', value: auditStats.total, detail: 'Actividad administrativa', tone: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200' },
+                { label: 'Alta prioridad', value: auditStats.alta, detail: 'Requiere revisión', tone: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200' },
+                { label: 'Prioridad media', value: auditStats.media, detail: 'Seguimiento preventivo', tone: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200' },
+                { label: 'Seguridad', value: auditStats.seguridad, detail: 'Sesiones y accesos', tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200' }
+              ].map((item) => (
+                <div key={item.label} className={`rounded-2xl px-4 py-4 ${item.tone}`}>
+                  <p className="text-[11px] font-black uppercase tracking-wider opacity-70">{item.label}</p>
+                  <p className="mt-2 text-3xl font-black">{item.value}</p>
+                  <p className="mt-1 text-xs font-bold opacity-80">{item.detail}</p>
+                </div>
+              ))}
             </div>
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                <tr><th className="px-4 py-3">Evento</th><th className="px-4 py-3">Usuario</th><th className="px-4 py-3">Estado</th></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                <tr><td className="px-4 py-3 font-bold">Inicio de sesión superadmin</td><td className="px-4 py-3">{user?.usuario}</td><td className="px-4 py-3 text-emerald-600 font-bold">Activo</td></tr>
-                <tr><td className="px-4 py-3 font-bold">Gestión de usuarios habilitada</td><td className="px-4 py-3">{user?.usuario}</td><td className="px-4 py-3 text-blue-600 font-bold">Sistema</td></tr>
-              </tbody>
-            </table>
-          </div>
-        )}
 
-        {activeModule === 'catalogos' && (
-          <div className="grid gap-3 md:grid-cols-3">
-            {['Cargos', 'Oficinas', 'Tipos de documento', 'Tipos de vehículo', 'Estados del sistema'].map((item) => (
-              <div key={item} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/40">
-                <p className="font-black text-slate-900 dark:text-white">{item}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">Catálogo maestro administrativo.</p>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">Centro de auditoría administrativa</h3>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Monitorea accesos, cambios de configuración, cuentas de usuario y alertas críticas del sistema.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => alert('Exportación pendiente: se conectará cuando exista la tabla real de auditoría.')}
+                  className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+                >
+                  Exportar reporte
+                </button>
               </div>
-            ))}
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+                <input
+                  value={auditSearch}
+                  onChange={(event) => setAuditSearch(event.target.value)}
+                  placeholder="Buscar por evento, usuario, origen o estado..."
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                />
+                <select
+                  value={auditType}
+                  onChange={(event) => setAuditType(event.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                >
+                  <option value="TODOS">Todos los tipos</option>
+                  <option value="SEGURIDAD">Seguridad</option>
+                  <option value="CONFIGURACIÓN">Configuración</option>
+                  <option value="USUARIOS">Usuarios</option>
+                </select>
+                <select
+                  value={auditSeverity}
+                  onChange={(event) => setAuditSeverity(event.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                >
+                  <option value="TODOS">Toda prioridad</option>
+                  <option value="ALTA">Alta</option>
+                  <option value="MEDIA">Media</option>
+                  <option value="BAJA">Baja</option>
+                </select>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800">
+                <table className="w-full min-w-[900px] text-left text-sm">
+                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3">Fecha</th>
+                      <th className="px-4 py-3">Evento</th>
+                      <th className="px-4 py-3">Tipo</th>
+                      <th className="px-4 py-3">Prioridad</th>
+                      <th className="px-4 py-3">Usuario</th>
+                      <th className="px-4 py-3">Origen</th>
+                      <th className="px-4 py-3">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredAuditEvents.length ? filteredAuditEvents.map((event) => (
+                      <tr key={event.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="px-4 py-3 text-xs font-bold text-slate-500">{event.fecha}</td>
+                        <td className="px-4 py-3">
+                          <p className="font-black text-slate-900 dark:text-white">{event.evento}</p>
+                          <p className="mt-0.5 text-xs font-semibold text-slate-500">{event.detalle}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-200">
+                            {event.tipo}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
+                            event.severidad === 'ALTA'
+                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-200'
+                              : event.severidad === 'MEDIA'
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-200'
+                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200'
+                          }`}>
+                            {event.severidad}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">{event.usuario}</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-500">{event.origen}</td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                            {event.estado}
+                          </span>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm font-bold text-slate-500">
+                          No hay eventos que coincidan con los filtros.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 

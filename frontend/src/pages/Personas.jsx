@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
@@ -17,6 +18,7 @@ export function Personas({ user, onUserUpdate }) {
   const [selectedPersona, setSelectedPersona] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
   const [toast, setToast] = useState(null)
+  const [loadError, setLoadError] = useState('')
 
   const [formData, setFormData] = useState({
     tipoDocumento: 'DNI',
@@ -44,8 +46,9 @@ export function Personas({ user, onUserUpdate }) {
   }
 
   useEffect(() => {
+    setLoadError('')
     loadPersonas()
-      .catch(() => { })
+      .catch(() => setLoadError('No se pudo cargar el padrón de personas.'))
       .finally(() => setIsLoading(false))
   }, [])
 
@@ -272,6 +275,7 @@ export function Personas({ user, onUserUpdate }) {
           <span>{toast.message}</span>
         </div>
       )}
+      {loadError && <PageLoadError message={loadError} />}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">

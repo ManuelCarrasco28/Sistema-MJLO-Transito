@@ -21,8 +21,7 @@ export const navigationGroups = [
       { id: 'superadmin-usuarios', label: 'Gestión de usuarios', icon: 'people', path: '/superadmin/usuarios' },
       { id: 'superadmin-roles', label: 'Roles y permisos', icon: 'shieldCheck', path: '/superadmin/roles' },
       { id: 'superadmin-configuracion', label: 'Configuración', icon: 'settings', path: '/superadmin/configuracion' },
-      { id: 'superadmin-auditoria', label: 'Auditoría y logs', icon: 'document', path: '/superadmin/auditoria' },
-      { id: 'superadmin-catalogos', label: 'Catálogos maestros', icon: 'folderShield', path: '/superadmin/catalogos' }
+      { id: 'superadmin-auditoria', label: 'Auditoría y logs', icon: 'document', path: '/superadmin/auditoria' }
     ]
   },
   {
@@ -58,7 +57,7 @@ export const navigationGroups = [
     name: 'Trámites',
     items: [
       { id: 'permisos', label: 'Permisos', icon: 'routePermit', path: '/permisos' },
-      { id: 'cursos', label: 'Cursos viales', icon: 'course', path: '/cursos' },
+      { id: 'cursos', label: 'Cursos de Seguridad Vial', icon: 'course', path: '/cursos' },
     ]
   },
   {

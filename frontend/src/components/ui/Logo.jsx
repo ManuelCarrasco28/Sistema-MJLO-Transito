@@ -5,6 +5,7 @@ export function Logo({ sidebar = false }) {
         src="/img/logo-mjlo.png"
         alt="Municipalidad Distrital de José Leonardo Ortiz"
         className={sidebar ? 'h-10 w-auto' : 'h-14 w-auto sm:h-16'}
+        onError={(event) => { event.currentTarget.src = '/escudo-jlo.png' }}
       />
     </div>
   )

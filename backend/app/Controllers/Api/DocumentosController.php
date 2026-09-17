@@ -8,9 +8,40 @@ class DocumentosController extends ResourceController
 {
     protected $format = 'json';
 
+    private function documentColumn(string $column, string $alias): string
+    {
+        $db = \Config\Database::connect();
+
+        if ($db->fieldExists($column, 'documentos_vehiculo')) {
+            return "d.$column AS $alias";
+        }
+
+        return "NULL AS $alias";
+    }
+
+    private function filterExistingDocumentColumns(array $record): array
+    {
+        $db = \Config\Database::connect();
+
+        return array_filter(
+            $record,
+            static fn ($value, string $column): bool => $db->fieldExists($column, 'documentos_vehiculo'),
+            ARRAY_FILTER_USE_BOTH
+        );
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
+
+        $optionalColumns = [
+            $this->documentColumn('aseguradora', 'aseguradora'),
+            $this->documentColumn('numero_licencia', 'numeroLicencia'),
+            $this->documentColumn('foto_conductor', 'fotoConductor'),
+            $this->documentColumn('conductor_nombres', 'conductorNombres'),
+            $this->documentColumn('id_inspeccion', 'idInspeccion'),
+            $this->documentColumn('numero_inspeccion', 'numeroInspeccion'),
+        ];
 
         $rows = $db->table('documentos_vehiculo d')
             ->select("
@@ -27,12 +58,7 @@ class DocumentosController extends ResourceController
                 COALESCE(v.partida_registral, '') AS vehiculoPartidaRegistral,
                 d.tipo_documento AS tipoDocumento,
                 d.codigo,
-                d.aseguradora,
-                d.numero_licencia AS numeroLicencia,
-                d.foto_conductor AS fotoConductor,
-                d.conductor_nombres AS conductorNombres,
-                d.id_inspeccion AS idInspeccion,
-                d.numero_inspeccion AS numeroInspeccion,
+                " . implode(",\n                ", $optionalColumns) . ",
                 d.fecha_expedicion AS fechaExpedicion,
                 d.fecha_expiracion AS fechaExpiracion,
                 d.estado,
@@ -149,6 +175,7 @@ class DocumentosController extends ResourceController
             'id_inspeccion'      => !empty($input['idInspeccion']) ? (int)$input['idInspeccion'] : null,
             'numero_inspeccion'  => !empty($input['numeroInspeccion']) ? trim($input['numeroInspeccion']) : null,
         ];
+        $record = $this->filterExistingDocumentColumns($record);
 
         $db->table('documentos_vehiculo')->insert($record);
         $insertId = (int)$db->insertID();
@@ -179,12 +206,12 @@ class DocumentosController extends ResourceController
             'fechaExpedicion'          => $record['fecha_expedicion'],
             'fechaExpiracion'          => $record['fecha_expiracion'],
             'estado'                   => $record['estado'],
-            'aseguradora'              => $record['aseguradora'],
-            'numeroLicencia'           => $record['numero_licencia'],
-            'fotoConductor'            => $record['foto_conductor'],
-            'conductorNombres'         => $record['conductor_nombres'],
-            'idInspeccion'             => $record['id_inspeccion'],
-            'numeroInspeccion'         => $record['numero_inspeccion'],
+            'aseguradora'              => $record['aseguradora'] ?? null,
+            'numeroLicencia'           => $record['numero_licencia'] ?? null,
+            'fotoConductor'            => $record['foto_conductor'] ?? null,
+            'conductorNombres'         => $record['conductor_nombres'] ?? null,
+            'idInspeccion'             => $record['id_inspeccion'] ?? null,
+            'numeroInspeccion'         => $record['numero_inspeccion'] ?? null,
             'propietario'              => $propietarioNombre ?: 'Sin Propietario Asignado',
             'propietarioDni'           => $propietarioRow['dni'] ?? '',
             'hasPropietario'           => !empty($propietarioNombre),
@@ -228,6 +255,7 @@ class DocumentosController extends ResourceController
         if (array_key_exists('conductorNombres', $input)) $record['conductor_nombres'] = trim($input['conductorNombres'] ?? '') ?: null;
         if (array_key_exists('idInspeccion', $input)) $record['id_inspeccion'] = $input['idInspeccion'] ? (int)$input['idInspeccion'] : null;
         if (array_key_exists('numeroInspeccion', $input)) $record['numero_inspeccion'] = trim($input['numeroInspeccion'] ?? '') ?: null;
+        $record = $this->filterExistingDocumentColumns($record);
 
         if (!empty($record)) {
             $db->table('documentos_vehiculo')->where('id', $id)->update($record);

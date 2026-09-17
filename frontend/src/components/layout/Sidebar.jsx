@@ -132,7 +132,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
       <aside
         style={{ height: '100%', maxHeight: '100dvh' }}
         className={`fixed inset-y-0 left-0 z-50 flex h-screen max-h-screen h-dvh max-h-dvh flex-col overflow-hidden bg-white dark:bg-[#111C44] text-slate-800 dark:text-slate-100 border-r border-slate-200/80 dark:border-white/10 shadow-2xl transition-all duration-300 lg:relative lg:z-auto lg:h-full lg:max-h-full lg:translate-x-0 lg:shadow-none shrink-0 ${
-          collapsedOnDesktop ? 'w-20' : 'w-72'
+          collapsedOnDesktop ? 'w-20' : 'w-[19.5rem]'
         } ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
@@ -149,8 +149,18 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
               <span className="text-xl font-black text-[#2B3674] dark:text-white">JLO</span>
             ) : (
               <>
-                <img src="/img/logo-mjlo.png" alt="Logo Municipalidad JLO" className="h-9 w-auto object-contain dark:hidden block" />
-                <img src="/img/logo-mjlo-blanco.png" alt="Logo Municipalidad JLO" className="h-9 w-auto object-contain dark:block hidden" />
+                <img
+                  src="/img/logo-mjlo.png"
+                  alt="Logo Municipalidad JLO"
+                  className="h-10 max-w-[9rem] object-contain dark:hidden block"
+                  onError={(event) => { event.currentTarget.src = '/escudo-jlo.png' }}
+                />
+                <img
+                  src="/img/logo-mjlo-blanco.png"
+                  alt="Logo Municipalidad JLO"
+                  className="h-10 max-w-[9rem] object-contain dark:block hidden"
+                  onError={(event) => { event.currentTarget.src = '/escudo-jlo.png' }}
+                />
               </>
             )}
           </div>
@@ -179,7 +189,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           </button>
         </div>
 
-        <nav className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1 py-2 px-3 ${collapsedOnDesktop ? 'lg:px-2 px-3' : 'px-3'}`} aria-label="Navegación principal">
+        <nav className={`no-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1 py-2 px-3 ${collapsedOnDesktop ? 'lg:px-2 px-3' : 'px-3'}`} aria-label="Navegación principal">
           {visibleNavigationGroups.map((group) => {
             const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30' }
             const isSingle = group.items.length === 1

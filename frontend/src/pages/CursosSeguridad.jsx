@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
@@ -16,6 +17,7 @@ export function CursosSeguridad() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedCurso, setSelectedCurso] = useState(null)
+  const [loadError, setLoadError] = useState('')
   const [formData, setFormData] = useState({
     codigo: '', titulo: '', descripcion: '', fecha: '', horario: '',
     instructor: '', lugar: '', capacidad: 50, estado: 'PROGRAMADO', tipo: 'SEGURIDAD_VIAL'
@@ -137,8 +139,9 @@ export function CursosSeguridad() {
   )
 
   useEffect(() => {
+    setLoadError('')
     apiFetch('/cursos')
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : Promise.reject(res))
       .then(data => {
         const fetchedCursos = (data.data || []).map(c => ({
           ...c,
@@ -149,12 +152,13 @@ export function CursosSeguridad() {
         setCursos(fetchedCursos)
         setCachedData('/cursos', fetchedCursos)
       })
-      .catch(() => { })
+      .catch(() => setLoadError('No se pudo cargar el registro de cursos viales.'))
       .finally(() => setIsLoading(false))
   }, [])
 
   return (
     <div className="space-y-6">
+      {loadError && <PageLoadError message={loadError} />}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">

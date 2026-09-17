@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
@@ -20,6 +21,7 @@ export function Pagos() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedPago, setSelectedPago] = useState(null)
+  const [loadError, setLoadError] = useState('')
 
   const [formData, setFormData] = useState({
     numeroRecibo: '', tipoPago: 'TRAMITE', metodo: 'EFECTIVO', montoTotal: 0,
@@ -121,19 +123,21 @@ export function Pagos() {
   )
 
   useEffect(() => {
+    setLoadError('')
     apiFetch('/pagos')
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : Promise.reject(res))
       .then(data => {
         const pData = data.data || []
         setPagos(pData)
         setCachedData('/pagos', pData)
       })
-      .catch(() => {})
+      .catch(() => setLoadError('No se pudo cargar el registro de pagos.'))
       .finally(() => setIsLoading(false))
   }, [])
 
   return (
     <div className="space-y-6">
+      {loadError && <PageLoadError message={loadError} />}
       
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">

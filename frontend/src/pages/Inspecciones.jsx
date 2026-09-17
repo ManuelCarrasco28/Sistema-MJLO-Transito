@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
@@ -22,6 +23,7 @@ export function Inspecciones() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedInspeccion, setSelectedInspeccion] = useState(null)
+  const [loadError, setLoadError] = useState('')
 
   const [formData, setFormData] = useState({
     vehiculoPlaca: '',
@@ -55,11 +57,12 @@ export function Inspecciones() {
   )
 
   useEffect(() => {
-    apiFetch('/personal').then(r => r.json()).then(r => setTecnicos((r.data || []).filter(p => p.estado === 'ACTIVO'))).catch(() => {})
+    setLoadError('')
+    apiFetch('/personal').then(r => r.ok ? r.json() : Promise.reject(r)).then(r => setTecnicos((r.data || []).filter(p => p.estado === 'ACTIVO'))).catch(() => {})
     Promise.all([
-      apiFetch('/inspecciones').then(res => res.json()).catch(() => ({ data: [] })),
-      apiFetch('/inspeccion-criterios').then(res => res.json()).catch(() => ({ data: [] })),
-      apiFetch('/vehiculos').then(res => res.json()).catch(() => ({ data: [] }))
+      apiFetch('/inspecciones').then(res => res.ok ? res.json() : Promise.reject(res)),
+      apiFetch('/inspeccion-criterios').then(res => res.ok ? res.json() : Promise.reject(res)),
+      apiFetch('/vehiculos').then(res => res.ok ? res.json() : Promise.reject(res))
     ]).then(([inspRes, critRes, vehRes]) => {
       const fetched = (inspRes.data || []).map(i => ({
         ...i,
@@ -76,6 +79,7 @@ export function Inspecciones() {
       setIsLoading(false)
     }).catch(err => {
       console.error('Error fetching inspecciones:', err)
+      setLoadError('No se pudo cargar el módulo de inspecciones.')
       setIsLoading(false)
     })
   }, [])

@@ -14,6 +14,7 @@ export function Documentos() {
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [loadError, setLoadError] = useState('')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
@@ -23,42 +24,23 @@ export function Documentos() {
   // Autocompletado / Búsqueda de Placa Vehicular
   const [isPlacaDropdownOpen, setIsPlacaDropdownOpen] = useState(false)
   const placaDropdownRef = useRef(null)
-  const fileInputRef = useRef(null)
 
   const [formData, setFormData] = useState({
     vehiculoPlaca: '',
-    tipoDocumento: 'TARJETA_OPERATIVIDAD',
+    tipoDocumento: '',
     codigo: '',
-    resMunicipal: 'R.M. N° 045-2024-MDJLO/GSCyT',
-    direccion: 'AV. JOSÉ LEONARDO ORTIZ 450 - CHICLAYO',
-    fechaExpedicion: new Date().toISOString().split('T')[0],
-    fechaExpiracion: '2027-12-31',
-    estado: 'VIGENTE',
+    fechaExpedicion: '',
+    fechaExpiracion: '',
+    estado: '',
     propietario: '',
     propietarioDni: '',
     asociacion: '',
-    aseguradora: '',
-    numeroLicencia: '',
-    fotoConductor: '',
-    conductorNombres: '',
-    conductorDni: '',
-    idInspeccion: '',
-    numeroInspeccion: '',
-    checklist: {
-      luces: true,
-      frenos: true,
-      chasis: true,
-      neumaticos: true,
-      seguridad: true,
-    },
-    resultadoInspeccion: 'APROBADO',
-    observacionesInspeccion: '',
-    inspectorTecnico: 'Ing. Carlos Mendoza (CIP 148201)',
   })
 
   // Cargar datos frescos del backend
   const loadData = () => {
     setIsLoading(true)
+    setLoadError('')
     Promise.all([
       apiFetch('/documentos').then((response) => (response.ok ? response.json() : Promise.reject(response))),
       apiFetch('/vehiculos').then((response) => (response.ok ? response.json() : Promise.reject(response))),
@@ -77,7 +59,9 @@ export function Documentos() {
         setCachedData('/vehiculos', vData)
         setCachedData('/inspecciones', iData)
       })
-      .catch(() => {})
+      .catch(() => {
+        setLoadError('No se pudo mostrar la información en este momento.')
+      })
       .finally(() => setIsLoading(false))
   }
 
@@ -132,38 +116,16 @@ export function Documentos() {
   )
 
   const handleOpenCreateModal = () => {
-    const defaultVeh = vehiculos[0]
-    const approvedInsp = defaultVeh ? getApprovedInspectionForVehicle(defaultVeh.placa) : null
-
     setFormData({
-      vehiculoPlaca: defaultVeh?.placa || '',
-      tipoDocumento: 'TARJETA_OPERATIVIDAD',
-      codigo: `TUC-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      resMunicipal: 'R.M. N° 045-2024-MDJLO/GSCyT',
-      direccion: 'AV. JOSÉ LEONARDO ORTIZ 450 - CHICLAYO',
-      fechaExpedicion: new Date().toISOString().split('T')[0],
-      fechaExpiracion: '2027-12-31',
-      estado: 'VIGENTE',
-      propietario: defaultVeh?.propietario || '',
-      propietarioDni: defaultVeh?.propietarioDni || '45892140',
-      asociacion: defaultVeh?.asociacion || 'Independiente',
-      aseguradora: '',
-      numeroLicencia: defaultVeh?.propietarioLicencia || 'Q-45892140',
-      fotoConductor: '',
-      conductorNombres: defaultVeh?.propietario || '',
-      conductorDni: defaultVeh?.propietarioDni || '45892140',
-      idInspeccion: approvedInsp ? approvedInsp.id : '',
-      numeroInspeccion: approvedInsp ? approvedInsp.numeroInspeccion : '',
-      checklist: {
-        luces: true,
-        frenos: true,
-        chasis: true,
-        neumaticos: true,
-        seguridad: true,
-      },
-      resultadoInspeccion: 'APROBADO',
-      observacionesInspeccion: '',
-      inspectorTecnico: 'Ing. Carlos Mendoza (CIP 148201)',
+      vehiculoPlaca: '',
+      tipoDocumento: '',
+      codigo: '',
+      fechaExpedicion: '',
+      fechaExpiracion: '',
+      estado: '',
+      propietario: '',
+      propietarioDni: '',
+      asociacion: '',
     })
     setIsEditing(false)
     setIsPlacaDropdownOpen(false)
@@ -174,33 +136,14 @@ export function Documentos() {
     setSelectedDoc(doc)
     setFormData({
       vehiculoPlaca: doc.vehiculoPlaca || '',
-      tipoDocumento: doc.tipoDocumento === 'CITV' ? 'INSPECCION_TECNICA' : doc.tipoDocumento,
+      tipoDocumento: doc.tipoDocumento === 'CITV' ? 'INSPECCION_TECNICA' : (doc.tipoDocumento || 'TARJETA_OPERATIVIDAD'),
       codigo: doc.codigo || '',
-      resMunicipal: doc.resMunicipal || 'R.M. N° 045-2024-MDJLO/GSCyT',
-      direccion: doc.direccion || 'AV. JOSÉ LEONARDO ORTIZ 450 - CHICLAYO',
       fechaExpedicion: doc.fechaExpedicion || '',
       fechaExpiracion: doc.fechaExpiracion || '',
       estado: doc.estado || 'VIGENTE',
       propietario: doc.propietario || '',
       propietarioDni: doc.propietarioDni || '',
       asociacion: doc.asociacion || '',
-      aseguradora: doc.aseguradora || '',
-      numeroLicencia: doc.numeroLicencia || '',
-      fotoConductor: doc.fotoConductor || '',
-      conductorNombres: doc.conductorNombres || '',
-      conductorDni: doc.conductorDni || doc.propietarioDni || '',
-      idInspeccion: doc.idInspeccion || '',
-      numeroInspeccion: doc.numeroInspeccion || '',
-      checklist: {
-        luces: true,
-        frenos: true,
-        chasis: true,
-        neumaticos: true,
-        seguridad: true,
-      },
-      resultadoInspeccion: 'APROBADO',
-      observacionesInspeccion: '',
-      inspectorTecnico: 'Ing. Carlos Mendoza (CIP 148201)',
     })
     setIsEditing(true)
     setIsPlacaDropdownOpen(false)
@@ -259,125 +202,58 @@ export function Documentos() {
 
   const handleVehicleChange = (placa) => {
     const veh = vehiculos.find((v) => v.placa === placa)
-    const approvedInsp = getApprovedInspectionForVehicle(placa)
-
     setFormData((prev) => ({
       ...prev,
       vehiculoPlaca: placa,
-      propietario: veh ? veh.propietario : prev.propietario,
-      propietarioDni: veh?.propietarioDni || prev.propietarioDni,
-      asociacion: veh ? veh.asociacion : prev.asociacion,
-      idInspeccion: approvedInsp ? approvedInsp.id : prev.idInspeccion,
-      numeroInspeccion: approvedInsp ? approvedInsp.numeroInspeccion : prev.numeroInspeccion,
-      conductorNombres: prev.tipoDocumento === 'CURSO_VIAL' && !prev.conductorNombres ? (veh?.propietario || '') : prev.conductorNombres,
-      numeroLicencia: prev.tipoDocumento === 'CURSO_VIAL' && !prev.numeroLicencia ? (veh?.propietarioLicencia || 'Q-45892140') : prev.numeroLicencia,
+      propietario: veh ? veh.propietario : '',
+      propietarioDni: veh?.propietarioDni || '',
+      asociacion: veh ? veh.asociacion : '',
     }))
   }
 
   const handleDocTypeChange = (tipo) => {
-    let prefix = 'DOC'
-    if (tipo === 'TARJETA_OPERATIVIDAD') prefix = 'TUC'
-    else if (tipo === 'CURSO_VIAL') prefix = 'CSV'
-    else if (tipo === 'CERTICAV') prefix = 'CAV'
-    else if (tipo === 'SOAT') prefix = 'SOAT'
-    else if (tipo === 'INSPECCION_TECNICA') prefix = 'INSP'
-
-    const approvedInsp = getApprovedInspectionForVehicle(formData.vehiculoPlaca)
-    const veh = vehiculos.find((v) => v.placa === formData.vehiculoPlaca)
-
     setFormData((prev) => ({
       ...prev,
       tipoDocumento: tipo,
-      codigo: `${prefix}-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      idInspeccion: tipo === 'TARJETA_OPERATIVIDAD' && approvedInsp ? approvedInsp.id : prev.idInspeccion,
-      numeroInspeccion: tipo === 'TARJETA_OPERATIVIDAD' && approvedInsp ? approvedInsp.numeroInspeccion : prev.numeroInspeccion,
-      conductorNombres: tipo === 'CURSO_VIAL' && !prev.conductorNombres ? (veh?.propietario || '') : prev.conductorNombres,
-      numeroLicencia: tipo === 'CURSO_VIAL' && !prev.numeroLicencia ? (veh?.propietarioLicencia || 'Q-45892140') : prev.numeroLicencia,
-      resMunicipal: prev.resMunicipal || 'R.M. N° 045-2024-MDJLO/GSCyT',
     }))
   }
 
-  const handlePhotoUpload = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (file.size > 2 * 1024 * 1024) {
-      alert('La fotografía del conductor no debe superar los 2MB.')
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setFormData((prev) => ({ ...prev, fotoConductor: reader.result }))
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const handleChecklistToggle = (key) => {
-    setFormData((prev) => {
-      const updatedChecklist = {
-        ...prev.checklist,
-        [key]: !prev.checklist[key],
-      }
-      const allPassed = Object.values(updatedChecklist).every(Boolean)
-      return {
-        ...prev,
-        checklist: updatedChecklist,
-        resultadoInspeccion: allPassed ? 'APROBADO' : 'DESAPROBADO',
-      }
-    })
-  }
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
 
-    if (!formData.codigo.trim() || !formData.vehiculoPlaca.trim()) {
-      alert('Por favor completa los campos requeridos de código y placa.')
+    if (!formData.codigo.trim() || !formData.vehiculoPlaca.trim() || !formData.tipoDocumento) {
+      alert('Por favor completa los campos requeridos de placa, tipo y número de documento.')
       return
-    }
-
-    // 1. REGLA: Al seleccionar "Tarjeta de Operatividad", exigir vinculación a Res. Municipal y CertiCAV Aprobado
-    if (formData.tipoDocumento === 'TARJETA_OPERATIVIDAD') {
-      if (!formData.resMunicipal || !formData.resMunicipal.trim()) {
-        alert('Para emitir la Tarjeta de Operatividad es obligatorio indicar la Resolución Municipal de Autorización.')
-        return
-      }
-      if (!formData.numeroInspeccion || !formData.numeroInspeccion.trim()) {
-        alert('Para emitir la Tarjeta de Operatividad es obligatorio vincular un CertiCAV (Inspección Técnica) en estado APROBADO.')
-        return
-      }
-    }
-
-    // 2. REGLA: Al seleccionar "Curso Vial", exigir N° de Licencia
-    if (formData.tipoDocumento === 'CURSO_VIAL') {
-      if (!formData.numeroLicencia || !formData.numeroLicencia.trim()) {
-        alert('Para emitir el Carnet de Seguridad Vial (Curso Vial) es obligatorio registrar el N° de Licencia de Conducir.')
-        return
-      }
     }
 
     // Validación de fechas
-    if (new Date(formData.fechaExpiracion) < new Date(formData.fechaExpedicion)) {
+    if (formData.fechaExpedicion && formData.fechaExpiracion && new Date(formData.fechaExpiracion) < new Date(formData.fechaExpedicion)) {
       alert('La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
       return
+    }
+
+    const dataToSubmit = {
+      ...formData,
+      estado: formData.estado || 'VIGENTE',
     }
 
     try {
       if (isEditing) {
         const res = await apiFetch(`/documentos/${selectedDoc.id}`, {
           method: 'PUT',
-          body: formData,
+          body: dataToSubmit,
         })
         const resData = await res.json()
         if (!res.ok) {
           alert(resData.messages?.error || resData.message || 'Error al actualizar el documento.')
           return
         }
-        setDocumentos(documentos.map((d) => (d.id === selectedDoc.id ? { ...d, ...formData } : d)))
+        setDocumentos(documentos.map((d) => (d.id === selectedDoc.id ? { ...d, ...dataToSubmit } : d)))
       } else {
         const res = await apiFetch('/documentos', {
           method: 'POST',
-          body: formData,
+          body: dataToSubmit,
         })
         const resData = await res.json()
         if (!res.ok) {
@@ -385,7 +261,7 @@ export function Documentos() {
           return
         }
         const newDoc = resData.data || {
-          ...formData,
+          ...dataToSubmit,
           id: Date.now(),
         }
         setDocumentos([newDoc, ...documentos])
@@ -631,7 +507,6 @@ export function Documentos() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Documento / Código</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Placa Vehicular</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Titular / Conductor</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Detalle / Requisito</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Emisión</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Vencimiento</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
@@ -647,7 +522,6 @@ export function Documentos() {
                     <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
@@ -658,14 +532,18 @@ export function Documentos() {
                 ))
               ) : filteredDocs.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-5 py-12 text-center text-slate-400">
-                    <div className="mx-auto max-w-xs space-y-2">
-                      <Icon name="document" className="size-10" />
+                  <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
+                    <div className="mx-auto max-w-xs space-y-3 flex flex-col items-center justify-center">
+                      <Icon name="document" className="size-10 text-slate-300 dark:text-slate-600" />
                       <p className="font-bold text-slate-600 dark:text-slate-300">
-                        No se encontraron documentos
+                        {loadError ? 'No se pudo cargar la información.' : (documentos.length === 0 ? 'Aún no hay documentos emitidos' : 'No se encontraron documentos')}
                       </p>
                       <p className="text-xs text-slate-400">
-                        Modifica los parámetros de búsqueda o los filtros aplicados.
+                        {loadError
+                          ? 'Ocurrió un problema al conectar con el servidor. Por favor, intenta de nuevo.'
+                          : documentos.length === 0
+                            ? 'Primero emite una TUC, SOAT, CertiCAV, Curso Vial o Inspección desde el botón “Emitir Documento”.'
+                            : 'Modifica los parámetros de búsqueda o los filtros aplicados.'}
                       </p>
                     </div>
                   </td>
@@ -715,33 +593,6 @@ export function Documentos() {
                             </p>
                           </div>
                         </div>
-                      </td>
-
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        {d.tipoDocumento === 'SOAT' && d.aseguradora ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                            🛡️ {d.aseguradora}
-                          </span>
-                        ) : d.tipoDocumento === 'CURSO_VIAL' ? (
-                          <div className="text-xs">
-                            <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300">
-                              Lic: {d.numeroLicencia || 'B-IIc'}
-                            </span>
-                          </div>
-                        ) : d.tipoDocumento === 'TARJETA_OPERATIVIDAD' ? (
-                          <div className="text-xs space-y-0.5">
-                            <div className="font-mono text-[10.5px] font-bold text-blue-700 dark:text-blue-300">
-                              {d.resMunicipal ? `Res: ${d.resMunicipal}` : 'R.M. Vinculada'}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              Insp: {d.numeroInspeccion || 'CertiCAV Aprobado'}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-500 font-mono">
-                            {d.numeroInspeccion || 'CertiCAV Oficial'}
-                          </span>
-                        )}
                       </td>
 
                       <td className="px-3.5 py-3.5 whitespace-nowrap">
@@ -832,11 +683,8 @@ export function Documentos() {
                 </span>
                 <div>
                   <h3 className="text-lg font-extrabold text-white">
-                    {isEditing ? 'Editar Documento Municipal' : 'Emitir Nuevo Documento Oficial'}
+                    {isEditing ? 'Editar Documento' : 'Emitir Documento'}
                   </h3>
-                  <p className="text-xs text-blue-100/80">
-                    Módulo Dinámico: Tarjeta de Operatividad, Curso Vial, CertiCAV y SOAT
-                  </p>
                 </div>
               </div>
               <button
@@ -848,586 +696,224 @@ export function Documentos() {
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-              
-              {/* Información Base del Documento */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-3 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-emerald-600" />
-                  Información Base del Documento
-                </h4>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  
-                  {/* Selector / Autocompletado de Placa Vehicular */}
-                  <div className="relative" ref={placaDropdownRef}>
-                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
-                      <input
-                        id="doc_veh_placa"
-                        type="text"
-                        required
-                        placeholder=" "
-                        autoComplete="off"
-                        value={formData.vehiculoPlaca}
-                        onFocus={() => setIsPlacaDropdownOpen(true)}
-                        onChange={(e) => {
-                          const val = e.target.value.toUpperCase().trim()
-                          handleVehicleChange(val)
-                          setIsPlacaDropdownOpen(true)
-                        }}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-black tracking-wider text-slate-800 outline-none dark:text-white"
-                      />
-                      <label
-                        htmlFor="doc_veh_placa"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                      >
-                        Placa Vehicular Asignada *
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setIsPlacaDropdownOpen(!isPlacaDropdownOpen)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs p-1 cursor-pointer"
-                        tabIndex={-1}
-                      >
-                        ▼
-                      </button>
-                    </div>
-
-                    {isPlacaDropdownOpen && (
-                      <div className="absolute left-0 right-0 top-full mt-1.5 z-40 max-h-48 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-[#0f172a] text-xs">
-                        {filteredPlacas.length === 0 ? (
-                          <div className="px-3 py-2.5 text-center text-slate-400 font-medium">
-                            No se encontraron vehículos registrados
-                          </div>
-                        ) : (
-                          filteredPlacas.map((v) => (
-                            <button
-                              key={v.id}
-                              type="button"
-                              onClick={() => {
-                                handleVehicleChange(v.placa)
-                                setIsPlacaDropdownOpen(false)
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded-xl font-mono font-black text-xs transition flex items-center justify-between cursor-pointer ${
-                                formData.vehiculoPlaca === v.placa
-                                  ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                  : 'text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80'
-                              }`}
-                            >
-                              <span>{v.placa}</span>
-                              {formData.vehiculoPlaca === v.placa && (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">✓</span>
-                              )}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Selector Dinámico de Tipo de Documento */}
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
-                    <select
-                      id="doc_tipo"
-                      value={formData.tipoDocumento}
-                      onChange={(e) => handleDocTypeChange(e.target.value)}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
-                    >
-                      <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
-                      <option value="CURSO_VIAL">Curso Vial (Carnet de Seguridad Vial)</option>
-                      <option value="CERTICAV">CERTICAV (Inspección Técnica)</option>
-                      <option value="SOAT">SOAT Vehicular</option>
-                    </select>
-                    <label
-                      htmlFor="doc_tipo"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Tipo de Documento Emisible *
-                    </label>
-                  </div>
-
-                  {/* Código Correlativo */}
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
+            <form onSubmit={handleFormSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Fila 1: Placa Vehicular y Tipo de Documento */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Placa Vehicular */}
+                <div className="relative" ref={placaDropdownRef}>
+                  <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
                     <input
-                      id="doc_codigo"
+                      id="doc_veh_placa"
                       type="text"
                       required
-                      placeholder=" "
-                      value={formData.codigo}
-                      onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
+                      autoComplete="off"
+                      value={formData.vehiculoPlaca}
+                      onFocus={() => setIsPlacaDropdownOpen(true)}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase().trim()
+                        handleVehicleChange(val)
+                        setIsPlacaDropdownOpen(true)
+                      }}
+                      className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 font-mono text-sm font-bold tracking-wider text-slate-900 outline-none dark:text-white"
                     />
                     <label
-                      htmlFor="doc_codigo"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
+                      htmlFor="doc_veh_placa"
+                      className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
+                        formData.vehiculoPlaca
+                          ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
+                          : 'top-3.5 text-sm text-slate-400'
+                      } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
                     >
-                      N° Documento / Correlativo *
+                      Placa Vehicular
                     </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsPlacaDropdownOpen(!isPlacaDropdownOpen)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs p-1 cursor-pointer"
+                      tabIndex={-1}
+                    >
+                      ▼
+                    </button>
                   </div>
 
-                  {/* Fecha Expedición */}
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
-                    <input
-                      id="doc_expedicion"
-                      type="date"
-                      value={formData.fechaExpedicion}
-                      onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="doc_expedicion"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Fecha de Expedición
-                    </label>
-                  </div>
+                  {isPlacaDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-40 max-h-48 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-[#0f172a] text-xs">
+                      {filteredPlacas.length === 0 ? (
+                        <div className="px-3 py-2.5 text-center text-slate-400 font-medium">
+                          No se encontraron vehículos registrados
+                        </div>
+                      ) : (
+                        filteredPlacas.map((v) => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => {
+                              handleVehicleChange(v.placa)
+                              setIsPlacaDropdownOpen(false)
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-xl font-mono font-bold text-xs transition flex items-center justify-between cursor-pointer ${
+                              formData.vehiculoPlaca === v.placa
+                                ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                : 'text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80'
+                            }`}
+                          >
+                            <span>{v.placa}</span>
+                            {formData.vehiculoPlaca === v.placa && (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">✓</span>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
 
-                  {/* Fecha Vencimiento */}
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
-                    <input
-                      id="doc_expiracion"
-                      type="date"
-                      value={formData.fechaExpiracion}
-                      onChange={(e) => setFormData({ ...formData, fechaExpiracion: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="doc_expiracion"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Fecha de Vencimiento
-                    </label>
-                  </div>
+                  {formData.propietario && (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded-lg px-2.5 py-1.5 border border-slate-200 dark:border-slate-700">
+                      <span className="font-semibold truncate">{formData.propietario}</span>
+                      {formData.asociacion && <span className="text-slate-400 shrink-0">· {formData.asociacion}</span>}
+                    </div>
+                  )}
+                </div>
 
-                  {/* Estado */}
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-emerald-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-emerald-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-emerald-400">
-                    <select
-                      id="doc_estado"
-                      value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
-                    >
-                      <option value="VIGENTE">VIGENTE</option>
-                      <option value="EN_TRAMITE">EN TRÁMITE</option>
-                      <option value="VENCIDO">VENCIDO</option>
-                    </select>
-                    <label
-                      htmlFor="doc_estado"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Estado del Documento
-                    </label>
-                  </div>
-
+                {/* Tipo de Documento */}
+                <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
+                  <select
+                    id="doc_tipo"
+                    required
+                    value={formData.tipoDocumento}
+                    onChange={(e) => handleDocTypeChange(e.target.value)}
+                    className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 text-sm font-semibold text-slate-800 outline-none transition dark:text-white cursor-pointer"
+                  >
+                    <option value="" disabled hidden></option>
+                    <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
+                    <option value="CURSO_VIAL">Curso Vial (Carnet de Seguridad Vial)</option>
+                    <option value="CERTICAV">CERTICAV (Inspección Técnica)</option>
+                    <option value="SOAT">SOAT Vehicular</option>
+                  </select>
+                  <label
+                    htmlFor="doc_tipo"
+                    className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
+                      formData.tipoDocumento
+                        ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
+                        : 'top-3.5 text-sm text-slate-400'
+                    } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
+                  >
+                    Tipo de Documento
+                  </label>
                 </div>
               </div>
 
-              {/* ====================================================================
-                  CAMPOS DINÁMICOS SEGÚN EL TIPO DE DOCUMENTO SELECCIONADO
-                 ==================================================================== */}
+              {/* Fila 2: N° de Documento */}
+              <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
+                <input
+                  id="doc_codigo"
+                  type="text"
+                  required
+                  value={formData.codigo}
+                  onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
+                  className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 font-mono text-sm font-bold tracking-wider text-slate-800 outline-none dark:text-white"
+                />
+                <label
+                  htmlFor="doc_codigo"
+                  className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
+                    formData.codigo
+                      ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
+                      : 'top-3.5 text-sm text-slate-400'
+                  } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
+                >
+                  N° de Documento
+                </label>
+              </div>
 
-              {/* 1. DINÁMICO PARA TARJETA DE OPERATIVIDAD (TUC):
-                     Exige vinculación a una Res. Municipal y a un CertiCAV Aprobado */}
-              {formData.tipoDocumento === 'TARJETA_OPERATIVIDAD' && (
-                <div className="rounded-2xl border-2 border-blue-200 bg-blue-50/60 p-4.5 dark:border-blue-900/60 dark:bg-blue-950/30 space-y-4">
-                  <div className="flex items-center justify-between border-b border-blue-200/80 pb-2 dark:border-blue-900/60">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-blue-900 dark:text-blue-300 flex items-center gap-2">
-                      <span className="size-2.5 rounded-full bg-blue-600 animate-pulse" />
-                      Requisitos Obligatorios: Resolución Municipal & CertiCAV Aprobado
-                    </h4>
-                    <span className="rounded-full bg-blue-200/70 text-blue-900 dark:bg-blue-900 dark:text-blue-200 px-2.5 py-0.5 text-[10px] font-bold">
-                      Control Legal TUC
-                    </span>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {/* Campo 1: Resolución Municipal (EXIGIDO) */}
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                        Resolución Municipal de Autorización *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.resMunicipal}
-                        onChange={(e) => setFormData({ ...formData, resMunicipal: e.target.value })}
-                        placeholder="Ej. R.M. N° 045-2024-MDJLO/GSCyT"
-                        className="w-full rounded-xl border border-blue-300 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 dark:border-blue-800 dark:bg-slate-900 dark:text-white"
-                      />
-                      <p className="text-[11px] text-blue-800 dark:text-blue-300 mt-1">
-                        ★ Obligatorio: Resolución que autoriza la operatividad en el distrito.
-                      </p>
-                    </div>
-
-                    {/* Campo 2: Vinculación a CertiCAV Aprobado (EXIGIDO) */}
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                        CertiCAV (Inspección Técnica) Aprobado *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.numeroInspeccion || (currentApprovedInsp?.numeroInspeccion || '')}
-                        onChange={(e) => setFormData({ ...formData, numeroInspeccion: e.target.value })}
-                        placeholder="Ej. CAV-2026-0089 (Debe estar APROBADO)"
-                        className="w-full rounded-xl border border-blue-300 bg-white px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 dark:border-blue-800 dark:bg-slate-900 dark:text-white"
-                      />
-                      
-                      {currentApprovedInsp ? (
-                        <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-1 flex items-center gap-1">
-                          <span>✓</span> CertiCAV Aprobado detectado en sistema: {currentApprovedInsp.numeroInspeccion} ({currentApprovedInsp.fecha})
-                        </p>
-                      ) : (
-                        <div className="mt-1.5 rounded-lg bg-amber-100 border border-amber-300 p-2 text-[10.5px] text-amber-900 dark:bg-amber-950/60 dark:border-amber-800 dark:text-amber-200">
-                          ⚠️ <strong>Advertencia Normativa:</strong> El vehículo {formData.vehiculoPlaca || '(sin placa)'} no tiene inspección CertiCAV previa registrada como APROBADO. Verifique el N° de CertiCAV para completar la emisión.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-blue-100 dark:border-blue-900/40">
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                        Dirección Legal del Titular (Impresión Carnet) *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.direccion}
-                        onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                        placeholder="Ej. Av. José Leonardo Ortiz 450"
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                        Titular / Propietario Validado
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={formData.propietario || '—'}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                      />
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        Asociación: <strong>{formData.asociacion || 'Independiente'}</strong>
-                      </p>
-                    </div>
-                  </div>
+              {/* Fila 3: Fechas + Estado */}
+              <div className="grid gap-4 sm:grid-cols-3">
+                {/* Fecha de Expedición */}
+                <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
+                  <input
+                    id="doc_expedicion"
+                    type="date"
+                    value={formData.fechaExpedicion}
+                    onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
+                    className={`peer block w-full bg-transparent px-3.5 pt-5 pb-1 text-xs font-semibold outline-none dark:text-white ${
+                      !formData.fechaExpedicion ? 'text-transparent focus:text-slate-800 dark:focus:text-white' : 'text-slate-800 dark:text-white'
+                    }`}
+                  />
+                  <label
+                    htmlFor="doc_expedicion"
+                    className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
+                      formData.fechaExpedicion
+                        ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
+                        : 'top-3.5 text-sm text-slate-400'
+                    } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
+                  >
+                    Fecha de Expedición
+                  </label>
                 </div>
-              )}
 
-              {/* 2. DINÁMICO PARA CURSO VIAL (CARNET DE SEGURIDAD VIAL):
-                     Debe mostrar N° de Licencia y Carga de Foto del Conductor */}
-              {formData.tipoDocumento === 'CURSO_VIAL' && (
-                <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-4.5 dark:border-emerald-900/60 dark:bg-emerald-950/30 space-y-4">
-                  <div className="flex items-center justify-between border-b border-emerald-200/80 pb-2 dark:border-emerald-900/60">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-emerald-900 dark:text-emerald-300 flex items-center gap-2">
-                      <span className="size-2.5 rounded-full bg-emerald-600 animate-pulse" />
-                      Carnet de Seguridad Vial: Datos de Licencia & Fotografía Digital
-                    </h4>
-                    <span className="rounded-full bg-emerald-200/70 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-200 px-2.5 py-0.5 text-[10px] font-bold">
-                      Curso Vial 2026
-                    </span>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-12 items-center">
-                    {/* Previsualización y carga de Foto Digital */}
-                    <div className="sm:col-span-4 flex flex-col items-center justify-center p-3 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/60 text-center">
-                      <div className="size-24 rounded-2xl border-2 border-emerald-500 overflow-hidden bg-slate-100 dark:bg-slate-800 mb-2 flex items-center justify-center shadow-xs">
-                        {formData.fotoConductor ? (
-                          <img src={formData.fotoConductor} alt="Conductor" className="size-full object-cover" />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center text-slate-400">
-                            <span className="text-2xl">📷</span>
-                            <span className="text-[10px] font-bold">Sin Fotografía</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        accept="image/*"
-                        onChange={handlePhotoUpload}
-                        className="hidden"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700 transition shadow-xs cursor-pointer"
-                      >
-                        Subir Foto Conductor
-                      </button>
-                      <p className="text-[10px] text-slate-400 mt-1">Formato carnet (JPG/PNG max 2MB)</p>
-                    </div>
-
-                    {/* Campos de texto de Conductor y Licencia */}
-                    <div className="sm:col-span-8 space-y-3">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                          N° de Licencia de Conducir *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.numeroLicencia}
-                          onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() })}
-                          placeholder="Ej. Q45892140 / Categoría B-IIc"
-                          className="w-full rounded-xl border border-emerald-300 bg-white px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-800 dark:bg-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                          Nombre Completo del Conductor
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.conductorNombres}
-                          onChange={(e) => setFormData({ ...formData, conductorNombres: e.target.value })}
-                          placeholder="Apellidos y Nombres del Conductor Capacitado"
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                            DNI del Conductor
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.conductorDni}
-                            onChange={(e) => setFormData({ ...formData, conductorDni: e.target.value })}
-                            placeholder="DNI 8 dígitos"
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-mono font-bold text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                            Res. de Gerencia
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.resMunicipal}
-                            onChange={(e) => setFormData({ ...formData, resMunicipal: e.target.value })}
-                            placeholder="R.G. N° 018-2025"
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                {/* Vencimiento */}
+                <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
+                  <input
+                    id="doc_expiracion"
+                    type="date"
+                    value={formData.fechaExpiracion}
+                    onChange={(e) => setFormData({ ...formData, fechaExpiracion: e.target.value })}
+                    className={`peer block w-full bg-transparent px-3.5 pt-5 pb-1 text-xs font-semibold outline-none dark:text-white ${
+                      !formData.fechaExpiracion ? 'text-transparent focus:text-slate-800 dark:focus:text-white' : 'text-slate-800 dark:text-white'
+                    }`}
+                  />
+                  <label
+                    htmlFor="doc_expiracion"
+                    className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
+                      formData.fechaExpiracion
+                        ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
+                        : 'top-3.5 text-sm text-slate-400'
+                    } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
+                  >
+                    Vencimiento
+                  </label>
                 </div>
-              )}
 
-              {/* 3. DINÁMICO PARA CERTICAV:
-                     Debe desplegar el Checklist de Inspección Técnica (luces, frenos, chasis, etc.) */}
-              {formData.tipoDocumento === 'CERTICAV' && (
-                <div className="rounded-2xl border-2 border-purple-200 bg-purple-50/60 p-4.5 dark:border-purple-900/60 dark:bg-purple-950/30 space-y-4">
-                  <div className="flex items-center justify-between border-b border-purple-200/80 pb-2 dark:border-purple-900/60">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-purple-900 dark:text-purple-300 flex items-center gap-2">
-                      <span className="size-2.5 rounded-full bg-purple-600 animate-pulse" />
-                      Ficha CertiCAV: Checklist Oficial de Inspección Técnica
-                    </h4>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-black ${
-                        formData.resultadoInspeccion === 'APROBADO'
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                          : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                      }`}
-                    >
-                      Resultado: {formData.resultadoInspeccion}
-                    </span>
-                  </div>
-
-                  {/* Checklist interactivo por categorías normativas */}
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    {/* Item 1: Luces */}
-                    <div className="flex items-center justify-between rounded-xl bg-white p-3 border border-purple-200 dark:bg-slate-900 dark:border-purple-900/50 shadow-2xs">
-                      <div>
-                        <strong className="text-xs block text-slate-800 dark:text-white">1. Sistema de Luces</strong>
-                        <span className="text-[10px] text-slate-400">Faros altas/bajas, direccionales, freno, luz de placa</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleChecklistToggle('luces')}
-                        className={`rounded-lg px-2.5 py-1 text-[11px] font-black transition cursor-pointer ${
-                          formData.checklist.luces
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                        }`}
-                      >
-                        {formData.checklist.luces ? '✓ Conforme' : '✕ Observado'}
-                      </button>
-                    </div>
-
-                    {/* Item 2: Frenos */}
-                    <div className="flex items-center justify-between rounded-xl bg-white p-3 border border-purple-200 dark:bg-slate-900 dark:border-purple-900/50 shadow-2xs">
-                      <div>
-                        <strong className="text-xs block text-slate-800 dark:text-white">2. Sistema de Frenos</strong>
-                        <span className="text-[10px] text-slate-400">Freno de servicio (pedal), estacionamiento, líquido</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleChecklistToggle('frenos')}
-                        className={`rounded-lg px-2.5 py-1 text-[11px] font-black transition cursor-pointer ${
-                          formData.checklist.frenos
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                        }`}
-                      >
-                        {formData.checklist.frenos ? '✓ Conforme' : '✕ Observado'}
-                      </button>
-                    </div>
-
-                    {/* Item 3: Chasis y Carrocería */}
-                    <div className="flex items-center justify-between rounded-xl bg-white p-3 border border-purple-200 dark:bg-slate-900 dark:border-purple-900/50 shadow-2xs">
-                      <div>
-                        <strong className="text-xs block text-slate-800 dark:text-white">3. Chasis & Carrocería</strong>
-                        <span className="text-[10px] text-slate-400">Bastidor sin fisuras, toldo reglamentario, asientos</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleChecklistToggle('chasis')}
-                        className={`rounded-lg px-2.5 py-1 text-[11px] font-black transition cursor-pointer ${
-                          formData.checklist.chasis
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                        }`}
-                      >
-                        {formData.checklist.chasis ? '✓ Conforme' : '✕ Observado'}
-                      </button>
-                    </div>
-
-                    {/* Item 4: Neumáticos y Dirección */}
-                    <div className="flex items-center justify-between rounded-xl bg-white p-3 border border-purple-200 dark:bg-slate-900 dark:border-purple-900/50 shadow-2xs">
-                      <div>
-                        <strong className="text-xs block text-slate-800 dark:text-white">4. Neumáticos & Dirección</strong>
-                        <span className="text-[10px] text-slate-400">Cocada reglamentaria, alineación, amortiguación</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleChecklistToggle('neumaticos')}
-                        className={`rounded-lg px-2.5 py-1 text-[11px] font-black transition cursor-pointer ${
-                          formData.checklist.neumaticos
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                        }`}
-                      >
-                        {formData.checklist.neumaticos ? '✓ Conforme' : '✕ Observado'}
-                      </button>
-                    </div>
-
-                    {/* Item 5: Equipamiento de Seguridad */}
-                    <div className="flex items-center justify-between rounded-xl bg-white p-3 border border-purple-200 dark:bg-slate-900 dark:border-purple-900/50 shadow-2xs sm:col-span-2">
-                      <div>
-                        <strong className="text-xs block text-slate-800 dark:text-white">5. Equipamiento de Seguridad</strong>
-                        <span className="text-[10px] text-slate-400">Extintor con carga vigente, botiquín de primeros auxilios, cintas reflectivas</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleChecklistToggle('seguridad')}
-                        className={`rounded-lg px-2.5 py-1 text-[11px] font-black transition cursor-pointer ${
-                          formData.checklist.seguridad
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                        }`}
-                      >
-                        {formData.checklist.seguridad ? '✓ Conforme' : '✕ Observado'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-purple-100 dark:border-purple-900/40">
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                        Inspector Técnico Evaluador
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.inspectorTecnico}
-                        onChange={(e) => setFormData({ ...formData, inspectorTecnico: e.target.value })}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                        Resultado de Inspección
-                      </label>
-                      <select
-                        value={formData.resultadoInspeccion}
-                        onChange={(e) => setFormData({ ...formData, resultadoInspeccion: e.target.value })}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                      >
-                        <option value="APROBADO">APROBADO — Emite CertiCAV Válido</option>
-                        <option value="DESAPROBADO">DESAPROBADO — Con Observaciones Técnicas</option>
-                      </select>
-                    </div>
-                  </div>
+                {/* Estado */}
+                <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
+                  <select
+                    id="doc_estado"
+                    value={formData.estado}
+                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                    className="peer block w-full bg-transparent px-3.5 pt-5 pb-1 text-xs font-bold text-slate-800 outline-none transition dark:text-white cursor-pointer"
+                  >
+                    <option value="" disabled hidden></option>
+                    <option value="VIGENTE">VIGENTE</option>
+                    <option value="EN_TRAMITE">EN TRÁMITE</option>
+                    <option value="VENCIDO">VENCIDO</option>
+                  </select>
+                  <label
+                    htmlFor="doc_estado"
+                    className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
+                      formData.estado
+                        ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
+                        : 'top-3.5 text-sm text-slate-400'
+                    } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
+                  >
+                    Estado
+                  </label>
                 </div>
-              )}
-
-              {/* 4. DINÁMICO PARA SOAT: Compañía Aseguradora */}
-              {formData.tipoDocumento === 'SOAT' && (
-                <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/60 p-4.5 dark:border-amber-900/60 dark:bg-amber-950/30 space-y-3">
-                  <div className="flex items-center justify-between border-b border-amber-200/80 pb-2 dark:border-amber-900/60">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300 flex items-center gap-2">
-                      <span className="size-2.5 rounded-full bg-amber-600" />
-                      Póliza SOAT Vehicular — Registro Externo SBS
-                    </h4>
-                    <span className="rounded-full bg-amber-200/70 text-amber-900 dark:bg-amber-900 dark:text-amber-200 px-2.5 py-0.5 text-[10px] font-bold">
-                      Control Externo
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1">
-                      Compañía Aseguradora Registrada *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.aseguradora}
-                      onChange={(e) => setFormData({ ...formData, aseguradora: e.target.value })}
-                      placeholder="Ej. La Positiva Seguros, Rímac, Pacífico, Mapfre, Interseguro..."
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                    />
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {['La Positiva', 'Rímac Seguros', 'Pacífico', 'Mapfre', 'Interseguro'].map((aseg) => (
-                        <button
-                          key={aseg}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, aseguradora: aseg })}
-                          className="rounded-lg bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 transition cursor-pointer"
-                        >
-                          + {aseg}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-amber-800 dark:text-amber-300 italic pt-1">
-                    ℹ️ Nota oficial: El SOAT es expedido por entidades aseguradoras privadas supervisadas por la SBS. Este módulo solo registra la póliza para verificación y fiscalización vehicular; no emite carnet municipal.
-                  </p>
-                </div>
-              )}
+              </div>
 
               {/* Botones de acción del formulario */}
-              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-2.5 text-xs font-black text-white hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-600/25 transition-all cursor-pointer"
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer flex items-center gap-2"
                 >
-                  {isEditing ? 'Guardar Cambios' : 'Emitir Documento Oficial'}
+                  <Icon name="document" className="size-4" />
+                  {isEditing ? 'Guardar Cambios' : 'Emitir Documento'}
                 </button>
               </div>
             </form>

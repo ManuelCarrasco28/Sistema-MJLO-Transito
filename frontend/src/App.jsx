@@ -30,7 +30,6 @@ function Layout({ onLogout, user, onUserUpdate }) {
   const getActiveItem = () => {
     const path = location.pathname
     if (path.includes('/superadmin/respaldo')) return 'Respaldo'
-    if (path.includes('/superadmin/catalogos')) return 'Catálogos maestros'
     if (path.includes('/superadmin/auditoria')) return 'Auditoría y logs'
     if (path.includes('/superadmin/configuracion')) return 'Configuración'
     if (path.includes('/superadmin/roles')) return 'Roles y permisos'
@@ -105,7 +104,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
   return (
     <main
       className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden ${
-        sidebarCollapsed ? 'lg:grid-cols-[5.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[17rem_minmax(0,1fr)]'
+        sidebarCollapsed ? 'lg:grid-cols-[5.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[19.5rem_minmax(0,1fr)]'
       }`}
     >
       <Sidebar

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,27 +7,28 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
   // Configuración de URL del Backend:
-  // 1. Local / Wi-Fi: Cambia esta IP si tu amigo o tú tienen otra IP en la red
+  // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
+  // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
   // 2. Producción: Puedes pasar --dart-define=API_URL=https://api.tudominio.com/api
-  static const String _defaultUrl = 'http://192.168.101.18:8080/api';
+  static const String _defaultUrl = 'http://10.0.2.2:8080/api';
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb ? 'http://127.0.0.1:8080/api' : _configuredUrl;
   static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api/?$'), '');
-  static const Duration _requestTimeout = Duration(seconds: 12);
+  static const Duration _requestTimeout = Duration(seconds: 20);
 
   static Future<Map<String, dynamic>> login(String username, String password) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/login'),
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Mobile-App': 'MJLO-TRANSITO',
-      },
-      body: jsonEncode({
-        'usuario': username,
-        'password': password,
-      }),
-    ).timeout(_requestTimeout);
+    final response = await _send(() => http.post(
+          Uri.parse('$baseUrl/login'),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Mobile-App': 'MJLO-TRANSITO',
+          },
+          body: jsonEncode({
+            'usuario': username,
+            'password': password,
+          }),
+        ));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -194,5 +196,15 @@ class ApiService {
       }
     } catch (_) {}
     return fallback;
+  }
+
+  static Future<http.Response> _send(Future<http.Response> Function() request) async {
+    try {
+      return await request().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception('No se pudo conectar con el servidor. Verifica que el backend esté encendido en http://10.0.2.2:8080/api o configura API_URL si usas celular físico.');
+    } catch (_) {
+      throw Exception('No se pudo conectar con el servidor. Verifica la conexión y que el backend esté levantado.');
+    }
   }
 }

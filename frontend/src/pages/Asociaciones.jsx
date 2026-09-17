@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
@@ -20,6 +21,7 @@ export function Asociaciones() {
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [mapPreview, setMapPreview] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [loadError, setLoadError] = useState('')
 
   const emptyForm = {
     tipo: 'ASOCIACION',
@@ -39,6 +41,7 @@ export function Asociaciones() {
   const [formData, setFormData] = useState(emptyForm)
 
   useEffect(() => {
+    setLoadError('')
     apiFetch('/asociaciones')
       .then((response) => response.ok ? response.json() : Promise.reject(response))
       .then((payload) => {
@@ -46,7 +49,7 @@ export function Asociaciones() {
         setAsociaciones(data)
         setCachedData('/asociaciones', data)
       })
-      .catch(() => { })
+      .catch(() => setLoadError('No se pudo cargar el padrón de asociaciones.'))
       .finally(() => setIsLoading(false))
   }, [])
 
@@ -164,6 +167,7 @@ export function Asociaciones() {
 
   return (
     <div className="space-y-3.5 sm:space-y-4">
+      {loadError && <PageLoadError message={loadError} />}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
