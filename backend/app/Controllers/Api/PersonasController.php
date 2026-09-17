@@ -79,6 +79,29 @@ class PersonasController extends ResourceController
             return $this->failValidationErrors('Número de documento, nombres y apellido paterno son requeridos.');
         }
 
+        $numeroDoc = trim($input['numeroDocumento']);
+        $tipoDocName = $input['tipoDocumento'] ?? 'DNI';
+        $docLen = strlen($numeroDoc);
+
+        if ($tipoDocName === 'DNI' && ($docLen !== 8 || !ctype_digit($numeroDoc))) {
+            return $this->failValidationErrors('El DNI debe tener exactamente 8 dígitos numéricos.');
+        }
+        if ($tipoDocName !== 'DNI' && ($docLen < 8 || $docLen > 15)) {
+            return $this->failValidationErrors('El número de documento debe tener entre 8 y 15 caracteres.');
+        }
+
+        if (!empty($input['email']) && !filter_var(trim($input['email']), FILTER_VALIDATE_EMAIL)) {
+            return $this->failValidationErrors('Por favor ingresa un correo electrónico válido.');
+        }
+
+        if (!empty($input['celular']) && (!ctype_digit(trim($input['celular'])) || strlen(trim($input['celular'])) !== 9)) {
+            return $this->failValidationErrors('El número de celular debe tener exactamente 9 dígitos numéricos.');
+        }
+
+        if ($db->table('personas')->where('numero', $numeroDoc)->countAllResults() > 0) {
+            return $this->failValidationErrors('El número de documento ya se encuentra registrado en el sistema.');
+        }
+
         $db->transStart();
 
         $tipoDocName = $input['tipoDocumento'] ?? 'DNI';
@@ -132,8 +155,42 @@ class PersonasController extends ResourceController
             return $this->failNotFound('ID de persona no especificado.');
         }
 
-        if (!$db->table('personas')->where('id', $id)->countAllResults()) {
+        $currentPersona = $db->table('personas')->where('id', $id)->get()->getRowArray();
+        if (!$currentPersona) {
             return $this->failNotFound('Persona no encontrada.');
+        }
+
+        $tipoDocName = $input['tipoDocumento'] ?? null;
+        
+        if (isset($input['numeroDocumento'])) {
+            $numeroDoc = trim($input['numeroDocumento']);
+            $currentTipoDoc = $tipoDocName ?? ($db->table('tipo_documentos_identidad')->where('id', $currentPersona['id_tipo_documento'])->get()->getRowArray()['nombre'] ?? 'DNI');
+            $docLen = strlen($numeroDoc);
+
+            if ($currentTipoDoc === 'DNI' && ($docLen !== 8 || !ctype_digit($numeroDoc))) {
+                return $this->failValidationErrors('El DNI debe tener exactamente 8 dígitos numéricos.');
+            }
+            if ($currentTipoDoc !== 'DNI' && ($docLen < 8 || $docLen > 15)) {
+                return $this->failValidationErrors('El número de documento debe tener entre 8 y 15 caracteres.');
+            }
+
+            if ($db->table('personas')->where('numero', $numeroDoc)->where('id !=', $id)->countAllResults() > 0) {
+                return $this->failValidationErrors('El número de documento ya se encuentra registrado en el sistema.');
+            }
+        }
+
+        if (isset($input['email'])) {
+            $email = trim($input['email']);
+            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return $this->failValidationErrors('Por favor ingresa un correo electrónico válido.');
+            }
+        }
+
+        if (isset($input['celular'])) {
+            $celular = trim($input['celular']);
+            if ($celular !== '' && (!ctype_digit($celular) || strlen($celular) !== 9)) {
+                return $this->failValidationErrors('El número de celular debe tener exactamente 9 dígitos numéricos.');
+            }
         }
 
         $db->transStart();

@@ -192,8 +192,8 @@ export function Personas({ user, onUserUpdate }) {
       alert('El DNI debe tener exactamente 8 dígitos numéricos.')
       return
     }
-    if (formData.tipoDocumento !== 'DNI' && (docLen < 8 || docLen > 12)) {
-      alert('El número de documento debe tener entre 8 y 12 caracteres.')
+    if (formData.tipoDocumento !== 'DNI' && (docLen < 8 || docLen > 15)) {
+      alert('El número de documento debe tener entre 8 y 15 caracteres.')
       return
     }
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
