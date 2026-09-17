@@ -691,9 +691,14 @@ export function Personas({ user, onUserUpdate }) {
                         id="per_num_doc"
                         type="text"
                         required
+                        maxLength={formData.tipoDocumento === 'DNI' ? 8 : 15}
                         placeholder=" "
                         value={formData.numeroDocumento}
-                        onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (formData.tipoDocumento === 'DNI' && !/^\d*$/.test(val)) return;
+                          setFormData({ ...formData, numeroDocumento: val })
+                        }}
                         className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
                       />
                       <label
@@ -813,10 +818,14 @@ export function Personas({ user, onUserUpdate }) {
                       <input
                         id="per_celular"
                         type="tel"
-                        maxLength={20}
+                        maxLength={9}
                         placeholder=" "
                         value={formData.celular}
-                        onChange={(e) => setFormData({ ...formData, celular: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!/^\d*$/.test(val)) return;
+                          setFormData({ ...formData, celular: val });
+                        }}
                         className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                       />
                       <label
