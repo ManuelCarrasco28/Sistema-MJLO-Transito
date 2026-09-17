@@ -17,6 +17,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->post('perfil/password', 'AuthController::cambiarPassword');
         $routes->get('dashboard', 'DashboardController::index');
         
+        $routes->get('vehiculos/persona/dni', 'VehiculosController::getVehiculosByPersonaDni');
         $routes->resource('vehiculos', ['controller' => 'VehiculosController']);
         $routes->resource('personas', ['controller' => 'PersonasController']);
         $routes->get('personal/catalogos', 'PersonalController::catalogos');

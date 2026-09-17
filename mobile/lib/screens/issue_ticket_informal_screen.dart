@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 
@@ -31,29 +30,11 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   
   // Lista dinámica de infracciones seleccionadas
   final List<String?> _selectedInfraccionesIds = [null];
-  
-  String _lugar = '';
-  String _observaciones = '';
-  
-  final List<XFile> _fotos = [];
-  Position? _currentPosition;
-  final ImagePicker _picker = ImagePicker();
-  
-  late TextEditingController _lugarController;
 
   @override
   void initState() {
     super.initState();
     _loadTiposInfraccion();
-    if (widget.reporteData['fuga_direccion'] != null) {
-      _lugar = widget.reporteData['fuga_direccion'];
-    }
-    if (widget.reporteData['fuga_observaciones'] != null && widget.reporteData['fuga_observaciones'].toString().isNotEmpty) {
-      _observaciones = 'FUGA DEL CONDUCTOR. ${widget.reporteData['fuga_observaciones']}';
-    } else if (widget.reporteData['fuga'] == true) {
-      _observaciones = 'FUGA DEL CONDUCTOR.';
-    }
-    _lugarController = TextEditingController(text: _lugar);
   }
 
   Future<void> _loadTiposInfraccion() async {
@@ -79,74 +60,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
     }
   }
 
-  Future<void> _takePhoto() async {
-    try {
-      final XFile? photo = await _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 80,
-      );
-      if (photo != null) {
-        setState(() {
-          _fotos.add(photo);
-        });
-      }
-    } catch (e) {
-      _showError('Error al tomar la foto: $e');
-    }
-  }
 
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showError('Los servicios de ubicación están desactivados.');
-        return;
-      }
-
-      permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _showError('Los permisos de ubicación fueron denegados.');
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        _showError('Los permisos de ubicación están denegados permanentemente.');
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition();
-      setState(() {
-        _currentPosition = position;
-        if (_lugar.trim().isEmpty) {
-          _lugar = '${position.latitude}, ${position.longitude}';
-          _lugarController.text = _lugar;
-        }
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ubicación obtenida correctamente')),
-        );
-      }
-    } catch (e) {
-      _showError('Error al obtener la ubicación: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
 
   double get _montoTotal {
     double total = 0;
@@ -208,14 +122,13 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
         'duenoDni': widget.reporteData['dni_dueno'] ?? '',
         'duenoNombres': widget.reporteData['nombres_dueno'] ?? '',
         'duenoApellidos': widget.reporteData['apellidos_dueno'] ?? '',
-        'lugar': _lugar,
+        'lugar': widget.reporteData['lugar'] ?? '',
         'infraccionesIds': infraccionesInts,
-        'observacionesAutoridad': _observaciones,
+        'observacionesAutoridad': widget.reporteData['observaciones'] ?? '',
         'inspectorId': inspectorId,
         'fuga': widget.reporteData['fuga'] ?? false,
         'fugaLatitud': widget.reporteData['fuga_latitud'],
         'fugaLongitud': widget.reporteData['fuga_longitud'],
-        // 'fugaImagenes': widget.reporteData['fuga_imagenes'], // Pendiente de implementación en backend
       };
 
       final result = await ApiService.createPapeleta(requestData);
@@ -244,8 +157,11 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   }
 
   Future<void> _submitOnlyReport() async {
-    if (_lugar.trim().isEmpty || _observaciones.trim().isEmpty) {
-      _showError('Ingrese lugar y observaciones del reporte');
+    final String lugar = widget.reporteData['lugar'] ?? '';
+    final String obs = widget.reporteData['observaciones'] ?? '';
+
+    if (lugar.trim().isEmpty || obs.trim().isEmpty) {
+      _showError('No se recibió lugar u observaciones del reporte');
       return;
     }
 
@@ -257,10 +173,14 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
           : '';
 
       List<String> fotosBase64 = [];
-      for (var foto in _fotos) {
-        final bytes = await foto.readAsBytes();
-        fotosBase64.add(base64Encode(bytes));
+      if (widget.reporteData['fotos'] != null) {
+        final List<XFile> receivedFotos = widget.reporteData['fotos'];
+        for (var foto in receivedFotos) {
+          final bytes = await foto.readAsBytes();
+          fotosBase64.add(base64Encode(bytes));
+        }
       }
+
       final fugaImagenes = widget.reporteData['fuga_imagenes'];
       if (fugaImagenes is List) {
         for (final path in fugaImagenes) {
@@ -275,9 +195,9 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
       await ApiService.createReporteIntervencion({
         'inspectorId': inspectorId,
         'placa': placa,
-        'lugar': _lugar,
-        'observaciones': _observaciones,
-        'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : '',
+        'lugar': lugar,
+        'observaciones': obs,
+        'coordenadas': widget.reporteData['coordenadas'] ?? '',
         'fotos': fotosBase64,
       });
 
@@ -301,7 +221,6 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   @override
   void dispose() {
     _signatureController.dispose();
-    _lugarController.dispose();
     super.dispose();
   }
 
@@ -458,106 +377,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                     ),
                   ],
 
-                  const SizedBox(height: 24),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _lugarController,
-                          decoration: InputDecoration(
-                            labelText: 'Lugar de Intervención',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            prefixIcon: const Icon(Icons.location_on, color: Colors.grey),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.my_location, color: Colors.blue),
-                              onPressed: _getCurrentLocation,
-                            ),
-                          ),
-                          onChanged: (val) => _lugar = val,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          initialValue: _observaciones,
-                          decoration: InputDecoration(
-                            labelText: 'Observaciones',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            alignLabelWithHint: true,
-                          ),
-                          maxLines: 3,
-                          onChanged: (val) => _observaciones = val,
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            const Text('Evidencia (Fotos):', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                            const Spacer(),
-                            ElevatedButton.icon(
-                              onPressed: _takePhoto,
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text('Tomar Foto'),
-                            ),
-                          ],
-                        ),
-                        if (_fotos.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            height: 100,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _fotos.length,
-                              itemBuilder: (context, index) {
-                                return Stack(
-                                  children: [
-                                    Container(
-                                      margin: const EdgeInsets.only(right: 8, top: 8),
-                                      width: 100,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(8),
-                                        image: DecorationImage(
-                                          image: FileImage(File(_fotos[index].path)),
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      right: 0,
-                                      top: 0,
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            _fotos.removeAt(index);
-                                          });
-                                        },
-                                        child: Container(
-                                          decoration: const BoxDecoration(
-                                            color: Colors.red,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.close, color: Colors.white, size: 20),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                  const SizedBox(height: 16),
 
                   const SizedBox(height: 32),
                   if (permitePapeleta) ...[

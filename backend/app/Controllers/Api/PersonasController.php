@@ -29,7 +29,7 @@ class PersonasController extends ResourceController
                 COALESCE(c.foto, '') AS fotoImg,
                 p.estado
             ", false)
-            ->join('ciudadanos c', 'c.id_persona = p.id', 'inner')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
             ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
             ->where('p.id', $id)
             ->get()
@@ -57,7 +57,7 @@ class PersonasController extends ResourceController
                 COALESCE(c.foto, '') AS fotoImg,
                 p.estado
             ", false)
-            ->join('ciudadanos c', 'c.id_persona = p.id', 'inner')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
             ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left');
 
         $numero = $this->request->getGet('numeroDocumento');

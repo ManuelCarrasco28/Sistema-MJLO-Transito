@@ -9,6 +9,7 @@ import 'register_vehicle_screen.dart';
 import 'history_screen.dart';
 import 'vehicle_details_screen.dart';
 import 'person_history_screen.dart';
+import 'person_details_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -117,16 +118,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_isLoadingMobileConfig) return;
 
     setState(() => _isLoadingMobileConfig = true);
-    final permitido = await _loadMobileConfig(silent: true);
-    if (!mounted) return;
+    try {
+      final permitido = await ApiService.permiteAplicarPapeletaMovil();
+      if (!mounted) return;
+      
+      setState(() => _permitePapeletaMovil = permitido);
 
-    if (permitido) {
-      _showSearchTypeSelectionDialog(context);
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
-      ).then((_) => _loadMobileConfig(silent: true));
+      if (permitido) {
+        _showSearchTypeSelectionDialog(context);
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
+        ).then((_) => _loadMobileConfig(silent: true));
+      }
+    } catch (_) {
+      // Ignorar
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingMobileConfig = false);
+      }
     }
   }
 
@@ -226,15 +237,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final value = controller.text.trim().toUpperCase();
               if (value.isEmpty) return;
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => VehicleDetailsScreen(
-                    searchQuery: value,
-                    searchType: searchType,
+              if (searchType == 'PLACA') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VehicleDetailsScreen(
+                      searchQuery: value,
+                      searchType: searchType,
+                    ),
                   ),
-                ),
-              );
+                );
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PersonDetailsScreen(dni: value),
+                  ),
+                );
+              }
             },
             child: const Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
@@ -506,12 +526,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       childAspectRatio: 0.9,
       children: [
         _buildActionCard(
-          title: permitePapeleta
-              ? 'Nueva Papeleta'
-              : 'Registrar Evidencia',
+          title: 'Consultar Veh. / Persona',
           subtitle: permitePapeleta
-              ? 'Generar infracción\nvehicular en tiempo real.'
-              : 'Enviar reporte para\nrevisión administrativa.',
+              ? 'Buscar y generar\ninfracciones.'
+              : 'Buscar y enviar\nreportes.',
           icon: permitePapeleta ? Icons.edit_document : Icons.camera_alt,
           isPrimary: true,
           badge: permitePapeleta ? 'NUEVO' : 'REPORTE',

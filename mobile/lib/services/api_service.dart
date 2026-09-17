@@ -13,9 +13,22 @@ class ApiService {
   static const String _defaultUrl = 'http://10.0.2.2:8080/api';
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
-  static const String baseUrl = kIsWeb ? 'http://127.0.0.1:8080/api' : _configuredUrl;
+  static const String baseUrl = kIsWeb
+      ? 'http://127.0.0.1:8080/api'
+      : _configuredUrl;
   static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api/?$'), '');
   static const Duration _requestTimeout = Duration(seconds: 20);
+
+  static Future<Map<String, String>> _getHeaders({bool isJson = true}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cookie = prefs.getString('session_cookie');
+    final headers = <String, String>{
+      'X-Mobile-App': 'MJLO-TRANSITO',
+      if (isJson) 'Content-Type': 'application/json',
+      if (cookie != null && cookie.isNotEmpty) 'Cookie': cookie,
+    };
+    return headers;
+  }
 
   static Future<Map<String, dynamic>> login(String username, String password) async {
     final response = await _send(() => http.post(
@@ -34,13 +47,26 @@ class ApiService {
       final data = jsonDecode(response.body);
       if (data['status'] == true) {
         final prefs = await SharedPreferences.getInstance();
-        
-        final idPersona = data['data']['id_persona'] ?? data['data']['id_trabajador'];
-        if (idPersona == null) {
-          throw Exception('El backend no devolvió el id_persona del inspector.');
+
+        final rawCookie = response.headers['set-cookie'];
+        if (rawCookie != null) {
+          final match = RegExp(r'session_user=[^;]+').firstMatch(rawCookie);
+          if (match != null) {
+            await prefs.setString('session_cookie', match.group(0)!);
+          }
         }
-        final int parsedId = idPersona is int ? idPersona : int.parse(idPersona.toString());
-        
+
+        final idPersona =
+            data['data']['id_persona'] ?? data['data']['id_trabajador'];
+        if (idPersona == null) {
+          throw Exception(
+            'El backend no devolvió el id_persona del inspector.',
+          );
+        }
+        final int parsedId = idPersona is int
+            ? idPersona
+            : int.parse(idPersona.toString());
+
         await prefs.setInt('id_persona', parsedId);
         await prefs.setString('nombres', data['data']['nombres']);
         await prefs.setString('apellidos', data['data']['apellidos']);
@@ -61,7 +87,12 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getPapeletas() async {
-    final response = await http.get(Uri.parse('$baseUrl/papeletas')).timeout(_requestTimeout);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/papeletas'),
+          headers: await _getHeaders(isJson: false),
+        )
+        .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['data'] ?? [];
@@ -70,16 +101,19 @@ class ApiService {
   }
 
   static Future<bool> permiteAplicarPapeletaMovil() async {
-    final uri = Uri.parse('$baseUrl/mobile/config').replace(queryParameters: {
-      '_': DateTime.now().millisecondsSinceEpoch.toString(),
-    });
-    final response = await http.get(
-      uri,
-      headers: const {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-      },
-    ).timeout(const Duration(seconds: 6));
+    final uri = Uri.parse('$baseUrl/mobile/config').replace(
+      queryParameters: {'_': DateTime.now().millisecondsSinceEpoch.toString()},
+    );
+    final response = await http
+        .get(
+          uri,
+          headers: {
+            ...await _getHeaders(isJson: false),
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        )
+        .timeout(const Duration(seconds: 6));
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['data']?['permite_aplicar_papeleta'] == true;
@@ -87,25 +121,35 @@ class ApiService {
     return false;
   }
 
-  static Future<Map<String, dynamic>> createPapeleta(Map<String, dynamic> data) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/papeletas'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    ).timeout(_requestTimeout);
+  static Future<Map<String, dynamic>> createPapeleta(
+    Map<String, dynamic> data,
+  ) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/papeletas'),
+          headers: await _getHeaders(),
+          body: jsonEncode(data),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       return jsonDecode(response.body);
     }
-    throw Exception(_extractError(response.body, 'Error al registrar papeleta'));
+    throw Exception(
+      _extractError(response.body, 'Error al registrar papeleta'),
+    );
   }
 
-  static Future<Map<String, dynamic>> createReporteIntervencion(Map<String, dynamic> data) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/reportes-intervencion'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    ).timeout(_requestTimeout);
+  static Future<Map<String, dynamic>> createReporteIntervencion(
+    Map<String, dynamic> data,
+  ) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/reportes-intervencion'),
+          headers: await _getHeaders(),
+          body: jsonEncode(data),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -114,14 +158,13 @@ class ApiService {
   }
 
   static Future<void> uploadFirma(int papeletaId, String firmaBase64) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/papeletas/$papeletaId/firma'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'firmaBase64': firmaBase64,
-        'estado': 'FIRMADO'
-      }),
-    ).timeout(_requestTimeout);
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/papeletas/$papeletaId/firma'),
+          headers: await _getHeaders(),
+          body: jsonEncode({'firmaBase64': firmaBase64, 'estado': 'FIRMADO'}),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_extractError(response.body, 'Error al subir firma'));
@@ -129,7 +172,12 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getTiposInfraccion() async {
-    final response = await http.get(Uri.parse('$baseUrl/tipos-infraccion')).timeout(_requestTimeout);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/tipos-infraccion'),
+          headers: await _getHeaders(isJson: false),
+        )
+        .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['data'] ?? [];
@@ -138,7 +186,12 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getVehiculos() async {
-    final response = await http.get(Uri.parse('$baseUrl/vehiculos')).timeout(_requestTimeout);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/vehiculos'),
+          headers: await _getHeaders(isJson: false),
+        )
+        .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['data'] ?? [];
@@ -146,19 +199,27 @@ class ApiService {
     return [];
   }
 
-  static Future<Map<String, dynamic>?> buscarVehiculo(String tipo, String valor) async {
-    final uri = Uri.parse('$baseUrl/mobile/vehiculos/buscar').replace(queryParameters: {
-      'tipo': tipo,
-      'valor': valor,
-      '_': DateTime.now().millisecondsSinceEpoch.toString(),
-    });
-    final response = await http.get(
-      uri,
-      headers: const {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
+  static Future<Map<String, dynamic>?> buscarVehiculo(
+    String tipo,
+    String valor,
+  ) async {
+    final uri = Uri.parse('$baseUrl/mobile/vehiculos/buscar').replace(
+      queryParameters: {
+        'tipo': tipo,
+        'valor': valor,
+        '_': DateTime.now().millisecondsSinceEpoch.toString(),
       },
-    ).timeout(_requestTimeout);
+    );
+    final response = await http
+        .get(
+          uri,
+          headers: {
+            ...await _getHeaders(isJson: false),
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -171,7 +232,12 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>?> getPersonaByDni(String dni) async {
-    final response = await http.get(Uri.parse('$baseUrl/personas?numeroDocumento=$dni')).timeout(_requestTimeout);
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/personas?numeroDocumento=$dni'),
+          headers: await _getHeaders(isJson: false),
+        )
+        .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final List<dynamic> list = data['data'] ?? [];
@@ -180,6 +246,20 @@ class ApiService {
       }
     }
     return null;
+  }
+
+  static Future<List<dynamic>> getVehiculosByPersonaDni(String dni) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/vehiculos/persona/dni?dni=$dni'),
+          headers: await _getHeaders(isJson: false),
+        )
+        .timeout(_requestTimeout);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data'] ?? [];
+    }
+    return [];
   }
 
   static String _extractError(String body, String fallback) {

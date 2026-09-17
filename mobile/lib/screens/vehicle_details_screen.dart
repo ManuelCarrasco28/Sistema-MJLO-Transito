@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 import 'issue_ticket_screen.dart';
-import 'person_history_screen.dart';
+import 'person_details_screen.dart';
 
 class VehicleDetailsScreen extends StatefulWidget {
   final String searchQuery;
@@ -187,43 +187,100 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
           ),
           
           const SizedBox(height: 32),
-          _buildSectionTitle('Propietario', Icons.person),
+          _buildSectionTitle('DATOS TÉCNICOS', Icons.build),
           _buildInfoCard([
-            _buildInfoRow('Nombre', _vehicleData!['propietario']),
+            _buildInfoRow('Tipo', _vehicleData!['tipo'] ?? '-'),
             _buildDivider(),
-            _buildInfoRow('Documento', _vehicleData!['propietarioDni']),
+            _buildInfoRow('Marca', _vehicleData!['marca'] ?? '-'),
             _buildDivider(),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                icon: const Icon(Icons.history, color: AppTheme.primaryBlue),
-                label: const Text('Ver Historial de Papeletas', style: TextStyle(color: AppTheme.primaryBlue, fontWeight: FontWeight.bold)),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => PersonHistoryScreen(
-                        dni: _vehicleData!['propietarioDni'].toString(),
-                        nombre: _vehicleData!['propietario'].toString(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ]),
-
-          const SizedBox(height: 24),
-          _buildSectionTitle('Datos del Vehículo', Icons.directions_car),
-          _buildInfoCard([
-            _buildInfoRow('Tipo', _vehicleData!['tipo'] ?? 'Desconocido'),
-            _buildDivider(),
-            _buildInfoRow('Marca / Modelo', '${_vehicleData!['marca'] ?? '-'} / ${_vehicleData!['modelo'] ?? '-'}'),
+            _buildInfoRow('Modelo', _vehicleData!['modelo'] ?? '-'),
             _buildDivider(),
             _buildInfoRow('Color', _vehicleData!['color'] ?? '-'),
             _buildDivider(),
-            _buildInfoRow('Formalización', _vehicleData!['estado'] ?? 'NO REGISTRADO', isHighlight: true),
+            _buildInfoRow('Categoría', _vehicleData!['categoria'] ?? '-'),
+            _buildDivider(),
+            _buildInfoRow('Carrocería', _vehicleData!['carroceria'] ?? '-'),
+            _buildDivider(),
+            _buildInfoRow('Año de Fabricación', _vehicleData!['anio']?.toString() ?? '-'),
           ]),
+
+          const SizedBox(height: 24),
+          _buildSectionTitle('REGISTRO SUNARP', Icons.account_balance),
+          _buildInfoCard([
+            _buildInfoRow('Nº Motor', _vehicleData!['serieMotor'] ?? '-'),
+            _buildDivider(),
+            _buildInfoRow('Nº Serie', _vehicleData!['numeroSerie'] ?? '-'),
+            _buildDivider(),
+            _buildInfoRow('Partida Registral', _vehicleData!['partidaRegistral'] ?? '-'),
+            _buildDivider(),
+            _buildInfoRow('Sede Registral', _vehicleData!['sedeRegistro'] ?? '-'),
+          ]),
+
+          const SizedBox(height: 24),
+          _buildSectionTitle('TITULAR / PROPIETARIO', Icons.person),
+          GestureDetector(
+            onTap: () {
+              if (_vehicleData!['propietarioDni'] != null && _vehicleData!['propietarioDni'].toString().isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PersonDetailsScreen(dni: _vehicleData!['propietarioDni'].toString()),
+                  ),
+                );
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.3)),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: AppTheme.primaryBlue.withOpacity(0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.person, color: AppTheme.primaryBlue),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _vehicleData!['propietario'] ?? 'Sin Propietario Asignado',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'DNI: ${_vehicleData!['propietarioDni'] ?? '-'}',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+
+          if (_vehicleData!['asociacion'] != null && _vehicleData!['asociacion'].toString().isNotEmpty) ...[
+            const SizedBox(height: 24),
+            _buildSectionTitle('ASOCIACIÓN / EMPRESA', Icons.business),
+            _buildInfoCard([
+              _buildInfoRow('Razón Social', _vehicleData!['asociacion'] ?? '-'),
+              _buildDivider(),
+              _buildInfoRow('Estado', _vehicleData!['estado'] ?? 'INFORMAL', isHighlight: true),
+            ]),
+          ] else ...[
+            const SizedBox(height: 24),
+            _buildInfoCard([
+              _buildInfoRow('Estado', 'INFORMAL', isHighlight: true),
+            ]),
+          ],
 
           const SizedBox(height: 32),
           _buildSectionTitle('Estado de Documentos', Icons.verified_user),

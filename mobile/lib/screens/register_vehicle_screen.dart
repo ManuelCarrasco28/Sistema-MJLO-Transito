@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart' as geocoding;
 import '../services/api_service.dart';
 import '../theme.dart';
 import 'issue_ticket_informal_screen.dart';
-import 'fuga_capture_screen.dart';
-
 class RegisterVehicleScreen extends StatefulWidget {
   const RegisterVehicleScreen({super.key});
 
@@ -23,8 +25,6 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
   final _nombresDueno = TextEditingController();
   final _apellidosDueno = TextEditingController();
   
-  bool _conductorFugo = false;
-
   // Vehículo
   String _estadoPlaca = 'CON_PLACA'; // 'CON_PLACA', 'SIN_PLACA'
   final _placaController = TextEditingController();
@@ -35,14 +35,107 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
   final _colorController = TextEditingController();
   final _motorController = TextEditingController();
 
+  // GPS y Evidencias
+  bool _isLoadingLocation = false;
+  final List<XFile> _fotos = [];
+  Position? _currentPosition;
+  final ImagePicker _picker = ImagePicker();
+  final _lugarController = TextEditingController();
+  final _observacionesController = TextEditingController();
+
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+      if (photo != null) {
+        setState(() {
+          _fotos.add(photo);
+        });
+      }
+    } catch (e) {
+      _showError('Error al tomar la foto: $e');
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showError('Los servicios de ubicación están desactivados.');
+        return;
+      }
+
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showError('Los permisos de ubicación fueron denegados.');
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _showError('Los permisos de ubicación están denegados permanentemente.');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      
+      // Geocodificación inversa
+      String address = '${position.latitude}, ${position.longitude}';
+      try {
+        List<geocoding.Placemark> placemarks = await geocoding.Geocoding().placemarkFromCoordinates(position.latitude, position.longitude);
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          address = '${place.thoroughfare ?? ''} ${place.subThoroughfare ?? ''}'.trim();
+          if (address.isEmpty) {
+            address = place.street ?? '';
+          }
+          final locality = place.locality ?? place.subAdministrativeArea ?? '';
+          if (locality.isNotEmpty) {
+            address = address.isEmpty ? locality : '$address, $locality';
+          }
+          if (address.trim().isEmpty) {
+            address = '${position.latitude}, ${position.longitude}';
+          }
+        }
+      } catch (e) {
+        // Fallback a coordenadas si falla
+      }
+
+      setState(() {
+        _currentPosition = position;
+        _lugarController.text = address;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ubicación obtenida correctamente')),
+        );
+      }
+    } catch (e) {
+      _showError('Error al obtener la ubicación: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+      }
+    }
+  }
+
   void _continuarAEvidencia() {
     if (_estadoPlaca == 'CON_PLACA' && _placaController.text.isEmpty) {
       _showError('Ingresa la placa del vehículo');
-      return;
-    }
-
-    if (_estadoPlaca == 'SIN_PLACA' && (_claseController.text.isEmpty || _motorController.text.isEmpty)) {
-      _showError('Ingresa la clase del vehículo y el código de motor (Obligatorio)');
       return;
     }
 
@@ -61,23 +154,18 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
       'marca_vehiculo': _marcaController.text.trim().toUpperCase(),
       'color_vehiculo': _colorController.text.trim().toUpperCase(),
       'motor_vehiculo': _motorController.text.trim().toUpperCase(),
+      'lugar': _lugarController.text.trim(),
+      'observaciones': _observacionesController.text.trim(),
+      'fotos': _fotos,
+      'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : null,
     };
 
-    if (_estadoPlaca == 'SIN_PLACA' && _conductorFugo) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => FugaCaptureScreen(reporteBaseData: reporteData),
-        ),
-      );
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => IssueTicketInformalScreen(reporteData: reporteData),
-        ),
-      );
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => IssueTicketInformalScreen(reporteData: reporteData),
+      ),
+    );
   }
 
   bool _isSearching = false;
@@ -129,6 +217,8 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
     _marcaController.dispose();
     _colorController.dispose();
     _motorController.dispose();
+    _lugarController.dispose();
+    _observacionesController.dispose();
     super.dispose();
   }
 
@@ -183,18 +273,6 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             const SizedBox(height: 12),
             
             Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
-              child: SwitchListTile(
-                title: const Text('El conductor se dio a la FUGA', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                value: _conductorFugo,
-                activeColor: Colors.red,
-                onChanged: (val) => setState(() => _conductorFugo = val),
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -223,19 +301,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             const SizedBox(height: 16),
             if (_estadoPlaca == 'CON_PLACA')
               _buildTextField(_placaController, 'Número de Placa (Ej: M1-5678)', Icons.directions_car, TextInputType.text)
-            else if (_conductorFugo) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.shade300)),
-                child: const Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.orange, size: 32),
-                    SizedBox(width: 12),
-                    Expanded(child: Text('Como el vehículo no tiene placa y el conductor se dio a la fuga, deberá tomar capturas fotográficas en el siguiente paso.', style: TextStyle(color: Colors.brown))),
-                  ],
-                ),
-              ),
-            ] else ...[
+            else ...[
               const Padding(
                 padding: EdgeInsets.only(bottom: 8.0),
                 child: Text('Características del Vehículo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
@@ -250,6 +316,120 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             ],
             
             const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8.0),
+              child: Text('Lugar y Evidencia', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+            ),
+            
+            TextFormField(
+              controller: _lugarController,
+              decoration: InputDecoration(
+                labelText: 'Lugar de Intervención',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: const Icon(Icons.location_on, color: Colors.grey),
+                suffixIcon: _isLoadingLocation 
+                  ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                  : IconButton(
+                      icon: const Icon(Icons.my_location, color: Colors.blue),
+                      onPressed: _getCurrentLocation,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _observacionesController,
+              decoration: InputDecoration(
+                labelText: 'Observaciones',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.white,
+                alignLabelWithHint: true,
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Evidencia Fotográfica', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                      ElevatedButton.icon(
+                        onPressed: _takePhoto,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange.shade600,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        icon: const Icon(Icons.camera_alt, size: 20),
+                        label: const Text('Tomar Foto', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  if (_fotos.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 100,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _fotos.length,
+                        itemBuilder: (context, index) {
+                          return Stack(
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(right: 12, top: 8),
+                                width: 100,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  image: DecorationImage(
+                                    image: FileImage(File(_fotos[index].path)),
+                                    fit: BoxFit.cover,
+                                  ),
+                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)],
+                                ),
+                              ),
+                              Positioned(
+                                right: 4,
+                                top: 0,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _fotos.removeAt(index);
+                                    });
+                                  },
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    padding: const EdgeInsets.all(4),
+                                    child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -267,10 +447,10 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 5,
               ),
-              icon: _estadoPlaca == 'SIN_PLACA' && _conductorFugo ? const Icon(Icons.camera_alt) : const Icon(Icons.arrow_forward),
-              label: Text(
-                _estadoPlaca == 'SIN_PLACA' && _conductorFugo ? 'Tomar evidencia y GPS' : 'Siguiente: Registrar evidencia',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text(
+                'Siguiente: Registrar evidencia',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
               ),
             ),
           ),

@@ -190,6 +190,27 @@ class VehiculosController extends ResourceController
         return $this->respond(['data' => $this->appendVehiculoRelations($rows)[0]]);
     }
 
+    public function getVehiculosByPersonaDni()
+    {
+        $dni = trim((string)$this->request->getGet('dni'));
+        $normalizado = $this->normalizeSearchValue($dni);
+
+        if ($normalizado === '') {
+            return $this->failValidationErrors('Ingrese el DNI para buscar sus vehículos.');
+        }
+
+        $db = \Config\Database::connect();
+        $builder = $this->vehiculosBaseQuery($db);
+        $builder->where("REPLACE(REPLACE(UPPER(p.numero), '-', ''), ' ', '') =", $normalizado);
+
+        $rows = $builder
+            ->orderBy('v.id', 'DESC')
+            ->get()
+            ->getResultArray();
+
+        return $this->respond(['data' => $this->appendVehiculoRelations($rows)]);
+    }
+
     public function create()
     {
         $db = \Config\Database::connect();
