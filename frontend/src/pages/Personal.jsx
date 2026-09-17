@@ -3,7 +3,7 @@ import { apiFetch } from '../config/api'
 import { Pagination } from '../components/ui/Pagination'
 import { Icon } from '../components/ui/Icon'
 
-const emptyForm = { tipo_documento: 'DNI', numero_documento: '', nombres: '', apellidos: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
+const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 const fieldClass = 'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900'
 
 export function Personal() {
@@ -17,6 +17,9 @@ export function Personal() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [catalogos, setCatalogos] = useState({ cargos: [], unidades: [] })
+  const [personas, setPersonas] = useState([])
+  const [personaSearch, setPersonaSearch] = useState('')
+  const [personaDropdownOpen, setPersonaDropdownOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -29,12 +32,30 @@ export function Personal() {
     apiFetch('/personal/catalogos').then((r) => r.ok ? r.json() : { cargos: [], unidades: [] }).then((data) => {
       if (active) setCatalogos(data)
     }).catch(() => {})
+    apiFetch('/personas').then((r) => r.ok ? r.json() : { data: [] }).then((data) => {
+      if (active) setPersonas(data.data || [])
+    }).catch(() => {})
     return () => { active = false }
   }, [])
 
   const filtered = rows.filter((row) => `${row.nombres} ${row.apellidos} ${row.numero_documento} ${row.cargo} ${row.unidad_organica} ${row.jerarquia} ${row.documento} ${row.solicitud}`.toLowerCase().includes(search.toLowerCase()))
   const visible = filtered.slice((page - 1) * pageSize, page * pageSize)
-  const openForm = (record) => { setForm({ ...emptyForm, ...record }); setFormError('') }
+  const openForm = (record) => {
+    setForm({ ...emptyForm, ...record, id_persona: record?.id_persona || record?.id || '' })
+    setPersonaSearch(record?.id ? `${record.numero_documento || ''} — ${record.nombres || ''} ${record.apellidos || ''}`.trim() : '')
+    setPersonaDropdownOpen(false)
+    setFormError('')
+  }
+
+  const selectedPersona = personas.find((persona) => String(persona.id) === String(form?.id_persona))
+  const personasDisponibles = personas
+    .filter((persona) => !rows.some((row) => String(row.id_persona || row.id) === String(persona.id)) || String(form?.id_persona) === String(persona.id))
+    .filter((persona) => {
+      const query = personaSearch.trim().toLowerCase()
+      if (!query) return true
+      return `${persona.numeroDocumento} ${persona.nombres} ${persona.apellidoPaterno} ${persona.apellidoMaterno}`.toLowerCase().includes(query)
+    })
+    .slice(0, 8)
 
   async function save(event) {
     event.preventDefault()
@@ -79,7 +100,7 @@ export function Personal() {
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
         <div className="p-4"><input aria-label="Buscar personal" placeholder="Buscar por trabajador, DNI, cargo, unidad o documento de asignación…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className={`${fieldClass} max-w-2xl`} /></div>
         <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-300"><tr>{['Documento de asignación', 'Trabajador', 'Cargo', 'Unidad orgánica', 'Jerarquía', 'Función', 'Estado', 'Acciones'].map((title) => <th key={title} className="px-4 py-3 font-semibold">{title}</th>)}</tr></thead>
+          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-300"><tr>{['Documento de asignación', 'Trabajador', 'Cargo', 'Unidad orgánica', 'Jerarquía', 'Función', 'Cuenta', 'Estado', 'Acciones'].map((title) => <th key={title} className="px-4 py-3 font-semibold">{title}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {visible.map((row) => <tr key={row.id} className="hover:bg-blue-50/40 dark:hover:bg-slate-800">
               <td className="px-4 py-4 max-w-[230px]">
@@ -95,10 +116,11 @@ export function Personal() {
               <td className="px-4 py-4 max-w-[240px]"><p className="truncate" title={row.unidad_organica}>{row.unidad_organica || '—'}</p></td>
               <td className="px-4 py-4">{row.jerarquia || '—'}</td>
               <td className="px-4 py-4"><span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{row.tipo_funcion || '—'}</span></td>
+              <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${Number(row.tiene_cuenta) === 1 ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'}`}>{Number(row.tiene_cuenta) === 1 ? 'Sí' : 'No'}</span></td>
               <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.estado === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>{row.estado}</span></td>
               <td className="px-4 py-4"><button onClick={() => openForm(row)} className="rounded-lg px-3 py-2 text-blue-600 hover:bg-blue-50 dark:text-blue-400">Editar</button></td>
             </tr>)}
-            {!visible.length && <tr><td colSpan={8} className="p-8 text-center text-slate-500">{loading ? 'Cargando personal…' : error ? 'Listado no disponible.' : 'No se encontraron trabajadores.'}</td></tr>}
+            {!visible.length && <tr><td colSpan={9} className="p-8 text-center text-slate-500">{loading ? 'Cargando personal…' : error ? 'Listado no disponible.' : 'No se encontraron trabajadores.'}</td></tr>}
           </tbody>
         </table></div>
         <Pagination currentPage={page} totalItems={filtered.length} itemsPerPage={pageSize} onPageChange={setPage} onItemsPerPageChange={setPageSize} />
@@ -107,11 +129,79 @@ export function Personal() {
         <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
           <h2 id="personal-title" className="text-xl font-bold">{form.id ? 'Editar trabajador' : 'Registrar trabajador'}</h2>
           <div className="my-5 grid gap-4 sm:grid-cols-2">
-            <label className="text-sm">Tipo de documento<select className={fieldClass} value={form.tipo_documento} onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}>{['DNI', 'CE', 'PASAPORTE'].map((type) => <option key={type}>{type}</option>)}</select></label>
-            {Object.entries({ numero_documento: 'Número de documento', nombres: 'Nombres', apellidos: 'Apellidos' }).map(([key, label]) => <label key={key} className="text-sm">{label}<input required maxLength={key === 'numero_documento' ? 20 : 100} className={fieldClass} value={form[key] || ''} onChange={(e) => setForm({ ...form, [key]: e.target.value })} /></label>)}
+            {!form.id && (
+              <div className="sm:col-span-2">
+                <label className="text-sm font-semibold">Persona registrada</label>
+                <input
+                  required
+                  className={fieldClass}
+                  placeholder="Busca por DNI o nombre de la persona..."
+                  value={personaSearch}
+                  onFocus={() => setPersonaDropdownOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setPersonaDropdownOpen(false), 120)
+                  }}
+                  onChange={(e) => {
+                    setPersonaSearch(e.target.value)
+                    setPersonaDropdownOpen(true)
+                    setForm({ ...form, id_persona: '' })
+                  }}
+                />
+                {personaDropdownOpen && !selectedPersona && (
+                  <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                    {personasDisponibles.map((persona) => (
+                      <button
+                        key={persona.id}
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          setForm((current) => ({ ...current, id_persona: persona.id }))
+                          setPersonaSearch(`${persona.numeroDocumento} — ${persona.nombres} ${persona.apellidoPaterno} ${persona.apellidoMaterno || ''}`.trim())
+                          setPersonaDropdownOpen(false)
+                        }}
+                        className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-blue-50 dark:border-slate-800 dark:hover:bg-slate-800"
+                      >
+                        <p className="font-bold text-slate-900 dark:text-white">{persona.nombres} {persona.apellidoPaterno} {persona.apellidoMaterno}</p>
+                        <p className="text-xs font-semibold text-blue-600">{persona.tipoDocumento}: {persona.numeroDocumento}</p>
+                      </button>
+                    ))}
+                    {!personasDisponibles.length && (
+                      <p className="px-3 py-3 text-sm font-semibold text-slate-500">No hay personas disponibles. Registra primero en Personas.</p>
+                    )}
+                  </div>
+                )}
+                {selectedPersona && (
+                  <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
+                    Seleccionado: {selectedPersona.nombres} {selectedPersona.apellidoPaterno} · {selectedPersona.numeroDocumento}
+                  </p>
+                )}
+                {!selectedPersona && (
+                  <p className="mt-2 text-xs font-semibold text-slate-400">
+                    Primero selecciona una persona registrada para asignarla como trabajador.
+                  </p>
+                )}
+              </div>
+            )}
+            {form.id && (
+              <div className="sm:col-span-2 rounded-xl bg-slate-50 px-3 py-3 text-sm dark:bg-slate-800">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">Persona vinculada</p>
+                <p className="mt-1 font-bold">{form.nombres} {form.apellidos}</p>
+                <p className="text-xs text-slate-500">{form.tipo_documento}: {form.numero_documento}</p>
+              </div>
+            )}
             <label className="text-sm">Cargo<input required list="cargos-list" className={fieldClass} value={form.cargo || ''} onChange={(e) => setForm({ ...form, cargo: e.target.value })} /><datalist id="cargos-list">{catalogos.cargos.map((c) => <option key={c.id} value={c.nombre} />)}</datalist></label>
             <label className="text-sm">Unidad orgánica<select className={fieldClass} value={form.id_unidad_organica || ''} onChange={(e) => setForm({ ...form, id_unidad_organica: e.target.value })}><option value="">Sin unidad asignada</option>{catalogos.unidades.map((u) => <option key={u.id} value={u.id}>{u.nombre} {u.jerarquia ? `(${u.jerarquia})` : ''}</option>)}</select></label>
             <label className="text-sm">Tipo de función<select className={fieldClass} value={form.tipo_funcion || 'Titular'} onChange={(e) => setForm({ ...form, tipo_funcion: e.target.value })}><option>Titular</option><option>Encargado</option><option>Operador</option></select></label>
+            {form.id && (
+              <div className="rounded-xl border border-slate-200 p-3 text-sm font-semibold dark:border-slate-700">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">Cuenta de usuario</p>
+                <p className={`mt-1 font-black ${Number(form.tiene_cuenta) === 1 ? 'text-blue-700' : 'text-slate-500'}`}>
+                  {Number(form.tiene_cuenta) === 1 ? 'Sí tiene usuario activo' : 'No tiene usuario activo'}
+                </p>
+                <p className="mt-1 text-xs font-medium text-slate-500">Este valor se actualiza desde el módulo Gestión de usuarios.</p>
+              </div>
+            )}
             <label className="text-sm sm:col-span-2">Solicitud / motivo<input className={fieldClass} value={form.solicitud || ''} onChange={(e) => setForm({ ...form, solicitud: e.target.value })} placeholder="Asignación, desplazamiento, encargatura..." /></label>
             <label className="text-sm">Documento de asignación<input className={fieldClass} value={form.documento || ''} onChange={(e) => setForm({ ...form, documento: e.target.value })} placeholder="MEMORÁNDUM / RESOLUCIÓN..." /></label>
             <label className="text-sm">Fecha documento<input type="date" className={fieldClass} value={form.fecha_documento || ''} onChange={(e) => setForm({ ...form, fecha_documento: e.target.value })} /></label>

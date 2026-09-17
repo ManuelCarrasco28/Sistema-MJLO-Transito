@@ -120,8 +120,8 @@ class _FugaCaptureScreenState extends State<FugaCaptureScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reporte Fuga y Sin Placa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.red.shade800,
+        title: const Text('Evidencia de Fuga y Sin Placa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: AppTheme.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
@@ -261,9 +261,9 @@ class _FugaCaptureScreenState extends State<FugaCaptureScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _continuar,
-        backgroundColor: Colors.red.shade700,
+        backgroundColor: AppTheme.primaryBlue,
         icon: const Icon(Icons.arrow_forward, color: Colors.white),
-        label: const Text('Proceder a Infracción', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: const Text('Continuar con evidencia', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );

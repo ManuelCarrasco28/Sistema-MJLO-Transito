@@ -36,18 +36,15 @@ class UsuariosController extends ResourceController
     public function create()
     {
         $input = $this->request->getJSON(true) ?: [];
-        
-        $doc = trim($input['numero_documento'] ?? '');
-        $nombres = trim($input['nombres'] ?? '');
-        $apePaterno = trim($input['apellido_paterno'] ?? '');
-        $apeMaterno = trim($input['apellido_materno'] ?? '');
+
+        $idTrabajador = (int)($input['id_trabajador'] ?? 0);
         $nombreUsuario = trim($input['nombre_usuario'] ?? '');
         $password = trim($input['password'] ?? '');
         $cargo = trim($input['cargo'] ?? 'Inspector de Tránsito');
         $estado = trim($input['estado'] ?? 'ACTIVO');
 
-        if (empty($doc) || empty($nombres) || empty($apePaterno) || empty($nombreUsuario) || empty($password)) {
-            return $this->failValidationErrors('Complete los campos obligatorios (Documento, Nombres, Apellido Paterno, Usuario y Contraseña).');
+        if (empty($idTrabajador) || empty($nombreUsuario) || empty($password)) {
+            return $this->failValidationErrors('Seleccione un trabajador y complete Usuario y Contraseña.');
         }
 
         if (strlen($password) < 6) {
@@ -56,62 +53,29 @@ class UsuariosController extends ResourceController
 
         $db = \Config\Database::connect();
 
-        // 1. Verificar si el nombre_usuario ya existe
         $existUser = $db->table('usuarios')->where('nombre_usuario', $nombreUsuario)->countAllResults();
         if ($existUser > 0) {
             return $this->failValidationErrors('El nombre de usuario ya se encuentra registrado.');
         }
 
+        $trabajador = $db->table('trabajadores t')
+            ->select('t.*, c.nombres, c.apellido_paterno, c.apellido_materno', false)
+            ->join('ciudadanos c', 'c.id_persona = t.id_persona', 'inner')
+            ->where('t.id_persona', $idTrabajador)
+            ->get()
+            ->getRowArray();
+
+        if (!$trabajador) {
+            return $this->failValidationErrors('El trabajador seleccionado no existe. Regístrelo primero en Trabajadores.');
+        }
+
+        $existUserTrabajador = $db->table('usuarios')->where('id_trabajador', $idTrabajador)->countAllResults();
+        if ($existUserTrabajador > 0) {
+            return $this->failValidationErrors('El trabajador seleccionado ya cuenta con un usuario registrado.');
+        }
+
         $db->transStart();
 
-        // 2. Verificar o insertar en personas
-        $persona = $db->table('personas')->where('numero', $doc)->get()->getRowArray();
-        if ($persona) {
-            $idPersona = $persona['id'];
-        } else {
-            $db->table('personas')->insert([
-                'id_tipo_documento' => 1, // DNI
-                'numero' => $doc,
-                'estado' => 'ACTIVO'
-            ]);
-            $idPersona = $db->insertID();
-        }
-
-        // 3. Verificar o insertar en ciudadanos
-        $ciudadano = $db->table('ciudadanos')->where('id_persona', $idPersona)->get()->getRowArray();
-        if (!$ciudadano) {
-            $db->table('ciudadanos')->insert([
-                'id_persona' => $idPersona,
-                'nombres' => $nombres,
-                'apellido_paterno' => $apePaterno,
-                'apellido_materno' => $apeMaterno
-            ]);
-        }
-
-        // 4. Verificar o insertar en trabajadores
-        $trabajador = $db->table('trabajadores')->where('id_persona', $idPersona)->get()->getRowArray();
-        if (!$trabajador) {
-            $db->table('trabajadores')->insert([
-                'id_persona' => $idPersona,
-                'tipo' => 'INTERNO',
-                'tiene_cuenta' => 1,
-                'estado' => 'ACTIVO'
-            ]);
-        } else {
-            $db->table('trabajadores')->where('id_persona', $idPersona)->update([
-                'tiene_cuenta' => 1,
-                'estado' => 'ACTIVO'
-            ]);
-        }
-
-        // 5. Verificar si este trabajador ya tiene usuario
-        $existUserTrabajador = $db->table('usuarios')->where('id_trabajador', $idPersona)->countAllResults();
-        if ($existUserTrabajador > 0) {
-            $db->transRollback();
-            return $this->failValidationErrors('El trabajador con este documento ya cuenta con un usuario registrado.');
-        }
-
-        // 6. Obtener o crear el cargo
         $cargoRow = $db->table('cargos')->where('nombre', $cargo)->get()->getRowArray();
         if (!$cargoRow) {
             $db->table('cargos')->insert(['nombre' => $cargo, 'estado' => 'ACTIVO']);
@@ -120,15 +84,14 @@ class UsuariosController extends ResourceController
             $cargoId = $cargoRow['id'];
         }
 
-        // 7. Registrar desplazamiento_oficina
-        $existDof = $db->table('desplazamiento_oficina')->where('id_trabajador', $idPersona)->get()->getRowArray();
+        $existDof = $db->table('desplazamiento_oficina')->where('id_trabajador', $idTrabajador)->get()->getRowArray();
         if ($existDof) {
             $db->table('desplazamiento_oficina')->where('id', $existDof['id'])->update([
                 'id_cargo' => $cargoId
             ]);
         } else {
             $db->table('desplazamiento_oficina')->insert([
-                'id_trabajador' => $idPersona,
+                'id_trabajador' => $idTrabajador,
                 'id_cargo' => $cargoId,
                 'documento' => 'DESIGNACION-' . date('Y'),
                 'fecha_documento' => date('Y-m-d'),
@@ -136,14 +99,17 @@ class UsuariosController extends ResourceController
             ]);
         }
 
-        // 8. Insertar usuario
         $db->table('usuarios')->insert([
-            'id_trabajador' => $idPersona,
+            'id_trabajador' => $idTrabajador,
             'nombre_usuario' => $nombreUsuario,
             'password_hash' => password_hash($password, PASSWORD_BCRYPT),
             'estado' => $estado
         ]);
         $newUserId = $db->insertID();
+
+        $db->table('trabajadores')->where('id_persona', $idTrabajador)->update([
+            'tiene_cuenta' => $estado === 'ACTIVO' ? 1 : 0
+        ]);
 
         $db->transComplete();
 
@@ -155,18 +121,17 @@ class UsuariosController extends ResourceController
             'message' => 'Usuario creado exitosamente.',
             'data' => [
                 'id' => $newUserId,
-                'id_trabajador' => $idPersona,
+                'id_trabajador' => $idTrabajador,
                 'nombre_usuario' => $nombreUsuario,
                 'usuario_estado' => $estado,
-                'nombres' => $nombres,
-                'apellido_paterno' => $apePaterno,
-                'apellido_materno' => $apeMaterno,
-                'nombre_completo' => trim("$nombres $apePaterno $apeMaterno"),
+                'nombres' => $trabajador['nombres'],
+                'apellido_paterno' => $trabajador['apellido_paterno'],
+                'apellido_materno' => $trabajador['apellido_materno'],
+                'nombre_completo' => trim($trabajador['nombres'] . ' ' . $trabajador['apellido_paterno'] . ' ' . ($trabajador['apellido_materno'] ?? '')),
                 'cargo' => $cargo
             ]
         ]);
     }
-
     public function update($id = null)
     {
         $input = $this->request->getJSON(true) ?: [];
@@ -187,6 +152,9 @@ class UsuariosController extends ResourceController
         // 2. Actualizar estado del usuario
         $db->table('usuarios')->where('id', $id)->update([
             'estado' => $input['estado']
+        ]);
+        $db->table('trabajadores')->where('id_persona', $usuario['id_trabajador'])->update([
+            'tiene_cuenta' => $input['estado'] === 'ACTIVO' ? 1 : 0
         ]);
 
         // 3. Obtener o crear el cargo
@@ -244,6 +212,28 @@ class UsuariosController extends ResourceController
             'password_hash' => password_hash($input['password'], PASSWORD_BCRYPT)
         ]);
 
-        return $this->respond(['message' => 'Contraseña restablecida correctamente.']);
+        return $this->respond($this->formatResponse(true, 'Contraseña actualizada correctamente.', $usuario), 200);
+    }
+
+    public function delete($id = null)
+    {
+        $model = new UsuarioModel();
+        
+        $usuario = $model->find($id);
+        if (!$usuario) {
+            return $this->failNotFound('Usuario no encontrado.');
+        }
+
+        if ($usuario['nombre_usuario'] === 'superadmin') {
+            return $this->fail('No se puede eliminar al usuario superadmin principal.', 403);
+        }
+
+        try {
+            $model->delete($id);
+            return $this->respondDeleted($this->formatResponse(true, 'Usuario eliminado correctamente.'));
+        } catch (\Exception $e) {
+            return $this->failServerError('Error al eliminar el usuario: ' . $e->getMessage());
+        }
     }
 }
+

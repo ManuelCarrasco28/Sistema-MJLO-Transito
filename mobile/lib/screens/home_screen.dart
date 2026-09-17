@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
@@ -15,16 +17,55 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   int _registradasHoy = 0;
-  bool _permitePapeletaMovil = true;
+  bool? _permitePapeletaMovil;
+  bool _isLoadingMobileConfig = true;
+  int _mobileConfigRequestSeq = 0;
+  Timer? _mobileConfigTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadDashboardData();
     _loadMobileConfig();
+    _startMobileConfigAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _mobileConfigTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _loadMobileConfig(silent: true);
+    _startMobileConfigAutoRefresh();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadDashboardData();
+      _loadMobileConfig(silent: true);
+      _startMobileConfigAutoRefresh();
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _mobileConfigTimer?.cancel();
+      _mobileConfigTimer = null;
+    }
+  }
+
+  void _startMobileConfigAutoRefresh() {
+    _mobileConfigTimer?.cancel();
+    _mobileConfigTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) return;
+      _loadMobileConfig(silent: true);
+    });
   }
 
   Future<void> _loadDashboardData() async {
@@ -50,10 +91,42 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadMobileConfig() async {
-    final permitido = await ApiService.permiteAplicarPapeletaMovil();
-    if (mounted) {
-      setState(() => _permitePapeletaMovil = permitido);
+  Future<bool> _loadMobileConfig({bool silent = false}) async {
+    final int requestId = ++_mobileConfigRequestSeq;
+    if (!silent && mounted) {
+      setState(() => _isLoadingMobileConfig = true);
+    }
+
+    bool permitido = false;
+    try {
+      permitido = await ApiService.permiteAplicarPapeletaMovil();
+    } catch (_) {
+      permitido = false;
+    }
+
+    if (mounted && requestId == _mobileConfigRequestSeq) {
+      setState(() {
+        _permitePapeletaMovil = permitido;
+        _isLoadingMobileConfig = false;
+      });
+    }
+    return permitido;
+  }
+
+  Future<void> _handlePrimaryControlAction() async {
+    if (_isLoadingMobileConfig) return;
+
+    setState(() => _isLoadingMobileConfig = true);
+    final permitido = await _loadMobileConfig(silent: true);
+    if (!mounted) return;
+
+    if (permitido) {
+      _showSearchTypeSelectionDialog(context);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
+      ).then((_) => _loadMobileConfig(silent: true));
     }
   }
 
@@ -150,13 +223,14 @@ class _HomeScreenState extends State<HomeScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () {
-              if (controller.text.trim().isEmpty) return;
+              final value = controller.text.trim().toUpperCase();
+              if (value.isEmpty) return;
               Navigator.pop(context);
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => VehicleDetailsScreen(
-                    searchQuery: controller.text.trim(),
+                    searchQuery: value,
                     searchType: searchType,
                   ),
                 ),
@@ -412,6 +486,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildActionGrid(BuildContext context) {
+    final bool configReady = _permitePapeletaMovil != null && !_isLoadingMobileConfig;
+    final bool permitePapeleta = _permitePapeletaMovil == true;
+    if (!configReady) {
+      return const SizedBox(
+        height: 220,
+        child: Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryBlue),
+        ),
+      );
+    }
+
     return GridView.count(
       crossAxisCount: 2,
       crossAxisSpacing: 16,
@@ -421,23 +506,16 @@ class _HomeScreenState extends State<HomeScreen> {
       childAspectRatio: 0.9,
       children: [
         _buildActionCard(
-          title: _permitePapeletaMovil ? 'Nueva Papeleta' : 'Registrar Evidencia',
-          subtitle: _permitePapeletaMovil
+          title: permitePapeleta
+              ? 'Nueva Papeleta'
+              : 'Registrar Evidencia',
+          subtitle: permitePapeleta
               ? 'Generar infracción\nvehicular en tiempo real.'
               : 'Enviar reporte para\nrevisión administrativa.',
-          icon: _permitePapeletaMovil ? Icons.edit_document : Icons.camera_alt,
+          icon: permitePapeleta ? Icons.edit_document : Icons.camera_alt,
           isPrimary: true,
-          badge: _permitePapeletaMovil ? 'NUEVO' : 'REPORTE',
-          onTap: () {
-            if (_permitePapeletaMovil) {
-              _showSearchTypeSelectionDialog(context);
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
-              );
-            }
-          },
+          badge: permitePapeleta ? 'NUEVO' : 'REPORTE',
+          onTap: () => _handlePrimaryControlAction(),
         ),
         _buildActionCard(
           title: 'Escáner',

@@ -35,6 +35,8 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (path.includes('/superadmin/configuracion')) return 'Configuración'
     if (path.includes('/superadmin/roles')) return 'Roles y permisos'
     if (path.includes('/superadmin/usuarios')) return 'Gestión de usuarios'
+    if (path.includes('/superadmin/personas')) return 'Personas'
+    if (path.includes('/superadmin/trabajadores')) return 'Trabajadores'
     if (path.includes('/superadmin')) return 'Dashboard Super Admin'
     if (path.includes('/vehiculos')) return 'Vehículos'
     if (path.includes('/personas')) return 'Personas'
@@ -139,6 +141,8 @@ function Layout({ onLogout, user, onUserUpdate }) {
           <Routes>
             <Route path="/" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
             <Route path="/superadmin" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/superadmin/personas" element={isSuperAdmin ? <Personas user={user} onUserUpdate={onUserUpdate} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/superadmin/trabajadores" element={isSuperAdmin ? <Personal /> : <Navigate to="/dashboard" replace />} />
             <Route path="/superadmin/:moduleId" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
             <Route path="/admin" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
             <Route path="/dashboard" element={onlyNormalUser(<DashboardHome />)} />

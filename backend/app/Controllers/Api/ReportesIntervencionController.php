@@ -113,7 +113,7 @@ class ReportesIntervencionController extends ResourceController
 
             if (is_array($fotos)) {
                 foreach ($fotos as $foto) {
-                    $foto = trim((string)$foto);
+                    $foto = $this->normalizarFoto(trim((string)$foto));
                     if ($foto !== '') {
                         $db->table('reporte_intervencion_fotos')->insert([
                             'id_reporte' => $id,
@@ -283,5 +283,18 @@ class ReportesIntervencionController extends ResourceController
         ]);
 
         return $this->respond(['message' => 'Reporte rechazado correctamente.']);
+    }
+
+    private function normalizarFoto(string $foto): string
+    {
+        if ($foto === '') {
+            return '';
+        }
+
+        if (str_starts_with($foto, 'data:image/')) {
+            return $foto;
+        }
+
+        return 'data:image/jpeg;base64,' . $foto;
     }
 }

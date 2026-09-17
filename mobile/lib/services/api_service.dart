@@ -8,21 +8,25 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Local / Wi-Fi: Cambia esta IP si tu amigo o tú tienen otra IP en la red
   // 2. Producción: Puedes pasar --dart-define=API_URL=https://api.tudominio.com/api
-  static const String _defaultUrl = 'http://10.207.78.109:8080/api';
+  static const String _defaultUrl = 'http://192.168.101.18:8080/api';
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb ? 'http://127.0.0.1:8080/api' : _configuredUrl;
   static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api/?$'), '');
+  static const Duration _requestTimeout = Duration(seconds: 12);
 
   static Future<Map<String, dynamic>> login(String username, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl/login'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Mobile-App': 'MJLO-TRANSITO',
+      },
       body: jsonEncode({
         'usuario': username,
         'password': password,
       }),
-    );
+    ).timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -55,7 +59,7 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getPapeletas() async {
-    final response = await http.get(Uri.parse('$baseUrl/papeletas'));
+    final response = await http.get(Uri.parse('$baseUrl/papeletas')).timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['data'] ?? [];
@@ -64,12 +68,21 @@ class ApiService {
   }
 
   static Future<bool> permiteAplicarPapeletaMovil() async {
-    final response = await http.get(Uri.parse('$baseUrl/mobile/config'));
+    final uri = Uri.parse('$baseUrl/mobile/config').replace(queryParameters: {
+      '_': DateTime.now().millisecondsSinceEpoch.toString(),
+    });
+    final response = await http.get(
+      uri,
+      headers: const {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+    ).timeout(const Duration(seconds: 6));
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['data']?['permite_aplicar_papeleta'] == true;
     }
-    return true;
+    return false;
   }
 
   static Future<Map<String, dynamic>> createPapeleta(Map<String, dynamic> data) async {
@@ -77,7 +90,7 @@ class ApiService {
       Uri.parse('$baseUrl/papeletas'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
-    );
+    ).timeout(_requestTimeout);
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -90,7 +103,7 @@ class ApiService {
       Uri.parse('$baseUrl/reportes-intervencion'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
-    );
+    ).timeout(_requestTimeout);
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -106,7 +119,7 @@ class ApiService {
         'firmaBase64': firmaBase64,
         'estado': 'FIRMADO'
       }),
-    );
+    ).timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_extractError(response.body, 'Error al subir firma'));
@@ -114,7 +127,7 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getTiposInfraccion() async {
-    final response = await http.get(Uri.parse('$baseUrl/tipos-infraccion'));
+    final response = await http.get(Uri.parse('$baseUrl/tipos-infraccion')).timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['data'] ?? [];
@@ -123,7 +136,7 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getVehiculos() async {
-    final response = await http.get(Uri.parse('$baseUrl/vehiculos'));
+    final response = await http.get(Uri.parse('$baseUrl/vehiculos')).timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['data'] ?? [];
@@ -131,8 +144,32 @@ class ApiService {
     return [];
   }
 
+  static Future<Map<String, dynamic>?> buscarVehiculo(String tipo, String valor) async {
+    final uri = Uri.parse('$baseUrl/mobile/vehiculos/buscar').replace(queryParameters: {
+      'tipo': tipo,
+      'valor': valor,
+      '_': DateTime.now().millisecondsSinceEpoch.toString(),
+    });
+    final response = await http.get(
+      uri,
+      headers: const {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+    ).timeout(_requestTimeout);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final vehicle = data['data'];
+      if (vehicle is Map<String, dynamic>) {
+        return vehicle;
+      }
+    }
+    return null;
+  }
+
   static Future<Map<String, dynamic>?> getPersonaByDni(String dni) async {
-    final response = await http.get(Uri.parse('$baseUrl/personas?numeroDocumento=$dni'));
+    final response = await http.get(Uri.parse('$baseUrl/personas?numeroDocumento=$dni')).timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final List<dynamic> list = data['data'] ?? [];

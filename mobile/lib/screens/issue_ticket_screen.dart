@@ -26,7 +26,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
 
   bool _isLoading = true;
   bool _isSubmitting = false;
-  bool _permitePapeletaMovil = true;
+  bool? _permitePapeletaMovil;
   List<dynamic> _tiposInfraccion = [];
   
   // Lista dinámica de infracciones seleccionadas
@@ -35,7 +35,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   String _lugar = '';
   String _observaciones = '';
   
-  List<XFile> _fotos = [];
+  final List<XFile> _fotos = [];
   Position? _currentPosition;
   final ImagePicker _picker = ImagePicker();
   
@@ -92,10 +92,14 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _permitePapeletaMovil = false;
+        _tiposInfraccion = [];
+        _isLoading = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error cargando infracciones: $e')),
+          const SnackBar(content: Text('No se pudo verificar el permiso móvil. Se registrará como reporte.')),
         );
       }
     }
@@ -182,7 +186,17 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   }
 
   Future<void> _submitTicket() async {
-    if (!_permitePapeletaMovil) {
+    bool permisoActual = _permitePapeletaMovil == true;
+    try {
+      permisoActual = await ApiService.permiteAplicarPapeletaMovil();
+      if (mounted) {
+        setState(() => _permitePapeletaMovil = permisoActual);
+      }
+    } catch (_) {
+      permisoActual = false;
+    }
+
+    if (!permisoActual) {
       await _submitOnlyReport();
       return;
     }
@@ -314,11 +328,14 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   @override
   Widget build(BuildContext context) {
     String identificador = widget.vehicleData['placa'] ?? widget.vehicleData['chasis'] ?? 'Sin ID';
+    final bool permisoVerificado = _permitePapeletaMovil != null;
+    final bool permitePapeleta = _permitePapeletaMovil == true;
+    final Color accentColor = permitePapeleta ? Colors.red.shade700 : AppTheme.primaryBlue;
     
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Generar Multa Oficial', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(!permisoVerificado ? 'Cargando...' : permitePapeleta ? 'Generar Papeleta' : 'Registrar Evidencia', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: AppTheme.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
@@ -378,7 +395,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                   ],
 
                   const SizedBox(height: 24),
-                  if (_permitePapeletaMovil) ...[
+                  if (permitePapeleta) ...[
                   _buildSectionTitle('Infracciones a Aplicar'),
                   Container(
                     decoration: BoxDecoration(
@@ -404,7 +421,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                                   Expanded(
                                     child: DropdownButtonFormField<String>(
                                       decoration: InputDecoration(
-                                        labelText: 'Multa ${index + 1}',
+                                        labelText: 'Infracción ${index + 1}',
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                         filled: true,
                                         fillColor: Colors.grey.shade50,
@@ -449,7 +466,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                             });
                           },
                           icon: const Icon(Icons.add, color: Color(0xFF1E3A8A)),
-                          label: const Text('Añadir otra multa', style: TextStyle(color: Color(0xFF1E3A8A), fontWeight: FontWeight.bold)),
+                          label: const Text('Añadir otra infracción', style: TextStyle(color: Color(0xFF1E3A8A), fontWeight: FontWeight.bold)),
                         )
                       ],
                     ),
@@ -459,7 +476,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      'TOTAL A PAGAR: S/ $_montoTotal',
+                      'TOTAL DE PAPELETA: S/ $_montoTotal',
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
                     ),
                   ),
@@ -581,7 +598,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                   ),
 
                   const SizedBox(height: 32),
-                  if (_permitePapeletaMovil) ...[
+                  if (permitePapeleta) ...[
                   _buildSectionTitle('Firma del Conductor Actual'),
                   Container(
                     decoration: BoxDecoration(
@@ -638,15 +655,15 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                   child: ElevatedButton.icon(
                     onPressed: _isSubmitting ? null : _submitTicket,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
+                      backgroundColor: accentColor,
                       foregroundColor: Colors.white,
                       elevation: 5,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    icon: _isSubmitting ? const SizedBox() : Icon(_permitePapeletaMovil ? Icons.gavel : Icons.send),
+                    icon: _isSubmitting ? const SizedBox() : Icon(permitePapeleta ? Icons.gavel : Icons.send),
                     label: _isSubmitting
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : Text(_permitePapeletaMovil ? 'Emitir Multas Oficiales' : 'Enviar Reporte a Administración', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                        : Text(permitePapeleta ? 'Generar Papeleta' : 'Enviar Evidencia a Administración', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),

@@ -8,11 +8,14 @@ class VehiculosController extends ResourceController
 {
     protected $format = 'json';
 
-    public function index()
+    private function normalizeSearchValue(string $value): string
     {
-        $db = \Config\Database::connect();
+        return strtoupper(preg_replace('/[^A-Z0-9]/', '', trim($value)) ?? '');
+    }
 
-        $rows = $db->table('vehiculos v')
+    private function vehiculosBaseQuery($db)
+    {
+        return $db->table('vehiculos v')
             ->select("
                 v.id,
                 v.placa,
@@ -45,10 +48,12 @@ class VehiculosController extends ResourceController
             ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
             ->join('personas p', 'p.id = vp.id_persona', 'left')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
-            ->orderBy('v.id', 'DESC')
-            ->get()
-            ->getResultArray();
+            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left');
+    }
+
+    private function appendVehiculoRelations(array $rows): array
+    {
+        $db = \Config\Database::connect();
 
         $vehiculoIds = array_map(static fn (array $row): int => (int)$row['id'], $rows);
         $documentosPorVehiculo = [];
@@ -136,7 +141,53 @@ class VehiculosController extends ResourceController
             ];
         }, $rows);
 
-        return $this->respond(['data' => $data]);
+        return $data;
+    }
+
+    public function index()
+    {
+        $db = \Config\Database::connect();
+
+        $rows = $this->vehiculosBaseQuery($db)
+            ->orderBy('v.id', 'DESC')
+            ->get()
+            ->getResultArray();
+
+        return $this->respond(['data' => $this->appendVehiculoRelations($rows)]);
+    }
+
+    public function buscarMobile()
+    {
+        $tipo = strtoupper(trim((string)$this->request->getGet('tipo')));
+        $valor = trim((string)$this->request->getGet('valor'));
+        $normalizado = $this->normalizeSearchValue($valor);
+
+        if ($normalizado === '') {
+            return $this->failValidationErrors('Ingrese un dato para buscar.');
+        }
+
+        $db = \Config\Database::connect();
+        $builder = $this->vehiculosBaseQuery($db);
+
+        if ($tipo === 'PLACA') {
+            $builder->where("REPLACE(REPLACE(UPPER(v.placa), '-', ''), ' ', '') =", $normalizado);
+        } elseif ($tipo === 'DNI') {
+            $builder->where("REPLACE(REPLACE(UPPER(p.numero), '-', ''), ' ', '') =", $normalizado);
+        } else {
+            $builder->where("REPLACE(REPLACE(UPPER(v.codigo_qr), '-', ''), ' ', '') =", $normalizado);
+        }
+
+        $rows = $builder
+            ->orderBy('v.id', 'DESC')
+            ->limit(1)
+            ->get()
+            ->getResultArray();
+
+        if (empty($rows)) {
+            return $this->failNotFound('No se encontró vehículo con el dato ingresado.');
+        }
+
+        return $this->respond(['data' => $this->appendVehiculoRelations($rows)[0]]);
     }
 
     public function create()

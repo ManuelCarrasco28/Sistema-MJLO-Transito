@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { apiFetch } from '../../config/api'
 
 export function Login({ onLogin }) {
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
+  const isLocalTurnstileBypass = import.meta.env.DEV
+    || (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname))
+  const turnstileSiteKey = isLocalTurnstileBypass ? '' : import.meta.env.VITE_TURNSTILE_SITE_KEY
   const [username, setUsername] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('remember_username')) || ''
   })

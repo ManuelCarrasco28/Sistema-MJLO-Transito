@@ -4,10 +4,7 @@ import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
 
 const DEFAULT_USER_FORM = {
-  numero_documento: '',
-  nombres: '',
-  apellido_paterno: '',
-  apellido_materno: '',
+  id_trabajador: '',
   nombre_usuario: '',
   password: '',
   cargo: 'INSPECTOR DE TRÁNSITO MUNICIPAL',
@@ -51,10 +48,14 @@ export function SuperAdminDashboard({ user }) {
   const { moduleId } = useParams()
   const [activeModule, setActiveModule] = useState(moduleId || null)
   const [usuarios, setUsuarios] = useState([])
+  const [trabajadores, setTrabajadores] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [trabajadorSearch, setTrabajadorSearch] = useState('')
+  const [trabajadorDropdownOpen, setTrabajadorDropdownOpen] = useState(false)
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [message, setMessage] = useState('')
   const [userForm, setUserForm] = useState(DEFAULT_USER_FORM)
+  const [userModalOpen, setUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [passwordUser, setPasswordUser] = useState(null)
   const [newPassword, setNewPassword] = useState('')
@@ -67,6 +68,8 @@ export function SuperAdminDashboard({ user }) {
   const [loadingMunicipalidad, setLoadingMunicipalidad] = useState(false)
 
   const adminModules = [
+    { id: 'personas', label: 'Personas', detail: 'Registrar y mantener datos personales base del sistema.', icon: 'idCard', tone: 'from-sky-600 to-cyan-500' },
+    { id: 'trabajadores', label: 'Trabajadores', detail: 'Gestionar personal municipal antes de crear credenciales.', icon: 'workerBadge', tone: 'from-indigo-600 to-blue-500' },
     { id: 'usuarios', label: 'Gestión de usuarios', detail: 'Crear cuentas, activar usuarios y asignar responsables.', icon: 'people', tone: 'from-blue-600 to-indigo-500' },
     { id: 'roles', label: 'Roles y permisos', detail: 'Definir accesos por perfil y estado de cuenta.', icon: 'shieldCheck', tone: 'from-emerald-600 to-teal-500' },
     { id: 'configuracion', label: 'Configuración del sistema', detail: 'Parámetros globales, seguridad y sesiones.', icon: 'settings', tone: 'from-violet-600 to-purple-500' },
@@ -97,6 +100,17 @@ export function SuperAdminDashboard({ user }) {
     }
   }
 
+  const fetchTrabajadores = async () => {
+    try {
+      const res = await apiFetch('/personal')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo cargar trabajadores.')
+      setTrabajadores(data.data || [])
+    } catch (error) {
+      setMessage(error.message || 'Error al cargar trabajadores.')
+    }
+  }
+
   const fetchMunicipalidadConfig = async () => {
     setLoadingMunicipalidad(true)
     try {
@@ -124,6 +138,7 @@ export function SuperAdminDashboard({ user }) {
 
   useEffect(() => {
     fetchUsuarios()
+    fetchTrabajadores()
     fetchMunicipalidadConfig()
   }, [])
 
@@ -195,6 +210,19 @@ export function SuperAdminDashboard({ user }) {
     )
   }, [usuarios, searchTerm])
 
+  const trabajadoresSinUsuario = useMemo(() => {
+    const q = trabajadorSearch.trim().toLowerCase()
+    return trabajadores
+      .filter((trabajador) => Number(trabajador.tiene_cuenta) !== 1 || String(trabajador.id_persona || trabajador.id) === String(userForm.id_trabajador))
+      .filter((trabajador) => {
+        if (!q) return true
+        return `${trabajador.numero_documento} ${trabajador.nombres} ${trabajador.apellidos} ${trabajador.cargo}`.toLowerCase().includes(q)
+      })
+      .slice(0, 8)
+  }, [trabajadores, trabajadorSearch, userForm.id_trabajador])
+
+  const selectedTrabajador = trabajadores.find((trabajador) => String(trabajador.id_persona || trabajador.id) === String(userForm.id_trabajador))
+
   const saveUser = async (event) => {
     event.preventDefault()
     setMessage('')
@@ -204,6 +232,10 @@ export function SuperAdminDashboard({ user }) {
       if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo crear el usuario.')
       setUsuarios((current) => [data.data, ...current])
       setUserForm(DEFAULT_USER_FORM)
+      setTrabajadorSearch('')
+      setTrabajadorDropdownOpen(false)
+      setUserModalOpen(false)
+      fetchTrabajadores()
       setMessage('Usuario creado correctamente.')
     } catch (error) {
       setMessage(error.message || 'Error al crear usuario.')
@@ -248,11 +280,45 @@ export function SuperAdminDashboard({ user }) {
     }
   }
 
+  const deleteUser = async (userToDelete) => {
+    setMessage('')
+    try {
+      const res = await apiFetch(`/usuarios/${userToDelete.id}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo eliminar el usuario.')
+      setUsuarios((current) => current.filter((item) => item.id !== userToDelete.id))
+      setMessage('Usuario eliminado correctamente.')
+    } catch (error) {
+      setMessage(error.message || 'Error al eliminar usuario.')
+    }
+  }
+
   const moduleStats = [
     { label: 'Usuarios activos', value: usuarios.filter((u) => u.usuario_estado === 'ACTIVO').length },
     { label: 'Usuarios inactivos', value: usuarios.filter((u) => u.usuario_estado !== 'ACTIVO').length },
     { label: 'Roles registrados', value: new Set(usuarios.map((u) => u.cargo).filter(Boolean)).size },
     { label: 'Módulos admin', value: adminModules.length }
+  ]
+
+  const rolesAgrupados = useMemo(() => {
+    const grupos = usuarios.reduce((acc, usuario) => {
+      const rol = usuario.cargo || 'Sin rol asignado'
+      if (!acc[rol]) acc[rol] = []
+      acc[rol].push(usuario)
+      return acc
+    }, {})
+    return Object.entries(grupos)
+      .map(([rol, miembros]) => ({ rol, miembros }))
+      .sort((a, b) => a.rol.localeCompare(b.rol))
+  }, [usuarios])
+
+  const dashboardStats = [
+    { label: 'Usuarios activos', value: moduleStats[0].value, detail: 'Cuentas habilitadas', icon: 'people', tone: 'text-emerald-600 bg-emerald-50' },
+    { label: 'Usuarios inactivos', value: moduleStats[1].value, detail: 'Cuentas bloqueadas', icon: 'lock', tone: 'text-rose-600 bg-rose-50' },
+    { label: 'Roles registrados', value: moduleStats[2].value, detail: 'Perfiles administrativos', icon: 'shieldCheck', tone: 'text-blue-600 bg-blue-50' },
+    { label: 'Permiso móvil', value: mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO', detail: mobilePermitePapeleta ? 'Móvil aplica papeletas' : 'Solo reportes/evidencias', icon: 'settings', tone: mobilePermitePapeleta ? 'text-violet-600 bg-violet-50' : 'text-amber-600 bg-amber-50' }
   ]
 
   return (
@@ -275,10 +341,6 @@ export function SuperAdminDashboard({ user }) {
             </p>
           </div>
         </div>
-        <div className="rounded-2xl bg-white px-4 py-3 text-sm shadow-sm dark:bg-slate-900">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Usuario activo</p>
-          <p className="mt-1 font-black text-slate-900 dark:text-white">{user?.usuario || 'superadmin'}</p>
-        </div>
       </div>
 
       {message && (
@@ -289,39 +351,53 @@ export function SuperAdminDashboard({ user }) {
 
       {isDashboard && (
         <>
-          <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 p-6 text-white shadow-2xl shadow-blue-950/20">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-cyan-100">
-              <Icon name="shieldCheck" className="size-4" />
-              Administración del sistema
-            </span>
-            <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Módulos administrativos</h2>
-            <p className="mt-2 max-w-3xl text-sm font-medium text-blue-100/80">
-              Selecciona un módulo para gestionar solo funciones de superadministración. Los módulos operativos quedan fuera de este perfil.
-            </p>
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {dashboardStats.map((stat) => (
+              <div key={stat.label} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-400">{stat.label}</p>
+                    <p className="mt-3 text-2xl font-black text-slate-950 dark:text-white">{stat.value}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{stat.detail}</p>
+                  </div>
+                  <span className={`grid size-11 shrink-0 place-items-center rounded-2xl ${stat.tone}`}>
+                    <Icon name={stat.icon} className="size-5" />
+                  </span>
+                </div>
+              </div>
+            ))}
           </section>
 
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {adminModules.map((module) => (
-              <button
-                key={module.id}
-                type="button"
-                onClick={() => navigate(`/superadmin/${module.id}`)}
-                className="rounded-3xl border border-slate-200/80 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 dark:bg-[#0f172a]"
-              >
-                <div className="flex items-start gap-4">
-                  <span className={`grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${module.tone} text-white shadow-lg`}>
-                    <Icon name={module.icon} className="size-6" />
-                  </span>
-                  <div className="min-w-0">
-                    <h2 className="text-base font-black text-slate-950 dark:text-white">{module.label}</h2>
-                    <p className="mt-1 text-sm font-semibold leading-5 text-slate-500 dark:text-slate-400">{module.detail}</p>
-                    <span className="mt-4 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                      Abrir módulo
+          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+            <div className="mb-5">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Administración del sistema</p>
+              <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-white">Módulos administrativos</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Funciones exclusivas para superadministración. Los módulos operativos quedan fuera de este perfil.</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {adminModules.map((module) => (
+                <button
+                  key={module.id}
+                  type="button"
+                  onClick={() => navigate(`/superadmin/${module.id}`)}
+                  className="group rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-lg dark:border-slate-800 dark:bg-slate-800/40"
+                >
+                  <div className="flex items-start gap-4">
+                    <span className={`grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${module.tone} text-white shadow-lg`}>
+                      <Icon name={module.icon} className="size-5" />
                     </span>
+                    <div className="min-w-0">
+                      <h2 className="text-base font-black text-slate-950 dark:text-white">{module.label}</h2>
+                      <p className="mt-1 text-sm font-semibold leading-5 text-slate-500 dark:text-slate-400">{module.detail}</p>
+                      <span className="mt-4 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 shadow-sm group-hover:text-blue-700 dark:bg-slate-900 dark:text-slate-300">
+                        Abrir módulo
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </section>
         </>
       )}
@@ -329,14 +405,9 @@ export function SuperAdminDashboard({ user }) {
       {!isDashboard && (
       <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <span className={`grid size-11 place-items-center rounded-2xl bg-gradient-to-br ${activeModuleInfo.tone} text-white shadow-lg`}>
-              <Icon name={activeModuleInfo.icon} className="size-5" />
-            </span>
-            <div>
-              <h2 className="text-xl font-black text-slate-900 dark:text-white">{activeModuleInfo.label}</h2>
-              <p className="text-sm font-semibold text-slate-500">{activeModuleInfo.detail}</p>
-            </div>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Módulo administrativo</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">{activeModuleInfo.detail}</p>
           </div>
           {(activeModule === 'usuarios' || activeModule === 'roles') && (
             <button onClick={fetchUsuarios} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white">
@@ -346,45 +417,41 @@ export function SuperAdminDashboard({ user }) {
         </div>
 
         {activeModule === 'usuarios' && (
-          <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-            <form onSubmit={saveUser} className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
-              <h3 className="text-base font-black text-slate-900 dark:text-white">Nuevo usuario</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input required value={userForm.numero_documento} onChange={(e) => setUserForm({ ...userForm, numero_documento: e.target.value })} placeholder="DNI" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-                <input required value={userForm.nombres} onChange={(e) => setUserForm({ ...userForm, nombres: e.target.value })} placeholder="Nombres" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-                <input required value={userForm.apellido_paterno} onChange={(e) => setUserForm({ ...userForm, apellido_paterno: e.target.value })} placeholder="Apellido paterno" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-                <input value={userForm.apellido_materno} onChange={(e) => setUserForm({ ...userForm, apellido_materno: e.target.value })} placeholder="Apellido materno" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-                <input required value={userForm.nombre_usuario} onChange={(e) => setUserForm({ ...userForm, nombre_usuario: e.target.value.toLowerCase().replace(/\s+/g, '') })} placeholder="Usuario" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-                <input required minLength={6} type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Contraseña" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-                <select value={userForm.cargo} onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm sm:col-span-2">
-                  {CARGOS.map((cargo) => <option key={cargo} value={cargo}>{cargo}</option>)}
-                </select>
-              </div>
-              <button className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700">
-                Crear usuario
-              </button>
-            </form>
-
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {moduleStats.map((stat) => (
+                <div key={stat.label} className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{stat.label}</span>
+                    <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+                      <Icon name="people" className="size-5" />
+                    </span>
+                  </div>
+                  <p className="mt-3 text-3xl font-black text-slate-800 dark:text-white">{stat.value}</p>
+                </div>
+              ))}
+            </div>
             <UsersTable
               usuarios={filteredUsers}
+              totalUsuarios={usuarios.length}
               loading={loadingUsers}
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
+              onCreate={() => {
+                setUserForm(DEFAULT_USER_FORM)
+                setTrabajadorSearch('')
+                setTrabajadorDropdownOpen(false)
+                setUserModalOpen(true)
+              }}
               onEdit={setEditingUser}
               onPassword={setPasswordUser}
+              onDelete={deleteUser}
             />
           </div>
         )}
 
         {activeModule === 'roles' && (
-          <UsersTable
-            usuarios={filteredUsers}
-            loading={loadingUsers}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            onEdit={setEditingUser}
-            onPassword={setPasswordUser}
-          />
+          <RolesPanel roles={rolesAgrupados} loading={loadingUsers} onEdit={setEditingUser} />
         )}
 
         {activeModule === 'configuracion' && (
@@ -504,6 +571,10 @@ export function SuperAdminDashboard({ user }) {
 
         {activeModule === 'auditoria' && (
           <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+              <h3 className="text-base font-black text-slate-900 dark:text-white">Eventos recientes</h3>
+              <p className="text-xs font-semibold text-slate-500">Registro resumido de acciones administrativas.</p>
+            </div>
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr><th className="px-4 py-3">Evento</th><th className="px-4 py-3">Usuario</th><th className="px-4 py-3">Estado</th></tr>
@@ -518,7 +589,7 @@ export function SuperAdminDashboard({ user }) {
 
         {activeModule === 'catalogos' && (
           <div className="grid gap-3 md:grid-cols-3">
-            {['Cargos', 'Oficinas', 'Tipos de documento', 'Tipos de vehículo', 'Estados del sistema', 'Parámetros UIT'].map((item) => (
+            {['Cargos', 'Oficinas', 'Tipos de documento', 'Tipos de vehículo', 'Estados del sistema'].map((item) => (
               <div key={item} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/40">
                 <p className="font-black text-slate-900 dark:text-white">{item}</p>
                 <p className="mt-1 text-xs font-semibold text-slate-500">Catálogo maestro administrativo.</p>
@@ -528,11 +599,18 @@ export function SuperAdminDashboard({ user }) {
         )}
 
         {activeModule === 'respaldo' && (
-          <div className="grid gap-4 md:grid-cols-3">
-            {moduleStats.map((stat) => (
-              <div key={stat.label} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/40">
-                <p className="text-xs font-black uppercase text-slate-400">{stat.label}</p>
-                <p className="mt-2 text-3xl font-black text-slate-900 dark:text-white">{stat.value}</p>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {[
+              { title: 'Base de datos', detail: 'Preparado para exportar copia de seguridad del sistema.', status: 'Pendiente de integrar' },
+              { title: 'Archivos y evidencias', detail: 'Control de fotos, reportes móviles y documentos adjuntos.', status: 'En revisión' },
+              { title: 'Restauración', detail: 'Proceso reservado para mantenimiento técnico autorizado.', status: 'Restringido' }
+            ].map((item) => (
+              <div key={item.title} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                <p className="font-black text-slate-900 dark:text-white">{item.title}</p>
+                <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{item.detail}</p>
+                <span className="mt-4 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 shadow-sm">
+                  {item.status}
+                </span>
               </div>
             ))}
           </div>
@@ -556,12 +634,91 @@ export function SuperAdminDashboard({ user }) {
         </Modal>
       )}
 
+      {userModalOpen && (
+        <Modal title="Nuevo usuario" onClose={() => setUserModalOpen(false)} maxWidth="max-w-3xl">
+          <form onSubmit={saveUser} className="space-y-4">
+            <div className="grid gap-3">
+              <div>
+                <label className="text-xs font-black uppercase tracking-wide text-slate-400">Trabajador municipal</label>
+                <input
+                  required
+                  value={trabajadorSearch}
+                  onFocus={() => setTrabajadorDropdownOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setTrabajadorDropdownOpen(false), 120)
+                  }}
+                  onChange={(e) => {
+                    setTrabajadorSearch(e.target.value)
+                    setTrabajadorDropdownOpen(true)
+                    setUserForm({ ...userForm, id_trabajador: '' })
+                  }}
+                  placeholder="Busca por DNI, nombre o cargo..."
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white"
+                />
+                {trabajadorDropdownOpen && !selectedTrabajador && (
+                  <div className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                    {trabajadoresSinUsuario.map((trabajador) => (
+                      <button
+                        key={trabajador.id_persona || trabajador.id}
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          const idTrabajador = trabajador.id_persona || trabajador.id
+                          setUserForm((current) => ({ ...current, id_trabajador: idTrabajador, cargo: trabajador.cargo || current.cargo }))
+                          setTrabajadorSearch(`${trabajador.numero_documento} — ${trabajador.nombres} ${trabajador.apellidos || ''}`.trim())
+                          setTrabajadorDropdownOpen(false)
+                        }}
+                        className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-blue-50 dark:border-slate-800 dark:hover:bg-slate-800"
+                      >
+                        <p className="font-bold text-slate-900 dark:text-white">{trabajador.nombres} {trabajador.apellidos}</p>
+                        <p className="text-xs font-semibold text-blue-600">{trabajador.tipo_documento}: {trabajador.numero_documento} · {trabajador.cargo || 'Sin cargo'}</p>
+                      </button>
+                    ))}
+                    {!trabajadoresSinUsuario.length && (
+                      <p className="px-3 py-3 text-sm font-semibold text-slate-500">
+                        No hay trabajadores disponibles. Registra primero al trabajador o verifica que no tenga usuario activo.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {selectedTrabajador && (
+                  <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
+                    Seleccionado: {selectedTrabajador.nombres} {selectedTrabajador.apellidos} · {selectedTrabajador.numero_documento}
+                  </p>
+                )}
+                {!selectedTrabajador && (
+                  <p className="mt-2 text-xs font-semibold text-slate-400">
+                    Primero selecciona un trabajador para poder crearle su cuenta de usuario.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input required value={userForm.nombre_usuario} onChange={(e) => setUserForm({ ...userForm, nombre_usuario: e.target.value.toLowerCase().replace(/\s+/g, '') })} placeholder="Usuario" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white" />
+              <input required minLength={6} type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Contraseña" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white" />
+              <select value={userForm.cargo} onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white sm:col-span-2">
+                {CARGOS.map((cargo) => <option key={cargo} value={cargo}>{cargo}</option>)}
+              </select>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <button type="button" onClick={() => setUserModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                Cancelar
+              </button>
+              <button className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2 text-sm font-black text-white shadow-md shadow-blue-600/20 hover:shadow-lg">
+                Crear usuario
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       {passwordUser && (
         <Modal title="Restablecer contraseña" onClose={() => setPasswordUser(null)}>
           <form onSubmit={resetPassword} className="space-y-4">
             <p className="text-sm font-semibold text-slate-600">Usuario: <strong>{passwordUser.nombre_usuario}</strong></p>
-            <input minLength={6} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nueva contraseña temporal" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <button className="w-full rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white">Restablecer contraseña</button>
+            <input minLength={6} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nueva contraseña" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <button className="w-full rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white">Actualizar contraseña</button>
           </form>
         </Modal>
       )}
@@ -569,31 +726,86 @@ export function SuperAdminDashboard({ user }) {
   )
 }
 
-function UsersTable({ usuarios, loading, searchTerm, setSearchTerm, onEdit, onPassword }) {
+function UsersTable({ usuarios, totalUsuarios, loading, searchTerm, setSearchTerm, onCreate, onEdit, onPassword, onDelete }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-base font-black text-slate-900 dark:text-white">Usuarios registrados</h3>
-        <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar usuario, nombre o rol..." className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1">
+          <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar usuario, nombre o rol..."
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-400"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={onCreate}
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] hover:shadow-lg active:scale-95"
+        >
+          <span className="text-base leading-none font-black">+</span>
+          <span>Nuevo usuario</span>
+        </button>
       </div>
+
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
+        <span>
+          Mostrando <strong className="text-slate-800 dark:text-white">{usuarios.length}</strong> de{' '}
+          <strong className="text-slate-800 dark:text-white">{totalUsuarios}</strong> usuarios registrados
+        </span>
+        <span className="hidden sm:inline text-[11px] text-slate-400">
+          Administración de accesos MDJLO · {new Date().getFullYear()}
+        </span>
+      </div>
+
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr><th className="px-4 py-3">Usuario</th><th className="px-4 py-3">Nombre</th><th className="px-4 py-3">Rol</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3 text-right">Acciones</th></tr>
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+            <tr>
+              <th className="px-3.5 py-3.5 whitespace-nowrap">Usuario</th>
+              <th className="px-3.5 py-3.5 whitespace-nowrap">Nombre completo</th>
+              <th className="px-3.5 py-3.5 whitespace-nowrap">Rol</th>
+              <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
+              <th className="sticky right-0 z-20 bg-slate-50/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:border-slate-800 dark:bg-slate-900/95 dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
+            </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {loading ? (
               <tr><td colSpan="5" className="px-4 py-8 text-center font-bold text-slate-500">Cargando...</td></tr>
             ) : usuarios.length ? usuarios.map((item) => (
-              <tr key={item.id}>
-                <td className="px-4 py-3 font-black">{item.nombre_usuario}</td>
-                <td className="px-4 py-3">{item.nombre_completo}</td>
-                <td className="px-4 py-3"><span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-black text-blue-700">{item.cargo || 'Sin rol'}</span></td>
-                <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-black ${item.usuario_estado === 'ACTIVO' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{item.usuario_estado}</span></td>
-                <td className="px-4 py-3">
+              <tr key={item.id} className="group transition-colors hover:bg-blue-50/30 dark:hover:bg-slate-800/40">
+                <td className="px-3.5 py-3.5">
+                  <p className="font-black text-slate-800 dark:text-white">{item.nombre_usuario}</p>
+                  <p className="text-xs font-semibold text-slate-400">ID trabajador: {item.id_trabajador}</p>
+                </td>
+                <td className="px-3.5 py-3.5 font-semibold text-slate-600 dark:text-slate-300">{item.nombre_completo}</td>
+                <td className="px-3.5 py-3.5">
+                  <span className="inline-flex max-w-[260px] rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-black uppercase leading-4 text-blue-700">
+                    {item.cargo || 'Sin rol'}
+                  </span>
+                </td>
+                <td className="px-3.5 py-3.5">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${item.usuario_estado === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'}`}>
+                    <span className="size-1.5 rounded-full bg-current" />
+                    {item.usuario_estado}
+                  </span>
+                </td>
+                <td className="sticky right-0 z-10 bg-white px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] group-hover:bg-blue-50/40 dark:border-slate-800/80 dark:bg-[#0f172a] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] dark:group-hover:bg-slate-800/60">
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => onEdit(item)} className="rounded-lg bg-blue-50 p-2 text-blue-600" title="Editar rol"><Icon name="shieldCheck" className="size-4" /></button>
-                    <button onClick={() => onPassword(item)} className="rounded-lg bg-amber-50 p-2 text-amber-600" title="Contraseña"><Icon name="settings" className="size-4" /></button>
+                    <button onClick={() => onEdit(item)} className="rounded-xl bg-blue-50 p-2 text-blue-600 transition hover:bg-blue-500 hover:text-white dark:bg-blue-950/60 dark:text-blue-400" title="Editar"><Icon name="pencil" className="size-4" /></button>
+                    <button onClick={() => onPassword(item)} className="rounded-xl bg-amber-50 p-2 text-amber-600 transition hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400" title="Contraseña"><Icon name="settings" className="size-4" /></button>
+                    <button onClick={() => { if(window.confirm('¿Está seguro de eliminar este usuario?')) { onDelete(item) } }} className="rounded-xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400" title="Eliminar"><Icon name="trash" className="size-4" /></button>
                   </div>
                 </td>
               </tr>
@@ -603,6 +815,55 @@ function UsersTable({ usuarios, loading, searchTerm, setSearchTerm, onEdit, onPa
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+function RolesPanel({ roles, loading, onEdit }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-semibold leading-6 text-blue-900">
+        Aquí se administra la relación entre roles y usuarios. No se repite la gestión de creación de usuarios; para cambiar un rol usa el botón de editar en cada integrante.
+      </div>
+
+      {loading ? (
+        <div className="rounded-2xl border border-slate-100 bg-white p-8 text-center text-sm font-bold text-slate-500">Cargando roles...</div>
+      ) : roles.length ? (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {roles.map((grupo) => (
+            <div key={grupo.rol} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-base font-black text-slate-950 dark:text-white">{grupo.rol}</p>
+                  <p className="mt-0.5 text-xs font-semibold text-slate-500">{grupo.miembros.length} usuario{grupo.miembros.length === 1 ? '' : 's'} asignado{grupo.miembros.length === 1 ? '' : 's'}</p>
+                </div>
+                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-blue-700 shadow-sm">{grupo.miembros.length}</span>
+              </div>
+
+              <div className="mt-4 divide-y divide-slate-200/70 overflow-hidden rounded-xl border border-slate-200/70 bg-white">
+                {grupo.miembros.map((usuario) => (
+                  <div key={usuario.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-slate-900">{usuario.nombre_usuario}</p>
+                      <p className="truncate text-xs font-semibold text-slate-500">{usuario.nombre_completo}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${usuario.usuario_estado === 'ACTIVO' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {usuario.usuario_estado}
+                      </span>
+                      <button onClick={() => onEdit(usuario)} className="rounded-lg bg-blue-50 p-2 text-blue-600" title="Editar rol">
+                        <Icon name="shieldCheck" className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-slate-100 bg-white p-8 text-center text-sm font-bold text-slate-500">No hay roles asignados.</div>
+      )}
     </div>
   )
 }
@@ -623,10 +884,10 @@ function LabeledInput({ label, value, onChange, className = '', type = 'text', p
   )
 }
 
-function Modal({ title, children, onClose }) {
+function Modal({ title, children, onClose, maxWidth = 'max-w-md' }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+      <div className={`w-full ${maxWidth} overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900`}>
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <h3 className="text-lg font-black text-slate-900 dark:text-white">{title}</h3>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><Icon name="close" /></button>

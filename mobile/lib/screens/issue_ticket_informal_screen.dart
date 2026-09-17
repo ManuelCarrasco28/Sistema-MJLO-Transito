@@ -26,7 +26,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
 
   bool _isLoading = true;
   bool _isSubmitting = false;
-  bool _permitePapeletaMovil = true;
+  bool? _permitePapeletaMovil;
   List<dynamic> _tiposInfraccion = [];
   
   // Lista dinámica de infracciones seleccionadas
@@ -35,7 +35,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   String _lugar = '';
   String _observaciones = '';
   
-  List<XFile> _fotos = [];
+  final List<XFile> _fotos = [];
   Position? _currentPosition;
   final ImagePicker _picker = ImagePicker();
   
@@ -66,10 +66,14 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _permitePapeletaMovil = false;
+        _tiposInfraccion = [];
+        _isLoading = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error cargando infracciones: $e')),
+          const SnackBar(content: Text('No se pudo verificar el permiso móvil. Se registrará como evidencia.')),
         );
       }
     }
@@ -156,7 +160,17 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   }
 
   Future<void> _submitReportAndTicket() async {
-    if (!_permitePapeletaMovil) {
+    bool permisoActual = _permitePapeletaMovil == true;
+    try {
+      permisoActual = await ApiService.permiteAplicarPapeletaMovil();
+      if (mounted) {
+        setState(() => _permitePapeletaMovil = permisoActual);
+      }
+    } catch (_) {
+      permisoActual = false;
+    }
+
+    if (!permisoActual) {
       await _submitOnlyReport();
       return;
     }
@@ -197,7 +211,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
         'lugar': _lugar,
         'infraccionesIds': infraccionesInts,
         'observacionesAutoridad': _observaciones,
-        'id_inspector': inspectorId,
+        'inspectorId': inspectorId,
         'fuga': widget.reporteData['fuga'] ?? false,
         'fugaLatitud': widget.reporteData['fuga_latitud'],
         'fugaLongitud': widget.reporteData['fuga_longitud'],
@@ -218,7 +232,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Reporte informal y multas generados con éxito!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('¡Papeleta generada con éxito!'), backgroundColor: Colors.green),
         );
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
@@ -246,6 +260,16 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
       for (var foto in _fotos) {
         final bytes = await foto.readAsBytes();
         fotosBase64.add(base64Encode(bytes));
+      }
+      final fugaImagenes = widget.reporteData['fuga_imagenes'];
+      if (fugaImagenes is List) {
+        for (final path in fugaImagenes) {
+          final file = File(path.toString());
+          if (await file.exists()) {
+            final bytes = await file.readAsBytes();
+            fotosBase64.add(base64Encode(bytes));
+          }
+        }
       }
 
       await ApiService.createReporteIntervencion({
@@ -284,11 +308,14 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   @override
   Widget build(BuildContext context) {
     String identificador = widget.reporteData['placa'] ?? widget.reporteData['chasis'] ?? 'Sin ID';
+    final bool permisoVerificado = _permitePapeletaMovil != null;
+    final bool permitePapeleta = _permitePapeletaMovil == true;
+    final Color accentColor = permitePapeleta ? Colors.red.shade700 : AppTheme.primaryBlue;
     
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: Text(_permitePapeletaMovil ? 'Multar Vehículo Informal' : 'Registrar Evidencia', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(!permisoVerificado ? 'Cargando...' : permitePapeleta ? 'Generar Papeleta' : 'Registrar Evidencia', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: AppTheme.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -305,14 +332,14 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.red.shade200, width: 2),
+                      border: Border.all(color: accentColor.withOpacity(0.25), width: 2),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Vehículo a Sancionar (Informal)',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey),
+                        Text(
+                          permitePapeleta ? 'Vehículo a sancionar' : 'Vehículo reportado',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -322,14 +349,14 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                         const SizedBox(height: 8),
                         Text(
                           'Conductor: ${widget.reporteData['nombres_conductor']} ${widget.reporteData['apellidos_conductor']}',
-                          style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: accentColor, fontWeight: FontWeight.bold),
                         )
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
                   
-                  if (_permitePapeletaMovil) ...[
+                  if (permitePapeleta) ...[
                   _buildSectionTitle('Infracciones a Aplicar'),
                   Container(
                     decoration: BoxDecoration(
@@ -355,7 +382,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                                   Expanded(
                                     child: DropdownButtonFormField<String>(
                                       decoration: InputDecoration(
-                                        labelText: 'Multa ${index + 1}',
+                                        labelText: 'Infracción ${index + 1}',
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                         filled: true,
                                         fillColor: Colors.grey.shade50,
@@ -400,7 +427,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                             });
                           },
                           icon: const Icon(Icons.add, color: Color(0xFF1E3A8A)),
-                          label: const Text('Añadir otra multa', style: TextStyle(color: Color(0xFF1E3A8A), fontWeight: FontWeight.bold)),
+                          label: const Text('Añadir otra infracción', style: TextStyle(color: Color(0xFF1E3A8A), fontWeight: FontWeight.bold)),
                         )
                       ],
                     ),
@@ -410,7 +437,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      'TOTAL A PAGAR: S/ $_montoTotal',
+                      'TOTAL DE PAPELETA: S/ $_montoTotal',
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
                     ),
                   ),
@@ -533,7 +560,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                   ),
 
                   const SizedBox(height: 32),
-                  if (_permitePapeletaMovil) ...[
+                  if (permitePapeleta) ...[
                   _buildSectionTitle('Firma del Conductor Actual'),
                   Container(
                     decoration: BoxDecoration(
@@ -588,15 +615,15 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                   child: ElevatedButton.icon(
                     onPressed: _isSubmitting ? null : _submitReportAndTicket,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
+                      backgroundColor: accentColor,
                       foregroundColor: Colors.white,
                       elevation: 5,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    icon: _isSubmitting ? const SizedBox() : Icon(_permitePapeletaMovil ? Icons.gavel : Icons.send),
+                    icon: _isSubmitting ? const SizedBox() : Icon(permitePapeleta ? Icons.gavel : Icons.send),
                     label: _isSubmitting
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : Text(_permitePapeletaMovil ? 'Guardar Reporte y Multas' : 'Enviar Reporte a Administración', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                        : Text(permitePapeleta ? 'Generar Papeleta' : 'Enviar Evidencia a Administración', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),

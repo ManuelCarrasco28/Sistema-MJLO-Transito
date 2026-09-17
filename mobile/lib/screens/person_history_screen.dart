@@ -14,8 +14,8 @@ class PersonHistoryScreen extends StatefulWidget {
 }
 
 class _PersonHistoryScreenState extends State<PersonHistoryScreen> {
-  List<dynamic> _multasDueno = [];
-  List<dynamic> _multasConductor = [];
+  List<dynamic> _papeletasDueno = [];
+  List<dynamic> _papeletasConductor = [];
   bool _isLoading = true;
 
   @override
@@ -33,15 +33,18 @@ class _PersonHistoryScreenState extends State<PersonHistoryScreen> {
 
       if (mounted) {
         setState(() {
-          _multasDueno = duenoList;
-          _multasConductor = conductorList;
+          _papeletasDueno = duenoList;
+          _papeletasConductor = conductorList;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando historial: $e')));
-        setState(() => _isLoading = false);
+        setState(() {
+          _papeletasDueno = [];
+          _papeletasConductor = [];
+          _isLoading = false;
+        });
       }
     }
   }
@@ -89,8 +92,8 @@ class _PersonHistoryScreenState extends State<PersonHistoryScreen> {
                   Expanded(
                     child: TabBarView(
                       children: [
-                        _buildList(_multasDueno, 'No tiene multas como dueño'),
-                        _buildList(_multasConductor, 'No tiene intervenciones como conductor'),
+                        _buildList(_papeletasDueno, 'No tiene papeletas como dueño'),
+                        _buildList(_papeletasConductor, 'No tiene intervenciones como conductor'),
                       ],
                     ),
                   ),
@@ -164,7 +167,7 @@ class _PersonHistoryScreenState extends State<PersonHistoryScreen> {
         
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Detalles de la Multa', style: TextStyle(color: isFormal ? Colors.blue.shade800 : Colors.red.shade800, fontWeight: FontWeight.bold)),
+          title: Text('Detalles de la Papeleta', style: TextStyle(color: isFormal ? Colors.blue.shade800 : Colors.red.shade800, fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

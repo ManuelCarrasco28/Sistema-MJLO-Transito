@@ -41,21 +41,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
     });
 
     try {
-      final vehiculos = await ApiService.getVehiculos();
-      dynamic matched;
-      
-      for (var v in vehiculos) {
-        if (widget.searchType == 'PLACA' && v['placa'] == widget.searchQuery) {
-          matched = v;
-          break;
-        } else if (widget.searchType == 'DNI' && v['propietarioDni'] == widget.searchQuery) {
-          matched = v;
-          break;
-        } else if (widget.searchType != 'PLACA' && widget.searchType != 'DNI' && v['codigoQr'] == widget.searchQuery) {
-          matched = v;
-          break;
-        }
-      }
+      final matched = await ApiService.buscarVehiculo(widget.searchType, widget.searchQuery);
 
       if (matched == null) {
         setState(() {
@@ -170,7 +156,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         icon: const Icon(Icons.assignment_late, size: 28),
-        label: const Text('Generar Multa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+        label: const Text('Continuar intervención', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
       ),
     );
   }
@@ -211,7 +197,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
               alignment: Alignment.centerRight,
               child: TextButton.icon(
                 icon: const Icon(Icons.history, color: AppTheme.primaryBlue),
-                label: const Text('Ver Historial de Multas', style: TextStyle(color: AppTheme.primaryBlue, fontWeight: FontWeight.bold)),
+                label: const Text('Ver Historial de Papeletas', style: TextStyle(color: AppTheme.primaryBlue, fontWeight: FontWeight.bold)),
                 onPressed: () {
                   Navigator.push(
                     context,

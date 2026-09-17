@@ -7,6 +7,8 @@ $routes->get('/', 'Home::index');
 $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($routes): void {
     $routes->options('(:any)', 'AuthController::options');
     $routes->post('login', 'AuthController::login');
+    $routes->get('mobile/config', 'MunicipalidadController::mobileConfig');
+    $routes->get('mobile/vehiculos/buscar', 'VehiculosController::buscarMobile');
 
     $routes->get('status', 'StatusController::index');
     $routes->group('', ['filter' => 'sessionauth'], static function ($routes): void {
@@ -39,12 +41,12 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('usuarios', 'UsuariosController::index');
         $routes->post('usuarios', 'UsuariosController::create');
         $routes->put('usuarios/(:num)', 'UsuariosController::update/$1');
+        $routes->delete('usuarios/(:num)', 'UsuariosController::delete/$1');
         $routes->put('usuarios/(:num)/password', 'UsuariosController::updatePassword/$1');
         $routes->get('municipalidad/config', 'MunicipalidadController::config');
         $routes->put('municipalidad/(:num)', 'MunicipalidadController::update/$1');
         $routes->post('municipalidad/anios', 'MunicipalidadController::saveAnio');
         $routes->put('configuracion-sistema', 'MunicipalidadController::saveConfiguracion');
-        $routes->get('mobile/config', 'MunicipalidadController::mobileConfig');
         $routes->get('reportes-intervencion', 'ReportesIntervencionController::index');
         $routes->post('reportes-intervencion', 'ReportesIntervencionController::create');
         $routes->post('reportes-intervencion/(:num)/convertir', 'ReportesIntervencionController::convertir/$1');

@@ -32,6 +32,7 @@ class PersonalController extends ResourceController
                 dof.fecha_documento,
                 dof.firma_documento,
                 dof.fecha_termino,
+                CASE WHEN ua.id IS NULL THEN 0 ELSE 1 END AS tiene_cuenta,
                 pe.estado
             ", false)
             ->join('personas p', 'p.id = pe.id_persona', 'inner')
@@ -41,6 +42,7 @@ class PersonalController extends ResourceController
             ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
             ->join('unidades_organicas uo', 'uo.id = dof.id_unidad_organica', 'left')
             ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
+            ->join('usuarios ua', "ua.id_trabajador = pe.id_persona AND ua.estado = 'ACTIVO'", 'left')
             ->orderBy('pe.id_persona', 'DESC')
             ->get()->getResultArray();
 
@@ -85,10 +87,13 @@ class PersonalController extends ResourceController
     private function saveRecord($id = null)
     {
         $input = $this->request->getJSON(true) ?: [];
-        foreach (['tipo_documento', 'numero_documento', 'nombres', 'apellidos', 'cargo', 'estado'] as $field) {
+        foreach (['cargo', 'estado'] as $field) {
             if (!isset($input[$field]) || !is_string($input[$field]) || trim($input[$field]) === '') {
                 return $this->failValidationErrors('Complete todos los campos del trabajador.');
             }
+        }
+        if ($id === null && empty($input['id_persona'])) {
+            return $this->failValidationErrors('Seleccione una persona registrada para crear el trabajador.');
         }
 
         $estado = trim($input['estado']);
@@ -99,11 +104,7 @@ class PersonalController extends ResourceController
         $db = \Config\Database::connect();
         $db->transStart();
         
-        // 1. Tipo de documento
-        $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', $input['tipo_documento'])->get()->getRowArray();
-        $tipoDocId = $tipoDocRow ? $tipoDocRow['id'] : 1; // Default to DNI
-
-        // 2. Cargo
+        // 1. Cargo
         $cargoRow = $db->table('cargos')->where('nombre', $input['cargo'])->get()->getRowArray();
         if (!$cargoRow) {
             $db->table('cargos')->insert(['nombre' => $input['cargo'], 'estado' => 'ACTIVO']);
@@ -119,38 +120,21 @@ class PersonalController extends ResourceController
         $firmaDocumento = trim($input['firma_documento'] ?? '');
         $fechaTermino = !empty($input['fecha_termino']) ? $input['fecha_termino'] : null;
 
-        // Split apellidos
-        $apellidos = explode(' ', $input['apellidos'], 2);
-        $apePaterno = $apellidos[0];
-        $apeMaterno = $apellidos[1] ?? '';
-
         if ($id === null) {
-            // Validate duplicate
-            if ($db->table('personas')->where('numero', $input['numero_documento'])->countAllResults() > 0) {
-                return $this->failValidationErrors('Ya existe un trabajador con ese documento.');
+            $id = (int)$input['id_persona'];
+            $persona = $db->table('personas')->where('id', $id)->get()->getRowArray();
+            if (!$persona) {
+                return $this->failValidationErrors('La persona seleccionada no existe.');
             }
-
-            // Insert Persona
-            $db->table('personas')->insert([
-                'id_tipo_documento' => $tipoDocId,
-                'numero' => $input['numero_documento'],
-                'estado' => 'ACTIVO'
-            ]);
-            $id = $db->insertID();
-
-            // Insert Ciudadano
-            $db->table('ciudadanos')->insert([
-                'id_persona' => $id,
-                'nombres' => $input['nombres'],
-                'apellido_paterno' => $apePaterno,
-                'apellido_materno' => $apeMaterno
-            ]);
+            if ($db->table('trabajadores')->where('id_persona', $id)->countAllResults() > 0) {
+                return $this->failValidationErrors('La persona seleccionada ya está registrada como trabajador.');
+            }
 
             // Insert Trabajador
             $db->table('trabajadores')->insert([
                 'id_persona' => $id,
                 'tipo' => 'INTERNO',
-                'tiene_cuenta' => 1,
+                'tiene_cuenta' => 0,
                 'estado' => $input['estado']
             ]);
 
@@ -172,22 +156,9 @@ class PersonalController extends ResourceController
                 return $this->failNotFound('Trabajador no encontrado.');
             }
             
-            // Update Persona
-            $db->table('personas')->where('id', $id)->update([
-                'id_tipo_documento' => $tipoDocId,
-                'numero' => $input['numero_documento']
-            ]);
-
-            // Update Ciudadano
-            $db->table('ciudadanos')->where('id_persona', $id)->update([
-                'nombres' => $input['nombres'],
-                'apellido_paterno' => $apePaterno,
-                'apellido_materno' => $apeMaterno
-            ]);
-
             // Update Trabajador
             $db->table('trabajadores')->where('id_persona', $id)->update([
-                'estado' => $input['estado']
+                'estado' => $input['estado'],
             ]);
             
             // Update Desplazamiento

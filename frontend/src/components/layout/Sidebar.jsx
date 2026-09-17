@@ -56,6 +56,8 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
 
   const groupIconConfig = {
     'Super Admin': { icon: 'shieldCheck', color: 'text-cyan-500 dark:text-cyan-300', bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
+    'Administración': { icon: 'settings', color: 'text-emerald-500 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+    'Mantenimiento': { icon: 'lock', color: 'text-slate-500 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800/60' },
     'Principal': { icon: 'dashboard', color: 'text-[#4318FF]', bg: 'bg-[#EEF2FF] dark:bg-blue-950/40' },
     'Padrón municipal': { icon: 'people', color: 'text-[#4318FF] dark:text-indigo-400', bg: 'bg-[#EEF2FF] dark:bg-indigo-950/40' },
     'Documentación': { icon: 'document', color: 'text-[#FFB547] dark:text-amber-400', bg: 'bg-[#FFF9EC] dark:bg-amber-950/40' },

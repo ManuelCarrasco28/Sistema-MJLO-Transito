@@ -127,7 +127,11 @@ class AuthController extends ResourceController
 
     private function writeRateLimit(string $usuario, array $data): void
     {
-        file_put_contents($this->rateLimitPath($usuario), json_encode($data), LOCK_EX);
+        try {
+            @file_put_contents($this->rateLimitPath($usuario), json_encode($data), LOCK_EX);
+        } catch (\Throwable $e) {
+            log_message('warning', 'No se pudo escribir rate-limit de login: ' . $e->getMessage());
+        }
     }
 
     private function ensureLoginIsNotRateLimited(string $usuario)
@@ -203,7 +207,15 @@ class AuthController extends ResourceController
         }
 
         $turnstileSecret = trim((string) env('turnstile.secretKey', ''));
-        if ($turnstileSecret !== '') {
+        $userAgent = $this->request->getUserAgent()->getAgentString();
+        $isMobileApp = $this->request->getHeaderLine('X-Mobile-App') === 'MJLO-TRANSITO'
+            || str_contains($userAgent, 'Dart/')
+            || str_contains($userAgent, 'Dart ');
+        $shouldValidateCaptcha = $turnstileSecret !== ''
+            && !$isMobileApp
+            && ENVIRONMENT === 'production';
+
+        if ($shouldValidateCaptcha) {
             if ($captchaToken === '') {
                 return $this->failValidationErrors('Completa la verificación de seguridad.');
             }

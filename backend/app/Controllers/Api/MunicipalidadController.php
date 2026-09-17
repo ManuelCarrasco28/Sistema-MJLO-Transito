@@ -51,7 +51,10 @@ class MunicipalidadController extends ResourceController
         $db = \Config\Database::connect();
         $config = $this->configuracionSistema($db);
 
-        return $this->respond([
+        return $this->response
+            ->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->setHeader('Pragma', 'no-cache')
+            ->setJSON([
             'data' => [
                 'permite_aplicar_papeleta' => ($config['mobile_permite_aplicar_papeleta']['valor'] ?? '0') === '1',
             ],

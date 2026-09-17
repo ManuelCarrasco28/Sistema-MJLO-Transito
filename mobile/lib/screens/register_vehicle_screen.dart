@@ -35,7 +35,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
   final _colorController = TextEditingController();
   final _motorController = TextEditingController();
 
-  void _continuarAMulta() {
+  void _continuarAEvidencia() {
     if (_estadoPlaca == 'CON_PLACA' && _placaController.text.isEmpty) {
       _showError('Ingresa la placa del vehículo');
       return;
@@ -137,7 +137,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Reporte Informal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('Registrar Evidencia', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF1E3A8A),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -179,7 +179,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             ],
             
             const SizedBox(height: 32),
-            const Text('3. Datos del Vehículo y Detención', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+            const Text('3. Datos del Vehículo y Evidencia', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
             const SizedBox(height: 12),
             
             Container(
@@ -260,16 +260,16 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             width: double.infinity,
             height: 55,
             child: ElevatedButton.icon(
-              onPressed: _continuarAMulta,
+              onPressed: _continuarAEvidencia,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
+                backgroundColor: AppTheme.primaryBlue,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 5,
               ),
               icon: _estadoPlaca == 'SIN_PLACA' && _conductorFugo ? const Icon(Icons.camera_alt) : const Icon(Icons.arrow_forward),
               label: Text(
-                _estadoPlaca == 'SIN_PLACA' && _conductorFugo ? 'Tomar Capturas y GPS' : 'Siguiente: Generar Multa',
+                _estadoPlaca == 'SIN_PLACA' && _conductorFugo ? 'Tomar evidencia y GPS' : 'Siguiente: Registrar evidencia',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
               ),
             ),

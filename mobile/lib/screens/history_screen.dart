@@ -11,7 +11,7 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  List<dynamic> _multasOficiales = [];
+  List<dynamic> _papeletasOficiales = [];
   List<dynamic> _reportesInformales = [];
   bool _isLoading = true;
 
@@ -37,14 +37,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
 
       setState(() {
-        _multasOficiales = formales;
+        _papeletasOficiales = formales;
         _reportesInformales = informales;
         _isLoading = false;
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando historial: $e')));
-        setState(() => _isLoading = false);
+        setState(() {
+          _papeletasOficiales = [];
+          _reportesInformales = [];
+          _isLoading = false;
+        });
       }
     }
   }
@@ -73,7 +76,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
             : TabBarView(
                 children: [
-                  _buildList(_multasOficiales, true),
+                  _buildList(_papeletasOficiales, true),
                   _buildList(_reportesInformales, false),
                 ],
               ),
@@ -152,7 +155,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Detalles de la Multa', style: TextStyle(color: isFormal ? Colors.blue.shade800 : Colors.red.shade800, fontWeight: FontWeight.bold)),
+          title: Text('Detalles de la Papeleta', style: TextStyle(color: isFormal ? Colors.blue.shade800 : Colors.red.shade800, fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
