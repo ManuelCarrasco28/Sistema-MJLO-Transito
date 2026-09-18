@@ -164,7 +164,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
   Widget _buildDetails() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 24.0, bottom: 100.0),
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 24.0, bottom: 140.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

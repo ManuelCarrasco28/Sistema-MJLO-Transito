@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 import 'vehicle_details_screen.dart';
+import 'register_alien_vehicle_screen.dart';
 
 class PersonDetailsScreen extends StatefulWidget {
   final String dni;
@@ -65,7 +66,7 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 80.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -116,6 +117,36 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
               ..._vehiculos.map((v) => _buildVehicleCard(v)),
             ]
           ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RegisterAlienVehicleScreen(conductor: _persona!),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 5,
+              ),
+              icon: const Icon(Icons.car_crash),
+              label: const Text(
+                'Infracción a Vehículo Distinto',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
+              ),
+            ),
+          ),
         ),
       ),
     );

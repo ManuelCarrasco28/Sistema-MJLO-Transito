@@ -25,6 +25,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('asociaciones', ['controller' => 'AsociacionesController']);
         $routes->resource('documentos', ['controller' => 'DocumentosController']);
         $routes->resource('papeletas', ['controller' => 'PapeletasController']);
+        $routes->get('operativos/activo/(:num)', 'OperativosController::activo/$1');
         $routes->resource('operativos', ['controller' => 'OperativosController']);
         $routes->post('papeletas/(:num)/pagar', 'PapeletasController::pagar/$1');
         $routes->post('papeletas/(:num)/firma', 'PapeletasController::firma/$1');

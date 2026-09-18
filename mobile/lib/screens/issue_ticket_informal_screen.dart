@@ -226,7 +226,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String identificador = widget.reporteData['placa'] ?? widget.reporteData['chasis'] ?? 'Sin ID';
+    String identificador = widget.reporteData['placa'] ?? widget.reporteData['chasis'] ?? 'Sin Identificar';
     final bool permisoVerificado = _permitePapeletaMovil != null;
     final bool permitePapeleta = _permitePapeletaMovil == true;
     final Color accentColor = permitePapeleta ? Colors.red.shade700 : AppTheme.primaryBlue;

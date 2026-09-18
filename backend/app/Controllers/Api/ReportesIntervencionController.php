@@ -15,7 +15,9 @@ class ReportesIntervencionController extends ResourceController
             return $this->respond(['data' => []]);
         }
 
-        $rows = $db->table('reportes_intervencion r')
+        $tieneOperativo = $db->fieldExists('id_operativo', 'reportes_intervencion');
+
+        $query = $db->table('reportes_intervencion r')
             ->select("
                 r.*,
                 COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa_visual,
@@ -23,15 +25,19 @@ class ReportesIntervencionController extends ResourceController
                 COALESCE(v.modelo, '') AS vehiculo_modelo,
                 COALESCE(v.color, '') AS vehiculo_color,
                 COALESCE(CONCAT(ci.nombres, ' ', ci.apellido_paterno, ' ', COALESCE(ci.apellido_materno, '')), 'Inspector Municipal') AS inspector_nombre,
-                p.numero_papeleta
+                p.numero_papeleta" . 
+                ($tieneOperativo ? ", r.id_operativo as operativoId, COALESCE(op.nombre, '') as operativoNombre" : "") . "
             ", false)
             ->join('vehiculos v', 'v.id = r.id_vehiculo', 'left')
             ->join('trabajadores t', 't.id_persona = r.id_inspector', 'left')
             ->join('ciudadanos ci', 'ci.id_persona = t.id_persona', 'left')
-            ->join('papeletas p', 'p.id = r.id_papeleta', 'left')
-            ->orderBy('r.id', 'DESC')
-            ->get()
-            ->getResultArray();
+            ->join('papeletas p', 'p.id = r.id_papeleta', 'left');
+            
+        if ($tieneOperativo) {
+            $query->join('operativos op', 'op.id = r.id_operativo', 'left');
+        }
+
+        $rows = $query->orderBy('r.id', 'DESC')->get()->getResultArray();
 
         foreach ($rows as &$row) {
             $row['id'] = (int)$row['id'];
@@ -62,6 +68,7 @@ class ReportesIntervencionController extends ResourceController
         $lugar = trim((string)($input['lugar'] ?? ''));
         $observaciones = trim((string)($input['observaciones'] ?? $input['observacionesAutoridad'] ?? ''));
         $coordenadas = trim((string)($input['coordenadas'] ?? ''));
+        $idOperativo = !empty($input['id_operativo']) ? (int)$input['id_operativo'] : null;
         $fotos = $input['fotos'] ?? [];
 
         if ($inspectorId <= 0) {
@@ -97,10 +104,15 @@ class ReportesIntervencionController extends ResourceController
             $fechaHora = (new \DateTime('now', new \DateTimeZone('America/Lima')))->format('Y-m-d H:i:s');
         }
 
+        if (!$db->fieldExists('id_operativo', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_operativo INT NULL AFTER id_papeleta');
+        }
+
         $db->transException(true)->transBegin();
         try {
             $db->table('reportes_intervencion')->insert([
                 'id_inspector' => $inspectorId,
+                'id_operativo' => $idOperativo,
                 'id_vehiculo' => $vehiculoId,
                 'placa' => $placa !== '' ? $placa : null,
                 'fecha_hora' => $fechaHora,

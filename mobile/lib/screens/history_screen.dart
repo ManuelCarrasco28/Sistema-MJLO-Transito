@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
+import 'operative_history_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -11,8 +12,8 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  List<dynamic> _papeletasOficiales = [];
-  List<dynamic> _reportesInformales = [];
+  List<dynamic> _todasActividades = [];
+  List<Map<String, dynamic>> _listaOperativos = [];
   bool _isLoading = true;
 
   @override
@@ -24,28 +25,50 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<void> _loadHistory() async {
     try {
       final papeletas = await ApiService.getPapeletas();
+      final reportes = await ApiService.getReportes();
 
-      List<dynamic> formales = [];
-      List<dynamic> informales = [];
+      List<dynamic> todas = [];
+      Map<String, Map<String, dynamic>> opsMap = {};
 
       for (var p in papeletas) {
-        if (p['tipoInfractor'] == 'FORMAL') {
-          formales.add(p);
-        } else {
-          informales.add(p);
+        todas.add({...p, 'es_reporte': false});
+        if (p['operativoId'] != null) {
+          final opId = p['operativoId'].toString();
+          opsMap[opId] = {
+            'id': p['operativoId'],
+            'nombre': p['operativoNombre'] ?? 'Operativo $opId',
+          };
         }
       }
+      
+      for (var r in reportes) {
+        todas.add({...r, 'es_reporte': true});
+        if (r['operativoId'] != null) {
+          final opId = r['operativoId'].toString();
+          opsMap[opId] = {
+            'id': r['operativoId'],
+            'nombre': r['operativoNombre'] ?? 'Operativo $opId',
+          };
+        }
+      }
+      
+      // Ordenar por fecha_hora descendente
+      todas.sort((a, b) {
+        final dateA = DateTime.tryParse(a['fecha_hora']?.toString() ?? a['fechaHora']?.toString() ?? '') ?? DateTime(2000);
+        final dateB = DateTime.tryParse(b['fecha_hora']?.toString() ?? b['fechaHora']?.toString() ?? '') ?? DateTime(2000);
+        return dateB.compareTo(dateA);
+      });
 
       setState(() {
-        _papeletasOficiales = formales;
-        _reportesInformales = informales;
+        _todasActividades = todas;
+        _listaOperativos = opsMap.values.toList();
         _isLoading = false;
       });
     } catch (e) {
       if (mounted) {
         setState(() {
-          _papeletasOficiales = [];
-          _reportesInformales = [];
+          _todasActividades = [];
+          _listaOperativos = [];
           _isLoading = false;
         });
       }
@@ -67,8 +90,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
             unselectedLabelColor: Colors.white70,
             indicatorColor: AppTheme.accentYellow,
             tabs: [
-              Tab(icon: Icon(Icons.receipt_long), text: 'Formales'),
-              Tab(icon: Icon(Icons.report_problem), text: 'Informales'),
+              Tab(icon: Icon(Icons.list_alt), text: 'Actividades'),
+              Tab(icon: Icon(Icons.local_police), text: 'Operativos'),
             ],
           ),
         ),
@@ -76,21 +99,65 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
             : TabBarView(
                 children: [
-                  _buildList(_papeletasOficiales, true),
-                  _buildList(_reportesInformales, false),
+                  _buildListActividades(_todasActividades),
+                  _buildListOperativos(),
                 ],
               ),
       ),
     );
   }
 
-  Widget _buildList(List<dynamic> list, bool isFormal) {
+  Widget _buildListOperativos() {
+    if (_listaOperativos.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.local_police, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text('No participaste en ningún operativo', style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _listaOperativos.length,
+      itemBuilder: (context, index) {
+        final op = _listaOperativos[index];
+        return Card(
+          elevation: 2,
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: ListTile(
+            leading: const CircleAvatar(backgroundColor: AppTheme.primaryBlue, child: Icon(Icons.local_police, color: Colors.white)),
+            title: Text(op['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OperativeHistoryScreen(
+                    operativo: op,
+                    actividades: _todasActividades,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildListActividades(List<dynamic> list) {
     if (list.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(isFormal ? Icons.receipt_long : Icons.report_problem, size: 64, color: Colors.grey.shade400),
+            Icon(Icons.list_alt, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
             Text('No hay actividades registradas', style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
           ],
@@ -99,74 +166,91 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
       itemCount: list.length,
       itemBuilder: (context, index) {
         final data = list[index];
-        final numPapeleta = data['numeroPapeleta'] ?? 'N° ${data['id'].toString().padLeft(6, '0')}';
-        final identificador = data['vehiculoPlaca'] ?? 'Sin placa';
-
-        if (isFormal) {
-          return Card(
-            elevation: 2,
-            margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.blue.shade100)),
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: Colors.blue.shade100, child: Icon(Icons.receipt_long, color: Colors.blue.shade700)),
-              title: Text('Formal - $numPapeleta', style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('Vehículo: $identificador\nMonto Total: S/ ${data['montoTotal']}'),
-              isThreeLine: true,
-              trailing: TextButton.icon(
-                icon: const Icon(Icons.visibility, size: 18),
-                label: const Text('Ver'),
-                style: TextButton.styleFrom(foregroundColor: Colors.blue.shade700),
-                onPressed: () => _showDetails(context, data, true, identificador),
-              ),
-            ),
-          );
+        final esReporte = data['es_reporte'] == true;
+        
+        final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
+        final identificador = esReporte ? (data['placa_visual'] ?? 'Sin placa') : (data['vehiculoPlaca'] ?? 'Sin placa');
+        
+        final isFormal = !esReporte && data['tipoInfractor'] == 'FORMAL';
+        final esSinIdentificar = esReporte || (data['vehiculoPlaca'] != null && data['vehiculoPlaca'].toString().startsWith('SIN-PLACA'));
+        
+        Color cardColor;
+        Color avatarBgColor;
+        IconData iconData;
+        String tipoTexto;
+        
+        if (esSinIdentificar) {
+          cardColor = Colors.orange;
+          avatarBgColor = Colors.orange.shade100;
+          iconData = Icons.help_outline;
+          tipoTexto = esReporte ? 'Sin Identificar (Reporte)' : 'Sin Identificar (Infracción)';
+        } else if (isFormal) {
+          cardColor = Colors.blue;
+          avatarBgColor = Colors.blue.shade100;
+          iconData = Icons.receipt_long;
+          tipoTexto = 'Formal (Infracción)';
         } else {
-          return Card(
-            elevation: 2,
-            margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.red.shade100)),
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: Colors.red.shade100, child: Icon(Icons.report_problem, color: Colors.red.shade700)),
-              title: Text('Informal - $numPapeleta', style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('Vehículo: $identificador\nMonto Total: S/ ${data['montoTotal'] ?? 0}'),
-              isThreeLine: true,
-              trailing: TextButton.icon(
-                icon: const Icon(Icons.visibility, size: 18),
-                label: const Text('Ver'),
-                style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
-                onPressed: () => _showDetails(context, data, false, identificador),
-              ),
-            ),
-          );
+          cardColor = Colors.red;
+          avatarBgColor = Colors.red.shade100;
+          iconData = Icons.report_problem;
+          tipoTexto = 'Informal (Infracción)';
         }
+
+        final opName = data['operativoNombre'] != null && data['operativoNombre'].toString().isNotEmpty 
+            ? '\nOperativo: ${data['operativoNombre']}' 
+            : '';
+            
+        final montoText = esReporte ? '' : '\nMonto Total: S/ ${data['montoTotal'] ?? 0}';
+
+        return Card(
+          elevation: 2,
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: avatarBgColor)),
+          child: ListTile(
+            leading: CircleAvatar(backgroundColor: avatarBgColor, child: Icon(iconData, color: cardColor)),
+            title: Text('$tipoTexto - $numDoc', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            subtitle: Text('Vehículo: $identificador$montoText$opName'),
+            isThreeLine: true,
+            trailing: TextButton.icon(
+              icon: const Icon(Icons.visibility, size: 18),
+              label: const Text('Ver'),
+              style: TextButton.styleFrom(foregroundColor: cardColor),
+              onPressed: () => _showDetails(context, data, isFormal, esReporte, identificador),
+            ),
+          ),
+        );
       },
     );
   }
 
-  void _showDetails(BuildContext context, dynamic data, bool isFormal, String identificador) {
+  void _showDetails(BuildContext context, dynamic data, bool isFormal, bool esReporte, String identificador) {
     showDialog(
       context: context,
       builder: (context) {
-        final numPapeleta = data['numeroPapeleta'] ?? 'N° ${data['id'].toString().padLeft(6, '0')}';
+        final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
         
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Detalles de la Papeleta', style: TextStyle(color: isFormal ? Colors.blue.shade800 : Colors.red.shade800, fontWeight: FontWeight.bold)),
+          title: Text('Detalles de la Actividad', style: TextStyle(color: esReporte ? Colors.orange.shade800 : (isFormal ? Colors.blue.shade800 : Colors.red.shade800), fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildDetailRow('Papeleta:', numPapeleta, isBold: true),
-                _buildDetailRow('Vehículo:', '$identificador (${isFormal ? "Formal" : "Informal"})'),
-                if (isFormal && data['vehiculoAsociacion'] != null)
+                _buildDetailRow('Documento:', numDoc, isBold: true),
+                _buildDetailRow('Vehículo:', '$identificador (${esReporte ? "Sin identificar" : (isFormal ? "Formal" : "Informal")})'),
+                if (!esReporte && isFormal && data['vehiculoAsociacion'] != null)
                   _buildDetailRow('Asociación:', data['vehiculoAsociacion']),
                 _buildDetailRow('Lugar:', data['lugar'] ?? 'No especificado'),
-                _buildDetailRow('Obs. Inspector:', data['observacionesAutoridad'] ?? 'Ninguna'),
+                if (!esReporte)
+                  _buildDetailRow('Obs. Inspector:', data['observacionesAutoridad'] ?? 'Ninguna'),
+                if (esReporte)
+                  _buildDetailRow('Observaciones:', data['observaciones'] ?? 'Ninguna'),
+
                 _buildDetailRow('Obs. Conductor:', data['observacionesConductor'] ?? 'Ninguna'),
                 const Divider(height: 24),
                 _buildDetailRow('Conductor:', '${data['conductorNombre'] ?? 'No identificado'}\nDNI: ${data['conductorDni'] ?? 'S/D'}'),

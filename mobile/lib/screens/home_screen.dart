@@ -8,7 +8,6 @@ import 'qr_scanner_screen.dart';
 import 'register_vehicle_screen.dart';
 import 'history_screen.dart';
 import 'vehicle_details_screen.dart';
-import 'person_history_screen.dart';
 import 'person_details_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,8 +18,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  int _selectedIndex = 0;
+  final int _selectedIndex = 0;
   int _registradasHoy = 0;
+  Map<String, dynamic>? _operativoActivo;
   bool? _permitePapeletaMovil;
   bool _isLoadingMobileConfig = true;
   int _mobileConfigRequestSeq = 0;
@@ -66,12 +66,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _mobileConfigTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!mounted) return;
       _loadMobileConfig(silent: true);
+      _loadDashboardData();
     });
   }
 
   Future<void> _loadDashboardData() async {
     try {
       final papeletas = await ApiService.getPapeletas();
+      final op = await ApiService.getOperativoActivo();
       final todayStr = DateTime.now().toIso8601String().split('T').first;
       
       int count = 0;
@@ -85,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _registradasHoy = count;
+          _operativoActivo = op;
         });
       }
     } catch (e) {
@@ -114,30 +117,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return permitido;
   }
 
-  Future<void> _handlePrimaryControlAction() async {
-    if (_isLoadingMobileConfig) return;
-
-    setState(() => _isLoadingMobileConfig = true);
-    try {
-      final permitido = await ApiService.permiteAplicarPapeletaMovil();
-      if (!mounted) return;
-      
-      setState(() => _permitePapeletaMovil = permitido);
-
-      if (permitido) {
-        _showSearchTypeSelectionDialog(context);
-      } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
-        ).then((_) => _loadMobileConfig(silent: true));
-      }
-    } catch (_) {
-      // Ignorar
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingMobileConfig = false);
-      }
+  void _handlePrimaryControlAction() {
+    if (_permitePapeletaMovil == true) {
+      _showSearchTypeSelectionDialog(context);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
+      ).then((_) => _loadMobileConfig(silent: true));
     }
   }
 
@@ -263,65 +250,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _showPersonHistoryDialog(BuildContext context) {
-    final controller = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Consulta Historial', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Ingrese el DNI de la persona para buscar su historial de infracciones.', style: TextStyle(color: Colors.black87)),
-            const SizedBox(height: 24),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Número de DNI',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                prefixIcon: const Icon(Icons.badge, color: Colors.grey),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar', style: TextStyle(color: Colors.grey.shade600)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryBlue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              if (controller.text.trim().isEmpty) return;
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PersonHistoryScreen(
-                    dni: controller.text.trim(),
-                    nombre: 'Consulta por DNI',
-                  ),
-                ),
-              );
-            },
-            child: const Text('Consultar', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -370,14 +299,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ),
         child: SafeArea(
-          child: SizedBox(
-            height: 60,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildBottomNavItem(Icons.home_rounded, 'Inicio', 0),
-                _buildBottomNavItem(Icons.history_rounded, 'Historial', 1),
-                _buildBottomNavItem(Icons.logout_rounded, 'Salir', 2),
+                _buildBottomNavItem(Icons.home_rounded, 'Inicio', 0, () {}),
+                _buildOperativoNavItem(),
+                _buildBottomNavItem(Icons.logout_rounded, 'Salir', 2, () => _logout(context)),
               ],
             ),
           ),
@@ -386,21 +315,101 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildBottomNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedIndex == index;
+  Widget _buildOperativoNavItem() {
+    final bool hasOperativo = _operativoActivo != null;
     return InkWell(
       onTap: () {
-        if (index == 1) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const HistoryScreen()),
-          );
-        } else if (index == 2) {
-          _logout(context);
+        if (hasOperativo) {
+          _showOperativoInfoDialog();
         } else {
-          setState(() => _selectedIndex = index);
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No pertenece a ningún operativo activo en este momento.')),
+          );
         }
       },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.shield,
+              color: hasOperativo ? AppTheme.accentYellow : Colors.grey.shade500,
+              size: 24,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Operativo',
+              style: TextStyle(
+                fontSize: 12,
+                color: hasOperativo ? AppTheme.accentYellow : Colors.grey.shade600,
+                fontWeight: hasOperativo ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showOperativoInfoDialog() {
+    final op = _operativoActivo!;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Operativo Actual', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDialogRow(Icons.local_police, 'Nombre', op['nombre'] ?? '-'),
+            const SizedBox(height: 12),
+            _buildDialogRow(Icons.location_on, 'Lugar', op['lugar'] ?? '-'),
+            const SizedBox(height: 12),
+            _buildDialogRow(Icons.event, 'Fecha y Hora', '${op['fecha']} ${op['hora_inicio']}'),
+            const SizedBox(height: 12),
+            _buildDialogRow(Icons.assignment_ind, 'Su cargo', op['cargo_inspector'] ?? 'Inspector'),
+            const SizedBox(height: 12),
+            _buildDialogRow(Icons.info_outline, 'Estado', op['estado'] ?? '-'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDialogRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: AppTheme.primaryBlue, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomNavItem(IconData icon, String label, int index, VoidCallback onTap) {
+    final isSelected = _selectedIndex == index;
+    return InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -460,6 +469,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _operativoActivo != null ? 'Operativo: ${_operativoActivo!['nombre']}' : 'Sin operativo asignado',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -532,7 +549,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               : 'Buscar y enviar\nreportes.',
           icon: permitePapeleta ? Icons.edit_document : Icons.camera_alt,
           isPrimary: true,
-          badge: permitePapeleta ? 'NUEVO' : 'REPORTE',
           onTap: () => _handlePrimaryControlAction(),
         ),
         _buildActionCard(
@@ -547,8 +563,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           },
         ),
         _buildActionCard(
-          title: 'Registrar Informal',
-          subtitle: 'Registrar vehículo sin\nplaca.',
+          title: 'Registrar veh. sin identificar',
+          subtitle: permitePapeleta
+              ? 'Registrar vehículo sin placa y generar infracción.'
+              : 'Registrar vehículo sin placa y generar reporte.',
           icon: Icons.motorcycle,
           onTap: () {
             Navigator.push(
@@ -558,10 +576,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           },
         ),
         _buildActionCard(
-          title: 'Consulta Historial',
-          subtitle: 'Consultar papeletas por persona.',
-          icon: Icons.person_search,
-          onTap: () => _showPersonHistoryDialog(context),
+          title: 'Mi Historial',
+          subtitle: 'Ver mis papeletas registradas.',
+          icon: Icons.history,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HistoryScreen()),
+            );
+          },
         ),
       ],
     );

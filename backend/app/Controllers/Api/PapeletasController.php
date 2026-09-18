@@ -324,6 +324,7 @@ class PapeletasController extends ResourceController
 
             $papeletaData = [
                 'numero_papeleta' => $numeroPapeleta,
+                'id_operativo' => !empty($input['id_operativo']) ? (int)$input['id_operativo'] : null,
                 'id_vehiculo' => $vehiculoId,
                 'id_persona_infractor' => $personaId,
                 'id_inspector' => $inputInspectorId,

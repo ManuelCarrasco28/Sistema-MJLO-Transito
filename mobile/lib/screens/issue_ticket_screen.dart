@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart' as geocoding;
 import '../services/api_service.dart';
 import '../theme.dart';
 
@@ -25,6 +26,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   );
 
   bool _isLoading = true;
+  bool _isLoadingLocation = false;
   bool _isSubmitting = false;
   bool? _permitePapeletaMovil;
   List<dynamic> _tiposInfraccion = [];
@@ -40,6 +42,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   final ImagePicker _picker = ImagePicker();
   
   late TextEditingController _lugarController;
+  final TextEditingController _coordenadasController = TextEditingController();
 
   // Datos del Conductor (si es distinto al dueño)
   bool _conductorEsDueno = true;
@@ -126,7 +129,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
     LocationPermission permission;
 
     setState(() {
-      _isLoading = true;
+      _isLoadingLocation = true;
     });
 
     try {
@@ -151,12 +154,27 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       }
 
       final position = await Geolocator.getCurrentPosition();
+      
+      String address = '${position.latitude}, ${position.longitude}';
+      try {
+        List<geocoding.Placemark> placemarks = await geocoding.Geocoding().placemarkFromCoordinates(position.latitude, position.longitude);
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          address = '${place.thoroughfare ?? ''} ${place.subThoroughfare ?? ''}'.trim();
+          if (address.isEmpty) address = place.street ?? '';
+          final locality = place.locality ?? place.subAdministrativeArea ?? '';
+          if (locality.isNotEmpty) address = address.isEmpty ? locality : '$address, $locality';
+          if (address.trim().isEmpty) address = '${position.latitude}, ${position.longitude}';
+        }
+      } catch (e) {
+        debugPrint('Error obteniendo dirección: $e');
+      }
+
       setState(() {
         _currentPosition = position;
-        if (_lugar.trim().isEmpty) {
-          _lugar = '${position.latitude}, ${position.longitude}';
-          _lugarController.text = _lugar;
-        }
+        _lugarController.text = address;
+        _lugar = address;
+        _coordenadasController.text = '${position.latitude}, ${position.longitude}';
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -168,7 +186,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoadingLocation = false;
         });
       }
     }
@@ -322,12 +340,13 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
     _nombresConductor.dispose();
     _apellidosConductor.dispose();
     _lugarController.dispose();
+    _coordenadasController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    String identificador = widget.vehicleData['placa'] ?? widget.vehicleData['chasis'] ?? 'Sin ID';
+    String identificador = widget.vehicleData['placa'] ?? widget.vehicleData['chasis'] ?? 'Sin Identificar';
     final bool permisoVerificado = _permitePapeletaMovil != null;
     final bool permitePapeleta = _permitePapeletaMovil == true;
     final Color accentColor = permitePapeleta ? Colors.red.shade700 : AppTheme.primaryBlue;
@@ -512,17 +531,40 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                         TextFormField(
                           controller: _lugarController,
                           decoration: InputDecoration(
-                            labelText: 'Lugar de Intervención',
+                            labelText: 'Lugar de Intervención (Calle/Nombre)',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             filled: true,
                             fillColor: Colors.grey.shade50,
                             prefixIcon: const Icon(Icons.location_on, color: Colors.grey),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.my_location, color: Colors.blue),
-                              onPressed: _getCurrentLocation,
+                            suffixIcon: Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryBlue,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: _isLoadingLocation 
+                                    ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)))
+                                    : IconButton(
+                                        icon: const Icon(Icons.my_location, color: Colors.white),
+                                        onPressed: _getCurrentLocation,
+                                      ),
+                              ),
                             ),
                           ),
                           onChanged: (val) => _lugar = val,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _coordenadasController,
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            labelText: 'Coordenadas exactas',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            filled: true,
+                            fillColor: Colors.grey.shade100,
+                            prefixIcon: const Icon(Icons.gps_fixed, color: Colors.grey),
+                          ),
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -537,17 +579,36 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                           onChanged: (val) => _observaciones = val,
                         ),
                         const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            const Text('Evidencia (Fotos):', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                            const Spacer(),
-                            ElevatedButton.icon(
-                              onPressed: _takePhoto,
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text('Tomar Foto'),
-                            ),
-                          ],
-                        ),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: const Text('Evidencia Fotográfica', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: _takePhoto,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange.shade600,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    ),
+                                    icon: const Icon(Icons.camera_alt, size: 20),
+                                    label: const Text('Tomar Foto', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
                         if (_fotos.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           SizedBox(
@@ -592,10 +653,13 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                               },
                             ),
                           ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
 
                   const SizedBox(height: 32),
                   if (permitePapeleta) ...[
@@ -680,9 +744,20 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey.shade600),
         suffixIcon: hasSearch
-            ? IconButton(
-                icon: _isSearching ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(Icons.search, color: AppTheme.primaryBlue),
-                onPressed: _isSearching ? null : onSearch,
+            ? Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: ElevatedButton(
+                  onPressed: _isSearching ? null : onSearch,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: _isSearching 
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                      : const Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
               )
             : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

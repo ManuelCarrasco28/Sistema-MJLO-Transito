@@ -10,7 +10,7 @@ class ApiService {
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
   // 2. Producción: Puedes pasar --dart-define=API_URL=https://api.tudominio.com/api
-  static const String _defaultUrl = 'http://10.0.2.2:8080/api';
+  static const String _defaultUrl = 'http://10.227.15.109:8080/api';
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb
@@ -97,7 +97,39 @@ class ApiService {
       final data = jsonDecode(response.body);
       return data['data'] ?? [];
     }
-    throw Exception('Error al cargar historial');
+    throw Exception('Error al cargar historial de papeletas');
+  }
+
+  static Future<List<dynamic>> getReportes() async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/reportes-intervencion'),
+          headers: await _getHeaders(isJson: false),
+        )
+        .timeout(_requestTimeout);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data'] ?? [];
+    }
+    throw Exception('Error al cargar historial de reportes');
+  }
+
+  static Future<Map<String, dynamic>?> getOperativoActivo() async {
+    final idPersona = await getPersonalId();
+    if (idPersona == null) return null;
+
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/operativos/activo/$idPersona'),
+          headers: await _getHeaders(isJson: false),
+        )
+        .timeout(_requestTimeout);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data'];
+    }
+    return null;
   }
 
   static Future<bool> permiteAplicarPapeletaMovil() async {
@@ -124,6 +156,13 @@ class ApiService {
   static Future<Map<String, dynamic>> createPapeleta(
     Map<String, dynamic> data,
   ) async {
+    try {
+      final op = await getOperativoActivo();
+      if (op != null && op['id'] != null) {
+        data['id_operativo'] = op['id'];
+      }
+    } catch (_) {}
+
     final response = await http
         .post(
           Uri.parse('$baseUrl/papeletas'),
@@ -143,6 +182,13 @@ class ApiService {
   static Future<Map<String, dynamic>> createReporteIntervencion(
     Map<String, dynamic> data,
   ) async {
+    try {
+      final op = await getOperativoActivo();
+      if (op != null && op['id'] != null) {
+        data['id_operativo'] = op['id'];
+      }
+    } catch (_) {}
+
     final response = await http
         .post(
           Uri.parse('$baseUrl/reportes-intervencion'),
