@@ -398,7 +398,9 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   #seccion-impresion,
   #seccion-impresion *,
   #seccion-impresion-tuc,
-  #seccion-impresion-tuc * {
+  #seccion-impresion-tuc *,
+  #seccion-impresion-ticket,
+  #seccion-impresion-ticket * {
     visibility: visible !important;
   }
 
@@ -415,6 +417,16 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     box-shadow: none !important;
   }
 
+  /* Para tickets térmicos de altura dinámica, usamos relative para que defina la altura del documento */
+  #seccion-impresion-ticket {
+    position: relative !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
   /* Evitar saltos de página indeseados dentro del carnet u hoja oficial */
   .print-card-container {
     break-inside: avoid !important;
@@ -423,6 +435,6 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
 
   @page {
     size: auto;
-    margin: 6mm;
+    margin: 0mm;
   }
 }

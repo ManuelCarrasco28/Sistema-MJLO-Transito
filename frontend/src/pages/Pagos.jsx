@@ -101,6 +101,8 @@ export function Pagos() {
   const totalMonto = pagos.filter(p => p.estado === 'PAGADO').reduce((acc, curr) => acc + (curr.montoTotal || 0), 0)
   const pagosHoy = pagos.filter(p => p.estado === 'PAGADO' && p.fecha && new Date(p.fecha).toDateString() === new Date().toDateString()).length
 
+  const [filterEstado, setFilterEstado] = useState('TODOS')
+
   const filteredPagos = pagos.filter((p) => {
     const search = searchTerm.toLowerCase()
     const matchesSearch =
@@ -110,12 +112,15 @@ export function Pagos() {
       p.tipoPago?.toLowerCase().includes(search)
 
     const matchesTipoPago = filterTipoPago === 'TODOS' || p.tipoPago === filterTipoPago
-    return matchesSearch && matchesTipoPago
+    const matchesEstado = filterEstado === 'TODOS' || 
+      (filterEstado === 'PAGADO' ? p.estado === 'PAGADO' : p.estado !== 'PAGADO')
+    
+    return matchesSearch && matchesTipoPago && matchesEstado
   })
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterTipoPago])
+  }, [searchTerm, filterTipoPago, filterEstado])
 
   const paginatedPagos = filteredPagos.slice(
     (currentPage - 1) * itemsPerPage,
@@ -139,7 +144,7 @@ export function Pagos() {
     <div className="space-y-6">
       {loadError && <PageLoadError message={loadError} />}
       
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div className="flex items-center gap-3.5">
           
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
@@ -172,7 +177,7 @@ export function Pagos() {
       </div>
 
       
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3 print:hidden">
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-emerald-400">Total Recaudado</span>
@@ -208,7 +213,7 @@ export function Pagos() {
       </div>
 
       
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] print:hidden">
         
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -221,16 +226,26 @@ export function Pagos() {
               className="w-full rounded-xl border border-emerald-200/80 bg-emerald-50/20 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-emerald-400"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={filterEstado}
+              onChange={(e) => setFilterEstado(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-xs font-bold text-slate-700 outline-none transition focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 cursor-pointer"
+            >
+              <option value="TODOS">Cualquier Estado</option>
+              <option value="PAGADO">Pagados</option>
+              <option value="PENDIENTE">Pendientes por pagar</option>
+            </select>
             <select
               value={filterTipoPago}
               onChange={(e) => setFilterTipoPago(e.target.value)}
               className="rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-xs font-bold text-slate-700 outline-none transition focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 cursor-pointer"
             >
-              <option value="TODOS">Todos los pagos</option>
+              <option value="TODOS">Todos los tipos</option>
               <option value="PAPELETA">Papeletas</option>
               <option value="TRAMITE">Trámites</option>
               <option value="CURSO">Cursos</option>
+              <option value="INTERNAMIENTO">Internamientos</option>
             </select>
             <button
               onClick={handleOpenCreateModal}
@@ -326,16 +341,18 @@ export function Pagos() {
                     </td>
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-end gap-1.5 pr-1">
-                        {p.estado === 'PENDIENTE' && <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Confirmar recibo</button>}
+                        {p.estado === 'PENDIENTE' && p.tipoPago !== 'INTERNAMIENTO' && <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Confirmar recibo</button>}
                         <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="rounded-xl p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalle">
                           <Icon name="eye" className="size-4" />
                         </button>
                         <button disabled={p.estado !== 'PAGADO'} onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="rounded-xl p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/60 dark:text-sky-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Imprimir Ticket">
                           <Icon name="print" className="size-4" />
                         </button>
-                        <button disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Anular Pago">
-                          <Icon name="trash" className="size-4" />
-                        </button>
+                        {p.tipoPago !== 'INTERNAMIENTO' && (
+                          <button disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Anular Pago">
+                            <Icon name="trash" className="size-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -433,8 +450,8 @@ export function Pagos() {
       )}
 
       {isPreviewModalOpen && selectedPago && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-sm overflow-hidden rounded-md bg-white shadow-2xl dark:bg-slate-100 p-8 text-center text-slate-900 font-mono text-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter print:static print:block print:p-0 print:bg-transparent">
+          <div id="seccion-impresion-ticket" className="w-full max-w-sm overflow-hidden rounded-md bg-white shadow-2xl dark:bg-slate-100 p-8 text-center text-slate-900 font-mono text-xs">
             <h4 className="font-bold text-sm mb-1">MUNICIPALIDAD DISTRITAL JLO</h4>
             <p className="mb-4">TICKET DE PAGO MUNICIPAL</p>
             <p className="text-left"><strong>N° RECIBO:</strong> {selectedPago.numeroRecibo}</p>

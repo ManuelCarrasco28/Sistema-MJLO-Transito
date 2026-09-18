@@ -330,7 +330,7 @@ export function Papeletas() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div>
           <div className="flex items-center gap-3">
             <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 text-white shadow-md shadow-rose-500/20">
@@ -350,7 +350,7 @@ export function Papeletas() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 print:hidden">
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Impuestas</span>
@@ -398,7 +398,7 @@ export function Papeletas() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xs dark:border-slate-800 dark:bg-[#0f172a] print:hidden">
         <button
           type="button"
           onClick={() => setActiveView('PAPELETAS')}
@@ -417,7 +417,7 @@ export function Papeletas() {
       </div>
 
       {activeView === 'REPORTES' && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] print:hidden">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
             <div>
               <h2 className="text-lg font-black text-slate-900 dark:text-white">Reportes Evidencias</h2>
@@ -483,7 +483,7 @@ export function Papeletas() {
         </div>
       )}
 
-      {activeView === 'PAPELETAS' && <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      {activeView === 'PAPELETAS' && <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] print:hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative flex-1 min-w-[220px]">
             <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -1108,7 +1108,7 @@ export function Papeletas() {
 
 
       {isPreviewModalOpen && selectedPapeleta && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-enter print:bg-white print:p-0">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-enter print:static print:block print:p-0 print:bg-transparent">
           <div className="absolute top-4 right-4 flex gap-3 print:hidden">
             <button onClick={() => window.print()} className="rounded-xl bg-white px-5 py-2.5 text-xs font-extrabold text-rose-600 shadow-lg hover:bg-rose-50 cursor-pointer flex items-center gap-2">
               <Icon name="print" className="size-4" /> Imprimir Ticket
@@ -1118,7 +1118,7 @@ export function Papeletas() {
             </button>
           </div>
 
-          <div className="w-full max-w-[320px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl print:shadow-none print:max-w-full">
+          <div id="seccion-impresion-ticket" className="w-full max-w-[320px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl print:shadow-none print:max-w-full">
             <div className="p-4 border border-slate-200 print:border-none print:p-0">
               <div className="text-center mb-3">
                 <h2 className="text-sm font-black uppercase mb-1">MUNICIPALIDAD DISTRITAL</h2>

@@ -22,6 +22,8 @@ class InternamientosController extends ResourceController
                     COALESCE(v.marca, '') as vehiculoMarca,
                     COALESCE(v.modelo, '') as vehiculoModelo,
                     COALESCE(v.color, '') as vehiculoColor,
+                    COALESCE(v.carroceria, '') as vehiculoTipo,
+                    COALESCE(v.serie_motor, '') as vehiculoMotor,
                     CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END as vehiculoFormalidad,
                     COALESCE(aso.razon_social, 'Sin Asociación (Informal)') as vehiculoAsociacion,
                     p.numero_papeleta as numeroPapeleta,
@@ -42,9 +44,18 @@ class InternamientosController extends ResourceController
                     COALESCE(CONCAT(rem_c.nombres, ' ', rem_c.apellido_paterno, ' ', COALESCE(rem_c.apellido_materno, '')), 'Inspector Remisor') as remisorNombre,
                     COALESCE(CONCAT(inte_c.nombres, ' ', inte_c.apellido_paterno, ' ', COALESCE(inte_c.apellido_materno, '')), 'Conductor / Interesado') as interesadoNombre,
                     COALESCE(inte.numero, 'S/D') as interesadoDni,
+                    COALESCE(inte.direccion, '') as interesadoDireccion,
+                    COALESCE(v.anio_fabricacion, '') as vehiculoAnio,
+                    COALESCE(inte_c.fecha_nacimiento, '') as interesadoFechaNacimiento,
                     ol.id as ordenLibertadId,
                     ol.numero_orden as numeroOrdenLibertad,
                     ol.fecha_emision as fechaLiberacion,
+                    ol.numero_recibo_papeleta as reciboPapeleta,
+                    ol.monto_papeleta as montoPapeletaCobrada,
+                    ol.numero_recibo_guardiania as reciboGuardiania,
+                    ol.monto_guardiania as montoGuardiania,
+                    ol.numero_recibo_remolque as reciboRemolque,
+                    ol.monto_remolque as montoRemolque,
                     ol.monto_total as montoTotalLiberacion
                 ", false)
                 ->join('vehiculos v', 'v.id = oi.id_vehiculo', 'left')

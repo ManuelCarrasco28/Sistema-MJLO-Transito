@@ -107,36 +107,40 @@ function Layout({ onLogout, user, onUserUpdate }) {
         sidebarCollapsed ? 'lg:grid-cols-[5.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[19.5rem_minmax(0,1fr)]'
       }`}
     >
-      <Sidebar
-        activeItem={activeItem}
-        onSelect={setActiveItem}
-        mobileOpen={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        onLogout={onLogout}
-        collapsedOnDesktop={sidebarCollapsed}
-        user={user}
-        onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
-      />
-      <div className="no-scrollbar min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col">
-        <Header
-          onOpenMobile={() => setMobileOpen(true)}
-          sidebarCollapsed={sidebarCollapsed}
-          onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-          notifications={notifications}
-          setNotifications={setNotifications}
-          notifOpen={notifOpen}
-          setNotifOpen={setNotifOpen}
-          userMenuOpen={userMenuOpen}
-          setUserMenuOpen={setUserMenuOpen}
-          notifRef={notifRef}
-          userMenuRef={userMenuRef}
+      <div className="print:hidden">
+        <Sidebar
+          activeItem={activeItem}
+          onSelect={setActiveItem}
+          mobileOpen={mobileOpen}
+          onClose={() => setMobileOpen(false)}
           onLogout={onLogout}
+          collapsedOnDesktop={sidebarCollapsed}
           user={user}
+          onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
         />
+      </div>
+      <div className="no-scrollbar min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col print:block print:h-auto print:overflow-visible">
+        <div className="print:hidden">
+          <Header
+            onOpenMobile={() => setMobileOpen(true)}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+            notifications={notifications}
+            setNotifications={setNotifications}
+            notifOpen={notifOpen}
+            setNotifOpen={setNotifOpen}
+            userMenuOpen={userMenuOpen}
+            setUserMenuOpen={setUserMenuOpen}
+            notifRef={notifRef}
+            userMenuRef={userMenuRef}
+            onLogout={onLogout}
+            user={user}
+          />
+        </div>
 
-        <div className="mx-auto w-full max-w-[96rem] flex-1 space-y-4 p-3.5 sm:p-5 lg:p-6">
+        <div className="mx-auto w-full max-w-[96rem] flex-1 space-y-4 p-3.5 sm:p-5 lg:p-6 print:block print:p-0 print:space-y-0 print:m-0 print:max-w-none">
           <Routes>
             <Route path="/" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
             <Route path="/superadmin" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />

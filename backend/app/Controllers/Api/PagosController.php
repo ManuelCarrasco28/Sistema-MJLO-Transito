@@ -11,8 +11,62 @@ class PagosController extends ResourceController
 
     public function index()
     {
-        $rows = \Config\Database::connect()->table('pagos_transito')->orderBy('id', 'DESC')->get()->getResultArray();
-        return $this->respond(['data' => array_map([$this, 'present'], $rows)]);
+        $db = \Config\Database::connect();
+        
+        $rows = $db->table('pagos_transito')->orderBy('id', 'DESC')->get()->getResultArray();
+        $pagos = array_map([$this, 'present'], $rows);
+
+        $pendientes = $db->table('ordenes_internamiento oi')
+            ->select("oi.id, 'INTERNAMIENTO' as tipo_pago, NULL as numero_recibo, NULL as numero_voucher, 'SIN CONFIRMAR' as medio_pago, CONCAT('Boleta #', oi.numero_boleta) as referencia_pago, 0 as total, NULL as fecha_pago, 'PENDIENTE' as estado")
+            ->where('oi.estado', 'RETENIDO')
+            ->get()->getResultArray();
+
+        foreach ($pendientes as $p) {
+            $pagos[] = [
+                'id' => 'int_p_' . $p['id'],
+                'tipoPago' => $p['tipo_pago'],
+                'papeletaId' => null, 'tramiteId' => null, 'inscripcionId' => null,
+                'numeroRecibo' => $p['numero_recibo'],
+                'numeroVoucher' => $p['numero_voucher'],
+                'metodo' => $p['medio_pago'],
+                'metodoPago' => $p['medio_pago'],
+                'referenciaPago' => $p['referencia_pago'],
+                'montoTotal' => (float)$p['total'],
+                'fecha' => $p['fecha_pago'],
+                'fechaHora' => $p['fecha_pago'],
+                'estado' => $p['estado'],
+            ];
+        }
+
+        $pagados = $db->table('ordenes_libertad ol')
+            ->select("ol.id, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_papeleta, ol.numero_recibo_remolque, 'VARIOS') as numero_recibo, NULL as numero_voucher, 'MULTIPLE' as medio_pago, CONCAT('Orden #', ol.numero_orden) as referencia_pago, ol.monto_total as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado")
+            ->get()->getResultArray();
+
+        foreach ($pagados as $p) {
+            $pagos[] = [
+                'id' => 'int_l_' . $p['id'],
+                'tipoPago' => $p['tipo_pago'],
+                'papeletaId' => null, 'tramiteId' => null, 'inscripcionId' => null,
+                'numeroRecibo' => $p['numero_recibo'],
+                'numeroVoucher' => $p['numero_voucher'],
+                'metodo' => $p['medio_pago'],
+                'metodoPago' => $p['medio_pago'],
+                'referenciaPago' => $p['referencia_pago'],
+                'montoTotal' => (float)$p['total'],
+                'fecha' => $p['fecha_pago'],
+                'fechaHora' => $p['fecha_pago'],
+                'estado' => $p['estado'],
+            ];
+        }
+
+        usort($pagos, function($a, $b) {
+            $dateA = $a['fecha'] ? strtotime($a['fecha']) : 0;
+            $dateB = $b['fecha'] ? strtotime($b['fecha']) : 0;
+            if ($dateA === $dateB) return 0;
+            return $dateB <=> $dateA;
+        });
+
+        return $this->respond(['data' => $pagos]);
     }
 
     public function present(array $row): array
