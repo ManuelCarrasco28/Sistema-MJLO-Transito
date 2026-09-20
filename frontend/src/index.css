@@ -371,13 +371,23 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
 }
 
 /* ==========================================================================
-   ESTILOS DE IMPRESIÓN OFICIAL (TUC DIGITAL / CERTICAV / CARNET)
+   ESTILOS DE IMPRESIÓN OFICIAL (TUC DIGITAL / CERTICAV / SOAT / CARNETS)
    ========================================================================== */
 @media print {
   /* Forzar impresión de colores exactos y fondos */
   *, *::before, *::after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Ocultar TODO el árbol de React en #root para eliminar modales, tablas, scrolls y alturas fantasmas */
+  body > #root {
+    display: none !important;
   }
 
   html, body {
@@ -387,6 +397,8 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     padding: 0 !important;
     width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
 
   /* Ocultar toda la interfaz web del dashboard (sidebar, header, modales, botones) */
@@ -400,21 +412,20 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   #seccion-impresion-tuc,
   #seccion-impresion-tuc *,
   #seccion-impresion-ticket,
-  #seccion-impresion-ticket * {
+  #seccion-impresion-ticket *,
+  body > #seccion-impresion,
+  body > .seccion-impresion-portal,
+  .seccion-impresion-portal,
+  .seccion-impresion-portal * {
     visibility: visible !important;
-  }
-
-  /* Posicionar el documento en la esquina superior de la hoja */
-  #seccion-impresion,
-  #seccion-impresion-tuc {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
     width: 100% !important;
-    margin: 0 !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     background: #ffffff !important;
     box-shadow: none !important;
+    border: none !important;
   }
 
   /* Para tickets térmicos de altura dinámica, usamos relative para que defina la altura del documento */
@@ -428,9 +439,19 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   }
 
   /* Evitar saltos de página indeseados dentro del carnet u hoja oficial */
+  .ficha-certicav-a4,
+  .constancia-soat-a4,
+  .resolucion-permiso-a4,
+  .autorizacion-carga-a4,
+  .autorizacion-vias-a4,
+  .carnet-wrapper,
   .print-card-container {
-    break-inside: avoid !important;
     page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
   }
 
   @page {
