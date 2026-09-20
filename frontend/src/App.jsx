@@ -48,7 +48,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (path.includes('/cursos')) return 'Cursos'
     if (path.includes('/pagos')) return 'Pagos'
     if (path.includes('/internamientos') || path.includes('/retenciones')) return 'Internamientos'
-    if (path.includes('/permisos')) return 'Permisos'
+    if (path.includes('/permisos')) return 'Permisos y Autorizaciones'
     return 'Dashboard'
   }
 
