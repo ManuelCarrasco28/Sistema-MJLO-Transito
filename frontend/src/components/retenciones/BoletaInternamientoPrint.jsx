@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom';
+
 export const BoletaInternamientoPrint = ({ item }) => {
   const fecha = item?.fechaRegistro ? new Date(item.fechaRegistro) : new Date();
   const day = fecha.getDate().toString().padStart(2, '0');
@@ -41,7 +43,9 @@ export const BoletaInternamientoPrint = ({ item }) => {
     </div>
   );
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div id="seccion-impresion" className="print:block hidden bg-white text-black font-sans w-[210mm] mx-auto pt-0 pb-2 px-6 box-border print:absolute print:top-0 print:left-0 print:m-0 print:w-full">
       {/* Header */}
       <div className="text-center relative mb-1 pt-2">
@@ -188,6 +192,7 @@ export const BoletaInternamientoPrint = ({ item }) => {
         </div>
       </div>
 
-    </div>
+    </div>,
+    document.body
   );
 };

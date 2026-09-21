@@ -5,6 +5,7 @@ import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { CerticavFichaPrint } from '../components/documentos/TarjetaOperatividadPrint'
+import { exportToExcel } from '../utils/exportToExcel'
 
 export function Inspecciones() {
   const cachedInsp = getCachedData('/inspecciones')
@@ -66,6 +67,31 @@ export function Inspecciones() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Inspecciones_Tecnicas_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Inspecciones',
+      title: 'REGISTRO DE INSPECCIONES TÉCNICAS VEHICULARES - CERTICAV',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',
+      metadata: [
+        { label: 'Resultado', value: filterResultado },
+        { label: 'Total Registros', value: String(filteredInspecciones.length) }
+      ],
+      columns: [
+        { header: 'N° REGISTRO', key: 'numeroRegistro', isText: true, width: 120, align: 'center' },
+        { header: 'SERIE CERTICAV', render: (_, i) => i.numeroSerieCerticav || ('CCV-2026-' + String(i.id || '').padStart(6, '0')), isText: true, width: 140, align: 'center' },
+        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+        { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
+        { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
+        { header: 'LICENCIA', key: 'conductorLicencia', isText: true, width: 120, align: 'center' },
+        { header: 'INSPECTOR', key: 'inspector', width: 180 },
+        { header: 'FECHA INSPECCIÓN', key: 'fecha', width: 120, align: 'center' },
+        { header: 'RESULTADO', key: 'resultado', width: 120, align: 'center' }
+      ],
+      data: filteredInspecciones
+    })
+  }
 
   useEffect(() => {
     setLoadError('')
@@ -416,6 +442,16 @@ export function Inspecciones() {
               <option value="OBSERVADO">Observados</option>
               <option value="DESAPROBADO">Desaprobados</option>
             </select>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar registro de inspecciones en Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
+            </button>
+
             <button
               type="button"
               onClick={handleOpenCreateModal}

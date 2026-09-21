@@ -187,4 +187,110 @@ class CursosController extends ResourceController
             return $this->failServerError('Error eliminando el curso: ' . $e->getMessage());
         }
     }
+
+    public function inscribirParticipante($idCurso)
+    {
+        $db = \Config\Database::connect();
+        $input = $this->request->getJSON(true);
+        if (!is_array($input)) {
+            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
+
+        $dni = trim($input['dni'] ?? '');
+        if (!$dni) {
+            return $this->failValidationErrors('El DNI es obligatorio para la inscripción.');
+        }
+
+        // Buscar a la persona
+        $persona = $db->table('personas p')
+            ->select('p.id as id_persona, c.nombres, c.apellido_paterno, c.apellido_materno, c.numero_licencia, c.foto')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->where('p.numero', $dni)
+            ->get()
+            ->getRowArray();
+
+        if (!$persona) {
+            return $this->failNotFound('No se encontró una persona con el DNI proporcionado en el sistema.');
+        }
+
+        $idPersona = $persona['id_persona'];
+
+        // Verificar si ya está inscrito
+        $existe = $db->table('inscripciones_curso')
+            ->where('id_curso', $idCurso)
+            ->where('id_persona', $idPersona)
+            ->countAllResults();
+
+        if ($existe > 0) {
+            return $this->failValidationErrors('Esta persona ya se encuentra inscrita en este curso.');
+        }
+
+        // Inscribir
+        $data = [
+            'id_curso' => $idCurso,
+            'id_persona' => $idPersona,
+            'fecha_inscripcion' => date('Y-m-d H:i:s'),
+            'estado_pago' => 'PAGADO', // Por defecto para simplificar
+            'asistio' => 0,
+            'estado' => 'INSCRITO'
+        ];
+
+        try {
+            $db->table('inscripciones_curso')->insert($data);
+            
+            $participanteData = [
+                'nombres' => $persona['nombres'],
+                'apellido_paterno' => $persona['apellido_paterno'],
+                'apellido_materno' => $persona['apellido_materno'],
+                'dni' => $dni,
+                'licencia' => $persona['numero_licencia'],
+                'fotoUrl' => $persona['foto'],
+                'estado' => 'INSCRITO',
+                'asistio' => 0
+            ];
+            
+            return $this->respondCreated(['status' => 201, 'message' => 'Participante inscrito exitosamente.', 'data' => $participanteData]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error al inscribir al participante: ' . $e->getMessage());
+        }
+    }
+
+    public function registrarNota($idCurso, $dni)
+    {
+        $db = \Config\Database::connect();
+        $input = $this->request->getJSON(true);
+        if (!is_array($input)) {
+            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
+
+        $estado = trim($input['estado'] ?? '');
+        $asistio = isset($input['asistio']) ? (int)$input['asistio'] : null;
+
+        if (!$estado && $asistio === null) {
+            return $this->failValidationErrors('No se enviaron datos para actualizar.');
+        }
+
+        // Buscar persona por DNI para obtener su ID
+        $persona = $db->table('personas')->where('numero', $dni)->get()->getRowArray();
+        if (!$persona) {
+            return $this->failNotFound('No se encontró a la persona con el DNI proporcionado.');
+        }
+        
+        $idPersona = $persona['id'];
+
+        $data = [];
+        if ($estado) $data['estado'] = $estado;
+        if ($asistio !== null) $data['asistio'] = $asistio;
+
+        try {
+            $db->table('inscripciones_curso')
+                ->where('id_curso', $idCurso)
+                ->where('id_persona', $idPersona)
+                ->update($data);
+                
+            return $this->respond(['status' => 200, 'message' => 'Nota/asistencia registrada correctamente.']);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error al registrar nota: ' . $e->getMessage());
+        }
+    }
 }

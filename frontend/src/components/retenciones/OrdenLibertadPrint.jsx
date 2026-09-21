@@ -1,10 +1,14 @@
+import { createPortal } from 'react-dom';
+
 export const OrdenLibertadPrint = ({ item }) => {
   const fecha = item?.fechaRegistro ? new Date(item.fechaRegistro) : new Date();
   const day = fecha.getDate().toString().padStart(2, '0');
   const month = (fecha.getMonth() + 1).toString().padStart(2, '0');
   const year = fecha.getFullYear().toString().slice(-2);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div id="seccion-impresion" className="print:block hidden bg-white text-black font-sans w-[210mm] mx-auto pt-0 pb-2 px-6 box-border text-xs print:absolute print:top-0 print:left-0 print:m-0 print:w-full">
       
       {/* Header */}
@@ -157,6 +161,8 @@ export const OrdenLibertadPrint = ({ item }) => {
         viernes, Mañanas de 09:00 a 15:00 hrs
       </div>
 
-    </div>
+    </div>,
+    document.body
   );
 };
+

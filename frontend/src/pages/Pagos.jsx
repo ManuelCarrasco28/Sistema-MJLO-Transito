@@ -4,6 +4,7 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { exportToExcel } from '../utils/exportToExcel'
 
 export function Pagos() {
   const cached = getCachedData('/pagos')
@@ -22,6 +23,12 @@ export function Pagos() {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedPago, setSelectedPago] = useState(null)
   const [loadError, setLoadError] = useState('')
+
+  // Estado para Arqueo de Caja Diario
+  const [isArqueoModalOpen, setIsArqueoModalOpen] = useState(false)
+  const [arqueoFecha, setArqueoFecha] = useState(new Date().toISOString().slice(0, 10))
+  const [arqueoData, setArqueoData] = useState(null)
+  const [isLoadingArqueo, setIsLoadingArqueo] = useState(false)
 
   const [formData, setFormData] = useState({
     numeroRecibo: '', tipoPago: 'TRAMITE', metodo: 'EFECTIVO', montoTotal: 0,
@@ -95,6 +102,82 @@ export function Pagos() {
       setIsModalOpen(false)
     } catch (err) { alert(err.message) }
     finally { setIsSaving(false) }
+  }
+
+  const fetchArqueo = async (fecha = arqueoFecha) => {
+    setIsLoadingArqueo(true)
+    try {
+      const res = await apiFetch(`/pagos/arqueo-diario?fecha=${fecha}`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.message || 'Error al obtener el arqueo diario')
+      setArqueoData(json.data)
+    } catch (err) {
+      console.error(err)
+      alert(err.message || 'Error al cargar arqueo de caja')
+    } finally {
+      setIsLoadingArqueo(false)
+    }
+  }
+
+  const handleOpenArqueo = () => {
+    setIsArqueoModalOpen(true)
+    fetchArqueo(arqueoFecha)
+  }
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Pagos_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Pagos',
+      title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
+      subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',
+      metadata: [
+        { label: 'Estado', value: filterEstado },
+        { label: 'Tipo', value: filterTipoPago },
+        { label: 'Total Recaudado', value: `S/ ${totalMonto.toFixed(2)}` }
+      ],
+      columns: [
+        { header: 'N° RECIBO', key: 'numeroRecibo', isText: true, width: 140 },
+        { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente', width: 110 },
+        { header: 'TIPO PAGO', key: 'tipoPago', width: 130 },
+        { header: 'N° VOUCHER', key: 'numeroVoucher', isText: true, width: 140 },
+        { header: 'REFERENCIA', key: 'referenciaPago', width: 160 },
+        { header: 'MÉTODO PAGO', key: 'metodo', width: 120 },
+        { header: 'MONTO (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}`, align: 'right', width: 120 },
+        { header: 'ESTADO', key: 'estado', align: 'center', width: 110 }
+      ],
+      data: filteredPagos
+    })
+  }
+
+  const handleExportArqueoExcel = () => {
+    if (!arqueoData || !arqueoData.pagos || arqueoData.pagos.length === 0) {
+      alert('No hay movimientos registrados en la fecha seleccionada para exportar.')
+      return
+    }
+    exportToExcel({
+      filename: `Arqueo_Caja_${arqueoData.fecha}.xls`,
+      sheetName: 'Arqueo',
+      title: `ARQUEO Y CIERRE DE CAJA DIARIA - ${arqueoData.fecha}`,
+      subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Subgerencia de Tránsito',
+      metadata: [
+        { label: 'Fecha Cierre', value: arqueoData.fecha },
+        { label: 'Total Recaudado', value: `S/ ${arqueoData.totalRecaudado.toFixed(2)}` },
+        { label: 'Efectivo', value: `S/ ${(arqueoData.porMetodo?.efectivo || 0).toFixed(2)}` },
+        { label: 'Tarjeta', value: `S/ ${(arqueoData.porMetodo?.tarjeta || 0).toFixed(2)}` },
+        { label: 'Transferencia', value: `S/ ${(arqueoData.porMetodo?.transferencia || 0).toFixed(2)}` },
+        { label: 'Total Operaciones', value: String(arqueoData.totalOperaciones || 0) }
+      ],
+      columns: [
+        { header: 'N° RECIBO', key: 'numeroRecibo', isText: true, width: 140 },
+        { header: 'HORA / FECHA', key: 'fecha', width: 150 },
+        { header: 'CONCEPTO / TIPO', key: 'tipoPago', width: 140 },
+        { header: 'VOUCHER', key: 'numeroVoucher', isText: true, width: 130 },
+        { header: 'MÉTODO', key: 'metodo', width: 120 },
+        { header: 'CAJERO / OPERADOR', key: 'cajero', width: 180 },
+        { header: 'IMPORTE (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}`, align: 'right', width: 120 }
+      ],
+      data: arqueoData.pagos
+    })
   }
 
   const totalPagos = pagos.length
@@ -247,6 +330,27 @@ export function Pagos() {
               <option value="CURSO">Cursos</option>
               <option value="INTERNAMIENTO">Internamientos</option>
             </select>
+
+            <button
+              type="button"
+              onClick={handleOpenArqueo}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-3.5 py-2.5 text-xs font-extrabold text-purple-700 shadow-2xs hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Reporte de Arqueo y Cierre Diario de Caja"
+            >
+              <Icon name="chart" className="size-4" />
+              <span>Arqueo Diario</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar reporte de pagos en Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
+            </button>
+
             <button
               onClick={handleOpenCreateModal}
               className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
@@ -467,6 +571,293 @@ export function Pagos() {
             <div className="mt-8 pt-4 border-t border-slate-300 flex justify-between print:hidden">
               <button onClick={() => window.print()} className="bg-emerald-600 text-white px-4 py-2 rounded font-sans font-bold hover:bg-emerald-700">Imprimir</button>
               <button onClick={() => setIsPreviewModalOpen(false)} className="bg-slate-800 text-white px-4 py-2 rounded font-sans font-bold hover:bg-slate-700">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ARQUEO Y CIERRE DE CAJA DIARIO */}
+      {isArqueoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
+            {/* Cabecera del modal */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
+              <div className="flex items-center gap-3">
+                <span className="grid size-10 place-items-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                  <Icon name="chart" className="size-5" />
+                </span>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                    Arqueo y Cierre Diario de Caja
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Conciliación de recaudación municipal, métodos de pago y rendición por cajero.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={arqueoFecha}
+                  onChange={(e) => {
+                    setArqueoFecha(e.target.value)
+                    fetchArqueo(e.target.value)
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none transition hover:border-purple-300 focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => fetchArqueo(arqueoFecha)}
+                  disabled={isLoadingArqueo}
+                  className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-100 hover:text-purple-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+                  title="Actualizar arqueo"
+                >
+                  <Icon name="refresh" className={`size-4 ${isLoadingArqueo ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsArqueoModalOpen(false)}
+                  className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido scrolleable */}
+            <div className="flex-1 space-y-6 overflow-y-auto p-6">
+              {isLoadingArqueo ? (
+                <div className="py-16 text-center">
+                  <div className="inline-block size-8 animate-spin rounded-full border-4 border-purple-600 border-t-transparent"></div>
+                  <p className="mt-3 text-xs font-bold text-slate-500">Calculando balance de caja...</p>
+                </div>
+              ) : !arqueoData ? (
+                <div className="py-12 text-center text-slate-500">
+                  <p className="text-sm">No se pudieron cargar los datos del arqueo.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Tarjetas de Balance */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/60 dark:bg-purple-950/30">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                        <span>Total Recaudado</span>
+                        <span>💰</span>
+                      </div>
+                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                        S/ {Number(arqueoData.totalRecaudado || 0).toFixed(2)}
+                      </p>
+                      <span className="mt-1 inline-block rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                        {arqueoData.totalOperaciones} operaciones
+                      </span>
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        <span>Efectivo en Caja</span>
+                        <span>💵</span>
+                      </div>
+                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                        S/ {Number(arqueoData.porMetodo?.efectivo || 0).toFixed(2)}
+                      </p>
+                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        Caja física para custodia
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-900/60 dark:bg-sky-950/30">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                        <span>Tarjetas (POS)</span>
+                        <span>💳</span>
+                      </div>
+                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                        S/ {Number(arqueoData.porMetodo?.tarjeta || 0).toFixed(2)}
+                      </p>
+                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        Liquidación electrónica
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                        <span>Transferencias</span>
+                        <span>🏦</span>
+                      </div>
+                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                        S/ {Number(arqueoData.porMetodo?.transferencia || 0).toFixed(2)}
+                      </p>
+                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        Banco de la Nación / Cta Cte
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tablas de Desglose */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {/* Desglose por concepto */}
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                      <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        📊 Recaudación por Concepto
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800">
+                            <tr>
+                              <th className="pb-2">Concepto</th>
+                              <th className="pb-2 text-center">Cant.</th>
+                              <th className="pb-2 text-right">Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                            {arqueoData.porConcepto?.length === 0 ? (
+                              <tr>
+                                <td colSpan="3" className="py-4 text-center text-slate-400">Sin ingresos en la fecha</td>
+                              </tr>
+                            ) : (
+                              arqueoData.porConcepto?.map((c, i) => (
+                                <tr key={i} className="hover:bg-white/60 dark:hover:bg-slate-800/30">
+                                  <td className="py-2 font-bold text-slate-800 dark:text-slate-200">{c.tipoPago}</td>
+                                  <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.cantidad}</td>
+                                  <td className="py-2 text-right font-black text-slate-900 dark:text-white">
+                                    S/ {Number(c.total || 0).toFixed(2)}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Desglose por cajero */}
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                      <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        👤 Rendición por Cajero / Operador
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800">
+                            <tr>
+                              <th className="pb-2">Cajero</th>
+                              <th className="pb-2 text-center">Operaciones</th>
+                              <th className="pb-2 text-right">Total Cobrado</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                            {arqueoData.porCajero?.length === 0 ? (
+                              <tr>
+                                <td colSpan="3" className="py-4 text-center text-slate-400">Sin operaciones de cajero</td>
+                              </tr>
+                            ) : (
+                              arqueoData.porCajero?.map((c, i) => (
+                                <tr key={i} className="hover:bg-white/60 dark:hover:bg-slate-800/30">
+                                  <td className="py-2 font-bold text-slate-800 dark:text-slate-200">{c.usuario}</td>
+                                  <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.cantidad}</td>
+                                  <td className="py-2 text-right font-black text-emerald-600 dark:text-emerald-400">
+                                    S/ {Number(c.total || 0).toFixed(2)}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Detalle de Movimientos del Día */}
+                  <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        🧾 Movimientos y Recibos Emitidos ({arqueoData.pagos?.length || 0})
+                      </h4>
+                      <span className="text-[11px] font-medium text-slate-400">
+                        Fecha: {arqueoData.fecha}
+                      </span>
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="sticky top-0 bg-white border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:bg-[#0f172a] dark:border-slate-800">
+                          <tr>
+                            <th className="py-2">N° Recibo</th>
+                            <th className="py-2">Hora</th>
+                            <th className="py-2">Concepto</th>
+                            <th className="py-2">Método</th>
+                            <th className="py-2">Cajero</th>
+                            <th className="py-2 text-right">Monto</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                          {arqueoData.pagos?.length === 0 ? (
+                            <tr>
+                              <td colSpan="6" className="py-6 text-center text-slate-400">
+                                No se registraron cobros en esta jornada.
+                              </td>
+                            </tr>
+                          ) : (
+                            arqueoData.pagos?.map((p) => (
+                              <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                <td className="py-2 font-mono font-bold text-slate-900 dark:text-white">
+                                  {p.numeroRecibo || `#${p.id}`}
+                                </td>
+                                <td className="py-2 text-slate-500">
+                                  {p.fecha ? p.fecha.split(' ')[1] || p.fecha : '---'}
+                                </td>
+                                <td className="py-2">
+                                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                    {p.tipoPago}
+                                  </span>
+                                </td>
+                                <td className="py-2 text-slate-600 dark:text-slate-300">
+                                  {p.metodo}
+                                </td>
+                                <td className="py-2 text-slate-600 dark:text-slate-400">
+                                  {p.cajero}
+                                </td>
+                                <td className="py-2 text-right font-black text-slate-900 dark:text-white">
+                                  S/ {Number(p.montoTotal || 0).toFixed(2)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer de Acciones del Arqueo */}
+            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportArqueoExcel}
+                  disabled={!arqueoData?.pagos?.length}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-slate-700 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Icon name="table" className="size-4" />
+                  <span>Exportar Arqueo Excel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-3.5 py-2 text-xs font-extrabold text-purple-700 shadow-2xs hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-300 transition-all cursor-pointer"
+                >
+                  <Icon name="print" className="size-4" />
+                  <span>Imprimir Acta Cierre</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsArqueoModalOpen(false)}
+                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>

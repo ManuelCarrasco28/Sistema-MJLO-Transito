@@ -3,6 +3,7 @@
 namespace App\Controllers\Api;
 
 use App\Services\PagosTransito;
+use App\Services\AuditoriaService;
 use CodeIgniter\RESTful\ResourceController;
 
 class PagosController extends ResourceController
@@ -100,7 +101,16 @@ class PagosController extends ResourceController
     public function confirmar($id = null)
     {
         try {
-            $pago = (new PagosTransito(\Config\Database::connect()))->confirmar((int)$id, $this->request->getJSON(true) ?? []);
+            $input = $this->request->getJSON(true) ?? [];
+            $pago = (new PagosTransito(\Config\Database::connect()))->confirmar((int)$id, $input);
+            
+            AuditoriaService::registrar(
+                'PAGOS',
+                'CONFIRMAR',
+                "Se confirmó el pago N° {$pago['numero_recibo']} ({$pago['tipo_pago']}) por S/ {$pago['total']}",
+                ['id' => $id, 'numeroRecibo' => $pago['numero_recibo'], 'monto' => $pago['total'], 'metodo' => $pago['medio_pago']]
+            );
+
             return $this->respond(['data' => $this->present($pago)]);
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
@@ -114,6 +124,14 @@ class PagosController extends ResourceController
     {
         try {
             (new PagosTransito(\Config\Database::connect()))->anular((int)$id);
+
+            AuditoriaService::registrar(
+                'PAGOS',
+                'ANULAR',
+                "Se anuló el recibo de pago ID: $id",
+                ['id' => $id]
+            );
+
             return $this->respond(['message' => 'Pago anulado.']);
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
@@ -130,5 +148,106 @@ class PagosController extends ResourceController
             'TRAMITE' => $db->table('tramites_documentarios')->select('id, numero_expediente AS nombre')->where('id_procedimiento_admin IS NOT NULL', null, false)->whereNotIn('estado', ['ANULADO','ANULADA'])->get()->getResultArray(),
             'CURSO' => $db->table('inscripciones_curso i')->select("i.id, CONCAT(c.nombre, ' — ', p.nombres, ' ', p.apellido_paterno) AS nombre", false)->join('cursos_seguridad_vial c', 'c.id=i.id_curso')->join('personas p', 'p.id=i.id_persona')->where('i.estado_pago !=', 'PAGADO')->whereNotIn('i.estado', ['ANULADO','CANCELADO'])->get()->getResultArray(),
         ]]);
+    }
+
+    public function arqueoDiario()
+    {
+        $db = \Config\Database::connect();
+        $fecha = trim($this->request->getGet('fecha') ?? date('Y-m-d'));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+            $fecha = date('Y-m-d');
+        }
+
+        $pagosTransito = $db->table('pagos_transito')
+            ->where('DATE(fecha_pago)', $fecha)
+            ->where('estado', 'PAGADO')
+            ->orderBy('hora_pago', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $pagosInternamiento = $db->table('ordenes_libertad ol')
+            ->select("ol.id, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_papeleta, ol.numero_recibo_remolque, CONCAT('ORD-', ol.numero_orden)) as numero_recibo, 'EFECTIVO' as medio_pago, CONCAT('Liberación Vehículo - Orden #', ol.numero_orden) as referencia_pago, ol.monto_total as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado", false)
+            ->where('DATE(ol.fecha_emision)', $fecha)
+            ->get()
+            ->getResultArray();
+
+        $todosPagos = [];
+        foreach ($pagosTransito as $p) {
+            $todosPagos[] = [
+                'id' => (int)$p['id'],
+                'numeroRecibo' => $p['numero_recibo'] ?: 'REC-' . $p['id'],
+                'tipoPago' => $p['tipo_pago'],
+                'metodoPago' => strtoupper($p['medio_pago'] ?: 'EFECTIVO'),
+                'monto' => (float)$p['total'],
+                'referencia' => $p['referencia_pago'] ?: '',
+                'hora' => $p['hora_pago'] ?: '00:00:00',
+                'cajero' => $p['cajero'] ?: 'Cajero Principal',
+            ];
+        }
+        foreach ($pagosInternamiento as $p) {
+            $todosPagos[] = [
+                'id' => 'int_' . $p['id'],
+                'numeroRecibo' => $p['numero_recibo'],
+                'tipoPago' => 'INTERNAMIENTO',
+                'metodoPago' => 'EFECTIVO',
+                'monto' => (float)$p['total'],
+                'referencia' => $p['referencia_pago'],
+                'hora' => '12:00:00',
+                'cajero' => 'Cajero Depósito',
+            ];
+        }
+
+        $totalRecaudado = 0;
+        $totalEfectivo = 0;
+        $totalTarjeta = 0;
+        $totalTransferencia = 0;
+        $porConcepto = [
+            'PAPELETA' => 0,
+            'TRAMITE' => 0,
+            'CURSO' => 0,
+            'INTERNAMIENTO' => 0,
+        ];
+        $porCajero = [];
+
+        foreach ($todosPagos as $item) {
+            $m = $item['monto'];
+            $totalRecaudado += $m;
+            
+            $metodo = $item['metodoPago'];
+            if (str_contains($metodo, 'TARJETA') || str_contains($metodo, 'POS') || str_contains($metodo, 'DEBITO') || str_contains($metodo, 'CREDITO')) {
+                $totalTarjeta += $m;
+            } elseif (str_contains($metodo, 'TRANS') || str_contains($metodo, 'DEPOSITO') || str_contains($metodo, 'BBVA') || str_contains($metodo, 'BN')) {
+                $totalTransferencia += $m;
+            } else {
+                $totalEfectivo += $m;
+            }
+
+            $c = $item['tipoPago'];
+            if (!isset($porConcepto[$c])) {
+                $porConcepto[$c] = 0;
+            }
+            $porConcepto[$c] += $m;
+
+            $caj = $item['cajero'];
+            if (!isset($porCajero[$caj])) {
+                $porCajero[$caj] = ['cajero' => $caj, 'operaciones' => 0, 'monto' => 0];
+            }
+            $porCajero[$caj]['operaciones']++;
+            $porCajero[$caj]['monto'] += $m;
+        }
+
+        return $this->respond([
+            'data' => [
+                'fecha' => $fecha,
+                'totalOperaciones' => count($todosPagos),
+                'totalRecaudado' => round($totalRecaudado, 2),
+                'totalEfectivo' => round($totalEfectivo, 2),
+                'totalTarjeta' => round($totalTarjeta, 2),
+                'totalTransferencia' => round($totalTransferencia, 2),
+                'porConcepto' => $porConcepto,
+                'porCajero' => array_values($porCajero),
+                'detalles' => $todosPagos,
+            ]
+        ]);
     }
 }

@@ -3,6 +3,7 @@ import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { exportToExcel } from '../utils/exportToExcel'
 
 function FloatingInput({ id, label, type = "text", ...props }) {
   return (
@@ -128,6 +129,7 @@ export function Asociaciones() {
     tipoAmbiente: '',
     numeroLicencia: '',
     resolucionAlcaldia: '',
+    flotaAutorizada: 50,
     estado: 'ACTIVO',
   }
 
@@ -150,6 +152,41 @@ export function Asociaciones() {
   const particulares = asociaciones.filter((o) => o.tipo === 'PARTICULAR').length
   const asociacionesCount = asociaciones.filter((o) => o.tipo === 'ASOCIACION').length
   const flotaAcumulada = asociaciones.reduce((sum, o) => sum + Number(o.flotaTotal || 0), 0)
+  const flotaAutorizadaTotal = asociaciones.reduce((sum, o) => sum + Number(o.flotaAutorizada || 50), 0)
+
+  const handleExportExcel = () => {
+    const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
+    exportToExcel({
+      filename: `Padron_Asociaciones_${new Date().getFullYear()}.xls`,
+      sheetName: 'Asociaciones',
+      title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
+      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
+      metadata: [
+        { label: 'Filtro Tipo', value: filterTipo },
+        { label: 'Filtro Estado', value: filterEstado },
+        { label: 'Flota Total Registrada', value: `${flotaAcumulada} unidades` },
+        { label: 'Capacidad Global Autorizada', value: `${flotaAutorizadaTotal} cupos` },
+      ],
+      columns: [
+        { header: 'N°', align: 'center', width: 45, render: (_, __, i) => i + 1 },
+        { header: 'Tipo', key: 'tipo', width: 110, align: 'center' },
+        { header: 'Razón Social / Organización', key: 'razonSocial', width: 260 },
+        { header: 'RUC', key: 'ruc', width: 120, align: 'center', isText: true },
+        { header: 'Partida Registral', key: 'partidaRegistral', width: 130, align: 'center', isText: true },
+        { header: 'Resolución Alcaldía', key: 'resolucionAlcaldia', width: 160, align: 'center' },
+        { header: 'Flota Autorizada (Cupo)', key: 'flotaAutorizada', width: 120, align: 'center' },
+        { header: 'Flota Registrada', key: 'flotaTotal', width: 110, align: 'center' },
+        { header: 'Cupos Disponibles', key: 'cuposDisponibles', width: 120, align: 'center' },
+        { header: 'Ocupación (%)', width: 100, align: 'center', render: (_, r) => `${r.porcentajeOcupacion ?? 0}%` },
+        { header: 'Estado Cupo', key: 'estadoCupo', width: 110, align: 'center' },
+        { header: 'Teléfono', key: 'telefono', width: 110, align: 'center', isText: true },
+        { header: 'Correo Electrónico', key: 'email', width: 180 },
+        { header: 'Dirección', key: 'direccion', width: 220 },
+        { header: 'Estado', key: 'estado', width: 90, align: 'center' },
+      ],
+      data: listToExport,
+    })
+  }
 
   const filteredOrgs = asociaciones.filter((o) => {
     const fullSearch = `${o.razonSocial} ${o.ruc} ${o.partidaRegistral} ${o.direccion} ${o.numeroLicencia} ${o.resolucionAlcaldia || ''}`.toLowerCase()
@@ -328,15 +365,19 @@ export function Asociaciones() {
           </div>
         </div>
 
-        {/* 4. Flota Autorizada */}
+        {/* 4. Flota y Capacidad de Cupos */}
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Flota Autorizada</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Control de Cupos</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(flotaAcumulada)}</p>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">Capacidad Total</span>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(flotaAcumulada)} <span className="text-xs font-bold text-slate-400">/ {new Intl.NumberFormat('es-PE').format(flotaAutorizadaTotal)}</span>
+            </p>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">
+              {flotaAutorizadaTotal > 0 ? `${Math.round((flotaAcumulada / flotaAutorizadaTotal) * 100)}% ocupado` : 'Capacidad'}
+            </span>
           </div>
         </div>
       </div>
@@ -399,6 +440,16 @@ export function Asociaciones() {
                 <Icon name="filterX" className="size-4" />
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar padrón en formato Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
+            </button>
 
             <button
               type="button"
@@ -500,10 +551,35 @@ export function Asociaciones() {
                         {o.coordenadas ? 'Ver mapa' : 'Sin coordenadas'}
                       </button>
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-extrabold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                        ⚡ {o.flotaTotal} Unidades
-                      </span>
+                    <td className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-black text-slate-800 dark:text-slate-200">
+                            {o.flotaTotal} <span className="text-[10px] font-bold text-slate-400">/ {o.flotaAutorizada ?? 50}</span>
+                          </span>
+                          <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase ${
+                            (o.flotaTotal > (o.flotaAutorizada ?? 50))
+                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                              : (o.flotaTotal === (o.flotaAutorizada ?? 50))
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          }`}>
+                            {o.flotaTotal > (o.flotaAutorizada ?? 50) ? 'Sobrecupo' : (o.flotaTotal === (o.flotaAutorizada ?? 50) ? 'Completo' : `${Math.max(0, (o.flotaAutorizada ?? 50) - o.flotaTotal)} libres`)}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${
+                              (o.flotaTotal > (o.flotaAutorizada ?? 50))
+                                ? 'bg-rose-500'
+                                : (o.flotaTotal === (o.flotaAutorizada ?? 50))
+                                ? 'bg-amber-500'
+                                : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, Math.round((o.flotaTotal / Math.max(1, o.flotaAutorizada ?? 50)) * 100))}%` }}
+                          />
+                        </div>
+                      </div>
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-center">
                       <span
@@ -722,6 +798,17 @@ export function Asociaciones() {
                     />
                   </div>
 
+                  <div className="sm:col-span-1">
+                    <FloatingInput
+                      id="org_flota_autorizada"
+                      label="Flota Autorizada (Cupo)"
+                      type="number"
+                      min="1"
+                      value={formData.flotaAutorizada ?? 50}
+                      onChange={(e) => setFormData({ ...formData, flotaAutorizada: Math.max(1, parseInt(e.target.value) || 1) })}
+                    />
+                  </div>
+
                   {formData.tipo === 'ASOCIACION' && (
                     <FloatingInput
                       id="org_tel_asoc"
@@ -838,8 +925,20 @@ export function Asociaciones() {
                     <span className="font-semibold text-slate-700 dark:text-slate-200">{detailOrg.fechaCreacion || '—'}</span>
                   </div>
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                    <span className="font-bold text-slate-400">Flota Registrada</span>
-                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{detailOrg.flotaTotal} Unidades</span>
+                    <span className="font-bold text-slate-400">Flota Registrada / Cupo</span>
+                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{detailOrg.flotaTotal} / {detailOrg.flotaAutorizada ?? 50} Unidades</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                    <span className="font-bold text-slate-400">Estado de Cupo</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                      detailOrg.flotaTotal > (detailOrg.flotaAutorizada ?? 50)
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                        : detailOrg.flotaTotal === (detailOrg.flotaAutorizada ?? 50)
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                    }`}>
+                      {detailOrg.flotaTotal > (detailOrg.flotaAutorizada ?? 50) ? 'Sobrecupo excedido' : `${Math.max(0, (detailOrg.flotaAutorizada ?? 50) - detailOrg.flotaTotal)} cupos libres`}
+                    </span>
                   </div>
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
                     <span className="font-bold text-slate-400">Teléfono de contacto</span>

@@ -3,6 +3,7 @@
 namespace App\Controllers\Api;
 
 use CodeIgniter\RESTful\ResourceController;
+use App\Services\AuditoriaService;
 
 class AsociacionesController extends ResourceController
 {
@@ -27,6 +28,7 @@ class AsociacionesController extends ResourceController
                 COALESCE(o.tipo_ambiente, '') AS tipoAmbiente,
                 COALESCE(o.numero_licencia, '') AS numeroLicencia,
                 COALESCE(o.resolucion_alcaldia, '') AS resolucionAlcaldia,
+                COALESCE(o.flota_autorizada, 50) AS flotaAutorizada,
                 o.estado,
                 COUNT(v.id) AS flotaTotal
             ", false)
@@ -36,7 +38,19 @@ class AsociacionesController extends ResourceController
             ->get()
             ->getResultArray();
 
-        return $this->respond(['data' => $rows]);
+        $data = array_map(static function (array $r) {
+            $r['id'] = (int)$r['id'];
+            $flotaTotal = (int)$r['flotaTotal'];
+            $flotaAutorizada = max(1, (int)$r['flotaAutorizada']);
+            $r['flotaTotal'] = $flotaTotal;
+            $r['flotaAutorizada'] = $flotaAutorizada;
+            $r['cuposDisponibles'] = max(0, $flotaAutorizada - $flotaTotal);
+            $r['porcentajeOcupacion'] = round(($flotaTotal / $flotaAutorizada) * 100);
+            $r['estadoCupo'] = $flotaTotal > $flotaAutorizada ? 'SOBRECUPO' : ($flotaTotal === $flotaAutorizada ? 'COMPLETO' : 'DISPONIBLE');
+            return $r;
+        }, $rows);
+
+        return $this->respond(['data' => $data]);
     }
 
     public function show($id = null)
@@ -62,6 +76,7 @@ class AsociacionesController extends ResourceController
                 COALESCE(o.tipo_ambiente, '') AS tipoAmbiente,
                 COALESCE(o.numero_licencia, '') AS numeroLicencia,
                 COALESCE(o.resolucion_alcaldia, '') AS resolucionAlcaldia,
+                COALESCE(o.flota_autorizada, 50) AS flotaAutorizada,
                 o.estado,
                 COUNT(v.id) AS flotaTotal
             ", false)
@@ -74,6 +89,15 @@ class AsociacionesController extends ResourceController
         if (!$asociacion) {
             return $this->failNotFound('Asociación no encontrada.');
         }
+
+        $asociacion['id'] = (int)$asociacion['id'];
+        $flotaTotal = (int)$asociacion['flotaTotal'];
+        $flotaAutorizada = max(1, (int)$asociacion['flotaAutorizada']);
+        $asociacion['flotaTotal'] = $flotaTotal;
+        $asociacion['flotaAutorizada'] = $flotaAutorizada;
+        $asociacion['cuposDisponibles'] = max(0, $flotaAutorizada - $flotaTotal);
+        $asociacion['porcentajeOcupacion'] = round(($flotaTotal / $flotaAutorizada) * 100);
+        $asociacion['estadoCupo'] = $flotaTotal > $flotaAutorizada ? 'SOBRECUPO' : ($flotaTotal === $flotaAutorizada ? 'COMPLETO' : 'DISPONIBLE');
 
         $socios = $db->table('vehiculo_propietarios vp')
             ->select("
@@ -98,15 +122,17 @@ class AsociacionesController extends ResourceController
         $vehiculos = $db->table('vehiculos v')
             ->select("
                 v.id,
-                COALESCE(v.placa, '') AS placa,
+                v.placa,
+                COALESCE(tv.nombre, 'Mototaxi (Trimovil)') AS tipo,
                 COALESCE(v.marca, '') AS marca,
                 COALESCE(v.modelo, '') AS modelo,
                 COALESCE(v.color, '') AS color,
-                CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END AS estado,
-                COALESCE(p.numero, '') AS propietarioDocumento,
-                TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) AS propietario
+                COALESCE(v.anio_fabricacion, '') AS anio,
+                COALESCE(p.numero, '') AS propietarioDni,
+                TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) AS propietarioNombre
             ", false)
-            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.estado = "ACTIVO"', 'left')
+            ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
+            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
             ->join('personas p', 'p.id = vp.id_persona', 'left')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
             ->where('v.id_asociacion', $id)
@@ -116,9 +142,9 @@ class AsociacionesController extends ResourceController
 
         return $this->respond([
             'data' => array_merge($asociacion, [
-                'socios' => $socios,
+                'socios'    => $socios,
                 'vehiculos' => $vehiculos,
-            ]),
+            ])
         ]);
     }
 
@@ -151,6 +177,8 @@ class AsociacionesController extends ResourceController
             return $this->failValidationErrors('El teléfono debe contener solo números.');
         }
 
+        $flotaAutorizada = isset($input['flotaAutorizada']) ? max(1, (int)$input['flotaAutorizada']) : 50;
+
         $record = [
             'tipo'                 => strtoupper($input['tipo'] ?? 'ASOCIACION'),
             'razon_social'         => trim($input['razonSocial']),
@@ -164,11 +192,19 @@ class AsociacionesController extends ResourceController
             'tipo_ambiente'        => trim($input['tipoAmbiente'] ?? ''),
             'numero_licencia'      => trim($input['numeroLicencia'] ?? ''),
             'resolucion_alcaldia'  => trim($input['resolucionAlcaldia'] ?? ''),
+            'flota_autorizada'     => $flotaAutorizada,
             'estado'               => strtoupper($input['estado'] ?? 'ACTIVO'),
         ];
 
         $db->table('asociaciones')->insert($record);
         $insertId = $db->insertID();
+
+        AuditoriaService::registrar(
+            'ASOCIACIONES',
+            'CREAR',
+            "Se registró la asociación '{$record['razon_social']}' con cupo de $flotaAutorizada unidades",
+            ['id' => $insertId, 'razonSocial' => $record['razon_social'], 'flotaAutorizada' => $flotaAutorizada, 'ruc' => $record['ruc']]
+        );
 
         $newOrg = [
             'id'                 => (int)$insertId,
@@ -184,6 +220,10 @@ class AsociacionesController extends ResourceController
             'tipoAmbiente'       => $record['tipo_ambiente'],
             'numeroLicencia'     => $record['numero_licencia'],
             'resolucionAlcaldia' => $record['resolucion_alcaldia'],
+            'flotaAutorizada'    => $flotaAutorizada,
+            'cuposDisponibles'   => $flotaAutorizada,
+            'porcentajeOcupacion'=> 0,
+            'estadoCupo'         => 'DISPONIBLE',
             'estado'             => $record['estado'],
             'flotaTotal'         => 0,
         ];
@@ -198,6 +238,11 @@ class AsociacionesController extends ResourceController
 
         if (!$id) {
             return $this->failNotFound('ID de asociación no especificado.');
+        }
+
+        $existente = $db->table('asociaciones')->where('id', $id)->get()->getRowArray();
+        if (!$existente) {
+            return $this->failNotFound('Asociación no encontrada.');
         }
 
         $record = [];
@@ -240,10 +285,18 @@ class AsociacionesController extends ResourceController
         if (isset($input['tipoAmbiente'])) $record['tipo_ambiente'] = trim($input['tipoAmbiente']);
         if (isset($input['numeroLicencia'])) $record['numero_licencia'] = trim($input['numeroLicencia']);
         if (isset($input['resolucionAlcaldia'])) $record['resolucion_alcaldia'] = trim($input['resolucionAlcaldia']);
+        if (isset($input['flotaAutorizada'])) $record['flota_autorizada'] = max(1, (int)$input['flotaAutorizada']);
         if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
 
         if (!empty($record)) {
             $db->table('asociaciones')->where('id', $id)->update($record);
+
+            AuditoriaService::registrar(
+                'ASOCIACIONES',
+                'MODIFICAR',
+                "Se actualizaron los datos de la asociación '{$existente['razon_social']}'",
+                ['id' => $id, 'cambios' => $record]
+            );
         }
 
         return $this->respond(['status' => true, 'message' => 'Asociación actualizada con éxito']);
@@ -257,10 +310,20 @@ class AsociacionesController extends ResourceController
             return $this->failNotFound('ID de asociación no especificado.');
         }
 
+        $existente = $db->table('asociaciones')->where('id', $id)->get()->getRowArray();
+        if (!$existente) {
+            return $this->failNotFound('Asociación no encontrada.');
+        }
+
         $db->table('asociaciones')->where('id', $id)->delete();
+
+        AuditoriaService::registrar(
+            'ASOCIACIONES',
+            'ELIMINAR',
+            "Se eliminó la asociación '{$existente['razon_social']}' (ID: $id)",
+            ['id' => $id, 'razonSocial' => $existente['razon_social']]
+        );
 
         return $this->respondDeleted(['status' => true, 'message' => 'Asociación eliminada del padrón']);
     }
 }
-
-

@@ -1832,9 +1832,61 @@ export function Personas({ user, onUserUpdate }) {
                   </div>
                 </div>
               </div>
+
+              {/* Récord 360: Papeletas y Cursos */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-3.5">
+                {/* 3. Historial de Papeletas */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 flex flex-col shadow-xs max-h-60">
+                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 shrink-0">
+                    Historial de Papeletas ({selectedPersona.historialPapeletas?.length || 0})
+                  </h5>
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-2">
+                    {!selectedPersona.historialPapeletas || selectedPersona.historialPapeletas.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic text-center py-4">No registra papeletas.</p>
+                    ) : (
+                      selectedPersona.historialPapeletas.map((pap, i) => (
+                        <div key={i} className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                          <div className="flex justify-between items-center mb-1">
+                            <strong className="text-rose-600 dark:text-rose-400 font-mono">{pap.numero_papeleta}</strong>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400">{pap.estado}</span>
+                          </div>
+                          <p className="text-slate-600 dark:text-slate-300 font-semibold">Placa: {pap.placa}</p>
+                          <p className="text-slate-500 dark:text-slate-400 text-[10px]">{formatFecha(pap.fecha_hora)} - {pap.lugar}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. Historial de Cursos */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 flex flex-col shadow-xs max-h-60">
+                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 shrink-0">
+                    Historial de Cursos ({selectedPersona.historialCursos?.length || 0})
+                  </h5>
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-2">
+                    {!selectedPersona.historialCursos || selectedPersona.historialCursos.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic text-center py-4">No registra cursos de seguridad vial.</p>
+                    ) : (
+                      selectedPersona.historialCursos.map((cur, i) => (
+                        <div key={i} className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                          <div className="flex justify-between items-start mb-1">
+                            <strong className="text-indigo-600 dark:text-indigo-400 leading-tight">{cur.curso_nombre}</strong>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ml-2 whitespace-nowrap ${
+                              cur.estado === 'APROBADO' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400' :
+                              cur.estado === 'DESAPROBADO' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400' :
+                              'bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400'
+                            }`}>{cur.estado}</span>
+                          </div>
+                          <p className="text-slate-500 dark:text-slate-400 text-[10px]">Inscrito: {formatFecha(cur.fecha_inscripcion)}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+              </div>
             </div>
           </div>
-        </div>
       )}
     </div>
   )

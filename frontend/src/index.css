@@ -521,14 +521,6 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   .seccion-impresion-portal,
   .seccion-impresion-portal * {
     visibility: visible !important;
-    position: static !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    box-shadow: none !important;
-    border: none !important;
   }
 
   /* Para tickets térmicos de altura dinámica, usamos relative para que defina la altura del documento */

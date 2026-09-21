@@ -3,6 +3,7 @@ import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { PlantillaImpresionTUC } from '../components/documentos/PlantillaImpresionTUC'
+import { exportToExcel } from '../utils/exportToExcel'
 
 export function Documentos() {
   const [documentos, setDocumentos] = useState([])
@@ -104,6 +105,31 @@ export function Documentos() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Documentos_Transito_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Documentos',
+      title: 'PADRÓN OFICIAL DE DOCUMENTOS DE TRANSPORTE Y VIALIDAD',
+      subtitle: 'TUC, Carnets de Seguridad Vial, CERTICAV y SOAT - Control Municipal',
+      metadata: [
+        { label: 'Tipo Documento', value: filterTipo },
+        { label: 'Estado', value: filterEstado }
+      ],
+      columns: [
+        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+        { header: 'TIPO DOCUMENTO', key: 'tipoDocumento', width: 180 },
+        { header: 'N° / CÓDIGO', key: 'codigo', isText: true, width: 140, align: 'center' },
+        { header: 'EXPEDICIÓN', key: 'fechaExpedicion', width: 110, align: 'center' },
+        { header: 'VENCIMIENTO', key: 'fechaExpiracion', width: 110, align: 'center' },
+        { header: 'PROPIETARIO / TITULAR', key: 'propietario', width: 190 },
+        { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
+        { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 200 },
+        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+      ],
+      data: filteredDocs
+    })
+  }
 
   // Inspección técnica aprobada para el vehículo seleccionado
   const getApprovedInspectionForVehicle = (placa) => {
@@ -482,6 +508,16 @@ export function Documentos() {
                 Limpiar Filtros
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar padrón de documentos en Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
+            </button>
 
             <button
               type="button"

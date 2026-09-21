@@ -3,6 +3,7 @@ import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { exportToExcel } from '../utils/exportToExcel'
 
 const getPeruDateInputValue = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -89,6 +90,33 @@ export function Operativos({ user }) {
   }, [operativos, search, estado, fechaFiltro])
 
   const visible = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Operativos',
+      title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
+      metadata: [
+        { label: 'Estado', value: estado },
+        { label: 'Total Operativos', value: String(filtered.length) }
+      ],
+      columns: [
+        { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, isText: true, width: 120, align: 'center' },
+        { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 220 },
+        { header: 'LUGAR / ZONA', key: 'lugar', width: 200 },
+        { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
+        { header: 'HORA INICIO', key: 'hora_inicio', width: 100, align: 'center' },
+        { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 100, align: 'center' },
+        { header: 'INSPECTORES', render: (_, o) => String(o.inspectores_total || o.inspectores?.length || 0), width: 110, align: 'center' },
+        { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 100, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' },
+        { header: 'OBSERVACIONES', render: (_, o) => o.observacion || '—', width: 240 }
+      ],
+      data: filtered
+    })
+  }
+
   const activos = operativos.filter((op) => ['PROGRAMADO', 'EN_CURSO'].includes(op.estado)).length
   const finalizados = operativos.filter((op) => op.estado === 'FINALIZADO').length
   const papeletas = operativos.reduce((acc, op) => acc + Number(op.total_papeletas || 0), 0)
@@ -445,6 +473,15 @@ export function Operativos({ user }) {
                 Limpiar Filtros
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar registro de operativos en Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
+            </button>
           </div>
         </div>
 

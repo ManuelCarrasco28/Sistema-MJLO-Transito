@@ -3,6 +3,7 @@ import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { exportToExcel } from '../utils/exportToExcel'
 
 export function Papeletas() {
   const cachedPapeletas = getCachedData('/papeletas')
@@ -147,6 +148,35 @@ export function Papeletas() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Papeletas',
+      title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Fiscalización Municipal',
+      metadata: [
+        { label: 'Estado', value: filterEstado },
+        { label: 'Formalidad', value: filterFormalidad },
+        { label: 'Total Papeletas', value: String(filteredPapeletas.length) }
+      ],
+      columns: [
+        { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 140, align: 'center' },
+        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+        { header: 'CÓDIGO INFRACCIÓN', key: 'infraccionCodigo', isText: true, width: 140, align: 'center' },
+        { header: 'DESCRIPCIÓN INFRACCIÓN', key: 'infraccionDescripcion', width: 260 },
+        { header: 'GRAVEDAD', key: 'gravedad', width: 110, align: 'center' },
+        { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 120 },
+        { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
+        { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
+        { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 170 },
+        { header: 'FECHA INFRACCIÓN', key: 'fechaInfraccion', width: 130, align: 'center' },
+        { header: 'LUGAR', key: 'lugarInfraccion', width: 200 },
+        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
+      ],
+      data: filteredPapeletas
+    })
+  }
 
   const renderOrigen = (p) => {
     const isOperativo = p.origen === 'OPERATIVO' || p.operativoId
@@ -571,6 +601,16 @@ export function Papeletas() {
                 Limpiar Filtros
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar padrón de papeletas en Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
+            </button>
           </div>
         </div>
 

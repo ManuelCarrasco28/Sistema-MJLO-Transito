@@ -4,6 +4,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { BoletaInternamientoPrint } from '../components/retenciones/BoletaInternamientoPrint'
 import { OrdenLibertadPrint } from '../components/retenciones/OrdenLibertadPrint'
+import { exportToExcel } from '../utils/exportToExcel'
 
 export function Retenciones() {
   const cached = getCachedData('/internamientos')
@@ -61,6 +62,34 @@ export function Retenciones() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Internamientos',
+      title: 'REGISTRO DE INTERNAMIENTOS EN DEPÓSITO MUNICIPAL DE VEHÍCULOS',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Custodia y Órdenes de Libertad',
+      metadata: [
+        { label: 'Estado', value: filterEstado },
+        { label: 'Total Registros', value: String(filteredItems.length) }
+      ],
+      columns: [
+        { header: 'N° BOLETA', key: 'numeroBoleta', isText: true, width: 130, align: 'center' },
+        { header: 'DEPÓSITO', key: 'deposito', width: 160 },
+        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+        { header: 'TIPO VEHÍCULO', key: 'vehiculoTipo', width: 140 },
+        { header: 'PAPELETA ASOCIADA', render: (_, i) => i.numeroPapeleta || '—', isText: true, width: 130, align: 'center' },
+        { header: 'MOTIVO INTERNAMIENTO', key: 'motivoIngreso', width: 220 },
+        { header: 'CONDUCTOR / INTERESADO', key: 'interesadoNombre', width: 180 },
+        { header: 'DNI CONDUCTOR', key: 'interesadoDni', isText: true, width: 110, align: 'center' },
+        { header: 'FECHA INGRESO', render: (_, i) => `${i.fechaIngreso || ''} ${i.horaIngreso || ''}`.trim(), width: 130, align: 'center' },
+        { header: 'DÍAS RETENIDO', render: (_, i) => String(i.totalDias || 0), width: 100, align: 'center' },
+        { header: 'FECHA LIBERACIÓN', render: (_, i) => i.fechaLiberacion || 'EN CUSTODIA', width: 130, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+      ],
+      data: filteredItems
+    })
+  }
 
   const handleOpenDetail = (item) => {
     setSelectedItem(item)
@@ -236,6 +265,16 @@ export function Retenciones() {
               {st === 'TODOS' ? 'Todos' : st === 'RETENIDO' ? 'En Depósito' : 'Liberados'}
             </button>
           ))}
+
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+            title="Descargar registro de internamientos en Excel"
+          >
+            <Icon name="table" className="size-4" />
+            <span>Exportar Excel</span>
+          </button>
         </div>
       </div>
 

@@ -11,7 +11,16 @@ class PersonalController extends ResourceController
     public function index()
     {
         $db = \Config\Database::connect();
-        $rows = $db->table('trabajadores pe')
+        $cookie = $this->request->getCookie('session_user');
+        $rol = '';
+        if ($cookie && str_contains($cookie, '.')) {
+            [$payload] = explode('.', $cookie, 2);
+            $json = base64_decode(strtr($payload, '-_', '+/'));
+            $user = $json ? json_decode($json, true) : null;
+            $rol = strtoupper($user['rol'] ?? '');
+        }
+
+        $builder = $db->table('trabajadores pe')
             ->select("
                 pe.id_persona as id,
                 pe.id_persona as id_persona,
@@ -42,8 +51,13 @@ class PersonalController extends ResourceController
             ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
             ->join('unidades_organicas uo', 'uo.id = dof.id_unidad_organica', 'left')
             ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
-            ->join('usuarios ua', "ua.id_trabajador = pe.id_persona AND ua.estado = 'ACTIVO'", 'left')
-            ->orderBy('pe.id_persona', 'DESC')
+            ->join('usuarios ua', "ua.id_trabajador = pe.id_persona AND ua.estado = 'ACTIVO'", 'left');
+            
+        if ($rol !== 'SUPERADMIN') {
+            $builder->where('p.numero !=', '00000001');
+        }
+
+        $rows = $builder->orderBy('pe.id_persona', 'DESC')
             ->get()->getResultArray();
 
         foreach ($rows as &$row) {

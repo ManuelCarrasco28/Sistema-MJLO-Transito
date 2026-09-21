@@ -3,6 +3,7 @@ import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { ResolucionPermisoPrint } from '../components/documentos/TarjetaOperatividadPrint'
+import { exportToExcel } from '../utils/exportToExcel'
 
 export function Permisos() {
   const cachedPermisos = getCachedData('/permisos')
@@ -112,6 +113,36 @@ export function Permisos() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Autorizaciones',
+      title: 'PADRÓN OFICIAL DE AUTORIZACIONES DE CARGA, DESCARGA Y USO DE VÍAS',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Resoluciones y Permisos Especiales',
+      metadata: [
+        { label: 'Tipo Trámite', value: filterTipo },
+        { label: 'Estado', value: filterEstado },
+        { label: 'Total Registros', value: String(filteredPermisos.length) }
+      ],
+      columns: [
+        { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', isText: true, width: 150, align: 'center' },
+        { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 140 },
+        { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', isText: true, width: 130, align: 'center' },
+        { header: 'SOLICITANTE / EMPRESA', key: 'solicitanteNombre', width: 220 },
+        { header: 'DNI / RUC', key: 'solicitanteDocumento', isText: true, width: 120, align: 'center' },
+        { header: 'EXPEDIENTE', key: 'expediente', isText: true, width: 130, align: 'center' },
+        { header: 'ZONA', key: 'zonaCirculacion', width: 180 },
+        { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 130, align: 'center' },
+        { header: 'INICIO VIGENCIA', key: 'fechaInicioVigencia', width: 120, align: 'center' },
+        { header: 'FIN VIGENCIA', key: 'fechaFinVigencia', width: 120, align: 'center' },
+        { header: 'RECIBO INGRESO', key: 'reciboIngresoNumero', isText: true, width: 130, align: 'center' },
+        { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toFixed(2)}`, align: 'right', width: 110 },
+        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+      ],
+      data: filteredPermisos
+    })
+  }
 
   const handleOpenDetail = (p) => {
     setSelectedPermiso(p)
@@ -234,6 +265,16 @@ export function Permisos() {
           >
             <Icon name="plus" className="size-4" />
             <span>Nueva Autorización Oficial</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 shadow-2xs transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 cursor-pointer"
+            title="Exportar padrón de autorizaciones en Excel"
+          >
+            <Icon name="table" className="size-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Exportar Excel</span>
           </button>
 
           <button

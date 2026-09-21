@@ -72,6 +72,67 @@ class DashboardController extends ResourceController
             ['label' => 'Por vencer', 'value' => $documentosPorVencer, 'color' => 'bg-amber-500'],
         ];
 
+        // Cálculo de alertas de vencimiento (TUC, SOAT, CERTICAV)
+        $alertas = [];
+        
+        // 1. Alertas de Documentos (SOAT, TUC)
+        $docsAlertas = $db->table('documentos_vehiculo d')
+            ->select("
+                d.tipo_documento,
+                d.codigo,
+                d.fecha_expiracion,
+                v.placa,
+                DATEDIFF(d.fecha_expiracion, CURDATE()) as dias_restantes
+            ", false)
+            ->join('vehiculos v', 'v.id = d.id_vehiculo', 'left')
+            ->where('d.estado', 'VIGENTE')
+            ->where('d.fecha_expiracion >=', 'CURDATE()', false)
+            ->where('d.fecha_expiracion <=', 'DATE_ADD(CURDATE(), INTERVAL 30 DAY)', false)
+            ->get()->getResultArray();
+
+        foreach ($docsAlertas as $doc) {
+            $dias = (int)$doc['dias_restantes'];
+            $nivel = $dias <= 7 ? 'rojo' : ($dias <= 15 ? 'naranja' : 'amarillo');
+            $alertas[] = [
+                'tipo' => $doc['tipo_documento'],
+                'identificador' => 'Placa: ' . $doc['placa'],
+                'detalle' => 'Vence el ' . date('d/m/Y', strtotime($doc['fecha_expiracion'])),
+                'dias' => $dias,
+                'nivel' => $nivel
+            ];
+        }
+
+        // 2. Alertas de Inspecciones (CERTICAV) - asumiendo validez de 6 meses desde fecha
+        $certAlertas = $db->table('certicav c')
+            ->select("
+                c.numero_registro,
+                v.placa,
+                DATE_ADD(c.fecha, INTERVAL 6 MONTH) as fecha_expiracion,
+                DATEDIFF(DATE_ADD(c.fecha, INTERVAL 6 MONTH), CURDATE()) as dias_restantes
+            ", false)
+            ->join('vehiculos v', 'v.id = c.id_vehiculo', 'left')
+            ->where('c.estado', 'APROBADO')
+            ->where('DATE_ADD(c.fecha, INTERVAL 6 MONTH) >=', 'CURDATE()', false)
+            ->where('DATE_ADD(c.fecha, INTERVAL 6 MONTH) <=', 'DATE_ADD(CURDATE(), INTERVAL 30 DAY)', false)
+            ->get()->getResultArray();
+
+        foreach ($certAlertas as $cert) {
+            $dias = (int)$cert['dias_restantes'];
+            $nivel = $dias <= 7 ? 'rojo' : ($dias <= 15 ? 'naranja' : 'amarillo');
+            $alertas[] = [
+                'tipo' => 'CERTICAV',
+                'identificador' => 'Placa: ' . $cert['placa'],
+                'detalle' => 'Vence el ' . date('d/m/Y', strtotime($cert['fecha_expiracion'])),
+                'dias' => $dias,
+                'nivel' => $nivel
+            ];
+        }
+
+        // Ordenar alertas por días restantes (ascendente)
+        usort($alertas, function($a, $b) {
+            return $a['dias'] <=> $b['dias'];
+        });
+
         return $this->respond([
             'summaryCards' => [
                 ['label' => 'Vehículos registrados', 'value' => $vehTotal, 'detail' => '+' . $vehMes . ' este mes', 'change' => '', 'positive' => null, 'icon' => 'vehicle', 'tone' => 'blue'],
@@ -89,6 +150,7 @@ class DashboardController extends ResourceController
             'operatividad' => $this->operatividad($db),
             'operacionesMensuales' => $this->operacionesMensuales($db, $currentYear),
             'multasPagosPorAnio' => $this->multasPagosPorAnio($db),
+            'alertasVencimiento' => $alertas,
         ]);
     }
 
