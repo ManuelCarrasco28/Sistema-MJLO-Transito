@@ -48,7 +48,7 @@ export function TarjetaOperatividadPrint({ data }) {
               </div>
               <div className="row-single nombres-box">
                 <span className="val-nombres">{data.apellidos || ''}</span>
-                <span className="val-nombres">{data.nombres || data.apellidos ? '' : 'CONDUCTOR AUTORIZADO'}</span>
+                <span className="val-nombres">{data.nombres || (!data.apellidos ? 'CONDUCTOR AUTORIZADO' : '')}</span>
               </div>
             </div>
           </div>
@@ -357,3 +357,4 @@ export function CerticavFichaPrint({ data }) {
     </div>
   )
 }
+

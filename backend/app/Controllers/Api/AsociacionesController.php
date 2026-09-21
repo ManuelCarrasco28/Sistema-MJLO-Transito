@@ -26,6 +26,7 @@ class AsociacionesController extends ResourceController
                 COALESCE(o.email_contacto, '') AS email,
                 COALESCE(o.tipo_ambiente, '') AS tipoAmbiente,
                 COALESCE(o.numero_licencia, '') AS numeroLicencia,
+                COALESCE(o.resolucion_alcaldia, '') AS resolucionAlcaldia,
                 o.estado,
                 COUNT(v.id) AS flotaTotal
             ", false)
@@ -60,6 +61,7 @@ class AsociacionesController extends ResourceController
                 COALESCE(o.email_contacto, '') AS email,
                 COALESCE(o.tipo_ambiente, '') AS tipoAmbiente,
                 COALESCE(o.numero_licencia, '') AS numeroLicencia,
+                COALESCE(o.resolucion_alcaldia, '') AS resolucionAlcaldia,
                 o.estado,
                 COUNT(v.id) AS flotaTotal
             ", false)
@@ -161,6 +163,7 @@ class AsociacionesController extends ResourceController
             'email_contacto'       => trim($input['email'] ?? ''),
             'tipo_ambiente'        => trim($input['tipoAmbiente'] ?? ''),
             'numero_licencia'      => trim($input['numeroLicencia'] ?? ''),
+            'resolucion_alcaldia'  => trim($input['resolucionAlcaldia'] ?? ''),
             'estado'               => strtoupper($input['estado'] ?? 'ACTIVO'),
         ];
 
@@ -180,6 +183,7 @@ class AsociacionesController extends ResourceController
             'email'              => $record['email_contacto'],
             'tipoAmbiente'       => $record['tipo_ambiente'],
             'numeroLicencia'     => $record['numero_licencia'],
+            'resolucionAlcaldia' => $record['resolucion_alcaldia'],
             'estado'             => $record['estado'],
             'flotaTotal'         => 0,
         ];
@@ -235,6 +239,7 @@ class AsociacionesController extends ResourceController
         }
         if (isset($input['tipoAmbiente'])) $record['tipo_ambiente'] = trim($input['tipoAmbiente']);
         if (isset($input['numeroLicencia'])) $record['numero_licencia'] = trim($input['numeroLicencia']);
+        if (isset($input['resolucionAlcaldia'])) $record['resolucion_alcaldia'] = trim($input['resolucionAlcaldia']);
         if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
 
         if (!empty($record)) {
@@ -257,3 +262,5 @@ class AsociacionesController extends ResourceController
         return $this->respondDeleted(['status' => true, 'message' => 'Asociación eliminada del padrón']);
     }
 }
+
+

@@ -1,10 +1,102 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+
+function FloatingInput({ id, label, type = "text", ...props }) {
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type={type}
+        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+        placeholder=" "
+        autoComplete="off"
+        {...props}
+      />
+      <label
+        htmlFor={id}
+        className="pointer-events-none absolute left-3 right-3 truncate whitespace-nowrap top-1/2 -translate-y-1/2 select-none text-xs font-medium text-slate-400 transition-all duration-150 peer-focus:top-1 peer-focus:-translate-y-0 peer-focus:text-[9.5px] peer-focus:font-bold peer-focus:text-indigo-600 peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:-translate-y-0 peer-[:not(:placeholder-shown)]:text-[9.5px] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:text-slate-500 dark:peer-[:not(:placeholder-shown)]:text-slate-400"
+      >
+        {label}
+      </label>
+    </div>
+  )
+}
+
+function FloatingSelect({ id, label, value, onChange, options = [], className = '' }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectedOption = options.find((opt) => String(opt.value) === String(value)) || options[0]
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        id={id}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-900 dark:text-white cursor-pointer ${isOpen
+            ? 'border-indigo-500 ring-1 ring-indigo-500/20 dark:border-indigo-400'
+            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+          }`}
+      >
+        <span className="truncate">{selectedOption?.label || value}</span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      <label htmlFor={id} className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-indigo-600 dark:!text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`}>
+        {label}
+      </label>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+          <div className="space-y-0.5">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value)
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange({ target: { value: opt.value } })
+                    setIsOpen(false)
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
+                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
+                    }`}
+                >
+                  <span className="whitespace-nowrap">{opt.label}</span>
+                  {isSelected && (
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3 text-indigo-600 dark:text-indigo-400 shrink-0">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function Vehiculos() {
   const cachedVeh = getCachedData('/vehiculos')
@@ -132,7 +224,7 @@ export function Vehiculos() {
   }
 
   const isVehiculoFormal = (v) => Boolean(
-    v?.asociacionId || 
+    v?.asociacionId ||
     (v?.asociacion && v.asociacion !== 'Sin Asociación' && v.asociacion !== 'Independiente' && v.asociacion !== 'Independiente / Particular')
   )
 
@@ -154,7 +246,7 @@ export function Vehiculos() {
 
     const matchesTipo = filterTipo === 'TODOS' || v.tipo === filterTipo
     const formal = isVehiculoFormal(v)
-    const matchesEstado = 
+    const matchesEstado =
       filterEstado === 'TODOS' ||
       (filterEstado === 'FORMAL' && formal) ||
       (filterEstado === 'INFORMAL' && !formal) ||
@@ -267,13 +359,13 @@ export function Vehiculos() {
     setShowPropietarioResults(false)
     setAsociacionSearch(isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '')
     setShowAsociacionResults(false)
-    setFormData({ 
+    setFormData({
       ...vehiculo,
       asociacion: isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '',
       propietarioDni: vehiculo.propietarioDni || '',
       propietario: vehiculo.propietario || '',
-      estado: vehiculo.estado === 'SUSPENDIDO' || vehiculo.estado === 'BAJA' 
-        ? vehiculo.estado 
+      estado: vehiculo.estado === 'SUSPENDIDO' || vehiculo.estado === 'BAJA'
+        ? vehiculo.estado
         : (isVehiculoFormal(vehiculo) ? 'FORMAL' : 'INFORMAL')
     })
     setIsEditing(true)
@@ -343,18 +435,19 @@ export function Vehiculos() {
     <div className="space-y-6">
       {loadError && <PageLoadError message={loadError} />}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3.5">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30">
-            <Icon name="vehicle" className="size-6" />
+      {/* Cabecera Principal */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
+            <Icon name="vehicle" className="size-5.5" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                Padrón Oficial de Vehículos
+              <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                Gestión de Vehículos
               </h1>
             </div>
-            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Registro municipal, control de trimóviles, empresas autorizadas y fiscalización vial.
             </p>
           </div>
@@ -362,61 +455,57 @@ export function Vehiculos() {
       </div>
 
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Tarjetas KPI con Bordes de Colores */}
+      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 1. Total Unidades */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-indigo-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Unidades</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-              <Icon name="vehicle" className="size-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total Unidades</span>
+            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+              <Icon name="vehicle" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(totalVehiculos)}</p>
-            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">Padrón 2026</span>
-          </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Vehículos en la base municipal</p>
-        </div>
-
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Formales</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">✓</span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(formales)}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">{porcentajeFormales}% En Asociación</span>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${porcentajeFormales}%` }} />
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(totalVehiculos)}</p>
+            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">Padrón 2026</span>
           </div>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 2. Formales */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Informales</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold">⚠️</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Formales</span>
+            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(informales)}</p>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">Sin Asociación</span>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(formales)}</p>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">{porcentajeFormales}% En Asoc.</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Vehículos independientes no afiliados</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 3. Informales */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-amber-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-500 dark:text-rose-400">Observados / Baja</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold">✕</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Informales</span>
+            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs">⚠️</span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(suspendidos)}</p>
-            <span className="text-xs font-bold text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">Inhabilitados</span>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(informales)}</p>
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">Sin Asoc.</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Restringidos para circular</p>
+        </div>
+
+        {/* 4. Observados / Baja */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-rose-500/80 dark:bg-[#0f172a]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Obs. / Baja</span>
+            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">✕</span>
+          </div>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(suspendidos)}</p>
+            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-1.5 py-0.5 rounded-md">Inhabilitados</span>
+          </div>
         </div>
       </div>
 
@@ -476,9 +565,10 @@ export function Vehiculos() {
                   setFilterEstado('TODOS')
                   setSearchTerm('')
                 }}
-                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                title="Limpiar filtros"
+                className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
-                Limpiar Filtros
+                <Icon name="filterX" className="size-4" />
               </button>
             )}
 
@@ -516,7 +606,7 @@ export function Vehiculos() {
               <col className="w-[13%]" />
               <col className="w-[10%]" />
             </colgroup>
-            <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
               <tr>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Placa</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Vehículo & Modelo</th>
@@ -524,7 +614,7 @@ export function Vehiculos() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Propietario & Titular</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
-                <th className="px-3 py-3.5 text-center whitespace-nowrap">Acciones</th>
+                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-slate-800/40 px-3 py-3.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -542,7 +632,7 @@ export function Vehiculos() {
                     <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-4"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-4 shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
                   </tr>
                 ))
               ) : filteredVehiculos.length === 0 ? (
@@ -563,7 +653,7 @@ export function Vehiculos() {
                 paginatedVehiculos.map((v) => (
                   <tr
                     key={v.id}
-                    className="group transition-colors hover:bg-blue-50/30 dark:hover:bg-slate-800/40"
+                    className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40"
                   >
 
                     <td className="px-3.5 py-3.5 whitespace-nowrap">
@@ -645,13 +735,13 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="px-3 py-3.5 whitespace-nowrap">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-3.5 whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(v)}
                           title="Ver Ficha Técnica"
-                          className="rounded-xl p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/60 dark:text-sky-400 dark:hover:bg-sky-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer"
+                          className="size-8 rounded-lg grid place-items-center bg-cyan-50 text-cyan-600 hover:bg-cyan-500 hover:text-white dark:bg-cyan-950/60 dark:text-cyan-400 dark:hover:bg-cyan-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
                         >
                           <Icon name="eye" className="size-4" />
                         </button>
@@ -659,7 +749,7 @@ export function Vehiculos() {
                           type="button"
                           onClick={() => handleOpenEditModal(v)}
                           title="Editar Vehículo"
-                          className="rounded-xl p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer"
+                          className="size-8 rounded-lg grid place-items-center bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
                         >
                           <Icon name="pencil" className="size-4" />
                         </button>
@@ -667,7 +757,7 @@ export function Vehiculos() {
                           type="button"
                           onClick={() => handleDelete(v.id)}
                           title="Eliminar Vehículo"
-                          className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer"
+                          className="size-8 rounded-lg grid place-items-center bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
                         >
                           <Icon name="trash" className="size-4" />
                         </button>
@@ -696,36 +786,36 @@ export function Vehiculos() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-slate-950/70 backdrop-blur-xs animate-enter sm:p-4">
           <div className="w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b border-blue-900/20 bg-[#123b6d] px-6 py-4.5 text-white dark:border-slate-800 dark:bg-[#102a4d]">
-              <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-cyan-300">
-                  <Icon name="vehicle" className="size-5" />
+            {/* Cabecera del Modal (Limpia, sin morado) */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Icon name="vehicle" className="size-4" />
                 </span>
-                <div>
-                  <h3 className="text-lg font-extrabold text-white">
-                    {isEditing ? 'Editar Registro de Vehículo' : 'Registrar Nuevo Vehículo'}
-                  </h3>
-                  <p className="text-xs text-blue-100/80">Gestión de datos técnicos y propietario</p>
-                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {isEditing ? 'Editar Vehículo' : 'Registrar Vehículo'}
+                </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="grid size-9 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-xs transition hover:bg-white/20 cursor-pointer"
+                title="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                <Icon name="close" className="size-4" />
+                <Icon name="close" className="size-5" />
               </button>
             </div>
 
             <form
               onSubmit={handleFormSubmit}
+              autoComplete="off"
               onMouseDown={(event) => {
                 if (!event.target.closest('[data-combobox="vehiculo"]')) {
                   setShowPropietarioResults(false)
                   setShowAsociacionResults(false)
                 }
               }}
-              className="no-scrollbar max-h-[calc(96vh-88px)] space-y-5 overflow-y-auto p-5 sm:p-6"
+              className="no-scrollbar max-h-[calc(96vh-88px)] space-y-4 overflow-y-auto p-4 sm:p-5"
             >
 
               <div>
@@ -734,183 +824,92 @@ export function Vehiculos() {
                   Identificación de la Unidad
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div data-combobox="vehiculo" className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_placa"
-                      type="text"
-                      required
-                      maxLength={15}
-                      placeholder=" "
-                      value={formData.placa}
-                      onChange={(e) => {
-                        const val = e.target.value.toUpperCase();
-                        if (/[^A-Z0-9-]/.test(val)) return;
-                        setFormData({ ...formData, placa: val });
-                      }}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-black uppercase text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_placa"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Placa de Rodaje
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_placa"
+                    label="Placa de Rodaje"
+                    required
+                    maxLength={15}
+                    value={formData.placa}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      if (/[^A-Z0-9-]/.test(val)) return;
+                      setFormData({ ...formData, placa: val });
+                    }}
+                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-black uppercase"
+                  />
 
-                  <div data-combobox="vehiculo" className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <select
-                      id="veh_tipo"
-                      value={formData.tipo}
-                      onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    >
-                      <option value="Mototaxi (Trimovil)">Mototaxi (Trimovil)</option>
-                      <option value="Colectivo (Auto)">Colectivo (Auto)</option>
-                      <option value="Combi / Minivan">Combi / Minivan</option>
-                    </select>
-                    <label
-                      htmlFor="veh_tipo"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Tipo de Vehículo
-                    </label>
-                  </div>
+                  <FloatingSelect
+                    id="veh_tipo"
+                    label="Tipo de Vehículo"
+                    value={formData.tipo}
+                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                    options={[
+                      { value: 'Mototaxi (Trimovil)', label: 'Mototaxi (Trimovil)' },
+                      { value: 'Colectivo (Auto)', label: 'Colectivo (Auto)' },
+                      { value: 'Combi / Minivan', label: 'Combi / Minivan' },
+                    ]}
+                  />
 
-                  <div data-combobox="vehiculo" className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_marca"
-                      type="text"
-                      placeholder=" "
-                      value={formData.marca}
-                      onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_marca"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Marca
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_marca"
+                    label="Marca"
+                    value={formData.marca}
+                    onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                  />
 
-                  <div data-combobox="vehiculo" className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_modelo"
-                      type="text"
-                      placeholder=" "
-                      value={formData.modelo}
-                      onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_modelo"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Modelo
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_modelo"
+                    label="Modelo"
+                    value={formData.modelo}
+                    onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                  />
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_color"
-                      type="text"
-                      placeholder=" "
-                      value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_color"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Color
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_color"
+                    label="Color"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  />
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_anio"
-                      type="number"
-                      placeholder=" "
-                      value={formData.anio}
-                      onChange={(e) => setFormData({ ...formData, anio: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_anio"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Año de Fabricación
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_anio"
+                    type="number"
+                    label="Año de Fabricación"
+                    value={formData.anio}
+                    onChange={(e) => setFormData({ ...formData, anio: e.target.value })}
+                  />
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_categoria"
-                      type="text"
-                      placeholder=" "
-                      value={formData.categoria || ''}
-                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value.toUpperCase() })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold uppercase text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_categoria"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Categoría SUNARP
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_categoria"
+                    label="Categoría SUNARP"
+                    value={formData.categoria || ''}
+                    onChange={(e) => setFormData({ ...formData, categoria: e.target.value.toUpperCase() })}
+                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
+                  />
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_carroceria"
-                      type="text"
-                      placeholder=" "
-                      value={formData.carroceria || ''}
-                      onChange={(e) => setFormData({ ...formData, carroceria: e.target.value.toUpperCase() })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold uppercase text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_carroceria"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Carrocería
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_carroceria"
+                    label="Carrocería"
+                    value={formData.carroceria || ''}
+                    onChange={(e) => setFormData({ ...formData, carroceria: e.target.value.toUpperCase() })}
+                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
+                  />
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_sede"
-                      type="text"
-                      placeholder=" "
-                      value={formData.sedeRegistro || ''}
-                      onChange={(e) => setFormData({ ...formData, sedeRegistro: e.target.value.toUpperCase() })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold uppercase text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_sede"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Sede de Registro SUNARP
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_sede"
+                    label="Sede de Registro SUNARP"
+                    value={formData.sedeRegistro || ''}
+                    onChange={(e) => setFormData({ ...formData, sedeRegistro: e.target.value.toUpperCase() })}
+                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
+                  />
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_tipo_carroceria"
-                      type="text"
-                      placeholder=" "
-                      value={formData.tipoCarroceria || ''}
-                      onChange={(e) => setFormData({ ...formData, tipoCarroceria: e.target.value.toUpperCase() })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono uppercase text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_tipo_carroceria"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Tipo de Carrocería
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_tipo_carroceria"
+                    label="Tipo de Carrocería"
+                    value={formData.tipoCarroceria || ''}
+                    onChange={(e) => setFormData({ ...formData, tipoCarroceria: e.target.value.toUpperCase() })}
+                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase font-mono"
+                  />
                 </div>
               </div>
 
@@ -921,56 +920,29 @@ export function Vehiculos() {
                   Datos Técnicos & SUNARP
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_serie"
-                      type="text"
-                      placeholder=" "
-                      value={formData.numeroSerie}
-                      onChange={(e) => setFormData({ ...formData, numeroSerie: e.target.value.toUpperCase() })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_serie"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Número de Serie (VIN)
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_serie"
+                    label="Número de Serie (VIN)"
+                    value={formData.numeroSerie}
+                    onChange={(e) => setFormData({ ...formData, numeroSerie: e.target.value.toUpperCase() })}
+                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                  />
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_motor"
-                      type="text"
-                      placeholder=" "
-                      value={formData.serieMotor}
-                      onChange={(e) => setFormData({ ...formData, serieMotor: e.target.value.toUpperCase() })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_motor"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Serie del Motor
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_motor"
+                    label="Serie del Motor"
+                    value={formData.serieMotor}
+                    onChange={(e) => setFormData({ ...formData, serieMotor: e.target.value.toUpperCase() })}
+                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                  />
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
-                      id="veh_partida"
-                      type="text"
-                      placeholder=" "
-                      value={formData.partidaRegistral}
-                      onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono text-slate-800 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="veh_partida"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-blue-600 dark:peer-focus:text-blue-400"
-                    >
-                      Partida Registral SUNARP
-                    </label>
-                  </div>
+                  <FloatingInput
+                    id="veh_partida"
+                    label="Partida Registral SUNARP"
+                    value={formData.partidaRegistral}
+                    onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
+                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                  />
                 </div>
               </div>
 
@@ -981,12 +953,11 @@ export function Vehiculos() {
                   Titular & Asociación Autorizada
                 </h4>
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
+                  <div className="relative">
+                    <FloatingInput
                       id="veh_propietario"
+                      label="Propietario registrado en Personas"
                       required
-                      type="text"
-                      placeholder="Escribe DNI o nombre del propietario..."
                       value={propietarioSearch}
                       onFocus={() => setShowPropietarioResults(true)}
                       onChange={(e) => {
@@ -999,14 +970,7 @@ export function Vehiculos() {
                         })
                         setShowPropietarioResults(true)
                       }}
-                      className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 text-sm font-bold text-slate-800 outline-none dark:text-white"
                     />
-                    <label
-                      htmlFor="veh_propietario"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Propietario registrado en Personas
-                    </label>
                     {showPropietarioResults && (
                       <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
                         {propietarioResults.length ? (
@@ -1037,22 +1001,21 @@ export function Vehiculos() {
                       </div>
                     )}
                     {formData.propietarioDni && (
-                      <p className="px-3.5 pb-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                      <p className="px-3.5 pb-2 pt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                         Seleccionado: {formData.propietarioDni} — {formData.propietario}
                       </p>
                     )}
                     {!personas.length && (
-                      <p className="px-3.5 pb-2 text-xs font-semibold text-amber-600">
+                      <p className="px-3.5 pb-2 pt-2 text-xs font-semibold text-amber-600">
                         No hay personas cargadas. Registra primero al propietario en el módulo Personas.
                       </p>
                     )}
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <input
+                  <div className="relative">
+                    <FloatingInput
                       id="veh_org"
-                      type="text"
-                      placeholder="Escribe nombre o RUC de la asociación..."
+                      label="Empresa o Asociación (Define Formal / Informal)"
                       value={asociacionSearch}
                       onFocus={() => setShowAsociacionResults(true)}
                       onChange={(e) => {
@@ -1065,14 +1028,7 @@ export function Vehiculos() {
                         })
                         setShowAsociacionResults(true)
                       }}
-                      className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                     />
-                    <label
-                      htmlFor="veh_org"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Empresa o Asociación (Define Formal / Informal)
-                    </label>
                     {showAsociacionResults && (
                       <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-40 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
                         {asociacionResults.length ? (
@@ -1098,7 +1054,7 @@ export function Vehiculos() {
                         )}
                       </div>
                     )}
-                    <div className="flex items-center justify-between gap-2 px-3.5 pb-2 text-xs">
+                    <div className="flex items-center justify-between gap-2 px-3.5 pb-2 pt-2 text-xs">
                       {formData.asociacion ? (
                         <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                           Formal: {formData.asociacion}
@@ -1125,25 +1081,18 @@ export function Vehiculos() {
                   Estado de Operatividad Municipal
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-1">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-blue-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-blue-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-blue-400">
-                    <select
-                      id="veh_estado"
-                      value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
-                    >
-                      <option value="FORMAL">FORMAL (Autorizado)</option>
-                      <option value="INFORMAL">INFORMAL (Sin Asociación)</option>
-                      <option value="SUSPENDIDO">SUSPENDIDO</option>
-                      <option value="BAJA">BAJA</option>
-                    </select>
-                    <label
-                      htmlFor="veh_estado"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Estado Municipal del Vehículo
-                    </label>
-                  </div>
+                  <FloatingSelect
+                    id="veh_estado"
+                    label="Estado Municipal del Vehículo"
+                    value={formData.estado}
+                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                    options={[
+                      { value: 'FORMAL', label: 'FORMAL (Autorizado)' },
+                      { value: 'INFORMAL', label: 'INFORMAL (Sin Asociación)' },
+                      { value: 'SUSPENDIDO', label: 'SUSPENDIDO' },
+                      { value: 'BAJA', label: 'BAJA' }
+                    ]}
+                  />
                 </div>
               </div>
 

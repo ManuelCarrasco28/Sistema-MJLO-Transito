@@ -58,7 +58,7 @@ export function Inspecciones() {
 
   useEffect(() => {
     setLoadError('')
-    apiFetch('/personal').then(r => r.ok ? r.json() : Promise.reject(r)).then(r => setTecnicos((r.data || []).filter(p => p.estado === 'ACTIVO'))).catch(() => {})
+    apiFetch('/personal').then(r => r.ok ? r.json() : Promise.reject(r)).then(r => setTecnicos((r.data || []).filter(p => p.estado === 'ACTIVO'))).catch(() => setTecnicos([]))
     Promise.all([
       apiFetch('/inspecciones').then(res => res.ok ? res.json() : Promise.reject(res)),
       apiFetch('/inspeccion-criterios').then(res => res.ok ? res.json() : Promise.reject(res)),
@@ -185,6 +185,7 @@ export function Inspecciones() {
 
   return (
     <div className="space-y-6">
+      {loadError && <PageLoadError message={loadError} />}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">

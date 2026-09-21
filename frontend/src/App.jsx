@@ -1,28 +1,37 @@
-import { useState, useRef, useEffect } from 'react'
+import { lazy, Suspense, useState, useRef, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Login } from './components/auth/Login'
 import { Sidebar } from './components/layout/Sidebar'
 import { Header } from './components/layout/Header'
-import { DashboardHome } from './pages/DashboardHome'
-import { Vehiculos } from './pages/Vehiculos'
-import { Personas } from './pages/Personas'
-import { Personal } from './pages/Personal'
-import { Asociaciones } from './pages/Asociaciones'
-import { Documentos } from './pages/Documentos'
-import { Inspecciones } from './pages/Inspecciones'
-import { Papeletas } from './pages/Papeletas'
-import { CursosSeguridad } from './pages/CursosSeguridad'
-import { Pagos } from './pages/Pagos'
-import { Retenciones } from './pages/Retenciones'
-import { Permisos } from './pages/Permisos'
-import { SuperAdminDashboard } from './pages/SuperAdminDashboard'
-import { Operativos } from './pages/Operativos'
 import { navigationGroups } from './config/navigation'
 import { apiFetch } from './config/api'
 
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000
 
+const DashboardHome = lazy(() => import('./pages/DashboardHome').then((module) => ({ default: module.DashboardHome })))
+const Vehiculos = lazy(() => import('./pages/Vehiculos').then((module) => ({ default: module.Vehiculos })))
+const Personas = lazy(() => import('./pages/Personas').then((module) => ({ default: module.Personas })))
+const Trabajadores = lazy(() => import('./pages/Trabajadores').then((module) => ({ default: module.Trabajadores })))
+const Asociaciones = lazy(() => import('./pages/Asociaciones').then((module) => ({ default: module.Asociaciones })))
+const Documentos = lazy(() => import('./pages/Documentos').then((module) => ({ default: module.Documentos })))
+const Inspecciones = lazy(() => import('./pages/Inspecciones').then((module) => ({ default: module.Inspecciones })))
+const Papeletas = lazy(() => import('./pages/Papeletas').then((module) => ({ default: module.Papeletas })))
+const CursosSeguridad = lazy(() => import('./pages/CursosSeguridad').then((module) => ({ default: module.CursosSeguridad })))
+const Pagos = lazy(() => import('./pages/Pagos').then((module) => ({ default: module.Pagos })))
+const Retenciones = lazy(() => import('./pages/Retenciones').then((module) => ({ default: module.Retenciones })))
+const Permisos = lazy(() => import('./pages/Permisos').then((module) => ({ default: module.Permisos })))
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard').then((module) => ({ default: module.SuperAdminDashboard })))
+const Operativos = lazy(() => import('./pages/Operativos').then((module) => ({ default: module.Operativos })))
+
 const isSuperAdminUser = (user) => user?.usuario?.toLowerCase() === 'superadmin'
+
+function ModuleFallback() {
+  return (
+    <div className="grid min-h-[45vh] place-items-center rounded-2xl bg-white text-sm font-black text-slate-500 shadow-sm dark:bg-slate-900 dark:text-slate-300">
+      Cargando módulo...
+    </div>
+  )
+}
 
 function Layout({ onLogout, user, onUserUpdate }) {
   const location = useLocation()
@@ -39,7 +48,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (path.includes('/superadmin')) return 'Dashboard Super Admin'
     if (path.includes('/vehiculos')) return 'Vehículos'
     if (path.includes('/personas')) return 'Personas'
-    if (path.includes('/personal')) return 'Personal'
+    if (path.includes('/trabajadores')) return 'Trabajadores'
     if (path.includes('/asociaciones')) return 'Asociaciones'
     if (path.includes('/documentos')) return 'Documentos'
     if (path.includes('/inspecciones')) return 'Inspecciones'
@@ -140,36 +149,38 @@ function Layout({ onLogout, user, onUserUpdate }) {
           />
         </div>
 
-        <div className="mx-auto w-full max-w-[96rem] flex-1 space-y-4 p-3.5 sm:p-5 lg:p-6 print:block print:p-0 print:space-y-0 print:m-0 print:max-w-none">
-          <Routes>
-            <Route path="/" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
-            <Route path="/superadmin" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/superadmin/personas" element={isSuperAdmin ? <Personas user={user} onUserUpdate={onUserUpdate} /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/superadmin/trabajadores" element={isSuperAdmin ? <Personal /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/superadmin/:moduleId" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/admin" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
-            <Route path="/dashboard" element={onlyNormalUser(<DashboardHome />)} />
-            <Route path="/vehiculos" element={onlyNormalUser(<Vehiculos />)} />
-            <Route path="/personas" element={onlyNormalUser(<Personas user={user} onUserUpdate={onUserUpdate} />)} />
-            <Route path="/personal" element={onlyNormalUser(<Personal />)} />
-            <Route path="/asociaciones" element={onlyNormalUser(<Asociaciones />)} />
-            <Route path="/documentos" element={onlyNormalUser(<Documentos />)} />
-            <Route path="/inspecciones" element={onlyNormalUser(<Inspecciones />)} />
-            <Route path="/papeletas" element={onlyNormalUser(<Papeletas />)} />
-            <Route path="/operativos" element={onlyNormalUser(<Operativos user={user} />)} />
-            <Route path="/cursos" element={onlyNormalUser(<CursosSeguridad />)} />
-            <Route path="/cursos-seguridad" element={onlyNormalUser(<CursosSeguridad />)} />
-            <Route path="/pagos" element={onlyNormalUser(<Pagos />)} />
-            <Route path="/internamientos" element={onlyNormalUser(<Retenciones />)} />
-            <Route path="/retenciones" element={onlyNormalUser(<Navigate to="/internamientos" replace />)} />
-            <Route path="/permisos" element={onlyNormalUser(<Permisos />)} />
-            <Route path="*" element={
-              <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">
-                <h2 className="text-xl font-bold">Módulo en desarrollo</h2>
-                <p className="mt-2 text-slate-500">Esta sección estará disponible próximamente.</p>
-              </div>
-            } />
-          </Routes>
+        <div className="app-content mx-auto w-full max-w-[96rem] flex-1 space-y-4 p-3.5 sm:p-5 lg:p-6 print:block print:p-0 print:space-y-0 print:m-0 print:max-w-none">
+          <Suspense fallback={<ModuleFallback />}>
+            <Routes>
+              <Route path="/" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
+              <Route path="/superadmin" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
+              <Route path="/superadmin/personas" element={isSuperAdmin ? <Personas user={user} onUserUpdate={onUserUpdate} /> : <Navigate to="/dashboard" replace />} />
+              <Route path="/superadmin/trabajadores" element={isSuperAdmin ? <Trabajadores /> : <Navigate to="/dashboard" replace />} />
+              <Route path="/superadmin/:moduleId" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
+              <Route path="/admin" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
+              <Route path="/dashboard" element={onlyNormalUser(<DashboardHome />)} />
+              <Route path="/vehiculos" element={onlyNormalUser(<Vehiculos />)} />
+              <Route path="/personas" element={onlyNormalUser(<Personas user={user} onUserUpdate={onUserUpdate} />)} />
+              <Route path="/trabajadores" element={onlyNormalUser(<Trabajadores />)} />
+              <Route path="/asociaciones" element={onlyNormalUser(<Asociaciones />)} />
+              <Route path="/documentos" element={onlyNormalUser(<Documentos />)} />
+              <Route path="/inspecciones" element={onlyNormalUser(<Inspecciones />)} />
+              <Route path="/papeletas" element={onlyNormalUser(<Papeletas />)} />
+              <Route path="/operativos" element={onlyNormalUser(<Operativos user={user} />)} />
+              <Route path="/cursos" element={onlyNormalUser(<CursosSeguridad />)} />
+              <Route path="/cursos-seguridad" element={onlyNormalUser(<CursosSeguridad />)} />
+              <Route path="/pagos" element={onlyNormalUser(<Pagos />)} />
+              <Route path="/internamientos" element={onlyNormalUser(<Retenciones />)} />
+              <Route path="/retenciones" element={onlyNormalUser(<Navigate to="/internamientos" replace />)} />
+              <Route path="/permisos" element={onlyNormalUser(<Permisos />)} />
+              <Route path="*" element={
+                <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">
+                  <h2 className="text-xl font-bold">Módulo en desarrollo</h2>
+                  <p className="mt-2 text-slate-500">Esta sección estará disponible próximamente.</p>
+                </div>
+              } />
+            </Routes>
+          </Suspense>
         </div>
       </div>
     </main>

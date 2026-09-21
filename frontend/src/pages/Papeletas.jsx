@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 export function Papeletas() {
@@ -24,6 +25,7 @@ export function Papeletas() {
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
   const [asociaciones, setAsociaciones] = useState(cachedOrgs || [])
   const [isLoading, setIsLoading] = useState(!cachedPapeletas)
+  const [loadError, setLoadError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [filterOrigen, setFilterOrigen] = useState('TODOS')
@@ -161,12 +163,13 @@ export function Papeletas() {
 
   const loadData = () => {
     setIsLoading(true)
+    setLoadError('')
     Promise.all([
-      apiFetch('/papeletas').then(res => res.json()).catch(() => ({ data: [] })),
-      apiFetch('/tipos-infraccion').then(res => res.json()).catch(() => ({ data: [] })),
-      apiFetch('/vehiculos').then(res => res.json()).catch(() => ({ data: [] })),
-      apiFetch('/asociaciones').then(res => res.json()).catch(() => ({ data: [] })),
-      apiFetch('/reportes-intervencion').then(res => res.json()).catch(() => ({ data: [] }))
+      apiFetch('/papeletas').then(res => res.ok ? res.json() : Promise.reject(res)),
+      apiFetch('/tipos-infraccion').then(res => res.ok ? res.json() : Promise.reject(res)),
+      apiFetch('/vehiculos').then(res => res.ok ? res.json() : Promise.reject(res)),
+      apiFetch('/asociaciones').then(res => res.ok ? res.json() : Promise.reject(res)),
+      apiFetch('/reportes-intervencion').then(res => res.ok ? res.json() : Promise.reject(res))
     ]).then(([papeletasRes, tiposRes, vehiculosRes, orgsRes, reportesRes]) => {
       const pData = (papeletasRes.data || []).map(normalizePapeleta)
       const tData = tiposRes.data || []
@@ -183,8 +186,8 @@ export function Papeletas() {
       setCachedData('/vehiculos', vData)
       setCachedData('/asociaciones', oData)
       setIsLoading(false)
-    }).catch(err => {
-      console.error('Error fetching data for papeletas:', err)
+    }).catch(() => {
+      setLoadError('No se pudo cargar el módulo de papeletas.')
       setIsLoading(false)
     })
   }
@@ -330,6 +333,7 @@ export function Papeletas() {
 
   return (
     <div className="space-y-6">
+      {loadError && <PageLoadError message={loadError} />}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div>
           <div className="flex items-center gap-3">

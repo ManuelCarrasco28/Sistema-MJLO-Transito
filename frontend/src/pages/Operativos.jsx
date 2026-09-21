@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 
 const getPeruDateInputValue = () => {
@@ -39,6 +40,7 @@ export function Operativos({ user }) {
   const [form, setForm] = useState(initialForm)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState('')
 
   const loadOperativos = async () => {
     const response = await apiFetch('/operativos')
@@ -50,7 +52,8 @@ export function Operativos({ user }) {
   }
 
   useEffect(() => {
-    loadOperativos().catch(() => { }).finally(() => setLoading(false))
+    setLoadError('')
+    loadOperativos().catch(() => setLoadError('No se pudo cargar el módulo de operativos.')).finally(() => setLoading(false))
     apiFetch('/personal')
       .then((r) => r.ok ? r.json() : { data: [] })
       .then((r) => setPersonal((r.data || []).filter((p) => p.estado === 'ACTIVO')))
@@ -380,6 +383,7 @@ export function Operativos({ user }) {
 
   return (
     <section className="space-y-6">
+      {loadError && <PageLoadError message={loadError} />}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose-600 to-orange-500 text-white shadow-lg shadow-rose-500/30">

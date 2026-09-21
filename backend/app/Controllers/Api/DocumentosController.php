@@ -37,8 +37,6 @@ class DocumentosController extends ResourceController
         $optionalColumns = [
             $this->documentColumn('aseguradora', 'aseguradora'),
             $this->documentColumn('numero_licencia', 'numeroLicencia'),
-            $this->documentColumn('foto_conductor', 'fotoConductor'),
-            $this->documentColumn('conductor_nombres', 'conductorNombres'),
             $this->documentColumn('id_inspeccion', 'idInspeccion'),
             $this->documentColumn('numero_inspeccion', 'numeroInspeccion'),
         ];
@@ -56,6 +54,7 @@ class DocumentosController extends ResourceController
                 COALESCE(v.numero_serie, '') AS vehiculoSerie,
                 COALESCE(v.carroceria, '') AS vehiculoCarroceria,
                 COALESCE(v.partida_registral, '') AS vehiculoPartidaRegistral,
+                COALESCE(v.codigo_qr, '') AS codigoQr,
                 d.tipo_documento AS tipoDocumento,
                 d.codigo,
                 " . implode(",\n                ", $optionalColumns) . ",
@@ -63,23 +62,31 @@ class DocumentosController extends ResourceController
                 d.fecha_expiracion AS fechaExpiracion,
                 d.estado,
                 COALESCE(o.razon_social, 'Independiente') AS asociacion,
+                COALESCE(o.resolucion_alcaldia, '') AS resMunicipal,
                 COALESCE(c.nombres, '') AS propietarioNombres,
                 COALESCE(c.apellido_paterno, '') AS propietarioPaterno,
                 COALESCE(c.apellido_materno, '') AS propietarioMaterno,
-                COALESCE(p.numero, '') AS propietarioDni
+                COALESCE(c.foto, '') AS fotoConductor,
+                COALESCE(p.numero, '') AS propietarioDni,
+                COALESCE(p.direccion, '') AS direccion
             ", false)
             ->join('vehiculos v', 'v.id = d.id_vehiculo', 'left')
             ->join('asociaciones o', 'o.id = v.id_asociacion', 'left')
             ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
             ->join('personas p', 'p.id = vp.id_persona', 'left')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->whereNotIn('d.tipo_documento', ['TARJETA_PROPIEDAD', 'CITV', 'INSPECCION_TECNICA', 'CURSO_VIAL'])
             ->orderBy('d.id', 'DESC')
             ->get()
             ->getResultArray();
 
         $data = array_map(static function (array $row): array {
             $propietario = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
+            $apellidos = trim(($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
             $row['propietario'] = $propietario ?: 'Sin Propietario Asignado';
+            $row['conductorNombres'] = trim($row['propietarioNombres'] ?? '');
+            $row['conductorApellidos'] = $apellidos;
+            $row['conductorDni'] = $row['propietarioDni'] ?? '';
             $row['hasPropietario'] = !empty($propietario);
             unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
             return $row;
@@ -103,13 +110,12 @@ class DocumentosController extends ResourceController
             return $this->failValidationErrors('La Tarjeta de Propiedad es expedida exclusivamente por la SUNARP (Partida Registral) y no constituye un documento emitible por la Municipalidad.');
         }
 
-        // Map legacy CITV to municipal technical inspection
-        if ($rawTipo === 'CITV') {
-            $rawTipo = 'INSPECCION_TECNICA';
+        if ($rawTipo === 'CITV' || $rawTipo === 'INSPECCION_TECNICA') {
+            return $this->failValidationErrors('Las inspecciones técnicas (CITV) no son gestionadas en este módulo de emisión de documentos.');
         }
 
-        if (!in_array($rawTipo, ['TARJETA_OPERATIVIDAD', 'SOAT', 'CERTICAV', 'INSPECCION_TECNICA', 'CURSO_VIAL'], true)) {
-            return $this->failValidationErrors('Tipo de documento vehicular no válido. Solo se permite Tarjeta de Operatividad, Carnet de Seguridad Vial (Curso Vial), CertiCAV, SOAT e Inspección Técnica Municipal.');
+        if (!in_array($rawTipo, ['TARJETA_OPERATIVIDAD', 'SOAT', 'CERTICAV'], true)) {
+            return $this->failValidationErrors('Tipo de documento vehicular no válido. Solo se permite Tarjeta de Operatividad, CertiCAV, y SOAT.');
         }
 
         $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
@@ -127,7 +133,7 @@ class DocumentosController extends ResourceController
 
         // Check owner if issuing TUC
         $propietarioRow = $db->table('vehiculo_propietarios vp')
-            ->select("COALESCE(c.nombres, '') AS nombres, COALESCE(c.apellido_paterno, '') AS apePaterno, COALESCE(c.apellido_materno, '') AS apeMaterno, COALESCE(p.numero, '') AS dni")
+            ->select("COALESCE(c.nombres, '') AS nombres, COALESCE(c.apellido_paterno, '') AS apePaterno, COALESCE(c.apellido_materno, '') AS apeMaterno, COALESCE(c.foto, '') AS foto, COALESCE(p.numero, '') AS dni, COALESCE(p.direccion, '') AS direccion")
             ->join('personas p', 'p.id = vp.id_persona', 'inner')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'inner')
             ->where('vp.id_vehiculo', $vehiculoId)
@@ -170,8 +176,6 @@ class DocumentosController extends ResourceController
             'estado'             => strtoupper($input['estado'] ?? 'VIGENTE'),
             'aseguradora'        => !empty($input['aseguradora']) ? trim($input['aseguradora']) : null,
             'numero_licencia'    => !empty($input['numeroLicencia']) ? trim($input['numeroLicencia']) : null,
-            'foto_conductor'     => !empty($input['fotoConductor']) ? $input['fotoConductor'] : null,
-            'conductor_nombres'  => !empty($input['conductorNombres']) ? trim($input['conductorNombres']) : null,
             'id_inspeccion'      => !empty($input['idInspeccion']) ? (int)$input['idInspeccion'] : null,
             'numero_inspeccion'  => !empty($input['numeroInspeccion']) ? trim($input['numeroInspeccion']) : null,
         ];
@@ -201,6 +205,7 @@ class DocumentosController extends ResourceController
             'vehiculoSerie'            => $vehiculoRow['numero_serie'] ?? '',
             'vehiculoCarroceria'       => $vehiculoRow['carroceria'] ?? '',
             'vehiculoPartidaRegistral' => $vehiculoRow['partida_registral'] ?? '',
+            'codigoQr'                 => $vehiculoRow['codigo_qr'] ?? '',
             'tipoDocumento'            => $record['tipo_documento'],
             'codigo'                   => $record['codigo'],
             'fechaExpedicion'          => $record['fecha_expedicion'],
@@ -208,8 +213,12 @@ class DocumentosController extends ResourceController
             'estado'                   => $record['estado'],
             'aseguradora'              => $record['aseguradora'] ?? null,
             'numeroLicencia'           => $record['numero_licencia'] ?? null,
-            'fotoConductor'            => $record['foto_conductor'] ?? null,
-            'conductorNombres'         => $record['conductor_nombres'] ?? null,
+            'fotoConductor'            => $propietarioRow['foto'] ?? '',
+            'conductorNombres'         => $propietarioRow['nombres'] ?? '',
+            'conductorApellidos'       => trim(($propietarioRow['apePaterno'] ?? '') . ' ' . ($propietarioRow['apeMaterno'] ?? '')),
+            'conductorDni'             => $propietarioRow['dni'] ?? '',
+            'resMunicipal'             => $asocRow['resolucion_alcaldia'] ?? '',
+            'direccion'                => $propietarioRow['direccion'] ?? '',
             'idInspeccion'             => $record['id_inspeccion'] ?? null,
             'numeroInspeccion'         => $record['numero_inspeccion'] ?? null,
             'propietario'              => $propietarioNombre ?: 'Sin Propietario Asignado',
@@ -236,10 +245,10 @@ class DocumentosController extends ResourceController
             if ($tipoDocumento === 'TARJETA_PROPIEDAD') {
                 return $this->failValidationErrors('La Tarjeta de Propiedad es de SUNARP y no es un documento emitible por la Municipalidad.');
             }
-            if ($tipoDocumento === 'CITV') {
-                $tipoDocumento = 'INSPECCION_TECNICA';
+            if ($tipoDocumento === 'CITV' || $tipoDocumento === 'INSPECCION_TECNICA') {
+                return $this->failValidationErrors('Las inspecciones técnicas (CITV) no son gestionadas en este módulo de emisión de documentos.');
             }
-            if (!in_array($tipoDocumento, ['TARJETA_OPERATIVIDAD', 'SOAT', 'CERTICAV', 'INSPECCION_TECNICA', 'CURSO_VIAL'], true)) {
+            if (!in_array($tipoDocumento, ['TARJETA_OPERATIVIDAD', 'SOAT', 'CERTICAV'], true)) {
                 return $this->failValidationErrors('Tipo de documento vehicular no válido.');
             }
             $record['tipo_documento'] = $tipoDocumento;
@@ -251,8 +260,6 @@ class DocumentosController extends ResourceController
         if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
         if (array_key_exists('aseguradora', $input)) $record['aseguradora'] = trim($input['aseguradora'] ?? '') ?: null;
         if (array_key_exists('numeroLicencia', $input)) $record['numero_licencia'] = trim($input['numeroLicencia'] ?? '') ?: null;
-        if (array_key_exists('fotoConductor', $input)) $record['foto_conductor'] = $input['fotoConductor'] ?: null;
-        if (array_key_exists('conductorNombres', $input)) $record['conductor_nombres'] = trim($input['conductorNombres'] ?? '') ?: null;
         if (array_key_exists('idInspeccion', $input)) $record['id_inspeccion'] = $input['idInspeccion'] ? (int)$input['idInspeccion'] : null;
         if (array_key_exists('numeroInspeccion', $input)) $record['numero_inspeccion'] = trim($input['numeroInspeccion'] ?? '') ?: null;
         $record = $this->filterExistingDocumentColumns($record);
@@ -277,3 +284,8 @@ class DocumentosController extends ResourceController
         return $this->respondDeleted(['status' => true, 'message' => 'Documento anulado con éxito']);
     }
 }
+
+
+
+
+

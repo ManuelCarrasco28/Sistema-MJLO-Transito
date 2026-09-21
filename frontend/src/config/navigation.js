@@ -41,7 +41,7 @@ export const navigationGroups = [
     name: 'Padrón municipal',
     items: [
       { id: 'personas', label: 'Personas', icon: 'idCard', path: '/personas' },
-      { id: 'personal', label: 'Trabajadores', icon: 'workerBadge', path: '/personal' },
+      { id: 'trabajadores', label: 'Trabajadores', icon: 'workerBadge', path: '/trabajadores' },
       { id: 'asociaciones', label: 'Asociaciones', icon: 'office', path: '/asociaciones' },
       { id: 'vehiculos', label: 'Vehículos', icon: 'motoTaxi', path: '/vehiculos' },
     ]

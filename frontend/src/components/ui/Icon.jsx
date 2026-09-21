@@ -240,6 +240,33 @@ const iconPaths = {
     </>
   ),
   filter: <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />,
+  filterX: (
+    <>
+      <path d="M13.013 3H2l8 9.46V19l4 2v-8.54l.9-1.06" />
+      <path d="m22 3-5 5" />
+      <path d="m17 3 5 5" />
+    </>
+  ),
+  rotateCcw: (
+    <>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </>
+  ),
+  fileSpreadsheet: (
+    <>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M8 13h2M8 17h2M14 13h2M14 17h2" />
+    </>
+  ),
+  filePdf: (
+    <>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M10 12v6M10 15h2a1.5 1.5 0 0 0 0-3h-2" />
+    </>
+  ),
   battery: (
     <>
       <rect x="2" y="7" width="18" height="10" rx="2" />

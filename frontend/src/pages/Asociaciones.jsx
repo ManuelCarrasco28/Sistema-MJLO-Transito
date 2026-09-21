@@ -1,8 +1,100 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+
+function FloatingInput({ id, label, type = "text", ...props }) {
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type={type}
+        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+        placeholder=" "
+        autoComplete="off"
+        {...props}
+      />
+      <label
+        htmlFor={id}
+        className="pointer-events-none absolute left-3 right-3 truncate whitespace-nowrap top-1/2 -translate-y-1/2 select-none text-xs font-medium text-slate-400 transition-all duration-150 peer-focus:top-1 peer-focus:-translate-y-0 peer-focus:text-[9.5px] peer-focus:font-bold peer-focus:text-indigo-600 peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:-translate-y-0 peer-[:not(:placeholder-shown)]:text-[9.5px] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:text-slate-500 dark:peer-[:not(:placeholder-shown)]:text-slate-400"
+      >
+        {label}
+      </label>
+    </div>
+  )
+}
+
+function FloatingSelect({ id, label, value, onChange, options = [], className = '' }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectedOption = options.find((opt) => String(opt.value) === String(value)) || options[0]
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        id={id}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-900 dark:text-white cursor-pointer ${isOpen
+            ? 'border-indigo-500 ring-1 ring-indigo-500/20 dark:border-indigo-400'
+            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+          }`}
+      >
+        <span className="truncate">{selectedOption?.label || value}</span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      <label htmlFor={id} className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-indigo-600 dark:!text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`}>
+        {label}
+      </label>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+          <div className="space-y-0.5">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value)
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange({ target: { value: opt.value } })
+                    setIsOpen(false)
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
+                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
+                    }`}
+                >
+                  <span className="whitespace-nowrap">{opt.label}</span>
+                  {isSelected && (
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3 text-indigo-600 dark:text-indigo-400 shrink-0">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function Asociaciones() {
   const cached = getCachedData('/asociaciones')
@@ -35,6 +127,7 @@ export function Asociaciones() {
     email: '',
     tipoAmbiente: '',
     numeroLicencia: '',
+    resolucionAlcaldia: '',
     estado: 'ACTIVO',
   }
 
@@ -59,7 +152,7 @@ export function Asociaciones() {
   const flotaAcumulada = asociaciones.reduce((sum, o) => sum + Number(o.flotaTotal || 0), 0)
 
   const filteredOrgs = asociaciones.filter((o) => {
-    const fullSearch = `${o.razonSocial} ${o.ruc} ${o.partidaRegistral} ${o.direccion} ${o.numeroLicencia}`.toLowerCase()
+    const fullSearch = `${o.razonSocial} ${o.ruc} ${o.partidaRegistral} ${o.direccion} ${o.numeroLicencia} ${o.resolucionAlcaldia || ''}`.toLowerCase()
     const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
     const matchesTipo = filterTipo === 'TODOS' || o.tipo === filterTipo
     const matchesEstado = filterEstado === 'TODOS' || o.estado === filterEstado
@@ -169,10 +262,11 @@ export function Asociaciones() {
     <div className="space-y-3.5 sm:space-y-4">
       {loadError && <PageLoadError message={loadError} />}
 
+      {/* Cabecera Principal */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
-            <Icon name="building" className="size-5" />
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
+            <Icon name="building" className="size-5.5" />
           </span>
           <div>
             <div className="flex items-center gap-2">
@@ -188,63 +282,61 @@ export function Asociaciones() {
       </div>
 
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Tarjetas KPI con Bordes de Colores */}
+      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 1. Total registros */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-indigo-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total registros</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
-              <Icon name="building" className="size-4" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registros</span>
+            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+              <Icon name="building" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <p className="text-2xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(totalOrgs)}</p>
-            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">Padrón 2026</span>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(totalOrgs)}</p>
+            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">Padrón 2026</span>
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Asociaciones y particulares</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 2. Asociaciones */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-amber-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Asociaciones</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
-              <Icon name="vehicle" className="size-4" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Asociaciones</span>
+            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+              <Icon name="vehicle" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <p className="text-2xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(asociacionesCount)}</p>
-            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">Trimóviles</span>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(asociacionesCount)}</p>
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">Trimóviles</span>
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Comités y transportistas</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 3. Particulares */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-cyan-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Particulares</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
-              <Icon name="building" className="size-4" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Particulares</span>
+            <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
+              <Icon name="building" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <p className="text-2xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(particulares)}</p>
-            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 px-2 py-0.5 rounded-full">Independientes</span>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(particulares)}</p>
+            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 px-1.5 py-0.5 rounded-md">Independientes</span>
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Registros particulares</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 4. Flota Autorizada */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Flota Autorizada</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Flota Autorizada</span>
+            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
           </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <p className="text-2xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(flotaAcumulada)}</p>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">Capacidad Total</span>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(flotaAcumulada)}</p>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">Capacidad Total</span>
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Unidades totales habilitadas</p>
         </div>
       </div>
 
@@ -300,9 +392,10 @@ export function Asociaciones() {
                   setFilterEstado('TODOS')
                   setSearchTerm('')
                 }}
-                className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                title="Limpiar filtros"
+                className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
-                Limpiar Filtros
+                <Icon name="filterX" className="size-4" />
               </button>
             )}
 
@@ -330,7 +423,7 @@ export function Asociaciones() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[220px]">Asociación / Particular</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[125px]">RUC / Partida</th>
@@ -338,7 +431,7 @@ export function Asociaciones() {
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[240px]">Ubicación</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[105px]">Flota</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[90px] text-center">Estado</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-right">Acciones</th>
+                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-slate-800/40 px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -359,7 +452,7 @@ export function Asociaciones() {
                     <td className="px-3 py-3"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3 py-3"><div className="h-4 w-14 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3 py-3"><div className="h-4 w-14 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-3 text-right"><div className="h-6 w-16 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3.5 py-3 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"><div className="mx-auto h-6 w-16 rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
                   </tr>
                 ))
               ) : filteredOrgs.length === 0 ? (
@@ -378,7 +471,7 @@ export function Asociaciones() {
                 </tr>
               ) : (
                 paginatedOrgs.map((o) => (
-                  <tr key={o.id} className="group transition-colors hover:bg-indigo-50/30 dark:hover:bg-slate-800/40">
+                  <tr key={o.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
                     <td className="px-3.5 py-2.5 min-w-[220px]">
                       <div className="flex items-center gap-2.5">
                         <span className={`grid size-8 shrink-0 place-items-center rounded-xl text-base font-bold shadow-xs ${o.tipo === 'ASOCIACION'
@@ -430,31 +523,31 @@ export function Asociaciones() {
                         {o.estado}
                       </span>
                     </td>
-                    <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3.5 py-2.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(o)}
                           title="Ver Detalle"
-                          className="rounded-lg p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/60 dark:text-sky-400 dark:hover:bg-sky-500 dark:hover:text-white transition-all duration-150 shadow-2xs hover:shadow-sm active:scale-95 cursor-pointer"
+                          className="size-8 rounded-lg grid place-items-center bg-cyan-50 text-cyan-600 hover:bg-cyan-500 hover:text-white dark:bg-cyan-950/60 dark:text-cyan-400 dark:hover:bg-cyan-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
                         >
-                          <Icon name="eye" className="size-3.5" />
+                          <Icon name="eye" className="size-4" />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleOpenEditModal(o)}
                           title="Editar Asociación"
-                          className="rounded-lg p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all duration-150 shadow-2xs hover:shadow-sm active:scale-95 cursor-pointer"
+                          className="size-8 rounded-lg grid place-items-center bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
                         >
-                          <Icon name="pencil" className="size-3.5" />
+                          <Icon name="pencil" className="size-4" />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDelete(o.id)}
                           title="Eliminar Asociación"
-                          className="rounded-lg p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all duration-150 shadow-2xs hover:shadow-sm active:scale-95 cursor-pointer"
+                          className="size-8 rounded-lg grid place-items-center bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
                         >
-                          <Icon name="trash" className="size-3.5" />
+                          <Icon name="trash" className="size-4" />
                         </button>
                       </div>
                     </td>
@@ -481,28 +574,27 @@ export function Asociaciones() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b border-blue-900/20 bg-[#123b6d] px-6 py-4.5 text-white dark:border-slate-800 dark:bg-[#102a4d]">
-              <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-cyan-300">
-                  <Icon name="building" className="size-5" />
+            {/* Cabecera del Modal (Limpia, sin morado) */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Icon name="building" className="size-4" />
                 </span>
-                <div>
-                  <h3 className="text-lg font-extrabold text-white">
-                    {isEditing ? 'Editar Registro' : 'Registrar Asociación / Particular'}
-                  </h3>
-                  <p className="text-xs text-blue-100/80">Gestión de datos, ubicación y contacto</p>
-                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {isEditing ? 'Editar Registro' : 'Registrar Asociación / Particular'}
+                </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="grid size-9 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-xs transition hover:bg-white/20 cursor-pointer"
+                title="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                <Icon name="close" className="size-4" />
+                <Icon name="close" className="size-5" />
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleFormSubmit} autoComplete="off" className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
 
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-2">
@@ -510,75 +602,53 @@ export function Asociaciones() {
                   Identificación Institucional
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                    <select
-                      id="org_tipo"
-                      value={formData.tipo}
-                      onChange={(e) => {
-                        const tipo = e.target.value
-                        setFormData({
-                          ...formData,
-                          tipo,
-                          partidaRegistral: tipo === 'PARTICULAR' ? '' : formData.partidaRegistral,
-                          fechaCreacion: tipo === 'PARTICULAR' ? '' : formData.fechaCreacion,
-                          coordenadas: tipo === 'PARTICULAR' ? '' : formData.coordenadas,
-                          tipoAmbiente: tipo === 'ASOCIACION' ? '' : formData.tipoAmbiente,
-                          numeroLicencia: tipo === 'ASOCIACION' ? '' : formData.numeroLicencia,
-                        })
-                      }}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
-                    >
-                      <option value="ASOCIACION">ASOCIACIÓN</option>
-                      <option value="PARTICULAR">PARTICULAR</option>
-                    </select>
-                    <label
-                      htmlFor="org_tipo"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                    >
-                      Tipo de Registro
-                    </label>
-                  </div>
+                  <FloatingSelect
+                    id="org_tipo"
+                    label="Tipo de Registro"
+                    value={formData.tipo}
+                    onChange={(e) => {
+                      const tipo = e.target.value
+                      setFormData({
+                        ...formData,
+                        tipo,
+                        partidaRegistral: tipo === 'PARTICULAR' ? '' : formData.partidaRegistral,
+                        fechaCreacion: tipo === 'PARTICULAR' ? '' : formData.fechaCreacion,
+                        coordenadas: tipo === 'PARTICULAR' ? '' : formData.coordenadas,
+                        tipoAmbiente: tipo === 'ASOCIACION' ? '' : formData.tipoAmbiente,
+                        numeroLicencia: tipo === 'ASOCIACION' ? '' : formData.numeroLicencia,
+                      })
+                    }}
+                    options={[
+                      { value: 'ASOCIACION', label: 'ASOCIACIÓN' },
+                      { value: 'PARTICULAR', label: 'PARTICULAR' }
+                    ]}
+                  />
 
-                  <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                    <input
+                  <div className="sm:col-span-2">
+                    <FloatingInput
                       id="org_razon"
-                      type="text"
+                      label="Razón Social / Nombre"
                       required
-                      placeholder=" "
                       value={formData.razonSocial}
                       onChange={(e) => setFormData({ ...formData, razonSocial: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
                     />
-                    <label
-                      htmlFor="org_razon"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-indigo-600 dark:peer-focus:text-indigo-400"
-                    >
-                      Razón Social / Nombre
-                    </label>
                   </div>
 
                   <div className="flex gap-2 sm:col-span-3">
-                    <div className="relative flex-1 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                      <input
+                    <div className="flex-1">
+                      <FloatingInput
                         id="org_ruc"
-                        type="text"
+                        label="RUC"
                         required
                         maxLength={11}
-                        placeholder=" "
                         value={formData.ruc}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (!/^\d*$/.test(val)) return;
                           setFormData({ ...formData, ruc: val });
                         }}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
+                        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
                       />
-                      <label
-                        htmlFor="org_ruc"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-indigo-600 dark:peer-focus:text-indigo-400"
-                      >
-                        RUC
-                      </label>
                     </div>
                     <button
                       type="button"
@@ -592,39 +662,20 @@ export function Asociaciones() {
 
                   {formData.tipo === 'ASOCIACION' && (
                     <>
-                      <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                        <input
-                          id="org_partida"
-                          type="text"
-                          placeholder=" "
-                          value={formData.partidaRegistral}
-                          onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
-                          className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono text-slate-800 outline-none dark:text-white"
-                        />
-                        <label
-                          htmlFor="org_partida"
-                          className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-indigo-600 dark:peer-focus:text-indigo-400"
-                        >
-                          Partida Registral SUNARP
-                        </label>
-                      </div>
-
-                      <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                        <input
-                          id="org_fecha_creacion"
-                          type="date"
-                          placeholder=" "
-                          value={formData.fechaCreacion || ''}
-                          onChange={(e) => setFormData({ ...formData, fechaCreacion: e.target.value })}
-                          className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                        />
-                        <label
-                          htmlFor="org_fecha_creacion"
-                          className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"
-                        >
-                          Fecha creación
-                        </label>
-                      </div>
+                      <FloatingInput
+                        id="org_partida"
+                        label="Partida Registral SUNARP"
+                        value={formData.partidaRegistral}
+                        onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
+                        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                      />
+                      <FloatingInput
+                        id="org_fecha_creacion"
+                        type="date"
+                        label="Fecha creación"
+                        value={formData.fechaCreacion || ''}
+                        onChange={(e) => setFormData({ ...formData, fechaCreacion: e.target.value })}
+                      />
                     </>
                   )}
                 </div>
@@ -637,79 +688,69 @@ export function Asociaciones() {
                   Contacto, ubicación y autorización
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                    <input
+                  <div className="sm:col-span-2">
+                    <FloatingInput
                       id="org_dir"
-                      type="text"
-                      placeholder=" "
+                      label="Dirección donde se encuentra ubicado"
                       value={formData.direccion}
                       onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                     />
-                    <label
-                      htmlFor="org_dir"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-indigo-600 dark:peer-focus:text-indigo-400"
-                    >
-                      Dirección donde se encuentra ubicado
-                    </label>
                   </div>
 
-                  {formData.tipo === 'ASOCIACION' && (
-                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                      <input
-                        id="org_coordenadas"
-                        type="text"
-                        placeholder=" "
-                        value={formData.coordenadas}
-                        onChange={(e) => setFormData({ ...formData, coordenadas: e.target.value })}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-semibold text-slate-800 outline-none dark:text-white"
-                      />
-                      <label
-                        htmlFor="org_coordenadas"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-indigo-600 dark:peer-focus:text-indigo-400"
-                      >
-                        Coordenadas
-                      </label>
-                    </div>
-                  )}
-
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                    <input
+                  {formData.tipo === 'ASOCIACION' ? (
+                    <FloatingInput
+                      id="org_coordenadas"
+                      label="Coordenadas"
+                      value={formData.coordenadas}
+                      onChange={(e) => setFormData({ ...formData, coordenadas: e.target.value })}
+                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                    />
+                  ) : (
+                    <FloatingInput
                       id="org_tel"
-                      type="text"
+                      label="Teléfono de Contacto"
                       maxLength={9}
-                      placeholder=" "
                       value={formData.telefono}
                       onChange={(e) => {
                         const val = e.target.value;
                         if (!/^\d*$/.test(val)) return;
                         setFormData({ ...formData, telefono: val });
                       }}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                     />
-                    <label
-                      htmlFor="org_tel"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-indigo-600 dark:peer-focus:text-indigo-400"
-                    >
-                      Teléfono de Contacto
-                    </label>
+                  )}
+
+                  <div className="sm:col-span-2">
+                    <FloatingInput
+                      id="org_resolucion_alcaldia"
+                      label="Resolución de alcaldía"
+                      value={formData.resolucionAlcaldia}
+                      onChange={(e) => setFormData({ ...formData, resolucionAlcaldia: e.target.value.toUpperCase() })}
+                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                    />
                   </div>
 
-                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                    <input
+                  {formData.tipo === 'ASOCIACION' && (
+                    <FloatingInput
+                      id="org_tel_asoc"
+                      label="Teléfono de Contacto"
+                      maxLength={9}
+                      value={formData.telefono}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!/^\d*$/.test(val)) return;
+                        setFormData({ ...formData, telefono: val });
+                      }}
+                    />
+                  )}
+
+                  <div className={formData.tipo === 'ASOCIACION' ? 'sm:col-span-3' : 'sm:col-span-1'}>
+                    <FloatingInput
                       id="org_email"
                       type="email"
-                      placeholder=" "
+                      label="Email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                     />
-                    <label
-                      htmlFor="org_email"
-                      className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-indigo-600 dark:peer-focus:text-indigo-400"
-                    >
-                      Email
-                    </label>
                   </div>
 
                   {formData.tipo === 'PARTICULAR' && (
@@ -738,21 +779,13 @@ export function Asociaciones() {
                         </div>
                       </div>
 
-                      <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-indigo-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-indigo-400">
-                        <input
+                      <div className="sm:col-span-2">
+                        <FloatingInput
                           id="org_numero_licencia"
-                          type="text"
-                          placeholder=" "
+                          label="Número licencia"
                           value={formData.numeroLicencia}
                           onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value })}
-                          className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                         />
-                        <label
-                          htmlFor="org_numero_licencia"
-                          className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-indigo-600 dark:peer-focus:text-indigo-400"
-                        >
-                          Número licencia
-                        </label>
                       </div>
                     </>
                   )}
@@ -818,6 +851,10 @@ export function Asociaciones() {
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
                     <span className="font-bold text-slate-400">Teléfono de contacto</span>
                     <span className="font-semibold text-slate-700 dark:text-slate-200">{detailOrg.telefono || '—'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                    <span className="font-bold text-slate-400">Resolución de alcaldía</span>
+                    <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{detailOrg.resolucionAlcaldia || '—'}</span>
                   </div>
                   {detailOrg.tipo === 'PARTICULAR' && (
                     <>
@@ -983,6 +1020,9 @@ export function Asociaciones() {
           </div>
         </div>
       )}
+
     </div>
   )
 }
+
+

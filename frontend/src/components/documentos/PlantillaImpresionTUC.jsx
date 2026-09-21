@@ -10,33 +10,37 @@ export function PlantillaImpresionTUC({ documento, onClose }) {
   const isCerticav = documento.tipoDocumento === 'CERTICAV'
   const isSoat = documento.tipoDocumento === 'SOAT'
 
+  const propietarioParts = (documento.propietario || '').trim().split(/\s+/).filter(Boolean)
+  const fallbackApellidos = propietarioParts.length > 2 ? propietarioParts.slice(-2).join(' ') : documento.propietario || ''
+  const fallbackNombres = propietarioParts.length > 2 ? propietarioParts.slice(0, -2).join(' ') : ''
+
   const printData = {
     tucNumero: documento.codigo || '',
     codigo: documento.codigo || '',
     asociacion: documento.asociacion || 'INDEPENDIENTE',
-    resMunicipal: documento.resMunicipal || 'R.M. N° 045-2024-MDJLO/GSCyT',
-    dni: documento.propietarioDni || documento.dni || '45892140',
-    conductorDni: documento.conductorDni || documento.propietarioDni || '45892140',
-    direccion: documento.direccion || 'CALLE LOS HEROES 450 - JLO',
-    apellidos: documento.propietario || documento.conductorNombres || '',
-    nombres: '',
+    resMunicipal: documento.resMunicipal || '',
+    dni: documento.conductorDni || documento.propietarioDni || documento.dni || '',
+    conductorDni: documento.conductorDni || documento.propietarioDni || '',
+    direccion: documento.direccion || '',
+    apellidos: documento.conductorApellidos || fallbackApellidos,
+    nombres: documento.conductorNombres || fallbackNombres,
     conductorNombres: documento.conductorNombres || documento.propietario || '',
-    numeroLicencia: documento.numeroLicencia || 'B-IIc',
+    numeroLicencia: documento.numeroLicencia || '',
     fotoUrl: documento.fotoConductor || '',
     fotoConductor: documento.fotoConductor || '',
     placa: documento.vehiculoPlaca || '',
     vehiculoPlaca: documento.vehiculoPlaca || '',
-    numeroMotor: documento.vehiculoMotor || '162FMJ-98214',
-    vehiculoMotor: documento.vehiculoMotor || '162FMJ-98214',
-    vehiculoMarca: documento.vehiculoMarca || 'WANXIN',
-    vehiculoModelo: documento.vehiculoModelo || 'WX-200',
+    numeroMotor: documento.vehiculoMotor || '',
+    vehiculoMotor: documento.vehiculoMotor || '',
+    vehiculoMarca: documento.vehiculoMarca || '',
+    vehiculoModelo: documento.vehiculoModelo || '',
     fechaExpedicion: documento.fechaExpedicion || '',
     fechaVencimiento: documento.fechaExpiracion || '',
     fechaExpiracion: documento.fechaExpiracion || '',
-    numeroInspeccion: documento.numeroInspeccion || 'CAV-2026-APROBADO',
+    numeroInspeccion: documento.numeroInspeccion || '',
     propietario: documento.propietario || '',
     propietarioDni: documento.propietarioDni || '',
-    qrUrl: `https://munijlo.gob.pe/transito/validar?doc=${encodeURIComponent(documento.codigo || '')}&placa=${encodeURIComponent(documento.vehiculoPlaca || '')}`
+    qrUrl: documento.codigoQr || ''
   }
 
   const handlePrint = () => {
@@ -148,3 +152,4 @@ export function PlantillaImpresionTUC({ documento, onClose }) {
     </div>
   )
 }
+

@@ -3,16 +3,19 @@ import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { CarnetCursoVialPrint } from '../components/documentos/TarjetaOperatividadPrint'
 
 export function CursosSeguridad() {
   const cached = getCachedData('/cursos')
   const [cursos, setCursos] = useState(cached || [])
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchAprobados, setSearchAprobados] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [activeView, setActiveView] = useState('CURSOS')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -32,6 +35,29 @@ export function CursosSeguridad() {
     })
     setSelectedCurso(null)
     setIsModalOpen(true)
+  }
+
+  const [printCurso, setPrintCurso] = useState(null)
+  const [printAprobado, setPrintAprobado] = useState(null)
+
+  const handlePrintBatch = (curso) => {
+    if (!curso.participantes || curso.participantes.length === 0) {
+      alert('No hay participantes inscritos en este curso para imprimir.');
+      return;
+    }
+    setPrintCurso(curso);
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => setPrintCurso(null), 500);
+    }, 300);
+  }
+
+  const handlePrintSingle = (aprobado) => {
+    setPrintAprobado(aprobado);
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => setPrintAprobado(null), 500);
+    }, 300);
   }
 
   const handleOpenEditModal = (curso) => {
@@ -156,6 +182,24 @@ export function CursosSeguridad() {
       .finally(() => setIsLoading(false))
   }, [])
 
+  const aprobados = cursos.flatMap(c => 
+    (c.estado === 'FINALIZADO' && c.participantes) 
+      ? c.participantes
+          .filter(p => p.estado === 'APROBADO' || p.asistio)
+          .map(p => ({ ...p, curso: c })) 
+      : []
+  )
+
+  const filteredAprobados = searchAprobados 
+    ? aprobados.filter(p => 
+        (p.dni && p.dni.includes(searchAprobados)) || 
+        (p.nombres && p.nombres.toLowerCase().includes(searchAprobados.toLowerCase())) ||
+        (p.apellido_paterno && p.apellido_paterno.toLowerCase().includes(searchAprobados.toLowerCase()))
+      )
+    : aprobados
+
+  const paginatedAprobados = filteredAprobados.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
   return (
     <div className="space-y-6">
       {loadError && <PageLoadError message={loadError} />}
@@ -233,7 +277,23 @@ export function CursosSeguridad() {
         </div>
       </div>
 
+      <div className="mb-6 flex gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#0f172a]">
+        <button
+          onClick={() => setActiveView('CURSOS')}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'CURSOS' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+        >
+          Cursos programados
+        </button>
+        <button
+          onClick={() => setActiveView('APROBADOS')}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'APROBADOS' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+        >
+          Registros de Carnet
+          <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">{aprobados.length}</span>
+        </button>
+      </div>
 
+      {activeView === 'CURSOS' && (
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
 
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -397,6 +457,11 @@ export function CursosSeguridad() {
 
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-end gap-1">
+                        {c.estado === 'FINALIZADO' && (
+                          <button onClick={() => handlePrintBatch(c)} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Descargar Carnets (Lote)">
+                            <Icon name="print" className="size-4" />
+                          </button>
+                        )}
                         <button onClick={() => { setSelectedCurso(c); setIsDetailModalOpen(true); }} className="rounded-lg p-1.5 bg-purple-50 text-purple-600 hover:bg-purple-500 hover:text-white dark:bg-purple-950/60 dark:text-purple-400 dark:hover:bg-purple-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalles">
                           <Icon name="eye" className="size-4" />
                         </button>
@@ -426,6 +491,95 @@ export function CursosSeguridad() {
           }}
         />
       </div>
+      )}
+
+      {activeView === 'APROBADOS' && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+          {/* Controls Aprobados */}
+          <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 dark:border-slate-800/60">
+            <div className="relative flex-1">
+              <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar por DNI o Nombres..."
+                value={searchAprobados}
+                onChange={(e) => setSearchAprobados(e.target.value)}
+                className="w-full rounded-xl border border-emerald-200/80 bg-emerald-50/20 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-emerald-400"
+              />
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-4">Conductor</th>
+                  <th className="px-5 py-4">DNI / Licencia</th>
+                  <th className="px-5 py-4">Curso Válido</th>
+                  <th className="px-5 py-4">Expedición / Venc.</th>
+                  <th className="px-5 py-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {paginatedAprobados.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-5 py-12 text-center text-slate-500 dark:text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="rounded-full bg-slate-100 p-4 dark:bg-slate-800">
+                          <Icon name="file-check" className="size-8 text-slate-400 dark:text-slate-500" />
+                        </div>
+                        <p className="text-base font-semibold text-slate-700 dark:text-slate-300">No hay conductores aprobados</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedAprobados.map((p, i) => {
+                    const dt = new Date(p.curso.fecha);
+                    dt.setFullYear(dt.getFullYear() + 1);
+                    const fechaVencimiento = dt.toISOString().split('T')[0];
+
+                    return (
+                      <tr key={i} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-slate-800/40">
+                        <td className="px-5 py-4">
+                          <p className="font-bold text-slate-800 dark:text-slate-200">{p.nombres} {p.apellido_paterno} {p.apellido_materno}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="font-bold text-slate-800 dark:text-slate-200">{p.dni}</p>
+                          <p className="text-[10px] font-semibold text-slate-500">LIC. {p.licencia || 'S/N'}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="font-semibold text-slate-800 dark:text-slate-200">{p.curso.codigo}</p>
+                          <p className="text-[10px] font-semibold text-slate-500 max-w-[150px] truncate">{p.curso.titulo}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="font-bold text-slate-800 dark:text-slate-200">{p.curso.fecha}</p>
+                          <p className="text-[10px] font-semibold text-slate-500">Vence: {fechaVencimiento}</p>
+                        </td>
+                        <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                          <div className="flex items-center justify-end gap-1">
+                            <button onClick={() => handlePrintSingle(p)} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Descargar Carnet Individual">
+                              <Icon name="print" className="size-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredAprobados.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(size) => {
+              setItemsPerPage(size)
+              setCurrentPage(1)
+            }}
+          />
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
@@ -549,6 +703,67 @@ export function CursosSeguridad() {
               <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800 cursor-pointer">Cerrar</button>
             </div>
           </div>
+        </div>
+      )}
+      {/* SECCIÓN OCULTA PARA IMPRESIÓN OFICIAL (LOTE) */}
+      {printCurso && (
+        <div id="batch-print-container" className="hidden print:flex absolute inset-0 bg-white z-50 flex-col gap-10 bg-transparent m-0 p-0">
+          <style>{`
+            @media print {
+              #batch-print-container #seccion-impresion {
+                position: relative !important;
+                page-break-after: always;
+                page-break-inside: avoid;
+              }
+            }
+          `}</style>
+          {printCurso.participantes
+            .filter(p => printCurso.estado === 'FINALIZADO' ? (p.estado === 'APROBADO' || p.asistio) : true)
+            .map((p, i) => {
+              const dt = new Date(printCurso.fecha);
+              dt.setFullYear(dt.getFullYear() + 1);
+              const fechaVencimiento = dt.toISOString().split('T')[0];
+
+              return (
+                <div key={i}>
+                  <CarnetCursoVialPrint data={{
+                    codigo: printCurso.codigo,
+                    apellidos: `${p.apellido_paterno || ''} ${p.apellido_materno || ''}`.trim(),
+                    nombres: p.nombres || '',
+                    dni: p.dni || '',
+                    licencia: p.licencia || '',
+                    fotoUrl: p.fotoUrl || '',
+                    fechaExpedicion: printCurso.fecha,
+                    fechaExpiracion: fechaVencimiento
+                  }} />
+                </div>
+              );
+            })}
+        </div>
+      )}
+      {printAprobado && (
+        <div id="single-print-container" className="hidden print:flex absolute inset-0 bg-white z-50 flex-col bg-transparent m-0 p-0">
+          <style>{`
+            @media print {
+              #single-print-container #seccion-impresion {
+                position: relative !important;
+              }
+            }
+          `}</style>
+          <CarnetCursoVialPrint data={{
+            codigo: printAprobado.curso.codigo,
+            apellidos: `${printAprobado.apellido_paterno || ''} ${printAprobado.apellido_materno || ''}`.trim(),
+            nombres: printAprobado.nombres || '',
+            dni: printAprobado.dni || '',
+            licencia: printAprobado.licencia || '',
+            fotoUrl: printAprobado.fotoUrl || '',
+            fechaExpedicion: printAprobado.curso.fecha,
+            fechaExpiracion: (() => {
+              const dt = new Date(printAprobado.curso.fecha);
+              dt.setFullYear(dt.getFullYear() + 1);
+              return dt.toISOString().split('T')[0];
+            })()
+          }} />
         </div>
       )}
     </div>

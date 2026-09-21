@@ -449,7 +449,6 @@ export function Documentos() {
             >
               <option value="TODOS">Todos los tipos</option>
               <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
-              <option value="CURSO_VIAL">Carnet Curso Vial</option>
               <option value="CERTICAV">CertiCAV (Inspección)</option>
               <option value="SOAT">SOAT Vehicular</option>
             </select>
@@ -786,7 +785,6 @@ export function Documentos() {
                   >
                     <option value="" disabled hidden></option>
                     <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
-                    <option value="CURSO_VIAL">Curso Vial (Carnet de Seguridad Vial)</option>
                     <option value="CERTICAV">CERTICAV (Inspección Técnica)</option>
                     <option value="SOAT">SOAT Vehicular</option>
                   </select>

@@ -1,8 +1,311 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
-import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { PageHeader } from '../components/ui/PageHeader'
+import { KpiStrip } from '../components/ui/KpiStrip'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
+
+function formatFecha(fechaStr) {
+  if (!fechaStr) return '—'
+  try {
+    const parts = fechaStr.split(/[- :T]/)
+    if (parts.length >= 3) {
+      const year = parseInt(parts[0], 10)
+      const month = parseInt(parts[1], 10) - 1
+      const day = parseInt(parts[2], 10)
+      const d = new Date(year, month, day)
+      return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    }
+    return fechaStr
+  } catch {
+    return fechaStr
+  }
+}
+
+function calcularEdad(fechaNacStr) {
+  if (!fechaNacStr) return null
+  try {
+    const d = new Date(fechaNacStr)
+    const diffMs = Date.now() - d.getTime()
+    const ageDt = new Date(diffMs)
+    const edad = Math.abs(ageDt.getUTCFullYear() - 1970)
+    return !isNaN(edad) && edad > 0 && edad < 120 ? `(${edad} años)` : null
+  } catch {
+    return null
+  }
+}
+
+function formatSexo(val) {
+  if (!val) return '—'
+  const v = val.toUpperCase().trim()
+  if (v === 'M' || v === 'MASCULINO') return 'Masculino'
+  if (v === 'F' || v === 'FEMENINO') return 'Femenino'
+  return val
+}
+
+function FloatingInput({
+  id,
+  label,
+  value,
+  onChange,
+  type = 'text',
+  required = false,
+  maxLength,
+  optional = false,
+  autoComplete = 'off',
+  className = '',
+  inputClassName = '',
+  ...props
+}) {
+  const [isFocused, setIsFocused] = useState(false)
+  const isFloating = isFocused || (value !== undefined && value !== null && String(value).trim() !== '')
+
+  return (
+    <div className={`relative ${className}`}>
+      <input
+        id={id}
+        type={type}
+        required={required}
+        maxLength={maxLength}
+        value={value ?? ''}
+        onChange={onChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        autoComplete={autoComplete}
+        placeholder=" "
+        className={`peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 ${inputClassName}`}
+        {...props}
+      />
+      <label
+        htmlFor={id}
+        className={`pointer-events-none absolute left-3 select-none transition-all duration-150 ${isFloating
+            ? 'top-1 text-[9.5px] font-bold text-slate-500 dark:text-slate-400'
+            : 'top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-slate-500'
+          } ${isFocused ? '!text-blue-600 dark:!text-blue-400' : ''}`}
+      >
+        {label}
+        {optional && (
+          <span className="ml-1 text-[9px] font-normal text-slate-400 dark:text-slate-500">(Opcional)</span>
+        )}
+      </label>
+    </div>
+  )
+}
+
+const TIPO_DOC_OPTIONS = [
+  { value: 'DNI', label: 'DNI (Doc. Nacional)' },
+  { value: 'CE', label: 'Carnet de Extranjería' },
+  { value: 'PASAPORTE', label: 'Pasaporte' },
+]
+
+const ESTADO_OPTIONS = [
+  { value: 'ACTIVO', label: 'ACTIVO' },
+  { value: 'INACTIVO', label: 'INACTIVO' },
+]
+
+const FILTER_ESTADO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'ACTIVO', label: 'Activos' },
+  { value: 'INACTIVO', label: 'Inactivos' },
+]
+
+function FloatingSelect({
+  id,
+  label,
+  value,
+  onChange,
+  options = [],
+  className = '',
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectedOption = options.find((opt) => opt.value === value) || options[0]
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        id={id}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-800 dark:text-white cursor-pointer ${isOpen
+            ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
+            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+          }`}
+      >
+        <span className="truncate">{selectedOption?.label || value}</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
+            }`}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      <label
+        htmlFor={id}
+        className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-blue-600 dark:!text-blue-400' : 'text-slate-500 dark:text-slate-400'
+          }`}
+      >
+        {label}
+      </label>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+          <div className="space-y-0.5">
+            {options.map((opt) => {
+              const isSelected = opt.value === value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange({ target: { value: opt.value } })
+                    setIsOpen(false)
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
+                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold'
+                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
+                    }`}
+                >
+                  <span className="whitespace-nowrap">{opt.label}</span>
+                  {isSelected && (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="size-3 text-blue-600 dark:text-blue-400 shrink-0"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RoundedSelect({
+  value,
+  onChange,
+  options = [],
+  className = '',
+  buttonClassName = '',
+  dropdownClassName = '',
+  placeholder = 'Seleccionar...',
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectedOption = options.find((opt) => opt.value === value)
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center justify-between gap-2 rounded-xl border bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 transition outline-none dark:bg-slate-800 dark:text-slate-200 cursor-pointer ${isOpen
+            ? 'border-indigo-500 ring-2 ring-indigo-500/20 dark:border-indigo-400'
+            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+          } ${buttonClassName}`}
+      >
+        <span className="whitespace-nowrap">{selectedOption?.label || placeholder}</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''
+            }`}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div
+          className={`absolute right-0 top-full mt-1 z-40 min-w-full w-max rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100 ${dropdownClassName}`}
+        >
+          <div className="space-y-0.5">
+            {options.map((opt) => {
+              const isSelected = opt.value === value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value)
+                    setIsOpen(false)
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
+                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
+                    }`}
+                >
+                  <span className="whitespace-nowrap">{opt.label}</span>
+                  {isSelected && (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="size-3 text-indigo-600 dark:text-indigo-400 shrink-0"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function Personas({ user, onUserUpdate }) {
   const cached = getCachedData('/personas')
@@ -47,6 +350,7 @@ export function Personas({ user, onUserUpdate }) {
 
   useEffect(() => {
     setLoadError('')
+    invalidateCache('/personas')
     loadPersonas()
       .catch(() => setLoadError('No se pudo cargar el padrón de personas.'))
       .finally(() => setIsLoading(false))
@@ -56,7 +360,53 @@ export function Personas({ user, onUserUpdate }) {
   const conductores = personas.filter((p) => Boolean(p.numeroLicencia)).length
   const propietarios = personas.filter((p) => !p.numeroLicencia).length
   const activos = personas.filter((p) => p.estado === 'ACTIVO').length
+  const inactivos = personas.filter((p) => p.estado !== 'ACTIVO').length
   const porcentajeActivos = totalPersonas > 0 ? Math.round((activos / totalPersonas) * 100) : 0
+
+  const kpiItems = [
+    {
+      label: 'Total registrados',
+      value: new Intl.NumberFormat('es-PE').format(totalPersonas),
+      context: 'En padrón municipal',
+      icon: 'people',
+      accentColor: '#1d4f91',
+      borderColor: '#93c5fd',
+      borderClass: 'border-2 border-blue-400 dark:border-blue-500/80 shadow-xs',
+      iconClass: 'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700',
+    },
+    {
+      label: 'Con licencia',
+      value: new Intl.NumberFormat('es-PE').format(conductores),
+      context: 'Habilitados para conducir',
+      icon: 'permit',
+      accentColor: '#0284c7',
+      borderColor: '#7dd3fc',
+      borderClass: 'border-2 border-sky-400 dark:border-sky-500/80 shadow-xs',
+      iconClass: 'bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-950/80 dark:text-sky-300 dark:border-sky-700',
+    },
+    {
+      label: 'Sin licencia',
+      value: new Intl.NumberFormat('es-PE').format(propietarios),
+      context: 'Propietarios sin registro de conducción',
+      icon: 'vehicle',
+      accentColor: '#6366f1',
+      borderColor: '#a5b4fc',
+      borderClass: 'border-2 border-indigo-400 dark:border-indigo-500/80 shadow-xs',
+      iconClass: 'bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-indigo-700',
+    },
+    {
+      label: 'Activos',
+      value: new Intl.NumberFormat('es-PE').format(activos),
+      progress: porcentajeActivos,
+      context: `${porcentajeActivos}% del total`,
+      icon: 'check',
+      accentColor: '#10b981',
+      borderColor: '#6ee7b7',
+      progressColor: '#10b981',
+      borderClass: 'border-2 border-emerald-400 dark:border-emerald-500/80 shadow-xs',
+      iconClass: 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700',
+    },
+  ]
 
   const filteredPersonas = personas.filter((p) => {
     const fullSearch = `${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''} ${p.numeroDocumento || ''} ${p.numeroLicencia || ''}`.toLowerCase()
@@ -112,7 +462,8 @@ export function Personas({ user, onUserUpdate }) {
     setSelectedPersona(persona)
     setFormData({
       ...persona,
-      celular: persona.celular || persona.telefono || '',
+      celular: persona.celular || '',
+      telefono: persona.telefono || '',
       fotoImg: persona.fotoImg || '',
     })
     setIsEditing(true)
@@ -183,6 +534,343 @@ export function Personas({ user, onUserUpdate }) {
     }
   }
 
+  const escapeXml = (str) => {
+    if (str === null || str === undefined) return ''
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
+  const handleExportExcel = () => {
+    const listToExport = filteredPersonas.length > 0 ? filteredPersonas : personas
+    if (listToExport.length === 0) {
+      alert('No hay registros de personas para exportar.')
+      return
+    }
+
+    const rowsHtml = listToExport
+      .map((p, index) => {
+        const docTipo = p.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : (p.tipoDocumento || 'DNI')
+        const cel = p.celular?.trim() || ''
+        const tel = p.telefono?.trim() || ''
+        const estadoClass = p.estado === 'ACTIVO' ? 'color: #059669; font-weight: bold;' : 'color: #dc2626; font-weight: bold;'
+
+        return `
+          <tr>
+            <td style="text-align: center;">${index + 1}</td>
+            <td style="text-align: center;">${escapeXml(docTipo)}</td>
+            <td style="text-align: center; mso-number-format:'\\@';">${escapeXml(p.numeroDocumento || '—')}</td>
+            <td>${escapeXml(p.apellidoPaterno || '—')}</td>
+            <td>${escapeXml(p.apellidoMaterno || '—')}</td>
+            <td>${escapeXml(p.nombres || '—')}</td>
+            <td style="text-align: center; mso-number-format:'\\@'; font-weight: bold;">${escapeXml(p.numeroLicencia || 'Sin licencia')}</td>
+            <td style="text-align: center; mso-number-format:'\\@';">${escapeXml(cel || '—')}</td>
+            <td style="text-align: center; mso-number-format:'\\@';">${escapeXml(tel || '—')}</td>
+            <td>${escapeXml(p.email || '—')}</td>
+            <td>${escapeXml(p.direccion || '—')}</td>
+            <td style="text-align: center;">${escapeXml(p.sexo || '—')}</td>
+            <td style="text-align: center;">${escapeXml(p.fechaNacimiento || '—')}</td>
+            <td style="text-align: center;">${escapeXml(p.estadoCivil || '—')}</td>
+            <td>${escapeXml(p.profesion || '—')}</td>
+            <td style="text-align: center; ${estadoClass}">${escapeXml(p.estado || 'ACTIVO')}</td>
+          </tr>
+        `
+      })
+      .join('')
+
+    const excelTemplate = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <!--[if gte mso 9]>
+          <xml>
+            <x:ExcelWorkbook>
+              <x:ExcelWorksheets>
+                <x:ExcelWorksheet>
+                  <x:Name>Padron Personas</x:Name>
+                  <x:WorksheetOptions>
+                    <x:DisplayGridlines/>
+                  </x:WorksheetOptions>
+                </x:ExcelWorksheet>
+              </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+          </xml>
+          <![endif]-->
+          <style>
+            body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+            table { border-collapse: collapse; width: 100%; }
+            th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; text-align: left; padding: 8px 10px; border: 1px solid #94a3b8; font-size: 11pt; }
+            td { padding: 6px 10px; border: 1px solid #cbd5e1; font-size: 10.5pt; vertical-align: middle; }
+            .header-title { font-size: 16pt; font-weight: bold; color: #1e3a8a; }
+            .header-subtitle { font-size: 11pt; color: #475569; margin-bottom: 8px; }
+            .header-meta { font-size: 10pt; color: #64748b; margin-bottom: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="header-title">MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ</div>
+          <div class="header-subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Conductores y Propietarios</div>
+          <div class="header-meta">
+            Fecha de emisión: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')} | 
+            Total registros: ${listToExport.length} | 
+            Filtro: ${filterEstado === 'TODOS' ? 'Todos' : filterEstado}
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: center; width: 45px;">N°</th>
+                <th style="text-align: center; width: 90px;">Tipo Doc.</th>
+                <th style="text-align: center; width: 110px;">N° Documento</th>
+                <th style="width: 160px;">Apellido Paterno</th>
+                <th style="width: 160px;">Apellido Materno</th>
+                <th style="width: 180px;">Nombres</th>
+                <th style="text-align: center; width: 120px;">N° Licencia</th>
+                <th style="text-align: center; width: 110px;">Celular</th>
+                <th style="text-align: center; width: 110px;">Teléfono Fijo</th>
+                <th style="width: 200px;">Correo Electrónico</th>
+                <th style="width: 240px;">Dirección</th>
+                <th style="text-align: center; width: 80px;">Sexo</th>
+                <th style="text-align: center; width: 110px;">F. Nacimiento</th>
+                <th style="text-align: center; width: 100px;">Estado Civil</th>
+                <th style="width: 160px;">Ocupación</th>
+                <th style="text-align: center; width: 90px;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `Padron_Personas_MJLO_${new Date().toISOString().slice(0, 10)}.xls`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportPdf = () => {
+    const listToExport = filteredPersonas.length > 0 ? filteredPersonas : personas
+    if (listToExport.length === 0) {
+      alert('No hay registros de personas para exportar.')
+      return
+    }
+
+    const printWin = window.open('', '_blank', 'width=1200,height=800')
+    if (!printWin) {
+      alert('No se pudo abrir la vista previa de impresión. Por favor habilita las ventanas emergentes en tu navegador.')
+      return
+    }
+
+    const rowsHtml = listToExport
+      .map((p, index) => {
+        const docTipo = p.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : (p.tipoDocumento || 'DNI')
+        const apellidos = [p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ') || (p.apellidoPaterno || '—')
+        const nombres = p.nombres || '—'
+        const cel = p.celular?.trim()
+        const tel = p.telefono?.trim()
+        const telefonos = Array.from(new Set([cel, tel].filter(Boolean))).join(' / ') || '—'
+        const estadoBadge = p.estado === 'ACTIVO'
+          ? '<span style="display:inline-block; padding:2px 7px; font-size:9.5px; font-weight:700; border-radius:5px; background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">ACTIVO</span>'
+          : '<span style="display:inline-block; padding:2px 7px; font-size:9.5px; font-weight:700; border-radius:5px; background:#fff1f2; color:#be123c; border:1px solid #fecdd3;">INACTIVO</span>'
+
+        return `
+          <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+            <td style="text-align: center; font-weight: bold; color: #64748b;">${index + 1}</td>
+            <td style="text-align: center; font-family: monospace; font-size: 10.5px;">
+              <span style="color:#64748b; font-size:9.5px;">${escapeXml(docTipo)}</span><br/>
+              <strong>${escapeXml(p.numeroDocumento || '—')}</strong>
+            </td>
+            <td>
+              <strong style="color: #0f172a; font-size: 11px; text-transform: uppercase;">${escapeXml(apellidos)}</strong>
+            </td>
+            <td>
+              <span style="color: #334155; font-size: 11px;">${escapeXml(nombres)}</span>
+            </td>
+            <td style="text-align: center; font-family: monospace;">
+              ${p.numeroLicencia ? `<span style="color: #b45309; font-weight: bold;">${escapeXml(p.numeroLicencia)}</span>` : '<span style="color:#94a3b8; font-size:10px;">Sin licencia</span>'}
+            </td>
+            <td style="text-align: center; font-size: 10.5px; color: #334155;">
+              ${escapeXml(telefonos)}
+            </td>
+            <td style="font-size: 10.5px; color: #4338ca; word-break: break-all;">
+              ${escapeXml(p.email || '—')}
+            </td>
+            <td style="font-size: 10.5px; color: #475569;">
+              ${escapeXml(p.direccion || '—')}
+            </td>
+            <td style="text-align: center;">${estadoBadge}</td>
+          </tr>
+        `
+      })
+      .join('')
+
+    const pdfHtml = `
+      <!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8"/>
+          <title>Padron_Personas_MJLO_${new Date().toISOString().slice(0, 10)}</title>
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 8mm 10mm 8mm 10mm;
+            }
+            * { box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              color: #0f172a;
+              margin: 0;
+              padding: 0;
+              font-size: 10.5px;
+            }
+            .header {
+              border-bottom: 2px solid #0f172a;
+              padding-bottom: 8px;
+              margin-bottom: 10px;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+            }
+            .title {
+              font-size: 15px;
+              font-weight: 900;
+              color: #0f172a;
+              letter-spacing: -0.3px;
+              text-transform: uppercase;
+            }
+            .subtitle {
+              font-size: 10.5px;
+              font-weight: 600;
+              color: #475569;
+              margin-top: 2px;
+            }
+            .meta {
+              font-size: 9.5px;
+              color: #64748b;
+              text-align: right;
+            }
+            .summary-bar {
+              display: flex;
+              gap: 16px;
+              margin-bottom: 10px;
+              background: #f1f5f9;
+              padding: 6px 12px;
+              border-radius: 6px;
+              font-size: 10.5px;
+            }
+            .summary-item {
+              display: flex;
+              align-items: center;
+              gap: 5px;
+            }
+            .summary-item strong {
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 4px;
+            }
+            th {
+              background-color: #0f172a;
+              color: #ffffff;
+              text-transform: uppercase;
+              font-size: 9px;
+              font-weight: 800;
+              letter-spacing: 0.4px;
+              padding: 6px 7px;
+              border: 1px solid #0f172a;
+              text-align: left;
+            }
+            td {
+              border: 1px solid #e2e8f0;
+              padding: 5px 7px;
+              vertical-align: middle;
+            }
+            .footer {
+              margin-top: 12px;
+              font-size: 8.5px;
+              color: #94a3b8;
+              display: flex;
+              justify-content: space-between;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 5px;
+            }
+            @media print {
+              .no-print { display: none !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="title">Municipalidad Distrital José Leonardo Ortiz</div>
+              <div class="subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Conductores y Propietarios</div>
+            </div>
+            <div class="meta">
+              <div><strong>Fecha de emisión:</strong> ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</div>
+              <div><strong>Sistema:</strong> MJLO Tránsito Digital v2026</div>
+            </div>
+          </div>
+
+          <div class="summary-bar">
+            <div class="summary-item">Total en padrón: <strong>${totalPersonas}</strong></div>
+            <div class="summary-item">· Exportando: <strong>${listToExport.length}</strong> personas</div>
+            <div class="summary-item">· Con Licencia: <strong>${conductores}</strong></div>
+            <div class="summary-item">· Sin Licencia: <strong>${propietarios}</strong></div>
+            <div class="summary-item">· Activos: <strong>${activos}</strong></div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 28px; text-align: center;">N°</th>
+                <th style="width: 80px; text-align: center;">Documento</th>
+                <th style="width: 155px;">Apellidos</th>
+                <th style="width: 135px;">Nombres</th>
+                <th style="width: 85px; text-align: center;">N° Licencia</th>
+                <th style="width: 95px; text-align: center;">Celular</th>
+                <th style="width: 150px;">Correo Electrónico</th>
+                <th>Dirección</th>
+                <th style="width: 65px; text-align: center;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <span>Documento oficial generado para fines administrativos y fiscalización del transporte en José Leonardo Ortiz.</span>
+            <span>Página 1 de 1</span>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.focus();
+              setTimeout(function() {
+                window.print();
+              }, 250);
+            };
+          </script>
+        </body>
+      </html>
+    `
+
+    printWin.document.open()
+    printWin.document.write(pdfHtml)
+    printWin.document.close()
+  }
+
   const handleFormSubmit = async (e) => {
     e.preventDefault()
     // Validaciones
@@ -236,7 +924,7 @@ export function Personas({ user, onUserUpdate }) {
           method: 'POST',
           body: formData,
         })
-        if (!res.ok) throw res
+        if (!res.ok) throw response
         const resData = await res.json()
         const newPersona = resData.data || {
           ...formData,
@@ -263,13 +951,26 @@ export function Personas({ user, onUserUpdate }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {toast && (
         <div
           key={toast.id}
-          className="fixed right-6 top-6 z-[80] flex items-center gap-3 rounded-[1.4rem] border border-white/70 bg-white/95 px-5 py-3.5 text-sm font-black text-slate-800 shadow-2xl shadow-cyan-900/15 ring-1 ring-slate-900/5 backdrop-blur-md animate-enter dark:border-slate-700 dark:bg-slate-900/95 dark:text-white"
+          className="fixed right-6 top-6 z-[80] flex items-center gap-2.5 rounded-[var(--radius)] border px-4 py-3 text-[13px] font-medium shadow-md transition-all animate-enter"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-ok)',
+            color: 'var(--text)',
+            boxShadow: 'var(--shadow-md)',
+          }}
         >
-          <span className="grid size-9 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-base text-white shadow-lg shadow-cyan-500/25">
+          <span
+            className="grid size-6 place-items-center rounded-full text-xs font-semibold shrink-0 border"
+            style={{
+              backgroundColor: 'var(--ok-bg)',
+              color: 'var(--ok-fg)',
+              borderColor: 'var(--border-ok)',
+            }}
+          >
             ✓
           </span>
           <span>{toast.message}</span>
@@ -277,124 +978,132 @@ export function Personas({ user, onUserUpdate }) {
       )}
       {loadError && <PageLoadError message={loadError} />}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3.5">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30">
-            <Icon name="people" className="size-6" />
+      {/* Cabecera Principal */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
+            <Icon name="people" className="size-5.5" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                Padrón de Conductores y Propietarios
+              <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                Gestión de Personas
               </h1>
             </div>
-            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-              Directorio oficial de administrados, conductores autorizados y propietarios vehiculares.
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Directorio oficial de administrados y ciudadanos registrados en el sistema.
             </p>
           </div>
         </div>
       </div>
 
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+      {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas separadas compactas */}
+      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+        {/* 1. Total registros */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-indigo-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Registrados</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
-              <Icon name="people" className="size-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registros</span>
+            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+              <Icon name="people" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(totalPersonas)}</p>
-            <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 px-2 py-0.5 rounded-full">Padrón 2026</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(totalPersonas)}
+            </p>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">En la plataforma municipal</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 2. Con licencia */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-amber-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Con licencia</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-              <Icon name="permit" className="size-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Con Licencia</span>
+            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+              <Icon name="permit" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(conductores)}</p>
-            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">Con Licencia</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(conductores)}
+            </p>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Habilitados para operar</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 3. Sin licencia */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-cyan-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Sin licencia</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
-              <Icon name="vehicle" className="size-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Sin Licencia</span>
+            <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
+              <Icon name="user" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(propietarios)}</p>
-            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">Titulares</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(propietarios)}
+            </p>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Dueños de unidades móviles</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 4. Activos */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Estado Activo</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">✓</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Activos</span>
+            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
+              ✓
+            </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{new Intl.NumberFormat('es-PE').format(activos)}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">{porcentajeActivos}% Aptos</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(activos)}
+            </p>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-              style={{ width: `${porcentajeActivos}%` }}
-            />
+        </div>
+
+        {/* 5. Inactivos */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-rose-500/80 dark:bg-[#0f172a]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Inactivos</span>
+            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
+              ✕
+            </span>
+          </div>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(inactivos)}
+            </p>
           </div>
         </div>
       </div>
 
-
+      {/* Contenedor de la Tabla */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por DNI, nombres, apellidos o número de licencia..."
+              placeholder="Buscar por DNI, nombres, apellidos o licencia..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-cyan-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 ✕
               </button>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-
-            <select
+          <div className="flex flex-wrap items-center gap-2">
+            <RoundedSelect
               value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODOS">Todos los estados</option>
-              <option value="ACTIVO">Activos</option>
-              <option value="INACTIVO">Inactivos</option>
-            </select>
+              onChange={setFilterEstado}
+              options={FILTER_ESTADO_OPTIONS}
+            />
 
             {(filterEstado !== 'TODOS' || searchTerm !== '') && (
               <button
@@ -403,75 +1112,128 @@ export function Personas({ user, onUserUpdate }) {
                   setFilterEstado('TODOS')
                   setSearchTerm('')
                 }}
-                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                title="Limpiar filtros"
+                className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
-                Limpiar Filtros
+                <Icon name="filterX" className="size-4" />
               </button>
             )}
 
             <button
               type="button"
+              onClick={handleExportExcel}
+              title="Descargar padrón en Excel (.xls)"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+            >
+              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Excel</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              title="Descargar o imprimir padrón en PDF"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+            >
+              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
+              <span>PDF</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-cyan-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-cyan-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <span className="text-base leading-none font-black">+</span>
-              <span>Nueva Persona</span>
+              <span>Nueva persona</span>
             </button>
           </div>
         </div>
 
 
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
-          <span>
-            Mostrando <strong className="text-slate-800 dark:text-white">{filteredPersonas.length}</strong> de{' '}
-            <strong className="text-slate-800 dark:text-white">{personas.length}</strong> personas registradas
-          </span>
-          <span className="hidden sm:inline text-[11px] text-slate-400">
-            Padrón Único MDJLO · {new Date().getFullYear()}
-          </span>
-        </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Persona</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Documento</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Licencia de Conducir</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Contacto</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
+                <th className="px-4 py-3 whitespace-nowrap">Persona</th>
+                <th className="px-4 py-3 whitespace-nowrap">Documento</th>
+                <th className="px-4 py-3 whitespace-nowrap">Licencia</th>
+                <th className="px-4 py-3 whitespace-nowrap">Contacto</th>
+                <th className="px-4 py-3 whitespace-nowrap">Estado</th>
+                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-slate-800/40">
+                  Acciones
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody>
               {isLoading && personas.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="px-3.5 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-full bg-slate-200 dark:bg-slate-800 shrink-0" />
+                        <div
+                          className="size-9 rounded-full shrink-0"
+                          style={{ backgroundColor: 'var(--bg-subtle)' }}
+                        />
                         <div className="space-y-1.5 flex-1 min-w-0">
-                          <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
-                          <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-slate-800/60" />
+                          <div
+                            className="h-3.5 w-32 rounded"
+                            style={{ backgroundColor: 'var(--bg-subtle)' }}
+                          />
+                          <div
+                            className="h-2.5 w-24 rounded"
+                            style={{ backgroundColor: 'var(--bg-subtle)' }}
+                          />
                         </div>
                       </div>
                     </td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-3">
+                      <div
+                        className="h-4 w-20 rounded"
+                        style={{ backgroundColor: 'var(--bg-subtle)' }}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div
+                        className="h-4 w-24 rounded"
+                        style={{ backgroundColor: 'var(--bg-subtle)' }}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div
+                        className="h-4 w-20 rounded"
+                        style={{ backgroundColor: 'var(--bg-subtle)' }}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div
+                        className="h-5 w-16 rounded-full"
+                        style={{ backgroundColor: 'var(--bg-subtle)' }}
+                      />
+                    </td>
+                    <td
+                      className="sticky right-0 z-10 px-4 py-3 text-right"
+                      style={{
+                        backgroundColor: 'var(--bg-surface)',
+                      }}
+                    >
+                      <div
+                        className="h-7 w-20 ml-auto rounded"
+                        style={{ backgroundColor: 'var(--bg-subtle)' }}
+                      />
+                    </td>
                   </tr>
                 ))
               ) : filteredPersonas.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-5 py-12 text-center text-slate-400">
-                    <div className="mx-auto max-w-xs space-y-2">
-                      <Icon name="people" className="size-10" />
-                      <p className="font-bold text-slate-600 dark:text-slate-300">
+                  <td colSpan="6" className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)' }}>
+                    <div className="mx-auto max-w-xs space-y-1.5">
+                      <Icon name="people" className="size-8 mx-auto opacity-40" />
+                      <p className="font-semibold" style={{ color: 'var(--text)' }}>
                         No se encontraron personas
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-[12.5px]">
                         Intenta con otro término de búsqueda o modifica los filtros.
                       </p>
                     </div>
@@ -479,85 +1241,190 @@ export function Personas({ user, onUserUpdate }) {
                 </tr>
               ) : (
                 paginatedPersonas.map((p) => (
-                  <tr key={p.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
-                    <td className="px-3.5 py-3.5 max-w-[200px]">
-                      <div className="flex items-center gap-3 min-w-0">
+                  <tr
+                    key={p.id}
+                    className="group transition-colors hover:bg-[var(--brand-soft)]"
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
                         {p.fotoImg ? (
                           <img
                             src={p.fotoImg}
                             alt={p.nombres}
                             onError={(e) => {
                               e.currentTarget.onerror = null
-                              e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.nombres)}+${encodeURIComponent(p.apellidoPaterno)}&background=0284c7&color=fff&bold=true`
+                              e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.nombres)}+${encodeURIComponent(p.apellidoPaterno)}&background=f1f5f9&color=475569&bold=true`
                             }}
-                            className="size-10 shrink-0 rounded-full object-cover border-2 border-slate-200 shadow-xs dark:border-slate-700"
+                            className="size-9 shrink-0 rounded-full object-cover border"
+                            style={{ borderColor: 'var(--border-brand-subtle)' }}
                           />
                         ) : (
-                          <div className="size-10 shrink-0 rounded-full bg-gradient-to-br from-cyan-600 to-blue-700 text-white font-black flex items-center justify-center text-xs shadow-xs border-2 border-slate-200 dark:border-slate-700 uppercase select-none">
+                          <div
+                            className="size-9 shrink-0 rounded-full font-semibold flex items-center justify-center text-[12px] uppercase select-none border"
+                            style={{
+                              backgroundColor: 'var(--brand-soft)',
+                              borderColor: 'var(--border-brand-subtle)',
+                              color: 'var(--brand)',
+                            }}
+                          >
                             {p.nombres?.[0] || '?'}{p.apellidoPaterno?.[0] || ''}
                           </div>
                         )}
-                        <div className="min-w-0 flex-1">
-                          <p className="font-extrabold text-slate-800 dark:text-white truncate" title={`${p.nombres} ${p.apellidoPaterno} ${p.apellidoMaterno}`}>
-                            {p.nombres} {p.apellidoPaterno} {p.apellidoMaterno}
+                        <div>
+                          <p
+                            className="font-medium text-[13.5px] whitespace-nowrap"
+                            style={{ color: 'var(--text)' }}
+                            title={`${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''} ${p.nombres || ''}`}
+                          >
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {[p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ') || p.nombres}
+                            </span>
+                            {p.apellidoPaterno && p.nombres && (
+                              <span className="font-medium text-slate-500 dark:text-slate-400">
+                                , {p.nombres}
+                              </span>
+                            )}
                           </p>
-                          <p className="text-xs text-slate-400 truncate" title={p.direccion}>{p.direccion}</p>
+                          <p
+                            className="text-[12px] whitespace-nowrap mt-0.5"
+                            style={{ color: 'var(--text-muted)' }}
+                            title={p.direccion}
+                          >
+                            {p.direccion || '—'}
+                          </p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3.5 py-3.5 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 font-mono text-xs font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-200">
-                        <span>{p.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : p.tipoDocumento}:</span>
-                        <span>{p.numeroDocumento}</span>
-                      </span>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 font-mono">
+                        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400">
+                          {p.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : p.tipoDocumento}
+                        </span>
+                        <span className="font-bold text-slate-800 dark:text-white text-[13px]">
+                          {p.numeroDocumento}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-3.5 py-3.5 whitespace-nowrap">
+
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {p.numeroLicencia ? (
-                        <div>
-                          <p className="font-mono font-bold text-cyan-700 dark:text-cyan-400">{p.numeroLicencia}</p>
-                        </div>
+                        <span
+                          className="font-mono-code text-[12.5px] font-semibold"
+                          style={{ color: 'var(--brand)' }}
+                        >
+                          {p.numeroLicencia}
+                        </span>
                       ) : (
-                        <span className="text-xs text-slate-400 italic">Sin Licencia</span>
+                        <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+                          Sin licencia
+                        </span>
                       )}
                     </td>
-                    <td className="px-3.5 py-3.5 whitespace-nowrap">
-                      <p className="font-bold text-slate-700 dark:text-slate-300">{p.celular || p.telefono || '—'}</p>
-                      <p className="mt-0.5 min-w-40 max-w-64 whitespace-normal text-xs leading-relaxed text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">{p.email}</p>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <p className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>
+                        {p.celular || p.telefono || '—'}
+                      </p>
+                      {p.email && (
+                        <p
+                          className="mt-0.5 text-[12px] whitespace-nowrap"
+                          style={{ color: 'var(--text-muted)' }}
+                          title={p.email}
+                        >
+                          {p.email}
+                        </p>
+                      )}
                     </td>
-                    <td className="px-3.5 py-3.5 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${p.estado === 'ACTIVO'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                          }`}
-                      >
-                        <span className="size-1.5 rounded-full bg-current" />
-                        {p.estado}
-                      </span>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <StatusBadge status={p.estado} />
                     </td>
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-cyan-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
-                      <div className="flex items-center justify-end gap-1.5 pr-1">
+
+                    <td
+                      className="sticky right-0 z-10 px-4 py-3 text-right whitespace-nowrap group-hover:bg-[var(--brand-soft)] transition-colors"
+                      style={{
+                        backgroundColor: 'var(--bg-surface)',
+                      }}
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* OJO: Celeste */}
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(p)}
-                          title="Ver Ficha Digital"
-                          className="rounded-xl p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/60 dark:text-sky-400 dark:hover:bg-sky-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer"
+                          title="Ver ficha"
+                          className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                          style={{
+                            backgroundColor: 'var(--action-eye-bg)',
+                            borderColor: 'var(--action-eye-border)',
+                            color: 'var(--action-eye-text)',
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-eye-hover)'
+                            e.currentTarget.style.borderColor = 'var(--action-eye-hover)'
+                            e.currentTarget.style.color = '#ffffff'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-eye-bg)'
+                            e.currentTarget.style.borderColor = 'var(--action-eye-border)'
+                            e.currentTarget.style.color = 'var(--action-eye-text)'
+                          }}
                         >
                           <Icon name="eye" className="size-4" />
                         </button>
+
+                        {/* EDITAR: Amarillo */}
                         <button
                           type="button"
                           onClick={() => handleOpenEditModal(p)}
-                          title="Editar Persona"
-                          className="rounded-xl p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer"
+                          title="Editar persona"
+                          className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                          style={{
+                            backgroundColor: 'var(--action-edit-bg)',
+                            borderColor: 'var(--action-edit-border)',
+                            color: 'var(--action-edit-text)',
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-edit-hover)'
+                            e.currentTarget.style.borderColor = 'var(--action-edit-hover)'
+                            e.currentTarget.style.color = '#ffffff'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-edit-bg)'
+                            e.currentTarget.style.borderColor = 'var(--action-edit-border)'
+                            e.currentTarget.style.color = 'var(--action-edit-text)'
+                          }}
                         >
                           <Icon name="pencil" className="size-4" />
                         </button>
+
+                        {/* ELIMINAR: Rojo */}
                         <button
                           type="button"
                           onClick={() => handleDelete(p.id)}
-                          title="Eliminar Persona"
-                          className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer"
+                          title="Eliminar persona"
+                          className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                          style={{
+                            backgroundColor: 'var(--action-del-bg)',
+                            borderColor: 'var(--action-del-border)',
+                            color: 'var(--action-del-text)',
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-del-hover)'
+                            e.currentTarget.style.borderColor = 'var(--action-del-hover)'
+                            e.currentTarget.style.color = '#ffffff'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-del-bg)'
+                            e.currentTarget.style.borderColor = 'var(--action-del-border)'
+                            e.currentTarget.style.color = 'var(--action-del-text)'
+                          }}
                         >
                           <Icon name="trash" className="size-4" />
                         </button>
@@ -582,67 +1449,56 @@ export function Personas({ user, onUserUpdate }) {
         />
       </div>
 
-
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b border-blue-900/20 bg-[#123b6d] shrink-0 px-5 py-3 text-white dark:border-slate-800 dark:bg-[#102a4d]">
-              <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-cyan-300">
-                  <Icon name="people" className="size-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+            {/* Header: Limpio, sin morado ni textos largos */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Icon name="people" className="size-4" />
                 </span>
-                <div>
-                  <h3 className="text-lg font-extrabold text-white">
-                    {isEditing ? 'Editar Registro de Persona' : 'Registrar Nueva Persona'}
-                  </h3>
-                  <p className="text-xs text-blue-100/80">Gestión de conductores y administrados</p>
-                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {isEditing ? 'Editar persona' : 'Nueva persona'}
+                </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="grid size-9 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-xs transition hover:bg-white/20 cursor-pointer"
+                title="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                <Icon name="close" className="size-4" />
+                <Icon name="close" className="size-5" />
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="flex min-h-0 flex-col">
-              <div className="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3">
-                <div className="flex flex-col sm:flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/40">
-                  <div className="shrink-0">
+            <form onSubmit={handleFormSubmit} autoComplete="off" className="flex flex-col">
+              <div className="p-4 sm:p-4.5 space-y-2.5">
+                {/* Bloque Superior: Foto a la izquierda + Identidad y Nombres a la derecha */}
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+                  {/* Foto tipo carnet (ancho óptimo para no desperdiciar espacio horizontal) */}
+                  <div className="w-full sm:w-[102px] shrink-0 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-2.5 flex flex-col items-center justify-center gap-2 dark:border-slate-800 dark:bg-slate-900/60 shadow-xs">
                     {formData.fotoImg ? (
                       <img
                         src={formData.fotoImg}
                         alt="Vista previa"
                         onError={(e) => {
                           e.currentTarget.onerror = null
-                          e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.nombres || 'P')}+${encodeURIComponent(formData.apellidoPaterno || 'P')}&background=0284c7&color=fff&bold=true`
+                          e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.nombres || 'P')}+${encodeURIComponent(formData.apellidoPaterno || 'P')}&background=f1f5f9&color=475569&bold=true`
                         }}
-                        className="size-14 rounded-2xl object-cover border-2 border-cyan-500 shadow-md"
+                        className="w-[78px] h-[98px] rounded-xl object-cover border-2 border-slate-200 dark:border-slate-700 shadow-xs bg-slate-100 dark:bg-slate-800"
                       />
                     ) : (
-                      <div className="size-14 rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-700 text-white font-black flex items-center justify-center text-xl shadow-md border-2 border-slate-200 dark:border-slate-700 uppercase select-none">
-                        {formData.nombres?.[0] || '?'}{formData.apellidoPaterno?.[0] || ''}
+                      <div className="w-[78px] h-[98px] rounded-xl font-bold flex flex-col items-center justify-center text-lg uppercase select-none border border-slate-200 bg-slate-800 text-white shrink-0 shadow-xs">
+                        <span>{formData.nombres?.[0] || '?'}{formData.apellidoPaterno?.[0] || ''}</span>
+                        <span className="text-[9px] text-slate-400 font-normal tracking-wide mt-0.5">Sin foto</span>
                       </div>
                     )}
-                  </div>
 
-                  <div className="flex-1 w-full space-y-2">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                        <span>Fotografía del Administrado / Conductor</span>
-                        <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">(Opcional)</span>
-                      </h4>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        Formatos permitidos: JPG, PNG, WebP (máx. 2 MB)
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-100 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer">
-                        <Icon name="camera" className="size-4 text-cyan-600" />
-                        <span>{formData.fotoImg ? 'Cambiar fotografía...' : 'Subir fotografía...'}</span>
+                    <div className="flex items-center gap-1.5 w-full justify-center">
+                      <label className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                        <Icon name="camera" className="size-3" />
+                        <span>{formData.fotoImg ? 'Cambiar' : 'Subir'}</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -650,233 +1506,163 @@ export function Personas({ user, onUserUpdate }) {
                           className="hidden"
                         />
                       </label>
-
                       {formData.fotoImg && (
                         <button
                           type="button"
                           onClick={handleClearPhoto}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 transition-all cursor-pointer"
+                          title="Quitar foto"
+                          className="rounded-lg border border-rose-200 bg-rose-50 p-1 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400 cursor-pointer"
                         >
-                          <Icon name="trash" className="size-3.5" />
-                          <span>Quitar foto</span>
+                          <Icon name="trash" className="size-3" />
                         </button>
                       )}
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-cyan-600" />
-                    Datos Personales & Documentos
-                  </h4>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                      <select
-                        id="per_tipo_doc"
-                        value={formData.tipoDocumento}
-                        onChange={(e) => setFormData({ ...formData, tipoDocumento: e.target.value })}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
-                      >
-                        <option value="DNI">DNI (Documento Nacional)</option>
-                        <option value="CE">Carnet de Extranjería</option>
-                        <option value="PASAPORTE">Pasaporte</option>
-                      </select>
-                      <label
-                        htmlFor="per_tipo_doc"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                      >
-                        Tipo de Documento
-                      </label>
+                  {/* Identidad y Nombres */}
+                  <div className="flex-1 min-w-0 space-y-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-blue-600" />
+                      Datos Personales
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                      <div className="sm:col-span-5">
+                        <FloatingSelect
+                          id="per_tipo_doc"
+                          label="Tipo de documento"
+                          value={formData.tipoDocumento}
+                          onChange={(e) => setFormData({ ...formData, tipoDocumento: e.target.value })}
+                          options={TIPO_DOC_OPTIONS}
+                        />
+                      </div>
+                      <div className="sm:col-span-7">
+                        <FloatingInput
+                          id="per_num_doc"
+                          label="Número de documento"
+                          required
+                          maxLength={formData.tipoDocumento === 'DNI' ? 8 : 15}
+                          value={formData.numeroDocumento}
+                          inputClassName="font-mono font-bold"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (formData.tipoDocumento === 'DNI' && !/^\d*$/.test(val)) return;
+                            setFormData({ ...formData, numeroDocumento: val })
+                          }}
+                        />
+                      </div>
                     </div>
 
-                    <div className="relative sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                      <input
-                        id="per_num_doc"
-                        type="text"
-                        required
-                        maxLength={formData.tipoDocumento === 'DNI' ? 8 : 15}
-                        placeholder=" "
-                        value={formData.numeroDocumento}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (formData.tipoDocumento === 'DNI' && !/^\d*$/.test(val)) return;
-                          setFormData({ ...formData, numeroDocumento: val })
-                        }}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
-                      />
-                      <label
-                        htmlFor="per_num_doc"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                      >
-                        Número de Documento
-                      </label>
-                    </div>
-
-                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                      <input
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <FloatingInput
                         id="per_nombres"
-                        type="text"
+                        label="Nombres"
                         required
-                        placeholder=" "
                         value={formData.nombres}
                         onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                       />
-                      <label
-                        htmlFor="per_nombres"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                      >
-                        Nombres Completo
-                      </label>
-                    </div>
-
-                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                      <input
+                      <FloatingInput
                         id="per_paterno"
-                        type="text"
+                        label="Apellido paterno"
                         required
-                        placeholder=" "
                         value={formData.apellidoPaterno}
                         onChange={(e) => setFormData({ ...formData, apellidoPaterno: e.target.value })}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                       />
-                      <label
-                        htmlFor="per_paterno"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                      >
-                        Apellido Paterno
-                      </label>
-                    </div>
-
-                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                      <input
+                      <FloatingInput
                         id="per_materno"
-                        type="text"
-                        placeholder=" "
+                        label="Apellido materno"
                         value={formData.apellidoMaterno}
                         onChange={(e) => setFormData({ ...formData, apellidoMaterno: e.target.value })}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
                       />
-                      <label
-                        htmlFor="per_materno"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                      >
-                        Apellido Materno
-                      </label>
                     </div>
                   </div>
                 </div>
 
-
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-blue-500" />
-                    Licencia de Conducir
+                {/* Bloque Inferior: Licencia y Contacto */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-600" />
+                    Licencia y contacto
                   </h4>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                      <input
-                        id="per_licencia"
-                        type="text"
-                        placeholder=" "
-                        value={formData.numeroLicencia}
-                        onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() })}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-mono font-bold text-slate-800 outline-none dark:text-white"
-                      />
-                      <label
-                        htmlFor="per_licencia"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                      >
-                        Número de Licencia
-                      </label>
-                    </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                    <FloatingInput
+                      id="per_licencia"
+                      label="Número de licencia"
+                      value={formData.numeroLicencia}
+                      inputClassName="font-mono font-bold uppercase"
+                      onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() })}
+                    />
 
+                    <FloatingInput
+                      id="per_celular"
+                      label="Celular"
+                      type="tel"
+                      maxLength={9}
+                      value={formData.celular}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!/^\d*$/.test(val)) return;
+                        setFormData({ ...formData, celular: val });
+                      }}
+                    />
 
+                    <FloatingInput
+                      id="per_telefono"
+                      label="Teléfono fijo"
+                      optional
+                      type="tel"
+                      maxLength={15}
+                      value={formData.telefono || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!/^[0-9\- ]*$/.test(val)) return;
+                        setFormData({ ...formData, telefono: val });
+                      }}
+                    />
 
+                    <FloatingSelect
+                      id="per_estado"
+                      label="Estado del registro"
+                      value={formData.estado}
+                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                      options={ESTADO_OPTIONS}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <FloatingInput
+                      id="per_direccion"
+                      label="Dirección"
+                      maxLength={250}
+                      value={formData.direccion || ''}
+                      onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                    />
+                    <FloatingInput
+                      id="per_email"
+                      label="Correo electrónico"
+                      type="email"
+                      maxLength={150}
+                      value={formData.email || ''}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    />
                   </div>
                 </div>
-
-
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-emerald-500" />
-                    Contacto y estado
-                  </h4>
-                  <div className="mb-3 grid gap-3 sm:grid-cols-2">
-                    {[
-                      ['direccion', 'Dirección', 250, 'text'],
-                      ['email', 'Correo electrónico', 150, 'email'],
-                    ].map(([field, label, maxLength, type]) => (
-                      <label key={field} className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        {label}
-                        <input type={type} maxLength={maxLength} value={formData[field] || ''}
-                          onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
-                          className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm outline-none focus:border-cyan-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                      </label>
-                    ))}
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                      <input
-                        id="per_celular"
-                        type="tel"
-                        maxLength={9}
-                        placeholder=" "
-                        value={formData.celular}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (!/^\d*$/.test(val)) return;
-                          setFormData({ ...formData, celular: val });
-                        }}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-semibold text-slate-800 outline-none dark:text-white"
-                      />
-                      <label
-                        htmlFor="per_celular"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:font-semibold peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-cyan-600 dark:peer-focus:text-cyan-400"
-                      >
-                        Teléfono / celular de contacto
-                      </label>
-                    </div>
-
-
-
-                    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 transition-all focus-within:border-cyan-600 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:ring-4 focus-within:ring-cyan-500/10 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80 dark:focus-within:border-cyan-400">
-                      <select
-                        id="per_estado"
-                        value={formData.estado}
-                        onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                        className="peer block w-full bg-transparent px-3.5 pt-4 pb-1 text-sm font-bold text-slate-800 outline-none dark:text-white"
-                      >
-                        <option value="ACTIVO">ACTIVO</option>
-                        <option value="INACTIVO">INACTIVO</option>
-                      </select>
-                      <label
-                        htmlFor="per_estado"
-                        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
-                      >
-                        Estado del Registro
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-
               </div>
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-white px-5 py-3 dark:border-slate-800 dark:bg-[#0f172a]">
+
+              {/* Modal Footer */}
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 active:scale-95 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 px-6 py-2.5 text-xs font-black text-white hover:from-cyan-700 hover:to-teal-700 shadow-md shadow-cyan-600/25 transition-all cursor-pointer"
+                  className="rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 px-5 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
                 >
-                  {isEditing ? 'Guardar Cambios' : 'Registrar Persona'}
+                  {isEditing ? 'Actualizar persona' : 'Guardar persona'}
                 </button>
               </div>
             </form>
@@ -884,62 +1670,164 @@ export function Personas({ user, onUserUpdate }) {
         </div>
       )}
 
-
       {isDetailModalOpen && selectedPersona && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
-            <div className="border-b border-slate-100 bg-[#071a2f] p-6 text-white text-center relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+            {/* Modal Header (Limpio, sin morado ni textos largos) */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Icon name="user" className="size-4" />
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Ficha del Administrado
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="absolute right-4 top-4 rounded-full p-1 text-slate-300 hover:bg-white/10 hover:text-white cursor-pointer"
+                title="Cerrar ficha"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                ✕
+                <Icon name="close" className="size-5" />
               </button>
-              {selectedPersona.fotoImg ? (
-                <img
-                  src={selectedPersona.fotoImg}
-                  alt={selectedPersona.nombres}
-                  onError={(e) => {
-                    e.currentTarget.onerror = null
-                    e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPersona.nombres)}+${encodeURIComponent(selectedPersona.apellidoPaterno)}&background=0284c7&color=fff&bold=true`
-                  }}
-                  className="size-24 rounded-full mx-auto object-cover border-4 border-cyan-400 shadow-lg"
-                />
-              ) : (
-                <div className="size-24 rounded-full mx-auto bg-gradient-to-br from-cyan-500 to-blue-600 text-white font-black flex items-center justify-center text-2xl border-4 border-cyan-400 shadow-lg uppercase select-none">
-                  {selectedPersona.nombres?.[0] || '?'}{selectedPersona.apellidoPaterno?.[0] || ''}
-                </div>
-              )}
-              <h3 className="mt-3 text-xl font-black">{selectedPersona.nombres} {selectedPersona.apellidoPaterno} {selectedPersona.apellidoMaterno}</h3>
-              <span className="mt-1 inline-block rounded-full bg-cyan-500/20 px-3 py-0.5 text-xs font-bold text-cyan-300 border border-cyan-500/30">
-                {selectedPersona.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : selectedPersona.tipoDocumento}: {selectedPersona.numeroDocumento}
-              </span>
             </div>
 
-            <div className="p-6 space-y-4 text-xs">
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/60">
-                <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                  <span className="font-bold text-slate-400">Licencia de Conducir</span>
-                  <span className="font-mono font-extrabold text-cyan-600 dark:text-cyan-400">{selectedPersona.numeroLicencia || 'N/A'}</span>
+            {/* Modal Body: Compacto sin scroll */}
+            <div className="p-5 pb-6 space-y-3">
+              {/* Profile Hero Card */}
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 flex flex-col sm:flex-row items-center gap-4 dark:border-slate-800 dark:bg-slate-900/60 shadow-xs">
+                {selectedPersona.fotoImg ? (
+                  <img
+                    src={selectedPersona.fotoImg}
+                    alt={selectedPersona.nombres}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null
+                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPersona.nombres)}+${encodeURIComponent(selectedPersona.apellidoPaterno)}&background=f1f5f9&color=475569&bold=true`
+                    }}
+                    className="w-[84px] h-[105px] rounded-xl object-cover border-2 border-slate-200 dark:border-slate-700 shrink-0 shadow-xs bg-slate-100 dark:bg-slate-800"
+                  />
+                ) : (
+                  <div className="w-[84px] h-[105px] rounded-xl font-bold flex flex-col items-center justify-center text-xl uppercase select-none border border-slate-200 bg-slate-800 text-white shrink-0 shadow-xs">
+                    <span>{selectedPersona.nombres?.[0] || '?'}{selectedPersona.apellidoPaterno?.[0] || ''}</span>
+                    <span className="text-[10px] text-slate-400 font-normal tracking-wide mt-1">Sin foto</span>
+                  </div>
+                )}
+                <div className="min-w-0 flex-1 text-center sm:text-left">
+                  <h4 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                    {[selectedPersona.apellidoPaterno, selectedPersona.apellidoMaterno].filter(Boolean).join(' ') || selectedPersona.nombres}
+                    {selectedPersona.apellidoPaterno && selectedPersona.nombres ? `, ${selectedPersona.nombres}` : ''}
+                  </h4>
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-mono text-[11px] font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-xs">
+                      <span className="text-slate-400 font-semibold">
+                        {selectedPersona.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : selectedPersona.tipoDocumento}:
+                      </span>
+                      <strong>{selectedPersona.numeroDocumento}</strong>
+                    </span>
+
+                    <StatusBadge status={selectedPersona.estado} />
+                  </div>
                 </div>
-
-
-                <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                  <span className="font-bold text-slate-400">Celular / Teléfono</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">{selectedPersona.celular || selectedPersona.telefono || 'N/A'}</span>
-                </div>
-
               </div>
 
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer"
-                >
-                  Cerrar Ficha
-                </button>
+              {/* Secciones de Datos en Rejilla: Solo atributos reales con espacio completo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* 1. Datos Personales y Licencia */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 space-y-1.5 shadow-xs">
+                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                    Datos personales
+                  </h5>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Nombres</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right">
+                        {selectedPersona.nombres || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Apellido paterno</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right">
+                        {selectedPersona.apellidoPaterno || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Apellido materno</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right">
+                        {selectedPersona.apellidoMaterno || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Sexo</span>
+                      <span className="font-bold text-slate-800 dark:text-white">
+                        {formatSexo(selectedPersona.sexo)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Nacimiento</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right">
+                        {formatFecha(selectedPersona.fechaNacimiento)} {calcularEdad(selectedPersona.fechaNacimiento)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Estado civil</span>
+                      <span className="font-bold text-slate-800 dark:text-white">
+                        {selectedPersona.estadoCivil || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Ocupación</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right break-words" title={selectedPersona.profesion}>
+                        {selectedPersona.profesion || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">N° Licencia</span>
+                      {selectedPersona.numeroLicencia ? (
+                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
+                          {selectedPersona.numeroLicencia}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                          Sin licencia
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Contacto */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 space-y-1.5 shadow-xs">
+                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                    Contacto
+                  </h5>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Celular</span>
+                      <span className="font-bold text-slate-800 dark:text-white">
+                        {selectedPersona.celular || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Teléfono fijo</span>
+                      <span className="font-semibold text-slate-800 dark:text-white">
+                        {selectedPersona.telefono || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Email</span>
+                      <span className="font-semibold text-indigo-600 dark:text-indigo-400 text-right break-all select-all" title={selectedPersona.email}>
+                        {selectedPersona.email || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Dirección</span>
+                      <span className="font-semibold text-slate-800 dark:text-white text-right break-words" title={selectedPersona.direccion}>
+                        {selectedPersona.direccion || '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

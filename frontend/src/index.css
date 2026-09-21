@@ -36,6 +36,55 @@
   background: #f3f7fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+
+  /* Tokens institucionales (Tema claro) */
+  --bg-page: #f4f5f7;
+  --bg-surface: #ffffff;
+  --bg-subtle: #eef0f3;
+  --border: #dcdfe4;
+  --border-strong: #c4c9d1;
+  --border-brand: #1d4f91;
+  --border-brand-subtle: rgba(29, 79, 145, 0.22);
+  --border-ok: rgba(22, 101, 52, 0.28);
+  --border-warn: rgba(138, 83, 0, 0.28);
+  --border-danger: rgba(161, 38, 38, 0.28);
+
+  --text: #1a1d21;
+  --text-muted: #5b626c;
+
+  --brand: #1d4f91;
+  --brand-hover: #173f75;
+  --brand-text: #ffffff;
+  --brand-soft: #e6eef8;
+  --brand-soft-hover: #dbe7f5;
+  --on-brand: #ffffff;
+
+  --ok-fg: #166534;     --ok-bg: #e3f4e8;
+  --warn-fg: #8a5300;   --warn-bg: #fbf0d9;
+  --danger-fg: #a12626; --danger-bg: #fbe7e7;
+  --neutral-fg: #4a5260; --neutral-bg: #eceef1;
+
+  /* Acciones funcionales de tabla (Ojo celeste, Editar amarillo, Eliminar rojo) */
+  --action-eye-bg: #e0f2fe;
+  --action-eye-border: #38bdf8;
+  --action-eye-text: #0284c7;
+  --action-eye-hover: #0284c7;
+
+  --action-edit-bg: #fef3c7;
+  --action-edit-border: #f59e0b;
+  --action-edit-text: #b45309;
+  --action-edit-hover: #f59e0b;
+
+  --action-del-bg: #fee2e2;
+  --action-del-border: #f87171;
+  --action-del-text: #dc2626;
+  --action-del-hover: #dc2626;
+
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--brand);
+  --shadow-surface: 0 1px 2px rgba(20, 24, 31, 0.06);
+
+  --radius: 6px;
+  --radius-sm: 4px;
 }
 
 * {
@@ -51,8 +100,53 @@ html {
 
 html.dark {
   color-scheme: dark;
-  background: #0b1120;
-  color: #f1f5f9;
+  background: #0f1424;
+  color: #e6e9f2;
+
+  /* Tokens institucionales (Tema oscuro) */
+  --bg-page: #0f1424;
+  --bg-surface: #161c2e;
+  --bg-subtle: #1d2439;
+  --border: #28334e;
+  --border-strong: #3b486d;
+  --border-brand: #3b82f6;
+  --border-brand-subtle: rgba(59, 130, 246, 0.35);
+  --border-ok: rgba(34, 197, 94, 0.35);
+  --border-warn: rgba(234, 179, 8, 0.35);
+  --border-danger: rgba(239, 68, 68, 0.35);
+
+  --text: #e6e9f2;
+  --text-muted: #98a1b8;
+
+  --brand: #2f6fc4;
+  --brand-hover: #3a7dd6;
+  --brand-text: #ffffff;
+  --brand-soft: rgba(47, 111, 196, 0.15);
+  --brand-soft-hover: rgba(47, 111, 196, 0.22);
+  --on-brand: #ffffff;
+
+  --ok-fg: #6fcf8f;      --ok-bg: rgba(63, 185, 110, 0.14);
+  --warn-fg: #e8b04a;    --warn-bg: rgba(232, 176, 74, 0.14);
+  --danger-fg: #f08080;  --danger-bg: rgba(240, 110, 110, 0.14);
+  --neutral-fg: #b0b7c2; --neutral-bg: rgba(255, 255, 255, 0.06);
+
+  /* Acciones funcionales de tabla (Tema oscuro) */
+  --action-eye-bg: rgba(14, 165, 233, 0.16);
+  --action-eye-border: #38bdf8;
+  --action-eye-text: #38bdf8;
+  --action-eye-hover: #0284c7;
+
+  --action-edit-bg: rgba(245, 158, 11, 0.16);
+  --action-edit-border: #f59e0b;
+  --action-edit-text: #fbbf24;
+  --action-edit-hover: #d97706;
+
+  --action-del-bg: rgba(239, 68, 68, 0.16);
+  --action-del-border: #f87171;
+  --action-del-text: #f87171;
+  --action-del-hover: #dc2626;
+
+  --shadow-surface: none;
 }
 
 body {
@@ -64,6 +158,15 @@ body {
 
 html.dark body {
   background: #0b1120;
+}
+
+.app-content {
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+}
+
+.font-mono-code {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 button,
