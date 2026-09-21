@@ -416,14 +416,19 @@ export function Vehiculos() {
         if (!res.ok) throw new Error(resData.messages?.error || resData.message || 'No se pudo actualizar el vehículo.')
         setVehiculos(vehiculos.map((v) => (v.id === selectedVehiculo.id ? { ...v, ...formData, id: v.id } : v)))
       } else {
+        const payload = {
+          ...formData,
+          estado: formData.asociacion?.trim() ? 'FORMAL' : 'INFORMAL',
+        }
         const res = await apiFetch('/vehiculos', {
           method: 'POST',
-          body: formData,
+          body: payload,
         })
         const resData = await res.json().catch(() => ({}))
         if (!res.ok || !resData.data?.id) throw new Error(resData.messages?.error || resData.message || 'No se pudo registrar el vehículo.')
         const newVehiculo = resData.data
         setVehiculos([newVehiculo, ...vehiculos])
+        setCurrentPage(1)
       }
       setIsModalOpen(false)
     } catch (err) {
@@ -584,15 +589,7 @@ export function Vehiculos() {
         </div>
 
 
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
-          <span>
-            Mostrando <strong className="text-slate-800 dark:text-white">{filteredVehiculos.length}</strong> de{' '}
-            <strong className="text-slate-800 dark:text-white">{vehiculos.length}</strong> vehículos registrados
-          </span>
-          <span className="hidden sm:inline text-[11px] text-slate-400">
-            JLO Tránsito Digital · {new Date().getFullYear()}
-          </span>
-        </div>
+
 
 
         <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Listado de vehículos" tabIndex={0}>
@@ -613,7 +610,7 @@ export function Vehiculos() {
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Asociación / Empresa</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Propietario & Titular</th>
                 <th className="px-3.5 py-3.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
+                <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Estado</th>
                 <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-slate-800/40 px-3 py-3.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
             </thead>
@@ -631,7 +628,7 @@ export function Vehiculos() {
                     <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4 text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-4 shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
                   </tr>
                 ))
@@ -715,7 +712,7 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="px-3.5 py-3.5 whitespace-nowrap">
+                    <td className="px-3.5 py-3.5 whitespace-nowrap text-center">
                       {v.estado === 'SUSPENDIDO' || v.estado === 'BAJA' ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300">
                           <span className="size-2 rounded-full bg-current" />
@@ -774,9 +771,9 @@ export function Vehiculos() {
           currentPage={currentPage}
           totalItems={filteredVehiculos.length}
           itemsPerPage={itemsPerPage}
-          onPageChange={setCurrentPage}
+          onPageChange={(page) => setCurrentPage(Number(page))}
           onItemsPerPageChange={(size) => {
-            setItemsPerPage(size)
+            setItemsPerPage(Number(size))
             setCurrentPage(1)
           }}
         />
@@ -784,9 +781,10 @@ export function Vehiculos() {
 
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-slate-950/70 backdrop-blur-xs animate-enter sm:p-4">
-          <div className="w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
-            {/* Cabecera del Modal (Limpia, sin morado) */}
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="flex min-h-full items-center justify-center p-4 sm:p-6 pb-24">
+            <div className="relative w-full max-w-5xl rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+              {/* Cabecera del Modal (Limpia, sin morado) */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -815,7 +813,7 @@ export function Vehiculos() {
                   setShowAsociacionResults(false)
                 }
               }}
-              className="no-scrollbar max-h-[calc(96vh-88px)] space-y-4 overflow-y-auto p-4 sm:p-5"
+              className="space-y-3 p-4 sm:p-5"
             >
 
               <div>
@@ -1075,29 +1073,31 @@ export function Vehiculos() {
               </div>
 
 
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-amber-500" />
-                  Estado de Operatividad Municipal
-                </h4>
-                <div className="grid gap-4 sm:grid-cols-1">
-                  <FloatingSelect
-                    id="veh_estado"
-                    label="Estado Municipal del Vehículo"
-                    value={formData.estado}
-                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                    options={[
-                      { value: 'FORMAL', label: 'FORMAL (Autorizado)' },
-                      { value: 'INFORMAL', label: 'INFORMAL (Sin Asociación)' },
-                      { value: 'SUSPENDIDO', label: 'SUSPENDIDO' },
-                      { value: 'BAJA', label: 'BAJA' }
-                    ]}
-                  />
+              {isEditing && (
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-amber-500" />
+                    Estado de Operatividad Municipal
+                  </h4>
+                  <div className="grid gap-4 sm:grid-cols-1">
+                    <FloatingSelect
+                      id="veh_estado"
+                      label="Estado Municipal del Vehículo"
+                      value={formData.estado}
+                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                      options={[
+                        { value: 'FORMAL', label: 'FORMAL (Autorizado)' },
+                        { value: 'INFORMAL', label: 'INFORMAL (Sin Asociación)' },
+                        { value: 'SUSPENDIDO', label: 'SUSPENDIDO' },
+                        { value: 'BAJA', label: 'BAJA' }
+                      ]}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
 
-              <div className="sticky bottom-0 z-30 -mx-5 flex items-center justify-end gap-3 border-t border-slate-100 bg-white/95 px-5 pt-4 pb-1 backdrop-blur-sm dark:border-slate-800 dark:bg-[#0f172a]/95 sm:-mx-6 sm:px-6">
+              <div className="-mx-5 mt-4 flex items-center justify-end gap-3 border-t border-slate-100 px-5 pt-3 pb-1 dark:border-slate-800 sm:-mx-6 sm:px-6">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -1113,6 +1113,7 @@ export function Vehiculos() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

@@ -611,8 +611,9 @@ export function Trabajadores() {
 
       {/* 4. Modal (Glassmorphism & Floating Labels - Estilo Personas) */}
       {form && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onKeyDown={(e) => { if (e.key === 'Escape' && !saving) setForm(null) }}>
-          <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter" onKeyDown={(e) => { if (e.key === 'Escape' && !saving) setForm(null) }}>
+          <div className="flex min-h-full items-center justify-center p-4 sm:p-6 pb-24">
+            <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="relative flex w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
             
             {/* Header Modal - Estilo Personas.jsx */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
@@ -635,7 +636,7 @@ export function Trabajadores() {
             </div>
 
             {/* Body Modal */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-4.5 space-y-3">
+            <div className="p-4 sm:p-4.5 space-y-3">
               
               {!form.id && (
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
@@ -752,16 +753,25 @@ export function Trabajadores() {
                   <FloatingInput id="f_doc" type="date" label="Fecha del Documento" value={form.fecha_documento || ''} onChange={(e) => setForm({ ...form, fecha_documento: e.target.value })} />
                   <FloatingInput id="f_term" type="date" label="Fecha de Término" value={form.fecha_termino || ''} onChange={(e) => setForm({ ...form, fecha_termino: e.target.value })} />
                   
-                  <FloatingSelect id="t_funcion" label="Tipo de Función" value={form.tipo_funcion || 'Titular'} onChange={(e) => setForm({ ...form, tipo_funcion: e.target.value })} options={[
-                    { value: 'Titular', label: 'Titular' },
-                    { value: 'Encargado', label: 'Encargado' },
-                    { value: 'Operador', label: 'Operador' },
-                  ]} />
+                  <FloatingSelect
+                    id="t_funcion"
+                    label="Tipo de Función"
+                    value={form.tipo_funcion || 'Titular'}
+                    onChange={(e) => setForm({ ...form, tipo_funcion: e.target.value })}
+                    className={form.id ? '' : 'sm:col-span-2 md:col-span-2'}
+                    options={[
+                      { value: 'Titular', label: 'Titular' },
+                      { value: 'Encargado', label: 'Encargado' },
+                      { value: 'Operador', label: 'Operador' },
+                    ]}
+                  />
 
-                  <FloatingSelect id="estado" label="Estado del Trabajador" value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })} options={[
-                    { value: 'ACTIVO', label: 'ACTIVO' },
-                    { value: 'INACTIVO', label: 'INACTIVO' },
-                  ]} />
+                  {form.id && (
+                    <FloatingSelect id="estado" label="Estado del Trabajador" value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })} options={[
+                      { value: 'ACTIVO', label: 'ACTIVO' },
+                      { value: 'INACTIVO', label: 'INACTIVO' },
+                    ]} />
+                  )}
                 </div>
               </div>
 
@@ -798,7 +808,7 @@ export function Trabajadores() {
             </div>
 
             {/* Footer Modal - Estilo Personas.jsx */}
-            <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className="-mx-4 sm:-mx-4.5 mt-2 flex items-center justify-end gap-3 border-t border-slate-100 px-4 sm:px-4.5 pt-3 pb-1 dark:border-slate-800">
               <button type="button" disabled={saving} onClick={() => setForm(null)} className="rounded-xl border border-slate-200/80 bg-white px-5 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 shadow-xs cursor-pointer">
                 Cancelar
               </button>
@@ -807,6 +817,7 @@ export function Trabajadores() {
               </button>
             </div>
           </form>
+          </div>
         </div>
       )}
     </section>

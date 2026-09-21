@@ -933,6 +933,7 @@ export function Personas({ user, onUserUpdate }) {
         const nextPersonas = [newPersona, ...personas]
         setPersonas(nextPersonas)
         setCachedData('/personas', nextPersonas)
+        setCurrentPage(1)
         showToast('Se ha agregado')
       }
       setIsModalOpen(false)
@@ -1584,7 +1585,7 @@ export function Personas({ user, onUserUpdate }) {
                     Licencia y contacto
                   </h4>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 ${isEditing ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
                     <FloatingInput
                       id="per_licencia"
                       label="Número de licencia"
@@ -1620,13 +1621,15 @@ export function Personas({ user, onUserUpdate }) {
                       }}
                     />
 
-                    <FloatingSelect
-                      id="per_estado"
-                      label="Estado del registro"
-                      value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                      options={ESTADO_OPTIONS}
-                    />
+                    {isEditing && (
+                      <FloatingSelect
+                        id="per_estado"
+                        label="Estado del registro"
+                        value={formData.estado}
+                        onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                        options={ESTADO_OPTIONS}
+                      />
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

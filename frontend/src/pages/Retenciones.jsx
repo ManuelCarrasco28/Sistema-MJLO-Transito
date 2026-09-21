@@ -360,7 +360,10 @@ export function Retenciones() {
             totalItems={filteredItems.length}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
-            onItemsPerPageChange={setItemsPerPage}
+            onItemsPerPageChange={(size) => {
+              setItemsPerPage(size)
+              setCurrentPage(1)
+            }}
           />
         </div>
       </div>

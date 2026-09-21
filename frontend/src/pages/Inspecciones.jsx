@@ -897,7 +897,8 @@ export function Inspecciones() {
                   {/* Columna Izquierda: SISTEMA ELÉCTRICO + ASPECTOS INTERIORES */}
                   <div className="space-y-4">
                     {['SISTEMA ELECTRICO', 'ASPECTOS INTERIORES'].map((secName) => {
-                      const itemsInSec = criteriosInspeccion.filter(c => (c.seccion || '').toUpperCase() === secName)
+                      const normalizeSec = (s) => (s || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+                      const itemsInSec = criteriosInspeccion.filter(c => normalizeSec(c.seccion) === normalizeSec(secName))
                       if (itemsInSec.length === 0) return null
                       return (
                         <div key={secName} className="rounded-xl border border-slate-200 bg-white overflow-hidden dark:border-slate-800 dark:bg-slate-900/60 shadow-2xs">
@@ -979,8 +980,9 @@ export function Inspecciones() {
 
                   {/* Columna Derecha: ESPECIFICACIONES MECÁNICAS + ASPECTOS EXTERIORES */}
                   <div className="space-y-4">
-                    {['ESPECIFICACIONES MECÁNICAS', 'ASPECTOS EXTERIORES'].map((secName) => {
-                      const itemsInSec = criteriosInspeccion.filter(c => (c.seccion || '').toUpperCase() === secName)
+                    {['ESPECIFICACIONES MECANICAS', 'ASPECTOS EXTERIORES'].map((secName) => {
+                      const normalizeSec = (s) => (s || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+                      const itemsInSec = criteriosInspeccion.filter(c => normalizeSec(c.seccion) === normalizeSec(secName))
                       if (itemsInSec.length === 0) return null
                       return (
                         <div key={secName} className="rounded-xl border border-slate-200 bg-white overflow-hidden dark:border-slate-800 dark:bg-slate-900/60 shadow-2xs">

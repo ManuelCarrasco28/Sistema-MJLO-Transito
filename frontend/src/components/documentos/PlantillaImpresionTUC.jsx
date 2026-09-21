@@ -56,7 +56,6 @@ export function PlantillaImpresionTUC({ documento, onClose }) {
     observaciones: documento.observaciones || '',
     detalles: documento.detalles || [],
     qrUrl: `https://munijlo.gob.pe/transito/validar?doc=${encodeURIComponent(documento.codigo || '')}&placa=${encodeURIComponent(documento.vehiculoPlaca || '')}`
->>>>>>> 344ce134d5e7acd0c85f2fe9dbffd903676add53
   }
 
   const handlePrint = () => {

@@ -110,7 +110,7 @@ export function Pagination({
     <div className="relative flex flex-col sm:flex-row items-center justify-center min-h-[52px] gap-3 border-t border-slate-100 bg-white px-4 py-2.5 text-xs text-slate-600 dark:border-slate-800 dark:bg-[#0f172a] dark:text-slate-400">
       {onItemsPerPageChange && (
         <div className="flex items-center gap-1.5 sm:absolute sm:left-4">
-          <span className="text-[11px] text-slate-500 dark:text-slate-400">Filas:</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">Por página:</span>
           <PaginationRowsSelect
             value={itemsPerPage}
             onChange={(val) => {

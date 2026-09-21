@@ -587,7 +587,10 @@ export function Permisos() {
               totalItems={filteredPermisos.length}
               itemsPerPage={itemsPerPage}
               onPageChange={setCurrentPage}
-              onItemsPerPageChange={setItemsPerPage}
+              onItemsPerPageChange={(size) => {
+                setItemsPerPage(size)
+                setCurrentPage(1)
+              }}
             />
           </div>
         </div>

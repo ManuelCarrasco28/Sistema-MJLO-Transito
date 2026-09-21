@@ -240,6 +240,7 @@ export function Asociaciones() {
           id: Date.now(),
         }
         setAsociaciones([newOrg, ...asociaciones])
+        setCurrentPage(1)
       }
       setIsModalOpen(false)
     } catch (err) {
@@ -411,15 +412,7 @@ export function Asociaciones() {
         </div>
 
 
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4 py-1.5 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
-          <span>
-            Mostrando <strong className="text-slate-800 dark:text-white">{filteredOrgs.length}</strong> de{' '}
-            <strong className="text-slate-800 dark:text-white">{asociaciones.length}</strong> asociaciones registradas
-          </span>
-          <span className="hidden sm:inline text-[11px] text-slate-400">
-            Registro Institucional MDJLO · {new Date().getFullYear()}
-          </span>
-        </div>
+
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
