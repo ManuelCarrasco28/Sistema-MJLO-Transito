@@ -4,6 +4,24 @@
    ========================================================================== */
 
 /* Estilos normales de pantalla (Vista previa) */
+.seccion-impresion-portal {
+  display: none !important;
+}
+
+.preview-doc-screen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.carnet-preview-wrap {
+  padding: 16px;
+  background-color: #f0f2f5;
+  border-radius: 16px;
+}
+
 #seccion-impresion {
   display: flex;
   flex-direction: column;
@@ -350,14 +368,30 @@
    HOJA A4 OFICIAL: FICHA CERTICAV (INSPECCIÓN TÉCNICA)
    =================================================== */
 .ficha-certicav-a4 {
-  width: 190mm;
-  min-height: 265mm;
+  width: 100%;
+  max-width: 190mm;
   background: #ffffff;
   color: #0f172a;
-  padding: 10mm 12mm;
+  padding: 6mm 8mm;
   border: 1px solid #cbd5e1;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  font-family: Arial, sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  font-family: Arial, Helvetica, sans-serif;
+  box-sizing: border-box;
+}
+
+/* ===================================================
+   HOJA A4 OFICIAL: CONSTANCIA SOAT Y RESOLUCIÓN PERMISOS
+   =================================================== */
+.constancia-soat-a4,
+.resolucion-permiso-a4 {
+  width: 100%;
+  max-width: 190mm;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 8mm 10mm;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  font-family: Arial, Helvetica, sans-serif;
   box-sizing: border-box;
 }
 
@@ -369,39 +403,69 @@
   *, *::before, *::after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+    box-sizing: border-box !important;
   }
 
-  /* Ocultar toda la interfaz del software administrativo */
-  body * {
-    visibility: hidden !important;
+  /* 1. Ocultar TODO el árbol de React en #root para erradicar scrolls y páginas fantasmas */
+  body > #root {
+    display: none !important;
   }
 
-  /* Hacer visible únicamente el componente montado para impresión */
-  #seccion-impresion,
+  /* 2. Normalizar html y body a 1 sola página sin margen */
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* 3. Mostrar ÚNICAMENTE el contenedor portaleado directo en document.body */
+  body > #seccion-impresion,
+  body > .seccion-impresion-portal,
+  .seccion-impresion-portal {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .seccion-impresion-portal *,
   #seccion-impresion * {
     visibility: visible !important;
   }
 
-  #seccion-impresion {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+  /* Contenedor centralizado para la hoja */
+  .impresion-documento-hoja {
     width: 100% !important;
-    margin: 0 !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
     padding: 0 !important;
-    background: transparent !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: 10mm !important;
     align-items: center !important;
-    box-shadow: none !important;
   }
 
+  /* Carnets: anverso y reverso apilados limpiamente en la parte superior */
   .carnet-wrapper {
     display: flex !important;
     flex-direction: column !important;
     gap: 12mm !important;
     align-items: center !important;
+    margin: 8mm auto !important;
   }
 
   .carnet-box {
@@ -411,17 +475,26 @@
     border: 0.2pt solid #000 !important; /* Borde fino de corte guiado */
   }
 
-  .ficha-certicav-a4 {
+  /* Hojas A4 Oficiales (CertiCAV, SOAT, Resoluciones) */
+  .ficha-certicav-a4,
+  .constancia-soat-a4,
+  .resolucion-permiso-a4 {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
   }
 
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 5mm;
   }
 }

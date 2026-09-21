@@ -49,15 +49,15 @@ export const navigationGroups = [
   {
     name: 'Documentación',
     items: [
-      { id: 'documentos', label: 'Documentos vehículo', icon: 'folderShield', path: '/documentos' },
-      { id: 'certicav', label: 'Certicav', icon: 'certificate', path: '/inspecciones' },
+      { id: 'documentos', label: 'Documentos del Vehículo', icon: 'folderShield', path: '/documentos' },
+      { id: 'certicav', label: 'CERTICAV (Inspección Técnica)', icon: 'certificate', path: '/inspecciones' },
     ]
   },
   {
     name: 'Trámites',
     items: [
-      { id: 'permisos', label: 'Permisos', icon: 'routePermit', path: '/permisos' },
-      { id: 'cursos', label: 'Cursos de Seguridad Vial', icon: 'course', path: '/cursos' },
+      { id: 'permisos', label: 'Permisos y Autorizaciones', icon: 'routePermit', path: '/permisos' },
+      { id: 'cursos', label: 'Curso de Seguridad Vial', icon: 'course', path: '/cursos' },
     ]
   },
   {

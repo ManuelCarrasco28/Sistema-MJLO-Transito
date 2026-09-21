@@ -544,122 +544,17 @@ export function SuperAdminDashboard({ user }) {
         )}
 
         {activeModule === 'roles' && (
-          <RolesPanel roles={rolesAgrupados} loading={loadingUsers} onEdit={setEditingUser} />
+          <RolesTable roles={rolesAgrupados} loading={loadingUsers} onEdit={setEditingUser} />
         )}
 
         {activeModule === 'configuracion' && (
-          <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
-            <form onSubmit={saveMunicipalidad} className="space-y-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">Datos de municipalidad</h3>
-                  <p className="text-xs font-semibold text-slate-500">Información institucional usada por el sistema.</p>
-                </div>
-                <button type="button" onClick={fetchMunicipalidadConfig} className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-600 shadow-sm">
-                  {loadingMunicipalidad ? 'Cargando...' : 'Recargar'}
-                </button>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <LabeledInput label="RUC" value={municipalidadForm.ruc} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, ruc: value.replace(/\D/g, '').slice(0, 11) })} required />
-                <LabeledInput label="Razón social" value={municipalidadForm.razon_social} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, razon_social: value })} required />
-                <LabeledInput label="Nombre abreviado" value={municipalidadForm.nombre_abreviado} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, nombre_abreviado: value })} />
-                <LabeledInput label="Sigla" value={municipalidadForm.sigla} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, sigla: value.toUpperCase().slice(0, 10) })} />
-                <LabeledInput label="Dirección fiscal" value={municipalidadForm.direccion_fiscal} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, direccion_fiscal: value })} className="md:col-span-2" required />
-                <LabeledInput label="Departamento" value={municipalidadForm.departamento} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, departamento: value })} required />
-                <LabeledInput label="Provincia" value={municipalidadForm.provincia} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, provincia: value })} required />
-                <LabeledInput label="Distrito" value={municipalidadForm.distrito} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, distrito: value })} required />
-                <LabeledInput label="Teléfono" value={municipalidadForm.telefono} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, telefono: value })} required />
-                <LabeledInput label="Email" type="email" value={municipalidadForm.email} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, email: value })} required />
-                <LabeledInput label="Mesa de partes" value={municipalidadForm.mesa_partes} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, mesa_partes: value })} required />
-                <LabeledInput label="Logo / ruta" value={municipalidadForm.logo} onChange={(value) => setMunicipalidadForm({ ...municipalidadForm, logo: value })} />
-                <label className="space-y-1">
-                  <span className="text-[11px] font-black uppercase tracking-wide text-slate-400">Estado</span>
-                  <select value={municipalidadForm.estado || 'ACTIVO'} onChange={(e) => setMunicipalidadForm({ ...municipalidadForm, estado: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700">
-                    <option value="ACTIVO">ACTIVO</option>
-                    <option value="INACTIVO">INACTIVO</option>
-                  </select>
-                </label>
-              </div>
-
-              <button className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700">
-                Guardar municipalidad
-              </button>
-            </form>
-
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-base font-black text-slate-900 dark:text-white">Permiso general móvil</h3>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
-                      Si está activo, todos los inspectores podrán aplicar papeletas desde el móvil. Si está inactivo, el móvil debe ocultar esa opción y trabajar solo con reportes/evidencias.
-                    </p>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input
-                      type="checkbox"
-                      checked={mobilePermitePapeleta}
-                      disabled={savingConfigSistema}
-                      onChange={(event) => {
-                        const next = event.target.checked
-                        setMobilePermitePapeleta(next)
-                        saveConfigSistema(
-                          'mobile_permite_aplicar_papeleta',
-                          next,
-                          next
-                            ? 'Papeletas desde móvil habilitadas para todos los inspectores.'
-                            : 'Papeletas desde móvil deshabilitadas. El móvil deberá registrar reportes/evidencias.'
-                        )
-                      }}
-                      className="peer sr-only"
-                    />
-                    <span className="h-7 w-12 rounded-full bg-slate-300 transition peer-checked:bg-violet-600 peer-disabled:opacity-60"></span>
-                    <span className="absolute left-1 top-1 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
-                  </label>
-                </div>
-                <div className={`mt-3 rounded-xl px-3 py-2 text-xs font-black ${
-                  mobilePermitePapeleta ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                }`}>
-                  {mobilePermitePapeleta
-                    ? 'ACTIVO: el móvil muestra “Aplicar papeleta”.'
-                    : 'INACTIVO: el móvil debe mostrar solo “Registrar reporte/evidencia”.'}
-                </div>
-              </div>
-
-              <form onSubmit={saveAnio} className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
-                <div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">UIT por año</h3>
-                  <p className="text-xs font-semibold text-slate-500">La multa se calcula desde municipalidad_anio.</p>
-                </div>
-                <LabeledInput label="Nombre" value={anioForm.nombre} onChange={(value) => setAnioForm({ ...anioForm, nombre: value })} placeholder="Año Fiscal 2026" />
-                <LabeledInput label="Año" value={anioForm.anio} onChange={(value) => setAnioForm({ ...anioForm, anio: value.replace(/\D/g, '').slice(0, 4) })} required />
-                <LabeledInput label="UIT" type="number" value={anioForm.uit} onChange={(value) => setAnioForm({ ...anioForm, uit: value })} required />
-                <button className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white hover:bg-emerald-700">
-                  Guardar UIT
-                </button>
-              </form>
-
-              <div className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <h3 className="text-sm font-black text-slate-900 dark:text-white">Años configurados</h3>
-                <div className="mt-3 space-y-2">
-                  {municipalidadAnios.length ? municipalidadAnios.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setAnioForm({ nombre: item.nombre || '', anio: String(item.anio), uit: String(item.uit) })}
-                      className="flex w-full items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-blue-50"
-                    >
-                      <span>{item.anio} · {item.nombre}</span>
-                      <span className="text-blue-700">S/ {Number(item.uit || 0).toFixed(2)}</span>
-                    </button>
-                  )) : (
-                    <p className="rounded-xl bg-amber-50 px-3 py-3 text-xs font-bold text-amber-700">Aún no hay UIT configurada.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <ConfiguracionReadOnly
+            municipalidad={municipalidad}
+            municipalidadAnios={municipalidadAnios}
+            mobilePermitePapeleta={mobilePermitePapeleta}
+            loading={loadingMunicipalidad}
+            onReload={fetchMunicipalidadConfig}
+          />
         )}
 
         {activeModule === 'auditoria' && (
@@ -1005,50 +900,609 @@ function UsersTable({ usuarios, totalUsuarios, loading, searchTerm, setSearchTer
   )
 }
 
-function RolesPanel({ roles, loading, onEdit }) {
+function RolesTable({ roles, loading, onEdit }) {
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const filteredRoles = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return roles
+    return roles.filter((grupo) => {
+      const matchRol = (grupo.rol || '').toLowerCase().includes(q)
+      const matchMiembro = (grupo.miembros || []).some((m) =>
+        (m.nombre_usuario || '').toLowerCase().includes(q) ||
+        (m.nombre_completo || '').toLowerCase().includes(q)
+      )
+      return matchRol || matchMiembro
+    })
+  }, [roles, searchTerm])
+
+  const totalAsignaciones = useMemo(() => {
+    return roles.reduce((acc, r) => acc + (r.miembros?.length || 0), 0)
+  }, [roles])
+
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-semibold leading-6 text-blue-900">
-        Aquí se administra la relación entre roles y usuarios. No se repite la gestión de creación de usuarios; para cambiar un rol usa el botón de editar en cada integrante.
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1">
+          <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar rol, cargo o usuario asignado..."
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-400"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
-      {loading ? (
-        <div className="rounded-2xl border border-slate-100 bg-white p-8 text-center text-sm font-bold text-slate-500">Cargando roles...</div>
-      ) : roles.length ? (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {roles.map((grupo) => (
-            <div key={grupo.rol} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-base font-black text-slate-950 dark:text-white">{grupo.rol}</p>
-                  <p className="mt-0.5 text-xs font-semibold text-slate-500">{grupo.miembros.length} usuario{grupo.miembros.length === 1 ? '' : 's'} asignado{grupo.miembros.length === 1 ? '' : 's'}</p>
-                </div>
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-blue-700 shadow-sm">{grupo.miembros.length}</span>
-              </div>
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
+        <span>
+          Mostrando <strong className="text-slate-800 dark:text-white">{filteredRoles.length}</strong> de{' '}
+          <strong className="text-slate-800 dark:text-white">{roles.length}</strong> roles registrados ({totalAsignaciones} usuarios vinculados)
+        </span>
+        <span className="hidden sm:inline text-[11px] text-slate-400">
+          Roles y perfiles de usuario MDJLO · {new Date().getFullYear()}
+        </span>
+      </div>
 
-              <div className="mt-4 divide-y divide-slate-200/70 overflow-hidden rounded-xl border border-slate-200/70 bg-white">
-                {grupo.miembros.map((usuario) => (
-                  <div key={usuario.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-slate-900">{usuario.nombre_usuario}</p>
-                      <p className="truncate text-xs font-semibold text-slate-500">{usuario.nombre_completo}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${usuario.usuario_estado === 'ACTIVO' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                        {usuario.usuario_estado}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+            <tr>
+              <th className="px-3.5 py-3.5 whitespace-nowrap">Rol / Cargo</th>
+              <th className="px-3.5 py-3.5 whitespace-nowrap">Total Asignados</th>
+              <th className="px-3.5 py-3.5 whitespace-nowrap">Usuarios con este Rol</th>
+              <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
+              <th className="sticky right-0 z-20 bg-slate-50/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:border-slate-800 dark:bg-slate-900/95 dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {loading ? (
+              <tr><td colSpan="5" className="px-4 py-8 text-center font-bold text-slate-500">Cargando roles...</td></tr>
+            ) : filteredRoles.length ? filteredRoles.map((grupo) => (
+              <tr key={grupo.rol} className="group transition-colors hover:bg-blue-50/30 dark:hover:bg-slate-800/40">
+                <td className="px-3.5 py-3.5 align-top">
+                  <p className="font-black text-slate-800 dark:text-white">{grupo.rol}</p>
+                  <p className="text-xs font-semibold text-slate-400">Perfil del sistema</p>
+                </td>
+                <td className="px-3.5 py-3.5 align-top">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                    <span className="size-1.5 rounded-full bg-blue-500" />
+                    {grupo.miembros.length} {grupo.miembros.length === 1 ? 'usuario' : 'usuarios'}
+                  </span>
+                </td>
+                <td className="px-3.5 py-3.5 align-top">
+                  <div className="flex flex-wrap gap-1.5 max-w-xl">
+                    {grupo.miembros.length ? grupo.miembros.map((m) => (
+                      <span
+                        key={m.id}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200/80 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                      >
+                        <span className="font-bold text-slate-900 dark:text-white">{m.nombre_usuario}</span>
+                        <span className="text-[11px] text-slate-400">({m.nombre_completo})</span>
                       </span>
-                      <button onClick={() => onEdit(usuario)} className="rounded-lg bg-blue-50 p-2 text-blue-600" title="Editar rol">
-                        <Icon name="shieldCheck" className="size-4" />
-                      </button>
-                    </div>
+                    )) : (
+                      <span className="text-xs italic text-slate-400">Sin usuarios asignados</span>
+                    )}
                   </div>
-                ))}
+                </td>
+                <td className="px-3.5 py-3.5 align-top">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <span className="size-1.5 rounded-full bg-current" />
+                    ACTIVO
+                  </span>
+                </td>
+                <td className="sticky right-0 z-10 bg-white px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] group-hover:bg-blue-50/40 dark:border-slate-800/80 dark:bg-[#0f172a] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] dark:group-hover:bg-slate-800/60 align-top">
+                  <div className="flex justify-end gap-1.5">
+                    {grupo.miembros.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(grupo.miembros[0])}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-blue-500 hover:text-white dark:bg-blue-950/60 dark:text-blue-400"
+                        title="Gestionar rol"
+                      >
+                        <Icon name="shieldCheck" className="size-4" />
+                        <span>Gestionar</span>
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">N/A</span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )) : (
+              <tr><td colSpan="5" className="px-4 py-8 text-center font-bold text-slate-500">No se encontraron roles coincidentes.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function ConfiguracionReadOnly({ municipalidad, municipalidadAnios, mobilePermitePapeleta, loading, onReload }) {
+  const [activeTab, setActiveTab] = useState('todos')
+
+  const uitVigente = useMemo(() => {
+    const currentYear = String(new Date().getFullYear())
+    const match = (municipalidadAnios || []).find((a) => String(a.anio) === currentYear)
+    return match || (municipalidadAnios || [])[0] || null
+  }, [municipalidadAnios])
+
+  const kpis = [
+    {
+      label: 'Entidad Titular',
+      value: municipalidad?.sigla || 'MDJLO',
+      detail: `RUC ${municipalidad?.ruc || '20148364975'}`,
+      icon: 'building',
+      tone: 'text-blue-600 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-300'
+    },
+    {
+      label: 'UIT Periodo 2026',
+      value: uitVigente ? `S/ ${Number(uitVigente.uit).toFixed(2)}` : 'S/ 5,350.00',
+      detail: uitVigente ? uitVigente.nombre || 'Año Fiscal 2026' : 'Multas e Infracciones',
+      icon: 'receiptCheck',
+      tone: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300'
+    },
+    {
+      label: 'Permiso Móvil',
+      value: mobilePermitePapeleta ? 'HABILITADO' : 'SOLO REPORTES',
+      detail: mobilePermitePapeleta ? 'Aplica papeleta directa' : 'Reportes y evidencias',
+      icon: 'settings',
+      tone: mobilePermitePapeleta
+        ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300'
+        : 'text-amber-600 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300'
+    },
+    {
+      label: 'Motor de BD',
+      value: 'MariaDB 10.6',
+      detail: 'Instancia Docker :3306',
+      icon: 'folderShield',
+      tone: 'text-violet-600 bg-violet-50 dark:bg-violet-950/60 dark:text-violet-300'
+    }
+  ]
+
+  return (
+    <div className="space-y-6">
+      {/* Banner de Aviso Solo Lectura */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 p-4 text-blue-900 shadow-xs dark:border-blue-900/50 dark:from-blue-950/40 dark:to-indigo-950/30 dark:text-blue-200">
+        <div className="flex items-center gap-3">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
+            <Icon name="lock" className="size-5" />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-slate-900 dark:text-white">Configuración y Parámetros del Sistema (Modo Solo Lectura)</h4>
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Datos institucionales, técnicos y valores de cálculo tributario protegidos contra edición directa.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onReload}
+          disabled={loading}
+          className="inline-flex items-center justify-center gap-1.5 self-start sm:self-auto rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-xs font-black text-blue-700 shadow-xs transition hover:bg-blue-50 hover:shadow-md active:scale-95 disabled:opacity-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300 cursor-pointer"
+        >
+          <span>{loading ? 'Cargando datos...' : 'Recargar información'}</span>
+        </button>
+      </div>
+
+      {/* KPI Cards de Resumen */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {kpis.map((kpi) => (
+          <div key={kpi.label} className="flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+            <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${kpi.tone}`}>
+              <Icon name={kpi.icon} className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{kpi.label}</p>
+              <p className="text-base font-black text-slate-800 dark:text-white truncate">{kpi.value}</p>
+              <p className="text-xs font-medium text-slate-500 truncate">{kpi.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Selector de Pestañas */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
+        {[
+          { id: 'todos', label: 'Ver Todo', icon: 'document' },
+          { id: 'institucional', label: 'Datos Institucionales', icon: 'building' },
+          { id: 'parametros', label: 'Parámetros Operativos', icon: 'settings' },
+          { id: 'uit', label: 'Valores Oficiales UIT', icon: 'receiptCheck' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-black transition-all cursor-pointer ${
+              activeTab === tab.id
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Icon name={tab.icon} className="size-4" />
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* SECCIÓN 1: DATOS INSTITUCIONALES */}
+      {(activeTab === 'todos' || activeTab === 'institucional') && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                <Icon name="building" className="size-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800 dark:text-white">Datos Institucionales de la Entidad</h3>
+                <p className="text-xs font-semibold text-slate-400">Identificación fiscal y administrativa de la Municipalidad Distrital José Leonardo Ortiz.</p>
               </div>
             </div>
-          ))}
+            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 mt-2 sm:mt-0 self-start sm:self-auto">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+              ENTIDAD VIGENTE
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3.5 w-1/4">Parámetro Institucional</th>
+                  <th className="px-5 py-3.5 w-2/5">Valor Registrado</th>
+                  <th className="px-5 py-3.5">Detalle / Referencia</th>
+                  <th className="px-5 py-3.5 text-right">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">RUC</td>
+                  <td className="px-5 py-3">
+                    <span className="inline-flex items-center font-mono font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/70 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300">
+                      {municipalidad?.ruc || '20148364975'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Registro Único de Contribuyente (SUNAT)</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">OFICIAL</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Razón Social</td>
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-slate-200">{municipalidad?.razon_social || 'MUNICIPALIDAD DISTRITAL DE JOSÉ LEONARDO ORTIZ'}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Denominación legal de la entidad pública</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">ACTIVO</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Nombre Abreviado</td>
+                  <td className="px-5 py-3 font-semibold text-slate-700 dark:text-slate-300">{municipalidad?.nombre_abreviado || 'Municipalidad Distrital José Leonardo Ortiz'}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Nombre de uso común administrativo</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">ESTÁNDAR</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Sigla Oficial</td>
+                  <td className="px-5 py-3 font-black text-indigo-700 dark:text-indigo-400">{municipalidad?.sigla || 'MDJLO'}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Acrónimo institucional de la comuna</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">ESTÁNDAR</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Dirección Fiscal</td>
+                  <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{municipalidad?.direccion_fiscal || 'Av. Sáenz Peña 2151'}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Domicilio legal de la sede principal</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">VÁLIDO</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Jurisdicción Territorial</td>
+                  <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">
+                    {municipalidad?.departamento || 'Lambayeque'} · {municipalidad?.provincia || 'Chiclayo'} · {municipalidad?.distrito || 'José Leonardo Ortiz'}
+                  </td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Departamento / Provincia / Distrito</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">UBIGEO</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Teléfono de Contacto</td>
+                  <td className="px-5 py-3 font-semibold text-slate-700 dark:text-slate-300">{municipalidad?.telefono || '(074) 251911'}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Central telefónica oficial</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">ACTIVO</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Correo Oficial</td>
+                  <td className="px-5 py-3 font-medium text-blue-600 dark:text-blue-400">{municipalidad?.email || 'mesa.partes@munijlo.gob.pe'}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Buzón de notificaciones institucionales</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">ACTIVO</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Mesa de Partes</td>
+                  <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{municipalidad?.mesa_partes || 'Mesa de Partes Virtual / Presencial'}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Canal de recepción de trámites ciudadanos</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">HABILITADO</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Logotipo Institucional</td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <img src={municipalidad?.logo || '/img/logo-mjlo.png'} alt="Logo" className="h-7 w-auto object-contain bg-white rounded p-0.5 shadow-xs border border-slate-200/60" />
+                      <span className="font-mono text-xs text-slate-500">{municipalidad?.logo || '/img/logo-mjlo.png'}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Recurso gráfico para carnets TUC y reportes</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">CARGADO</span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Estado General de la Entidad</td>
+                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">{municipalidad?.estado || 'ACTIVO'}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Vigencia operativa de la entidad municipal</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      <span className="size-1.5 rounded-full bg-emerald-500" />
+                      {municipalidad?.estado || 'ACTIVO'}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      ) : (
-        <div className="rounded-2xl border border-slate-100 bg-white p-8 text-center text-sm font-bold text-slate-500">No hay roles asignados.</div>
+      )}
+
+      {/* SECCIÓN 2: PARÁMETROS OPERATIVOS */}
+      {(activeTab === 'todos' || activeTab === 'parametros') && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+                <Icon name="settings" className="size-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800 dark:text-white">Parámetros Operativos del Sistema</h3>
+                <p className="text-xs font-semibold text-slate-400">Reglas de negocio, directivas móviles y configuración técnica de ejecución.</p>
+              </div>
+            </div>
+            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-black text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 mt-2 sm:mt-0 self-start sm:self-auto">
+              4 DIRECTIVAS ACTIVAS
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3.5 w-1/4">Directiva / Parámetro</th>
+                  <th className="px-5 py-3.5 w-1/4">Clave del Sistema</th>
+                  <th className="px-5 py-3.5 w-1/6">Valor Configurado</th>
+                  <th className="px-5 py-3.5">Regla de Negocio / Alcance</th>
+                  <th className="px-5 py-3.5 text-right">Condición</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-4">
+                    <p className="font-black text-slate-800 dark:text-white">Permiso Papeleta Móvil</p>
+                    <p className="text-xs font-medium text-slate-400">Emisión directa desde smartphone</p>
+                  </td>
+                  <td className="px-5 py-4">
+                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      mobile_permite_aplicar_papeleta
+                    </code>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
+                      mobilePermitePapeleta
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                    }`}>
+                      <span className="size-1.5 rounded-full bg-current" />
+                      {mobilePermitePapeleta ? 'HABILITADO' : 'SOLO REPORTES'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {mobilePermitePapeleta
+                      ? 'Los inspectores pueden imponer papeletas formalmente en calle desde el aplicativo móvil.'
+                      : 'El aplicativo móvil opera en modo recolección preventiva (reportes de intervención con evidencia fotográfica).'}
+                  </td>
+                  <td className="px-5 py-4 text-right">
+                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      PROTEGIDO
+                    </span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-4">
+                    <p className="font-black text-slate-800 dark:text-white">Entorno del Servidor</p>
+                    <p className="text-xs font-medium text-slate-400">Modo de compilación y logs</p>
+                  </td>
+                  <td className="px-5 py-4">
+                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      CI_ENVIRONMENT
+                    </code>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className="inline-flex font-mono font-black text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200/70 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300">
+                      development
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Ambiente activo en Apache / CodeIgniter 4 con registro detallado de eventos y rutas API.
+                  </td>
+                  <td className="px-5 py-4 text-right">
+                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      SISTEMA
+                    </span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-4">
+                    <p className="font-black text-slate-800 dark:text-white">Tiempo Límite de Inactividad</p>
+                    <p className="text-xs font-medium text-slate-400">Caducidad de sesión automática</p>
+                  </td>
+                  <td className="px-5 py-4">
+                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      INACTIVITY_LIMIT_MS
+                    </code>
+                  </td>
+                  <td className="px-5 py-4 font-black text-slate-800 dark:text-slate-200">
+                    15 Minutos
+                  </td>
+                  <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Desconexión por seguridad ante inactividad física del usuario en el navegador web.
+                  </td>
+                  <td className="px-5 py-4 text-right">
+                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      SEGURIDAD
+                    </span>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-4">
+                    <p className="font-black text-slate-800 dark:text-white">Conexión MariaDB Docker</p>
+                    <p className="text-xs font-medium text-slate-400">Base de datos municipal</p>
+                  </td>
+                  <td className="px-5 py-4">
+                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      database.default.DBDriver
+                    </code>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className="inline-flex items-center gap-1.5 font-bold text-xs text-emerald-700 dark:text-emerald-400">
+                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      MariaDB 10.6
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Instancia Docker en contenedor <span className="font-mono font-bold">mjlo_db</span> (puerto 3306 interno / 3307 externo).
+                  </td>
+                  <td className="px-5 py-4 text-right">
+                    <span className="inline-flex rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      ONLINE
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* SECCIÓN 3: VALORES DE LA UIT */}
+      {(activeTab === 'todos' || activeTab === 'uit') && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <Icon name="receiptCheck" className="size-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800 dark:text-white">Valores Oficiales de la Unidad Impositiva Tributaria (UIT)</h3>
+                <p className="text-xs font-semibold text-slate-400">Base oficial para el cálculo de sanciones de tránsito, retenciones y trámites TUPA.</p>
+              </div>
+            </div>
+            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 mt-2 sm:mt-0 self-start sm:self-auto">
+              UIT 2026: S/ 5,350.00
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3.5 w-1/6">Año Fiscal</th>
+                  <th className="px-5 py-3.5 w-1/4">Denominación Oficial</th>
+                  <th className="px-5 py-3.5 w-1/5">Valor UIT Vigente</th>
+                  <th className="px-5 py-3.5">Alcance Tributario y Aplicación</th>
+                  <th className="px-5 py-3.5 text-right">Condición</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {municipalidadAnios.length ? municipalidadAnios.map((item) => (
+                  <tr key={item.id} className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-4">
+                      <span className="font-mono font-black text-sm text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                        {item.anio}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 font-black text-slate-800 dark:text-slate-200">
+                      {item.nombre || `Año Fiscal ${item.anio}`}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="font-mono font-black text-base text-blue-700 dark:text-blue-400">
+                        S/ {Number(item.uit || 0).toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                      Base imponible legal para la tasación porcentual de papeletas de tránsito (Muy Graves, Graves y Leves) y custodia en depósito.
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
+                        String(item.anio) === String(new Date().getFullYear())
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                      }`}>
+                        <span className={`size-1.5 rounded-full ${String(item.anio) === String(new Date().getFullYear()) ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        {String(item.anio) === String(new Date().getFullYear()) ? 'VIGENTE' : 'HISTÓRICO'}
+                      </span>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="5" className="px-5 py-8 text-center text-xs font-bold text-slate-400">
+                      No hay registros de UIT configurados en la base de datos.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="border-t border-slate-100 bg-slate-50/40 p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 flex items-center justify-between">
+            <span className="font-medium">
+              Normativa: DS que fija la Unidad Impositiva Tributaria para el año fiscal en curso.
+            </span>
+            <span className="font-mono font-semibold text-[11px] text-slate-400">
+              Tabla: municipalidad_anio
+            </span>
+          </div>
+        </div>
       )}
     </div>
   )
