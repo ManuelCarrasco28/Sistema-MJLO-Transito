@@ -120,6 +120,17 @@ export function Asociaciones() {
 
   const [repSearch, setRepSearch] = useState('')
   const [showRepResults, setShowRepResults] = useState(false)
+  const repDropdownRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (repDropdownRef.current && !repDropdownRef.current.contains(e.target)) {
+        setShowRepResults(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const emptyForm = {
     tipo: 'ASOCIACION',
@@ -839,7 +850,7 @@ export function Asociaciones() {
                         </button>
                       </div>
                     ) : (
-                      <div className="relative">
+                      <div className="relative" ref={repDropdownRef}>
                         <div className="relative">
                           <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
                           <input
