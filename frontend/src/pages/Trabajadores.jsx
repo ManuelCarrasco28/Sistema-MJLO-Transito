@@ -845,15 +845,15 @@ export function Trabajadores() {
               )}
             </div>
 
-            {/* Footer Modal - Estilo Personas.jsx */}
-            <div className="-mx-4 sm:-mx-4.5 mt-2 flex items-center justify-end gap-3 border-t border-slate-100 px-4 sm:px-4.5 pt-3 pb-1 dark:border-slate-800">
-              <button type="button" disabled={saving} onClick={() => setForm(null)} className="rounded-xl border border-slate-200/80 bg-white px-5 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 shadow-xs cursor-pointer">
-                Cancelar
-              </button>
-              <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-6 py-2 text-xs font-extrabold text-white shadow-md shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white dark:shadow-slate-50/20">
-                {saving ? 'Guardando...' : 'Guardar trabajador'}
-              </button>
-            </div>
+              {/* Footer Modal */}
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3 dark:border-slate-800 dark:bg-slate-900/80 rounded-b-3xl">
+                <button type="button" disabled={saving} onClick={() => setForm(null)} className="rounded-xl border border-slate-200/80 bg-white px-5 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 shadow-xs cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-6 py-2 text-xs font-extrabold text-white shadow-md shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white dark:shadow-slate-50/20">
+                  {saving ? 'Guardando...' : 'Guardar trabajador'}
+                </button>
+              </div>
           </form>
           </div>
         </div>
