@@ -3,7 +3,7 @@ import { Editor } from '@tinymce/tinymce-react'
 import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
 import { BuscadorAdministrados } from '../components/permisos/BuscadorAdministrados'
-import { generarPlantillaCuerpo } from '../components/permisos/TramiteFormularioModal'
+import { generarPlantillaCuerpo } from '../utils/permisosPlantilla'
 
 const TINYMCE_API_KEY =
   import.meta.env.VITE_TINYMCE_API_KEY ||
