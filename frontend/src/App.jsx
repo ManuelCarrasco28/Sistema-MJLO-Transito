@@ -20,6 +20,7 @@ const CursosSeguridad = lazy(() => import('./pages/CursosSeguridad').then((modul
 const Pagos = lazy(() => import('./pages/Pagos').then((module) => ({ default: module.Pagos })))
 const Retenciones = lazy(() => import('./pages/Retenciones').then((module) => ({ default: module.Retenciones })))
 const Permisos = lazy(() => import('./pages/Permisos').then((module) => ({ default: module.Permisos })))
+const PermisoFormularioVentana = lazy(() => import('./pages/PermisoFormularioVentana').then((module) => ({ default: module.PermisoFormularioVentana })))
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard').then((module) => ({ default: module.SuperAdminDashboard })))
 const Operativos = lazy(() => import('./pages/Operativos').then((module) => ({ default: module.Operativos })))
 
@@ -310,6 +311,22 @@ function App() {
           <Route
             path="/login"
             element={user ? <Navigate to={isSuperAdminUser(user) ? "/superadmin" : "/dashboard"} replace /> : <LoginRoute onLogin={handleLogin} />}
+          />
+          <Route
+            path="/permisos-formulario"
+            element={user ? (
+              <Suspense fallback={<ModuleFallback />}>
+                <PermisoFormularioVentana />
+              </Suspense>
+            ) : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/permisos/formulario"
+            element={user ? (
+              <Suspense fallback={<ModuleFallback />}>
+                <PermisoFormularioVentana />
+              </Suspense>
+            ) : <Navigate to="/login" replace />}
           />
           <Route
             path="/*"

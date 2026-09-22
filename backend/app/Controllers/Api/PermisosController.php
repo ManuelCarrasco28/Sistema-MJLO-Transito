@@ -15,13 +15,15 @@ class PermisosController extends ResourceController
             ->select("
                 pc.id,
                 pc.id_tramite as tramiteId,
-                pc.id_persona as personaId,
-                pc.id_asociacion as asociacionId,
-                pc.id_vehiculo as vehiculoId,
                 pc.numero_autorizacion as numeroAutorizacion,
+                pc.vehiculo_placa as vehiculoPlaca,
+                pc.solicitante_nombre as solicitanteNombre,
+                pc.solicitante_documento as solicitanteDocumento,
+                pc.representante_legal as representanteLegal,
                 pc.tipo_permiso as tipoPermiso,
                 pc.asunto,
                 pc.referencia_sisgedo as referenciaSisgedo,
+                pc.expediente,
                 pc.registro_numero as registroNumero,
                 pc.contenido,
                 pc.zona_circulacion as zonaCirculacion,
@@ -29,6 +31,9 @@ class PermisosController extends ResourceController
                 pc.recorrido_ingreso as recorridoIngreso,
                 pc.recorrido_salida as recorridoSalida,
                 pc.flota_placas as flotaPlacas,
+                pc.recibo_ingreso_numero as reciboIngresoNumero,
+                pc.recibo_ingreso_monto as reciboIngresoMonto,
+                pc.recibo_ingreso_fecha as reciboIngresoFecha,
                 pc.tonelaje,
                 pc.numero_seguridad as numeroSeguridad,
                 pc.observaciones,
@@ -37,33 +42,23 @@ class PermisosController extends ResourceController
                 pc.fecha_emision as fechaEmision,
                 pc.fecha_inicio_vigencia as fechaInicioVigencia,
                 pc.fecha_fin_vigencia as fechaFinVigencia,
-                pc.representante_legal as representanteLegal,
                 pc.estado,
                 
                 -- Datos relacionados derivados de tramites, vehiculos, personas, asociaciones y pagos
-                COALESCE(td.numero_expediente, '') as expediente,
-                COALESCE(td.numero_expediente, '') as expedienteNumero,
+                COALESCE(NULLIF(pc.expediente, ''), td.numero_expediente, '') as expedienteNumero,
                 td.fecha_solicitud as fechaSolicitud,
                 pa.nombre as procedimientoNombre,
                 pa.codigo as procedimientoCodigo,
-                COALESCE(v.placa, '') as vehiculoPlaca,
-                COALESCE(o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as solicitanteNombre,
-                COALESCE(o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as solicitante,
-                COALESCE(o.ruc, p.numero, '') as solicitanteDocumento,
-                COALESCE(o.ruc, p.numero, '') as solicitanteDoc,
+                COALESCE(NULLIF(pc.solicitante_nombre, ''), o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as solicitante,
+                COALESCE(NULLIF(pc.solicitante_documento, ''), o.ruc, p.numero, '') as solicitanteDoc,
                 o.ruc as solicitanteRuc,
-                p.numero as solicitanteDni,
-                COALESCE(pt.numero_recibo, '') as reciboIngresoNumero,
-                pt.total as reciboIngresoMonto,
-                pt.fecha_pago as reciboIngresoFecha
+                p.numero as solicitanteDni
             ", false)
             ->join('tramites_documentarios td', 'td.id = pc.id_tramite', 'left')
             ->join('procedimientos_administrativos pa', 'pa.id = td.id_procedimiento_admin', 'left')
-            ->join('asociaciones o', 'o.id = COALESCE(pc.id_asociacion, td.id_asociacion)', 'left')
-            ->join('personas p', 'p.id = COALESCE(pc.id_persona, td.id_persona)', 'left')
-            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-            ->join('vehiculos v', 'v.id = COALESCE(pc.id_vehiculo, td.id_vehiculo)', 'left')
-            ->join('pagos_transito pt', 'pt.id_tramite = td.id', 'left');
+            ->join('asociaciones o', 'o.id = td.id_asociacion', 'left')
+            ->join('personas p', 'p.id = td.id_persona', 'left')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left');
     }
 
     public function index()
@@ -77,9 +72,6 @@ class PermisosController extends ResourceController
             $data = array_map(static function (array $r): array {
                 $r['id'] = (int)$r['id'];
                 $r['tramiteId'] = $r['tramiteId'] ? (int)$r['tramiteId'] : null;
-                $r['personaId'] = $r['personaId'] ? (int)$r['personaId'] : null;
-                $r['asociacionId'] = $r['asociacionId'] ? (int)$r['asociacionId'] : null;
-                $r['vehiculoId'] = $r['vehiculoId'] ? (int)$r['vehiculoId'] : null;
                 $r['reciboIngresoMonto'] = $r['reciboIngresoMonto'] ? (float)$r['reciboIngresoMonto'] : null;
                 return $r;
             }, $rows);
@@ -104,9 +96,6 @@ class PermisosController extends ResourceController
 
             $row['id'] = (int)$row['id'];
             $row['tramiteId'] = $row['tramiteId'] ? (int)$row['tramiteId'] : null;
-            $row['personaId'] = $row['personaId'] ? (int)$row['personaId'] : null;
-            $row['asociacionId'] = $row['asociacionId'] ? (int)$row['asociacionId'] : null;
-            $row['vehiculoId'] = $row['vehiculoId'] ? (int)$row['vehiculoId'] : null;
             $row['reciboIngresoMonto'] = $row['reciboIngresoMonto'] ? (float)$row['reciboIngresoMonto'] : null;
 
             return $this->respond(['data' => $row]);
@@ -122,70 +111,92 @@ class PermisosController extends ResourceController
 
         try {
             $tipoPermiso = !empty($payload['tipoPermiso']) ? trim($payload['tipoPermiso']) : 'CARGA_DESCARGA';
-            $numeroAutorizacion = !empty($payload['numeroAutorizacion'])
-                ? trim($payload['numeroAutorizacion'])
-                : 'AUT-' . date('Y') . '-' . str_pad((string)mt_rand(1, 9999), 4, '0', STR_PAD_LEFT);
+            $year = date('Y');
+
+            // Generar correlativo si no viene especificado
+            $numeroAutorizacion = !empty($payload['numeroAutorizacion']) ? trim($payload['numeroAutorizacion']) : '';
+            if (empty($numeroAutorizacion)) {
+                $count = $db->table('permisos_circulacion')->where('tipo_permiso', $tipoPermiso)->countAllResults() + 1;
+                $prefix = $tipoPermiso === 'CARGA_DESCARGA' ? "AUT. CARGA N° " : ($tipoPermiso === 'USO_VIAS' ? "AUT. VIAS N° " : "RES-SUBTRANS-{$year}-");
+                $numeroAutorizacion = $prefix . str_pad((string)$count, 3, '0', STR_PAD_LEFT) . "-{$year}-SGTTV";
+            }
 
             $idTramite = !empty($payload['tramiteId']) ? (int)$payload['tramiteId'] : (!empty($payload['id_tramite']) ? (int)$payload['id_tramite'] : null);
-            $idPersona = !empty($payload['personaId']) ? (int)$payload['personaId'] : (!empty($payload['id_persona']) ? (int)$payload['id_persona'] : null);
-            $idAsoc    = !empty($payload['asociacionId']) ? (int)$payload['asociacionId'] : (!empty($payload['id_asociacion']) ? (int)$payload['id_asociacion'] : null);
-            $idVehiculo = !empty($payload['vehiculoId']) ? (int)$payload['vehiculoId'] : (!empty($payload['id_vehiculo']) ? (int)$payload['id_vehiculo'] : null);
             $refSisgedo = !empty($payload['referenciaSisgedo']) ? trim($payload['referenciaSisgedo']) : (!empty($payload['expediente']) ? trim($payload['expediente']) : null);
+            $expediente = !empty($payload['expediente']) ? trim($payload['expediente']) : (!empty($payload['expedienteNumero']) ? trim($payload['expedienteNumero']) : null);
+            $vehiculoPlaca = !empty($payload['vehiculoPlaca']) ? strtoupper(trim($payload['vehiculoPlaca'])) : null;
+            $solicitanteNombre = !empty($payload['solicitanteNombre']) ? strtoupper(trim($payload['solicitanteNombre'])) : (!empty($payload['solicitante']) ? strtoupper(trim($payload['solicitante'])) : null);
+            $solicitanteDocumento = !empty($payload['solicitanteDocumento']) ? trim($payload['solicitanteDocumento']) : (!empty($payload['solicitanteDoc']) ? trim($payload['solicitanteDoc']) : null);
+            $reciboIngresoNumero = !empty($payload['reciboIngresoNumero']) ? trim($payload['reciboIngresoNumero']) : null;
+            $reciboIngresoMonto = isset($payload['reciboIngresoMonto']) && $payload['reciboIngresoMonto'] !== '' ? (float)$payload['reciboIngresoMonto'] : null;
+            $reciboIngresoFecha = !empty($payload['reciboIngresoFecha']) ? trim($payload['reciboIngresoFecha']) : date('Y-m-d');
 
-            // Auto-heredar claves foráneas del trámite si se vinculó un expediente
+            // Auto-heredar datos del trámite si se vinculó un trámite documentario y faltaban datos
             if ($idTramite) {
-                $tramite = $db->table('tramites_documentarios')->where('id', $idTramite)->get()->getRowArray();
+                $tramite = $db->table('tramites_documentarios td')
+                    ->select("
+                        td.numero_expediente,
+                        v.placa as vehiculo_placa,
+                        COALESCE(o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')))) as solicitante_nombre,
+                        COALESCE(o.ruc, p.numero) as solicitante_documento,
+                        pt.numero_recibo,
+                        pt.total as recibo_total,
+                        pt.fecha_pago
+                    ")
+                    ->join('asociaciones o', 'o.id = td.id_asociacion', 'left')
+                    ->join('personas p', 'p.id = td.id_persona', 'left')
+                    ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                    ->join('vehiculos v', 'v.id = td.id_vehiculo', 'left')
+                    ->join('pagos_transito pt', 'pt.id_tramite = td.id', 'left')
+                    ->where('td.id', $idTramite)
+                    ->get()
+                    ->getRowArray();
+
                 if ($tramite) {
-                    if (!$idPersona && !empty($tramite['id_persona'])) {
-                        $idPersona = (int)$tramite['id_persona'];
-                    }
-                    if (!$idAsoc && !empty($tramite['id_asociacion'])) {
-                        $idAsoc = (int)$tramite['id_asociacion'];
-                    }
-                    if (!$idVehiculo && !empty($tramite['id_vehiculo'])) {
-                        $idVehiculo = (int)$tramite['id_vehiculo'];
+                    if (!$expediente && !empty($tramite['numero_expediente'])) {
+                        $expediente = $tramite['numero_expediente'];
                     }
                     if (!$refSisgedo && !empty($tramite['numero_expediente'])) {
                         $refSisgedo = $tramite['numero_expediente'];
                     }
-                }
-            }
-
-            // Auto-detectar vehículo por placa si no se especificó idVehiculo
-            if (!$idVehiculo && !empty($payload['vehiculoPlaca'])) {
-                $veh = $db->table('vehiculos')->where('placa', strtoupper(trim((string)$payload['vehiculoPlaca'])))->get()->getRowArray();
-                if ($veh) {
-                    $idVehiculo = (int)$veh['id'];
-                }
-            }
-
-            // Auto-detectar persona o asociación por documento si faltan
-            if (!$idPersona && !$idAsoc && !empty($payload['solicitanteDocumento'])) {
-                $doc = trim((string)$payload['solicitanteDocumento']);
-                $persona = $db->table('personas')->where('numero', $doc)->get()->getRowArray();
-                if ($persona) {
-                    $idPersona = (int)$persona['id'];
-                } else {
-                    $asoc = $db->table('asociaciones')->where('ruc', $doc)->get()->getRowArray();
-                    if ($asoc) {
-                        $idAsoc = (int)$asoc['id'];
+                    if (!$vehiculoPlaca && !empty($tramite['vehiculo_placa'])) {
+                        $vehiculoPlaca = strtoupper($tramite['vehiculo_placa']);
+                    }
+                    if (!$solicitanteNombre && !empty($tramite['solicitante_nombre'])) {
+                        $solicitanteNombre = strtoupper($tramite['solicitante_nombre']);
+                    }
+                    if (!$solicitanteDocumento && !empty($tramite['solicitante_documento'])) {
+                        $solicitanteDocumento = $tramite['solicitante_documento'];
+                    }
+                    if (!$reciboIngresoNumero && !empty($tramite['numero_recibo'])) {
+                        $reciboIngresoNumero = $tramite['numero_recibo'];
+                    }
+                    if ($reciboIngresoMonto === null && !empty($tramite['recibo_total'])) {
+                        $reciboIngresoMonto = (float)$tramite['recibo_total'];
+                    }
+                    if (!empty($tramite['fecha_pago'])) {
+                        $reciboIngresoFecha = $tramite['fecha_pago'];
                     }
                 }
             }
 
             $data = [
                 'id_tramite'             => $idTramite,
-                'id_persona'             => $idPersona,
-                'id_asociacion'          => $idAsoc,
-                'id_vehiculo'            => $idVehiculo,
                 'numero_autorizacion'    => $numeroAutorizacion,
+                'vehiculo_placa'         => $vehiculoPlaca,
+                'solicitante_nombre'     => $solicitanteNombre,
+                'solicitante_documento'  => $solicitanteDocumento,
                 'representante_legal'    => !empty($payload['representanteLegal']) ? strtoupper(trim($payload['representanteLegal'])) : null,
                 'tipo_permiso'           => $tipoPermiso,
                 'asunto'                 => !empty($payload['asunto']) ? trim($payload['asunto']) : ($tipoPermiso === 'CARGA_DESCARGA' ? 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA' : 'AUTORIZACION PROVISIONAL DE USO DE VIAS'),
                 'referencia_sisgedo'     => $refSisgedo,
+                'expediente'             => $expediente,
                 'registro_numero'        => !empty($payload['registroNumero']) ? trim($payload['registroNumero']) : null,
                 'contenido'              => !empty($payload['contenido']) ? trim($payload['contenido']) : 'Autorización oficial emitida por la Subgerencia de Tránsito y Transporte.',
                 'zona_circulacion'       => !empty($payload['zonaCirculacion']) ? trim($payload['zonaCirculacion']) : 'Anillo Vial - Distrito de José Leonardo Ortiz',
+                'recibo_ingreso_numero'  => $reciboIngresoNumero,
+                'recibo_ingreso_monto'   => $reciboIngresoMonto,
+                'recibo_ingreso_fecha'   => $reciboIngresoFecha,
                 'ubicacion'              => !empty($payload['ubicacion']) ? trim($payload['ubicacion']) : null,
                 'recorrido_ingreso'      => !empty($payload['recorridoIngreso']) ? trim($payload['recorridoIngreso']) : null,
                 'recorrido_salida'       => !empty($payload['recorridoSalida']) ? trim($payload['recorridoSalida']) : null,
@@ -226,20 +237,23 @@ class PermisosController extends ResourceController
                 return $this->failNotFound('Permiso no encontrado.');
             }
 
-            $data = [];
             $allowedFields = [
                 'id_tramite'            => 'tramiteId',
-                'id_persona'            => 'personaId',
-                'id_asociacion'         => 'asociacionId',
-                'id_vehiculo'           => 'vehiculoId',
                 'numero_autorizacion'   => 'numeroAutorizacion',
+                'vehiculo_placa'        => 'vehiculoPlaca',
+                'solicitante_nombre'    => 'solicitanteNombre',
+                'solicitante_documento' => 'solicitanteDocumento',
                 'representante_legal'   => 'representanteLegal',
                 'tipo_permiso'          => 'tipoPermiso',
                 'asunto'                => 'asunto',
                 'referencia_sisgedo'    => 'referenciaSisgedo',
+                'expediente'            => 'expediente',
                 'registro_numero'       => 'registroNumero',
                 'contenido'             => 'contenido',
                 'zona_circulacion'      => 'zonaCirculacion',
+                'recibo_ingreso_numero' => 'reciboIngresoNumero',
+                'recibo_ingreso_monto'  => 'reciboIngresoMonto',
+                'recibo_ingreso_fecha'  => 'reciboIngresoFecha',
                 'ubicacion'             => 'ubicacion',
                 'recorrido_ingreso'     => 'recorridoIngreso',
                 'recorrido_salida'      => 'recorridoSalida',
@@ -255,50 +269,20 @@ class PermisosController extends ResourceController
                 'estado'                => 'estado',
             ];
 
+            $data = [];
             foreach ($allowedFields as $col => $jsonKey) {
                 if (array_key_exists($jsonKey, $payload)) {
                     $val = $payload[$jsonKey];
-                    if ($col === 'representante_legal') {
+                    if ($col === 'representante_legal' || $col === 'solicitante_nombre' || $col === 'vehiculo_placa' || $col === 'estado') {
                         $val = !empty($val) ? strtoupper(trim((string)$val)) : null;
-                    } elseif (in_array($col, ['id_tramite', 'id_persona', 'id_asociacion', 'id_vehiculo'], true)) {
+                    } elseif ($col === 'id_tramite') {
                         $val = !empty($val) ? (int)$val : null;
+                    } elseif ($col === 'recibo_ingreso_monto') {
+                        $val = (isset($val) && $val !== '') ? (float)$val : null;
+                    } else {
+                        $val = !empty($val) ? trim((string)$val) : null;
                     }
                     $data[$col] = $val;
-                }
-            }
-
-            if (!empty($data['id_tramite'])) {
-                $tramite = $db->table('tramites_documentarios')->where('id', $data['id_tramite'])->get()->getRowArray();
-                if ($tramite) {
-                    if (empty($data['id_persona']) && !empty($tramite['id_persona'])) {
-                        $data['id_persona'] = (int)$tramite['id_persona'];
-                    }
-                    if (empty($data['id_asociacion']) && !empty($tramite['id_asociacion'])) {
-                        $data['id_asociacion'] = (int)$tramite['id_asociacion'];
-                    }
-                    if (empty($data['id_vehiculo']) && !empty($tramite['id_vehiculo'])) {
-                        $data['id_vehiculo'] = (int)$tramite['id_vehiculo'];
-                    }
-                }
-            }
-
-            if (empty($data['id_vehiculo']) && !empty($payload['vehiculoPlaca'])) {
-                $veh = $db->table('vehiculos')->where('placa', strtoupper(trim((string)$payload['vehiculoPlaca'])))->get()->getRowArray();
-                if ($veh) {
-                    $data['id_vehiculo'] = (int)$veh['id'];
-                }
-            }
-
-            if (empty($data['id_persona']) && empty($data['id_asociacion']) && !empty($payload['solicitanteDocumento'])) {
-                $doc = trim((string)$payload['solicitanteDocumento']);
-                $persona = $db->table('personas')->where('numero', $doc)->get()->getRowArray();
-                if ($persona) {
-                    $data['id_persona'] = (int)$persona['id'];
-                } else {
-                    $asoc = $db->table('asociaciones')->where('ruc', $doc)->get()->getRowArray();
-                    if ($asoc) {
-                        $data['id_asociacion'] = (int)$asoc['id'];
-                    }
                 }
             }
 
@@ -358,7 +342,7 @@ class PermisosController extends ResourceController
                     o.ruc as asociacionRuc,
                     TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as personaNombre,
                     p.numero as personaDocumento,
-                    COALESCE(TRIM(CONCAT(c_rep.nombres, ' ', c_rep.apellido_paterno, ' ', COALESCE(c_rep.apellido_materno, ''))), '') as representanteLegalNombre,
+                    COALESCE(TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as representanteLegalNombre,
                     COALESCE(v.placa, '') as vehiculoPlaca,
                     COALESCE(pt.numero_recibo, '') as reciboIngresoNumero,
                     pt.total as reciboIngresoMonto,
@@ -366,8 +350,6 @@ class PermisosController extends ResourceController
                 ", false)
                 ->join('procedimientos_administrativos pa', 'pa.id = td.id_procedimiento_admin', 'left')
                 ->join('asociaciones o', 'o.id = td.id_asociacion', 'left')
-                ->join('personas p_rep', 'p_rep.id = o.id_representante_legal', 'left')
-                ->join('ciudadanos c_rep', 'c_rep.id_persona = p_rep.id', 'left')
                 ->join('personas p', 'p.id = td.id_persona', 'left')
                 ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
                 ->join('vehiculos v', 'v.id = td.id_vehiculo', 'left')
@@ -379,6 +361,162 @@ class PermisosController extends ResourceController
             return $this->respond(['data' => $rows]);
         } catch (\Throwable $e) {
             return $this->failServerError('Error consultando trámites: ' . $e->getMessage());
+        }
+    }
+
+    public function buscarAdministrados()
+    {
+        $db = \Config\Database::connect();
+        $q = trim((string)($this->request->getGet('q') ?? ''));
+
+        try {
+            $results = [];
+
+            // 1. Buscar en Asociaciones / Empresas
+            $builderAsoc = $db->table('asociaciones o')
+                ->select("
+                    o.id as asociacionId,
+                    'EMPRESA' as origenTipo,
+                    o.razon_social as nombre,
+                    COALESCE(o.ruc, '') as documento,
+                    'RUC' as tipoDocumento,
+                    COALESCE(o.direccion, '') as direccion,
+                    COALESCE(o.telefono_contacto, '') as telefono
+                ");
+
+            if ($q !== '') {
+                $builderAsoc->groupStart()
+                    ->like('o.razon_social', $q)
+                    ->orLike('o.ruc', $q)
+                    ->groupEnd();
+            }
+            $asocs = $builderAsoc->limit(10)->get()->getResultArray();
+            foreach ($asocs as $a) {
+                $results[] = [
+                    'tipo'               => 'EMPRESA',
+                    'nombre'             => $a['nombre'],
+                    'documento'          => $a['documento'],
+                    'tipoDocumento'      => 'RUC',
+                    'representanteLegal' => '',
+                    'direccion'          => $a['direccion'],
+                    'telefono'           => $a['telefono'],
+                    'placa'              => '',
+                    'expediente'         => '',
+                    'reciboNumero'       => '',
+                    'reciboMonto'        => null,
+                    'reciboFecha'        => '',
+                    'tramiteId'          => null,
+                ];
+            }
+
+            // 2. Buscar en Personas / Ciudadanos
+            $builderPers = $db->table('personas p')
+                ->select("
+                    p.id as personaId,
+                    'PERSONA' as origenTipo,
+                    TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre,
+                    COALESCE(p.numero, '') as documento,
+                    COALESCE(td.codigo, 'DNI') as tipoDocumento,
+                    COALESCE(p.direccion, '') as direccion,
+                    COALESCE(p.telefono, p.celular, '') as telefono
+                ")
+                ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left');
+
+            if ($q !== '') {
+                $builderPers->groupStart()
+                    ->like('p.numero', $q)
+                    ->orLike('c.nombres', $q)
+                    ->orLike('c.apellido_paterno', $q)
+                    ->orLike('c.apellido_materno', $q)
+                    ->groupEnd();
+            }
+            $pers = $builderPers->limit(10)->get()->getResultArray();
+            foreach ($pers as $p) {
+                if (empty($p['nombre']) && empty($p['documento'])) continue;
+                $results[] = [
+                    'tipo'               => 'PERSONA',
+                    'nombre'             => $p['nombre'],
+                    'documento'          => $p['documento'],
+                    'tipoDocumento'      => $p['tipoDocumento'],
+                    'representanteLegal' => '',
+                    'direccion'          => $p['direccion'],
+                    'telefono'           => $p['telefono'],
+                    'placa'              => '',
+                    'expediente'         => '',
+                    'reciboNumero'       => '',
+                    'reciboMonto'        => null,
+                    'reciboFecha'        => '',
+                    'tramiteId'          => null,
+                ];
+            }
+
+            // 3. Buscar en Trámites Documentarios (para auto-rellenar expediente, placa, recibo y solicitante)
+            $builderTram = $db->table('tramites_documentarios td')
+                ->select("
+                    td.id as tramiteId,
+                    td.numero_expediente as expediente,
+                    COALESCE(v.placa, '') as placa,
+                    COALESCE(o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as nombre,
+                    COALESCE(o.ruc, p.numero, '') as documento,
+                    CASE WHEN o.id IS NOT NULL THEN 'RUC' ELSE 'DNI' END as tipoDocumento,
+                    CASE WHEN o.id IS NOT NULL AND td.id_persona IS NOT NULL THEN TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) ELSE '' END as representanteLegal,
+                    COALESCE(pt.numero_recibo, '') as reciboNumero,
+                    pt.total as reciboMonto,
+                    pt.fecha_pago as reciboFecha
+                ")
+                ->join('asociaciones o', 'o.id = td.id_asociacion', 'left')
+                ->join('personas p', 'p.id = td.id_persona', 'left')
+                ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                ->join('vehiculos v', 'v.id = td.id_vehiculo', 'left')
+                ->join('pagos_transito pt', 'pt.id_tramite = td.id', 'left');
+
+            if ($q !== '') {
+                $builderTram->groupStart()
+                    ->like('td.numero_expediente', $q)
+                    ->orLike('v.placa', $q)
+                    ->orLike('o.razon_social', $q)
+                    ->orLike('o.ruc', $q)
+                    ->orLike('p.numero', $q)
+                    ->orLike('c.nombres', $q)
+                    ->orLike('c.apellido_paterno', $q)
+                    ->orLike('pt.numero_recibo', $q)
+                    ->groupEnd();
+            }
+            $trams = $builderTram->limit(10)->get()->getResultArray();
+            foreach ($trams as $t) {
+                if (empty($t['nombre']) && empty($t['documento']) && empty($t['expediente'])) continue;
+                $results[] = [
+                    'tipo'               => 'TRAMITE',
+                    'nombre'             => $t['nombre'],
+                    'documento'          => $t['documento'],
+                    'tipoDocumento'      => $t['tipoDocumento'],
+                    'representanteLegal' => $t['representanteLegal'] ?? '',
+                    'direccion'          => '',
+                    'telefono'           => '',
+                    'placa'              => $t['placa'],
+                    'expediente'         => $t['expediente'],
+                    'reciboNumero'       => $t['reciboNumero'],
+                    'reciboMonto'        => $t['reciboMonto'] ? (float)$t['reciboMonto'] : null,
+                    'reciboFecha'        => $t['reciboFecha'],
+                    'tramiteId'          => (int)$t['tramiteId'],
+                ];
+            }
+
+            // Deduplicar resultados por documento + nombre + expediente
+            $unique = [];
+            $seen = [];
+            foreach ($results as $item) {
+                $key = ($item['documento'] ?: '') . '|' . ($item['nombre'] ?: '') . '|' . ($item['expediente'] ?: '');
+                if (!isset($seen[$key])) {
+                    $seen[$key] = true;
+                    $unique[] = $item;
+                }
+            }
+
+            return $this->respond(['data' => array_slice($unique, 0, 15)]);
+        } catch (\Throwable $e) {
+            return $this->failServerError('Error buscando administrados: ' . $e->getMessage());
         }
     }
 
