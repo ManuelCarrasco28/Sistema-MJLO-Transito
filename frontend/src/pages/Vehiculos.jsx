@@ -709,8 +709,8 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="px-3.5 py-2.5 max-w-[200px]">
-                      <p className="line-clamp-2 font-extrabold leading-tight text-slate-800 dark:text-white" title={`${v.marca} ${v.modelo}`}>
+                    <td className="px-3.5 py-2.5">
+                      <p className="font-extrabold leading-tight text-slate-800 dark:text-white" title={`${v.marca} ${v.modelo}`}>
                         {v.marca} {v.modelo}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-400">
@@ -724,10 +724,10 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="px-3.5 py-2.5 max-w-[160px]">
+                    <td className="px-3.5 py-2.5">
                       {isVehiculoFormal(v) ? (
                         <>
-                          <p className="line-clamp-2 text-xs font-bold leading-tight text-slate-700 dark:text-slate-200" title={v.asociacion}>
+                          <p className="text-xs font-bold leading-tight text-slate-700 dark:text-slate-200" title={v.asociacion}>
                             {v.asociacion}
                           </p>
                           <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">MDJLO-AUTORIZADO</span>
@@ -743,8 +743,8 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="px-3.5 py-2.5 max-w-[160px]">
-                      <p className="line-clamp-2 font-bold leading-tight text-slate-800 dark:text-slate-100 text-xs" title={v.propietario}>{v.propietario}</p>
+                    <td className="px-3.5 py-2.5">
+                      <p className="font-bold leading-tight text-slate-800 dark:text-slate-100 text-xs" title={v.propietario}>{v.propietario}</p>
                       <p className="text-xs font-mono text-slate-400">
                         DNI/RUC: {v.propietarioDni || v.propietarioRuc || 'N/A'}
                       </p>
