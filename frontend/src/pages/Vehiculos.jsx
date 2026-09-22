@@ -989,7 +989,7 @@ export function Vehiculos() {
                   <span className="size-2 rounded-full bg-emerald-500" />
                   Titular & Asociación Autorizada
                 </h4>
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-2 items-start">
                   <div className="relative">
                     <FloatingInput
                       id="veh_propietario"
