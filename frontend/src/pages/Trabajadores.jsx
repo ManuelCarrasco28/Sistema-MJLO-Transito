@@ -3,6 +3,7 @@ import { apiFetch } from '../config/api'
 import { Pagination } from '../components/ui/Pagination'
 import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { exportToExcel } from '../utils/exportToExcel'
 
 const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 
@@ -284,6 +285,33 @@ export function Trabajadores() {
   })
   
   const visible = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Personal',
+      title: 'PADRÓN INSTITUCIONAL DE TRABAJADORES Y FISCALIZADORES',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Gestión de Personal',
+      metadata: [
+        { label: 'Estado', value: filterEstado }
+      ],
+      columns: [
+        { header: 'TIPO DOC', key: 'tipo_documento', width: 90, align: 'center' },
+        { header: 'N° DOCUMENTO', key: 'numero_documento', isText: true, width: 120, align: 'center' },
+        { header: 'NOMBRES', key: 'nombres', width: 140 },
+        { header: 'APELLIDOS', key: 'apellidos', width: 160 },
+        { header: 'CARGO', key: 'cargo', width: 180 },
+        { header: 'UNIDAD ORGÁNICA', key: 'unidad_organica', width: 220 },
+        { header: 'FUNCIÓN', key: 'tipo_funcion', width: 100, align: 'center' },
+        { header: 'DOC. DESIGNACIÓN', key: 'documento', width: 150 },
+        { header: 'FECHA ALTA', key: 'fecha_documento', width: 110, align: 'center' },
+        { header: 'VENCIMIENTO', render: (_, r) => r.fecha_termino || 'INDETERMINADO', width: 120, align: 'center' },
+        { header: 'TIENE ACCESO', render: (_, r) => r.tiene_usuario ? 'SÍ' : 'NO', width: 110, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 100, align: 'center' }
+      ],
+      data: filtered
+    })
+  }
   
   const openForm = (record) => {
     setForm({ ...emptyForm, ...record, id_persona: record?.id_persona || record?.id || '' })
@@ -445,6 +473,16 @@ export function Trabajadores() {
                 <Icon name="filterX" className="size-4" />
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar padrón de trabajadores en formato Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
+            </button>
 
             <button
               type="button"

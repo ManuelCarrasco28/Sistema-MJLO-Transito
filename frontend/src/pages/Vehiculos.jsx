@@ -5,6 +5,7 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { exportToExcel } from '../utils/exportToExcel'
 
 function FloatingInput({ id, label, type = "text", ...props }) {
   return (
@@ -263,6 +264,34 @@ export function Vehiculos() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Vehículos',
+      title: 'PADRÓN VEHICULAR MUNICIPAL',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
+      metadata: [
+        { label: 'Tipo Vehículo', value: filterTipo },
+        { label: 'Estado', value: filterEstado }
+      ],
+      columns: [
+        { header: 'PLACA', key: 'placa', isText: true, width: 110, align: 'center' },
+        { header: 'TIPO VEHÍCULO', key: 'tipo', width: 140 },
+        { header: 'MARCA', key: 'marca', width: 120 },
+        { header: 'MODELO', key: 'modelo', width: 120 },
+        { header: 'COLOR', key: 'color', width: 110 },
+        { header: 'AÑO', key: 'anio', width: 80, align: 'center' },
+        { header: 'N° MOTOR', key: 'numeroMotor', isText: true, width: 140 },
+        { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 140 },
+        { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
+        { header: 'PROPIETARIO', key: 'propietario', width: 180 },
+        { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+      ],
+      data: filteredVehiculos
+    })
+  }
 
   const getVehiculoDocumento = (vehiculo, tipoDocumento) => (
     vehiculo?.documentosVehiculo?.find((doc) => doc.tipoDocumento === tipoDocumento)
@@ -576,6 +605,16 @@ export function Vehiculos() {
                 <Icon name="filterX" className="size-4" />
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar padrón vehicular en formato Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
+            </button>
 
             <button
               type="button"
@@ -1336,6 +1375,50 @@ export function Vehiculos() {
                             )
                           })}
                         </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+                
+                {/* Historial de Internamientos */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 lg:col-span-2">
+                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Historial de internamientos al depósito</p>
+                  {(() => {
+                    const internamientos = selectedVehiculo.historialInternamientos || []
+                    
+                    if (internamientos.length === 0) {
+                      return (
+                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                          Sin internamientos registrados.
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800">
+                        {internamientos.map((int) => {
+                          return (
+                            <div key={int.numero_orden} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-slate-800 sm:grid-cols-[140px_1fr_120px] sm:items-center">
+                              <div>
+                                <p className="font-mono text-xs font-black text-rose-700 dark:text-rose-300">{int.numero_orden}</p>
+                                <p className="text-[10px] font-bold text-slate-400">{int.fecha_ingreso ? new Date(int.fecha_ingreso).toLocaleDateString() : 'Sin fecha'}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">{int.motivo || 'Sin motivo'}</p>
+                                <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">{int.lugar_intervencion || 'Sin lugar'}</p>
+                              </div>
+                              <div className="text-right">
+                                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${
+                                  int.estado === 'LIBERADO' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' :
+                                  'bg-orange-100 text-orange-800 dark:bg-orange-950/70 dark:text-orange-300'
+                                }`}>
+                                  <span className="size-1.5 rounded-full bg-current" />
+                                  {int.estado}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     )
                   })()}

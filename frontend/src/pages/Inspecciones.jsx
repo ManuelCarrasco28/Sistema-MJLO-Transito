@@ -5,6 +5,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { CerticavFichaPrint } from '../components/documentos/TarjetaOperatividadPrint'
+import { exportToExcel } from '../utils/exportToExcel'
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -714,99 +715,28 @@ export function Inspecciones() {
   }
 
   const handleExportExcel = () => {
-    const listToExport = filteredInspecciones.length > 0 ? filteredInspecciones : inspecciones
-    if (listToExport.length === 0) {
-      alert('No hay registros para exportar.')
-      return
-    }
-
-    const escapeXml = (unsafe) => {
-      if (unsafe === null || unsafe === undefined) return ''
-      return String(unsafe)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;')
-    }
-
-    const rowsHtml = listToExport
-      .map((i, index) => {
-        const vehiculo = vehiculos.find((v) => v.placa === i.vehiculoPlaca)
-        return `
-          <tr>
-            <td style="text-align: center;">${index + 1}</td>
-            <td style="text-align: center; font-weight: bold; mso-number-format:'\\@';">${escapeXml(i.numeroRegistro || i.numeroInspeccion || '')}</td>
-            <td style="text-align: center; font-weight: bold; mso-number-format:'\\@';">${escapeXml(i.numeroSerieCerticav || '')}</td>
-            <td style="text-align: center; font-weight: bold; mso-number-format:'\\@';">${escapeXml(i.vehiculoPlaca || '')}</td>
-            <td>${escapeXml(vehiculo?.marca || i.vehiculoMarca || '')} ${escapeXml(vehiculo?.modelo || i.vehiculoModelo || '')}</td>
-            <td>${escapeXml(vehiculo?.propietario || i.propietario || '—')}</td>
-            <td style="text-align: center; mso-number-format:'\\@';">${escapeXml(vehiculo?.propietarioDni || i.propietarioDni || '')}</td>
-            <td>${escapeXml(vehiculo?.asociacion || i.transportador || 'Independiente')}</td>
-            <td style="text-align: center;">${escapeXml(formatFecha(i.fecha))}</td>
-            <td style="text-align: center;">${escapeXml(formatFecha(i.fechaVencimiento))}</td>
-            <td style="text-align: center; font-weight: bold;">${escapeXml(i.resultado || '')}</td>
-          </tr>
-        `
-      })
-      .join('')
-
-    const excelTemplate = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office"
-            xmlns:x="urn:schemas-microsoft-com:office:excel"
-            xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-          <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-          <style>
-            body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
-            table { border-collapse: collapse; width: 100%; }
-            th { background-color: #0284c7; color: #ffffff; font-weight: bold; text-align: left; padding: 8px 10px; border: 1px solid #94a3b8; font-size: 11pt; }
-            td { padding: 6px 10px; border: 1px solid #cbd5e1; font-size: 10.5pt; vertical-align: middle; }
-            .header-title { font-size: 16pt; font-weight: bold; color: #0284c7; }
-            .header-subtitle { font-size: 11pt; color: #475569; margin-bottom: 8px; }
-            .header-meta { font-size: 10pt; color: #64748b; margin-bottom: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="header-title">MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ</div>
-          <div class="header-subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Inspecciones Técnicas (CERTICAV)</div>
-          <div class="header-meta">
-            Fecha de emisión: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')} | 
-            Total registros: ${listToExport.length}
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th style="text-align: center; width: 45px;">N°</th>
-                <th style="text-align: center; width: 120px;">N° Registro</th>
-                <th style="text-align: center; width: 120px;">Serie CertiCAV</th>
-                <th style="text-align: center; width: 90px;">Placa</th>
-                <th style="width: 160px;">Vehículo</th>
-                <th style="width: 200px;">Titular / Propietario</th>
-                <th style="text-align: center; width: 90px;">DNI</th>
-                <th style="width: 220px;">Asociación</th>
-                <th style="text-align: center; width: 100px;">Fecha</th>
-                <th style="text-align: center; width: 100px;">Vencimiento</th>
-                <th style="text-align: center; width: 110px;">Resultado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `
-
-    const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `Padron_Inspecciones_CERTICAV_${new Date().toISOString().slice(0, 10)}.xls`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    exportToExcel({
+      filename: `Inspecciones_Tecnicas_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Inspecciones',
+      title: 'REGISTRO DE INSPECCIONES TÉCNICAS VEHICULARES - CERTICAV',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',
+      metadata: [
+        { label: 'Resultado', value: filterResultado },
+        { label: 'Total Registros', value: String(filteredInspecciones.length) }
+      ],
+      columns: [
+        { header: 'N° REGISTRO', key: 'numeroRegistro', isText: true, width: 120, align: 'center' },
+        { header: 'SERIE CERTICAV', render: (_, i) => i.numeroSerieCerticav || ('CCV-2026-' + String(i.id || '').padStart(6, '0')), isText: true, width: 140, align: 'center' },
+        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+        { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
+        { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
+        { header: 'LICENCIA', key: 'conductorLicencia', isText: true, width: 120, align: 'center' },
+        { header: 'INSPECTOR', key: 'inspector', width: 180 },
+        { header: 'FECHA INSPECCIÓN', key: 'fecha', width: 120, align: 'center' },
+        { header: 'RESULTADO', key: 'resultado', width: 120, align: 'center' }
+      ],
+      data: filteredInspecciones
+    })
   }
 
   const handleExportPdf = () => {
@@ -1158,6 +1088,16 @@ export function Inspecciones() {
             >
               <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
               <span>PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar registro de inspecciones en Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
             </button>
 
             <button

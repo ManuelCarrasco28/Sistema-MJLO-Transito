@@ -47,6 +47,15 @@ class PersonasController extends ResourceController
     {
         $db = \Config\Database::connect();
 
+        $cookie = $this->request->getCookie('session_user');
+        $rol = '';
+        if ($cookie && str_contains($cookie, '.')) {
+            [$payload] = explode('.', $cookie, 2);
+            $json = base64_decode(strtr($payload, '-_', '+/'));
+            $user = $json ? json_decode($json, true) : null;
+            $rol = strtoupper($user['rol'] ?? '');
+        }
+
         $builder = $db->table('personas p')
             ->select("
                 p.id,
@@ -79,9 +88,70 @@ class PersonasController extends ResourceController
             $builder->where('p.numero', trim($numero));
         }
 
+        if ($rol !== 'SUPERADMIN') {
+            $builder->where('p.numero !=', '00000001');
+        }
+
         $rows = $builder->orderBy('p.id', 'DESC')->get()->getResultArray();
 
-        return $this->respond(['data' => $rows]);
+        $personaIds = array_map(function($r) { return $r['id']; }, $rows);
+        
+        $historialPapeletas = [];
+        $historialCursos = [];
+        
+        if (!empty($personaIds)) {
+            // Historial Papeletas (a través de los vehículos del que es propietario)
+            $papeletas = $db->table('papeletas pap')
+                ->select("
+                    vp.id_persona,
+                    pap.numero_papeleta,
+                    pap.fecha_hora,
+                    pap.lugar,
+                    pap.estado,
+                    v.placa
+                ", false)
+                ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = pap.id_vehiculo', 'inner')
+                ->join('vehiculos v', 'v.id = pap.id_vehiculo', 'left')
+                ->whereIn('vp.id_persona', $personaIds)
+                ->orderBy('pap.fecha_hora', 'DESC')
+                ->get()->getResultArray();
+                
+            foreach ($papeletas as $pap) {
+                $pId = $pap['id_persona'];
+                unset($pap['id_persona']);
+                $historialPapeletas[$pId][] = $pap;
+            }
+            
+            // Historial Cursos
+            $cursos = $db->table('inscripciones_curso ic')
+                ->select("
+                    ic.id_persona,
+                    ic.fecha_inscripcion,
+                    ic.estado,
+                    ic.asistio,
+                    c.nombre as curso_nombre,
+                    c.codigo,
+                    c.fecha_inicio
+                ", false)
+                ->join('cursos_seguridad_vial c', 'c.id = ic.id_curso', 'inner')
+                ->whereIn('ic.id_persona', $personaIds)
+                ->orderBy('c.fecha_inicio', 'DESC')
+                ->get()->getResultArray();
+                
+            foreach ($cursos as $cur) {
+                $pId = $cur['id_persona'];
+                unset($cur['id_persona']);
+                $historialCursos[$pId][] = $cur;
+            }
+        }
+        
+        $data = array_map(function($r) use ($historialPapeletas, $historialCursos) {
+            $r['historialPapeletas'] = $historialPapeletas[$r['id']] ?? [];
+            $r['historialCursos'] = $historialCursos[$r['id']] ?? [];
+            return $r;
+        }, $rows);
+
+        return $this->respond(['data' => $data]);
     }
 
     public function create()

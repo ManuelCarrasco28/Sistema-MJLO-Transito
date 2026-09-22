@@ -5,6 +5,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { PlantillaImpresionTUC } from '../components/documentos/PlantillaImpresionTUC'
+import { exportToExcel } from '../utils/exportToExcel'
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -602,98 +603,28 @@ export function Documentos() {
   }
 
   const handleExportExcel = () => {
-    const listToExport = filteredDocs.length > 0 ? filteredDocs : documentos
-    if (listToExport.length === 0) {
-      alert('No hay registros para exportar.')
-      return
-    }
-
-    const escapeXml = (unsafe) => {
-      if (unsafe === null || unsafe === undefined) return ''
-      return String(unsafe)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;')
-    }
-
-    const rowsHtml = listToExport
-      .map((d, index) => {
-        return `
-          <tr>
-            <td style="text-align: center;">${index + 1}</td>
-            <td style="text-align: center; font-weight: bold; mso-number-format:'\\@';">${escapeXml(d.codigo || '')}</td>
-            <td style="text-align: center;">${escapeXml(d.tipoDocumento || '')}</td>
-            <td style="text-align: center; font-weight: bold; mso-number-format:'\\@';">${escapeXml(d.vehiculoPlaca || '')}</td>
-            <td>${escapeXml(d.vehiculoMarca || '')} ${escapeXml(d.vehiculoModelo || '')}</td>
-            <td>${escapeXml(d.propietario || '—')}</td>
-            <td style="text-align: center; mso-number-format:'\\@';">${escapeXml(d.propietarioDni || '')}</td>
-            <td>${escapeXml(d.asociacion || 'Independiente')}</td>
-            <td style="text-align: center;">${escapeXml(d.fechaExpedicion || '')}</td>
-            <td style="text-align: center;">${escapeXml(d.fechaExpiracion || '')}</td>
-            <td style="text-align: center; font-weight: bold;">${escapeXml(d.estado || '')}</td>
-          </tr>
-        `
-      })
-      .join('')
-
-    const excelTemplate = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office"
-            xmlns:x="urn:schemas-microsoft-com:office:excel"
-            xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-          <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-          <style>
-            body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
-            table { border-collapse: collapse; width: 100%; }
-            th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; text-align: left; padding: 8px 10px; border: 1px solid #94a3b8; font-size: 11pt; }
-            td { padding: 6px 10px; border: 1px solid #cbd5e1; font-size: 10.5pt; vertical-align: middle; }
-            .header-title { font-size: 16pt; font-weight: bold; color: #1e3a8a; }
-            .header-subtitle { font-size: 11pt; color: #475569; margin-bottom: 8px; }
-            .header-meta { font-size: 10pt; color: #64748b; margin-bottom: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="header-title">MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ</div>
-          <div class="header-subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Documentos Vehiculares</div>
-          <div class="header-meta">
-            Fecha de emisión: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')} | 
-            Total registros: ${listToExport.length}
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th style="text-align: center; width: 45px;">N°</th>
-                <th style="text-align: center; width: 120px;">Código</th>
-                <th style="text-align: center; width: 140px;">Tipo Documento</th>
-                <th style="text-align: center; width: 90px;">Placa</th>
-                <th style="width: 150px;">Marca / Modelo</th>
-                <th style="width: 200px;">Titular / Propietario</th>
-                <th style="text-align: center; width: 90px;">DNI</th>
-                <th style="width: 220px;">Asociación</th>
-                <th style="text-align: center; width: 100px;">Expedición</th>
-                <th style="text-align: center; width: 100px;">Vencimiento</th>
-                <th style="text-align: center; width: 90px;">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `
-
-    const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `Padron_Documentos_MJLO_${new Date().toISOString().slice(0, 10)}.xls`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    exportToExcel({
+      filename: `Documentos_Transito_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Documentos',
+      title: 'PADRÓN OFICIAL DE DOCUMENTOS DE TRANSPORTE Y VIALIDAD',
+      subtitle: 'TUC, Carnets de Seguridad Vial, CERTICAV y SOAT - Control Municipal',
+      metadata: [
+        { label: 'Tipo Documento', value: filterTipo },
+        { label: 'Estado', value: filterEstado }
+      ],
+      columns: [
+        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+        { header: 'TIPO DOCUMENTO', key: 'tipoDocumento', width: 180 },
+        { header: 'N° / CÓDIGO', key: 'codigo', isText: true, width: 140, align: 'center' },
+        { header: 'EXPEDICIÓN', key: 'fechaExpedicion', width: 110, align: 'center' },
+        { header: 'VENCIMIENTO', key: 'fechaExpiracion', width: 110, align: 'center' },
+        { header: 'PROPIETARIO / TITULAR', key: 'propietario', width: 190 },
+        { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
+        { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 200 },
+        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+      ],
+      data: filteredDocs
+    })
   }
 
   const handleExportPdf = () => {

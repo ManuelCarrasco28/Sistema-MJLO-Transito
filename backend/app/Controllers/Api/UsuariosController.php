@@ -117,6 +117,13 @@ class UsuariosController extends ResourceController
             return $this->failServerError('No se pudo registrar el usuario.');
         }
 
+        \App\Services\AuditoriaService::registrar(
+            'USUARIOS',
+            'CREAR',
+            "Se creó la cuenta de usuario '$nombreUsuario' con rol '$cargo'",
+            ['id_usuario' => $newUserId, 'usuario' => $nombreUsuario, 'cargo' => $cargo, 'estado' => $estado]
+        );
+
         return $this->respondCreated([
             'message' => 'Usuario creado exitosamente.',
             'data' => [
@@ -190,6 +197,13 @@ class UsuariosController extends ResourceController
             return $this->failServerError('Error al actualizar el usuario.');
         }
 
+        \App\Services\AuditoriaService::registrar(
+            'USUARIOS',
+            'MODIFICAR',
+            "Se actualizó la cuenta de usuario '{$usuario['nombre_usuario']}': estado '{$input['estado']}', cargo '{$input['cargo']}'",
+            ['id_usuario' => $id, 'usuario' => $usuario['nombre_usuario'], 'estado' => $input['estado'], 'cargo' => $input['cargo']]
+        );
+
         return $this->respond(['message' => 'Usuario actualizado correctamente.']);
     }
 
@@ -212,6 +226,13 @@ class UsuariosController extends ResourceController
             'password_hash' => password_hash($input['password'], PASSWORD_BCRYPT)
         ]);
 
+        \App\Services\AuditoriaService::registrar(
+            'USUARIOS',
+            'CAMBIO_PASSWORD',
+            "Se restableció la contraseña del usuario '{$usuario['nombre_usuario']}'",
+            ['id_usuario' => $id, 'usuario' => $usuario['nombre_usuario']]
+        );
+
         return $this->respond($this->formatResponse(true, 'Contraseña actualizada correctamente.', $usuario), 200);
     }
 
@@ -230,6 +251,14 @@ class UsuariosController extends ResourceController
 
         try {
             $model->delete($id);
+
+            \App\Services\AuditoriaService::registrar(
+                'USUARIOS',
+                'ELIMINAR',
+                "Se eliminó la cuenta de usuario '{$usuario['nombre_usuario']}'",
+                ['id_usuario' => $id, 'usuario' => $usuario['nombre_usuario']]
+            );
+
             return $this->respondDeleted($this->formatResponse(true, 'Usuario eliminado correctamente.'));
         } catch (\Exception $e) {
             return $this->failServerError('Error al eliminar el usuario: ' . $e->getMessage());

@@ -116,9 +116,32 @@ class VehiculosController extends ResourceController
                     $certicavPorVehiculo[$vehiculoId] = $certicav;
                 }
             }
+            
+            // Historial de Internamientos
+            $internamientos = $db->table('ordenes_internamiento')
+                ->select("
+                    id_vehiculo,
+                    numero_orden,
+                    fecha_ingreso,
+                    fecha_salida,
+                    motivo,
+                    estado,
+                    lugar_intervencion
+                ")
+                ->whereIn('id_vehiculo', $vehiculoIds)
+                ->orderBy('fecha_ingreso', 'DESC')
+                ->get()
+                ->getResultArray();
+                
+            $internamientosPorVehiculo = [];
+            foreach ($internamientos as $int) {
+                $vehiculoId = (int)$int['id_vehiculo'];
+                unset($int['id_vehiculo']);
+                $internamientosPorVehiculo[$vehiculoId][] = $int;
+            }
         }
 
-        $data = array_map(static function (array $row) use ($documentosPorVehiculo, $papeletasPorVehiculo, $certicavPorVehiculo): array {
+        $data = array_map(static function (array $row) use ($documentosPorVehiculo, $papeletasPorVehiculo, $certicavPorVehiculo, $internamientosPorVehiculo): array {
             $propietario = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
             unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
             $vehiculoId = (int)$row['id'];
@@ -136,6 +159,7 @@ class VehiculosController extends ResourceController
                 'documentosVehiculo' => $documentosPorVehiculo[$vehiculoId] ?? [],
                 'certicav' => $certicavPorVehiculo[$vehiculoId] ?? null,
                 'historialPapeletas' => $papeletasPorVehiculo[$vehiculoId] ?? [],
+                'historialInternamientos' => $internamientosPorVehiculo[$vehiculoId] ?? [],
                 'soatEstado' => $soat['estado'] ?? 'SIN_REGISTRO',
                 'tucNumero' => 'TUC-2026-' . str_pad($row['id'], 3, '0', STR_PAD_LEFT),
             ];
@@ -291,6 +315,13 @@ class VehiculosController extends ResourceController
             'estado'       => 'ACTIVO',
         ]);
 
+        \App\Services\AuditoriaService::registrar(
+            'VEHICULOS',
+            'CREAR',
+            "Se registró el vehículo placa '{$record['placa']}' (" . ($asociacionId ? "Asociación: $orgName" : "Particular/Informal") . ")",
+            ['id' => $vehiculoId, 'placa' => $record['placa'], 'asociacion' => $orgName, 'propietario' => $propietarioNombre]
+        );
+
         $newVehiculo = [
             'id'               => $vehiculoId,
             'placa'            => $record['placa'],
@@ -407,6 +438,14 @@ class VehiculosController extends ResourceController
             ]);
         }
 
+        $vehPlaca = $record['placa'] ?? ($db->table('vehiculos')->where('id', $id)->get()->getRowArray()['placa'] ?? "ID $id");
+        \App\Services\AuditoriaService::registrar(
+            'VEHICULOS',
+            'MODIFICAR',
+            "Se modificó la información del vehículo placa '$vehPlaca'",
+            ['id' => $id, 'cambios' => $record]
+        );
+
         return $this->respond(['status' => true, 'message' => 'Vehículo actualizado con éxito']);
     }
 
@@ -418,9 +457,19 @@ class VehiculosController extends ResourceController
             return $this->failNotFound('ID de vehículo no especificado.');
         }
 
+        $veh = $db->table('vehiculos')->where('id', $id)->get()->getRowArray();
+        $placa = $veh['placa'] ?? "ID $id";
+
         $db->table('vehiculo_propietarios')->where('id_vehiculo', $id)->delete();
         $db->table('documentos_vehiculo')->where('id_vehiculo', $id)->delete();
         $db->table('vehiculos')->where('id', $id)->delete();
+
+        \App\Services\AuditoriaService::registrar(
+            'VEHICULOS',
+            'ELIMINAR',
+            "Se eliminó el vehículo con placa '$placa' (ID: $id)",
+            ['id' => $id, 'placa' => $placa]
+        );
 
         return $this->respondDeleted(['status' => true, 'message' => 'Vehículo eliminado con éxito']);
     }

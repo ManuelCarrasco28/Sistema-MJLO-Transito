@@ -254,6 +254,12 @@ class AuthController extends ResourceController
 
         if (!$userRecord || !password_verify($password, $userRecord['password_hash'])) {
             $this->registerFailedLogin($usuario);
+            \App\Services\AuditoriaService::registrar(
+                'SEGURIDAD',
+                'LOGIN_FALLIDO',
+                "Intento de acceso fallido para el usuario '$usuario' (credenciales incorrectas)",
+                ['usuario' => $usuario]
+            );
             return $this->failUnauthorized('El usuario o la contraseña son incorrectos.');
         }
 
@@ -285,6 +291,14 @@ class AuthController extends ResourceController
             'samesite' => 'Lax',
         ]);
 
+        \App\Services\AuditoriaService::registrar(
+            'SEGURIDAD',
+            'LOGIN',
+            "Inicio de sesión exitoso del usuario '{$userData['usuario']}' ({$userData['cargo']})",
+            ['usuario' => $userData['usuario'], 'cargo' => $userData['cargo']],
+            ['id' => $userData['id'], 'usuario' => $userData['usuario'], 'rol' => $userData['cargo']]
+        );
+
         return $this->respond([
             'status'  => true,
             'message' => 'Inicio de sesión exitoso',
@@ -314,6 +328,17 @@ class AuthController extends ResourceController
 
     public function logout()
     {
+        $cookieUser = $this->decodeSessionCookie($this->request->getCookie('session_user'));
+        if ($cookieUser) {
+            \App\Services\AuditoriaService::registrar(
+                'SEGURIDAD',
+                'LOGOUT',
+                "Cierre de sesión del usuario '{$cookieUser['usuario']}'",
+                null,
+                ['id' => $cookieUser['id'] ?? null, 'usuario' => $cookieUser['usuario'] ?? 'desconocido', 'rol' => $cookieUser['cargo'] ?? '']
+            );
+        }
+
         helper('cookie');
         delete_cookie('session_user', '', '/');
 

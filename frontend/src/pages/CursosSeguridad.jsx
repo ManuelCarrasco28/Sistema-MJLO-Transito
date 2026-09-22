@@ -4,6 +4,7 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { CarnetCursoVialPrint } from '../components/documentos/TarjetaOperatividadPrint'
+import { exportToExcel } from '../utils/exportToExcel'
 
 export function CursosSeguridad() {
   const cached = getCachedData('/cursos')
@@ -163,6 +164,33 @@ export function CursosSeguridad() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: `Cursos_Seguridad_Vial_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Cursos',
+      title: 'PROGRAMA MUNICIPAL DE EDUCACIÓN Y SEGURIDAD VIAL',
+      subtitle: 'Capacitación y Emisión de Carnets para Conductores y Transportistas',
+      metadata: [
+        { label: 'Tipo', value: filterTipo },
+        { label: 'Estado', value: filterEstado },
+        { label: 'Total Cursos', value: String(filteredCursos.length) }
+      ],
+      columns: [
+        { header: 'CÓDIGO', key: 'codigo', isText: true, width: 130, align: 'center' },
+        { header: 'TÍTULO DEL CURSO', key: 'titulo', width: 260 },
+        { header: 'TIPO', key: 'tipo', width: 160 },
+        { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
+        { header: 'HORARIO', key: 'horario', width: 140, align: 'center' },
+        { header: 'INSTRUCTOR', key: 'instructor', width: 180 },
+        { header: 'LUGAR', key: 'lugar', width: 200 },
+        { header: 'VACANTES', key: 'capacidad', width: 90, align: 'center' },
+        { header: 'INSCRITOS', render: (_, c) => String(c.inscritos || c.participantes?.length || 0), width: 90, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
+      ],
+      data: filteredCursos
+    })
+  }
 
   useEffect(() => {
     setLoadError('')
@@ -328,6 +356,16 @@ export function CursosSeguridad() {
               <option value="EN_CURSO">EN CURSO</option>
               <option value="FINALIZADO">FINALIZADO</option>
             </select>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Descargar padrón de cursos en Excel"
+            >
+              <Icon name="table" className="size-4" />
+              <span>Exportar Excel</span>
+            </button>
+
             <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-purple-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-600/30 active:scale-95 cursor-pointer whitespace-nowrap">
               <span className="text-base leading-none font-black">+</span>
               <span>Programar Curso</span>
@@ -655,52 +693,181 @@ export function CursosSeguridad() {
 
       {isDetailModalOpen && selectedCurso && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a] p-6">
-            <h3 className="text-xl font-black mb-2 text-slate-800 dark:text-white">{selectedCurso.titulo}</h3>
-            <p className="text-xs text-slate-500 mb-6">{selectedCurso.codigo}</p>
-            <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
-              <p><strong>Fecha:</strong> {selectedCurso.fecha}</p>
-              <p><strong>Horario:</strong> {selectedCurso.horario}</p>
-              <p><strong>Instructor:</strong> {selectedCurso.instructor}</p>
-              <p><strong>Lugar:</strong> {selectedCurso.lugar}</p>
-              <p><strong>Inscritos:</strong> {selectedCurso.inscritos} / {selectedCurso.capacidad}</p>
-              <p><strong>Estado:</strong> {selectedCurso.estado}</p>
+          <div className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 dark:text-white">{selectedCurso.titulo}</h3>
+                <p className="text-xs text-slate-500">{selectedCurso.codigo}</p>
+              </div>
+              <button onClick={() => setIsDetailModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 cursor-pointer">✕</button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4 text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50">
+                <p><strong>Fecha:</strong> {selectedCurso.fecha}</p>
+                <p><strong>Horario:</strong> {selectedCurso.horario}</p>
+                <p><strong>Instructor:</strong> {selectedCurso.instructor}</p>
+                <p><strong>Lugar:</strong> {selectedCurso.lugar}</p>
+                <p><strong>Inscritos:</strong> {selectedCurso.inscritos || (selectedCurso.participantes?.length || 0)} / {selectedCurso.capacidad}</p>
+                <p><strong>Estado:</strong> <span className="font-bold text-purple-600 dark:text-purple-400">{selectedCurso.estado}</span></p>
+              </div>
 
-              {selectedCurso.participantes && selectedCurso.participantes.length > 0 && (
-                <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
-                  <strong className="block mb-3 text-slate-800 dark:text-slate-200">Participantes:</strong>
-                  <ul className="space-y-2 max-h-40 overflow-y-auto pr-2">
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <strong className="text-base text-slate-800 dark:text-slate-200">Participantes</strong>
+                  
+                  {/* Formulario de inscripción rápida */}
+                  {selectedCurso.estado !== 'FINALIZADO' && (
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="text" 
+                      id="nuevoDniParticipante"
+                      placeholder="DNI del conductor..." 
+                      className="w-40 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                      maxLength={8}
+                    />
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        const dniInput = document.getElementById('nuevoDniParticipante');
+                        const dni = dniInput.value.trim();
+                        if (!dni) return alert('Ingrese un DNI');
+                        
+                        try {
+                          const res = await apiFetch(`/cursos/${selectedCurso.id}/participantes`, {
+                            method: 'POST',
+                            body: { dni }
+                          });
+                          const result = await res.json();
+                          
+                          if (!res.ok) throw new Error(result.messages?.error || 'Error al inscribir');
+                          
+                          alert('Participante inscrito correctamente');
+                          dniInput.value = '';
+                          
+                          // Actualizar estado local
+                          const updatedParticipantes = [...(selectedCurso.participantes || []), result.data];
+                          const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes, inscritos: updatedParticipantes.length };
+                          setSelectedCurso(updatedCurso);
+                          setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
+                        } catch (err) {
+                          alert(err.message);
+                        }
+                      }}
+                      className="rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-bold text-white shadow-md hover:bg-purple-700 cursor-pointer"
+                    >
+                      Inscribir
+                    </button>
+                  </div>
+                  )}
+                </div>
+
+                {(!selectedCurso.participantes || selectedCurso.participantes.length === 0) ? (
+                  <p className="text-sm text-slate-500 italic text-center py-4 bg-slate-50 dark:bg-slate-800/30 rounded-xl">No hay participantes inscritos en este curso.</p>
+                ) : (
+                  <ul className="space-y-3 max-h-64 overflow-y-auto pr-2">
                     {selectedCurso.participantes.map((p, i) => {
                       const estadoReal = selectedCurso.estado === 'FINALIZADO' 
                         ? (p.asistio ? 'APROBADO' : 'DESAPROBADO') 
                         : (p.estado || 'PENDIENTE');
                         
                       return (
-                      <li key={i} className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/50">
-                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                          {p.nombres} {p.apellido_paterno} {p.apellido_materno}
-                        </span>
-                        <span className="text-[10px] font-black uppercase">
-                          {estadoReal === 'APROBADO' ? (
-                            <span className="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-1 rounded-md">Aprobado</span>
-                          ) : estadoReal === 'DESAPROBADO' ? (
-                            <span className="text-rose-600 bg-rose-50 dark:bg-rose-950/50 px-2 py-1 rounded-md">Desaprobado</span>
-                          ) : estadoReal === 'CONFIRMADO' ? (
-                            <span className="text-blue-600 bg-blue-50 dark:bg-blue-950/50 px-2 py-1 rounded-md">Confirmado</span>
-                          ) : estadoReal === 'INSCRITO' ? (
-                            <span className="text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-1 rounded-md">Inscrito</span>
-                          ) : (
-                            <span className="text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{estadoReal}</span>
-                          )}
-                        </span>
+                      <li key={i} className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                            {p.nombres} {p.apellido_paterno} {p.apellido_materno}
+                          </p>
+                          <p className="text-xs text-slate-500 font-semibold">DNI: {p.dni || p.numero}</p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          {/* Controles de Asistencia y Estado */}
+                          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                checked={!!p.asistio}
+                                onChange={async (e) => {
+                                  const asistio = e.target.checked ? 1 : 0;
+                                  try {
+                                    const res = await apiFetch(`/cursos/${selectedCurso.id}/participantes/${p.dni || p.numero}`, {
+                                      method: 'PUT',
+                                      body: { asistio }
+                                    });
+                                    if (!res.ok) throw new Error('Error al guardar asistencia');
+                                    
+                                    const updatedParticipantes = [...selectedCurso.participantes];
+                                    updatedParticipantes[i] = { ...p, asistio };
+                                    const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes };
+                                    setSelectedCurso(updatedCurso);
+                                    setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
+                                  } catch (err) {
+                                    alert(err.message);
+                                  }
+                                }}
+                                className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                              />
+                              Asistió
+                            </label>
+                            
+                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                            
+                            <select 
+                              value={p.estado || 'INSCRITO'}
+                              onChange={async (e) => {
+                                const nuevoEstado = e.target.value;
+                                try {
+                                  const res = await apiFetch(`/cursos/${selectedCurso.id}/participantes/${p.dni || p.numero}`, {
+                                    method: 'PUT',
+                                    body: { estado: nuevoEstado }
+                                  });
+                                  if (!res.ok) throw new Error('Error al guardar estado');
+                                  
+                                  const updatedParticipantes = [...selectedCurso.participantes];
+                                  updatedParticipantes[i] = { ...p, estado: nuevoEstado };
+                                  const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes };
+                                  setSelectedCurso(updatedCurso);
+                                  setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
+                                } catch (err) {
+                                  alert(err.message);
+                                }
+                              }}
+                              className={`text-xs font-bold bg-transparent outline-none cursor-pointer ${
+                                (p.estado === 'APROBADO' || estadoReal === 'APROBADO') ? 'text-emerald-600 dark:text-emerald-400' : 
+                                (p.estado === 'DESAPROBADO' || estadoReal === 'DESAPROBADO') ? 'text-rose-600 dark:text-rose-400' : 
+                                'text-slate-600 dark:text-slate-400'
+                              }`}
+                            >
+                              <option value="INSCRITO">Inscrito</option>
+                              <option value="CONFIRMADO">Confirmado</option>
+                              <option value="APROBADO">Aprobado</option>
+                              <option value="DESAPROBADO">Desaprobado</option>
+                            </select>
+                          </div>
+                          
+                          <span className="text-[10px] font-black uppercase w-20 text-center">
+                            {estadoReal === 'APROBADO' ? (
+                              <span className="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-1 rounded-md block">Aprobado</span>
+                            ) : estadoReal === 'DESAPROBADO' ? (
+                              <span className="text-rose-600 bg-rose-50 dark:bg-rose-950/50 px-2 py-1 rounded-md block">Desaprobado</span>
+                            ) : estadoReal === 'CONFIRMADO' ? (
+                              <span className="text-blue-600 bg-blue-50 dark:bg-blue-950/50 px-2 py-1 rounded-md block">Confirmado</span>
+                            ) : estadoReal === 'INSCRITO' ? (
+                              <span className="text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-1 rounded-md block">Inscrito</span>
+                            ) : (
+                              <span className="text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md block">{estadoReal}</span>
+                            )}
+                          </span>
+                        </div>
                       </li>
                     )})}
                   </ul>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-            <div className="mt-8 flex justify-end">
-              <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800 cursor-pointer">Cerrar</button>
+            
+            <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex justify-end dark:border-slate-800 dark:bg-slate-900">
+              <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl bg-slate-900 px-6 py-2 text-sm font-extrabold text-white hover:bg-slate-800 cursor-pointer shadow-md">Cerrar</button>
             </div>
           </div>
         </div>

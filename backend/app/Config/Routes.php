@@ -31,8 +31,11 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->post('papeletas/(:num)/firma', 'PapeletasController::firma/$1');
         $routes->get('tipos-infraccion', 'PapeletasController::tipos');
         $routes->get('pagos/origenes', 'PagosController::origenes');
+        $routes->get('pagos/arqueo-diario', 'PagosController::arqueoDiario');
         $routes->post('pagos/(:num)/confirmar', 'PagosController::confirmar/$1');
         $routes->resource('pagos', ['controller' => 'PagosController', 'only' => ['index', 'create', 'delete']]);
+        $routes->post('cursos/(:num)/participantes', 'CursosController::inscribirParticipante/$1');
+        $routes->put('cursos/(:num)/participantes/(:num)', 'CursosController::registrarNota/$1/$2');
         $routes->resource('cursos', ['controller' => 'CursosController']);
         $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
         $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
@@ -53,5 +56,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->post('reportes-intervencion', 'ReportesIntervencionController::create');
         $routes->post('reportes-intervencion/(:num)/convertir', 'ReportesIntervencionController::convertir/$1');
         $routes->post('reportes-intervencion/(:num)/rechazar', 'ReportesIntervencionController::rechazar/$1');
+        $routes->get('auditoria', 'AuditoriaController::index');
+        $routes->get('auditoria/estadisticas', 'AuditoriaController::estadisticas');
     });
 });

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
+import { exportToExcel } from '../utils/exportToExcel'
 
 const DEFAULT_USER_FORM = {
   id_trabajador: '',
@@ -69,6 +70,62 @@ export function SuperAdminDashboard({ user }) {
   const [auditSearch, setAuditSearch] = useState('')
   const [auditType, setAuditType] = useState('TODOS')
   const [auditSeverity, setAuditSeverity] = useState('TODOS')
+  const [realAuditLogs, setRealAuditLogs] = useState([])
+  const [loadingAudit, setLoadingAudit] = useState(false)
+  const [auditStats, setAuditStats] = useState({ total: 0, hoy: 0, porModulo: [] })
+
+  const fetchAuditLogs = async () => {
+    setLoadingAudit(true)
+    try {
+      const params = new URLSearchParams()
+      if (auditSearch.trim()) params.set('search', auditSearch.trim())
+      if (auditType !== 'TODOS') params.set('modulo', auditType)
+      if (auditSeverity !== 'TODOS') params.set('accion', auditSeverity)
+      params.set('limit', '100')
+
+      const res = await apiFetch(`/auditoria?${params.toString()}`)
+      const data = await res.json()
+      if (res.ok && data.data) {
+        setRealAuditLogs(data.data)
+      }
+
+      const resStats = await apiFetch('/auditoria/estadisticas')
+      const dataStats = await resStats.json()
+      if (resStats.ok && dataStats.data) {
+        setAuditStats(dataStats.data)
+      }
+    } catch (err) {
+      console.error('Error cargando auditoría:', err)
+    } finally {
+      setLoadingAudit(false)
+    }
+  }
+
+  const handleExportAuditoria = () => {
+    exportToExcel({
+      filename: `Auditoria_Sistema_${new Date().getFullYear()}.xls`,
+      sheetName: 'Auditoria',
+      title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
+      subtitle: 'Subgerencia de Tránsito y Transporte · Registro Oficial de Auditoría y Trazabilidad',
+      metadata: [
+        { label: 'Total eventos', value: String(realAuditLogs.length) },
+        { label: 'Filtro Módulo', value: auditType },
+        { label: 'Filtro Acción', value: auditSeverity },
+      ],
+      columns: [
+        { header: 'N°', align: 'center', width: 45, render: (_, __, i) => i + 1 },
+        { header: 'Fecha y Hora', key: 'fecha_hora', width: 160, align: 'center' },
+        { header: 'Módulo', key: 'modulo', width: 130, align: 'center' },
+        { header: 'Acción', key: 'accion', width: 120, align: 'center' },
+        { header: 'Descripción del Evento', key: 'descripcion', width: 350 },
+        { header: 'Usuario Responsable', key: 'nombre_usuario', width: 140, align: 'center' },
+        { header: 'Rol', key: 'rol', width: 130, align: 'center' },
+        { header: 'Dirección IP', key: 'ip', width: 120, align: 'center', isText: true },
+        { header: 'Dispositivo / Navegador', key: 'user_agent', width: 220 },
+      ],
+      data: realAuditLogs,
+    })
+  }
 
   const adminModules = [
     { id: 'personas', label: 'Personas', detail: 'Registrar y mantener datos personales base del sistema.', icon: 'idCard', tone: 'from-sky-600 to-cyan-500' },
@@ -142,7 +199,15 @@ export function SuperAdminDashboard({ user }) {
     fetchUsuarios()
     fetchTrabajadores()
     fetchMunicipalidadConfig()
+    fetchAuditLogs()
   }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchAuditLogs()
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [auditSearch, auditType, auditSeverity, activeModule])
 
   const saveMunicipalidad = async (event) => {
     event.preventDefault()
@@ -308,13 +373,6 @@ export function SuperAdminDashboard({ user }) {
       return matchesSearch && matchesType && matchesSeverity
     })
   }, [auditEvents, auditSearch, auditType, auditSeverity])
-
-  const auditStats = useMemo(() => ({
-    total: auditEvents.length,
-    alta: auditEvents.filter((event) => event.severidad === 'ALTA').length,
-    media: auditEvents.filter((event) => event.severidad === 'MEDIA').length,
-    seguridad: auditEvents.filter((event) => event.tipo === 'SEGURIDAD').length
-  }), [auditEvents])
 
   const saveUser = async (event) => {
     event.preventDefault()
@@ -561,10 +619,10 @@ export function SuperAdminDashboard({ user }) {
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-4">
               {[
-                { label: 'Eventos auditados', value: auditStats.total, detail: 'Actividad administrativa', tone: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200' },
-                { label: 'Alta prioridad', value: auditStats.alta, detail: 'Requiere revisión', tone: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200' },
-                { label: 'Prioridad media', value: auditStats.media, detail: 'Seguimiento preventivo', tone: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200' },
-                { label: 'Seguridad', value: auditStats.seguridad, detail: 'Sesiones y accesos', tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200' }
+                { label: 'Total eventos', value: auditStats.total || realAuditLogs.length, detail: 'Registros en base de datos', tone: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200' },
+                { label: 'Eventos hoy', value: auditStats.hoy, detail: 'Actividad de la jornada', tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200' },
+                { label: 'Módulos activos', value: (auditStats.porModulo || []).length || '6', detail: 'Trazabilidad del sistema', tone: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200' },
+                { label: 'Mostrados', value: realAuditLogs.length, detail: 'Coincidencias con filtros', tone: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200' }
               ].map((item) => (
                 <div key={item.label} className={`rounded-2xl px-4 py-4 ${item.tone}`}>
                   <p className="text-[11px] font-black uppercase tracking-wider opacity-70">{item.label}</p>
@@ -577,25 +635,26 @@ export function SuperAdminDashboard({ user }) {
             <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white">Centro de auditoría administrativa</h3>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">Centro de auditoría institucional</h3>
                   <p className="text-xs font-semibold text-slate-500">
-                    Monitorea accesos, cambios de configuración, cuentas de usuario y alertas críticas del sistema.
+                    Registro formal y trazabilidad de eventos, inicios de sesión y modificaciones de datos en el sistema.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert('Exportación pendiente: se conectará cuando exista la tabla real de auditoría.')}
-                  className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+                  onClick={handleExportAuditoria}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
                 >
-                  Exportar reporte
+                  <Icon name="table" className="size-4" />
+                  <span>Exportar a Excel</span>
                 </button>
               </div>
 
-              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_200px_200px]">
                 <input
                   value={auditSearch}
                   onChange={(event) => setAuditSearch(event.target.value)}
-                  placeholder="Buscar por evento, usuario, origen o estado..."
+                  placeholder="Buscar por descripción, usuario, módulo o IP..."
                   className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                 />
                 <select
@@ -603,20 +662,28 @@ export function SuperAdminDashboard({ user }) {
                   onChange={(event) => setAuditType(event.target.value)}
                   className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                 >
-                  <option value="TODOS">Todos los tipos</option>
-                  <option value="SEGURIDAD">Seguridad</option>
-                  <option value="CONFIGURACIÓN">Configuración</option>
+                  <option value="TODOS">Todos los módulos</option>
+                  <option value="SEGURIDAD">Seguridad (Login/Logout)</option>
                   <option value="USUARIOS">Usuarios</option>
+                  <option value="VEHICULOS">Vehículos</option>
+                  <option value="ASOCIACIONES">Asociaciones</option>
+                  <option value="PAGOS">Pagos y Recaudación</option>
+                  <option value="PAPELETAS">Papeletas</option>
+                  <option value="CONFIGURACION">Configuración</option>
                 </select>
                 <select
                   value={auditSeverity}
                   onChange={(event) => setAuditSeverity(event.target.value)}
                   className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                 >
-                  <option value="TODOS">Toda prioridad</option>
-                  <option value="ALTA">Alta</option>
-                  <option value="MEDIA">Media</option>
-                  <option value="BAJA">Baja</option>
+                  <option value="TODOS">Todas las acciones</option>
+                  <option value="CREAR">Creación</option>
+                  <option value="MODIFICAR">Modificación</option>
+                  <option value="ELIMINAR">Eliminación</option>
+                  <option value="LOGIN">Inicio de sesión</option>
+                  <option value="LOGOUT">Cierre de sesión</option>
+                  <option value="CONFIRMAR">Confirmación de pago</option>
+                  <option value="ANULAR">Anulación</option>
                 </select>
               </div>
 
@@ -624,51 +691,67 @@ export function SuperAdminDashboard({ user }) {
                 <table className="w-full min-w-[900px] text-left text-sm">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 dark:bg-slate-950 dark:text-slate-400">
                     <tr>
-                      <th className="px-4 py-3">Fecha</th>
-                      <th className="px-4 py-3">Evento</th>
-                      <th className="px-4 py-3">Tipo</th>
-                      <th className="px-4 py-3">Prioridad</th>
+                      <th className="px-4 py-3">Fecha y Hora</th>
+                      <th className="px-4 py-3">Módulo</th>
+                      <th className="px-4 py-3">Acción</th>
+                      <th className="px-4 py-3">Descripción del Evento</th>
                       <th className="px-4 py-3">Usuario</th>
-                      <th className="px-4 py-3">Origen</th>
-                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3">Rol</th>
+                      <th className="px-4 py-3">Dirección IP</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredAuditEvents.length ? filteredAuditEvents.map((event) => (
+                    {loadingAudit ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm font-bold text-slate-500">
+                          Cargando eventos de auditoría desde la base de datos...
+                        </td>
+                      </tr>
+                    ) : realAuditLogs.length ? realAuditLogs.map((event) => (
                       <tr key={event.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td className="px-4 py-3 text-xs font-bold text-slate-500">{event.fecha}</td>
-                        <td className="px-4 py-3">
-                          <p className="font-black text-slate-900 dark:text-white">{event.evento}</p>
-                          <p className="mt-0.5 text-xs font-semibold text-slate-500">{event.detalle}</p>
+                        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">
+                          {event.fecha_hora ? new Date(event.fecha_hora).toLocaleString('es-PE') : '—'}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-200">
-                            {event.tipo}
+                            {event.modulo}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
-                            event.severidad === 'ALTA'
+                            event.accion === 'ELIMINAR' || event.accion === 'ANULAR'
                               ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-200'
-                              : event.severidad === 'MEDIA'
+                              : event.accion === 'MODIFICAR' || event.accion === 'CAMBIO_PASSWORD'
                                 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-200'
-                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200'
+                                : event.accion === 'CREAR' || event.accion === 'CONFIRMAR'
+                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200'
+                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                           }`}>
-                            {event.severidad}
+                            {event.accion}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">{event.usuario}</td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-500">{event.origen}</td>
-                        <td className="px-4 py-3">
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                            {event.estado}
-                          </span>
+                        <td className="px-4 py-3 max-w-md">
+                          <p className="font-semibold text-slate-800 dark:text-white leading-snug">{event.descripcion}</p>
+                          {event.user_agent && (
+                            <p className="mt-0.5 text-[10px] text-slate-400 truncate max-w-sm" title={event.user_agent}>
+                              {event.user_agent}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                          {event.nombre_usuario || 'sistema'}
+                        </td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                          {event.rol || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">
+                          {event.ip || '—'}
                         </td>
                       </tr>
                     )) : (
                       <tr>
                         <td colSpan={7} className="px-4 py-8 text-center text-sm font-bold text-slate-500">
-                          No hay eventos que coincidan con los filtros.
+                          No se encontraron registros de auditoría que coincidan con los filtros.
                         </td>
                       </tr>
                     )}
