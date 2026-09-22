@@ -113,7 +113,7 @@ export function FloatingSelect({
 
       {isOpen && (
         <div className="absolute left-0 top-full mt-1 min-w-full w-max max-w-[280px] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
-          <div className="space-y-0.5">
+          <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
             {options.map((opt) => {
               const isSelected = opt.value === value
               return (
@@ -207,8 +207,8 @@ export function RoundedSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1.5 w-max min-w-[120px] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
-          <div className="space-y-0.5">
+        <div className="absolute right-0 top-full mt-1.5 min-w-full w-max max-w-[320px] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+          <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
             {options.map((opt) => {
               const isSelected = opt.value === value
               return (
@@ -225,7 +225,7 @@ export function RoundedSelect({
                       : 'font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/60'
                   }`}
                 >
-                  <span className="whitespace-nowrap">{opt.label}</span>
+                  <span className="whitespace-normal text-left">{opt.label}</span>
                   {isSelected && (
                     <svg
                       aria-hidden="true"

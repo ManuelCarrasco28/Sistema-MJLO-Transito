@@ -5,6 +5,28 @@ import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { CarnetCursoVialPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
+import { exportToPdf } from '../utils/exportToPdf'
+import { RoundedSelect } from '../components/ui/FormInputs'
+
+const FILTER_TIPO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los tipos' },
+  { value: 'SEGURIDAD_VIAL', label: 'Seguridad Vial' },
+  { value: 'MOTOTAXI', label: 'Transporte Menor (Mototaxis)' },
+  { value: 'MANEJO_DEFENSIVO', label: 'Manejo Defensivo' }
+]
+
+const FILTER_ESTADO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'ACTIVO', label: 'ACTIVO / PROGRAMADO' },
+  { value: 'EN_CURSO', label: 'EN CURSO' },
+  { value: 'FINALIZADO', label: 'FINALIZADO' }
+]
+
+const FORM_ESTADO_OPTIONS = [
+  { value: 'PROGRAMADO', label: 'PROGRAMADO' },
+  { value: 'EN_CURSO', label: 'EN CURSO' },
+  { value: 'FINALIZADO', label: 'FINALIZADO' }
+]
 
 export function CursosSeguridad() {
   const cached = getCachedData('/cursos')
@@ -192,6 +214,32 @@ export function CursosSeguridad() {
     })
   }
 
+  const handleExportPdf = () => {
+    exportToPdf({
+      filename: `Cursos_Seguridad_Vial_${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'PROGRAMA MUNICIPAL DE EDUCACIÓN Y SEGURIDAD VIAL',
+      subtitle: 'Capacitación y Emisión de Carnets para Conductores y Transportistas',
+      metadata: [
+        { label: 'Tipo', value: filterTipo },
+        { label: 'Estado', value: filterEstado },
+        { label: 'Total Cursos', value: String(filteredCursos.length) }
+      ],
+      columns: [
+        { header: 'CÓDIGO', key: 'codigo', isText: true, width: 130, align: 'center' },
+        { header: 'TÍTULO DEL CURSO', key: 'titulo', width: 260 },
+        { header: 'TIPO', key: 'tipo', width: 160 },
+        { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
+        { header: 'HORARIO', key: 'horario', width: 140, align: 'center' },
+        { header: 'INSTRUCTOR', key: 'instructor', width: 180 },
+        { header: 'LUGAR', key: 'lugar', width: 200 },
+        { header: 'VACANTES', key: 'capacidad', width: 90, align: 'center' },
+        { header: 'INSCRITOS', render: (_, c) => String(c.inscritos || c.participantes?.length || 0), width: 90, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
+      ],
+      data: filteredCursos
+    })
+  }
+
   useEffect(() => {
     setLoadError('')
     apiFetch('/cursos')
@@ -229,83 +277,76 @@ export function CursosSeguridad() {
   const paginatedAprobados = filteredAprobados.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {loadError && <PageLoadError message={loadError} />}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-lg shadow-purple-600/25">
-            <Icon name="course" className="size-6" />
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-md">
+            <Icon name="course" className="size-5.5" />
           </span>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                Cursos de Seguridad Vial
-              </h1>
-            </div>
-            <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              Cursos de Seguridad Vial
+            </h1>
+            <p className="text-xs font-medium text-slate-500">
               Programa municipal de capacitación y seguridad vial.
             </p>
           </div>
         </div>
       </div>
 
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-purple-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">TOTAL CURSOS</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 font-bold text-xs">🎓</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">TOTAL CURSOS</span>
+            <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60">
+              🎓
+            </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{totalCursos}</p>
-            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">Gestión 2026</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{totalCursos}</p>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Cursos registrados</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">CURSOS ACTIVOS</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">🏫</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">CURSOS ACTIVOS</span>
+            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60">
+              🏫
+            </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{cursosActivos}</p>
-            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">Vacantes Disponibles</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{cursosActivos}</p>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Listos para inscripción</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-indigo-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">TOTAL INSCRITOS</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 font-bold text-xs">👥</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">TOTAL INSCRITOS</span>
+            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60">
+              👥
+            </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{totalInscritos}</p>
-            <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">Participantes</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{totalInscritos}</p>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Conductores en capacitación</p>
         </div>
 
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-amber-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">FINALIZADOS</span>
-            <span className="grid size-8 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs">✓</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">FINALIZADOS</span>
+            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60">
+              ✓
+            </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{cursosFinalizados}</p>
-            <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-400">Certificados</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{cursosFinalizados}</p>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Capacitaciones concluidas</p>
         </div>
       </div>
 
-      <div className="mb-6 flex gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#0f172a]">
         <button
           onClick={() => setActiveView('CURSOS')}
           className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'CURSOS' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
@@ -322,85 +363,59 @@ export function CursosSeguridad() {
       </div>
 
       {activeView === 'CURSOS' && (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col">
 
-        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          <div className="relative w-full sm:max-w-xs">
+            <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por código, título del curso, instructor o lugar..."
+              placeholder="Buscar por código, título, instructor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-purple-200/80 bg-purple-50/20 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-purple-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <select
+          <div className="flex flex-wrap items-center gap-2">
+            <RoundedSelect
               value={filterTipo}
-              onChange={(e) => setFilterTipo(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-xs font-bold text-slate-700 outline-none transition focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 cursor-pointer"
-            >
-              <option value="TODOS">Todos los tipos</option>
-              <option value="SEGURIDAD_VIAL">Seguridad Vial</option>
-              <option value="MOTOTAXI">Transporte Menor (Mototaxis)</option>
-              <option value="MANEJO_DEFENSIVO">Manejo Defensivo</option>
-            </select>
-            <select
+              onChange={setFilterTipo}
+              options={FILTER_TIPO_OPTIONS}
+            />
+            <RoundedSelect
               value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-xs font-bold text-slate-700 outline-none transition focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 cursor-pointer"
-            >
-              <option value="TODOS">Todos los estados</option>
-              <option value="ACTIVO">ACTIVO / PROGRAMADO</option>
-              <option value="EN_CURSO">EN CURSO</option>
-              <option value="FINALIZADO">FINALIZADO</option>
-            </select>
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-              title="Descargar padrón de cursos en Excel"
-            >
-              <Icon name="table" className="size-4" />
-              <span>Exportar Excel</span>
+              onChange={setFilterEstado}
+              options={FILTER_ESTADO_OPTIONS}
+            />
+            
+            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors">
+              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" /><span>Excel</span>
             </button>
-
-            <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-purple-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-600/30 active:scale-95 cursor-pointer whitespace-nowrap">
-              <span className="text-base leading-none font-black">+</span>
-              <span>Programar Curso</span>
+            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-colors">
+              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" /><span>PDF</span>
             </button>
-          </div>
-        </div>
-
-
-        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:text-slate-400">
-          <div>
-            <span className="rounded-md bg-purple-100 px-1.5 py-0.5 font-bold text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-              Mostrando {filteredCursos.length}
-            </span>{" "}
-            de {cursos.length} cursos registrados
-          </div>
-          <div className="text-[11px] font-medium text-slate-400">
-            Programa Municipal de Seguridad Vial - 2026
+            
+            <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap">
+              <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
+            </button>
           </div>
         </div>
 
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-y border-slate-100 bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800/50 dark:bg-[#0f172a] dark:text-slate-400">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-3 py-3 whitespace-nowrap">CÓDIGO / TIPO</th>
                 <th className="px-3 py-3">TÍTULO DEL CURSO</th>
-                <th className="px-3 py-3 whitespace-nowrap">FECHA PROGRAMADA</th>
-                <th className="px-3 py-3 whitespace-nowrap">INSCRITOS / CAPACIDAD</th>
+                <th className="px-3 py-3 whitespace-nowrap text-center">FECHA PROGRAMADA</th>
+                <th className="px-3 py-3 whitespace-nowrap text-center">INSCRITOS / CAPACIDAD</th>
                 <th className="px-3 py-3">INSTRUCTOR / LUGAR</th>
-                <th className="px-3 py-3 whitespace-nowrap">ESTADO</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
+                <th className="px-3 py-3 whitespace-nowrap text-center">ESTADO</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-3 py-3 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#0f172a]">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {isLoading && cursos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -438,16 +453,16 @@ export function CursosSeguridad() {
 
 
                     <td className="px-3 py-3">
-                      <div className="max-w-[190px] lg:max-w-[230px]">
-                        <p className="font-bold text-slate-900 dark:text-white truncate" title={c.titulo}>{c.titulo}</p>
-                        <p className="text-xs text-slate-500 truncate dark:text-slate-400" title={c.descripcion}>
+                      <div>
+                        <p className="font-bold text-slate-900 dark:text-white" title={c.titulo}>{c.titulo}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400" title={c.descripcion}>
                           {c.descripcion || 'Educación Vial Obligatoria para Conductores'}
                         </p>
                       </div>
                     </td>
 
 
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap text-center">
                       <p className="font-bold text-slate-800 dark:text-slate-200">{c.fecha}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         {c.horario || '09:00 AM - 12:00 PM'}
@@ -455,7 +470,7 @@ export function CursosSeguridad() {
                     </td>
 
 
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap text-center">
                       <p className="font-bold text-slate-900 dark:text-white">
                         {c.inscritos || 0} / {c.capacidad || 50}
                       </p>
@@ -466,14 +481,14 @@ export function CursosSeguridad() {
 
 
                     <td className="px-3 py-3">
-                      <div className="max-w-[150px] lg:max-w-[180px]">
-                        <p className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={c.instructor}>{c.instructor || 'Ing. Fernando Ramos'}</p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 truncate" title={c.lugar}>{c.lugar || 'Auditorio Municipal JLO'}</p>
+                      <div>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200" title={c.instructor}>{c.instructor || 'Ing. Fernando Ramos'}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500" title={c.lugar}>{c.lugar || 'Auditorio Municipal JLO'}</p>
                       </div>
                     </td>
 
 
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap text-center">
                       {c.estado === 'ACTIVO' || c.estado === 'PROGRAMADO' || c.estado === 'ABIERTO' ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
                           <span className="size-1.5 rounded-full bg-emerald-600" />
@@ -493,8 +508,8 @@ export function CursosSeguridad() {
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
-                      <div className="flex items-center justify-end gap-1">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                      <div className="flex items-center justify-center gap-1">
                         {c.estado === 'FINALIZADO' && (
                           <button onClick={() => handlePrintBatch(c)} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Descargar Carnets (Lote)">
                             <Icon name="print" className="size-4" />
@@ -532,23 +547,23 @@ export function CursosSeguridad() {
       )}
 
       {activeView === 'APROBADOS' && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col">
           {/* Controls Aprobados */}
-          <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 dark:border-slate-800/60">
-            <div className="relative flex-1">
-              <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+            <div className="relative w-full sm:max-w-xs">
+              <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Buscar por DNI o Nombres..."
                 value={searchAprobados}
                 onChange={(e) => setSearchAprobados(e.target.value)}
-                className="w-full rounded-xl border border-emerald-200/80 bg-emerald-50/20 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-emerald-400"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white"
               />
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-              <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+            <table className="w-full text-left text-xs sm:text-sm">
+              <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-5 py-4">Conductor</th>
                   <th className="px-5 py-4">DNI / Licencia</th>
@@ -621,8 +636,8 @@ export function CursosSeguridad() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900 rounded-t-2xl">
               <div>
                 <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">
                   {selectedCurso ? 'Editar Curso de Seguridad' : 'Programar Nuevo Curso'}
@@ -630,59 +645,68 @@ export function CursosSeguridad() {
               </div>
               <button onClick={() => setIsModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 cursor-pointer">✕</button>
             </div>
-            <form onSubmit={handleFormSubmit} className="flex-1 space-y-4 overflow-y-auto p-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Código</label>
-                  <input type="text" value={formData.codigo} disabled className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2 text-sm text-slate-500 outline-none dark:border-slate-700 dark:bg-slate-800" />
+            <form onSubmit={handleFormSubmit} className="flex-1 space-y-6 p-6">
+              
+              <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-slate-700">
+                <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DATOS GENERALES</legend>
+                <div className="grid gap-4 sm:grid-cols-2 mb-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Código</label>
+                    <input type="text" value={formData.codigo} disabled className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2 text-sm text-slate-500 outline-none dark:border-slate-700 dark:bg-slate-800" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Estado</label>
+                    <RoundedSelect
+                      value={formData.estado}
+                      onChange={val => setFormData({ ...formData, estado: val })}
+                      options={FORM_ESTADO_OPTIONS}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Estado</label>
-                  <select required value={formData.estado} onChange={e => setFormData({ ...formData, estado: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
-                    <option value="PROGRAMADO">PROGRAMADO</option>
-                    <option value="EN_CURSO">EN CURSO</option>
-                    <option value="FINALIZADO">FINALIZADO</option>
-                  </select>
+                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Título del Curso *</label>
+                  <input type="text" required value={formData.titulo} onChange={e => setFormData({ ...formData, titulo: e.target.value })} placeholder="Ej. Seguridad Vial para Mototaxis" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
                 </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Título del Curso *</label>
-                <input type="text" required value={formData.titulo} onChange={e => setFormData({ ...formData, titulo: e.target.value })} placeholder="Ej. Seguridad Vial para Mototaxis" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Fecha *</label>
-                  <input type="date" required value={formData.fecha} onChange={e => {
-                    const newDate = e.target.value;
-                    
-                    const localDate = new Date();
-                    const year = localDate.getFullYear();
-                    const month = String(localDate.getMonth() + 1).padStart(2, '0');
-                    const day = String(localDate.getDate()).padStart(2, '0');
-                    const today = `${year}-${month}-${day}`;
-                    
-                    let autoEstado = formData.estado;
-                    if (newDate > today) autoEstado = 'PROGRAMADO';
-                    else if (newDate === today) autoEstado = 'EN_CURSO';
-                    else if (newDate < today) autoEstado = 'FINALIZADO';
-                    
-                    setFormData({ ...formData, fecha: newDate, estado: autoEstado });
-                  }} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+              </fieldset>
+
+              <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-slate-700">
+                <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DETALLES DEL CURSO</legend>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Fecha *</label>
+                    <input type="date" required value={formData.fecha} onChange={e => {
+                      const newDate = e.target.value;
+                      
+                      const localDate = new Date();
+                      const year = localDate.getFullYear();
+                      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+                      const day = String(localDate.getDate()).padStart(2, '0');
+                      const today = `${year}-${month}-${day}`;
+                      
+                      let autoEstado = formData.estado;
+                      if (newDate > today) autoEstado = 'PROGRAMADO';
+                      else if (newDate === today) autoEstado = 'EN_CURSO';
+                      else if (newDate < today) autoEstado = 'FINALIZADO';
+                      
+                      setFormData({ ...formData, fecha: newDate, estado: autoEstado });
+                    }} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Horario *</label>
+                    <input type="text" required value={formData.horario} onChange={e => setFormData({ ...formData, horario: e.target.value })} placeholder="Ej. 09:00 AM - 12:00 PM" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Instructor *</label>
+                    <input type="text" required value={formData.instructor} onChange={e => setFormData({ ...formData, instructor: e.target.value })} placeholder="Ej. Ing. Juan Pérez" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Lugar *</label>
+                    <input type="text" required value={formData.lugar} onChange={e => setFormData({ ...formData, lugar: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                  </div>
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Horario *</label>
-                  <input type="text" required value={formData.horario} onChange={e => setFormData({ ...formData, horario: e.target.value })} placeholder="Ej. 09:00 AM - 12:00 PM" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Instructor *</label>
-                  <input type="text" required value={formData.instructor} onChange={e => setFormData({ ...formData, instructor: e.target.value })} placeholder="Ej. Ing. Juan Pérez" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Lugar *</label>
-                  <input type="text" required value={formData.lugar} onChange={e => setFormData({ ...formData, lugar: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 pt-4">
+              </fieldset>
+
+              <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancelar</button>
                 <button type="submit" className="rounded-xl bg-purple-600 px-5 py-2 text-xs font-extrabold text-white shadow-md hover:bg-purple-700 cursor-pointer">Guardar Curso</button>
               </div>
@@ -936,3 +960,4 @@ export function CursosSeguridad() {
     </div>
   )
 }
+export default CursosSeguridad

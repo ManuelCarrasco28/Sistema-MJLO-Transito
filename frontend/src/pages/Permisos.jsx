@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
@@ -415,7 +415,7 @@ export function Permisos() {
                     <th className="px-4 py-3 whitespace-nowrap">Vehículo</th>
                     <th className="px-4 py-3 whitespace-nowrap">Zona / Horario</th>
                     <th className="px-4 py-3 whitespace-nowrap">Vigencia</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Estado</th>
+                    <th className="px-4 py-3 text-center whitespace-nowrap">Estado</th>
                     <th className="sticky right-0 z-20 px-4 py-3 text-center whitespace-nowrap bg-slate-50/75 dark:bg-slate-800/40">
                       Acciones
                     </th>
@@ -450,7 +450,7 @@ export function Permisos() {
                                   {initials}
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-[13px] font-bold text-slate-900 dark:text-white max-w-[200px]">
+                                  <p className="text-[13px] font-bold text-slate-900 dark:text-white">
                                     {solicitanteText}
                                   </p>
                                   <p className="text-[10px] text-slate-400 font-mono">
@@ -500,7 +500,7 @@ export function Permisos() {
 
                             {/* Zona / Horario */}
                             <td className="px-4 py-3 text-xs align-top">
-                              <div className="font-semibold text-slate-800 dark:text-slate-200 max-w-[150px] truncate">
+                              <div className="font-semibold text-slate-800 dark:text-slate-200">
                                 {p.zonaCirculacion || p.zonaPermitida || '—'}
                               </div>
                               <div className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
@@ -519,12 +519,12 @@ export function Permisos() {
                             </td>
 
                             {/* Estado */}
-                            <td className="px-4 py-3 align-top">
+                            <td className="px-4 py-3 text-center align-top">
                               <StatusBadge status={p.estado} />
                             </td>
 
                             {/* Acciones - Estilo Personas.jsx */}
-                            <td className="sticky right-0 z-20 px-4 py-3 align-top bg-white/95 dark:bg-[#0f172a]/95">
+                            <td className="sticky right-0 z-20 px-4 py-3 text-center align-top bg-white/95 dark:bg-[#0f172a]/95">
                               <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   type="button"

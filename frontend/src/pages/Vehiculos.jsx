@@ -7,6 +7,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { RoundedSelect } from '../components/ui/FormInputs'
 
 function FloatingInput({ id, label, type = "text", ...props }) {
   return (
@@ -598,27 +599,27 @@ export function Vehiculos() {
 
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <select
+            <RoundedSelect
               value={filterTipo}
-              onChange={(e) => setFilterTipo(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODOS">Todos los tipos</option>
-              <option value="Mototaxi (Trimovil)">Mototaxi (Trimovil)</option>
-              <option value="Colectivo (Auto)">Colectivo (Auto)</option>
-              <option value="Combi / Minivan">Combi / Minivan</option>
-            </select>
+              onChange={setFilterTipo}
+              options={[
+                { value: 'TODOS', label: 'Todos los tipos' },
+                { value: 'Mototaxi (Trimovil)', label: 'Mototaxi (Trimovil)' },
+                { value: 'Colectivo (Auto)', label: 'Colectivo (Auto)' },
+                { value: 'Combi / Minivan', label: 'Combi / Minivan' }
+              ]}
+            />
 
-            <select
+            <RoundedSelect
               value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODOS">Todos los estados</option>
-              <option value="FORMAL">Formales (En Asociación)</option>
-              <option value="INFORMAL">Informales (Sin Asociación)</option>
-              <option value="SUSPENDIDO">Inhabilitados (Suspendidos/Baja)</option>
-            </select>
+              onChange={setFilterEstado}
+              options={[
+                { value: 'TODOS', label: 'Todos los estados' },
+                { value: 'FORMAL', label: 'Formales (En Asociación)' },
+                { value: 'INFORMAL', label: 'Informales (Sin Asociación)' },
+                { value: 'SUSPENDIDO', label: 'Inhabilitados (Suspendidos/Baja)' }
+              ]}
+            />
 
             {(filterTipo !== 'TODOS' || filterEstado !== 'TODOS' || searchTerm !== '') && (
               <button
@@ -763,7 +764,7 @@ export function Vehiculos() {
                         </>
                       ) : (
                         <>
-                          <p className="truncate text-xs font-bold text-slate-500 dark:text-slate-400">
+                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
                             Sin Asociación
                           </p>
                           <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold">INFORMAL</span>
@@ -810,7 +811,7 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-3.5 whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-3.5 whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
@@ -893,11 +894,11 @@ export function Vehiculos() {
               className="space-y-2.5 p-4 sm:p-5"
             >
 
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-blue-600" />
                   Identificación de la Unidad
-                </h4>
+                </legend>
                 <div className="space-y-2.5">
                   <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                     <FloatingInput
@@ -992,14 +993,14 @@ export function Vehiculos() {
                     />
                   </div>
                 </div>
-              </div>
+              </fieldset>
 
 
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-cyan-500" />
                   Datos Técnicos & SUNARP
-                </h4>
+                </legend>
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                   <FloatingInput
                     id="veh_serie"
@@ -1025,14 +1026,14 @@ export function Vehiculos() {
                     className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
                   />
                 </div>
-              </div>
+              </fieldset>
 
 
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <legend className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-1 mb-2 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-emerald-500" />
                   Titular & Asociación Autorizada
-                </h4>
+                </legend>
                 <div className="grid gap-2.5 lg:grid-cols-2 items-start">
                   <div className="relative" data-combobox="vehiculo">
                     <FloatingInput
@@ -1153,15 +1154,15 @@ export function Vehiculos() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </fieldset>
 
 
               {isEditing && (
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+                <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 px-1 mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-amber-500" />
                     Estado de Operatividad Municipal
-                  </h4>
+                  </legend>
                   <div className="grid gap-2.5 sm:grid-cols-1">
                     <FloatingSelect
                       id="veh_estado"
@@ -1176,7 +1177,7 @@ export function Vehiculos() {
                       ]}
                     />
                   </div>
-                </div>
+                </fieldset>
               )}
 
 
@@ -1408,7 +1409,7 @@ export function Vehiculos() {
                                 </div>
                                 <div className="min-w-0">
                                   <p className="text-xs font-black text-slate-800 dark:text-slate-100">{papeleta.codigoInfraccion || 'SIN CODIGO'} · {papeleta.gravedad || 'SIN GRAVEDAD'}</p>
-                                  <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400" title={papeleta.tipoInfraccion}>{papeleta.tipoInfraccion || papeleta.lugar || 'Infracción no especificada'}</p>
+                                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400" title={papeleta.tipoInfraccion}>{papeleta.tipoInfraccion || papeleta.lugar || 'Infracción no especificada'}</p>
                                 </div>
                                 <p className="font-mono text-xs font-black text-slate-800 dark:text-slate-100">S/ {Number(papeleta.montoTotal || 0).toFixed(2)}</p>
                                 <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${pagada ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : anulada ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'}`}>
@@ -1448,8 +1449,8 @@ export function Vehiculos() {
                                 <p className="text-[10px] font-bold text-slate-400">{int.fecha_ingreso ? new Date(int.fecha_ingreso).toLocaleDateString() : 'Sin fecha'}</p>
                               </div>
                               <div className="min-w-0">
-                                <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">{int.motivo || 'Sin motivo'}</p>
-                                <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">{int.lugar_intervencion || 'Sin lugar'}</p>
+                                <p className="text-xs font-black text-slate-800 dark:text-slate-100">{int.motivo || 'Sin motivo'}</p>
+                                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{int.lugar_intervencion || 'Sin lugar'}</p>
                               </div>
                               <div className="text-right">
                                 <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${

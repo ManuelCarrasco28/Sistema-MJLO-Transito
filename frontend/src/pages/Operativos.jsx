@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { PageLoadError } from '../components/ui/PageLoadError'
+import { RoundedSelect } from '../components/ui/FormInputs'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
+import { exportToPdf } from '../utils/exportToPdf'
 
 const getPeruDateInputValue = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -25,6 +27,21 @@ const initialForm = {
   observacion: '',
   inspectores: [],
 }
+
+const FILTER_ESTADO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'PROGRAMADO', label: 'Programado' },
+  { value: 'EN_CURSO', label: 'En curso' },
+  { value: 'FINALIZADO', label: 'Finalizado' },
+  { value: 'CANCELADO', label: 'Cancelado' },
+]
+
+const FILTER_FECHA_OPTIONS = [
+  { value: 'TODAS', label: 'Todas las fechas' },
+  { value: 'HOY', label: 'Hoy' },
+  { value: 'SEMANA', label: 'Últimos 7 días' },
+  { value: 'MES', label: 'Este mes' },
+]
 
 export function Operativos({ user }) {
   const cached = getCachedData('/operativos')
@@ -112,6 +129,30 @@ export function Operativos({ user }) {
         { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 100, align: 'center' },
         { header: 'ESTADO', key: 'estado', width: 120, align: 'center' },
         { header: 'OBSERVACIONES', render: (_, o) => o.observacion || '—', width: 240 }
+      ],
+      data: filtered
+    })
+  }
+
+  const handleExportPdf = () => {
+    exportToPdf({
+      filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
+      metadata: [
+        { label: 'Estado', value: estado },
+        { label: 'Total Operativos', value: String(filtered.length) }
+      ],
+      columns: [
+        { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, width: 25, align: 'center' },
+        { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 40 },
+        { header: 'LUGAR / ZONA', key: 'lugar', width: 40 },
+        { header: 'FECHA', key: 'fecha', width: 20, align: 'center' },
+        { header: 'HORA INICIO', key: 'hora_inicio', width: 20, align: 'center' },
+        { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 20, align: 'center' },
+        { header: 'INSPECTORES', render: (_, o) => String(o.inspectores_total || o.inspectores?.length || 0), width: 25, align: 'center' },
+        { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 20, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 25, align: 'center' }
       ],
       data: filtered
     })
@@ -410,117 +451,118 @@ export function Operativos({ user }) {
   }
 
   return (
-    <section className="space-y-6">
+    <div className="space-y-4">
       {loadError && <PageLoadError message={loadError} />}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3.5">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose-600 to-orange-500 text-white shadow-lg shadow-rose-500/30">
-            <Icon name="operations" className="size-6" />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose-600 to-orange-500 text-white shadow-md">
+            <Icon name="operations" className="size-5.5" />
           </span>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">Operativos</h1>
-            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">Programación, asignación de inspectores e historial de papeletas.</p>
+            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">Operativos</h1>
+            <p className="text-xs font-medium text-slate-500">Programación, asignación de inspectores e historial de papeletas.</p>
           </div>
         </div>
-        <button onClick={openCreate} className="rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 px-4 py-2.5 text-sm font-extrabold text-white shadow-md shadow-rose-500/20 hover:brightness-105">
-          + Nuevo operativo
-        </button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
         {[
           ['Total operativos', operativos.length, '📍'],
           ['Activos', activos, '🚦'],
           ['Finalizados', finalizados, '✅'],
           ['Papeletas vinculadas', papeletas, '🎫'],
         ].map(([label, value, icon]) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+          <div key={label} className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-rose-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">{label}</span>
-              <span className="grid size-8 place-items-center rounded-lg bg-rose-50 text-sm">{icon}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">{label}</span>
+              <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60">
+                <span className="text-sm">{icon}</span>
+              </span>
             </div>
-            <p className="mt-3 text-3xl font-black text-slate-900 dark:text-white">{loading ? '—' : value}</p>
+            <div className="mt-1">
+              <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{loading ? '—' : value}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, lugar o fecha..." className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm font-semibold outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+      <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          <div className="relative w-full sm:max-w-xs">
+            <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, lugar o fecha..." className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs font-semibold outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select value={estado} onChange={(e) => setEstado(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer">
-              <option value="TODOS">Todos los estados</option>
-              <option value="PROGRAMADO">Programado</option>
-              <option value="EN_CURSO">En curso</option>
-              <option value="FINALIZADO">Finalizado</option>
-              <option value="CANCELADO">Cancelado</option>
-            </select>
-            <select value={fechaFiltro} onChange={(e) => setFechaFiltro(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer">
-              <option value="TODAS">Todas las fechas</option>
-              <option value="HOY">Hoy</option>
-              <option value="SEMANA">Últimos 7 días</option>
-              <option value="MES">Este mes</option>
-            </select>
+            <RoundedSelect
+              value={estado}
+              onChange={setEstado}
+              options={FILTER_ESTADO_OPTIONS}
+            />
+            <RoundedSelect
+              value={fechaFiltro}
+              onChange={setFechaFiltro}
+              options={FILTER_FECHA_OPTIONS}
+            />
             {(search || estado !== 'TODOS' || fechaFiltro !== 'TODAS') && (
               <button
                 type="button"
                 onClick={() => { setSearch(''); setEstado('TODOS'); setFechaFiltro('TODAS') }}
-                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors"
+                className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors"
               >
-                Limpiar Filtros
+                Limpiar
               </button>
             )}
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-              title="Descargar registro de operativos en Excel"
-            >
-              <Icon name="table" className="size-4" />
-              <span>Exportar Excel</span>
+            
+            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition-colors">
+              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" /><span>Excel</span>
+            </button>
+            
+            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors">
+              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" /><span>PDF</span>
+            </button>
+            
+            <button onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md hover:brightness-105 transition-all">
+              <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
             </button>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-y border-slate-100 bg-slate-50 text-xs font-black uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-5 py-3.5">Operativo</th>
-                <th className="px-5 py-3.5 whitespace-nowrap">Fecha / hora</th>
-                <th className="px-5 py-3.5 text-center">Inspectores</th>
-                <th className="px-5 py-3.5 text-center">Papeletas</th>
-                <th className="px-5 py-3.5 text-center">Estado</th>
-                <th className="px-5 py-3.5 text-right">Acciones</th>
+                <th className="px-4 py-3">Operativo</th>
+                <th className="px-4 py-3 whitespace-nowrap">Fecha / hora</th>
+                <th className="px-4 py-3 text-center">Inspectores</th>
+                <th className="px-4 py-3 text-center">Papeletas</th>
+                <th className="px-4 py-3 text-center">Estado</th>
+                <th className="px-4 py-3 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {visible.map((op) => (
-                <tr key={op.id} className="transition-colors hover:bg-rose-50/30 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-4">
-                    <p className="font-black text-slate-900 dark:text-white">{op.nombre}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{op.lugar}</p>
+                <tr key={op.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-4 py-3">
+                    <p className="font-bold text-slate-900 dark:text-white">{op.nombre}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">{op.lugar}</p>
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap">
-                    <p className="font-bold text-slate-800 dark:text-slate-200">{formatFecha(op.fecha)}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{formatHora(op.hora_inicio)}{op.hora_fin ? ` - ${formatHora(op.hora_fin)}` : ''}</p>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <p className="font-semibold text-slate-800 dark:text-slate-200">{formatFecha(op.fecha)}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">{formatHora(op.hora_inicio)}{op.hora_fin ? ` - ${formatHora(op.hora_fin)}` : ''}</p>
                   </td>
-                  <td className="px-5 py-4 text-center font-bold text-slate-700 dark:text-slate-300">{op.total_inspectores || 0}</td>
-                  <td className="px-5 py-4 text-center font-bold text-slate-700 dark:text-slate-300">{op.total_papeletas || 0}</td>
-                  <td className="px-5 py-4 text-center"><span className={`inline-block rounded-full px-3 py-1 text-xs font-black ${badgeClass(op.estado)}`}>{op.estado}</span></td>
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => openDetail(op)} className="rounded-lg bg-sky-50 p-2 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/50 dark:text-sky-400 dark:hover:bg-sky-600 transition-colors" title="Ver detalle"><Icon name="eye" className="size-4" /></button>
-                      <button onClick={() => openEdit(op)} className="rounded-lg bg-amber-50 p-2 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/50 dark:text-amber-400 dark:hover:bg-amber-600 transition-colors" title="Editar"><Icon name="pencil" className="size-4" /></button>
-                      <button onClick={() => remove(op.id)} className="rounded-lg bg-rose-50 p-2 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/50 dark:text-rose-400 dark:hover:bg-rose-600 transition-colors" title="Eliminar"><Icon name="trash" className="size-4" /></button>
+                  <td className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">{op.total_inspectores || 0}</td>
+                  <td className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">{op.total_papeletas || 0}</td>
+                  <td className="px-4 py-3 text-center"><span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ${badgeClass(op.estado)}`}>{op.estado}</span></td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-center gap-1.5">
+                      <button onClick={() => openDetail(op)} className="rounded-md bg-sky-50 p-1.5 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-900/40 dark:text-sky-400 dark:hover:bg-sky-600 transition-colors" title="Ver detalle"><Icon name="eye" className="size-3.5" /></button>
+                      <button onClick={() => openEdit(op)} className="rounded-md bg-amber-50 p-1.5 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-900/40 dark:text-amber-400 dark:hover:bg-amber-600 transition-colors" title="Editar"><Icon name="pencil" className="size-3.5" /></button>
+                      <button onClick={() => remove(op.id)} className="rounded-md bg-rose-50 p-1.5 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-600 transition-colors" title="Eliminar"><Icon name="trash" className="size-3.5" /></button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {!visible.length && <tr><td colSpan="6" className="p-10 text-center text-slate-500">{loading ? 'Cargando operativos...' : 'No se encontraron operativos.'}</td></tr>}
+              {!visible.length && <tr><td colSpan="6" className="p-8 text-center text-xs text-slate-500">{loading ? 'Cargando operativos...' : 'No se encontraron operativos.'}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -530,32 +572,48 @@ export function Operativos({ user }) {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
-          <form onSubmit={save} className="max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl dark:bg-[#0f172a]">
+          <form onSubmit={save} className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#0f172a]">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-black">{editing ? 'Editar operativo' : 'Nuevo operativo'}</h2>
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">✕</button>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-bold">Nombre<input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
-              <label className="text-sm font-bold">Lugar<input required value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
-              <label className="text-sm font-bold">Fecha<input required type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
-              <label className="text-sm font-bold">Inicio<input required type="time" value={form.hora_inicio} onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
-              <label className="text-sm font-bold">Estado<select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900"><option>PROGRAMADO</option><option>EN_CURSO</option><option>FINALIZADO</option><option>CANCELADO</option></select></label>
-              {editing && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
-                  <p className="font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">Hora de fin</p>
-                  <p className="mt-1">
-                    {editing.estado === 'FINALIZADO' && editing.hora_fin
-                      ? `Finalizado a las ${formatHora(editing.hora_fin)}.`
-                      : 'Se registrará automáticamente cuando el estado cambie a FINALIZADO. Si se cancela, no se registra hora de fin.'}
-                  </p>
-                </div>
-              )}
-              <label className="text-sm font-bold sm:col-span-2">Observación<textarea value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} className="mt-1 min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
-            </div>
-            <div className="mt-5">
-              <p className="mb-2 text-sm font-black">Inspectores asignados</p>
-              <div className="grid max-h-56 gap-2 overflow-y-auto rounded-2xl border border-slate-200 p-3 sm:grid-cols-2 dark:border-slate-700">
+            
+            <fieldset className="mb-5 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-500">Datos Generales</legend>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm font-bold">Nombre<input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
+                <label className="text-sm font-bold">Lugar<input required value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
+                <label className="text-sm font-bold">Fecha<input required type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
+                <label className="text-sm font-bold">Inicio<input required type="time" value={form.hora_inicio} onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
+                <label className="text-sm font-bold flex flex-col gap-1">Estado
+                  <RoundedSelect
+                    value={form.estado}
+                    onChange={(val) => setForm({ ...form, estado: val })}
+                    options={[
+                      { value: 'PROGRAMADO', label: 'PROGRAMADO' },
+                      { value: 'EN_CURSO', label: 'EN_CURSO' },
+                      { value: 'FINALIZADO', label: 'FINALIZADO' },
+                      { value: 'CANCELADO', label: 'CANCELADO' }
+                    ]}
+                  />
+                </label>
+                {editing && (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+                    <p className="font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">Hora de fin</p>
+                    <p className="mt-1">
+                      {editing.estado === 'FINALIZADO' && editing.hora_fin
+                        ? `Finalizado a las ${formatHora(editing.hora_fin)}.`
+                        : 'Se registrará automáticamente cuando el estado cambie a FINALIZADO. Si se cancela, no se registra hora de fin.'}
+                    </p>
+                  </div>
+                )}
+                <label className="text-sm font-bold sm:col-span-2">Observación<textarea value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} className="mt-1 min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" /></label>
+              </div>
+            </fieldset>
+
+            <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-500">Inspectores Asignados</legend>
+              <div className="grid max-h-56 gap-2 overflow-y-auto sm:grid-cols-2">
                 {personal.map((p) => (
                   <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
                     <input type="checkbox" checked={form.inspectores.includes(String(p.id))} onChange={() => toggleInspector(p.id)} />
@@ -564,7 +622,8 @@ export function Operativos({ user }) {
                 ))}
                 {!personal.length && <p className="text-sm text-slate-500">No hay inspectores/trabajadores activos disponibles.</p>}
               </div>
-            </div>
+            </fieldset>
+
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold">Cancelar</button>
               <button disabled={saving} className="rounded-xl bg-rose-600 px-5 py-2 text-sm font-black text-white disabled:opacity-60">{saving ? 'Guardando...' : 'Guardar operativo'}</button>
@@ -575,7 +634,7 @@ export function Operativos({ user }) {
 
       {detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-xs">
-          <div className="flex max-h-[94dvh] w-full max-w-[92rem] flex-col rounded-3xl bg-white p-4 shadow-2xl dark:bg-[#0f172a]">
+          <div className="flex max-h-[94dvh] w-full max-w-[92rem] flex-col rounded-2xl bg-white p-4 shadow-2xl dark:bg-[#0f172a]">
             <div className="mb-3 shrink-0 flex items-start justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
               <div>
                 <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">{detail.nombre}</h2>
@@ -670,7 +729,7 @@ export function Operativos({ user }) {
                         </td>
                         <td className="px-4 py-2.5">
                           <p className="font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200">{formatFechaHora(p.fecha_hora)}</p>
-                          <p className="text-[11px] text-slate-500 truncate max-w-[190px]" title={p.lugar || detail.lugar}>{p.lugar || detail.lugar}</p>
+                          <p className="text-[11px] text-slate-500">{p.lugar || detail.lugar}</p>
                         </td>
                         <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-medium">
                           {p.inspector || 'Inspector Municipal'}
@@ -709,6 +768,7 @@ export function Operativos({ user }) {
           </div>
         </div>
       )}
-    </section>
+    </div>
   )
 }
+export default Operativos

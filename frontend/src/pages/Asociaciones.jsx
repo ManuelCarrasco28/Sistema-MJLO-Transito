@@ -6,97 +6,20 @@ import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 
-function FloatingInput({ id, label, type = "text", ...props }) {
-  return (
-    <div className="relative">
-      <input
-        id={id}
-        type={type}
-        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-        placeholder=" "
-        autoComplete="off"
-        {...props}
-      />
-      <label
-        htmlFor={id}
-        className="pointer-events-none absolute left-3 right-3 truncate whitespace-nowrap top-1/2 -translate-y-1/2 select-none text-xs font-medium text-slate-400 transition-all duration-150 peer-focus:top-1 peer-focus:-translate-y-0 peer-focus:text-[9.5px] peer-focus:font-bold peer-focus:text-indigo-600 peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:-translate-y-0 peer-[:not(:placeholder-shown)]:text-[9.5px] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:text-slate-500 dark:peer-[:not(:placeholder-shown)]:text-slate-400"
-      >
-        {label}
-      </label>
-    </div>
-  )
-}
+import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 
-function FloatingSelect({ id, label, value, onChange, options = [], className = '' }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef(null)
+const FILTER_TIPO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los tipos' },
+  { value: 'ASOCIACION', label: 'Asociaciones' },
+  { value: 'PARTICULAR', label: 'Particulares' },
+]
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+const FILTER_ESTADO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'ACTIVO', label: 'Activas' },
+  { value: 'SUSPENDIDO', label: 'Suspendidas' },
+]
 
-  const selectedOption = options.find((opt) => String(opt.value) === String(value)) || options[0]
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        id={id}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-900 dark:text-white cursor-pointer ${isOpen
-            ? 'border-indigo-500 ring-1 ring-indigo-500/20 dark:border-indigo-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
-          }`}
-      >
-        <span className="truncate">{selectedOption?.label || value}</span>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''}`}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      <label htmlFor={id} className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-indigo-600 dark:!text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`}>
-        {label}
-      </label>
-
-      {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
-          <div className="space-y-0.5">
-            {options.map((opt) => {
-              const isSelected = String(opt.value) === String(value)
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange({ target: { value: opt.value } })
-                    setIsOpen(false)
-                  }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
-                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
-                    }`}
-                >
-                  <span className="whitespace-nowrap">{opt.label}</span>
-                  {isSelected && (
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3 text-indigo-600 dark:text-indigo-400 shrink-0">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 export function Asociaciones() {
   const cached = getCachedData('/asociaciones')
@@ -520,25 +443,17 @@ export function Asociaciones() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <RoundedSelect
               value={filterTipo}
-              onChange={(e) => setFilterTipo(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-1.5 px-2.5 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODOS">Todos los tipos</option>
-              <option value="ASOCIACION">Asociaciones</option>
-              <option value="PARTICULAR">Particulares</option>
-            </select>
+              onChange={setFilterTipo}
+              options={FILTER_TIPO_OPTIONS}
+            />
 
-            <select
+            <RoundedSelect
               value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-1.5 px-2.5 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODOS">Todos los estados</option>
-              <option value="ACTIVO">Activas</option>
-              <option value="SUSPENDIDO">Suspendidas</option>
-            </select>
+              onChange={setFilterEstado}
+              options={FILTER_ESTADO_OPTIONS}
+            />
 
             {(filterTipo !== 'TODOS' || filterEstado !== 'TODOS' || searchTerm !== '') && (
               <button
@@ -767,10 +682,10 @@ export function Asociaciones() {
 
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
-            {/* Cabecera del Modal (Limpia, sin morado) */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter overflow-y-auto">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800 my-auto">
+            {/* Cabecera del Modal */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900 rounded-t-2xl">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                   <Icon name="building" className="size-4" />
@@ -789,13 +704,12 @@ export function Asociaciones() {
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} autoComplete="off" className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleFormSubmit} autoComplete="off" className="p-4 sm:p-5 space-y-4">
 
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-indigo-600" />
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Identificación Institucional
-                </h4>
+                </legend>
                 <div className="grid gap-4 sm:grid-cols-3">
                   <FloatingSelect
                     id="org_tipo"
@@ -869,7 +783,7 @@ export function Asociaciones() {
                             <Icon name="idCard" className="size-4" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
+                            <p className="text-xs font-black text-slate-800 dark:text-slate-100">
                               {formData.representanteNombre || 'Nombre no disponible'}
                             </p>
                             <p className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400">
@@ -931,7 +845,7 @@ export function Asociaciones() {
                                     className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center justify-between gap-3 transition-colors cursor-pointer group"
                                   >
                                     <div className="min-w-0">
-                                      <p className="font-bold text-slate-800 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                                      <p className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
                                         {nombre}
                                       </p>
                                       <p className="font-mono text-[11px] text-slate-400">
@@ -970,14 +884,13 @@ export function Asociaciones() {
                     </>
                   )}
                 </div>
-              </div>
+              </fieldset>
 
 
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-cyan-500" />
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Contacto, ubicación y autorización
-                </h4>
+                </legend>
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="sm:col-span-2">
                     <FloatingInput
@@ -1084,9 +997,35 @@ export function Asociaciones() {
                   )}
 
                 </div>
-              </div>
+              </fieldset>
 
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Control y Estado
+                </legend>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FloatingInput
+                    id="org_flota"
+                    type="number"
+                    min={1}
+                    label={formData.tipo === 'PARTICULAR' ? 'Flota permitida' : 'Flota Autorizada (máx vehículos)'}
+                    value={formData.flotaAutorizada}
+                    onChange={(e) => setFormData({ ...formData, flotaAutorizada: Number(e.target.value) || 0 })}
+                  />
 
+                  <FloatingSelect
+                    id="org_estado"
+                    label="Estado de la Organización"
+                    value={formData.estado}
+                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                    options={[
+                      { value: 'ACTIVO', label: 'ACTIVO' },
+                      { value: 'SUSPENDIDO', label: 'SUSPENDIDO' },
+                      { value: 'BAJA', label: 'DADO DE BAJA' }
+                    ]}
+                  />
+                </div>
+              </fieldset>
               <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                 <button
                   type="button"
