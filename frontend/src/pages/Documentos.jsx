@@ -1,15 +1,349 @@
 import { useEffect, useState, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
+import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { PlantillaImpresionTUC } from '../components/documentos/PlantillaImpresionTUC'
 import { exportToExcel } from '../utils/exportToExcel'
 
+function formatFecha(fechaStr) {
+  if (!fechaStr) return '—'
+  try {
+    const parts = fechaStr.split(/[- :T]/)
+    if (parts.length >= 3) {
+      const year = parseInt(parts[0], 10)
+      const month = parseInt(parts[1], 10) - 1
+      const day = parseInt(parts[2], 10)
+      const d = new Date(year, month, day)
+      return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    }
+    return fechaStr
+  } catch {
+    return fechaStr
+  }
+}
+
+function FloatingInput({
+  id,
+  label,
+  value,
+  onChange,
+  type = 'text',
+  required = false,
+  maxLength,
+  optional = false,
+  autoComplete = 'off',
+  className = '',
+  inputClassName = '',
+  ...props
+}) {
+  const [isFocused, setIsFocused] = useState(false)
+  const isFloating = isFocused || (value !== undefined && value !== null && String(value).trim() !== '')
+
+  return (
+    <div className={`relative ${className}`}>
+      <input
+        id={id}
+        type={type}
+        required={required}
+        maxLength={maxLength}
+        value={value ?? ''}
+        onChange={onChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        autoComplete={autoComplete}
+        placeholder=" "
+        className={`peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 ${inputClassName}`}
+        {...props}
+      />
+      <label
+        htmlFor={id}
+        className={`pointer-events-none absolute left-3 select-none transition-all duration-150 ${isFloating
+            ? 'top-1 text-[9.5px] font-bold text-slate-500 dark:text-slate-400'
+            : 'top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-slate-500'
+          } ${isFocused ? '!text-blue-600 dark:!text-blue-400' : ''}`}
+      >
+        {label}
+        {optional && (
+          <span className="ml-1 text-[9px] font-normal text-slate-400 dark:text-slate-500">(Opcional)</span>
+        )}
+      </label>
+    </div>
+  )
+}
+
+function FloatingSelect({
+  id,
+  label,
+  value,
+  onChange,
+  options = [],
+  className = '',
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectedOption = options.find((opt) => opt.value === value) || options[0]
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        id={id}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-800 dark:text-white cursor-pointer ${isOpen
+            ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
+            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+          }`}
+      >
+        <span className="truncate">{selectedOption?.label || value}</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
+            }`}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      <label
+        htmlFor={id}
+        className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-blue-600 dark:!text-blue-400' : 'text-slate-500 dark:text-slate-400'
+          }`}
+      >
+        {label}
+      </label>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
+          <div className="space-y-0.5">
+            {options.map((opt) => {
+              const isSelected = opt.value === value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange({ target: { value: opt.value } })
+                    setIsOpen(false)
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
+                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold'
+                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
+                    }`}
+                >
+                  <span className="whitespace-nowrap">{opt.label}</span>
+                  {isSelected && (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="size-3 text-blue-600 dark:text-blue-400 shrink-0"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RoundedSelect({
+  value,
+  onChange,
+  options = [],
+  className = '',
+  buttonClassName = '',
+  dropdownClassName = '',
+  placeholder = 'Seleccionar...',
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectedOption = options.find((opt) => opt.value === value)
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center justify-between gap-2 rounded-xl border bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 transition outline-none dark:bg-slate-800 dark:text-slate-200 cursor-pointer ${isOpen
+            ? 'border-indigo-500 ring-2 ring-indigo-500/20 dark:border-indigo-400'
+            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+          } ${buttonClassName}`}
+      >
+        <span className="whitespace-nowrap">{selectedOption?.label || placeholder}</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''
+            }`}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div
+          className={`absolute right-0 top-full mt-1 z-40 min-w-full w-max rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto ${dropdownClassName}`}
+        >
+          <div className="space-y-0.5">
+            {options.map((opt) => {
+              const isSelected = opt.value === value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value)
+                    setIsOpen(false)
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
+                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
+                    }`}
+                >
+                  <span className="whitespace-nowrap">{opt.label}</span>
+                  {isSelected && (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="size-3 text-indigo-600 dark:text-indigo-400 shrink-0"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const TIPO_DOC_OPTIONS = [
+  { value: 'TARJETA_OPERATIVIDAD', label: 'Tarjeta de Operatividad (TUC)' },
+  { value: 'SOAT', label: 'SOAT Vehicular' },
+  { value: 'CERTICAV', label: 'CERTICAV (Inspección Técnica)' },
+]
+
+const ESTADO_OPTIONS = [
+  { value: 'VIGENTE', label: 'VIGENTE' },
+  { value: 'EN_TRAMITE', label: 'EN TRÁMITE' },
+  { value: 'VENCIDO', label: 'VENCIDO' },
+]
+
+const FILTER_TIPO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los tipos' },
+  { value: 'TARJETA_OPERATIVIDAD', label: 'Tarjeta Operatividad (TUC)' },
+  { value: 'SOAT', label: 'SOAT' },
+  { value: 'CERTICAV', label: 'CERTICAV' },
+  { value: 'CITV', label: 'CITV' },
+  { value: 'TARJETA_PROPIEDAD', label: 'Tarjeta Propiedad' },
+]
+
+const FILTER_ESTADO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'VIGENTE', label: 'Vigentes' },
+  { value: 'EN_TRAMITE', label: 'En trámite' },
+  { value: 'VENCIDO', label: 'Vencidos' },
+]
+
+function getDocTypeBadge(tipo) {
+  switch (tipo) {
+    case 'TARJETA_OPERATIVIDAD':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10.5px] font-bold text-blue-700 border border-blue-200/80 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
+          TUC (Operatividad)
+        </span>
+      )
+    case 'SOAT':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10.5px] font-bold text-amber-700 border border-amber-200/80 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
+          SOAT Vehicular
+        </span>
+      )
+    case 'CERTICAV':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-[10.5px] font-bold text-purple-700 border border-purple-200/80 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800">
+          CertiCAV (Inspección)
+        </span>
+      )
+    case 'CITV':
+    case 'INSPECCION_TECNICA':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-0.5 text-[10.5px] font-bold text-cyan-700 border border-cyan-200/80 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800">
+          CITV
+        </span>
+      )
+    case 'TARJETA_PROPIEDAD':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+          Tarjeta Propiedad
+        </span>
+      )
+    default:
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-[10.5px] font-bold text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300">
+          {tipo || '—'}
+        </span>
+      )
+  }
+}
+
 export function Documentos() {
-  const [documentos, setDocumentos] = useState([])
+  const cached = getCachedData('/documentos')
+  const [documentos, setDocumentos] = useState(cached || [])
   const [vehiculos, setVehiculos] = useState([])
-  const [inspecciones, setInspecciones] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
@@ -18,60 +352,62 @@ export function Documentos() {
   const [loadError, setLoadError] = useState('')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [toast, setToast] = useState(null)
 
-  // Autocompletado / Búsqueda de Placa Vehicular
+  // Search dropdown for vehicle plate inside modal
   const [isPlacaDropdownOpen, setIsPlacaDropdownOpen] = useState(false)
   const placaDropdownRef = useRef(null)
 
   const [formData, setFormData] = useState({
     vehiculoPlaca: '',
-    tipoDocumento: '',
+    tipoDocumento: 'TARJETA_OPERATIVIDAD',
     codigo: '',
     fechaExpedicion: '',
     fechaExpiracion: '',
-    estado: '',
+    estado: 'VIGENTE',
+    aseguradora: '',
+    numeroLicencia: '',
     propietario: '',
     propietarioDni: '',
     asociacion: '',
   })
 
-  // Cargar datos frescos del backend
-  const loadData = () => {
-    setIsLoading(true)
-    setLoadError('')
-    Promise.all([
-      apiFetch('/documentos').then((response) => (response.ok ? response.json() : Promise.reject(response))),
-      apiFetch('/vehiculos').then((response) => (response.ok ? response.json() : Promise.reject(response))),
-      apiFetch('/inspecciones')
-        .then((response) => (response.ok ? response.json() : Promise.reject(response)))
-        .catch(() => ({ data: [] })),
-    ])
-      .then(([docsPayload, vehPayload, inspPayload]) => {
-        const dData = docsPayload.data ?? []
+  const loadData = async () => {
+    try {
+      const [docsRes, vehRes] = await Promise.all([
+        apiFetch('/documentos'),
+        apiFetch('/vehiculos'),
+      ])
+      if (!docsRes.ok) throw docsRes
+      const docsPayload = await docsRes.json()
+      const dData = docsPayload.data ?? []
+      setDocumentos(dData)
+      setCachedData('/documentos', dData)
+
+      if (vehRes.ok) {
+        const vehPayload = await vehRes.json()
         const vData = vehPayload.data ?? []
-        const iData = inspPayload.data ?? []
-        setDocumentos(dData)
         setVehiculos(vData)
-        setInspecciones(iData)
-        setCachedData('/documentos', dData)
         setCachedData('/vehiculos', vData)
-        setCachedData('/inspecciones', iData)
-      })
-      .catch(() => {
-        setLoadError('No se pudo mostrar la información en este momento.')
-      })
-      .finally(() => setIsLoading(false))
+      }
+    } catch {
+      setLoadError('No se pudo cargar el padrón oficial de documentos.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   useEffect(() => {
-    invalidateCache()
+    setLoadError('')
+    invalidateCache('/documentos')
     loadData()
   }, [])
 
-  // Cerrar dropdown de placa al hacer click fuera
+  // Close plate dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (placaDropdownRef.current && !placaDropdownRef.current.contains(event.target)) {
@@ -82,14 +418,29 @@ export function Documentos() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = window.setTimeout(() => setToast(null), 3000)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const showToast = (message, type = 'success') => {
+    setToast({
+      id: Date.now(),
+      message,
+      type,
+    })
+  }
+
+  // KPIs derived strictly from real DB records
   const totalDocs = documentos.length
+  const tucDocs = documentos.filter((d) => d.tipoDocumento === 'TARJETA_OPERATIVIDAD').length
+  const soatDocs = documentos.filter((d) => d.tipoDocumento === 'SOAT' || d.tipoDocumento === 'CERTICAV').length
   const vigentes = documentos.filter((d) => d.estado === 'VIGENTE').length
-  const enTramite = documentos.filter((d) => d.estado === 'EN_TRAMITE').length
-  const vencidos = documentos.filter((d) => d.estado === 'VENCIDO').length
-  const porcentajeVigentes = totalDocs > 0 ? Math.round((vigentes / totalDocs) * 100) : 0
+  const inactivosOVencidos = documentos.filter((d) => d.estado !== 'VIGENTE').length
 
   const filteredDocs = documentos.filter((d) => {
-    const fullSearch = `${d.codigo} ${d.vehiculoPlaca} ${d.propietario || ''} ${d.conductorNombres || ''} ${d.asociacion || ''} ${d.tipoDocumento} ${d.aseguradora || ''} ${d.resMunicipal || ''}`.toLowerCase()
+    const fullSearch = `${d.codigo || ''} ${d.vehiculoPlaca || ''} ${d.propietario || ''} ${d.conductorNombres || ''} ${d.asociacion || ''} ${d.tipoDocumento || ''} ${d.aseguradora || ''} ${d.vehiculoMarca || ''} ${d.vehiculoModelo || ''} ${d.propietarioDni || ''} ${d.numeroLicencia || ''}`.toLowerCase()
     const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
     const matchesTipo = filterTipo === 'TODOS' || d.tipoDocumento === filterTipo
     const matchesEstado = filterEstado === 'TODOS' || d.estado === filterEstado
@@ -105,6 +456,151 @@ export function Documentos() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  const filteredPlacas = vehiculos.filter((v) =>
+    (v.placa || '').toLowerCase().includes((formData.vehiculoPlaca || '').toLowerCase())
+  )
+
+  const handleVehicleChange = (placa) => {
+    const veh = vehiculos.find((v) => v.placa === placa)
+    setFormData((prev) => ({
+      ...prev,
+      vehiculoPlaca: placa,
+      propietario: veh?.propietario || '',
+      propietarioDni: veh?.propietarioDni || '',
+      asociacion: veh?.asociacion || '',
+      numeroLicencia: veh?.propietarioLicencia || prev.numeroLicencia || '',
+    }))
+  }
+
+  const handleOpenCreateModal = () => {
+    setFormData({
+      vehiculoPlaca: '',
+      tipoDocumento: 'TARJETA_OPERATIVIDAD',
+      codigo: '',
+      fechaExpedicion: new Date().toISOString().slice(0, 10),
+      fechaExpiracion: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      estado: 'VIGENTE',
+      aseguradora: '',
+      numeroLicencia: '',
+      propietario: '',
+      propietarioDni: '',
+      asociacion: '',
+    })
+    setIsEditing(false)
+    setIsPlacaDropdownOpen(false)
+    setIsModalOpen(true)
+  }
+
+  const handleOpenEditModal = (doc) => {
+    setSelectedDoc(doc)
+    setFormData({
+      vehiculoPlaca: doc.vehiculoPlaca || '',
+      tipoDocumento: doc.tipoDocumento || 'TARJETA_OPERATIVIDAD',
+      codigo: doc.codigo || '',
+      fechaExpedicion: doc.fechaExpedicion || '',
+      fechaExpiracion: doc.fechaExpiracion || '',
+      estado: doc.estado || 'VIGENTE',
+      aseguradora: doc.aseguradora || '',
+      numeroLicencia: doc.numeroLicencia || '',
+      propietario: doc.propietario || '',
+      propietarioDni: doc.propietarioDni || '',
+      asociacion: doc.asociacion || '',
+    })
+    setIsEditing(true)
+    setIsPlacaDropdownOpen(false)
+    setIsModalOpen(true)
+  }
+
+  const handleOpenDetail = (doc) => {
+    setSelectedDoc(doc)
+    setIsDetailModalOpen(true)
+  }
+
+  const handlePrint = (doc) => {
+    setSelectedDoc(doc)
+    setIsPreviewModalOpen(true)
+  }
+
+  const handleDelete = async (id) => {
+    if (window.confirm('¿Está seguro de anular este documento del padrón oficial?')) {
+      try {
+        const response = await apiFetch(`/documentos/${id}`, { method: 'DELETE' })
+        if (!response.ok) throw response
+        const nextDocs = documentos.filter((d) => d.id !== id)
+        setDocumentos(nextDocs)
+        setCachedData('/documentos', nextDocs)
+        showToast('Documento anulado con éxito')
+      } catch {
+        alert('No se pudo anular el documento.')
+      }
+    }
+  }
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!formData.codigo.trim() || !formData.vehiculoPlaca.trim() || !formData.tipoDocumento) {
+      alert('Por favor completa los campos requeridos (Placa, Tipo y Número de Documento).')
+      return
+    }
+
+    if (formData.fechaExpedicion && formData.fechaExpiracion && new Date(formData.fechaExpiracion) < new Date(formData.fechaExpedicion)) {
+      alert('La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
+      return
+    }
+
+    const dataToSubmit = {
+      ...formData,
+      vehiculoPlaca: formData.vehiculoPlaca.trim().toUpperCase(),
+      codigo: formData.codigo.trim().toUpperCase(),
+      estado: formData.estado || 'VIGENTE',
+    }
+
+    try {
+      if (isEditing) {
+        const res = await apiFetch(`/documentos/${selectedDoc.id}`, {
+          method: 'PUT',
+          body: dataToSubmit,
+        })
+        if (!res.ok) throw res
+        const resData = await res.json()
+        const updatedDoc = resData.data || { ...selectedDoc, ...dataToSubmit }
+        const nextDocs = documentos.map((d) => (d.id === selectedDoc.id ? updatedDoc : d))
+        setDocumentos(nextDocs)
+        setCachedData('/documentos', nextDocs)
+        showToast('Documento actualizado')
+      } else {
+        const res = await apiFetch('/documentos', {
+          method: 'POST',
+          body: dataToSubmit,
+        })
+        if (!res.ok) throw res
+        const resData = await res.json()
+        const newDoc = resData.data || {
+          ...dataToSubmit,
+          id: Date.now(),
+        }
+        const nextDocs = [newDoc, ...documentos]
+        setDocumentos(nextDocs)
+        setCachedData('/documentos', nextDocs)
+        setCurrentPage(1)
+        showToast('Documento emitido con éxito')
+      }
+      setIsModalOpen(false)
+    } catch (err) {
+      let message = 'Error de comunicación con el servidor al registrar el documento.'
+      if (err?.json) {
+        try {
+          const errData = await err.json()
+          message = errData.messages?.error || errData.message || errData.error || message
+        } catch (_) {
+          message = err.statusText || message
+        }
+      }
+      alert(message)
+    }
+  }
 
   const handleExportExcel = () => {
     exportToExcel({
@@ -131,369 +627,320 @@ export function Documentos() {
     })
   }
 
-  // Inspección técnica aprobada para el vehículo seleccionado
-  const getApprovedInspectionForVehicle = (placa) => {
-    return inspecciones.find((i) => i.vehiculoPlaca === placa && i.resultado === 'APROBADO')
-  }
-
-  // Filtrar placas según lo que el usuario escribe en el input
-  const filteredPlacas = vehiculos.filter((v) =>
-    v.placa.toLowerCase().includes((formData.vehiculoPlaca || '').toLowerCase())
-  )
-
-  const handleOpenCreateModal = () => {
-    setFormData({
-      vehiculoPlaca: '',
-      tipoDocumento: '',
-      codigo: '',
-      fechaExpedicion: '',
-      fechaExpiracion: '',
-      estado: '',
-      propietario: '',
-      propietarioDni: '',
-      asociacion: '',
-    })
-    setIsEditing(false)
-    setIsPlacaDropdownOpen(false)
-    setIsModalOpen(true)
-  }
-
-  const handleOpenEditModal = (doc) => {
-    setSelectedDoc(doc)
-    setFormData({
-      vehiculoPlaca: doc.vehiculoPlaca || '',
-      tipoDocumento: doc.tipoDocumento === 'CITV' ? 'INSPECCION_TECNICA' : (doc.tipoDocumento || 'TARJETA_OPERATIVIDAD'),
-      codigo: doc.codigo || '',
-      fechaExpedicion: doc.fechaExpedicion || '',
-      fechaExpiracion: doc.fechaExpiracion || '',
-      estado: doc.estado || 'VIGENTE',
-      propietario: doc.propietario || '',
-      propietarioDni: doc.propietarioDni || '',
-      asociacion: doc.asociacion || '',
-    })
-    setIsEditing(true)
-    setIsPlacaDropdownOpen(false)
-    setIsModalOpen(true)
-  }
-
-  const prepararDocCompleto = (doc) => {
-    const veh = vehiculos.find((v) => v.placa === doc.vehiculoPlaca)
-    const approvedInsp = getApprovedInspectionForVehicle(doc.vehiculoPlaca)
-    return {
-      ...doc,
-      detalles: doc.detalles || approvedInsp?.detalles || [],
-      resultado: doc.resultado || approvedInsp?.resultado || 'APROBADO',
-      inspector: doc.inspector || approvedInsp?.inspector || 'Inspector Técnico Municipal',
-      observaciones: doc.observaciones || approvedInsp?.observaciones || '',
-      vehiculoMarca: doc.vehiculoMarca || veh?.marca || 'WANXIN',
-      vehiculoModelo: doc.vehiculoModelo || veh?.modelo || 'WX-200',
-      vehiculoColor: doc.vehiculoColor || veh?.color || 'AZUL',
-      vehiculoAnio: doc.vehiculoAnio || veh?.anio || '2024',
-      vehiculoMotor: doc.vehiculoMotor || veh?.serieMotor || '162FMJ-98214',
-      vehiculoSerie: doc.vehiculoSerie || veh?.numeroSerie || 'LBBX200-84721',
-      vehiculoCarroceria: doc.vehiculoCarroceria || veh?.carroceria || 'TRIMOVIL PASAJEROS',
-      vehiculoPartidaRegistral: doc.vehiculoPartidaRegistral || veh?.partidaRegistral || '11482910 (SUNARP)',
-      propietarioDni: doc.propietarioDni || veh?.propietarioDni || '45892140',
-      conductorDni: doc.conductorDni || doc.propietarioDni || veh?.propietarioDni || '45892140',
-      resMunicipal: doc.resMunicipal || 'R.M. N° 045-2024-MDJLO/GSCyT',
-      direccion: doc.direccion || 'AV. JOSÉ LEONARDO ORTIZ 450 - CHICLAYO',
-      numeroInspeccion: doc.numeroInspeccion || approvedInsp?.numeroInspeccion || 'CAV-2026-APROBADO',
-      asociacion: doc.asociacion || veh?.asociacion || 'Independiente',
-      numeroLicencia: doc.numeroLicencia || veh?.propietarioLicencia || 'B-IIc',
-      conductorNombres: doc.conductorNombres || doc.propietario || veh?.propietario || 'CONDUCTOR AUTORIZADO',
-    }
-  }
-
-  const handleOpenPreview = (doc) => {
-    setSelectedDoc(prepararDocCompleto(doc))
-    setIsPreviewModalOpen(true)
-  }
-
-  // Manejo de Impresión Oficial: Se monta el contenedor #seccion-impresion y se activa window.print()
-  const handlePrint = (doc) => {
-    const fullDoc = prepararDocCompleto(doc)
-    setSelectedDoc(fullDoc)
-    setIsPreviewModalOpen(true)
-    setTimeout(() => {
-      window.print()
-    }, 300)
-  }
-
-  const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de anular o eliminar este documento del sistema?')) {
-      try {
-        await apiFetch(`/documentos/${id}`, { method: 'DELETE' })
-        setDocumentos(documentos.filter((d) => d.id !== id))
-      } catch (err) {
-        alert('No se pudo anular el documento.')
-      }
-    }
-  }
-
-  const handleVehicleChange = (placa) => {
-    const veh = vehiculos.find((v) => v.placa === placa)
-    setFormData((prev) => ({
-      ...prev,
-      vehiculoPlaca: placa,
-      propietario: veh ? veh.propietario : '',
-      propietarioDni: veh?.propietarioDni || '',
-      asociacion: veh ? veh.asociacion : '',
-    }))
-  }
-
-  const handleDocTypeChange = (tipo) => {
-    setFormData((prev) => ({
-      ...prev,
-      tipoDocumento: tipo,
-    }))
-  }
-
-
-  const handleFormSubmit = async (e) => {
-    e.preventDefault()
-
-    if (!formData.codigo.trim() || !formData.vehiculoPlaca.trim() || !formData.tipoDocumento) {
-      alert('Por favor completa los campos requeridos de placa, tipo y número de documento.')
+  const handleExportPdf = () => {
+    const listToExport = filteredDocs.length > 0 ? filteredDocs : documentos
+    if (listToExport.length === 0) {
+      alert('No hay registros para exportar.')
       return
     }
 
-    // Validación de fechas
-    if (formData.fechaExpedicion && formData.fechaExpiracion && new Date(formData.fechaExpiracion) < new Date(formData.fechaExpedicion)) {
-      alert('La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
+    const printWin = window.open('', '_blank', 'width=1100,height=750')
+    if (!printWin) {
+      alert('El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
       return
     }
 
-    const dataToSubmit = {
-      ...formData,
-      estado: formData.estado || 'VIGENTE',
+    const escapeXml = (unsafe) => {
+      if (unsafe === null || unsafe === undefined) return ''
+      return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
     }
 
-    try {
-      if (isEditing) {
-        const res = await apiFetch(`/documentos/${selectedDoc.id}`, {
-          method: 'PUT',
-          body: dataToSubmit,
-        })
-        const resData = await res.json()
-        if (!res.ok) {
-          alert(resData.messages?.error || resData.message || 'Error al actualizar el documento.')
-          return
-        }
-        setDocumentos(documentos.map((d) => (d.id === selectedDoc.id ? { ...d, ...dataToSubmit } : d)))
-      } else {
-        const res = await apiFetch('/documentos', {
-          method: 'POST',
-          body: dataToSubmit,
-        })
-        const resData = await res.json()
-        if (!res.ok) {
-          alert(resData.messages?.error || resData.message || 'Error al registrar el documento.')
-          return
-        }
-        const newDoc = resData.data || {
-          ...dataToSubmit,
-          id: Date.now(),
-        }
-        setDocumentos([newDoc, ...documentos])
-      }
-      setIsModalOpen(false)
-    } catch (err) {
-      alert('Error de comunicación con el servidor al registrar el documento.')
-    }
+    const rowsHtml = listToExport
+      .map((d, index) => {
+        const isVigente = d.estado === 'VIGENTE'
+        const estadoBadge = isVigente
+          ? `<span style="background:#dcfce7; color:#15803d; padding:2px 7px; border-radius:4px; font-weight:700; font-size:9.5px;">VIGENTE</span>`
+          : d.estado === 'EN_TRAMITE'
+            ? `<span style="background:#dbeafe; color:#1d4ed8; padding:2px 7px; border-radius:4px; font-weight:700; font-size:9.5px;">EN TRÁMITE</span>`
+            : `<span style="background:#fee2e2; color:#b91c1c; padding:2px 7px; border-radius:4px; font-weight:700; font-size:9.5px;">VENCIDO</span>`
+
+        return `
+          <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+            <td style="text-align: center; color: #64748b; font-size: 10px;">${index + 1}</td>
+            <td style="font-family: monospace; font-weight: 700; font-size: 11px; text-align: center;">${escapeXml(d.codigo || '')}</td>
+            <td style="font-size: 10px; font-weight: 600;">${escapeXml(d.tipoDocumento || '')}</td>
+            <td style="font-family: monospace; font-weight: 700; font-size: 11px; text-align: center; background: #fef3c7;">${escapeXml(d.vehiculoPlaca || '')}</td>
+            <td style="font-size: 10.5px; font-weight: 700; color: #0f172a;">${escapeXml(d.propietario || '—')}</td>
+            <td style="font-family: monospace; font-size: 10.5px; text-align: center;">${escapeXml(d.propietarioDni || '—')}</td>
+            <td style="font-size: 10px; color: #475569;">${escapeXml(d.asociacion || 'Independiente')}</td>
+            <td style="text-align: center; font-family: monospace; font-size: 10px;">${escapeXml(formatFecha(d.fechaExpedicion))}</td>
+            <td style="text-align: center; font-family: monospace; font-size: 10px; font-weight: bold;">${escapeXml(formatFecha(d.fechaExpiracion))}</td>
+            <td style="text-align: center;">${estadoBadge}</td>
+          </tr>
+        `
+      })
+      .join('')
+
+    const pdfHtml = `
+      <!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8"/>
+          <title>Padron_Documentos_MJLO_${new Date().toISOString().slice(0, 10)}</title>
+          <style>
+            @page { size: A4 landscape; margin: 8mm 10mm 8mm 10mm; }
+            * { box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              color: #0f172a; margin: 0; padding: 0; font-size: 10.5px;
+            }
+            .header {
+              border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 10px;
+              display: flex; justify-content: space-between; align-items: flex-start;
+            }
+            .title {
+              font-size: 15px; font-weight: 900; color: #0f172a; letter-spacing: -0.3px; text-transform: uppercase;
+            }
+            .subtitle {
+              font-size: 10.5px; font-weight: 600; color: #475569; margin-top: 2px;
+            }
+            .meta { font-size: 9.5px; color: #64748b; text-align: right; }
+            .summary-bar {
+              display: flex; gap: 16px; margin-bottom: 10px; background: #f1f5f9; padding: 6px 12px;
+              border-radius: 6px; font-size: 10.5px;
+            }
+            .summary-item strong { color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+            th {
+              background-color: #0f172a; color: #ffffff; text-transform: uppercase; font-size: 9px;
+              font-weight: 800; letter-spacing: 0.4px; padding: 6px 7px; border: 1px solid #0f172a; text-align: left;
+            }
+            td { border: 1px solid #e2e8f0; padding: 5px 7px; vertical-align: middle; }
+            .footer {
+              margin-top: 12px; font-size: 8.5px; color: #94a3b8; display: flex;
+              justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 5px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="title">Municipalidad Distrital José Leonardo Ortiz</div>
+              <div class="subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Documentos Vehiculares (TUC / SOAT / CertiCAV)</div>
+            </div>
+            <div class="meta">
+              <div><strong>Fecha de emisión:</strong> ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</div>
+              <div><strong>Sistema:</strong> MJLO Tránsito Digital v2026</div>
+            </div>
+          </div>
+          <div class="summary-bar">
+            <div>Total en padrón: <strong>${totalDocs}</strong></div>
+            <div>· Exportando: <strong>${listToExport.length}</strong> documentos</div>
+            <div>· Vigentes: <strong>${vigentes}</strong></div>
+            <div>· Vencidos / Trámite: <strong>${inactivosOVencidos}</strong></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 28px; text-align: center;">N°</th>
+                <th style="width: 105px; text-align: center;">Código</th>
+                <th style="width: 110px;">Tipo Doc.</th>
+                <th style="width: 80px; text-align: center;">Placa</th>
+                <th style="width: 170px;">Titular / Propietario</th>
+                <th style="width: 75px; text-align: center;">DNI</th>
+                <th>Asociación</th>
+                <th style="width: 75px; text-align: center;">Expedición</th>
+                <th style="width: 75px; text-align: center;">Vencimiento</th>
+                <th style="width: 75px; text-align: center;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <div class="footer">
+            <span>Documento oficial generado para fiscalización y control del transporte en José Leonardo Ortiz.</span>
+            <span>Página 1 de 1</span>
+          </div>
+          <script>
+            window.onload = function() {
+              window.focus();
+              setTimeout(function() { window.print(); }, 250);
+            };
+          </script>
+        </body>
+      </html>
+    `
+
+    printWin.document.open()
+    printWin.document.write(pdfHtml)
+    printWin.document.close()
   }
-
-  const getDocTypeBadge = (tipo) => {
-    switch (tipo) {
-      case 'TARJETA_OPERATIVIDAD':
-        return (
-          <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-            TUC (Tarjeta Operatividad)
-          </span>
-        )
-      case 'CURSO_VIAL':
-        return (
-          <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-            Carnet Curso Vial
-          </span>
-        )
-      case 'CERTICAV':
-        return (
-          <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-            CertiCAV (Inspección Técnica)
-          </span>
-        )
-      case 'SOAT':
-        return (
-          <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-            SOAT Vehicular
-          </span>
-        )
-      case 'INSPECCION_TECNICA':
-      case 'CITV':
-        return (
-          <span className="rounded-md bg-cyan-100 px-2 py-0.5 text-[10px] font-extrabold text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300">
-            Inspección Técnica
-          </span>
-        )
-      default:
-        return (
-          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-800 dark:bg-slate-800 dark:text-slate-300">
-            {tipo}
-          </span>
-        )
-    }
-  }
-
-  const currentApprovedInsp = getApprovedInspectionForVehicle(formData.vehiculoPlaca)
 
   return (
-    <div className="space-y-6">
-      {/* Cabecera del Módulo */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3.5">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/30">
-            <Icon name="document" className="size-6" />
+    <div className="space-y-4">
+      {toast && (
+        <div
+          key={toast.id}
+          className="fixed right-6 top-6 z-[80] flex items-center gap-2.5 rounded-[var(--radius)] border px-4 py-3 text-[13px] font-medium shadow-md transition-all animate-enter"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-ok)',
+            color: 'var(--text)',
+            boxShadow: 'var(--shadow-md)',
+          }}
+        >
+          <span
+            className="grid size-6 place-items-center rounded-full text-xs font-semibold shrink-0 border"
+            style={{
+              backgroundColor: 'var(--ok-bg)',
+              color: 'var(--ok-fg)',
+              borderColor: 'var(--border-ok)',
+            }}
+          >
+            ✓
+          </span>
+          <span>{toast.message}</span>
+        </div>
+      )}
+
+      {loadError && <PageLoadError message={loadError} />}
+
+      {/* Cabecera Principal - Estilo Exacto Personas */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
+            <Icon name="document" className="size-5.5" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                Emisión de TUCs, Carnets e Inspecciones
+              <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                Emisión de Documentos
               </h1>
             </div>
-            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-              Control de Tarjetas Únicas de Circulación (TUC), Carnet de Seguridad Vial (Curso Vial), CertiCAV y SOAT.
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Control oficial y emisión de Tarjetas de Operatividad (TUC), SOAT, CertiCAV e inspecciones vehiculares.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Tarjetas de Métricas */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+      {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas compactas (Estilo exacto Personas) */}
+      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+        {/* 1. Total documentos */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-indigo-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Emitidos</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/60 dark:text-teal-400">
-              <Icon name="document" className="size-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              Total registros
+            </span>
+            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+              <Icon name="document" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(totalDocs)}
             </p>
-            <span className="text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded-full">
-              Padrón 2026
-            </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Documentos municipales</p>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 2. Tarjetas Operatividad (TUC) */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-amber-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Vigentes</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              Tarjetas TUC
+            </span>
+            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+              <Icon name="permit" className="size-3.5" />
+            </span>
+          </div>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(tucDocs)}
+            </p>
+          </div>
+        </div>
+
+        {/* 3. SOAT y CertiCAV */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-cyan-500/80 dark:bg-[#0f172a]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+              SOAT / CertiCAV
+            </span>
+            <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
+              <Icon name="vehicle" className="size-3.5" />
+            </span>
+          </div>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(soatDocs)}
+            </p>
+          </div>
+        </div>
+
+        {/* 4. Vigentes */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              Vigentes
+            </span>
+            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
               ✓
             </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(vigentes)}
             </p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
-              {porcentajeVigentes}% al día
-            </span>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-              style={{ width: `${porcentajeVigentes}%` }}
-            />
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        {/* 5. Vencidos / Otros */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-rose-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">En Trámite</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold">
-              ⏳
+            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+              Vencidos / Trámite
             </span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">
-              {new Intl.NumberFormat('es-PE').format(enTramite)}
-            </p>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">
-              Pendientes
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">En revisión o firma</p>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-500 dark:text-rose-400">Expirados</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold">
+            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
               ✕
             </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">
-              {new Intl.NumberFormat('es-PE').format(vencidos)}
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(inactivosOVencidos)}
             </p>
-            <span className="text-xs font-bold text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">
-              Expirados
-            </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Requieren renovación</p>
         </div>
       </div>
 
-      {/* Tabla y Filtros */}
+      {/* Contenedor de la Tabla */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por N° Código, placa, titular, conductor, aseguradora..."
+              placeholder="Buscar por código, placa, titular, DNI, asociación o aseguradora..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-emerald-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 ✕
               </button>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Combo de Tipos Oficiales */}
-            <select
+          <div className="flex flex-wrap items-center gap-2">
+            <RoundedSelect
               value={filterTipo}
-              onChange={(e) => setFilterTipo(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODOS">Todos los tipos</option>
-              <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
-              <option value="CURSO_VIAL">Curso Vial (Carnet de Seguridad Vial)</option>
-              <option value="CERTICAV">CERTICAV (Inspección Técnica)</option>
-              <option value="SOAT">SOAT Vehicular</option>
-            </select>
+              onChange={setFilterTipo}
+              options={FILTER_TIPO_OPTIONS}
+            />
 
-            <select
+            <RoundedSelect
               value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODOS">Todos los estados</option>
-              <option value="VIGENTE">Vigentes</option>
-              <option value="EN_TRAMITE">En Trámite</option>
-              <option value="VENCIDO">Vencidos</option>
-            </select>
+              onChange={setFilterEstado}
+              options={FILTER_ESTADO_OPTIONS}
+            />
 
             {(filterTipo !== 'TODOS' || filterEstado !== 'TODOS' || searchTerm !== '') && (
               <button
@@ -503,196 +950,286 @@ export function Documentos() {
                   setFilterEstado('TODOS')
                   setSearchTerm('')
                 }}
-                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400"
+                title="Limpiar filtros"
+                className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
-                Limpiar Filtros
+                <Icon name="filterX" className="size-4" />
               </button>
             )}
 
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-              title="Descargar padrón de documentos en Excel"
+              title="Descargar padrón en Excel (.xls)"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
             >
-              <Icon name="table" className="size-4" />
-              <span>Exportar Excel</span>
+              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Excel</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              title="Descargar o imprimir padrón en PDF"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+            >
+              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
+              <span>PDF</span>
             </button>
 
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <span className="text-base leading-none font-black">+</span>
-              <span>Emitir Documento</span>
+              <span>Emitir documento</span>
             </button>
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
-          <span>
-            Mostrando <strong className="text-slate-800 dark:text-white">{filteredDocs.length}</strong> de{' '}
-            <strong className="text-slate-800 dark:text-white">{documentos.length}</strong> documentos registrados
-          </span>
-          <span className="hidden sm:inline text-[11px] text-slate-400">
-            Emisión Oficial MDJLO · Impresión optimizada a doble cara y formato A4
-          </span>
-        </div>
-
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Documento / Código</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Placa Vehicular</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Titular / Conductor</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Emisión</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Vencimiento</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-slate-900/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                <th className="px-4 py-3 whitespace-nowrap">Documento / Código</th>
+                <th className="px-4 py-3 whitespace-nowrap">Placa Vehicular</th>
+                <th className="px-4 py-3 whitespace-nowrap">Titular / Propietario</th>
+                <th className="px-4 py-3 whitespace-nowrap">Expedición</th>
+                <th className="px-4 py-3 whitespace-nowrap">Vencimiento</th>
+                <th className="px-4 py-3 whitespace-nowrap">Estado</th>
+                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-slate-800/40">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {isLoading && documentos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800">
-                      <div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" />
+                    <td className="px-4 py-3">
+                      <div className="h-4 w-28 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-5 w-20 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-4 w-36 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-4 w-20 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-4 w-20 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-5 w-16 rounded-full" style={{ backgroundColor: 'var(--bg-subtle)' }} />
+                    </td>
+                    <td
+                      className="sticky right-0 z-10 px-4 py-3 text-right"
+                      style={{ backgroundColor: 'var(--bg-surface)' }}
+                    >
+                      <div className="h-7 w-20 ml-auto rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
                     </td>
                   </tr>
                 ))
               ) : filteredDocs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
-                    <div className="mx-auto max-w-xs space-y-3 flex flex-col items-center justify-center">
-                      <Icon name="document" className="size-10 text-slate-300 dark:text-slate-600" />
-                      <p className="font-bold text-slate-600 dark:text-slate-300">
-                        {loadError ? 'No se pudo cargar la información.' : (documentos.length === 0 ? 'Aún no hay documentos emitidos' : 'No se encontraron documentos')}
+                  <td colSpan="7" className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)' }}>
+                    <div className="mx-auto max-w-xs space-y-1.5">
+                      <Icon name="document" className="size-8 mx-auto opacity-40" />
+                      <p className="font-semibold" style={{ color: 'var(--text)' }}>
+                        No se encontraron documentos
                       </p>
-                      <p className="text-xs text-slate-400">
-                        {loadError
-                          ? 'Ocurrió un problema al conectar con el servidor. Por favor, intenta de nuevo.'
-                          : documentos.length === 0
-                            ? 'Primero emite una TUC, SOAT, CertiCAV, Curso Vial o Inspección desde el botón “Emitir Documento”.'
-                            : 'Modifica los parámetros de búsqueda o los filtros aplicados.'}
+                      <p className="text-[12.5px]">
+                        Intenta con otro término de búsqueda o modifica los filtros.
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                paginatedDocs.map((d) => {
-                  const isDocCursoVial = d.tipoDocumento === 'CURSO_VIAL'
-                  const titularDisplay = isDocCursoVial ? (d.conductorNombres || d.propietario) : d.propietario
-
-                  return (
-                    <tr key={d.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-slate-800/40">
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        <div className="space-y-1">
-                          <p className="font-mono font-extrabold text-slate-800 dark:text-white">{d.codigo}</p>
-                          {getDocTypeBadge(d.tipoDocumento)}
+                paginatedDocs.map((d) => (
+                  <tr
+                    key={d.id}
+                    className="group transition-colors hover:bg-[var(--brand-soft)] dark:hover:bg-slate-800/40"
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-slate-900 dark:text-white text-[13px]">
+                            {d.codigo}
+                          </span>
                         </div>
-                      </td>
+                        <div>{getDocTypeBadge(d.tipoDocumento)}</div>
+                      </div>
+                    </td>
 
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="space-y-0.5">
+                        <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 shadow-2xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
                           {d.vehiculoPlaca}
                         </span>
-                      </td>
+                        {(d.vehiculoMarca || d.vehiculoModelo) && (
+                          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            {d.vehiculoMarca} {d.vehiculoModelo}
+                          </p>
+                        )}
+                      </div>
+                    </td>
 
-                      <td className="px-3.5 py-3.5 max-w-[170px]">
-                        <div className="flex items-center gap-2">
-                          {d.fotoConductor ? (
-                            <img
-                              src={d.fotoConductor}
-                              alt=""
-                              className="size-7 rounded-full object-cover shrink-0 border border-emerald-400"
-                            />
-                          ) : isDocCursoVial ? (
-                            <span className="size-7 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 grid place-items-center text-xs shrink-0">
-                              👤
-                            </span>
-                          ) : null}
-                          <div className="truncate">
-                            <p
-                              className="font-bold text-xs truncate text-slate-800 dark:text-slate-100"
-                              title={titularDisplay}
-                            >
-                              {titularDisplay || '—'}
-                            </p>
-                            <p className="text-[11px] text-slate-400 truncate max-w-[140px]" title={d.asociacion}>
-                              {d.asociacion || 'Independiente'}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        <p className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-xs">
-                          {d.fechaExpedicion}
-                        </p>
-                      </td>
-
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        <p className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs">
-                          {d.fechaExpiracion}
-                        </p>
-                      </td>
-
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${
-                            d.estado === 'VIGENTE'
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                              : d.estado === 'EN_TRAMITE'
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
-                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                          }`}
+                    <td className="px-4 py-3 max-w-[200px]">
+                      <div>
+                        <p
+                          className="font-bold text-[13px] text-slate-900 dark:text-white truncate"
+                          title={d.propietario}
                         >
-                          <span className="size-1.5 rounded-full bg-current" />
-                          {d.estado}
-                        </span>
-                      </td>
-
-                      <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
-                        <div className="flex items-center justify-end gap-1.5 pr-1">
-                          <button
-                            type="button"
-                            onClick={() => handlePrint(d)}
-                            title="Imprimir Carnet Oficial / TUC Digital"
-                            className="rounded-xl p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer"
-                          >
-                            <Icon name="print" className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(d)}
-                            title="Editar / Renovar Documento"
-                            className="rounded-xl p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer"
-                          >
-                            <Icon name="pencil" className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(d.id)}
-                            title="Anular Documento"
-                            className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer"
-                          >
-                            <Icon name="trash" className="size-4" />
-                          </button>
+                          {d.propietario || 'Sin Propietario Asignado'}
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                          {d.propietarioDni && (
+                            <span className="font-mono font-semibold">DNI: {d.propietarioDni}</span>
+                          )}
+                          {d.asociacion && (
+                            <span className="truncate" title={d.asociacion}>
+                              {d.propietarioDni ? '· ' : ''}{d.asociacion}
+                            </span>
+                          )}
                         </div>
-                      </td>
-                    </tr>
-                  )
-                })
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {formatFecha(d.fechaExpedicion)}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {formatFecha(d.fechaExpiracion)}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <StatusBadge status={d.estado} />
+                    </td>
+
+                    <td
+                      className="sticky right-0 z-10 px-4 py-3 text-right whitespace-nowrap group-hover:bg-[var(--brand-soft)] dark:group-hover:bg-slate-800/40 transition-colors shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"
+                      style={{ backgroundColor: 'var(--bg-surface)' }}
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* OJO: Celeste (Ver Ficha) */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDetail(d)}
+                          title="Ver ficha de documento"
+                          className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                          style={{
+                            backgroundColor: 'var(--action-eye-bg)',
+                            borderColor: 'var(--action-eye-border)',
+                            color: 'var(--action-eye-text)',
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-eye-hover)'
+                            e.currentTarget.style.borderColor = 'var(--action-eye-hover)'
+                            e.currentTarget.style.color = '#ffffff'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-eye-bg)'
+                            e.currentTarget.style.borderColor = 'var(--action-eye-border)'
+                            e.currentTarget.style.color = 'var(--action-eye-text)'
+                          }}
+                        >
+                          <Icon name="eye" className="size-4" />
+                        </button>
+
+                        {/* IMPRIMIR: Morado / Púrpura */}
+                        <button
+                          type="button"
+                          onClick={() => handlePrint(d)}
+                          title="Imprimir formato oficial / TUC"
+                          className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                          style={{
+                            backgroundColor: '#f3e8ff',
+                            borderColor: '#c084fc',
+                            color: '#7e22ce',
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#7e22ce'
+                            e.currentTarget.style.borderColor = '#7e22ce'
+                            e.currentTarget.style.color = '#ffffff'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3e8ff'
+                            e.currentTarget.style.borderColor = '#c084fc'
+                            e.currentTarget.style.color = '#7e22ce'
+                          }}
+                        >
+                          <Icon name="print" className="size-4" />
+                        </button>
+
+                        {/* EDITAR: Amarillo */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(d)}
+                          title="Editar documento"
+                          className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                          style={{
+                            backgroundColor: 'var(--action-edit-bg)',
+                            borderColor: 'var(--action-edit-border)',
+                            color: 'var(--action-edit-text)',
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-edit-hover)'
+                            e.currentTarget.style.borderColor = 'var(--action-edit-hover)'
+                            e.currentTarget.style.color = '#ffffff'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-edit-bg)'
+                            e.currentTarget.style.borderColor = 'var(--action-edit-border)'
+                            e.currentTarget.style.color = 'var(--action-edit-text)'
+                          }}
+                        >
+                          <Icon name="pencil" className="size-4" />
+                        </button>
+
+                        {/* ELIMINAR: Rojo */}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(d.id)}
+                          title="Anular documento"
+                          className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                          style={{
+                            backgroundColor: 'var(--action-del-bg)',
+                            borderColor: 'var(--action-del-border)',
+                            color: 'var(--action-del-text)',
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-del-hover)'
+                            e.currentTarget.style.borderColor = 'var(--action-del-hover)'
+                            e.currentTarget.style.color = '#ffffff'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--action-del-bg)'
+                            e.currentTarget.style.borderColor = 'var(--action-del-border)'
+                            e.currentTarget.style.color = 'var(--action-del-text)'
+                          }}
+                        >
+                          <Icon name="trash" className="size-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -710,252 +1247,423 @@ export function Documentos() {
         />
       </div>
 
-      {/* Modal Emitir / Editar Documento Dinámico */}
+      {/* Modal Emitir / Editar Documento */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
-            
-            {/* Header Modal */}
-            <div className="flex items-center justify-between border-b border-blue-900/20 bg-[#123b6d] px-6 py-4.5 text-white dark:border-slate-800 dark:bg-[#102a4d]">
-              <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-cyan-300">
-                  <Icon name="document" className="size-5" />
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Icon name="document" className="size-4" />
                 </span>
-                <div>
-                  <h3 className="text-lg font-extrabold text-white">
-                    {isEditing ? 'Editar Documento' : 'Emitir Documento'}
-                  </h3>
-                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {isEditing ? 'Editar documento vehicular' : 'Emitir nuevo documento'}
+                </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="grid size-9 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-xs transition hover:bg-white/20 cursor-pointer"
+                title="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                <Icon name="close" className="size-4" />
+                <Icon name="close" className="size-5" />
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              {/* Fila 1: Placa Vehicular y Tipo de Documento */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                {/* Placa Vehicular */}
-                <div className="relative" ref={placaDropdownRef}>
-                  <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
-                    <input
-                      id="doc_veh_placa"
-                      type="text"
-                      required
-                      autoComplete="off"
-                      value={formData.vehiculoPlaca}
-                      onFocus={() => setIsPlacaDropdownOpen(true)}
-                      onChange={(e) => {
-                        const val = e.target.value.toUpperCase().trim()
-                        handleVehicleChange(val)
-                        setIsPlacaDropdownOpen(true)
-                      }}
-                      className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 font-mono text-sm font-bold tracking-wider text-slate-900 outline-none dark:text-white"
-                    />
-                    <label
-                      htmlFor="doc_veh_placa"
-                      className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
-                        formData.vehiculoPlaca
-                          ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
-                          : 'top-3.5 text-sm text-slate-400'
-                      } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
-                    >
-                      Placa Vehicular
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsPlacaDropdownOpen(!isPlacaDropdownOpen)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs p-1 cursor-pointer"
-                      tabIndex={-1}
-                    >
-                      ▼
-                    </button>
-                  </div>
+            <form onSubmit={handleFormSubmit} autoComplete="off" className="flex flex-col">
+              <div className="p-4 sm:p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                {/* 1. Sección: Vehículo y Titular */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-blue-600" />
+                    Vehículo y Titular
+                  </h4>
 
-                  {isPlacaDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1.5 z-40 max-h-48 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-[#0f172a] text-xs">
-                      {filteredPlacas.length === 0 ? (
-                        <div className="px-3 py-2.5 text-center text-slate-400 font-medium">
-                          No se encontraron vehículos registrados
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                    {/* Input de Placa con Autocompletado desde Base de Datos */}
+                    <div className="sm:col-span-5 relative" ref={placaDropdownRef}>
+                      <FloatingInput
+                        id="doc_placa"
+                        label="Placa vehicular"
+                        required
+                        value={formData.vehiculoPlaca}
+                        inputClassName="font-mono font-bold tracking-wider uppercase"
+                        onFocus={() => setIsPlacaDropdownOpen(true)}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase().trim()
+                          handleVehicleChange(val)
+                          setIsPlacaDropdownOpen(true)
+                        }}
+                      />
+
+                      {isPlacaDropdownOpen && (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+                          {filteredPlacas.length === 0 ? (
+                            <div className="px-3 py-2 text-center text-xs text-slate-400">
+                              No hay vehículos con esa placa
+                            </div>
+                          ) : (
+                            filteredPlacas.map((v) => (
+                              <button
+                                key={v.id}
+                                type="button"
+                                onClick={() => {
+                                  handleVehicleChange(v.placa)
+                                  setIsPlacaDropdownOpen(false)
+                                }}
+                                className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition cursor-pointer ${
+                                  formData.vehiculoPlaca === v.placa
+                                    ? 'bg-blue-50 text-blue-700 font-bold dark:bg-blue-950/60 dark:text-blue-300'
+                                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
+                                }`}
+                              >
+                                <span className="font-mono font-bold">{v.placa}</span>
+                                <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                                  {v.propietario || v.marca || 'Registrado'}
+                                </span>
+                              </button>
+                            ))
+                          )}
                         </div>
-                      ) : (
-                        filteredPlacas.map((v) => (
-                          <button
-                            key={v.id}
-                            type="button"
-                            onClick={() => {
-                              handleVehicleChange(v.placa)
-                              setIsPlacaDropdownOpen(false)
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded-xl font-mono font-bold text-xs transition flex items-center justify-between cursor-pointer ${
-                              formData.vehiculoPlaca === v.placa
-                                ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                : 'text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80'
-                            }`}
-                          >
-                            <span>{v.placa}</span>
-                            {formData.vehiculoPlaca === v.placa && (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">✓</span>
-                            )}
-                          </button>
-                        ))
                       )}
                     </div>
-                  )}
 
-                  {formData.propietario && (
-                    <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded-lg px-2.5 py-1.5 border border-slate-200 dark:border-slate-700">
-                      <span className="font-semibold truncate">{formData.propietario}</span>
-                      {formData.asociacion && <span className="text-slate-400 shrink-0">· {formData.asociacion}</span>}
+                    {/* Selector de Tipo de Documento */}
+                    <div className="sm:col-span-7">
+                      <FloatingSelect
+                        id="doc_tipo"
+                        label="Tipo de documento"
+                        value={formData.tipoDocumento}
+                        onChange={(e) => setFormData({ ...formData, tipoDocumento: e.target.value })}
+                        options={TIPO_DOC_OPTIONS}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Resumen del Propietario / Vehículo cargado desde la BD */}
+                  {formData.vehiculoPlaca && (
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-800/80 flex items-center justify-between gap-3 text-xs">
+                      <div className="min-w-0">
+                        <span className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-wider block">
+                          Propietario en Padrón
+                        </span>
+                        <span className="font-bold text-slate-800 dark:text-white truncate block">
+                          {formData.propietario || 'Sin Propietario Asignado en BD'}
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {formData.propietarioDni && (
+                          <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 block">
+                            DNI: {formData.propietarioDni}
+                          </span>
+                        )}
+                        {formData.asociacion && (
+                          <span className="text-[10px] text-slate-400 truncate block mt-0.5">
+                            {formData.asociacion}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Tipo de Documento */}
-                <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
-                  <select
-                    id="doc_tipo"
-                    required
-                    value={formData.tipoDocumento}
-                    onChange={(e) => handleDocTypeChange(e.target.value)}
-                    className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 text-sm font-semibold text-slate-800 outline-none transition dark:text-white cursor-pointer"
-                  >
-                    <option value="" disabled hidden></option>
-                    <option value="TARJETA_OPERATIVIDAD">Tarjeta de Operatividad (TUC)</option>
-                    <option value="CERTICAV">CERTICAV (Inspección Técnica)</option>
-                    <option value="SOAT">SOAT Vehicular</option>
-                  </select>
-                  <label
-                    htmlFor="doc_tipo"
-                    className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
-                      formData.tipoDocumento
-                        ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
-                        : 'top-3.5 text-sm text-slate-400'
-                    } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
-                  >
-                    Tipo de Documento
-                  </label>
+                {/* 2. Sección: Datos del Documento */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-indigo-600" />
+                    Datos del Documento
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <FloatingInput
+                      id="doc_codigo"
+                      label="Código / Número de documento"
+                      required
+                      value={formData.codigo}
+                      inputClassName="font-mono font-bold uppercase"
+                      onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
+                    />
+
+                    {formData.tipoDocumento === 'SOAT' ? (
+                      <FloatingInput
+                        id="doc_aseguradora"
+                        label="Empresa Aseguradora"
+                        optional
+                        value={formData.aseguradora}
+                        onChange={(e) => setFormData({ ...formData, aseguradora: e.target.value })}
+                      />
+                    ) : (
+                      <FloatingInput
+                        id="doc_licencia"
+                        label="N° Licencia de conducir"
+                        optional
+                        value={formData.numeroLicencia}
+                        inputClassName="font-mono uppercase font-bold"
+                        onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() })}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Sección: Vigencia y Estado */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-600" />
+                    Vigencia y Estado
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <FloatingInput
+                      id="doc_expedicion"
+                      label="Fecha de expedición"
+                      type="date"
+                      required
+                      value={formData.fechaExpedicion}
+                      onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
+                    />
+
+                    <FloatingInput
+                      id="doc_expiracion"
+                      label="Fecha de vencimiento"
+                      type="date"
+                      required
+                      value={formData.fechaExpiracion}
+                      onChange={(e) => setFormData({ ...formData, fechaExpiracion: e.target.value })}
+                    />
+
+                    <FloatingSelect
+                      id="doc_estado"
+                      label="Estado del documento"
+                      value={formData.estado}
+                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                      options={ESTADO_OPTIONS}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Fila 2: N° de Documento */}
-              <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
-                <input
-                  id="doc_codigo"
-                  type="text"
-                  required
-                  value={formData.codigo}
-                  onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
-                  className="peer block w-full bg-transparent px-3.5 pt-5 pb-2 font-mono text-sm font-bold tracking-wider text-slate-800 outline-none dark:text-white"
-                />
-                <label
-                  htmlFor="doc_codigo"
-                  className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
-                    formData.codigo
-                      ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
-                      : 'top-3.5 text-sm text-slate-400'
-                  } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
-                >
-                  N° de Documento
-                </label>
-              </div>
-
-              {/* Fila 3: Fechas + Estado */}
-              <div className="grid gap-4 sm:grid-cols-3">
-                {/* Fecha de Expedición */}
-                <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
-                  <input
-                    id="doc_expedicion"
-                    type="date"
-                    value={formData.fechaExpedicion}
-                    onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
-                    className={`peer block w-full bg-transparent px-3.5 pt-5 pb-1 text-xs font-semibold outline-none dark:text-white ${
-                      !formData.fechaExpedicion ? 'text-transparent focus:text-slate-800 dark:focus:text-white' : 'text-slate-800 dark:text-white'
-                    }`}
-                  />
-                  <label
-                    htmlFor="doc_expedicion"
-                    className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
-                      formData.fechaExpedicion
-                        ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
-                        : 'top-3.5 text-sm text-slate-400'
-                    } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
-                  >
-                    Fecha de Expedición
-                  </label>
-                </div>
-
-                {/* Vencimiento */}
-                <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
-                  <input
-                    id="doc_expiracion"
-                    type="date"
-                    value={formData.fechaExpiracion}
-                    onChange={(e) => setFormData({ ...formData, fechaExpiracion: e.target.value })}
-                    className={`peer block w-full bg-transparent px-3.5 pt-5 pb-1 text-xs font-semibold outline-none dark:text-white ${
-                      !formData.fechaExpiracion ? 'text-transparent focus:text-slate-800 dark:focus:text-white' : 'text-slate-800 dark:text-white'
-                    }`}
-                  />
-                  <label
-                    htmlFor="doc_expiracion"
-                    className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
-                      formData.fechaExpiracion
-                        ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
-                        : 'top-3.5 text-sm text-slate-400'
-                    } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
-                  >
-                    Vencimiento
-                  </label>
-                </div>
-
-                {/* Estado */}
-                <div className="relative rounded-xl border border-slate-300 bg-white transition-all focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:border-emerald-400">
-                  <select
-                    id="doc_estado"
-                    value={formData.estado}
-                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                    className="peer block w-full bg-transparent px-3.5 pt-5 pb-1 text-xs font-bold text-slate-800 outline-none transition dark:text-white cursor-pointer"
-                  >
-                    <option value="" disabled hidden></option>
-                    <option value="VIGENTE">VIGENTE</option>
-                    <option value="EN_TRAMITE">EN TRÁMITE</option>
-                    <option value="VENCIDO">VENCIDO</option>
-                  </select>
-                  <label
-                    htmlFor="doc_estado"
-                    className={`pointer-events-none absolute left-3.5 transition-all duration-200 ${
-                      formData.estado
-                        ? 'top-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400'
-                        : 'top-3.5 text-sm text-slate-400'
-                    } peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:font-bold peer-focus:text-emerald-600 dark:peer-focus:text-emerald-400`}
-                  >
-                    Estado
-                  </label>
-                </div>
-              </div>
-
-              {/* Botones de acción del formulario */}
-              <div className="flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+              {/* Modal Footer */}
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 active:scale-95 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer flex items-center gap-2"
+                  className="rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 px-5 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
                 >
-                  <Icon name="document" className="size-4" />
-                  {isEditing ? 'Guardar Cambios' : 'Emitir Documento'}
+                  {isEditing ? 'Actualizar documento' : 'Emitir documento'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Ficha de Detalle (Diccionario Visual - Estilo Exacto Personas) */}
+      {isDetailModalOpen && selectedDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Icon name="document" className="size-4" />
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Ficha del Documento Vehicular
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDetailModalOpen(false)}
+                title="Cerrar ficha"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+              >
+                <Icon name="close" className="size-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 pb-6 space-y-3.5 max-h-[80vh] overflow-y-auto">
+              {/* Profile Hero Card */}
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 dark:border-slate-800 dark:bg-slate-900/60 shadow-xs">
+                <div className="flex items-center gap-3.5">
+                  <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-800">
+                    <Icon name="document" className="size-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-lg font-black text-slate-900 dark:text-white">
+                        {selectedDoc.codigo}
+                      </span>
+                      <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 shadow-2xs">
+                        {selectedDoc.vehiculoPlaca}
+                      </span>
+                    </div>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                      {selectedDoc.propietario || 'Sin Propietario Asignado'} · {selectedDoc.asociacion || 'Independiente'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={selectedDoc.estado} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDetailModalOpen(false)
+                      handlePrint(selectedDoc)
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
+                  >
+                    <Icon name="print" className="size-3.5" />
+                    <span>Imprimir</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Secciones de Datos en Rejilla: Solo atributos reales de la Base de Datos */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* 1. Datos del Vehículo y Titular */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 space-y-1.5 shadow-xs">
+                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                    Datos del Vehículo y Titular
+                  </h5>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Placa</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        {selectedDoc.vehiculoPlaca || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Marca / Modelo</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right">
+                        {[selectedDoc.vehiculoMarca, selectedDoc.vehiculoModelo].filter(Boolean).join(' ') || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Año / Color</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right">
+                        {[selectedDoc.vehiculoAnio, selectedDoc.vehiculoColor].filter(Boolean).join(' · ') || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">N° Serie / Chasis</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-white text-right">
+                        {selectedDoc.vehiculoSerie || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">N° Motor</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-white text-right">
+                        {selectedDoc.vehiculoMotor || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Carrocería</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right">
+                        {selectedDoc.vehiculoCarroceria || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Partida Registral</span>
+                      <span className="font-mono text-slate-800 dark:text-white text-right">
+                        {selectedDoc.vehiculoPartidaRegistral || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Titular / Propietario</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right">
+                        {selectedDoc.propietario || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">DNI del Titular</span>
+                      <span className="font-mono font-bold text-slate-800 dark:text-white">
+                        {selectedDoc.propietarioDni || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">N° Licencia</span>
+                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                        {selectedDoc.numeroLicencia || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Asociación</span>
+                      <span className="font-bold text-slate-800 dark:text-white text-right">
+                        {selectedDoc.asociacion || 'Independiente'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Datos de Emisión y Vigencia */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 space-y-1.5 shadow-xs">
+                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                    Datos de Emisión y Vigencia
+                  </h5>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Tipo de documento</span>
+                      <span>{getDocTypeBadge(selectedDoc.tipoDocumento)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Código oficial</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        {selectedDoc.codigo || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Fecha expedición</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-white">
+                        {formatFecha(selectedDoc.fechaExpedicion)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Fecha vencimiento</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        {formatFecha(selectedDoc.fechaExpiracion)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Estado de vigencia</span>
+                      <StatusBadge status={selectedDoc.estado} />
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Aseguradora</span>
+                      <span className="font-semibold text-slate-800 dark:text-white">
+                        {selectedDoc.aseguradora || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Resolución / Reg. Municipal</span>
+                      <span className="font-mono text-slate-800 dark:text-white text-right">
+                        {selectedDoc.resMunicipal || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Dirección del Titular</span>
+                      <span className="font-medium text-slate-800 dark:text-white text-right truncate max-w-[200px]" title={selectedDoc.direccion}>
+                        {selectedDoc.direccion || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Código QR</span>
+                      <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                        {selectedDoc.codigoQr || '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

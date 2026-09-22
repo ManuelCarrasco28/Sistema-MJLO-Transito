@@ -41,6 +41,10 @@ class DocumentosController extends ResourceController
             $this->documentColumn('numero_inspeccion', 'numeroInspeccion'),
         ];
 
+        $resMunicipalCol = $db->fieldExists('resolucion_alcaldia', 'asociaciones')
+            ? "COALESCE(o.resolucion_alcaldia, '')"
+            : ($db->fieldExists('numero_licencia', 'asociaciones') ? "COALESCE(o.numero_licencia, '')" : "''");
+
         $rows = $db->table('documentos_vehiculo d')
             ->select("
                 d.id,
@@ -62,12 +66,15 @@ class DocumentosController extends ResourceController
                 d.fecha_expiracion AS fechaExpiracion,
                 d.estado,
                 COALESCE(o.razon_social, 'Independiente') AS asociacion,
-                COALESCE(o.resolucion_alcaldia, '') AS resMunicipal,
+                $resMunicipalCol AS resMunicipal,
                 COALESCE(c.nombres, '') AS propietarioNombres,
                 COALESCE(c.apellido_paterno, '') AS propietarioPaterno,
                 COALESCE(c.apellido_materno, '') AS propietarioMaterno,
                 COALESCE(c.foto, '') AS fotoConductor,
+                COALESCE(c.numero_licencia, '') AS conductorLicencia,
                 COALESCE(p.numero, '') AS propietarioDni,
+                COALESCE(p.celular, '') AS propietarioCelular,
+                COALESCE(p.email, '') AS propietarioEmail,
                 COALESCE(p.direccion, '') AS direccion
             ", false)
             ->join('vehiculos v', 'v.id = d.id_vehiculo', 'left')
@@ -75,7 +82,6 @@ class DocumentosController extends ResourceController
             ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
             ->join('personas p', 'p.id = vp.id_persona', 'left')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-            ->whereNotIn('d.tipo_documento', ['TARJETA_PROPIEDAD', 'CITV', 'INSPECCION_TECNICA', 'CURSO_VIAL'])
             ->orderBy('d.id', 'DESC')
             ->get()
             ->getResultArray();
@@ -87,6 +93,9 @@ class DocumentosController extends ResourceController
             $row['conductorNombres'] = trim($row['propietarioNombres'] ?? '');
             $row['conductorApellidos'] = $apellidos;
             $row['conductorDni'] = $row['propietarioDni'] ?? '';
+            if (empty($row['numeroLicencia']) && !empty($row['conductorLicencia'])) {
+                $row['numeroLicencia'] = $row['conductorLicencia'];
+            }
             $row['hasPropietario'] = !empty($propietario);
             unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
             return $row;
