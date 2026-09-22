@@ -316,26 +316,19 @@ export function Trabajadores() {
 
   const handleExportPdf = () => {
     exportToPdf({
-      filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}.pdf`,
-      sheetName: 'Personal',
-      title: 'PADRÓN INSTITUCIONAL DE TRABAJADORES Y FISCALIZADORES',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Gestión de Personal',
-      metadata: [
-        { label: 'Estado', value: filterEstado }
+      filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}`,
+      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Personal Municipal',
+      summaryItems: [
+        { label: 'Total registrados', value: rows.length },
+        { label: 'Exportando', value: `${filtered.length} trabajadores` },
       ],
       columns: [
-        { header: 'TIPO DOC', key: 'tipo_documento', width: 90, align: 'center' },
-        { header: 'N° DOCUMENTO', key: 'numero_documento', isText: true, width: 120, align: 'center' },
-        { header: 'NOMBRES', key: 'nombres', width: 140 },
-        { header: 'APELLIDOS', key: 'apellidos', width: 160 },
-        { header: 'CARGO', key: 'cargo', width: 180 },
-        { header: 'UNIDAD ORGÁNICA', key: 'unidad_organica', width: 220 },
-        { header: 'FUNCIÓN', key: 'tipo_funcion', width: 100, align: 'center' },
-        { header: 'DOC. DESIGNACIÓN', key: 'documento', width: 150 },
-        { header: 'FECHA ALTA', key: 'fecha_documento', width: 110, align: 'center' },
-        { header: 'VENCIMIENTO', render: (_, r) => r.fecha_termino || 'INDETERMINADO', width: 120, align: 'center' },
-        { header: 'TIENE ACCESO', render: (_, r) => r.tiene_usuario ? 'SÍ' : 'NO', width: 110, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 100, align: 'center' }
+        { header: 'NOMBRES', render: (_, r) => `${r.nombres || ''} ${r.apellidoPaterno || ''} ${r.apellidoMaterno || ''}`.trim(), width: 200 },
+        { header: 'DNI', key: 'numeroDocumento', width: 90, align: 'center' },
+        { header: 'CARGO', key: 'cargo', width: 160 },
+        { header: 'UNIDAD ORGÁNICA', key: 'unidadOrganica', width: 180 },
+        { header: 'TELÉFONO', key: 'celular', width: 100, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
       ],
       data: filtered
     })

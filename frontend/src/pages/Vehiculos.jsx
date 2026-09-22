@@ -296,27 +296,27 @@ export function Vehiculos() {
 
   const handleExportPdf = () => {
     exportToPdf({
-      filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.pdf`,
-      sheetName: 'Vehículos',
-      title: 'PADRÓN VEHICULAR MUNICIPAL',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
-      metadata: [
-        { label: 'Tipo Vehículo', value: filterTipo },
-        { label: 'Estado', value: filterEstado }
+      filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}`,
+      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial Vehicular',
+      summaryItems: [
+        { label: 'Total en padrón', value: totalVehiculos },
+        { label: 'Exportando', value: `${filteredVehiculos.length} vehículos` },
+        { label: 'Formales', value: formales },
+        { label: 'Informales', value: informales },
+        { label: 'Inhabilitados', value: suspendidos },
       ],
       columns: [
-        { header: 'PLACA', key: 'placa', isText: true, width: 110, align: 'center' },
-        { header: 'TIPO VEHÍCULO', key: 'tipo', width: 140 },
-        { header: 'MARCA', key: 'marca', width: 120 },
-        { header: 'MODELO', key: 'modelo', width: 120 },
-        { header: 'COLOR', key: 'color', width: 110 },
-        { header: 'AÑO', key: 'anio', width: 80, align: 'center' },
-        { header: 'N° MOTOR', key: 'numeroMotor', isText: true, width: 140 },
-        { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 140 },
-        { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
-        { header: 'PROPIETARIO', key: 'propietario', width: 180 },
-        { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+        { header: 'PLACA', key: 'placa', width: 80, align: 'center' },
+        { header: 'TIPO', key: 'tipo', width: 130 },
+        { header: 'MARCA', key: 'marca', width: 90 },
+        { header: 'MODELO', key: 'modelo', width: 90 },
+        { header: 'COLOR', key: 'color', width: 80 },
+        { header: 'AÑO', key: 'anio', width: 45, align: 'center' },
+        { header: 'N° SERIE', key: 'numeroSerie', width: 120 },
+        { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'SIN ASOC.', width: 180 },
+        { header: 'PROPIETARIO', key: 'propietario', width: 150 },
+        { header: 'DNI/RUC', key: 'propietarioDni', width: 90, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
       ],
       data: filteredVehiculos
     })

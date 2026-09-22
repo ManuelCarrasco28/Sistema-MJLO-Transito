@@ -258,24 +258,24 @@ export function Asociaciones() {
   const handleExportPdf = () => {
     const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
     exportToPdf({
-      filename: `Padron_Asociaciones_${new Date().getFullYear()}.pdf`,
-      sheetName: 'Asociaciones',
-      title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Padrón Oficial de Asociaciones y Empresas',
-      metadata: [
-        { label: 'Filtro Tipo', value: filterTipo },
-        { label: 'Filtro Estado', value: filterEstado },
-        { label: 'Flota Total Registrada', value: `${flotaAcumulada} unidades` },
+      filename: `Padron_Asociaciones_${new Date().getFullYear()}`,
+      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
+      summaryItems: [
+        { label: 'Total registros', value: totalOrgs },
+        { label: 'Exportando', value: `${listToExport.length} registros` },
+        { label: 'Asociaciones', value: asociacionesCount },
+        { label: 'Particulares', value: particulares },
+        { label: 'Flota registrada', value: `${flotaAcumulada} vehículos` },
       ],
       columns: [
-        { header: 'RAZÓN SOCIAL', key: 'razonSocial', width: 250 },
-        { header: 'RUC', key: 'ruc', isText: true, width: 120, align: 'center' },
-        { header: 'REPRESENTANTE', key: 'representanteNombre', width: 200 },
-        { header: 'DNI REP.', key: 'representanteDni', isText: true, width: 110, align: 'center' },
-        { header: 'TIPO', key: 'tipo', width: 130, align: 'center' },
-        { header: 'FLOTA', key: 'flotaTotal', width: 90, align: 'center' },
-        { header: 'EXPEDIENTE', key: 'expediente', isText: true, width: 130, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
+        { header: 'RAZÓN SOCIAL', key: 'razonSocial', width: 220 },
+        { header: 'RUC', key: 'ruc', width: 100, align: 'center' },
+        { header: 'REPRESENTANTE', key: 'representanteNombre', width: 180 },
+        { header: 'DNI REP.', key: 'representanteDni', width: 90, align: 'center' },
+        { header: 'TIPO', key: 'tipo', width: 110, align: 'center' },
+        { header: 'FLOTA', key: 'flotaTotal', width: 60, align: 'center' },
+        { header: 'EXPEDIENTE', key: 'expediente', width: 110, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 90, align: 'center' },
       ],
       data: listToExport
     })

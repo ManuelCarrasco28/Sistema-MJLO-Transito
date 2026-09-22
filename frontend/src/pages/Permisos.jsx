@@ -170,29 +170,27 @@ export function Permisos() {
 
   const handleExportPdf = () => {
     exportToPdf({
-      filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.pdf`,
-      sheetName: 'Autorizaciones',
-      title: 'PADRÓN OFICIAL DE AUTORIZACIONES DE CARGA, DESCARGA Y USO DE VÍAS',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Resoluciones y Permisos Especiales',
-      metadata: [
-        { label: 'Tipo Trámite', value: filterTipo },
-        { label: 'Estado', value: filterEstado },
-        { label: 'Total Registros', value: String(filteredPermisos.length) }
+      filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}`,
+      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Autorizaciones y Permisos',
+      summaryItems: [
+        { label: 'Total autorizaciones', value: totalPermisos },
+        { label: 'Exportando', value: `${filteredPermisos.length} registros` },
+        { label: 'Carga y Descarga', value: totalCarga },
+        { label: 'Uso de Vías', value: totalVias },
+        { label: 'Vigentes', value: vigentes },
+        { label: 'Vencidos', value: vencidos },
       ],
       columns: [
-        { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', isText: true, width: 150, align: 'center' },
-        { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 140 },
-        { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', isText: true, width: 130, align: 'center' },
-        { header: 'SOLICITANTE / EMPRESA', key: 'solicitanteNombre', width: 220 },
-        { header: 'DNI / RUC', key: 'solicitanteDocumento', isText: true, width: 120, align: 'center' },
-        { header: 'EXPEDIENTE', key: 'expediente', isText: true, width: 130, align: 'center' },
-        { header: 'ZONA', key: 'zonaCirculacion', width: 180 },
-        { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 130, align: 'center' },
-        { header: 'INICIO VIGENCIA', key: 'fechaInicioVigencia', width: 120, align: 'center' },
-        { header: 'FIN VIGENCIA', key: 'fechaFinVigencia', width: 120, align: 'center' },
-        { header: 'RECIBO INGRESO', key: 'reciboIngresoNumero', isText: true, width: 130, align: 'center' },
-        { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toFixed(2)}`, align: 'right', width: 110 },
-        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+        { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', width: 110, align: 'center' },
+        { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 120 },
+        { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', width: 100, align: 'center' },
+        { header: 'SOLICITANTE', key: 'solicitanteNombre', width: 180 },
+        { header: 'DNI / RUC', key: 'solicitanteDocumento', width: 100, align: 'center' },
+        { header: 'ZONA', key: 'zonaCirculacion', width: 150 },
+        { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 100, align: 'center' },
+        { header: 'INICIO', key: 'fechaInicioVigencia', width: 85, align: 'center' },
+        { header: 'FIN', key: 'fechaFinVigencia', width: 85, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
       ],
       data: filteredPermisos
     })
