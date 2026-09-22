@@ -364,39 +364,6 @@ export function Permisos() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-violet-600/25 transition-all hover:scale-[1.01] active:scale-95 cursor-pointer"
-          >
-            <Icon name="plus" className="size-4" />
-            <span>Nueva Autorización Oficial</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 shadow-2xs transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 cursor-pointer"
-            title="Exportar padrón de autorizaciones en Excel"
-          >
-            <Icon name="table" className="size-4 text-emerald-600 dark:text-emerald-400" />
-            <span>Exportar Excel</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-horizon dark:shadow-none transition hover:bg-slate-50 dark:border-slate-800 dark:bg-[#111C44] dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
-          >
-            <Icon name="print" className="size-4 text-slate-500" />
-            <span>Imprimir Padrón</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Tarjetas de Estadísticas */}
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
         {/* 2. Carga y Descarga */}
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-amber-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
