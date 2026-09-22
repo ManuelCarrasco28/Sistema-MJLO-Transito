@@ -19,6 +19,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         
         $routes->get('vehiculos/persona/dni', 'VehiculosController::getVehiculosByPersonaDni');
         $routes->resource('vehiculos', ['controller' => 'VehiculosController']);
+        $routes->get('tipo-documentos', 'PersonasController::tiposDocumento');
         $routes->resource('personas', ['controller' => 'PersonasController']);
         $routes->get('personal/catalogos', 'PersonalController::catalogos');
         $routes->resource('personal', ['controller' => 'PersonalController', 'only' => ['index', 'create', 'update']]);
@@ -38,6 +39,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
         $routes->resource('internamientos', ['controller' => 'InternamientosController']);
         $routes->get('inventario-criterios', 'InternamientosController::criterios');
+        $routes->get('permisos/tramites-disponibles', 'PermisosController::tramitesDisponibles');
         $routes->resource('permisos', ['controller' => 'PermisosController']);
         $routes->get('procedimientos-admin', 'PermisosController::procedimientos');
         $routes->get('usuarios', 'UsuariosController::index');
