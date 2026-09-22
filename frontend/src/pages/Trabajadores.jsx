@@ -764,7 +764,12 @@ export function Trabajadores() {
                       onChange={(e) => setForm({ ...form, id_unidad_organica: e.target.value })} 
                       options={[
                         { value: '', label: 'Sin unidad asignada' },
-                        ...catalogos.unidades.map(u => ({ value: String(u.id), label: `${u.nombre} ${u.jerarquia ? `(${u.jerarquia})` : ''}` }))
+                        ...catalogos.unidades.map(u => ({ 
+                          value: String(u.id), 
+                          label: u.jerarquia && u.nombre !== u.jerarquia && !u.nombre.startsWith(u.jerarquia)
+                            ? `${u.nombre} (${u.jerarquia})` 
+                            : u.nombre 
+                        }))
                       ]}
                     />
                   </div>
