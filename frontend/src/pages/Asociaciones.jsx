@@ -547,10 +547,10 @@ export function Asociaciones() {
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[220px]">Asociación / Particular</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[125px]">RUC / Partida</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[200px]">Representante Legal</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[170px]">Contacto</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[240px]">Ubicación</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[105px]">Flota</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[170px]">Representante Legal</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">Contacto</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[200px]">Ubicación</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[80px]">Flota</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[90px] text-center">Estado</th>
                 <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-slate-800/40 px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
@@ -569,25 +569,45 @@ export function Asociaciones() {
                       </div>
                     </td>
                     <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-14 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-14 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3.5 py-3 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"><div className="mx-auto h-6 w-16 rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3 min-w-[170px]">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 min-w-[150px]">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-24 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-32 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 min-w-[200px]">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-48 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-16 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 min-w-[80px]">
+                      <div className="h-6 w-16 rounded bg-slate-200 dark:bg-slate-800" />
+                    </td>
+                    <td className="px-3 py-3 min-w-[90px] text-center">
+                      <div className="mx-auto h-5 w-14 rounded-full bg-slate-200 dark:bg-slate-800" />
+                    </td>
+                    <td className="sticky right-0 bg-white/50 dark:bg-[#0f172a]/50 px-3.5 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-slate-800" />
+                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-slate-800" />
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : filteredOrgs.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-5 py-10 text-center text-slate-400">
-                    <div className="mx-auto max-w-xs space-y-2">
-                      <Icon name="building" className="size-8" />
-                      <p className="font-bold text-slate-600 dark:text-slate-300">
-                        No se encontraron asociaciones
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        Modifica los términos de búsqueda o los filtros seleccionados.
-                      </p>
+                  <td colSpan="8" className="px-4 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <Icon name="building" className="size-12 text-slate-300 dark:text-slate-600 mb-4" />
+                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200">No se encontraron asociaciones</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Modifica los términos de búsqueda o los filtros seleccionados.</p>
                     </div>
                   </td>
                 </tr>
@@ -596,12 +616,12 @@ export function Asociaciones() {
                   <tr key={o.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
                     <td className="px-3.5 py-2.5 min-w-[220px]">
                       <div className="flex items-center gap-2.5">
-                        <span className={`grid size-8 shrink-0 place-items-center rounded-xl text-base font-bold shadow-xs ${o.tipo === 'ASOCIACION'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        <div className={`grid size-9 shrink-0 place-items-center rounded-xl font-bold shadow-xs ${o.tipo === 'ASOCIACION'
+                            ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
+                            : 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400'
                           }`}>
-                          {o.tipo === 'ASOCIACION' ? '🛺' : '👤'}
-                        </span>
+                          <Icon name={o.tipo === 'ASOCIACION' ? 'motoTaxi' : 'building'} className="size-4.5" />
+                        </div>
                         <div className="flex-1">
                           <p className="font-normal text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-snug" title={o.razonSocial}>{o.razonSocial}</p>
                           <span className="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300 mt-0.5">
@@ -614,7 +634,7 @@ export function Asociaciones() {
                       <p className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">RUC: {o.ruc}</p>
                       <p className="text-[11px] font-mono text-slate-400">{o.partidaRegistral || o.numeroLicencia || '—'}</p>
                     </td>
-                    <td className="px-3 py-2.5 min-w-[200px]">
+                    <td className="px-3 py-2.5 min-w-[170px]">
                       {o.representanteNombre ? (
                         <div>
                           <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug" title={o.representanteNombre}>
@@ -628,11 +648,11 @@ export function Asociaciones() {
                         <span className="text-xs text-slate-400 italic font-medium">— No asignado —</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 min-w-[170px]">
+                    <td className="px-3 py-2.5 min-w-[150px]">
                       <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{o.telefono || '—'}</p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap" title={o.email}>{o.email || '—'}</p>
                     </td>
-                    <td className="px-3 py-2.5 min-w-[240px]">
+                    <td className="px-3 py-2.5 min-w-[200px]">
                       <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug" title={o.direccion}>{o.direccion || '—'}</p>
                       <button
                         type="button"
@@ -643,13 +663,13 @@ export function Asociaciones() {
                         {o.coordenadas ? 'Ver mapa' : 'Sin coordenadas'}
                       </button>
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">
-                        <div className="flex items-center gap-2">
+                    <td className="px-3 py-2.5 whitespace-nowrap min-w-[80px]">
+                        <div className="flex items-center gap-1.5">
                           <span className="text-base font-black text-slate-800 dark:text-slate-200">
                             {o.flotaTotal}
                           </span>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                            {o.flotaTotal === 1 ? 'Vehículo' : 'Vehículos'}
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">
+                            {o.flotaTotal === 1 ? 'Und.' : 'Unds.'}
                           </span>
                         </div>
                     </td>
