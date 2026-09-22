@@ -50,6 +50,7 @@ services:
       - CHOKIDAR_USEPOLLING=true
       - VITE_API_BASE_URL=/api
       - VITE_BACKEND_URL=http://backend
+      - VITE_TINYMCE_API_KEY=unmcqzdx4e88wfy3gqtlbelk1w21unqt3sl8hlcltd49u0o8
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
