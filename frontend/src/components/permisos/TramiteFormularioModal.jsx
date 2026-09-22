@@ -514,7 +514,7 @@ export function TramiteFormularioModal({
             {/* Componente TinyMCE React Oficial */}
             <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
               <Editor
-                apiKey="no-api-key"
+                apiKey={import.meta.env.VITE_TINYMCE_API_KEY || 'unmcqzdx4e88wfy3gqtlbelk1w21unqt3sl8hlcltd49u0o8'}
                 value={formData.contenido}
                 onEditorChange={handleEditorChange}
                 init={{
