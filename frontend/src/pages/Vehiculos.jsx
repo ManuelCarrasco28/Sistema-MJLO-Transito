@@ -500,7 +500,7 @@ export function Vehiculos() {
               <Icon name="vehicle" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
+          <div className="mt-1 flex items-center justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(totalVehiculos)}</p>
             <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">Padrón 2026</span>
           </div>
@@ -512,7 +512,7 @@ export function Vehiculos() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Formales</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
+          <div className="mt-1 flex items-center justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(formales)}</p>
             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">{porcentajeFormales}% En Asoc.</span>
           </div>
@@ -524,7 +524,7 @@ export function Vehiculos() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Informales</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs">⚠️</span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
+          <div className="mt-1 flex items-center justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(informales)}</p>
             <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">Sin Asoc.</span>
           </div>
@@ -536,7 +536,7 @@ export function Vehiculos() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Obs. / Baja</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">✕</span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
+          <div className="mt-1 flex items-center justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(suspendidos)}</p>
             <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-1.5 py-0.5 rounded-md">Inhabilitados</span>
           </div>
