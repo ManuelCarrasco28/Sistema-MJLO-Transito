@@ -238,6 +238,8 @@ class PersonasController extends ResourceController
         ];
         $db->table('ciudadanos')->insert($cData);
 
+        // Registrar como administrado
+        $db->table('administrados')->insert(['id_persona' => $insertId]);
 
         $db->transComplete();
 

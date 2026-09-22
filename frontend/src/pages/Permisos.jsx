@@ -553,7 +553,7 @@ export function Permisos() {
 
                 <button
                   type="button"
-                  onClick={handleExportPdf}
+                  onClick={handlePrint}
                   title="Descargar o imprimir padrón en PDF"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
                 >
