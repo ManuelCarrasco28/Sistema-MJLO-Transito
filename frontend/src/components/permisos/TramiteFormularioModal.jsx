@@ -58,7 +58,8 @@ export function TramiteFormularioModal({
   onClose,
   initialData = null,
   onSave,
-  procedimientos = []
+  procedimientos = [],
+  tramitesDisponibles = []
 }) {
   const initialFormState = {
     id: null,
@@ -199,7 +200,8 @@ export function TramiteFormularioModal({
       })
 
       if (!res.ok) {
-        throw new Error('Error al procesar la autorización municipal.')
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.message || 'Error al procesar la autorización municipal.')
       }
 
       if (onSave) onSave()
@@ -221,7 +223,7 @@ export function TramiteFormularioModal({
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-600/30">
-              <Icon name="fileText" className="size-5" />
+              <Icon name="routePermit" className="size-5" />
             </span>
             <div>
               <h3 className="text-lg font-black text-slate-900 dark:text-white">
@@ -237,12 +239,50 @@ export function TramiteFormularioModal({
             onClick={onClose}
             className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
           >
-            <Icon name="x" className="size-5" />
+            <Icon name="close" className="size-5" />
           </button>
         </div>
 
         {/* Cuerpo del Formulario con Scroll */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+          {/* Selector opcional de Trámite / Expediente Previo */}
+          {!formData.id && tramitesDisponibles.length > 0 && (
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-3.5 dark:border-indigo-900/60 dark:bg-indigo-950/30">
+              <label className="mb-1 block font-extrabold uppercase tracking-wider text-indigo-900 dark:text-indigo-200 text-xs">
+                Vincular con Trámite / Mesa de Partes Existente (Opcional)
+              </label>
+              <select
+                className="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 dark:border-indigo-700 dark:bg-slate-800 dark:text-white"
+                onChange={(e) => {
+                  const tId = Number(e.target.value)
+                  if (!tId) return
+                  const t = tramitesDisponibles.find((item) => item.id === tId)
+                  if (t) {
+                    const updated = {
+                      ...formData,
+                      tramiteId: t.id,
+                      solicitanteNombre: t.solicitanteNombre || t.personaNombre || t.asociacionNombre || formData.solicitanteNombre,
+                      solicitanteDocumento: t.solicitanteDocumento || t.personaDocumento || t.asociacionRuc || formData.solicitanteDocumento,
+                      expediente: t.numeroExpediente || formData.expediente,
+                      vehiculoPlaca: t.vehiculoPlaca || formData.vehiculoPlaca,
+                      reciboIngresoNumero: t.reciboIngresoNumero || formData.reciboIngresoNumero,
+                      reciboIngresoMonto: t.reciboIngresoMonto ? String(t.reciboIngresoMonto) : formData.reciboIngresoMonto,
+                      representanteLegal: t.representanteLegalNombre || formData.representanteLegal,
+                    }
+                    updated.contenido = generarPlantillaCuerpo(updated)
+                    setFormData(updated)
+                  }
+                }}
+              >
+                <option value="">-- Trámite directo / Sin vincular expediente previo --</option>
+                {tramitesDisponibles.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    Exp. {t.numeroExpediente || 'S/N'} — {t.solicitanteNombre || t.personaNombre || 'Sin nombre'} {t.procedimientoNombre ? `(${t.procedimientoNombre})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           
           {/* Clasificación / Selector de Tipo de Trámite */}
           <div>
@@ -488,12 +528,78 @@ export function TramiteFormularioModal({
             </div>
           </div>
 
-          {/* BLOQUE 3: Editor TinyMCE para la Referencia Textual / Cuerpo */}
+          {/* BLOQUE 3: Vigencia y Estado Oficial */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
+            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-800">
+              <span className="grid size-5 place-items-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 text-[10px]">3</span>
+              Vigencia Temporal y Estado Administrativo
+            </span>
+
+            <div className="grid gap-3 sm:grid-cols-4">
+              <div>
+                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                  Fecha de Emisión
+                </label>
+                <input
+                  type="date"
+                  name="fechaEmision"
+                  value={formData.fechaEmision}
+                  onChange={handleInputChange}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                  Inicio de Vigencia
+                </label>
+                <input
+                  type="date"
+                  name="fechaInicioVigencia"
+                  value={formData.fechaInicioVigencia}
+                  onChange={handleInputChange}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                  Fin de Vigencia
+                </label>
+                <input
+                  type="date"
+                  name="fechaFinVigencia"
+                  value={formData.fechaFinVigencia}
+                  onChange={handleInputChange}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                  Estado Oficial
+                </label>
+                <select
+                  name="estado"
+                  value={formData.estado}
+                  onChange={handleInputChange}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                >
+                  <option value="VIGENTE">VIGENTE</option>
+                  <option value="VENCIDO">VENCIDO</option>
+                  <option value="SUSPENDIDO">SUSPENDIDO</option>
+                  <option value="ANULADO">ANULADO</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* BLOQUE 4: Editor TinyMCE para la Referencia Textual / Cuerpo */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60 space-y-2.5 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
               <div>
                 <label className="font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-100 text-xs flex items-center gap-2">
-                  <span className="grid size-5 place-items-center rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400 text-[10px]">3</span>
+                  <span className="grid size-5 place-items-center rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400 text-[10px]">4</span>
                   Referencia Textual / Cuerpo de la Resolución (TinyMCE)
                 </label>
                 <p className="text-[11px] text-slate-400 mt-0.5">
@@ -506,7 +612,7 @@ export function TramiteFormularioModal({
                 className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 shadow-2xs hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300 transition active:scale-95 cursor-pointer whitespace-nowrap self-start sm:self-auto"
                 title="Genera o restablece la plantilla HTML con los datos actuales del formulario"
               >
-                <Icon name="refresh" className="size-3.5" />
+                <Icon name="rotateCcw" className="size-3.5" />
                 <span>Recargar Plantilla Oficial</span>
               </button>
             </div>
