@@ -264,6 +264,17 @@ class InspeccionesController extends ResourceController
                 $vehiculoId = (int)$vehiculo['id'];
             }
 
+            // Actualizar datos técnicos del vehículo si se ingresaron en la inspección
+            $vehUpdate = [];
+            if (!empty($input['vehiculoMarca'])) $vehUpdate['marca'] = trim($input['vehiculoMarca']);
+            if (!empty($input['vehiculoModelo'])) $vehUpdate['modelo'] = trim($input['vehiculoModelo']);
+            if (!empty($input['vehiculoAnio'])) $vehUpdate['anio_fabricacion'] = trim($input['vehiculoAnio']);
+            if (!empty($input['vehiculoMotor'])) $vehUpdate['serie_motor'] = trim($input['vehiculoMotor']);
+            if (!empty($input['asociacionId']) && (int)$input['asociacionId'] > 0) $vehUpdate['id_asociacion'] = (int)$input['asociacionId'];
+            if (!empty($vehUpdate)) {
+                $db->table('vehiculos')->where('id', $vehiculoId)->update($vehUpdate);
+            }
+
             $tecnicoId = (int)($input['tecnicoId'] ?? 0);
             if ($tecnicoId > 0) {
                 $tecnico = $db->table('trabajadores pe')->where('id_persona', $tecnicoId)->where('estado', 'ACTIVO')->get()->getRowArray();
@@ -459,6 +470,21 @@ class InspeccionesController extends ResourceController
 
             if (!empty($data)) {
                 $db->table('certicav')->where('id', $id)->update($data);
+            }
+
+            // Actualizar datos técnicos del vehículo si se modificaron
+            $existingCert = $db->table('certicav')->where('id', $id)->get()->getRowArray();
+            if ($existingCert && !empty($existingCert['id_vehiculo'])) {
+                $vehId = (int)$existingCert['id_vehiculo'];
+                $vehUpdate = [];
+                if (!empty($input['vehiculoMarca'])) $vehUpdate['marca'] = trim($input['vehiculoMarca']);
+                if (!empty($input['vehiculoModelo'])) $vehUpdate['modelo'] = trim($input['vehiculoModelo']);
+                if (!empty($input['vehiculoAnio'])) $vehUpdate['anio_fabricacion'] = trim($input['vehiculoAnio']);
+                if (!empty($input['vehiculoMotor'])) $vehUpdate['serie_motor'] = trim($input['vehiculoMotor']);
+                if (!empty($input['asociacionId']) && (int)$input['asociacionId'] > 0) $vehUpdate['id_asociacion'] = (int)$input['asociacionId'];
+                if (!empty($vehUpdate)) {
+                    $db->table('vehiculos')->where('id', $vehId)->update($vehUpdate);
+                }
             }
 
             if (isset($input['detalles']) && is_array($input['detalles'])) {
