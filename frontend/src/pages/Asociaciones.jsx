@@ -99,7 +99,9 @@ function FloatingSelect({ id, label, value, onChange, options = [], className = 
 
 export function Asociaciones() {
   const cached = getCachedData('/asociaciones')
+  const cachedPersonas = getCachedData('/personas')
   const [asociaciones, setAsociaciones] = useState(cached || [])
+  const [personas, setPersonas] = useState(cachedPersonas || [])
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
@@ -116,9 +118,15 @@ export function Asociaciones() {
   const [isEditing, setIsEditing] = useState(false)
   const [loadError, setLoadError] = useState('')
 
+  const [repSearch, setRepSearch] = useState('')
+  const [showRepResults, setShowRepResults] = useState(false)
+
   const emptyForm = {
     tipo: 'ASOCIACION',
     razonSocial: '',
+    idRepresentanteLegal: null,
+    representanteNombre: '',
+    representanteDni: '',
     ruc: '',
     partidaRegistral: '',
     fechaCreacion: '',
@@ -146,7 +154,59 @@ export function Asociaciones() {
       })
       .catch(() => setLoadError('No se pudo cargar el padrón de asociaciones.'))
       .finally(() => setIsLoading(false))
+
+    if (!cachedPersonas || cachedPersonas.length === 0) {
+      apiFetch('/personas')
+        .then((response) => response.ok ? response.json() : Promise.reject(response))
+        .then((payload) => {
+          const pData = payload.data ?? []
+          setPersonas(pData)
+          setCachedData('/personas', pData)
+        })
+        .catch(() => {})
+    }
   }, [])
+
+  const getPersonaNombre = (p) => {
+    if (!p) return ''
+    if (p.nombreCompleto) return p.nombreCompleto
+    const full = `${p.nombres || ''} ${p.apellidoPaterno || p.apellido_paterno || ''} ${p.apellidoMaterno || p.apellido_materno || ''}`.trim()
+    return full || p.razon_social || p.razonSocial || 'Sin Nombre'
+  }
+
+  const repResults = personas
+    .filter((p) => {
+      const q = repSearch.trim().toLowerCase()
+      if (!q) return true
+      const doc = String(p.numeroDocumento || p.numero || '').toLowerCase()
+      const nom = getPersonaNombre(p).toLowerCase()
+      return doc.includes(q) || nom.includes(q)
+    })
+    .slice(0, 10)
+
+  const selectRepresentante = (p) => {
+    const dni = String(p.numeroDocumento || p.numero || '')
+    const nom = getPersonaNombre(p)
+    setFormData((prev) => ({
+      ...prev,
+      idRepresentanteLegal: p.id,
+      representanteDni: dni,
+      representanteNombre: nom,
+    }))
+    setRepSearch('')
+    setShowRepResults(false)
+  }
+
+  const clearRepresentante = () => {
+    setFormData((prev) => ({
+      ...prev,
+      idRepresentanteLegal: null,
+      representanteDni: '',
+      representanteNombre: '',
+    }))
+    setRepSearch('')
+    setShowRepResults(false)
+  }
 
   const totalOrgs = asociaciones.length
   const particulares = asociaciones.filter((o) => o.tipo === 'PARTICULAR').length
@@ -189,7 +249,7 @@ export function Asociaciones() {
   }
 
   const filteredOrgs = asociaciones.filter((o) => {
-    const fullSearch = `${o.razonSocial} ${o.ruc} ${o.partidaRegistral} ${o.direccion} ${o.numeroLicencia} ${o.resolucionAlcaldia || ''}`.toLowerCase()
+    const fullSearch = `${o.razonSocial} ${o.ruc} ${o.partidaRegistral || ''} ${o.direccion || ''} ${o.numeroLicencia || ''} ${o.resolucionAlcaldia || ''} ${o.representanteNombre || ''} ${o.representanteDni || ''}`.toLowerCase()
     const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
     const matchesTipo = filterTipo === 'TODOS' || o.tipo === filterTipo
     const matchesEstado = filterEstado === 'TODOS' || o.estado === filterEstado
@@ -208,13 +268,23 @@ export function Asociaciones() {
 
   const handleOpenCreateModal = () => {
     setFormData(emptyForm)
+    setRepSearch('')
+    setShowRepResults(false)
     setIsEditing(false)
     setIsModalOpen(true)
   }
 
   const handleOpenEditModal = (org) => {
     setSelectedOrg(org)
-    setFormData({ ...emptyForm, ...org })
+    setFormData({
+      ...emptyForm,
+      ...org,
+      idRepresentanteLegal: org.idRepresentanteLegal || null,
+      representanteNombre: org.representanteNombre || '',
+      representanteDni: org.representanteDni || '',
+    })
+    setRepSearch('')
+    setShowRepResults(false)
     setIsEditing(true)
     setIsModalOpen(true)
   }
@@ -239,7 +309,9 @@ export function Asociaciones() {
     if (window.confirm('¿Está seguro de eliminar esta asociación del registro municipal?')) {
       try {
         await apiFetch(`/asociaciones/${id}`, { method: 'DELETE' })
-        setAsociaciones(asociaciones.filter((o) => o.id !== id))
+        const nextList = asociaciones.filter((o) => o.id !== id)
+        setAsociaciones(nextList)
+        setCachedData('/asociaciones', nextList)
       } catch (err) {
         alert('No se pudo eliminar la asociación.')
       }
@@ -265,7 +337,14 @@ export function Asociaciones() {
           method: 'PUT',
           body: formData,
         })
-        setAsociaciones(asociaciones.map((o) => (o.id === selectedOrg.id ? { ...formData, id: o.id } : o)))
+        const updated = {
+          ...selectedOrg,
+          ...formData,
+          id: selectedOrg.id,
+        }
+        const nextList = asociaciones.map((o) => (o.id === selectedOrg.id ? updated : o))
+        setAsociaciones(nextList)
+        setCachedData('/asociaciones', nextList)
       } else {
         const res = await apiFetch('/asociaciones', {
           method: 'POST',
@@ -276,7 +355,9 @@ export function Asociaciones() {
           ...formData,
           id: Date.now(),
         }
-        setAsociaciones([newOrg, ...asociaciones])
+        const nextList = [newOrg, ...asociaciones]
+        setAsociaciones(nextList)
+        setCachedData('/asociaciones', nextList)
         setCurrentPage(1)
       }
       setIsModalOpen(false)
@@ -471,6 +552,7 @@ export function Asociaciones() {
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[220px]">Asociación / Particular</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[125px]">RUC / Partida</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[200px]">Representante Legal</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[170px]">Contacto</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[240px]">Ubicación</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[105px]">Flota</th>
@@ -492,6 +574,7 @@ export function Asociaciones() {
                       </div>
                     </td>
                     <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3 py-3"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3 py-3"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="px-3 py-3"><div className="h-4 w-14 rounded bg-slate-200 dark:bg-slate-800" /></td>
@@ -501,7 +584,7 @@ export function Asociaciones() {
                 ))
               ) : filteredOrgs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-5 py-10 text-center text-slate-400">
+                  <td colSpan="8" className="px-5 py-10 text-center text-slate-400">
                     <div className="mx-auto max-w-xs space-y-2">
                       <Icon name="building" className="size-8" />
                       <p className="font-bold text-slate-600 dark:text-slate-300">
@@ -535,6 +618,20 @@ export function Asociaciones() {
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <p className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">RUC: {o.ruc}</p>
                       <p className="text-[11px] font-mono text-slate-400">{o.partidaRegistral || o.numeroLicencia || '—'}</p>
+                    </td>
+                    <td className="px-3 py-2.5 min-w-[200px]">
+                      {o.representanteNombre ? (
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug" title={o.representanteNombre}>
+                            {o.representanteNombre}
+                          </p>
+                          <p className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                            DNI: {o.representanteDni}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic font-medium">— No asignado —</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 min-w-[170px]">
                       <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{o.telefono || '—'}</p>
@@ -729,6 +826,102 @@ export function Asociaciones() {
                     </button>
                   </div>
 
+                  {/* Selector de Representante Legal vinculado a Personas */}
+                  <div className="sm:col-span-3">
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Icon name="user" className="size-3.5 text-indigo-500" />
+                      <span>Representante Legal (Persona Natural)</span>
+                    </label>
+
+                    {formData.idRepresentanteLegal ? (
+                      <div className="flex items-center justify-between gap-3 p-3 rounded-2xl border border-indigo-200/80 bg-indigo-50/60 dark:border-indigo-900/60 dark:bg-indigo-950/30">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="size-9 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold text-xs shrink-0 shadow-xs">
+                            <Icon name="idCard" className="size-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
+                              {formData.representanteNombre || 'Nombre no disponible'}
+                            </p>
+                            <p className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                              DNI: {formData.representanteDni || '—'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={clearRepresentante}
+                          className="px-2.5 py-1 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/60 rounded-lg transition-colors cursor-pointer shrink-0"
+                          title="Cambiar o quitar representante"
+                        >
+                          ✕ Quitar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <div className="relative">
+                          <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            placeholder="Buscar representante por DNI o Nombres y Apellidos..."
+                            value={repSearch}
+                            onFocus={() => setShowRepResults(true)}
+                            onChange={(e) => {
+                              setRepSearch(e.target.value)
+                              setShowRepResults(true)
+                            }}
+                            className="w-full h-[42px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        {showRepResults && (
+                          <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                            <div className="flex items-center justify-between px-2.5 py-1 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 uppercase">
+                              <span>Personas registradas ({repResults.length})</span>
+                              <button
+                                type="button"
+                                onClick={() => setShowRepResults(false)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                              >
+                                ✕ Cerrar
+                              </button>
+                            </div>
+                            {repResults.length === 0 ? (
+                              <div className="p-3 text-center text-xs text-slate-400 font-medium">
+                                No se encontraron personas con ese DNI o nombre.
+                              </div>
+                            ) : (
+                              repResults.map((p) => {
+                                const dni = p.numeroDocumento || p.numero || ''
+                                const nombre = getPersonaNombre(p)
+                                return (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => selectRepresentante(p)}
+                                    className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center justify-between gap-3 transition-colors cursor-pointer group"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-slate-800 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                                        {nombre}
+                                      </p>
+                                      <p className="font-mono text-[11px] text-slate-400">
+                                        DNI: {dni}
+                                      </p>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      Seleccionar →
+                                    </span>
+                                  </button>
+                                )
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {formData.tipo === 'ASOCIACION' && (
                     <>
                       <FloatingInput
@@ -916,6 +1109,20 @@ export function Asociaciones() {
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 text-xs">
               <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/60">
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                    <span className="font-bold text-slate-400">Representante Legal</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100 text-right">
+                      {detailOrg.representanteNombre || '—'}
+                    </span>
+                  </div>
+                  {detailOrg.representanteDni && (
+                    <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                      <span className="font-bold text-slate-400">DNI Representante</span>
+                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                        {detailOrg.representanteDni}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
                     <span className="font-bold text-slate-400">Partida Registral SUNARP</span>
                     <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{detailOrg.partidaRegistral || '—'}</span>

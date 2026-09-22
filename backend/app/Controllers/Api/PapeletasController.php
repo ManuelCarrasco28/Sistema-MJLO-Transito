@@ -282,6 +282,7 @@ class PapeletasController extends ResourceController
                             'apellido_paterno' => $duenoApellidos[0] ?? 'NO REGISTRADO',
                             'apellido_materno' => isset($duenoApellidos[1]) ? implode(' ', array_slice($duenoApellidos, 1)) : null,
                         ]);
+                        $db->table('administrados')->ignore(true)->insert(['id_persona' => $duenoId]);
                     }
                     $db->table('vehiculo_propietarios')->insert([
                         'id_vehiculo'  => $vehiculoId,
@@ -316,6 +317,7 @@ class PapeletasController extends ResourceController
                         'apellido_paterno' => $apellidos[0] ?? 'NO REGISTRADO',
                         'apellido_materno' => isset($apellidos[1]) ? implode(' ', array_slice($apellidos, 1)) : null,
                     ]);
+                    $db->table('administrados')->ignore(true)->insert(['id_persona' => $personaId]);
                 }
             }
 

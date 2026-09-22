@@ -8,6 +8,19 @@ class PersonasController extends ResourceController
 {
     protected $format = 'json';
 
+    public function tiposDocumento()
+    {
+        $db = \Config\Database::connect();
+        $rows = $db->table('tipo_documentos_identidad')
+            ->select('id, nombre, codigo, estado')
+            ->where('estado', 'ACTIVO')
+            ->orderBy('id', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        return $this->respond(['data' => $rows]);
+    }
+
     private function findPersona($id)
     {
         $db = \Config\Database::connect();
@@ -15,7 +28,9 @@ class PersonasController extends ResourceController
         return $db->table('personas p')
             ->select("
                 p.id,
-                COALESCE(td.nombre, 'DNI') AS tipoDocumento,
+                p.id_tipo_documento AS idTipoDocumento,
+                COALESCE(td.codigo, td.nombre, 'DNI') AS tipoDocumento,
+                COALESCE(td.nombre, 'DOCUMENTO NACIONAL DE IDENTIDAD') AS tipoDocumentoNombre,
                 p.numero AS numeroDocumento,
                 c.nombres,
                 c.apellido_paterno AS apellidoPaterno,
@@ -59,7 +74,9 @@ class PersonasController extends ResourceController
         $builder = $db->table('personas p')
             ->select("
                 p.id,
-                COALESCE(td.nombre, 'DNI') AS tipoDocumento,
+                p.id_tipo_documento AS idTipoDocumento,
+                COALESCE(td.codigo, td.nombre, 'DNI') AS tipoDocumento,
+                COALESCE(td.nombre, 'DOCUMENTO NACIONAL DE IDENTIDAD') AS tipoDocumentoNombre,
                 p.numero AS numeroDocumento,
                 c.nombres,
                 c.apellido_paterno AS apellidoPaterno,
@@ -164,13 +181,15 @@ class PersonasController extends ResourceController
         }
 
         $numeroDoc = trim($input['numeroDocumento']);
-        $tipoDocName = $input['tipoDocumento'] ?? 'DNI';
+        $tipoDocName = trim($input['tipoDocumento'] ?? 'DNI');
         $docLen = strlen($numeroDoc);
 
-        if ($tipoDocName === 'DNI' && ($docLen !== 8 || !ctype_digit($numeroDoc))) {
+        $isDni = in_array(strtoupper($tipoDocName), ['DNI', 'DOCUMENTO NACIONAL DE IDENTIDAD', '1'], true);
+
+        if ($isDni && ($docLen !== 8 || !ctype_digit($numeroDoc))) {
             return $this->failValidationErrors('El DNI debe tener exactamente 8 dígitos numéricos.');
         }
-        if ($tipoDocName !== 'DNI' && ($docLen < 8 || $docLen > 15)) {
+        if (!$isDni && ($docLen < 8 || $docLen > 15)) {
             return $this->failValidationErrors('El número de documento debe tener entre 8 y 15 caracteres.');
         }
 
@@ -188,9 +207,14 @@ class PersonasController extends ResourceController
 
         $db->transStart();
 
-        $tipoDocName = $input['tipoDocumento'] ?? 'DNI';
-        $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', $tipoDocName)->get()->getRowArray();
-        $tipoDocId = $tipoDocRow ? $tipoDocRow['id'] : 1;
+        $tipoDocRow = $db->table('tipo_documentos_identidad')
+            ->groupStart()
+                ->where('codigo', $tipoDocName)
+                ->orWhere('nombre', $tipoDocName)
+                ->orWhere('id', is_numeric($tipoDocName) ? (int)$tipoDocName : 0)
+            ->groupEnd()
+            ->get()->getRowArray();
+        $tipoDocId = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
 
         $pData = [
             'id_tipo_documento' => $tipoDocId,
@@ -213,6 +237,9 @@ class PersonasController extends ResourceController
             'foto'             => trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '') ?: null,
         ];
         $db->table('ciudadanos')->insert($cData);
+
+        // Registrar como administrado
+        $db->table('administrados')->insert(['id_persona' => $insertId]);
 
         $db->transComplete();
 
@@ -281,8 +308,15 @@ class PersonasController extends ResourceController
 
         $pData = [];
         if (isset($input['tipoDocumento'])) {
-            $tipoDocRow = $db->table('tipo_documentos_identidad')->where('nombre', $input['tipoDocumento'])->get()->getRowArray();
-            $pData['id_tipo_documento'] = $tipoDocRow ? $tipoDocRow['id'] : 1;
+            $tipoDocInput = trim($input['tipoDocumento']);
+            $tipoDocRow = $db->table('tipo_documentos_identidad')
+                ->groupStart()
+                    ->where('codigo', $tipoDocInput)
+                    ->orWhere('nombre', $tipoDocInput)
+                    ->orWhere('id', is_numeric($tipoDocInput) ? (int)$tipoDocInput : 0)
+                ->groupEnd()
+                ->get()->getRowArray();
+            $pData['id_tipo_documento'] = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
         }
         if (isset($input['numeroDocumento'])) $pData['numero'] = trim($input['numeroDocumento']);
         if (isset($input['direccion'])) $pData['direccion'] = trim($input['direccion']);

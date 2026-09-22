@@ -4,6 +4,20 @@ import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { ResolucionPermisoPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
+
+const FILTER_TIPO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los tipos' },
+  { value: 'CARGA_DESCARGA', label: 'Carga y Descarga' },
+  { value: 'USO_VIAS', label: 'Uso de Vías' },
+]
+
+const FILTER_ESTADO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'VIGENTE', label: 'Vigentes' },
+  { value: 'VENCIDO', label: 'Vencidos' },
+]
 
 export function Permisos() {
   const cachedPermisos = getCachedData('/permisos')
@@ -11,6 +25,7 @@ export function Permisos() {
 
   const [permisos, setPermisos] = useState(cachedPermisos || [])
   const [procedimientos, setProcedimientos] = useState(cachedProcs || [])
+  const [tramitesDisponibles, setTramitesDisponibles] = useState([])
   const [isLoading, setIsLoading] = useState(!cachedPermisos)
   const [activeTab, setActiveTab] = useState('permisos')
   const [searchTerm, setSearchTerm] = useState('')
@@ -26,6 +41,10 @@ export function Permisos() {
   // Form State
   const initialForm = {
     id: null,
+    tramiteId: '',
+    personaId: null,
+    asociacionId: null,
+    vehiculoId: null,
     tipoPermiso: 'CARGA_DESCARGA',
     numeroAutorizacion: '',
     vehiculoPlaca: '',
@@ -61,16 +80,19 @@ export function Permisos() {
   const loadData = () => {
     setIsLoading(true)
     Promise.all([
-      apiFetch('/permisos').then((r) => r.json()).catch(() => ({ data: [] })),
-      apiFetch('/procedimientos-admin').then((r) => r.json()).catch(() => ({ data: [] })),
+      apiFetch('/permisos').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
+      apiFetch('/procedimientos-admin').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
+      apiFetch('/permisos/tramites-disponibles').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
     ])
-      .then(([permRes, procRes]) => {
-        const pData = permRes.data || []
-        const prData = procRes.data || []
+      .then(([permRes, procRes, tramRes]) => {
+        const pData = Array.isArray(permRes?.data) ? permRes.data : []
+        const prData = Array.isArray(procRes?.data) ? procRes.data : []
+        const trData = Array.isArray(tramRes?.data) ? tramRes.data : []
         setPermisos(pData)
         setProcedimientos(prData)
-        setCachedData('/permisos', pData)
-        setCachedData('/procedimientos-admin', prData)
+        setTramitesDisponibles(trData)
+        if (pData.length > 0) setCachedData('/permisos', pData)
+        if (prData.length > 0) setCachedData('/procedimientos-admin', prData)
         setIsLoading(false)
       })
       .catch(() => {
@@ -83,9 +105,10 @@ export function Permisos() {
   }, [])
 
   const totalPermisos = permisos.length
-  const vigentes = permisos.filter((p) => p.estado === 'VIGENTE').length
   const totalCarga = permisos.filter((p) => p.tipoPermiso === 'CARGA_DESCARGA').length
   const totalVias = permisos.filter((p) => p.tipoPermiso === 'USO_VIAS').length
+  const vigentes = permisos.filter((p) => p.estado === 'VIGENTE').length
+  const vencidos = permisos.filter((p) => p.estado !== 'VIGENTE').length
 
   const filteredPermisos = permisos.filter((p) => {
     const s = searchTerm.toLowerCase()
@@ -160,6 +183,10 @@ export function Permisos() {
   const handleOpenEdit = (p) => {
     setFormData({
       id: p.id,
+      tramiteId: p.tramiteId ? String(p.tramiteId) : '',
+      personaId: p.personaId || null,
+      asociacionId: p.asociacionId || null,
+      vehiculoId: p.vehiculoId || null,
       tipoPermiso: p.tipoPermiso || 'CARGA_DESCARGA',
       numeroAutorizacion: p.numeroAutorizacion || '',
       vehiculoPlaca: p.vehiculoPlaca || '',
@@ -192,6 +219,36 @@ export function Permisos() {
     setIsCreateModalOpen(true)
   }
 
+  const handleTramiteChange = (tramiteIdVal) => {
+    if (!tramiteIdVal) {
+      setFormData((prev) => ({
+        ...prev,
+        tramiteId: '',
+      }))
+      return
+    }
+
+    const t = tramitesDisponibles.find((x) => String(x.id) === String(tramiteIdVal))
+    if (!t) return
+
+    setFormData((prev) => ({
+      ...prev,
+      tramiteId: t.id,
+      personaId: t.personaId || null,
+      asociacionId: t.asociacionId || null,
+      vehiculoId: t.vehiculoId || null,
+      expediente: t.numeroExpediente || prev.expediente,
+      referenciaSisgedo: t.numeroExpediente || prev.referenciaSisgedo,
+      solicitanteNombre: t.solicitanteNombre || prev.solicitanteNombre,
+      solicitanteDocumento: t.solicitanteDocumento || prev.solicitanteDocumento,
+      representanteLegal: t.representanteLegalNombre || (t.asociacionNombre && t.personaNombre ? t.personaNombre : prev.representanteLegal),
+      vehiculoPlaca: t.vehiculoPlaca || prev.vehiculoPlaca,
+      reciboIngresoNumero: t.reciboIngresoNumero || prev.reciboIngresoNumero,
+      reciboIngresoMonto: t.reciboIngresoMonto ? String(t.reciboIngresoMonto) : prev.reciboIngresoMonto,
+      reciboIngresoFecha: t.reciboIngresoFecha || prev.reciboIngresoFecha,
+    }))
+  }
+
   const handleTipoChange = (newTipo) => {
     setFormData((prev) => ({
       ...prev,
@@ -215,14 +272,20 @@ export function Permisos() {
       const url = isEdit ? `/permisos/${formData.id}` : '/permisos'
       const method = isEdit ? 'PUT' : 'POST'
 
+      const payload = {
+        ...formData,
+        tramiteId: formData.tramiteId ? Number(formData.tramiteId) : null,
+      }
+
       const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       })
 
       if (!res.ok) {
-        throw new Error('Error al procesar la autorización municipal.')
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.message || 'Error al procesar la autorización municipal.')
       }
 
       setIsCreateModalOpen(false)
@@ -235,24 +298,68 @@ export function Permisos() {
     }
   }
 
+  const handleDeletePermiso = async (id) => {
+    if (window.confirm('¿Estás seguro de eliminar esta autorización municipal?')) {
+      try {
+        const res = await apiFetch(`/permisos/${id}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Error al eliminar la autorización.')
+        setPermisos((prev) => prev.filter((p) => p.id !== id))
+        invalidateCache('/permisos')
+      } catch (err) {
+        alert(err.message || 'No se pudo eliminar la autorización.')
+      }
+    }
+  }
+
+  const escapeXml = (str) => {
+    if (str === null || str === undefined) return ''
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
+
   const handlePrint = () => {
     window.print()
   }
 
   return (
-    <div className="space-y-6">
-      {/* Cabecera Principal */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3.5">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/30">
-            <Icon name="routePermit" className="size-6" />
+    <div className="space-y-4">
+      {/* Cabecera Principal - Estilo Personas.jsx */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
+            <Icon name="routePermit" className="size-5.5" />
           </span>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-              Permisos y Autorizaciones
-            </h1>
-            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-              Módulo oficial de emisión: Carga y Descarga, Uso Provisional de Vías y Trámites Subgerenciales.
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                Permisos y Autorizaciones
+              </h1>
+            </div>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Directorio oficial de autorizaciones de Carga y Descarga, y Uso Provisional de Vías.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas separadas compactas - Exacto a Personas.jsx */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {/* 1. Total Registros */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-blue-500/80 dark:bg-[#0f172a]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Total Registros</span>
+            <span className="grid size-6 place-items-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+              <Icon name="routePermit" className="size-3.5" />
+            </span>
+          </div>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(totalPermisos)}
             </p>
           </div>
         </div>
@@ -290,72 +397,64 @@ export function Permisos() {
 
       {/* Tarjetas de Estadísticas */}
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44]">
+        {/* 2. Carga y Descarga */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-amber-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Total Autorizaciones
-            </span>
-            <span className="grid size-8 place-items-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400">
-              <Icon name="permit" className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Carga y Descarga</span>
+            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+              <Icon name="motoTaxi" className="size-3.5" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-            {totalPermisos}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Resoluciones y autorizaciones emitidas
-          </p>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(totalCarga)}
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44]">
+        {/* 3. Uso de Vías */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-cyan-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Carga y Descarga
-            </span>
-            <span className="grid size-8 place-items-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400">
-              <Icon name="motoTaxi" className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Uso de Vías</span>
+            <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
+              <Icon name="permit" className="size-3.5" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black tracking-tight text-sky-600 dark:text-sky-400">
-            {totalCarga}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            En Anillo Vial (4PM - 5AM)
-          </p>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(totalVias)}
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44]">
+        {/* 4. Vigentes */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Uso de Vías
-            </span>
-            <span className="grid size-8 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
-              <Icon name="routePermit" className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Vigentes</span>
+            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
+              ✓
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black tracking-tight text-amber-600 dark:text-amber-400">
-            {totalVias}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Autorizaciones de recorrido de flota
-          </p>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(vigentes)}
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44]">
+        {/* 5. Vencidos */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-rose-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Vigentes
-            </span>
-            <span className="grid size-8 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-              <Icon name="check" className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Vencidos</span>
+            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
+              ✕
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400">
-            {vigentes}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Con circulación autorizada
-          </p>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(vencidos)}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -364,9 +463,9 @@ export function Permisos() {
         <button
           type="button"
           onClick={() => setActiveTab('permisos')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-extrabold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === 'permisos'
-              ? 'border-violet-600 text-violet-600 dark:border-violet-400 dark:text-violet-400'
+              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
@@ -377,9 +476,9 @@ export function Permisos() {
         <button
           type="button"
           onClick={() => setActiveTab('tupa')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-extrabold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === 'tupa'
-              ? 'border-violet-600 text-violet-600 dark:border-violet-400 dark:text-violet-400'
+              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
@@ -390,92 +489,115 @@ export function Permisos() {
 
       {activeTab === 'permisos' && (
         <div className="space-y-4">
-          {/* Barra de Filtros */}
-          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-horizon dark:shadow-none dark:border-slate-800 dark:bg-[#111C44] lg:flex-row lg:items-center lg:justify-between">
-            <div className="relative flex-1 max-w-md">
-              <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Buscar por placa, solicitante, expediente o recibo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-3 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-500/10 dark:border-slate-800 dark:bg-[#111C44]/60 dark:text-slate-200 dark:placeholder-slate-500 dark:focus:border-violet-400"
-              />
-            </div>
-
-            {/* Filtros por Tipo de Trámite y Estado */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setFilterTipo('TODOS')}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${filterTipo === 'TODOS' ? 'bg-white dark:bg-[#111C44] text-violet-700 dark:text-violet-300 shadow-xs' : 'text-slate-600 dark:text-slate-400'}`}
-                >
-                  Todos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterTipo('CARGA_DESCARGA')}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${filterTipo === 'CARGA_DESCARGA' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400'}`}
-                >
-                  Carga y Descarga
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterTipo('USO_VIAS')}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${filterTipo === 'USO_VIAS' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400'}`}
-                >
-                  Uso de Vías
-                </button>
-              </div>
-
-              <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 mx-1 hidden sm:block" />
-
-              <div className="flex items-center gap-1.5">
-                {['TODOS', 'VIGENTE', 'VENCIDO'].map((st) => (
+          {/* Contenedor de la Tabla - Exacto a Personas.jsx */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
+            
+            {/* Barra de Filtros y Acciones */}
+            <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1">
+                <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por placa, solicitante, autorización o expediente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
+                />
+                {searchTerm && (
                   <button
-                    key={st}
                     type="button"
-                    onClick={() => setFilterEstado(st)}
-                    className={`rounded-xl px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
-                      filterEstado === st
-                        ? 'bg-violet-600 text-white shadow-xs'
-                        : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-[#111C44]/60 dark:text-slate-300 dark:hover:bg-slate-800'
-                    }`}
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                   >
-                    {st === 'TODOS' ? 'Todos Estados' : st === 'VIGENTE' ? 'Vigentes' : 'Vencidos'}
+                    ✕
                   </button>
-                ))}
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <RoundedSelect
+                  value={filterTipo}
+                  onChange={setFilterTipo}
+                  options={FILTER_TIPO_OPTIONS}
+                />
+                <RoundedSelect
+                  value={filterEstado}
+                  onChange={setFilterEstado}
+                  options={FILTER_ESTADO_OPTIONS}
+                />
+
+                {(filterEstado !== 'TODOS' || filterTipo !== 'TODOS' || searchTerm !== '') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterEstado('TODOS')
+                      setFilterTipo('TODOS')
+                      setSearchTerm('')
+                    }}
+                    title="Limpiar filtros"
+                    className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                  >
+                    <Icon name="filterX" className="size-4" />
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  title="Descargar padrón en Excel (.xls)"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+                >
+                  <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Excel</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  title="Descargar o imprimir padrón en PDF"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+                >
+                  <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
+                  <span>PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenCreate}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+                >
+                  <span className="text-base leading-none font-black">+</span>
+                  <span>Nueva autorización</span>
+                </button>
               </div>
             </div>
-          </div>
 
-          {/* Tabla de Autorizaciones */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-horizon dark:shadow-none dark:border-slate-800 dark:bg-[#111C44]">
+            {/* Tabla de Autorizaciones */}
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
-                <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-[#111C44]/60 dark:text-slate-400">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <tr>
-                    <th className="px-4 py-3.5">N° Autorización / Tipo</th>
-                    <th className="px-4 py-3.5">Solicitante / Empresa</th>
-                    <th className="px-4 py-3.5">Vehículo / Flota</th>
-                    <th className="px-4 py-3.5">Zona y Horario</th>
-                    <th className="px-4 py-3.5">Vigencia</th>
-                    <th className="px-4 py-3.5">Derecho de Trámite</th>
-                    <th className="px-4 py-3.5">Estado</th>
-                    <th className="px-4 py-3.5 text-right">Acciones</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Solicitante</th>
+                    <th className="px-4 py-3 whitespace-nowrap">N° Autorización</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Vehículo</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Zona / Horario</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Vigencia</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Estado</th>
+                    <th className="sticky right-0 z-20 px-4 py-3 text-center whitespace-nowrap bg-slate-50/75 dark:bg-slate-800/40">
+                      Acciones
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                         Cargando autorizaciones municipales...
                       </td>
                     </tr>
                   ) : paginatedPermisos.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                         No se encontraron autorizaciones con los filtros seleccionados.
                       </td>
                     </tr>
@@ -483,139 +605,177 @@ export function Permisos() {
                     paginatedPermisos.map((p) => {
                       const isCarga = p.tipoPermiso === 'CARGA_DESCARGA'
                       const isVias = p.tipoPermiso === 'USO_VIAS'
+                      const solicitanteText = p.solicitanteNombre || p.solicitante || '—'
+                      const initials = solicitanteText.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || 'AU'
 
                       return (
-                        <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                          {/* N° Autorización & Tipo Badge */}
-                          <td className="px-4 py-3.5">
-                            <span
-                              className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-black uppercase mb-1 ${
-                                isCarga
-                                  ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
-                                  : isVias
-                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                    : 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
-                              }`}
-                            >
-                              {isCarga ? 'Carga y Descarga' : isVias ? 'Uso Provisional Vías' : 'Operación TUPA'}
-                            </span>
-                            <div className="font-extrabold text-slate-900 dark:text-white">
-                              {p.numeroAutorizacion}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              Exp. {p.expediente || p.expedienteNumero || 'S/N'} {p.registroNumero ? `· Reg. ${p.registroNumero}` : ''}
-                            </div>
-                          </td>
-
-                          {/* Solicitante / Titular */}
-                          <td className="px-4 py-3.5">
-                            <div className="font-bold text-slate-800 dark:text-slate-100">
-                              {p.solicitanteNombre || p.solicitante || '—'}
-                            </div>
-                            {p.representanteLegal && (
-                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                                Rep: {p.representanteLegal}
-                              </div>
-                            )}
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              {p.solicitanteDocumento || p.solicitanteDoc ? `DOC: ${p.solicitanteDocumento || p.solicitanteDoc}` : ''}
-                            </div>
-                          </td>
-
-                          {/* Vehículo / Flota */}
-                          <td className="px-4 py-3.5">
-                            {p.vehiculoPlaca && p.vehiculoPlaca !== '—' ? (
-                              <span className="inline-flex items-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2 py-0.5 font-mono text-[11px] font-black text-slate-950 shadow-xs">
-                                {p.vehiculoPlaca}
-                              </span>
-                            ) : p.flotaPlacas ? (
-                              <div>
-                                <span className="font-bold text-slate-700 dark:text-slate-300 text-xs">
-                                  Flota ({p.flotaPlacas.split(',').length} Vehículos)
+                          <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                            {/* Solicitante / Titular con Avatar */}
+                            <td className="px-4 py-3 align-top">
+                              <div className="flex items-center gap-3">
+                                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 font-bold text-slate-700 text-xs shadow-2xs dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                  {initials}
                                 </span>
-                                <div className="text-[10px] text-slate-400 font-mono truncate max-w-[150px]" title={p.flotaPlacas}>
-                                  {p.flotaPlacas}
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-[13px] font-bold text-slate-900 dark:text-white max-w-[200px]">
+                                    {solicitanteText}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 font-mono">
+                                    {p.solicitanteDocumento || p.solicitanteDoc ? `DOC: ${p.solicitanteDocumento || p.solicitanteDoc}` : 'Sin documento'}
+                                  </p>
                                 </div>
                               </div>
-                            ) : (
-                              <span className="text-slate-400 italic text-[11px]">Flota Autorizada</span>
-                            )}
-                          </td>
+                            </td>
 
-                          {/* Zona y Horario */}
-                          <td className="px-4 py-3.5 max-w-[180px]">
-                            <div className="font-medium text-slate-800 dark:text-slate-200 truncate" title={p.zonaCirculacion || p.ubicacion}>
-                              {p.zonaCirculacion || p.ubicacion || 'Anillo Vial JLO'}
-                            </div>
-                            <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">
-                              {p.horarioInicio && p.horarioFin ? `${p.horarioInicio.slice(0, 5)} - ${p.horarioFin.slice(0, 5)} hrs` : 'Horario Ordinario'}
-                            </div>
-                          </td>
-
-                          {/* Vigencia */}
-                          <td className="px-4 py-3.5">
-                            <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs">
-                              {p.fechaInicioVigencia ? new Date(p.fechaInicioVigencia).toLocaleDateString('es-PE') : '—'}
-                            </div>
-                            <div className="text-[10px] text-slate-400">
-                              Hasta: {p.fechaFinVigencia ? new Date(p.fechaFinVigencia).toLocaleDateString('es-PE') : 'Indefinido'}
-                            </div>
-                          </td>
-
-                          {/* Derecho de Trámite / Recibo */}
-                          <td className="px-4 py-3.5">
-                            {p.reciboIngresoNumero ? (
-                              <div>
-                                <div className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs">
-                                  Recibo: {p.reciboIngresoNumero}
-                                </div>
-                                <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">
-                                  S/ {Number(p.reciboIngresoMonto || 0).toFixed(2)} {p.tonelaje ? `· ${p.tonelaje}` : ''}
-                                </div>
+                            {/* Nº Autorización & Tipo Badge */}
+                            <td className="px-4 py-3 align-top">
+                              <span
+                                className={`inline-block rounded-md px-2 py-0.5 text-[9px] font-black uppercase mb-0.5 tracking-widest ${
+                                  isCarga
+                                    ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
+                                    : isVias
+                                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                      : 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
+                                }`}
+                              >
+                                {isCarga ? 'Carga y Descarga' : isVias ? 'Uso de Vías' : 'Operación TUPA'}
+                              </span>
+                              <div className="text-[13px] font-bold text-slate-700 dark:text-slate-200 font-mono">
+                                {p.numeroAutorizacion}
                               </div>
-                            ) : (
-                              <span className="text-slate-400 text-[11px]">—</span>
-                            )}
-                          </td>
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                Exp. {p.expediente || p.expedienteNumero || 'S/N'}
+                              </div>
+                            </td>
 
-                          {/* Estado */}
-                          <td className="px-4 py-3.5">
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-black border ${
-                                p.estado === 'VIGENTE'
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                  : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300'
-                              }`}
-                            >
-                              <span className={`size-1.5 rounded-full ${p.estado === 'VIGENTE' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                              {p.estado}
-                            </span>
-                          </td>
+                            {/* Vehículo / Flota */}
+                            <td className="px-4 py-3 align-top">
+                              {p.vehiculoPlaca && p.vehiculoPlaca !== '—' ? (
+                                <span className="inline-flex items-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2 py-0.5 font-mono text-[11px] font-black text-slate-950 shadow-xs">
+                                  {p.vehiculoPlaca}
+                                </span>
+                              ) : p.flotaPlacas ? (
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                    Flota General
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 dark:text-slate-500 italic text-xs">No especificado</span>
+                              )}
+                            </td>
 
-                          {/* Acciones */}
-                          <td className="px-4 py-3.5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenDetail(p)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-horizon dark:shadow-none transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:border-slate-800 dark:bg-[#111C44]/60 dark:text-slate-300 dark:hover:bg-violet-950/40 dark:hover:text-violet-300 cursor-pointer"
-                                title="Ver / Imprimir Formato Oficial A4"
-                              >
-                                <Icon name="print" className="size-3.5 text-slate-500" />
-                                <span>Imprimir A4</span>
-                              </button>
+                            {/* Zona / Horario */}
+                            <td className="px-4 py-3 text-xs align-top">
+                              <div className="font-semibold text-slate-800 dark:text-slate-200 max-w-[150px] truncate">
+                                {p.zonaCirculacion || p.zonaPermitida || '—'}
+                              </div>
+                              <div className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                                {p.horarioPermitido || (p.horarioInicio && p.horarioFin ? `${p.horarioInicio.slice(0, 5)} - ${p.horarioFin.slice(0, 5)}` : '—')}
+                              </div>
+                            </td>
 
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEdit(p)}
-                                className="grid size-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-[#111C44] dark:text-slate-300 cursor-pointer"
-                                title="Editar Autorización"
-                              >
-                                <Icon name="edit" className="size-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                            {/* Vigencia */}
+                            <td className="px-4 py-3 text-xs align-top">
+                              <div className="font-bold text-slate-800 dark:text-slate-200">
+                                {p.fechaInicioVigencia || p.fechaInicio || '—'}
+                              </div>
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                Al: {p.fechaFinVigencia || p.fechaFin || '—'}
+                              </div>
+                            </td>
+
+                            {/* Estado */}
+                            <td className="px-4 py-3 align-top">
+                              <StatusBadge status={p.estado} />
+                            </td>
+
+                            {/* Acciones - Estilo Personas.jsx */}
+                            <td className="sticky right-0 z-20 px-4 py-3 align-top bg-white/95 dark:bg-[#0f172a]/95">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPermiso(p)
+                                    setIsDetailModalOpen(true)
+                                  }}
+                                  title="Imprimir Formato Oficial"
+                                  className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                                  style={{
+                                    backgroundColor: 'var(--action-print-bg)',
+                                    borderColor: 'var(--action-print-border)',
+                                    color: 'var(--action-print-text)',
+                                    borderWidth: '1.5px',
+                                    borderStyle: 'solid',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'var(--action-print-hover)'
+                                    e.currentTarget.style.borderColor = 'var(--action-print-hover)'
+                                    e.currentTarget.style.color = '#ffffff'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'var(--action-print-bg)'
+                                    e.currentTarget.style.borderColor = 'var(--action-print-border)'
+                                    e.currentTarget.style.color = 'var(--action-print-text)'
+                                  }}
+                                >
+                                  <Icon name="print" className="size-4" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEdit(p)}
+                                  title="Editar Autorización"
+                                  className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                                  style={{
+                                    backgroundColor: 'var(--action-edit-bg)',
+                                    borderColor: 'var(--action-edit-border)',
+                                    color: 'var(--action-edit-text)',
+                                    borderWidth: '1.5px',
+                                    borderStyle: 'solid',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'var(--action-edit-hover)'
+                                    e.currentTarget.style.borderColor = 'var(--action-edit-hover)'
+                                    e.currentTarget.style.color = '#ffffff'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'var(--action-edit-bg)'
+                                    e.currentTarget.style.borderColor = 'var(--action-edit-border)'
+                                    e.currentTarget.style.color = 'var(--action-edit-text)'
+                                  }}
+                                >
+                                  <Icon name="pencil" className="size-4" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePermiso(p.id)}
+                                  title="Eliminar Autorización"
+                                  className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                                  style={{
+                                    backgroundColor: 'var(--action-del-bg)',
+                                    borderColor: 'var(--action-del-border)',
+                                    color: 'var(--action-del-text)',
+                                    borderWidth: '1.5px',
+                                    borderStyle: 'solid',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'var(--action-del-hover)'
+                                    e.currentTarget.style.borderColor = 'var(--action-del-hover)'
+                                    e.currentTarget.style.color = '#ffffff'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'var(--action-del-bg)'
+                                    e.currentTarget.style.borderColor = 'var(--action-del-border)'
+                                    e.currentTarget.style.color = 'var(--action-del-text)'
+                                  }}
+                                >
+                                  <Icon name="trash" className="size-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
                       )
                     })
                   )}
@@ -673,355 +833,360 @@ export function Permisos() {
         </div>
       )}
 
-      {/* MODAL DE EMISIÓN / EDICIÓN DE AUTORIZACIÓN OFICIAL */}
+      {/* MODAL CREAR / EDITAR - EXACTO A PERSONAS.JSX */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-xs overflow-y-auto animate-enter">
-          <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a] my-auto overflow-hidden">
-            
-            {/* Header del Modal */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-linear-to-r from-violet-700 to-indigo-700 p-5 text-white">
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-white/10 text-white">
-                  <Icon name="routePermit" className="size-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+            {/* Header: Limpio, exactamente como Personas.jsx */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Icon name="routePermit" className="size-4" />
                 </span>
-                <div>
-                  <h3 className="text-base font-black">
-                    {formData.id ? 'Editar Autorización Oficial' : 'Emitir Nueva Autorización Municipal'}
-                  </h3>
-                  <p className="text-xs text-violet-200">
-                    Subgerencia de Tránsito, Transporte y Vialidad · MDJLO
-                  </p>
-                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {formData.id ? 'Editar autorización' : 'Nueva autorización'}
+                </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl text-violet-200 hover:bg-white/10 hover:text-white transition cursor-pointer"
+                title="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                ✕
+                <Icon name="close" className="size-5" />
               </button>
             </div>
 
-            {/* Formulario */}
-            <form onSubmit={handleFormSubmit} className="p-5 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto text-xs">
-              
-              {/* Selector de Tipo de Autorización */}
-              <div>
-                <label className="mb-2 block font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 text-[11px]">
-                  Tipo de Autorización / Trámite Oficial *
-                </label>
+            <form onSubmit={handleFormSubmit} autoComplete="off" className="flex flex-col overflow-hidden flex-1">
+              <div className="p-4 sm:p-4.5 space-y-2.5 overflow-y-auto">
+                {/* Selector de Tipo de Autorización */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <button
                     type="button"
                     onClick={() => handleTipoChange('CARGA_DESCARGA')}
-                    className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                    className={`rounded-2xl border p-2.5 text-left transition cursor-pointer flex flex-col justify-between ${
                       formData.tipoPermiso === 'CARGA_DESCARGA'
-                        ? 'border-sky-500 bg-sky-50/70 dark:bg-sky-950/30 text-sky-950 dark:text-sky-200'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                        ? 'border-sky-500 bg-sky-50/70 dark:bg-sky-950/30 text-sky-950 dark:text-sky-200 shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
                     }`}
                   >
-                    <div>
-                      <span className="font-black block text-xs">🚛 Carga y Descarga</span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                        Anillo vial nocturno (4PM-5AM), tonelaje y recibo.
-                      </span>
+                    <div className="font-bold text-xs flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-sky-500" />
+                      Carga y Descarga
                     </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 block">
+                      Anillo vial nocturno y tonelaje.
+                    </span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleTipoChange('USO_VIAS')}
-                    className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                    className={`rounded-2xl border p-2.5 text-left transition cursor-pointer flex flex-col justify-between ${
                       formData.tipoPermiso === 'USO_VIAS'
-                        ? 'border-amber-500 bg-amber-50/70 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                        ? 'border-amber-500 bg-amber-50/70 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
                     }`}
                   >
-                    <div>
-                      <span className="font-black block text-xs">🛣️ Uso Provisional Vías</span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                        Recorridos de ingreso/salida y flota vehicular.
-                      </span>
+                    <div className="font-bold text-xs flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-amber-500" />
+                      Uso Provisional Vías
                     </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 block">
+                      Recorridos y flota vehicular.
+                    </span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleTipoChange('RENOVACION_OPERACION')}
-                    className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                    className={`rounded-2xl border p-2.5 text-left transition cursor-pointer flex flex-col justify-between ${
                       formData.tipoPermiso === 'RENOVACION_OPERACION'
-                        ? 'border-violet-500 bg-violet-50/70 dark:bg-violet-950/30 text-violet-950 dark:text-violet-200'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                        ? 'border-violet-500 bg-violet-50/70 dark:bg-violet-950/30 text-violet-950 dark:text-violet-200 shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
                     }`}
                   >
-                    <div>
-                      <span className="font-black block text-xs">📋 Operación / TUPA</span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                        Resolución subgerencial de operación y servicio.
-                      </span>
+                    <div className="font-bold text-xs flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-violet-500" />
+                      Operación / TUPA
                     </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 block">
+                      Resolución subgerencial.
+                    </span>
                   </button>
                 </div>
-              </div>
 
-              {/* BLOQUE 1: Datos del Titular y Empresa */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
-                <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                  <span className="grid size-5 place-items-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-400 text-[10px]">1</span>
-                  Datos del Administrado / Empresa de Transporte
-                </span>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="sm:col-span-2">
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      Razón Social o Administrado *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ej. TRANSPORTES ADMIRAL SAC o Persona Natural"
-                      value={formData.solicitanteNombre}
-                      onChange={(e) => setFormData({ ...formData, solicitanteNombre: e.target.value.toUpperCase() })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none focus:border-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    />
+                {/* VINCULACIÓN CON EXPEDIENTE / TRÁMITE SISGEDO */}
+                <div className="rounded-2xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50/70 to-sky-50/50 p-3 space-y-2 dark:border-indigo-900/50 dark:from-indigo-950/30 dark:to-slate-900/50 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-indigo-600" />
+                      Vincular Trámite / Expediente SISGEDO
+                    </h4>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Carga automáticamente solicitante, vehículo y recibo de pago
+                    </span>
                   </div>
 
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      RUC / DNI *
+                  <div className="relative">
+                    <select
+                      id="tramiteId"
+                      value={formData.tramiteId || ''}
+                      onChange={(e) => handleTramiteChange(e.target.value)}
+                      className="peer block h-[42px] w-full appearance-none rounded-xl border border-indigo-300/80 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/20 dark:border-indigo-800 dark:bg-slate-800 dark:text-white cursor-pointer"
+                    >
+                      <option value="">— Ninguno (Registro manual sin trámite previo) —</option>
+                      {tramitesDisponibles.map((t) => (
+                        <option key={t.id} value={String(t.id)}>
+                          {t.numeroExpediente ? `[${t.numeroExpediente}] ` : ''}{t.solicitanteNombre} ({t.solicitanteDocumento || 'S/D'}){t.vehiculoPlaca ? ` · Placa: ${t.vehiculoPlaca}` : ''}{t.reciboIngresoNumero ? ` · Recibo: ${t.reciboIngresoNumero} (S/ ${Number(t.reciboIngresoMonto || 0).toFixed(2)})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <label
+                      htmlFor="tramiteId"
+                      className="pointer-events-none absolute left-3 top-1 select-none text-[9.5px] font-bold text-indigo-700 dark:text-indigo-400"
+                    >
+                      Expediente o Trámite Documentario
                     </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="20601234567"
-                      value={formData.solicitanteDocumento}
-                      onChange={(e) => setFormData({ ...formData, solicitanteDocumento: e.target.value })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none focus:border-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    />
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-indigo-600 dark:text-indigo-400">
+                      <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
                   </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      Representante Legal / Gerente General
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. DENISS CARMELITA ALTAMIRANO REQUEJO"
+                  {formData.tramiteId && (
+                    <div className="rounded-xl bg-white/90 dark:bg-slate-900/90 p-2.5 border border-indigo-200/80 dark:border-indigo-900/60 text-xs flex items-center justify-between gap-3 text-slate-700 dark:text-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="grid size-5 place-items-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                          <Icon name="check" className="size-3" />
+                        </span>
+                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                          Expediente vinculado: <strong>{formData.expediente || 'EXP-SISGEDO'}</strong>. Los datos están sincronizados sin duplicidad.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleTramiteChange('')}
+                        className="text-[10px] font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 underline cursor-pointer shrink-0"
+                      >
+                        Desvincular
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* BLOQUE 1: Administrado */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-blue-600" />
+                      Datos del Administrado
+                    </h4>
+                    {formData.tramiteId && (
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                        Autocompletado desde Trámite
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                    <div className="sm:col-span-6">
+                      <FloatingInput
+                        id="solicitanteNombre"
+                        label="Razón Social o Administrado"
+                        value={formData.solicitanteNombre}
+                        onChange={(e) => setFormData({ ...formData, solicitanteNombre: e.target.value.toUpperCase() })}
+                        required
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <FloatingInput
+                        id="solicitanteDocumento"
+                        label="RUC / DNI"
+                        value={formData.solicitanteDocumento}
+                        onChange={(e) => setFormData({ ...formData, solicitanteDocumento: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <FloatingInput
+                        id="numeroSeguridad"
+                        label="Nº Seguridad SGTTV"
+                        value={formData.numeroSeguridad}
+                        onChange={(e) => setFormData({ ...formData, numeroSeguridad: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2.5">
+                    <FloatingInput
+                      id="representanteLegal"
+                      label="Representante Legal / Gerente General"
                       value={formData.representanteLegal}
                       onChange={(e) => setFormData({ ...formData, representanteLegal: e.target.value.toUpperCase() })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none focus:border-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      N° Seguridad SGTTV
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.numeroSeguridad}
-                      onChange={(e) => setFormData({ ...formData, numeroSeguridad: e.target.value })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono font-bold outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      optional
                     />
                   </div>
                 </div>
-              </div>
 
-              {/* BLOQUE 2: Vehículo o Flota Autorizada */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
-                <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                  <span className="grid size-5 place-items-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-400 text-[10px]">2</span>
-                  Vehículo y Parámetros Operativos
-                </span>
+                {/* BLOQUE 2: Vehículo y Operativa */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-600" />
+                    Vehículo y Parámetros
+                  </h4>
 
-                {formData.tipoPermiso === 'CARGA_DESCARGA' ? (
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                        Placa del Vehículo *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ej. AHC-810"
-                        value={formData.vehiculoPlaca}
-                        onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })}
-                        className="w-full rounded-xl border-2 border-sky-400 bg-white px-3 py-2 font-mono font-black text-sm outline-none focus:border-sky-600 dark:border-sky-700 dark:bg-slate-800 dark:text-white"
-                      />
+                  {formData.tipoPermiso === 'CARGA_DESCARGA' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                      <div className="sm:col-span-4">
+                        <FloatingInput
+                          id="vehiculoPlaca"
+                          label="Placa del Vehículo"
+                          value={formData.vehiculoPlaca}
+                          onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })}
+                          required
+                          inputClassName="border-sky-400 focus:border-sky-600 dark:border-sky-700 font-mono font-black"
+                        />
+                      </div>
+                      <div className="sm:col-span-4">
+                        <FloatingInput
+                          id="tonelaje"
+                          label="Capacidad / Tonelaje"
+                          value={formData.tonelaje}
+                          onChange={(e) => setFormData({ ...formData, tonelaje: e.target.value })}
+                        />
+                      </div>
+                      <div className="sm:col-span-4">
+                        <FloatingInput
+                          id="horarioVial"
+                          label="Horario Anillo Vial"
+                          value="4:00 PM - 5:00 AM"
+                          readOnly
+                          onChange={() => {}}
+                          inputClassName="bg-slate-100 text-slate-500 font-bold dark:bg-slate-800 dark:text-slate-400 cursor-not-allowed"
+                        />
+                      </div>
                     </div>
-
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                        Capacidad / Tonelaje
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Ej. 03 A 07-TM"
-                        value={formData.tonelaje}
-                        onChange={(e) => setFormData({ ...formData, tonelaje: e.target.value })}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                        Horario en Anillo Vial
-                      </label>
-                      <input
-                        type="text"
-                        value="4.00 PM - 05.00 AM (del día siguiente)"
-                        readOnly
-                        className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 font-bold text-slate-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                          Recorrido de Ingreso
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Av. Balta, Av. Chiclayo, Calle Kennedy..."
+                  ) : (
+                    <div className="space-y-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <FloatingInput
+                          id="recorridoIngreso"
+                          label="Recorrido de Ingreso"
                           value={formData.recorridoIngreso}
                           onChange={(e) => setFormData({ ...formData, recorridoIngreso: e.target.value })}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                         />
-                      </div>
-                      <div>
-                        <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                          Recorrido de Salida
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Calle Leguía, Av. México, Av. Sáenz Peña..."
+                        <FloatingInput
+                          id="recorridoSalida"
+                          label="Recorrido de Salida"
                           value={formData.recorridoSalida}
                           onChange={(e) => setFormData({ ...formData, recorridoSalida: e.target.value })}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                         />
                       </div>
+                      <div className="relative">
+                        <textarea
+                          id="flotaPlacas"
+                          rows="2"
+                          placeholder="Ej. M4-5678, M4-9012, 1234-5B..."
+                          value={formData.flotaPlacas}
+                          onChange={(e) => setFormData({ ...formData, flotaPlacas: e.target.value.toUpperCase() })}
+                          className="peer block w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400"
+                        />
+                        <label htmlFor="flotaPlacas" className="absolute -top-2 left-3 bg-white dark:bg-slate-800 px-1 text-[9.5px] font-bold text-slate-500 dark:text-slate-400">
+                          Flota Vehicular (Placas separadas por comas)
+                        </label>
+                      </div>
                     </div>
+                  )}
+                </div>
 
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                        Flota Vehicular (Placas autorizadas separadas por comas)
-                      </label>
-                      <textarea
-                        rows="2"
-                        placeholder="Ej. M4-5678, M4-9012, 1234-5B, 6789-9A, 5432-1C..."
-                        value={formData.flotaPlacas}
-                        onChange={(e) => setFormData({ ...formData, flotaPlacas: e.target.value.toUpperCase() })}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                {/* BLOQUE 3: Expediente, Pago y Fechas */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-amber-600" />
+                      Trámite, Pago y Vigencia
+                    </h4>
+                    {formData.tramiteId && (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                        Vinculado a Pagos y Trámites
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                    <div className="sm:col-span-3">
+                      <FloatingInput
+                        id="expediente"
+                        label="Nº Expediente UTD"
+                        value={formData.expediente}
+                        onChange={(e) => setFormData({ ...formData, expediente: e.target.value })}
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <FloatingInput
+                        id="registroNumero"
+                        label="Nº Registro"
+                        value={formData.registroNumero}
+                        onChange={(e) => setFormData({ ...formData, registroNumero: e.target.value })}
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <FloatingInput
+                        id="reciboIngresoNumero"
+                        label="Recibo de Ingreso Nº"
+                        value={formData.reciboIngresoNumero}
+                        onChange={(e) => setFormData({ ...formData, reciboIngresoNumero: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <FloatingInput
+                        id="reciboIngresoMonto"
+                        label="Monto Pagado (S/)"
+                        type="number"
+                        step="0.01"
+                        value={formData.reciboIngresoMonto}
+                        onChange={(e) => setFormData({ ...formData, reciboIngresoMonto: e.target.value })}
                       />
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* BLOQUE 3: Expediente, Pago y Fechas */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
-                <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                  <span className="grid size-5 place-items-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-400 text-[10px]">3</span>
-                  Expediente SISGEDO, Derecho de Trámite y Vigencia
-                </span>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      N° Expediente UTD
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. UTD- 5294-24-"
-                      value={formData.expediente}
-                      onChange={(e) => setFormData({ ...formData, expediente: e.target.value })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      N° Registro
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. 610"
-                      value={formData.registroNumero}
-                      onChange={(e) => setFormData({ ...formData, registroNumero: e.target.value })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      Recibo de Ingreso N° *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="202400028830"
-                      value={formData.reciboIngresoNumero}
-                      onChange={(e) => setFormData({ ...formData, reciboIngresoNumero: e.target.value })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono font-bold outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      Monto Cancelado (S/)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="1030.00"
-                      value={formData.reciboIngresoMonto}
-                      onChange={(e) => setFormData({ ...formData, reciboIngresoMonto: e.target.value })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      Inicio de Vigencia
-                    </label>
-                    <input
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <FloatingInput
+                      id="fechaInicioVigencia"
+                      label="Inicio de Vigencia"
                       type="date"
                       value={formData.fechaInicioVigencia}
                       onChange={(e) => setFormData({ ...formData, fechaInicioVigencia: e.target.value })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                     />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                      Fin de Vigencia (1 Año)
-                    </label>
-                    <input
+                    <FloatingInput
+                      id="fechaFinVigencia"
+                      label="Fin de Vigencia (1 Año)"
                       type="date"
                       value={formData.fechaFinVigencia}
                       onChange={(e) => setFormData({ ...formData, fechaFinVigencia: e.target.value })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Botones de Acción */}
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
+              {/* Modal Footer - Idéntico a Personas.jsx */}
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="rounded-xl border border-slate-300 px-5 py-2.5 font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 active:scale-95 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-2.5 font-black text-white shadow-md shadow-violet-600/20 hover:scale-[1.01] active:scale-95 transition cursor-pointer disabled:opacity-50"
+                  className="rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 px-5 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Guardando...' : formData.id ? 'Actualizar Autorización' : 'Emitir Autorización'}
+                  {isSubmitting ? 'Guardando...' : formData.id ? 'Actualizar autorización' : 'Guardar autorización'}
                 </button>
               </div>
             </form>

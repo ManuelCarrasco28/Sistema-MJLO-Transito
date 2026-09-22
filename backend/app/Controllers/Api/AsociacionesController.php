@@ -29,9 +29,15 @@ class AsociacionesController extends ResourceController
                 COALESCE(o.numero_licencia, '') AS numeroLicencia,
                 COALESCE(o.resolucion_alcaldia, '') AS resolucionAlcaldia,
                 COALESCE(o.flota_autorizada, 50) AS flotaAutorizada,
+                o.id_representante_legal AS idRepresentanteLegal,
+                COALESCE(p_rep.numero, '') AS representanteDni,
+                TRIM(CONCAT(COALESCE(c_rep.nombres, ''), ' ', COALESCE(c_rep.apellido_paterno, ''), ' ', COALESCE(c_rep.apellido_materno, ''))) AS representanteNombre,
+                COALESCE(NULLIF(p_rep.telefono, ''), NULLIF(p_rep.celular, ''), '') AS representanteTelefono,
                 o.estado,
                 COUNT(v.id) AS flotaTotal
             ", false)
+            ->join('personas p_rep', 'p_rep.id = o.id_representante_legal', 'left')
+            ->join('ciudadanos c_rep', 'c_rep.id_persona = p_rep.id', 'left')
             ->join('vehiculos v', 'v.id_asociacion = o.id', 'left')
             ->groupBy('o.id')
             ->orderBy('o.id', 'DESC')
@@ -77,9 +83,15 @@ class AsociacionesController extends ResourceController
                 COALESCE(o.numero_licencia, '') AS numeroLicencia,
                 COALESCE(o.resolucion_alcaldia, '') AS resolucionAlcaldia,
                 COALESCE(o.flota_autorizada, 50) AS flotaAutorizada,
+                o.id_representante_legal AS idRepresentanteLegal,
+                COALESCE(p_rep.numero, '') AS representanteDni,
+                TRIM(CONCAT(COALESCE(c_rep.nombres, ''), ' ', COALESCE(c_rep.apellido_paterno, ''), ' ', COALESCE(c_rep.apellido_materno, ''))) AS representanteNombre,
+                COALESCE(NULLIF(p_rep.telefono, ''), NULLIF(p_rep.celular, ''), '') AS representanteTelefono,
                 o.estado,
                 COUNT(v.id) AS flotaTotal
             ", false)
+            ->join('personas p_rep', 'p_rep.id = o.id_representante_legal', 'left')
+            ->join('ciudadanos c_rep', 'c_rep.id_persona = p_rep.id', 'left')
             ->join('vehiculos v', 'v.id_asociacion = o.id', 'left')
             ->where('o.id', $id)
             ->groupBy('o.id')
@@ -179,21 +191,29 @@ class AsociacionesController extends ResourceController
 
         $flotaAutorizada = isset($input['flotaAutorizada']) ? max(1, (int)$input['flotaAutorizada']) : 50;
 
+        $idRepresentante = null;
+        if (!empty($input['idRepresentanteLegal'])) {
+            $idRepresentante = (int)$input['idRepresentanteLegal'];
+        } elseif (!empty($input['id_representante_legal'])) {
+            $idRepresentante = (int)$input['id_representante_legal'];
+        }
+
         $record = [
-            'tipo'                 => strtoupper($input['tipo'] ?? 'ASOCIACION'),
-            'razon_social'         => trim($input['razonSocial']),
-            'ruc'                  => trim($input['ruc'] ?? ''),
-            'partida_registral'    => trim($input['partidaRegistral'] ?? ''),
-            'fecha_creacion'       => $input['fechaCreacion'] ?? null,
-            'direccion'            => trim($input['direccion'] ?? ''),
-            'coordenadas'          => trim($input['coordenadas'] ?? ''),
-            'telefono_contacto'    => trim($input['telefono'] ?? ''),
-            'email_contacto'       => trim($input['email'] ?? ''),
-            'tipo_ambiente'        => trim($input['tipoAmbiente'] ?? ''),
-            'numero_licencia'      => trim($input['numeroLicencia'] ?? ''),
-            'resolucion_alcaldia'  => trim($input['resolucionAlcaldia'] ?? ''),
-            'flota_autorizada'     => $flotaAutorizada,
-            'estado'               => strtoupper($input['estado'] ?? 'ACTIVO'),
+            'tipo'                   => strtoupper($input['tipo'] ?? 'ASOCIACION'),
+            'razon_social'           => trim($input['razonSocial']),
+            'id_representante_legal' => $idRepresentante,
+            'ruc'                    => trim($input['ruc'] ?? ''),
+            'partida_registral'      => trim($input['partidaRegistral'] ?? ''),
+            'fecha_creacion'         => $input['fechaCreacion'] ?? null,
+            'direccion'              => trim($input['direccion'] ?? ''),
+            'coordenadas'            => trim($input['coordenadas'] ?? ''),
+            'telefono_contacto'      => trim($input['telefono'] ?? ''),
+            'email_contacto'         => trim($input['email'] ?? ''),
+            'tipo_ambiente'          => trim($input['tipoAmbiente'] ?? ''),
+            'numero_licencia'        => trim($input['numeroLicencia'] ?? ''),
+            'resolucion_alcaldia'    => trim($input['resolucionAlcaldia'] ?? ''),
+            'flota_autorizada'       => $flotaAutorizada,
+            'estado'                 => strtoupper($input['estado'] ?? 'ACTIVO'),
         ];
 
         $db->table('asociaciones')->insert($record);
@@ -206,26 +226,42 @@ class AsociacionesController extends ResourceController
             ['id' => $insertId, 'razonSocial' => $record['razon_social'], 'flotaAutorizada' => $flotaAutorizada, 'ruc' => $record['ruc']]
         );
 
+        $repInfo = null;
+        if ($idRepresentante) {
+            $repInfo = $db->table('personas p')
+                ->select("
+                    p.numero AS representanteDni,
+                    TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) AS representanteNombre
+                ", false)
+                ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                ->where('p.id', $idRepresentante)
+                ->get()
+                ->getRowArray();
+        }
+
         $newOrg = [
-            'id'                 => (int)$insertId,
-            'tipo'               => $record['tipo'],
-            'razonSocial'        => $record['razon_social'],
-            'ruc'                => $record['ruc'],
-            'partidaRegistral'   => $record['partida_registral'],
-            'fechaCreacion'      => $record['fecha_creacion'] ?? '',
-            'direccion'          => $record['direccion'],
-            'coordenadas'        => $record['coordenadas'],
-            'telefono'           => $record['telefono_contacto'],
-            'email'              => $record['email_contacto'],
-            'tipoAmbiente'       => $record['tipo_ambiente'],
-            'numeroLicencia'     => $record['numero_licencia'],
-            'resolucionAlcaldia' => $record['resolucion_alcaldia'],
-            'flotaAutorizada'    => $flotaAutorizada,
-            'cuposDisponibles'   => $flotaAutorizada,
-            'porcentajeOcupacion'=> 0,
-            'estadoCupo'         => 'DISPONIBLE',
-            'estado'             => $record['estado'],
-            'flotaTotal'         => 0,
+            'id'                   => (int)$insertId,
+            'tipo'                 => $record['tipo'],
+            'razonSocial'          => $record['razon_social'],
+            'idRepresentanteLegal' => $record['id_representante_legal'],
+            'representanteDni'     => $repInfo['representanteDni'] ?? '',
+            'representanteNombre'  => $repInfo['representanteNombre'] ?? '',
+            'ruc'                  => $record['ruc'],
+            'partidaRegistral'     => $record['partida_registral'],
+            'fechaCreacion'        => $record['fecha_creacion'] ?? '',
+            'direccion'            => $record['direccion'],
+            'coordenadas'          => $record['coordenadas'],
+            'telefono'             => $record['telefono_contacto'],
+            'email'                => $record['email_contacto'],
+            'tipoAmbiente'         => $record['tipo_ambiente'],
+            'numeroLicencia'       => $record['numero_licencia'],
+            'resolucionAlcaldia'   => $record['resolucion_alcaldia'],
+            'flotaAutorizada'      => $flotaAutorizada,
+            'cuposDisponibles'     => $flotaAutorizada,
+            'porcentajeOcupacion'  => 0,
+            'estadoCupo'           => 'DISPONIBLE',
+            'estado'               => $record['estado'],
+            'flotaTotal'           => 0,
         ];
 
         return $this->respondCreated(['status' => true, 'message' => 'Asociación registrada con éxito', 'data' => $newOrg]);
@@ -248,6 +284,10 @@ class AsociacionesController extends ResourceController
         $record = [];
         if (isset($input['tipo'])) $record['tipo'] = strtoupper($input['tipo']);
         if (isset($input['razonSocial'])) $record['razon_social'] = trim($input['razonSocial']);
+        if (array_key_exists('idRepresentanteLegal', $input) || array_key_exists('id_representante_legal', $input)) {
+            $repVal = $input['idRepresentanteLegal'] ?? $input['id_representante_legal'] ?? null;
+            $record['id_representante_legal'] = !empty($repVal) ? (int)$repVal : null;
+        }
         
         if (isset($input['ruc'])) {
             $ruc = trim($input['ruc']);
