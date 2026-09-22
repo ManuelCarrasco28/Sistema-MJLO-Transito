@@ -550,7 +550,6 @@ export function Asociaciones() {
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[170px]">Representante Legal</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">Contacto</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[200px]">Ubicación</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[80px]">Flota</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[90px] text-center">Estado</th>
                 <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-slate-800/40 px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
@@ -587,9 +586,6 @@ export function Asociaciones() {
                         <div className="h-2.5 w-16 rounded bg-slate-100 dark:bg-slate-800/60" />
                       </div>
                     </td>
-                    <td className="px-3 py-3 min-w-[80px]">
-                      <div className="h-6 w-16 rounded bg-slate-200 dark:bg-slate-800" />
-                    </td>
                     <td className="px-3 py-3 min-w-[90px] text-center">
                       <div className="mx-auto h-5 w-14 rounded-full bg-slate-200 dark:bg-slate-800" />
                     </td>
@@ -603,7 +599,7 @@ export function Asociaciones() {
                 ))
               ) : filteredOrgs.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-4 py-16 text-center">
+                  <td colSpan="7" className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <Icon name="building" className="size-12 text-slate-300 dark:text-slate-600 mb-4" />
                       <h3 className="text-sm font-black text-slate-800 dark:text-slate-200">No se encontraron asociaciones</h3>
@@ -662,16 +658,6 @@ export function Asociaciones() {
                       >
                         {o.coordenadas ? 'Ver mapa' : 'Sin coordenadas'}
                       </button>
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap min-w-[80px]">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-base font-black text-slate-800 dark:text-slate-200">
-                            {o.flotaTotal}
-                          </span>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">
-                            {o.flotaTotal === 1 ? 'Und.' : 'Unds.'}
-                          </span>
-                        </div>
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-center">
                       <span
