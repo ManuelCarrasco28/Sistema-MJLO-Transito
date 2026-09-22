@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Editor } from '@tinymce/tinymce-react'
 import { Icon } from '../ui/Icon'
 import { apiFetch } from '../../config/api'
+import { BuscadorAdministrados } from './BuscadorAdministrados'
 
 /**
  * Genera una plantilla HTML oficial estructurada para el cuerpo del trámite / permiso
@@ -178,6 +179,25 @@ export function TramiteFormularioModal({
     setFormData(updated)
   }
 
+  // Cuando se selecciona un administrado desde el buscador inteligente
+  const handleSelectAdministrado = (item) => {
+    const updated = {
+      ...formData,
+      solicitanteNombre: item.nombre || formData.solicitanteNombre,
+      solicitanteDocumento: item.documento || formData.solicitanteDocumento,
+      representanteLegal: item.representanteLegal || formData.representanteLegal,
+      vehiculoPlaca: item.placa || formData.vehiculoPlaca,
+      expediente: item.expediente || formData.expediente,
+      referenciaSisgedo: item.expediente || formData.referenciaSisgedo,
+      reciboIngresoNumero: item.reciboNumero || formData.reciboIngresoNumero,
+      reciboIngresoMonto: item.reciboMonto ? String(item.reciboMonto) : formData.reciboIngresoMonto,
+      reciboIngresoFecha: item.reciboFecha || formData.reciboIngresoFecha,
+      tramiteId: item.tramiteId || formData.tramiteId
+    }
+    updated.contenido = generarPlantillaCuerpo(updated)
+    setFormData(updated)
+  }
+
   // Regenerar el cuerpo HTML en TinyMCE con los datos actuales
   const handleRecargarPlantilla = () => {
     const cuerpoGenerado = generarPlantillaCuerpo(formData)
@@ -200,8 +220,13 @@ export function TramiteFormularioModal({
       })
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}))
-        throw new Error(errBody.message || 'Error al procesar la autorización municipal.')
+        let msg = 'Error al procesar la autorización municipal.'
+        try {
+          const errData = await res.json()
+          if (errData?.message) msg = errData.message
+          else if (errData?.messages?.error) msg = errData.messages.error
+        } catch (_) {}
+        throw new Error(msg)
       }
 
       if (onSave) onSave()
@@ -284,6 +309,11 @@ export function TramiteFormularioModal({
             </div>
           )}
           
+          {/* Buscador inteligente en base de datos para auto-rellenado */}
+          <div className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40">
+            <BuscadorAdministrados onSelect={handleSelectAdministrado} />
+          </div>
+
           {/* Clasificación / Selector de Tipo de Trámite */}
           <div>
             <label className="mb-2 block font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">

@@ -43,6 +43,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('internamientos', ['controller' => 'InternamientosController']);
         $routes->get('inventario-criterios', 'InternamientosController::criterios');
         $routes->get('permisos/tramites-disponibles', 'PermisosController::tramitesDisponibles');
+        $routes->get('permisos/buscar-administrados', 'PermisosController::buscarAdministrados');
         $routes->resource('permisos', ['controller' => 'PermisosController']);
         $routes->get('procedimientos-admin', 'PermisosController::procedimientos');
         $routes->get('usuarios', 'UsuariosController::index');

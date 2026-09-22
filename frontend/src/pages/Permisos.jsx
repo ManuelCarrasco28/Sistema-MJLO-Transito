@@ -39,21 +39,46 @@ export function Permisos() {
   const [editingPermiso, setEditingPermiso] = useState(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const handleDeletePermiso = async (id) => {
-    if (!window.confirm('¿Está seguro de eliminar esta autorización municipal? Esta acción no se puede deshacer.')) {
-      return
-    }
-    try {
-      const res = await apiFetch(`/permisos/${id}`, { method: 'DELETE' })
-      if (!res.ok) {
-        throw new Error('Error al eliminar la autorización.')
-      }
-      setPermisos((prev) => prev.filter((p) => p.id !== id))
-      invalidateCache('/permisos')
-    } catch (err) {
-      alert(err.message || 'No se pudo eliminar la autorización.')
-    }
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Form State
+  const initialForm = {
+    id: null,
+    tramiteId: '',
+    personaId: null,
+    asociacionId: null,
+    vehiculoId: null,
+    tipoPermiso: 'CARGA_DESCARGA',
+    numeroAutorizacion: '',
+    vehiculoPlaca: '',
+    solicitanteNombre: '',
+    solicitanteDocumento: '',
+    representanteLegal: '',
+    expediente: '',
+    registroNumero: '',
+    referenciaSisgedo: '',
+    asunto: 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
+    zonaCirculacion: 'Anillo Vial - José Leonardo Ortiz',
+    ubicacion: 'Paradero Central y Anexos',
+    horarioInicio: '16:00:00',
+    horarioFin: '05:00:00',
+    fechaEmision: new Date().toISOString().slice(0, 10),
+    fechaInicioVigencia: new Date().toISOString().slice(0, 10),
+    fechaFinVigencia: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    reciboIngresoNumero: '',
+    reciboIngresoMonto: '1030.00',
+    reciboIngresoFecha: new Date().toISOString().slice(0, 10),
+    tonelaje: '03 A 07-TM',
+    numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000)),
+    recorridoIngreso: 'Av. Balta, Av. Chiclayo, Calle Kennedy',
+    recorridoSalida: 'Calle Leguía, Av. México, Av. Sáenz Peña',
+    flotaPlacas: '',
+    observaciones: '',
+    contenido: 'Se autoriza la circulación y operación vehicular en estricto cumplimiento de las Ordenanzas Municipales vigentes.',
+    estado: 'VIGENTE'
   }
+
+  const [formData, setFormData] = useState(initialForm)
 
   const loadData = () => {
     setIsLoading(true)
@@ -80,6 +105,26 @@ export function Permisos() {
 
   useEffect(() => {
     loadData()
+
+    const handleMessage = (e) => {
+      if (e.data?.type === 'PERMISO_GUARDADO') {
+        invalidateCache('/permisos')
+        loadData()
+      }
+    }
+    const handleStorage = (e) => {
+      if (e.key === 'mjlo_permisos_updated') {
+        invalidateCache('/permisos')
+        loadData()
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('message', handleMessage)
+      window.removeEventListener('storage', handleStorage)
+    }
   }, [])
 
   const totalPermisos = permisos.length
@@ -179,13 +224,39 @@ export function Permisos() {
   }
 
   const handleOpenCreate = () => {
-    setEditingPermiso(null)
-    setIsCreateModalOpen(true)
+    const w = 1200
+    const h = 900
+    const left = Math.max(0, (window.screen.width - w) / 2)
+    const top = Math.max(0, (window.screen.height - h) / 2)
+    const win = window.open(
+      '/permisos-formulario',
+      'PermisoVentana',
+      `width=${w},height=${h},top=${top},left=${left},scrollbars=yes,resizable=yes,status=no,toolbar=no,menubar=no`
+    )
+    if (win) {
+      win.focus()
+    } else {
+      setEditingPermiso(null)
+      setIsCreateModalOpen(true)
+    }
   }
 
   const handleOpenEdit = (p) => {
-    setEditingPermiso(p)
-    setIsCreateModalOpen(true)
+    const w = 1200
+    const h = 900
+    const left = Math.max(0, (window.screen.width - w) / 2)
+    const top = Math.max(0, (window.screen.height - h) / 2)
+    const win = window.open(
+      `/permisos-formulario?id=${p.id}`,
+      'PermisoVentana',
+      `width=${w},height=${h},top=${top},left=${left},scrollbars=yes,resizable=yes,status=no,toolbar=no,menubar=no`
+    )
+    if (win) {
+      win.focus()
+    } else {
+      setEditingPermiso(p)
+      setIsCreateModalOpen(true)
+    }
   }
 
   const handlePrint = () => {
@@ -386,7 +457,7 @@ export function Permisos() {
 
                 <button
                   type="button"
-                  onClick={handleExportPdf}
+                  onClick={handlePrint}
                   title="Descargar o imprimir padrón en PDF"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
                 >
@@ -680,7 +751,6 @@ export function Permisos() {
           loadData()
         }}
         procedimientos={procedimientos}
-        tramitesDisponibles={tramitesDisponibles}
       />
 
       {/* MODAL DE PREVISUALIZACIÓN E IMPRESIÓN OFICIAL HOJA A4 */}
