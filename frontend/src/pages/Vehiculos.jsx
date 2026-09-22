@@ -545,16 +545,16 @@ export function Vehiculos() {
 
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
 
           <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Buscar por placa, marca, modelo, DNI o propietario..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-9 pr-8 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-400"
             />
             {searchTerm && (
               <button
@@ -572,7 +572,7 @@ export function Vehiculos() {
             <select
               value={filterTipo}
               onChange={(e) => setFilterTipo(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className="rounded-xl border border-slate-200 bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="TODOS">Todos los tipos</option>
               <option value="Mototaxi (Trimovil)">Mototaxi (Trimovil)</option>
@@ -583,7 +583,7 @@ export function Vehiculos() {
             <select
               value={filterEstado}
               onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className="rounded-xl border border-slate-200 bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="TODOS">Todos los estados</option>
               <option value="FORMAL">Formales (En Asociación)</option>
@@ -629,7 +629,7 @@ export function Vehiculos() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Nuevo Vehículo</span>
@@ -654,12 +654,12 @@ export function Vehiculos() {
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
               <tr>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Placa</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Vehículo & Modelo</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Asociación / Empresa</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Propietario & Titular</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Estado</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Placa</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Vehículo & Modelo</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Asociación / Empresa</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Propietario & Titular</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap text-center">Estado</th>
                 <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-slate-800/40 px-3 py-3.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
             </thead>
@@ -667,17 +667,17 @@ export function Vehiculos() {
               {isLoading && vehiculos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="px-3.5 py-4"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4">
+                    <td className="px-3.5 py-2.5"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-2.5">
                       <div className="space-y-1.5">
                         <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
                         <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-slate-800/60" />
                       </div>
                     </td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4 text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-2.5"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-2.5 text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
                     <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-4 shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
                   </tr>
                 ))
@@ -702,14 +702,14 @@ export function Vehiculos() {
                     className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40"
                   >
 
-                    <td className="px-3.5 py-3.5 whitespace-nowrap">
+                    <td className="px-3.5 py-2.5 whitespace-nowrap">
                       <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
                         {v.placa}
                       </span>
                     </td>
 
 
-                    <td className="px-3.5 py-3.5 max-w-[200px]">
+                    <td className="px-3.5 py-2.5 max-w-[200px]">
                       <p className="font-extrabold text-slate-800 dark:text-white truncate" title={`${v.marca} ${v.modelo}`}>
                         {v.marca} {v.modelo}
                       </p>
@@ -724,7 +724,7 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="px-3.5 py-3.5 max-w-[160px]">
+                    <td className="px-3.5 py-2.5 max-w-[160px]">
                       {isVehiculoFormal(v) ? (
                         <>
                           <p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200" title={v.asociacion}>
@@ -743,7 +743,7 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="px-3.5 py-3.5 max-w-[160px]">
+                    <td className="px-3.5 py-2.5 max-w-[160px]">
                       <p className="font-bold text-slate-800 dark:text-slate-100 truncate text-xs" title={v.propietario}>{v.propietario}</p>
                       <p className="text-xs font-mono text-slate-400">
                         DNI/RUC: {v.propietarioDni || v.propietarioRuc || 'N/A'}
@@ -751,7 +751,7 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="px-3.5 py-3.5 whitespace-nowrap">
+                    <td className="px-3.5 py-2.5 whitespace-nowrap">
                       <p className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
                         {v.numeroSerie || 'N/A'}
                       </p>
@@ -761,7 +761,7 @@ export function Vehiculos() {
                     </td>
 
 
-                    <td className="px-3.5 py-3.5 whitespace-nowrap text-center">
+                    <td className="px-3.5 py-2.5 whitespace-nowrap text-center">
                       {v.estado === 'SUSPENDIDO' || v.estado === 'BAJA' ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300">
                           <span className="size-2 rounded-full bg-current" />
