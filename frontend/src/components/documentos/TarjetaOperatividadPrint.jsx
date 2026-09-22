@@ -463,7 +463,7 @@ export function CerticavFichaPrint({ data }) {
             <div style={{ padding: '2px 5px', borderRight: '1.5px solid #000' }}>
               <strong style={{ fontSize: '6pt', textTransform: 'uppercase', color: '#1e293b' }}>MARCA DE VEHICULO:</strong>{' '}
               <span style={{ fontSize: '7.5pt', fontWeight: 900, textTransform: 'uppercase' }}>
-                {data.vehiculoMarca || data.marca || 'WANXIN'}
+                {data.vehiculoMarca || data.marca || '—'}
               </span>
             </div>
             <div style={{ padding: '2px 5px', textAlign: 'center', background: '#f8fafc' }}>
@@ -622,7 +622,7 @@ export function CerticavFichaPrint({ data }) {
             <div style={{ marginTop: '2px' }}>
               <span style={{ fontSize: '6.2pt', color: '#334155' }}>Nombre: </span>
               <strong style={{ textTransform: 'uppercase', fontSize: '7.2pt' }}>
-                {data.inspector || 'CANTOS SEGURA T.'}
+                {data.inspector || '—'}
               </strong>
             </div>
             <div style={{ marginTop: '16px', borderTop: '1px dotted #64748b', paddingTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
