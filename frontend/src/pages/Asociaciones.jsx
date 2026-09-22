@@ -4,6 +4,7 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
+import { exportToPdf } from '../utils/exportToPdf'
 
 function FloatingInput({ id, label, type = "text", ...props }) {
   return (
@@ -251,6 +252,32 @@ export function Asociaciones() {
         { header: 'Estado', key: 'estado', width: 90, align: 'center' },
       ],
       data: listToExport,
+    })
+  }
+
+  const handleExportPdf = () => {
+    const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
+    exportToPdf({
+      filename: `Padron_Asociaciones_${new Date().getFullYear()}.pdf`,
+      sheetName: 'Asociaciones',
+      title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Padrón Oficial de Asociaciones y Empresas',
+      metadata: [
+        { label: 'Filtro Tipo', value: filterTipo },
+        { label: 'Filtro Estado', value: filterEstado },
+        { label: 'Flota Total Registrada', value: `${flotaAcumulada} unidades` },
+      ],
+      columns: [
+        { header: 'RAZÓN SOCIAL', key: 'razonSocial', width: 250 },
+        { header: 'RUC', key: 'ruc', isText: true, width: 120, align: 'center' },
+        { header: 'REPRESENTANTE', key: 'representanteNombre', width: 200 },
+        { header: 'DNI REP.', key: 'representanteDni', isText: true, width: 110, align: 'center' },
+        { header: 'TIPO', key: 'tipo', width: 130, align: 'center' },
+        { header: 'FLOTA', key: 'flotaTotal', width: 90, align: 'center' },
+        { header: 'EXPEDIENTE', key: 'expediente', isText: true, width: 130, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
+      ],
+      data: listToExport
     })
   }
 
@@ -540,7 +567,7 @@ export function Asociaciones() {
 
             <button
               type="button"
-              onClick={() => alert('Exportación a PDF pendiente de conectar en esta sección.')}
+              onClick={handleExportPdf}
               title="Descargar o imprimir padrón en PDF"
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
             >

@@ -6,6 +6,7 @@ import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
+import { exportToPdf } from '../utils/exportToPdf'
 
 function FloatingInput({ id, label, type = "text", ...props }) {
   return (
@@ -268,6 +269,34 @@ export function Vehiculos() {
   const handleExportExcel = () => {
     exportToExcel({
       filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.xls`,
+      sheetName: 'Vehículos',
+      title: 'PADRÓN VEHICULAR MUNICIPAL',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
+      metadata: [
+        { label: 'Tipo Vehículo', value: filterTipo },
+        { label: 'Estado', value: filterEstado }
+      ],
+      columns: [
+        { header: 'PLACA', key: 'placa', isText: true, width: 110, align: 'center' },
+        { header: 'TIPO VEHÍCULO', key: 'tipo', width: 140 },
+        { header: 'MARCA', key: 'marca', width: 120 },
+        { header: 'MODELO', key: 'modelo', width: 120 },
+        { header: 'COLOR', key: 'color', width: 110 },
+        { header: 'AÑO', key: 'anio', width: 80, align: 'center' },
+        { header: 'N° MOTOR', key: 'numeroMotor', isText: true, width: 140 },
+        { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 140 },
+        { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
+        { header: 'PROPIETARIO', key: 'propietario', width: 180 },
+        { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+      ],
+      data: filteredVehiculos
+    })
+  }
+
+  const handleExportPdf = () => {
+    exportToPdf({
+      filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.pdf`,
       sheetName: 'Vehículos',
       title: 'PADRÓN VEHICULAR MUNICIPAL',
       subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
@@ -618,7 +647,7 @@ export function Vehiculos() {
 
             <button
               type="button"
-              onClick={() => alert('Exportación a PDF pendiente de conectar en esta sección.')}
+              onClick={handleExportPdf}
               title="Descargar o imprimir padrón en PDF"
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
             >

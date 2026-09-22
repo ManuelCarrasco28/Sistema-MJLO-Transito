@@ -4,6 +4,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { exportToExcel } from '../utils/exportToExcel'
+import { exportToPdf } from '../utils/exportToPdf'
 
 const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 
@@ -312,6 +313,33 @@ export function Trabajadores() {
       data: filtered
     })
   }
+
+  const handleExportPdf = () => {
+    exportToPdf({
+      filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}.pdf`,
+      sheetName: 'Personal',
+      title: 'PADRÓN INSTITUCIONAL DE TRABAJADORES Y FISCALIZADORES',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Gestión de Personal',
+      metadata: [
+        { label: 'Estado', value: filterEstado }
+      ],
+      columns: [
+        { header: 'TIPO DOC', key: 'tipo_documento', width: 90, align: 'center' },
+        { header: 'N° DOCUMENTO', key: 'numero_documento', isText: true, width: 120, align: 'center' },
+        { header: 'NOMBRES', key: 'nombres', width: 140 },
+        { header: 'APELLIDOS', key: 'apellidos', width: 160 },
+        { header: 'CARGO', key: 'cargo', width: 180 },
+        { header: 'UNIDAD ORGÁNICA', key: 'unidad_organica', width: 220 },
+        { header: 'FUNCIÓN', key: 'tipo_funcion', width: 100, align: 'center' },
+        { header: 'DOC. DESIGNACIÓN', key: 'documento', width: 150 },
+        { header: 'FECHA ALTA', key: 'fecha_documento', width: 110, align: 'center' },
+        { header: 'VENCIMIENTO', render: (_, r) => r.fecha_termino || 'INDETERMINADO', width: 120, align: 'center' },
+        { header: 'TIENE ACCESO', render: (_, r) => r.tiene_usuario ? 'SÍ' : 'NO', width: 110, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 100, align: 'center' }
+      ],
+      data: filtered
+    })
+  }
   
   const openForm = (record) => {
     setForm({ ...emptyForm, ...record, id_persona: record?.id_persona || record?.id || '' })
@@ -486,7 +514,7 @@ export function Trabajadores() {
 
             <button
               type="button"
-              onClick={() => alert('Exportación a PDF pendiente de conectar en esta sección.')}
+              onClick={handleExportPdf}
               title="Descargar o imprimir padrón en PDF"
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
             >
