@@ -891,7 +891,7 @@ export function Vehiculos() {
                   setShowAsociacionResults(false)
                 }
               }}
-              className="space-y-3 p-4 sm:p-5"
+              className="space-y-3 p-4 sm:p-5 max-h-[calc(100vh-180px)] overflow-y-auto"
             >
 
               <div>
