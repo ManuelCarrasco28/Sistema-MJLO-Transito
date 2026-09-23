@@ -113,7 +113,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
   return (
     <main
-      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden ${sidebarCollapsed ? 'lg:grid-cols-[5.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[19.5rem_minmax(0,1fr)]'
+      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white ${sidebarCollapsed ? 'lg:grid-cols-[5.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[19.5rem_minmax(0,1fr)]'
         }`}
     >
       <div className="print:hidden">
