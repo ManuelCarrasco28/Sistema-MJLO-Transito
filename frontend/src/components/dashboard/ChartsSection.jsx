@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '../ui/Icon'
+import { apiFetch, getCachedData, setCachedData } from '../../config/api'
 
 export function ChartsSection({ data, loading = false }) {
   const navigate = useNavigate()
@@ -9,8 +10,32 @@ export function ChartsSection({ data, loading = false }) {
   const [selectedYear, setSelectedYear] = useState('2026')
   const [operationsZoom, setOperationsZoom] = useState(0)
   const [calendarDate, setCalendarDate] = useState(new Date())
+  const [operativos, setOperativos] = useState(() => getCachedData('/operativos') || [])
+  const [cursos, setCursos] = useState(() => getCachedData('/cursos') || [])
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState(null)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const operationsChartRef = useRef(null)
+
+  useEffect(() => {
+    let active = true
+    Promise.allSettled([
+      apiFetch('/operativos').then((r) => (r.ok ? r.json() : { data: [] })),
+      apiFetch('/cursos').then((r) => (r.ok ? r.json() : { data: [] })),
+    ])
+      .then(([opRes, curRes]) => {
+        if (!active) return
+        const ops = opRes.status === 'fulfilled' && Array.isArray(opRes.value?.data) ? opRes.value.data : []
+        const curs = curRes.status === 'fulfilled' && Array.isArray(curRes.value?.data) ? curRes.value.data : []
+        setOperativos(ops)
+        setCursos(curs)
+        setCachedData('/operativos', ops)
+        setCachedData('/cursos', curs)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
   const emptyMonths = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep'].map((month) => ({ month, multas: 0, pagos: 0 }))
   const expedientesBreakdown = data?.expedientes ?? [
     { label: 'Vigentes', value: 0, percent: '0%', color: 'bg-[#4318FF]', progress: '0%' },
@@ -161,8 +186,51 @@ export function ChartsSection({ data, loading = false }) {
   const today = new Date()
   const isCurrentMonth = today.getMonth() === currentMonth && today.getFullYear() === currentYear
   
-  const handlePrevMonth = () => setCalendarDate(new Date(currentYear, currentMonth - 1, 1))
-  const handleNextMonth = () => setCalendarDate(new Date(currentYear, currentMonth + 1, 1))
+  const handlePrevMonth = () => {
+    setSelectedCalendarDay(null)
+    setCalendarDate(new Date(currentYear, currentMonth - 1, 1))
+  }
+  const handleNextMonth = () => {
+    setSelectedCalendarDay(null)
+    setCalendarDate(new Date(currentYear, currentMonth + 1, 1))
+  }
+
+  const getEventsForDay = (year, month, day) => {
+    const monthStr = String(month + 1).padStart(2, '0')
+    const dayStr = String(day).padStart(2, '0')
+    const datePrefix = `${year}-${monthStr}-${dayStr}`
+
+    const dayOperativos = operativos.filter((op) => {
+      if (!op.fecha) return false
+      return String(op.fecha).slice(0, 10) === datePrefix
+    })
+
+    const dayCursos = cursos.filter((c) => {
+      const fecha = c.fecha || c.fecha_inicio
+      if (!fecha) return false
+      return String(fecha).slice(0, 10) === datePrefix
+    })
+
+    return {
+      dateStr: datePrefix,
+      day,
+      operativos: dayOperativos,
+      cursos: dayCursos,
+      hasEvents: dayOperativos.length > 0 || dayCursos.length > 0,
+    }
+  }
+
+  const currentMonthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`
+  const monthOperativos = useMemo(() => {
+    return operativos.filter((op) => op.fecha && String(op.fecha).startsWith(currentMonthPrefix))
+  }, [operativos, currentMonthPrefix])
+
+  const monthCursos = useMemo(() => {
+    return cursos.filter((c) => {
+      const fecha = c.fecha || c.fecha_inicio
+      return fecha && String(fecha).startsWith(currentMonthPrefix)
+    })
+  }, [cursos, currentMonthPrefix])
 
   return (
     <>
@@ -171,7 +239,7 @@ export function ChartsSection({ data, loading = false }) {
         <div className="lg:col-span-2 space-y-7">
           
           {/* 1. Operaciones mensuales (Restaurado interactivo svg) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '460ms' }}>
+          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '460ms' }}>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
               <div>
                 <h3 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Operaciones mensuales</h3>
@@ -277,7 +345,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Multas y pagos registrados (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '610ms' }}>
+          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '610ms' }}>
             <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
               <div>
                 <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Multas y pagos registrados</h2>
@@ -414,7 +482,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Modern Data Table */}
-          <div className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white" data-purpose="horizon-data-table">
+          <div className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800" data-purpose="horizon-data-table">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
                 <h3 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Últimos Movimientos e Intervenciones</h3>
@@ -557,7 +625,7 @@ export function ChartsSection({ data, loading = false }) {
           </div>
 
           {/* Operatividad de permisos (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '830ms' }}>
+          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '830ms' }}>
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#F4F7FE] pb-4 mb-5">
               <div>
                 <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Operatividad de permisos</h2>
@@ -621,8 +689,8 @@ export function ChartsSection({ data, loading = false }) {
 
         {/* RIGHT COLUMN (1/3 width on large screens) */}
         <div className="space-y-7">
-          {/* Mini Calendar Widget */}
-          <div className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white">
+          {/* Mini Calendar Widget con Operativos y Cursos de Seguridad Vial */}
+          <div className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white">{monthNames[currentMonth]} {currentYear}</h4>
               <div className="flex items-center gap-1">
@@ -643,29 +711,180 @@ export function ChartsSection({ data, loading = false }) {
             </div>
             <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#2B3674] dark:text-white gap-y-2.5">
               {Array.from({ length: firstDay }).map((_, i) => (
-                <span key={`prev-${i}`} className="text-[#A3AED0]/40">{prevMonthDays - firstDay + i + 1}</span>
+                <span key={`prev-${i}`} className="flex items-center justify-center text-[#A3AED0]/40 text-xs py-1">
+                  {prevMonthDays - firstDay + i + 1}
+                </span>
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1
+                const dayEvents = getEventsForDay(currentYear, currentMonth, day)
                 const isToday = isCurrentMonth && day === today.getDate()
-                if (isToday) {
-                  return (
-                    <div key={`day-${day}`} className="flex flex-col items-center justify-center">
-                      <span className="w-7 h-7 rounded-full bg-[#4318FF] text-white flex items-center justify-center font-black shadow-md shadow-[#4318FF]/40">{day}</span>
-                    </div>
-                  )
-                }
-                return <span key={`day-${day}`} className="flex items-center justify-center w-7 h-7">{day}</span>
+                const isSelected = selectedCalendarDay?.day === day
+                const hasOps = dayEvents.operativos.length > 0
+                const hasCur = dayEvents.cursos.length > 0
+
+                return (
+                  <button
+                    key={`day-${day}`}
+                    type="button"
+                    onClick={() => setSelectedCalendarDay(isSelected ? null : dayEvents)}
+                    className={`relative flex flex-col items-center justify-center py-1 transition-all rounded-xl cursor-pointer ${
+                      isSelected
+                        ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/40 shadow-sm'
+                        : isToday
+                        ? 'bg-[#4318FF] text-white shadow-md shadow-[#4318FF]/30 font-black'
+                        : (hasOps || hasCur)
+                        ? 'hover:bg-slate-100 dark:hover:bg-white/10 font-bold'
+                        : 'hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <span className={`text-xs ${isToday ? 'text-white' : ''}`}>
+                      {day}
+                    </span>
+
+                    {/* Indicadores visuales de operativos y cursos */}
+                    {(hasOps || hasCur) && (
+                      <div className="flex items-center gap-0.5 mt-0.5">
+                        {hasOps && (
+                          <span
+                            className={`size-1.5 rounded-full ${isToday ? 'bg-amber-300' : 'bg-blue-600 dark:bg-blue-400'}`}
+                            title={`${dayEvents.operativos.length} operativo(s)`}
+                          />
+                        )}
+                        {hasCur && (
+                          <span
+                            className={`size-1.5 rounded-full ${isToday ? 'bg-emerald-300' : 'bg-emerald-500 dark:bg-emerald-400'}`}
+                            title={`${dayEvents.cursos.length} curso(s)`}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </button>
+                )
               })}
             </div>
-            <div className="mt-4 pt-3 border-t border-[#F4F7FE] flex items-center justify-between">
-              <span className="text-xs font-bold text-[#707EAE]">Hoy:</span>
-              <span className="text-[10px] font-extrabold text-[#4318FF] bg-[#4318FF]/10 px-2 py-0.5 rounded-full">{today.toLocaleDateString()}</span>
+
+            {/* Leyenda y contador mensual */}
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
+                  <span className="size-2 rounded-full bg-blue-600 dark:bg-blue-400" />
+                  Operativos ({monthOperativos.length})
+                </span>
+                <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
+                  <span className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+                  Cursos ({monthCursos.length})
+                </span>
+              </div>
+              <span className="text-[10px] font-extrabold text-[#4318FF] dark:text-blue-300 bg-[#4318FF]/10 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+                Hoy: {today.toLocaleDateString()}
+              </span>
             </div>
+
+            {/* Detalle interactivo del día seleccionado */}
+            {selectedCalendarDay ? (
+              <div className="mt-3.5 rounded-2xl border border-blue-200/80 bg-blue-50/40 p-3.5 dark:border-slate-800 dark:bg-slate-900/80 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between pb-2 border-b border-blue-100 dark:border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <Icon name="calendar" className="size-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-xs font-black text-slate-800 dark:text-white">
+                      {selectedCalendarDay.day} de {monthNames[currentMonth]} {currentYear}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCalendarDay(null)}
+                    className="size-5 place-items-center rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {!selectedCalendarDay.hasEvents ? (
+                  <p className="mt-2.5 text-xs text-slate-500 dark:text-slate-400 text-center py-2">
+                    Sin operativos ni cursos programados para esta fecha.
+                  </p>
+                ) : (
+                  <div className="mt-2.5 space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                    {/* Operativos del día */}
+                    {selectedCalendarDay.operativos.map((op) => (
+                      <div
+                        key={`op-${op.id}`}
+                        className="rounded-xl border border-blue-200/60 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-950/80 shadow-2xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="inline-flex items-center gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-[9.5px] font-black text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                              OPERATIVO
+                            </span>
+                            <h5 className="mt-1 text-xs font-extrabold text-slate-800 dark:text-white line-clamp-1">
+                              {op.nombre || 'Operativo Inopinado'}
+                            </h5>
+                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                              <span>📍</span> {op.lugar || 'Distrito J.L. Ortiz'}
+                            </p>
+                            {op.hora_inicio && (
+                              <p className="text-[10px] text-slate-400">
+                                Hora: {op.hora_inicio}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => navigate('/operativos')}
+                            className="shrink-0 text-[10px] font-bold text-blue-600 hover:underline dark:text-blue-400 cursor-pointer pt-0.5"
+                          >
+                            Ir a módulo →
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Cursos del día */}
+                    {selectedCalendarDay.cursos.map((c) => (
+                      <div
+                        key={`cur-${c.id}`}
+                        className="rounded-xl border border-emerald-200/60 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-950/80 shadow-2xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[9.5px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              CURSO SEGURIDAD VIAL
+                            </span>
+                            <h5 className="mt-1 text-xs font-extrabold text-slate-800 dark:text-white line-clamp-1">
+                              {c.titulo || c.nombre || 'Capacitación Vial'}
+                            </h5>
+                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                              <span>📍</span> {c.lugar || 'Auditorio Municipal'}
+                            </p>
+                            {c.horario && (
+                              <p className="text-[10px] text-slate-400">
+                                Horario: {c.horario}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => navigate('/cursos-seguridad')}
+                            className="shrink-0 text-[10px] font-bold text-emerald-600 hover:underline dark:text-emerald-400 cursor-pointer pt-0.5"
+                          >
+                            Ir a módulo →
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-3 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-900/40 px-3 py-2 text-center text-[11px] text-slate-500 dark:text-slate-400">
+                Selecciona cualquier día con puntos de color para ver detalles de operativos o cursos.
+              </div>
+            )}
           </div>
 
           {/* Estado de expedientes (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '540ms' }}>
+          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '540ms' }}>
             <div className="border-b border-[#F4F7FE] pb-4 mb-5">
               <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Estado de expedientes</h2>
               <p className="mt-0.5 text-xs text-[#A3AED0]">Distribución de documentos vigentes y observados</p>
@@ -713,7 +932,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Asociaciones registradas (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '760ms' }}>
+          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '760ms' }}>
             <div className="border-b border-[#F4F7FE] pb-4 mb-5">
               <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Asociaciones</h2>
               <p className="mt-0.5 text-xs text-[#A3AED0]">Estado visual de empresas y comités</p>
@@ -740,7 +959,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Vehículos en depósito (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-white animate-enter" style={{ animationDelay: '690ms' }}>
+          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '690ms' }}>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white">Depósito Municipal</h4>
               <span className="text-[10px] font-bold text-[#EE5D50] bg-[#FEEFEE] dark:bg-rose-500/20 px-2 py-0.5 rounded-full">

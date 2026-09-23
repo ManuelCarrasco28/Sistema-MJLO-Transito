@@ -308,7 +308,7 @@ export function PermisoFormularioVentana() {
         )}
 
         {/* 1. BUSCADOR INTELIGENTE EN BASE DE DATOS (Auto-rellenado) */}
-        <div className="rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-indigo-900/50 dark:bg-[#0B1437]">
+        <div className="rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0B1437]">
           <BuscadorAdministrados onSelect={handleSelectAdministrado} />
         </div>
 
@@ -581,7 +581,7 @@ export function PermisoFormularioVentana() {
             <button
               type="button"
               onClick={handleRecargarPlantilla}
-              className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-300 text-xs font-bold transition cursor-pointer"
+              className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs font-bold transition cursor-pointer"
             >
               <span>↺ Regenerar plantilla con datos</span>
             </button>

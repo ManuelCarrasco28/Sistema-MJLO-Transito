@@ -158,7 +158,7 @@ export function Personas({ user, onUserUpdate }) {
       accentColor: '#1d4f91',
       borderColor: '#93c5fd',
       borderClass: 'border-2 border-blue-400 dark:border-slate-800 shadow-xs',
-      iconClass: 'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700',
+      iconClass: 'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-slate-800',
     },
     {
       label: 'Con licencia',
@@ -168,7 +168,7 @@ export function Personas({ user, onUserUpdate }) {
       accentColor: '#0284c7',
       borderColor: '#7dd3fc',
       borderClass: 'border-2 border-sky-400 dark:border-slate-800 shadow-xs',
-      iconClass: 'bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-950/80 dark:text-sky-300 dark:border-sky-700',
+      iconClass: 'bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-950/80 dark:text-sky-300 dark:border-slate-800',
     },
     {
       label: 'Sin licencia',
@@ -178,7 +178,7 @@ export function Personas({ user, onUserUpdate }) {
       accentColor: '#6366f1',
       borderColor: '#a5b4fc',
       borderClass: 'border-2 border-indigo-400 dark:border-slate-800 shadow-xs',
-      iconClass: 'bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-indigo-700',
+      iconClass: 'bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-slate-800',
     },
     {
       label: 'Activos',
@@ -190,7 +190,7 @@ export function Personas({ user, onUserUpdate }) {
       borderColor: '#6ee7b7',
       progressColor: '#10b981',
       borderClass: 'border-2 border-emerald-400 dark:border-slate-800 shadow-xs',
-      iconClass: 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700',
+      iconClass: 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-slate-800',
     },
   ]
 

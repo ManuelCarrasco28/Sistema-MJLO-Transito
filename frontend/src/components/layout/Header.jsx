@@ -174,7 +174,7 @@ export function Header({
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-bold text-slate-800 dark:text-white">Notificaciones</h4>
                   {unreadCount > 0 && (
-                    <span className="rounded-full bg-blue-50 dark:bg-blue-500/20 border border-blue-200/60 dark:border-blue-500/30 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                    <span className="rounded-full bg-blue-50 dark:bg-blue-500/20 border border-blue-200/60 dark:border-slate-700 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
                       {unreadCount} nuevas
                     </span>
                   )}

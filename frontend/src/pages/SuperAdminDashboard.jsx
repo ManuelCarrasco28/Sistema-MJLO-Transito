@@ -1210,7 +1210,7 @@ function ConfiguracionReadOnly({
   return (
     <div className="space-y-6">
       {/* TARJETA INTERACTIVA DE PERMISO GENERAL MÓVIL (Conexión App Móvil Inspectores) */}
-      <div className="rounded-3xl border border-violet-200/90 bg-gradient-to-r from-violet-50/90 via-purple-50/70 to-indigo-50/80 p-5 shadow-sm dark:border-violet-900/60 dark:from-violet-950/40 dark:via-purple-950/30 dark:to-indigo-950/30">
+      <div className="rounded-3xl border border-violet-200/90 bg-gradient-to-r from-violet-50/90 via-purple-50/70 to-indigo-50/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className={`grid size-12 shrink-0 place-items-center rounded-2xl text-white shadow-md transition-all ${
@@ -1275,7 +1275,7 @@ function ConfiguracionReadOnly({
       </div>
 
       {/* Banner de Aviso Solo Lectura */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 p-4 text-blue-900 shadow-xs dark:border-blue-900/50 dark:from-blue-950/40 dark:to-indigo-950/30 dark:text-blue-200">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 p-4 text-blue-900 shadow-xs dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
         <div className="flex items-center gap-3">
           <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
             <Icon name="lock" className="size-5" />
@@ -1291,7 +1291,7 @@ function ConfiguracionReadOnly({
           type="button"
           onClick={onReload}
           disabled={loading}
-          className="inline-flex items-center justify-center gap-1.5 self-start sm:self-auto rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-xs font-black text-blue-700 shadow-xs transition hover:bg-blue-50 hover:shadow-md active:scale-95 disabled:opacity-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300 cursor-pointer"
+          className="inline-flex items-center justify-center gap-1.5 self-start sm:self-auto rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-xs font-black text-blue-700 shadow-xs transition hover:bg-blue-50 hover:shadow-md active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 cursor-pointer"
         >
           <span>{loading ? 'Cargando datos...' : 'Recargar información'}</span>
         </button>
@@ -1370,7 +1370,7 @@ function ConfiguracionReadOnly({
                 <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">RUC</td>
                   <td className="px-5 py-3">
-                    <span className="inline-flex items-center font-mono font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/70 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300">
+                    <span className="inline-flex items-center font-mono font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/70 dark:bg-slate-800/80 dark:border-slate-700 dark:text-blue-300">
                       {municipalidad?.ruc || '20148364975'}
                     </span>
                   </td>
@@ -1566,7 +1566,7 @@ function ConfiguracionReadOnly({
                     </code>
                   </td>
                   <td className="px-5 py-4">
-                    <span className="inline-flex font-mono font-black text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200/70 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300">
+                    <span className="inline-flex font-mono font-black text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200/70 dark:bg-slate-800/80 dark:border-slate-700 dark:text-blue-300">
                       development
                     </span>
                   </td>
