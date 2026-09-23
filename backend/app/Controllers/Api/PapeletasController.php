@@ -95,8 +95,23 @@ class PapeletasController extends ResourceController
                 ->join('trabajadores ins', 'ins.id_persona = p.id_inspector', 'left')
                 ->join('personas ins_per', 'ins_per.id = ins.id_persona', 'left')
                 ->join('ciudadanos c_ins', 'c_ins.id_persona = ins.id_persona', 'left')
-                ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.estado = "ACTIVO"', 'left')
-                ->join('personas prop_per', 'prop_per.id = vp.id_persona', 'left')
+                // Propietario a la fecha de la infracción (según fecha_inicio/fecha_fin);
+                // si no hay registro para esa fecha, el propietario activo actual.
+                ->join(
+                    'vehiculo_propietarios vp',
+                    'vp.id = (SELECT vp2.id FROM vehiculo_propietarios vp2 WHERE vp2.id_vehiculo = v.id'
+                    . ' AND vp2.fecha_inicio <= DATE(p.fecha_hora) AND (vp2.fecha_fin IS NULL OR vp2.fecha_fin >= DATE(p.fecha_hora))'
+                    . ' ORDER BY vp2.fecha_inicio DESC, vp2.id DESC LIMIT 1)',
+                    'left',
+                    false
+                )
+                ->join(
+                    'vehiculo_propietarios vpa',
+                    "vpa.id = (SELECT vp3.id FROM vehiculo_propietarios vp3 WHERE vp3.id_vehiculo = v.id AND vp3.estado = 'ACTIVO' ORDER BY vp3.id DESC LIMIT 1)",
+                    'left',
+                    false
+                )
+                ->join('personas prop_per', 'prop_per.id = COALESCE(vp.id_persona, vpa.id_persona)', 'left', false)
                 ->join('ciudadanos c_prop', 'c_prop.id_persona = prop_per.id', 'left')
                 ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left')
                 ->groupBy('p.id')

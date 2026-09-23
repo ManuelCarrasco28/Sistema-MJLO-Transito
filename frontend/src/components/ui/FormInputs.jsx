@@ -161,7 +161,7 @@ export function RoundedSelect({
   options = [],
   className = '',
   buttonClassName = '',
-  placeholder = 'Seleccionar...',
+  placeholder = 'Seleccionar',
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)

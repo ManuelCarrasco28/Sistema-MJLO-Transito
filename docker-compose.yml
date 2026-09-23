@@ -26,8 +26,15 @@ services:
       - "8080:80"
     volumes:
       - ./backend:/var/www/html
+      # vendor y caché fuera del montaje de Windows (9p): leerlos desde D:\ en
+      # cada petición costaba ~1 s. Si cambia composer.lock: docker compose down
+      # y borrar el volumen backend_vendor para que se regenere desde la imagen.
+      - backend_vendor:/var/www/html/vendor
+      - backend_cache:/var/www/html/writable/cache
+      - backend_session:/var/www/html/writable/session
     environment:
-      - CI_ENVIRONMENT=development
+      # En producción: CI_ENVIRONMENT=production (oculta trazas de error en las respuestas).
+      - CI_ENVIRONMENT=${CI_ENVIRONMENT:-development}
       - database.default.hostname=db
       - database.default.database=transitomunicipal
       - database.default.username=root
@@ -67,4 +74,7 @@ services:
 
 volumes:
   db_data:
+  backend_vendor:
+  backend_cache:
+  backend_session:
 

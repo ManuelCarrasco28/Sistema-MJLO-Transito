@@ -3,10 +3,10 @@ import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
+import { apiFetch, getCachedData, setCachedData, invalidateCache, leerMensajeError } from '../config/api'
 import { CerticavFichaPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
-import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
+import { showError } from '../utils/SwalUtil'
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -55,7 +55,7 @@ function FloatingInput({
         onBlur={() => setIsFocused(false)}
         autoComplete={autoComplete}
         placeholder=" "
-        className={`peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 ${inputClassName}`}
+        className={`peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 disabled:bg-slate-100/90 disabled:text-slate-600 disabled:cursor-not-allowed disabled:border-slate-200/70 dark:disabled:bg-slate-900/80 dark:disabled:text-slate-400 dark:disabled:border-slate-800 ${inputClassName}`}
         {...props}
       />
       <label
@@ -104,6 +104,7 @@ function FloatingSelect({
         type="button"
         id={id}
         disabled={disabled}
+        title={selectedOption?.label || ''}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-800 dark:text-white ${disabled ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-slate-900' : 'cursor-pointer'
           } ${isOpen
@@ -136,7 +137,7 @@ function FloatingSelect({
       </label>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-full sm:min-w-[380px] max-w-lg rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100 max-h-60 overflow-y-auto overflow-x-hidden">
           <div className="space-y-0.5">
             {options.map((opt) => {
               const isSelected = String(opt.value) === String(value)
@@ -148,12 +149,12 @@ function FloatingSelect({
                     onChange({ target: { value: opt.value } })
                     setIsOpen(false)
                   }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors cursor-pointer ${isSelected
                     ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold'
                     : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
                     }`}
                 >
-                  <span className="whitespace-nowrap">{opt.label}</span>
+                  <span className="text-left break-words leading-tight flex-1">{opt.label}</span>
                   {isSelected && (
                     <svg
                       aria-hidden="true"
@@ -185,7 +186,7 @@ function RoundedSelect({
   className = '',
   buttonClassName = '',
   dropdownClassName = '',
-  placeholder = 'Seleccionar...',
+  placeholder = 'Seleccionar',
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
@@ -273,11 +274,82 @@ function RoundedSelect({
   )
 }
 
-const RESULTADO_OPTIONS = [
-  { value: 'APROBADO', label: 'APROBADO' },
-  { value: 'OBSERVADO', label: 'OBSERVADO' },
-  { value: 'DESAPROBADO', label: 'DESAPROBADO' },
-]
+// Escala la hoja A4 para que se vea completa en pantalla (la impresión usa
+// una copia aparte en un portal, así que no se ve afectada).
+function VistaPreviaEscalada({ ajustar, children }) {
+  const contenedorRef = useRef(null)
+  const hojaRef = useRef(null)
+  const [escala, setEscala] = useState(1)
+  const [alto, setAlto] = useState(0)
+
+  useEffect(() => {
+    const recalcular = () => {
+      const c = contenedorRef.current
+      const h = hojaRef.current
+      if (!c || !h) return
+      const s = ajustar ? Math.min(1, (c.clientHeight - 16) / h.scrollHeight, (c.clientWidth - 16) / h.scrollWidth) : 1
+      setEscala(s)
+      setAlto(h.scrollHeight * s)
+    }
+    recalcular()
+    const ro = new ResizeObserver(recalcular)
+    ro.observe(contenedorRef.current)
+    ro.observe(hojaRef.current)
+    return () => ro.disconnect()
+  }, [ajustar])
+
+  return (
+    <div ref={contenedorRef} className={`flex-1 min-h-0 w-full flex justify-center ${ajustar ? 'overflow-hidden' : 'overflow-auto'}`}>
+      <div style={{ height: alto || undefined }}>
+        <div
+          ref={hojaRef}
+          className="bg-white shadow-xl ring-1 ring-slate-300 transition-transform duration-200"
+          style={{ width: '210mm', transform: `scale(${escala})`, transformOrigin: 'top center' }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const TOAST_DURACION_MS = 3500
+
+// Verde al registrar, amarillo al editar, rojo al eliminar y rojo en errores.
+const TOAST_ESTILOS = {
+  crear: {
+    etiqueta: 'Registrado',
+    simbolo: '✓',
+    caja: 'bg-emerald-50 border-emerald-300 dark:bg-emerald-950/90 dark:border-emerald-700',
+    icono: 'bg-emerald-600 text-white',
+    titulo: 'text-emerald-700 dark:text-emerald-300',
+    barra: 'bg-emerald-500',
+  },
+  editar: {
+    etiqueta: 'Actualizado',
+    simbolo: '✎',
+    caja: 'bg-amber-50 border-amber-300 dark:bg-amber-950/90 dark:border-amber-700',
+    icono: 'bg-amber-500 text-white',
+    titulo: 'text-amber-700 dark:text-amber-300',
+    barra: 'bg-amber-500',
+  },
+  eliminar: {
+    etiqueta: 'Eliminado',
+    simbolo: '🗑',
+    caja: 'bg-rose-50 border-rose-300 dark:bg-rose-950/90 dark:border-rose-700',
+    icono: 'bg-rose-600 text-white',
+    titulo: 'text-rose-700 dark:text-rose-300',
+    barra: 'bg-rose-500',
+  },
+  error: {
+    etiqueta: 'Error',
+    simbolo: '!',
+    caja: 'bg-rose-100 border-rose-500 dark:bg-rose-950 dark:border-rose-500',
+    icono: 'bg-rose-700 text-white',
+    titulo: 'text-rose-800 dark:text-rose-200',
+    barra: 'bg-rose-700',
+  },
+}
 
 const FILTER_RESULTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los resultados' },
@@ -285,6 +357,26 @@ const FILTER_RESULTADO_OPTIONS = [
   { value: 'OBSERVADO', label: 'Observados' },
   { value: 'DESAPROBADO', label: 'Desaprobados' },
 ]
+
+// Primera evaluación: se deriva del checklist, no se elige a mano.
+// "No tiene" solo desaprueba en criterios obligatorios: la razón social, por
+// ejemplo, no aplica a unidades independientes.
+function calcularPrimeraEvaluacion(detalles, criterios = []) {
+  const obligatorio = (criterioId) => criterios.find((c) => c.id === criterioId)?.obligatorio !== false
+  const hayProblema = detalles.some(
+    (d) => d.estado === 'MAL_ESTADO' || (d.estado === 'NO_TIENE' && obligatorio(d.criterioId))
+  )
+  return hayProblema ? 'DESAPROBADO' : 'APROBADO'
+}
+
+// Resultado final: aprobado directo si pasó la primera, o según la segunda
+// evaluación (subsanación) cuando la primera fue desaprobada.
+function calcularResultado(primeraEvaluacion, segundaEvaluacion) {
+  if (primeraEvaluacion === 'APROBADO') return 'APROBADO'
+  if (segundaEvaluacion === 'APROBADO') return 'APROBADO'
+  if (segundaEvaluacion === 'DESAPROBADO') return 'DESAPROBADO'
+  return 'OBSERVADO'
+}
 
 function getResultadoBadge(resultado) {
   switch (resultado) {
@@ -324,6 +416,15 @@ export function Inspecciones() {
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
   const [asociaciones, setAsociaciones] = useState([])
   const [tecnicos, setTecnicos] = useState([])
+  const [personas, setPersonas] = useState([])
+  const [conductorEsRegistrado, setConductorEsRegistrado] = useState(false)
+  const [conductorMismoPropietario, setConductorMismoPropietario] = useState(false)
+  const [checklistModificado, setChecklistModificado] = useState(false)
+  const [inspeccionAEliminar, setInspeccionAEliminar] = useState(null)
+  const [previewAjustada, setPreviewAjustada] = useState(true)
+  // Solo para mostrar: el número definitivo lo asigna el servidor al guardar.
+  const [correlativoPreview, setCorrelativoPreview] = useState({ numeroRegistro: '', numeroSerieCerticav: '' })
+  const [eliminando, setEliminando] = useState(false)
   const [isLoading, setIsLoading] = useState(!cachedInsp)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterResultado, setFilterResultado] = useState('TODOS')
@@ -340,6 +441,10 @@ export function Inspecciones() {
   // Plate dropdown autocompletion
   const [isPlacaDropdownOpen, setIsPlacaDropdownOpen] = useState(false)
   const placaDropdownRef = useRef(null)
+
+  // Conductor dropdown autocompletion (búsqueda contra el padrón de personas)
+  const [isConductorDropdownOpen, setIsConductorDropdownOpen] = useState(false)
+  const conductorDropdownRef = useRef(null)
 
   const [formData, setFormData] = useState({
     vehiculoPlaca: '',
@@ -369,12 +474,13 @@ export function Inspecciones() {
 
   const loadData = async () => {
     try {
-      const [inspRes, critRes, vehRes, persRes, asocRes] = await Promise.all([
+      const [inspRes, critRes, vehRes, persRes, asocRes, personasRes] = await Promise.all([
         apiFetch('/inspecciones'),
         apiFetch('/inspeccion-criterios'),
         apiFetch('/vehiculos'),
         apiFetch('/personal').catch(() => ({ ok: false })),
         apiFetch('/asociaciones').catch(() => ({ ok: false })),
+        apiFetch('/personas').catch(() => ({ ok: false })),
       ])
 
       if (!inspRes.ok) throw inspRes
@@ -411,6 +517,11 @@ export function Inspecciones() {
         const aData = asocPayload.data || []
         setAsociaciones(aData)
       }
+
+      if (personasRes.ok) {
+        const personasPayload = await personasRes.json()
+        setPersonas(personasPayload.data || [])
+      }
     } catch {
       setLoadError('No se pudo cargar el módulo de inspecciones.')
     } finally {
@@ -430,6 +541,9 @@ export function Inspecciones() {
       if (placaDropdownRef.current && !placaDropdownRef.current.contains(event.target)) {
         setIsPlacaDropdownOpen(false)
       }
+      if (conductorDropdownRef.current && !conductorDropdownRef.current.contains(event.target)) {
+        setIsConductorDropdownOpen(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -437,11 +551,12 @@ export function Inspecciones() {
 
   useEffect(() => {
     if (!toast) return undefined
-    const timer = window.setTimeout(() => setToast(null), 3000)
+    const timer = window.setTimeout(() => setToast(null), TOAST_DURACION_MS)
     return () => window.clearTimeout(timer)
   }, [toast])
 
-  const showToast = (message, type = 'success') => {
+  // type: 'crear' | 'editar' | 'eliminar' | 'error'
+  const showToast = (message, type = 'crear') => {
     setToast({
       id: Date.now(),
       message,
@@ -478,55 +593,137 @@ export function Inspecciones() {
     (v.placa || '').toLowerCase().includes((formData.vehiculoPlaca || '').toLowerCase())
   )
 
+  const filteredConductores = (() => {
+    const termino = (formData.conductorNombre || '').trim().toLowerCase()
+    if (termino.length < 2) return []
+    return personas
+      .filter((p) => {
+        const nombreCompleto = `${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.toLowerCase()
+        return nombreCompleto.includes(termino) || (p.numeroDocumento || '').includes(termino)
+      })
+      .slice(0, 8)
+  })()
+
+  const handleSeleccionarConductor = (persona) => {
+    const nombreCompleto = `${persona.nombres || ''} ${persona.apellidoPaterno || ''} ${persona.apellidoMaterno || ''}`.trim()
+    setFormData((prev) => ({
+      ...prev,
+      conductorNombre: nombreCompleto.toUpperCase(),
+      conductorDni: persona.numeroDocumento || '',
+      conductorLicencia: (persona.numeroLicencia || '').toUpperCase(),
+    }))
+    setConductorEsRegistrado(true)
+    setIsConductorDropdownOpen(false)
+  }
+
   const handlePlacaChange = (val) => {
     const placaUpper = val.toUpperCase().trim()
     const vMatch = vehiculos.find((v) => v.placa.toUpperCase() === placaUpper)
     setFormData((prev) => ({
       ...prev,
       vehiculoPlaca: placaUpper,
-      vehiculoMarca: vMatch?.marca || prev.vehiculoMarca,
-      vehiculoModelo: vMatch?.modelo || prev.vehiculoModelo,
-      vehiculoAnio: vMatch?.anio || prev.vehiculoAnio,
-      vehiculoMotor: vMatch?.serieMotor || prev.vehiculoMotor,
-      vehiculoColor: vMatch?.color || prev.vehiculoColor,
-      transportador: vMatch?.asociacion || prev.transportador,
-      asociacionId: vMatch?.asociacionId || prev.asociacionId,
-      propietario: vMatch?.propietario || prev.propietario,
-      propietarioDni: vMatch?.propietarioDni || prev.propietarioDni,
-      conductorNombre: prev.conductorNombre || vMatch?.propietario || '',
-      conductorDni: prev.conductorDni || vMatch?.propietarioDni || '',
-      conductorLicencia: prev.conductorLicencia || vMatch?.propietarioLicencia || vMatch?.propietarioDni || '',
+      vehiculoMarca: vMatch?.marca || '',
+      vehiculoModelo: vMatch?.modelo || '',
+      vehiculoAnio: vMatch?.anio || '',
+      vehiculoMotor: vMatch?.serieMotor || '',
+      vehiculoColor: vMatch?.color || '',
+      transportador: vMatch?.asociacion || '',
+      asociacionId: vMatch?.asociacionId || '',
+      propietario: vMatch?.propietario || '',
+      propietarioDni: vMatch?.propietarioDni || '',
     }))
   }
 
-  const handleCopiarPropietario = () => {
-    const vMatch = vehiculos.find((v) => v.placa === formData.vehiculoPlaca)
-    const propName = formData.propietario || vMatch?.propietario || ''
-    const propDni = formData.propietarioDni || vMatch?.propietarioDni || ''
-    const propLic = vMatch?.propietarioLicencia || propDni
+  // La licencia sale del padrón de personas. Nunca se usa el DNI como licencia:
+  // al guardar, el backend actualizaría la licencia real de esa persona.
+  const licenciaDePersona = (dni) =>
+    personas.find((p) => (p.numeroDocumento || '').trim() === String(dni || '').trim())?.numeroLicencia || ''
+
+  // Mantiene sincronizados los datos del conductor con el titular mientras
+  // el checkbox "El conductor es el mismo propietario" esté activado.
+  useEffect(() => {
+    if (!conductorMismoPropietario) return
+    const propLic = licenciaDePersona(formData.propietarioDni)
     setFormData((prev) => ({
       ...prev,
-      conductorNombre: propName || 'ÍDEM',
-      conductorDni: propDni,
-      conductorLicencia: propLic,
+      conductorNombre: prev.propietario || '',
+      conductorDni: prev.propietarioDni || '',
+      conductorLicencia: propLic || '',
     }))
-    showToast('Datos del titular copiados al conductor (ÍDEM)')
+    setConductorEsRegistrado(Boolean(formData.propietarioDni))
+    setIsConductorDropdownOpen(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conductorMismoPropietario, formData.propietario, formData.propietarioDni, formData.vehiculoPlaca])
+
+  const handleToggleConductorMismoPropietario = (checked) => {
+    setConductorMismoPropietario(checked)
+    if (checked) {
+      const propLic = licenciaDePersona(formData.propietarioDni)
+      setFormData((prev) => ({
+        ...prev,
+        conductorNombre: prev.propietario || '',
+        conductorDni: prev.propietarioDni || '',
+        conductorLicencia: propLic || '',
+      }))
+      setConductorEsRegistrado(Boolean(formData.propietarioDni))
+      setIsConductorDropdownOpen(false)
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        conductorNombre: '',
+        conductorDni: '',
+        conductorLicencia: '',
+      }))
+      setConductorEsRegistrado(false)
+      setIsConductorDropdownOpen(false)
+    }
   }
 
-  const handleMarcarTodosBien = () => {
-    setFormData((prev) => ({
-      ...prev,
-      detalles: criteriosInspeccion.map((c) => ({ criterioId: c.id, estado: 'BIEN', obs: '' })),
-      resultado: 'APROBADO',
-      primeraEvaluacion: 'APROBADO',
-    }))
-    showToast('Los 37 criterios fueron marcados como BIEN')
+  // Busca el DNI ingresado contra el padrón de personas ya registradas.
+  // Si existe, autocompleta nombre/licencia y evita crear un duplicado en el backend.
+  const handleConductorDniChange = (value) => {
+    const dni = value.trim()
+    const match = personas.find((p) => (p.numeroDocumento || '').trim() === dni)
+    if (match) {
+      const nombreCompleto = `${match.nombres || ''} ${match.apellidoPaterno || ''} ${match.apellidoMaterno || ''}`.trim()
+      setFormData((prev) => ({
+        ...prev,
+        conductorDni: dni,
+        conductorNombre: nombreCompleto.toUpperCase(),
+        conductorLicencia: (match.numeroLicencia || prev.conductorLicencia || '').toUpperCase(),
+      }))
+      setConductorEsRegistrado(true)
+    } else {
+      setFormData((prev) => ({ ...prev, conductorDni: dni }))
+      setConductorEsRegistrado(false)
+    }
+  }
+
+  const handleToggleTodoBien = (checked) => {
+    if (checked) {
+      setFormData((prev) => {
+        const detalles = criteriosInspeccion.map((c) => ({ criterioId: c.id, estado: 'BIEN', obs: '' }))
+
+        if (selectedInspeccion && prev.primeraEvaluacion !== 'APROBADO') {
+          return { ...prev, detalles, segundaEvaluacion: 'APROBADO', resultado: 'APROBADO' }
+        }
+
+        return { ...prev, detalles, primeraEvaluacion: 'APROBADO', segundaEvaluacion: '', resultado: 'APROBADO' }
+      })
+      setChecklistModificado(true)
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        detalles: prev.detalles.map((d) => ({ ...d, estado: '' })),
+        primeraEvaluacion: 'OBSERVADO',
+        resultado: 'OBSERVADO',
+      }))
+      setChecklistModificado(true)
+    }
   }
 
   const handleOpenCreateModal = () => {
     const defaultTecnico = tecnicos.length > 0 ? tecnicos[0] : null
-    const nextReg = 'INSP-' + new Date().getFullYear() + '-' + String(inspecciones.length + 101).padStart(3, '0')
-    const nextSerie = String(inspecciones.length + 8180).padStart(7, '0')
     setFormData({
       vehiculoPlaca: '',
       vehiculoMarca: '',
@@ -541,8 +738,9 @@ export function Inspecciones() {
       conductorNombre: '',
       conductorDni: '',
       conductorLicencia: '',
-      numeroRegistro: nextReg,
-      numeroSerieCerticav: nextSerie,
+      // Vacíos: el servidor asigna el siguiente correlativo libre al guardar.
+      numeroRegistro: '',
+      numeroSerieCerticav: '',
       fecha: new Date().toISOString().split('T')[0],
       inspector: defaultTecnico ? `${defaultTecnico.nombres} ${defaultTecnico.apellidos}` : '',
       tecnicoId: defaultTecnico ? defaultTecnico.id : '',
@@ -554,6 +752,14 @@ export function Inspecciones() {
     })
     setSelectedInspeccion(null)
     setIsPlacaDropdownOpen(false)
+    setConductorEsRegistrado(false)
+    setConductorMismoPropietario(false)
+    setChecklistModificado(false)
+    setCorrelativoPreview({ numeroRegistro: '', numeroSerieCerticav: '' })
+    apiFetch(`/inspecciones/siguiente-correlativo?anio=${new Date().getFullYear()}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => json?.data && setCorrelativoPreview(json.data))
+      .catch(() => {})
     setIsModalOpen(true)
   }
 
@@ -570,9 +776,9 @@ export function Inspecciones() {
       asociacionId: vMatch?.asociacionId || '',
       propietario: inspeccion.propietario || vMatch?.propietario || '',
       propietarioDni: inspeccion.propietarioDni || vMatch?.propietarioDni || '',
-      conductorNombre: inspeccion.conductorNombre || vMatch?.propietario || '',
-      conductorDni: inspeccion.conductorDni || vMatch?.propietarioDni || '',
-      conductorLicencia: inspeccion.conductorLicencia || vMatch?.propietarioLicencia || '',
+      conductorNombre: inspeccion.conductorNombre || '',
+      conductorDni: inspeccion.conductorDni || '',
+      conductorLicencia: inspeccion.conductorLicencia || '',
       numeroRegistro: inspeccion.numeroRegistro || inspeccion.numeroInspeccion || '',
       numeroSerieCerticav: inspeccion.numeroSerieCerticav || '',
       fecha: inspeccion.fecha ? String(inspeccion.fecha).split('T')[0] : new Date().toISOString().split('T')[0],
@@ -589,6 +795,11 @@ export function Inspecciones() {
     })
     setSelectedInspeccion(inspeccion)
     setIsPlacaDropdownOpen(false)
+    setConductorEsRegistrado(Boolean(inspeccion.conductorDni))
+    const dniConductor = (inspeccion.conductorDni || '').trim()
+    const dniPropietario = (inspeccion.propietarioDni || vMatch?.propietarioDni || '').trim()
+    setConductorMismoPropietario(Boolean(dniConductor) && dniConductor === dniPropietario)
+    setChecklistModificado(false)
     setIsModalOpen(true)
   }
 
@@ -602,122 +813,109 @@ export function Inspecciones() {
     setIsPreviewModalOpen(true)
   }
 
-  const handleDelete = async (id) => {
-    const result = await showConfirm(
-      '¿Eliminar inspección?',
-      '¿Está seguro de eliminar esta inspección técnica del sistema?',
-      'Sí, eliminar',
-      'Cancelar'
-    )
-    if (result.isConfirmed) {
-      try {
-        const res = await apiFetch(`/inspecciones/${id}`, { method: 'DELETE' })
-        if (!res.ok) throw res
-        const next = inspecciones.filter((i) => i.id !== id)
-        setInspecciones(next)
-        setCachedData('/inspecciones', next)
-        showToast('Inspección eliminada con éxito')
-      } catch {
-        showError('Error', 'Error al eliminar la inspección.')
+  // Abre el modal de confirmación propio (en lugar del confirm() nativo del navegador).
+  const handleDelete = (id) => {
+    setInspeccionAEliminar(inspecciones.find((i) => i.id === id) || { id })
+  }
+
+  const confirmarEliminacion = async () => {
+    const objetivo = inspeccionAEliminar
+    if (!objetivo) return
+    setEliminando(true)
+    try {
+      const res = await apiFetch(`/inspecciones/${objetivo.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        showToast(await leerMensajeError(res, 'No se pudo eliminar la inspección.'), 'error')
+        return
       }
+      const next = inspecciones.filter((i) => i.id !== objetivo.id)
+      setInspecciones(next)
+      setCachedData('/inspecciones', next)
+      showToast(`Inspección ${objetivo.numeroRegistro || ''} eliminada correctamente`, 'eliminar')
+    } catch {
+      showToast('No se pudo conectar con el servidor. Intente nuevamente.', 'error')
+    } finally {
+      setEliminando(false)
+      setInspeccionAEliminar(null)
     }
   }
 
   const handleDetalleChange = (criterioId, field, value) => {
     setFormData((prev) => {
       const newDetalles = prev.detalles.map((d) => (d.criterioId === criterioId ? { ...d, [field]: value } : d))
+      const evalChecklist = calcularPrimeraEvaluacion(newDetalles, criteriosInspeccion)
 
-      let newResultado = prev.resultado
-      let newPrimeraEval = prev.primeraEvaluacion
-      if (field === 'estado') {
-        const hayMalEstado = newDetalles.some((d) => d.estado === 'MAL_ESTADO')
-        const hayNoTiene = newDetalles.some((d) => d.estado === 'NO_TIENE')
-
-        if (hayMalEstado || hayNoTiene) {
-          if (prev.resultado === 'APROBADO') {
-            newResultado = 'OBSERVADO'
-          }
-        } else {
-          newResultado = 'APROBADO'
-          newPrimeraEval = 'APROBADO'
+      // Editando una inspección ya DESAPROBADA: la Primera Evaluación queda
+      // fija (es historia); volver a llenar el checklist ahora define la
+      // Segunda Evaluación (subsanación), no la primera.
+      if (selectedInspeccion && prev.primeraEvaluacion !== 'APROBADO') {
+        return {
+          ...prev,
+          detalles: newDetalles,
+          segundaEvaluacion: evalChecklist,
+          resultado: calcularResultado(prev.primeraEvaluacion, evalChecklist),
         }
       }
 
+      // Registrando (o editando una inspección aún sin evaluar): el
+      // checklist define la Primera Evaluación.
       return {
         ...prev,
         detalles: newDetalles,
-        resultado: newResultado,
-        primeraEvaluacion: newPrimeraEval,
+        primeraEvaluacion: evalChecklist,
+        resultado: calcularResultado(evalChecklist, ''),
       }
     })
+    setChecklistModificado(true)
   }
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
     if (!formData.vehiculoPlaca.trim()) {
-      showError('Validación Fallida', 'Por favor ingrese la placa del vehículo.')
+      showToast('Por favor ingrese la placa del vehículo.', 'error')
       return
     }
 
-    const payload = {
-      ...formData,
-      resultado: formData.resultado,
-      observaciones: formData.observaciones,
-      detalles: formData.detalles,
+    const payload = { ...formData }
+    // Al editar sin tocar el checklist no se reenvía: así no se reemplaza el
+    // historial de una inspección evaluada con el formato anterior.
+    if (selectedInspeccion && !checklistModificado) {
+      delete payload.detalles
     }
 
     try {
-      if (selectedInspeccion) {
-        const response = await apiFetch(`/inspecciones/${selectedInspeccion.id}`, {
-          method: 'PUT',
-          body: payload,
-        })
-        if (!response.ok) throw response
-        const selectedTecnico = tecnicos.find((t) => String(t.id) === String(formData.tecnicoId))
-        const inspectorName = selectedTecnico
-          ? `${selectedTecnico.nombres} ${selectedTecnico.apellidos}`
-          : formData.inspector || selectedInspeccion.inspector
-        const updated = {
-          ...selectedInspeccion,
-          ...formData,
-          inspector: inspectorName,
-        }
-        const next = inspecciones.map((i) => (i.id === selectedInspeccion.id ? updated : i))
-        setInspecciones(next)
-        setCachedData('/inspecciones', next)
-        showToast('Inspección actualizada con éxito')
-      } else {
-        const response = await apiFetch('/inspecciones', {
-          method: 'POST',
-          body: payload,
-        })
-        if (!response.ok) throw response
-        const result = await response.json()
-        const selectedTecnico = tecnicos.find((t) => String(t.id) === String(formData.tecnicoId))
-        const inspectorName =
-          result.data?.inspector ||
-          (selectedTecnico ? `${selectedTecnico.nombres} ${selectedTecnico.apellidos}` : formData.inspector || 'Inspector Técnico Municipal')
-        const newInspeccion = {
-          ...result.data,
-          ...formData,
-          id: result.data?.id || Date.now(),
-          fecha: formData.fecha || result.data?.fecha || new Date().toISOString().split('T')[0],
-          inspector: inspectorName,
-          detalles:
-            typeof result.data?.detalles === 'string'
-              ? JSON.parse(result.data.detalles)
-              : result.data?.detalles || formData.detalles,
-        }
-        const next = [newInspeccion, ...inspecciones]
-        setInspecciones(next)
-        setCachedData('/inspecciones', next)
-        setCurrentPage(1)
-        showToast('Inspección registrada con éxito')
+      const esEdicion = Boolean(selectedInspeccion)
+      const response = await apiFetch(esEdicion ? `/inspecciones/${selectedInspeccion.id}` : '/inspecciones', {
+        method: esEdicion ? 'PUT' : 'POST',
+        body: payload,
+      })
+      if (!response.ok) {
+        showToast(await leerMensajeError(response, 'No se pudo guardar la inspección.'), 'error')
+        return
       }
+
+      const id = esEdicion ? selectedInspeccion.id : (await response.json()).data?.id
+      const guardada = await obtenerInspeccion(id)
+      const next = esEdicion
+        ? inspecciones.map((i) => (i.id === id ? guardada : i))
+        : [guardada, ...inspecciones]
+      setInspecciones(next)
+      setCachedData('/inspecciones', next)
+      if (!esEdicion) setCurrentPage(1)
+      showToast(
+        `Inspección ${guardada?.numeroRegistro || ''} ${esEdicion ? 'actualizada' : 'registrada'} correctamente`,
+        esEdicion ? 'editar' : 'crear'
+      )
       setIsModalOpen(false)
-    } catch (err) {
-      showError('Error de comunicación', 'Error con el servidor al guardar la inspección.')
+    } catch {
+      showToast('No se pudo conectar con el servidor. Intente nuevamente.', 'error')
     }
+  }
+
+  const obtenerInspeccion = async (id) => {
+    const res = await apiFetch(`/inspecciones/${id}`)
+    const json = await res.json()
+    return json.data
   }
 
   const handleExportExcel = () => {
@@ -896,30 +1094,92 @@ export function Inspecciones() {
     return acc
   }, {})
 
+  // Conteo de criterios marcados en BIEN para el estado visual del botón
+  const totalCriterios = formData.detalles?.length || 0
+  const cantBien = formData.detalles?.filter((d) => d.estado === 'BIEN').length || 0
+  const todosEnBien = totalCriterios > 0 && cantBien === totalCriterios
+
   return (
     <div className="space-y-4">
-      {toast && (
-        <div
-          key={toast.id}
-          className="fixed right-6 top-6 z-[80] flex items-center gap-2.5 rounded-[var(--radius)] border px-4 py-3 text-[13px] font-medium shadow-md transition-all animate-enter"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-ok)',
-            color: 'var(--text)',
-            boxShadow: 'var(--shadow-md)',
-          }}
-        >
-          <span
-            className="grid size-6 place-items-center rounded-full text-xs font-semibold shrink-0 border"
-            style={{
-              backgroundColor: 'var(--ok-bg)',
-              color: 'var(--ok-fg)',
-              borderColor: 'var(--border-ok)',
-            }}
+      {toast && (() => {
+        const estilo = TOAST_ESTILOS[toast.type] || TOAST_ESTILOS.crear
+        return (
+          <div
+            key={toast.id}
+            role={toast.type === 'error' ? 'alert' : 'status'}
+            className={`fixed right-6 top-6 z-[80] w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border shadow-lg ${estilo.caja} ${toast.type === 'error' ? 'toast-shake' : 'toast-in'}`}
           >
-            ✓
-          </span>
-          <span>{toast.message}</span>
+            <div className="flex items-start gap-3 px-4 py-3">
+              <span className={`toast-icon grid size-7 shrink-0 place-items-center rounded-full text-sm font-bold ${estilo.icono}`}>
+                {estilo.simbolo}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className={`text-[11px] font-bold uppercase tracking-wide ${estilo.titulo}`}>{estilo.etiqueta}</p>
+                <p className="text-[13px] font-medium text-slate-700 dark:text-slate-200">{toast.message}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                aria-label="Cerrar notificación"
+                className="shrink-0 rounded-md px-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className={`toast-progress h-1 ${estilo.barra}`} style={{ animationDuration: `${TOAST_DURACION_MS}ms` }} />
+          </div>
+        )
+      })()}
+
+      {inspeccionAEliminar && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter"
+          onClick={() => !eliminando && setInspeccionAEliminar(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="titulo-eliminar"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]"
+            style={{ animation: 'modal-pop 0.25s ease-out' }}
+          >
+            <div className="flex flex-col items-center gap-3 px-6 pt-6 pb-4 text-center">
+              <span className="toast-icon grid size-14 place-items-center rounded-full bg-rose-100 text-2xl text-rose-600 ring-8 ring-rose-50 dark:bg-rose-950/60 dark:text-rose-400 dark:ring-rose-950/30">
+                🗑
+              </span>
+              <h3 id="titulo-eliminar" className="text-base font-bold text-slate-900 dark:text-white">
+                ¿Eliminar esta inspección?
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Se anulará la inspección{' '}
+                <strong className="font-mono text-slate-800 dark:text-slate-200">{inspeccionAEliminar.numeroRegistro || ''}</strong>
+                {inspeccionAEliminar.vehiculoPlaca && (
+                  <> de la placa <strong className="font-mono text-slate-800 dark:text-slate-200">{inspeccionAEliminar.vehiculoPlaca}</strong></>
+                )}
+                . Dejará de aparecer en el listado.
+              </p>
+            </div>
+            <div className="flex gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3 dark:border-slate-800 dark:bg-slate-900/80">
+              <button
+                type="button"
+                disabled={eliminando}
+                onClick={() => setInspeccionAEliminar(null)}
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                autoFocus
+                disabled={eliminando}
+                onClick={confirmarEliminacion}
+                className="flex-1 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-xs transition hover:bg-rose-700 active:scale-95 disabled:opacity-60 cursor-pointer"
+              >
+                {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1039,7 +1299,7 @@ export function Inspecciones() {
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por código, serie CertiCAV, placa, conductor o titular..."
+              placeholder="Buscar por código, serie CertiCAV, placa, conductor o titular"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
@@ -1377,17 +1637,12 @@ export function Inspecciones() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center gap-2.5">
-                <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xs">
-                  <Icon name="inspection" className="size-4.5" />
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <Icon name="inspection" className="size-4" />
                 </span>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    {selectedInspeccion ? 'Editar Inspección Técnica Vehicular (CERTICAV)' : 'Digitalización de Inspección Técnica Vehicular (CERTICAV)'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Ordenanza Municipal N° 012-2012-MDJLO · Subgerencia de Tránsito, Transportes y Seguridad Vial
-                  </p>
-                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {selectedInspeccion ? 'Editar inspección CERTICAV' : 'Nueva inspección CERTICAV'}
+                </h3>
               </div>
               <button
                 type="button"
@@ -1403,15 +1658,10 @@ export function Inspecciones() {
               <div className="p-4 sm:p-5 space-y-4 max-h-[75vh] overflow-y-auto">
                 {/* 1. Sección: Identificación del Documento y Talonario */}
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-blue-600" />
-                      1. Identificación del Documento Oficial y Registro
-                    </h4>
-                    <span className="text-[10.5px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 px-2 py-0.5 rounded-md">
-                      Sello Rojo Correlativo
-                    </span>
-                  </div>
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-blue-600" />
+                    Documento y registro
+                  </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
                     {/* Placa Vehicular con Autocompletado */}
@@ -1464,10 +1714,10 @@ export function Inspecciones() {
                       <FloatingInput
                         id="insp_num_reg"
                         label="N° de Registro"
-                        required
-                        value={formData.numeroRegistro}
-                        inputClassName="font-mono font-bold uppercase"
-                        onChange={(e) => setFormData({ ...formData, numeroRegistro: e.target.value.toUpperCase() })}
+                        readOnly
+                        tabIndex={-1}
+                        value={(selectedInspeccion ? formData.numeroRegistro : correlativoPreview.numeroRegistro) || '…'}
+                        inputClassName="font-mono font-bold uppercase cursor-not-allowed bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300"
                       />
                     </div>
 
@@ -1475,10 +1725,10 @@ export function Inspecciones() {
                       <FloatingInput
                         id="insp_serie"
                         label="N° Serie CERTICAV"
-                        required
-                        value={formData.numeroSerieCerticav}
-                        inputClassName="font-mono font-black text-rose-600 dark:text-rose-400 text-sm tracking-wider"
-                        onChange={(e) => setFormData({ ...formData, numeroSerieCerticav: e.target.value.trim() })}
+                        readOnly
+                        tabIndex={-1}
+                        value={(selectedInspeccion ? formData.numeroSerieCerticav : correlativoPreview.numeroSerieCerticav) || '…'}
+                        inputClassName="font-mono font-black text-sm tracking-wider cursor-not-allowed bg-slate-100 text-rose-600 dark:bg-slate-900 dark:text-rose-400"
                       />
                     </div>
 
@@ -1487,7 +1737,7 @@ export function Inspecciones() {
                         id="insp_fecha"
                         label="Fecha de Inspección"
                         type="date"
-                        required
+                        disabled
                         value={formData.fecha}
                         onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
                       />
@@ -1497,21 +1747,17 @@ export function Inspecciones() {
 
                 {/* 2. Sección: Características Técnicas del Vehículo Menor */}
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-cyan-600" />
-                      2. Características Técnicas del Vehículo Menor y Transportador
-                    </h4>
-                    <span className="text-[10px] text-slate-400">
-                      Datos extraídos de la BD / Modificables para actualización
-                    </span>
-                  </div>
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-cyan-600" />
+                    Vehículo y transportador
+                  </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
                     <div className="sm:col-span-3">
                       <FloatingInput
                         id="insp_marca"
                         label="Marca de Vehículo"
+                        disabled
                         value={formData.vehiculoMarca}
                         inputClassName="uppercase font-semibold"
                         onChange={(e) => setFormData({ ...formData, vehiculoMarca: e.target.value.toUpperCase() })}
@@ -1522,6 +1768,7 @@ export function Inspecciones() {
                       <FloatingInput
                         id="insp_modelo"
                         label="Modelo"
+                        disabled
                         value={formData.vehiculoModelo}
                         inputClassName="uppercase font-semibold"
                         onChange={(e) => setFormData({ ...formData, vehiculoModelo: e.target.value.toUpperCase() })}
@@ -1533,6 +1780,7 @@ export function Inspecciones() {
                         id="insp_anio"
                         label="Año Fabricación"
                         maxLength={4}
+                        disabled
                         value={formData.vehiculoAnio}
                         inputClassName="font-mono font-bold"
                         onChange={(e) => setFormData({ ...formData, vehiculoAnio: e.target.value.trim() })}
@@ -1543,8 +1791,9 @@ export function Inspecciones() {
                       <FloatingInput
                         id="insp_color"
                         label="Color"
+                        disabled
                         value={formData.vehiculoColor}
-                        inputClassName="uppercase"
+                        inputClassName="uppercase font-semibold"
                         onChange={(e) => setFormData({ ...formData, vehiculoColor: e.target.value.toUpperCase() })}
                       />
                     </div>
@@ -1553,6 +1802,7 @@ export function Inspecciones() {
                       <FloatingInput
                         id="insp_motor"
                         label="N° Motor"
+                        disabled
                         value={formData.vehiculoMotor}
                         inputClassName="font-mono font-bold uppercase"
                         onChange={(e) => setFormData({ ...formData, vehiculoMotor: e.target.value.toUpperCase() })}
@@ -1561,42 +1811,14 @@ export function Inspecciones() {
 
                     {/* Razón Social del Transportador */}
                     <div className="sm:col-span-12">
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <FloatingInput
-                            id="insp_transportador"
-                            label="Razón Social del Transportador (Empresa / Asociación)"
-                            value={formData.transportador}
-                            inputClassName="uppercase font-bold text-slate-800 dark:text-white"
-                            onChange={(e) => setFormData({ ...formData, transportador: e.target.value.toUpperCase() })}
-                          />
-                        </div>
-                        {asociaciones.length > 0 && (
-                          <div className="w-56 shrink-0">
-                            <FloatingSelect
-                              id="insp_asoc_select"
-                              label="Vincular Asociación"
-                              value={formData.asociacionId}
-                              onChange={(e) => {
-                                const aId = e.target.value
-                                const aObj = asociaciones.find((a) => String(a.id) === String(aId))
-                                setFormData({
-                                  ...formData,
-                                  asociacionId: aId,
-                                  transportador: aObj ? aObj.razonSocial || aObj.nombre : formData.transportador,
-                                })
-                              }}
-                              options={[
-                                { value: '', label: 'Seleccionar...' },
-                                ...asociaciones.map((a) => ({
-                                  value: String(a.id),
-                                  label: a.razonSocial || a.nombre || `Asociación #${a.id}`,
-                                })),
-                              ]}
-                            />
-                          </div>
-                        )}
-                      </div>
+                      <FloatingInput
+                        id="insp_transportador"
+                        label="Razón Social del Transportador (Empresa / Asociación)"
+                        disabled
+                        value={formData.transportador}
+                        inputClassName="uppercase font-bold text-slate-800 dark:text-white"
+                        onChange={(e) => setFormData({ ...formData, transportador: e.target.value.toUpperCase() })}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1606,15 +1828,17 @@ export function Inspecciones() {
                   <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
                       <span className="size-2 rounded-full bg-emerald-600" />
-                      3. Datos del Propietario, Conductor y Técnico Inspector
+                      Propietario, conductor y técnico
                     </h4>
-                    <button
-                      type="button"
-                      onClick={handleCopiarPropietario}
-                      className="text-[11px] font-bold text-sky-700 bg-sky-50 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-2.5 py-1 rounded-lg hover:bg-sky-100 cursor-pointer transition shadow-2xs"
-                    >
-                      Copiar datos del Titular (ÍDEM)
-                    </button>
+                    <label className="flex items-center gap-2 text-[11px] font-bold text-sky-700 bg-sky-50 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-2.5 py-1 rounded-lg cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={conductorMismoPropietario}
+                        onChange={(e) => handleToggleConductorMismoPropietario(e.target.checked)}
+                        className="size-3.5 accent-sky-600 cursor-pointer"
+                      />
+                      El conductor es el mismo propietario
+                    </label>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
@@ -1623,6 +1847,7 @@ export function Inspecciones() {
                       <FloatingInput
                         id="insp_prop_nombre"
                         label="Propietario del Vehículo"
+                        disabled
                         value={formData.propietario}
                         inputClassName="font-bold uppercase text-slate-800 dark:text-white"
                         onChange={(e) => setFormData({ ...formData, propietario: e.target.value.toUpperCase() })}
@@ -1634,22 +1859,47 @@ export function Inspecciones() {
                         id="insp_prop_dni"
                         label="DNI del Propietario"
                         maxLength={8}
+                        disabled
                         value={formData.propietarioDni}
                         inputClassName="font-mono font-bold"
                         onChange={(e) => setFormData({ ...formData, propietarioDni: e.target.value.trim() })}
                       />
                     </div>
 
-                    {/* Conductor */}
-                    <div className="sm:col-span-4">
+                    {/* Conductor con autocompletado contra el padrón de personas */}
+                    <div className="sm:col-span-4 relative" ref={conductorDropdownRef}>
                       <FloatingInput
                         id="insp_cond_nombre"
-                        label="Conductor (Nombre o ÍDEM)"
+                        label="Conductor"
                         required
+                        disabled={conductorMismoPropietario}
                         value={formData.conductorNombre}
-                        inputClassName="font-bold uppercase text-slate-800 dark:text-white"
-                        onChange={(e) => setFormData({ ...formData, conductorNombre: e.target.value.toUpperCase() })}
+                        inputClassName={`font-bold uppercase text-slate-800 dark:text-white ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-slate-900' : ''}`}
+                        onFocus={() => setIsConductorDropdownOpen(true)}
+                        onChange={(e) => {
+                          setFormData({ ...formData, conductorNombre: e.target.value.toUpperCase() })
+                          setConductorEsRegistrado(false)
+                          setIsConductorDropdownOpen(true)
+                        }}
                       />
+
+                      {!conductorMismoPropietario && isConductorDropdownOpen && filteredConductores.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+                          {filteredConductores.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => handleSeleccionarConductor(p)}
+                              className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition cursor-pointer text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60"
+                            >
+                              <span className="font-bold truncate max-w-[170px]">
+                                {`${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.trim()}
+                              </span>
+                              <span className="font-mono text-[11px] text-slate-400">{p.numeroDocumento}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="sm:col-span-2">
@@ -1657,9 +1907,10 @@ export function Inspecciones() {
                         id="insp_cond_dni"
                         label="DNI Conductor"
                         maxLength={8}
+                        disabled={conductorMismoPropietario}
                         value={formData.conductorDni}
-                        inputClassName="font-mono font-bold"
-                        onChange={(e) => setFormData({ ...formData, conductorDni: e.target.value.trim() })}
+                        inputClassName={`font-mono font-bold ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-slate-900' : ''}`}
+                        onChange={(e) => handleConductorDniChange(e.target.value)}
                       />
                     </div>
 
@@ -1669,8 +1920,9 @@ export function Inspecciones() {
                         id="insp_cond_licencia"
                         label="N° Licencia de Conductor"
                         required
+                        disabled={conductorMismoPropietario}
                         value={formData.conductorLicencia}
-                        inputClassName="font-mono font-bold uppercase"
+                        inputClassName={`font-mono font-bold uppercase ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-slate-900' : ''}`}
                         onChange={(e) => setFormData({ ...formData, conductorLicencia: e.target.value.toUpperCase() })}
                       />
                     </div>
@@ -1690,7 +1942,7 @@ export function Inspecciones() {
                           })
                         }}
                         options={[
-                          { value: '', label: 'Seleccionar técnico responsable...' },
+                          { value: '', label: 'Seleccionar técnico responsable' },
                           ...tecnicos.map((t) => ({ value: String(t.id), label: `${t.nombres} ${t.apellidos} · Inspector Tránsito` })),
                         ]}
                       />
@@ -1698,30 +1950,47 @@ export function Inspecciones() {
                   </div>
                 </div>
 
-                {/* 4. Sección: Evaluación de Criterios Técnicos (37 Criterios Oficiales de Ordenanza Municipal) */}
+                {/* 4. Sección: Evaluación de Criterios Técnicos */}
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5 dark:border-slate-800">
-                    <div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2.5 flex-wrap">
                       <h4 className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
                         <span className="size-2 rounded-full bg-indigo-600" />
-                        4. Checklist Técnico Evaluado (37 Criterios Ordenanza N° 012-2012-MDJLO)
+                        Checklist técnico
                       </h4>
-                      <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
-                        Opciones oficiales del documento físico: <strong>B</strong> (Bien) · <strong>M.E.</strong> (Mal Estado) · <strong>N.T.</strong> (No Tiene)
-                      </p>
+                      <div className="flex items-center gap-2 text-[10.5px] font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800/90 px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
+                        <span className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-emerald-500" />
+                          <strong className="text-emerald-700 dark:text-emerald-400 font-bold">B:</strong> Bien
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-600">·</span>
+                        <span className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-amber-500" />
+                          <strong className="text-amber-700 dark:text-amber-400 font-bold">M.E.:</strong> Mal Estado
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-600">·</span>
+                        <span className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-rose-500" />
+                          <strong className="text-rose-700 dark:text-rose-400 font-bold">N.T.:</strong> No Tiene
+                        </span>
+                      </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleMarcarTodosBien}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition active:scale-95 cursor-pointer whitespace-nowrap"
-                      >
-                        <span>✓</span>
-                        <span>Marcar todos en "BIEN"</span>
-                      </button>
-                    </div>
+                    <label className="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-lg cursor-pointer select-none transition-all hover:bg-emerald-100/70 dark:hover:bg-emerald-900/40 self-start sm:self-auto shadow-2xs">
+                      <input
+                        type="checkbox"
+                        checked={todosEnBien}
+                        onChange={(e) => handleToggleTodoBien(e.target.checked)}
+                        className="size-3.5 accent-emerald-600 cursor-pointer"
+                      />
+                      Todo bien
+                    </label>
                   </div>
+
+                  {selectedInspeccion?.detalles?.some((d) => !criteriosInspeccion.some((c) => c.id === Number(d.criterioId))) && (
+                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+                      Esta inspección se evaluó con el checklist anterior. Si modifica el checklist, se registrará con el formato oficial de {criteriosInspeccion.length} ítems.
+                    </p>
+                  )}
 
                   <div className="space-y-4">
                     {Object.entries(criteriosPorSeccion).map(([seccion, items]) => {
@@ -1809,70 +2078,57 @@ export function Inspecciones() {
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-amber-600" />
-                    5. Dictamen Final y Evaluaciones Oficiales
+                    Dictamen final
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                    {/* Primera Evaluación */}
-                    <div className="sm:col-span-4">
-                      <FloatingSelect
-                        id="insp_primera_eval"
-                        label="Primera Evaluación"
-                        value={formData.primeraEvaluacion}
-                        onChange={(e) => setFormData({ ...formData, primeraEvaluacion: e.target.value })}
-                        options={[
-                          { value: 'APROBADO', label: 'APROBADO' },
-                          { value: 'DESAPROBADO', label: 'DESAPROBADO' },
-                        ]}
-                      />
-                    </div>
+                    {(() => {
+                      const mostrarSegunda = Boolean(selectedInspeccion) && formData.primeraEvaluacion !== 'APROBADO'
+                      const colSpan = mostrarSegunda ? 'sm:col-span-4' : 'sm:col-span-6'
+                      return (
+                        <>
+                          {/* Primera Evaluación: se deriva del checklist, no se elige a mano */}
+                          <div className={colSpan}>
+                            <span className="block text-[9.5px] font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">
+                              Primera Evaluación
+                            </span>
+                            {getResultadoBadge(formData.primeraEvaluacion)}
+                          </div>
 
-                    {/* Segunda Evaluación */}
-                    <div className="sm:col-span-4">
-                      <FloatingSelect
-                        id="insp_segunda_eval"
-                        label="Segunda Evaluación (Subsanación)"
-                        value={formData.segundaEvaluacion}
-                        onChange={(e) => setFormData({ ...formData, segundaEvaluacion: e.target.value })}
-                        options={[
-                          { value: '', label: 'NO REQUERIDA / PENDIENTE' },
-                          { value: 'APROBADO', label: 'APROBADO (Subsanado)' },
-                          { value: 'DESAPROBADO', label: 'DESAPROBADO' },
-                        ]}
-                      />
-                    </div>
+                          {/* Segunda Evaluación: solo aplica si la Primera fue DESAPROBADO.
+                              Se deriva de volver a llenar el checklist, igual que la primera. */}
+                          {mostrarSegunda && (
+                            <div className="sm:col-span-4">
+                              <span className="block text-[9.5px] font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">
+                                Segunda Evaluación
+                              </span>
+                              {formData.segundaEvaluacion
+                                ? getResultadoBadge(formData.segundaEvaluacion)
+                                : <StatusBadge status="PENDIENTE" />}
+                            </div>
+                          )}
 
-                    {/* Resultado Técnico Final */}
-                    <div className="sm:col-span-4">
-                      <FloatingSelect
-                        id="insp_resultado"
-                        label="Resultado Final"
-                        value={formData.resultado}
-                        onChange={(e) => setFormData({ ...formData, resultado: e.target.value })}
-                        options={RESULTADO_OPTIONS}
-                      />
-                    </div>
+                          {/* Resultado Final: derivado de la primera/segunda evaluación */}
+                          <div className={colSpan}>
+                            <span className="block text-[9.5px] font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">
+                              Resultado Final
+                            </span>
+                            {getResultadoBadge(formData.resultado)}
+                          </div>
+                        </>
+                      )
+                    })()}
 
                     {/* Observaciones */}
                     <div className="sm:col-span-12">
                       <FloatingInput
                         id="insp_observaciones"
-                        label="Observaciones y Recomendaciones Técnicas"
+                        label="Observaciones"
                         optional
                         value={formData.observaciones}
                         onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
                       />
                     </div>
-                  </div>
-
-                  {/* Cláusula Legal */}
-                  <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-2.5 dark:border-amber-900/60 dark:bg-amber-950/40 text-[11px] text-amber-800 dark:text-amber-300">
-                    <p className="font-semibold">
-                      Base Legal & Declaración Jurada:
-                    </p>
-                    <p className="text-[10.5px] mt-0.5 leading-relaxed">
-                      Se otorgará un plazo de cinco (5) días hábiles para subsanar las observaciones para una 2da. evaluación, de corresponder. Los datos consignados en esta ficha digital tienen carácter de Declaración Jurada bajo sanciones contempladas en la Ley del Procedimiento Administrativo General N° 27444.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -2063,7 +2319,10 @@ export function Inspecciones() {
                     <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                       <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Fecha y Vencimiento</span>
                       <span className="font-mono text-slate-800 dark:text-white">
-                        {formatFecha(selectedInspeccion.fecha)} · Vence: <strong className="font-bold">{formatFecha(selectedInspeccion.fechaVencimiento)}</strong>
+                        {formatFecha(selectedInspeccion.fecha)} ·{' '}
+                        {selectedInspeccion.resultado === 'APROBADO'
+                          ? <>Vence: <strong className="font-bold">{formatFecha(selectedInspeccion.fechaVencimiento)}</strong></>
+                          : <strong className="font-bold text-rose-600 dark:text-rose-400">Sin certificado vigente</strong>}
                       </span>
                     </div>
                     <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
@@ -2086,6 +2345,10 @@ export function Inspecciones() {
                         </span>
                       </div>
                     )}
+                    <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Resultado Final</span>
+                      {getResultadoBadge(selectedInspeccion.resultado)}
+                    </div>
                     <div className="flex justify-between items-center py-0.5">
                       <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Técnico Inspector</span>
                       <span className="font-bold text-slate-800 dark:text-white text-right">
@@ -2099,18 +2362,44 @@ export function Inspecciones() {
               {/* 3. Resumen de Criterios Evaluados (Agrupados por Sección Oficial sin truncar) */}
               {selectedInspeccion.detalles && selectedInspeccion.detalles.length > 0 && (
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 space-y-3 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                    <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-indigo-600" />
-                      Resultados del Checklist Técnico Evaluado (37 Criterios Oficiales)
-                    </h5>
-                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                        <span className="size-2 rounded-full bg-indigo-600" />
+                        Checklist Técnico ({selectedInspeccion.detalles.length} criterios)
+                      </h5>
+                      <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
+                        <span className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-emerald-500" />
+                          <strong className="text-emerald-700 dark:text-emerald-400 font-bold">B:</strong> Bien
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-600">·</span>
+                        <span className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-amber-500" />
+                          <strong className="text-amber-700 dark:text-amber-400 font-bold">M.E.:</strong> Mal Estado
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-600">·</span>
+                        <span className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-rose-500" />
+                          <strong className="text-rose-700 dark:text-rose-400 font-bold">N.T.:</strong> No Tiene
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded self-start sm:self-auto">
                       {selectedInspeccion.detalles.length} Verificados
                     </span>
                   </div>
 
                   <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                    {Object.entries(criteriosPorSeccion).map(([seccion, items]) => {
+                    {/* Se muestran los criterios con que se evaluó esta inspección, no el
+                        catálogo actual: las antiguas se evaluaron con otro formato. */}
+                    {Object.entries(
+                      selectedInspeccion.detalles.reduce((acc, d) => {
+                        const seccion = d.seccion || 'GENERAL'
+                        ;(acc[seccion] = acc[seccion] || []).push(d)
+                        return acc
+                      }, {})
+                    ).map(([seccion, items]) => {
                       return (
                         <div key={seccion} className="space-y-1.5">
                           <h6 className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -2118,19 +2407,19 @@ export function Inspecciones() {
                             {seccion}
                           </h6>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
-                            {items.map((crit) => {
-                              const det = selectedInspeccion.detalles.find((d) => Number(d.criterioId) === crit.id)
-                              const estadoVal = det ? det.estado : 'BIEN'
+                            {items.map((det) => {
+                              const estadoVal = det.estado
                               const isBien = estadoVal === 'BIEN'
                               const isMal = estadoVal === 'MAL_ESTADO'
+                              const nombre = det.nombre || `Criterio ${det.criterioId}`
                               return (
                                 <div
-                                  key={crit.id}
+                                  key={det.criterioId}
                                   className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-[11px] shadow-2xs"
                                 >
                                   <div className="min-w-0 flex-1">
-                                    <span className="font-medium text-slate-800 dark:text-slate-200 block truncate" title={crit.nombre}>
-                                      {crit.nombre}
+                                    <span className="font-medium text-slate-800 dark:text-slate-200 block truncate" title={nombre}>
+                                      {nombre}
                                     </span>
                                   </div>
                                   <span
@@ -2163,7 +2452,7 @@ export function Inspecciones() {
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400 border-t border-slate-200/60 dark:border-slate-800 pt-1.5">
-                  Declaración Jurada según Ley N° 27444 · Subsanación de observaciones en 5 días hábiles para 2da. evaluación.
+                  Declaración Jurada según Ley N° 27444.
                 </p>
               </div>
             </div>
@@ -2216,9 +2505,10 @@ export function Inspecciones() {
           vehiculoPlaca: selectedInspeccion.vehiculoPlaca,
           propietario: selectedInspeccion.propietario || vInfo?.propietario || '—',
           propietarioDni: selectedInspeccion.propietarioDni || vInfo?.propietarioDni || '—',
-          conductorNombre: selectedInspeccion.conductorNombre || vInfo?.propietario || '—',
-          conductorDni: selectedInspeccion.conductorDni || vInfo?.propietarioDni || '—',
-          conductorLicencia: selectedInspeccion.conductorLicencia || vInfo?.propietarioLicencia || '—',
+          // El conductor es quien se registró en la inspección; nunca se sustituye por el propietario.
+          conductorNombre: selectedInspeccion.conductorNombre || '—',
+          conductorDni: selectedInspeccion.conductorDni || '—',
+          conductorLicencia: selectedInspeccion.conductorLicencia || '—',
           transportador: selectedInspeccion.transportador || vInfo?.asociacion || 'Independiente',
           asociacion: selectedInspeccion.transportador || vInfo?.asociacion || 'Independiente',
           vehiculoMarca: selectedInspeccion.vehiculoMarca || vInfo?.marca || '—',
@@ -2242,8 +2532,8 @@ export function Inspecciones() {
         }
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xs overflow-y-auto animate-enter">
-            <div className="w-full max-w-4xl bg-white dark:bg-[#0f172a] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-enter">
+            <div className="w-full max-w-5xl h-[calc(100vh-2rem)] flex flex-col bg-white dark:bg-[#0f172a] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
               {/* Cabecera del visualizador */}
               <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white border-b border-slate-800">
                 <div className="flex items-center gap-3">
@@ -2281,17 +2571,20 @@ export function Inspecciones() {
               </div>
 
               {/* Vista previa y componente oficial para impresión */}
-              <div className="p-6 max-h-[75vh] overflow-y-auto bg-slate-100 dark:bg-slate-900/60 flex flex-col items-center justify-center gap-4">
-                <div className="text-center max-w-lg">
-                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Formato Oficial Hoja A4 — Ficha de Inspección Técnica con Checklist Mecánico / Eléctrico
-                  </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Al pulsar "Imprimir Ficha A4", el sistema activa la impresión garantizando 1 sola página exacta idéntica al documento oficial físico.
-                  </p>
+              <div className="flex-1 min-h-0 p-4 bg-slate-200/70 dark:bg-slate-900/60 flex flex-col items-center gap-3">
+                <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span>Vista previa de la hoja A4</span>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewAjustada((v) => !v)}
+                    className="rounded-lg border border-slate-300 bg-white px-2 py-0.5 font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+                  >
+                    {previewAjustada ? 'Ver al 100 %' : 'Ajustar a pantalla'}
+                  </button>
                 </div>
-
-                <CerticavFichaPrint data={certicavData} />
+                <VistaPreviaEscalada ajustar={previewAjustada}>
+                  <CerticavFichaPrint data={certicavData} />
+                </VistaPreviaEscalada>
               </div>
             </div>
           </div>

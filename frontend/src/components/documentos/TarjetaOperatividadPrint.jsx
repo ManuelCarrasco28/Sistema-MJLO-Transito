@@ -280,13 +280,13 @@ export function CerticavFichaPrint({ data }) {
   const isSegundaAprobado = segundaEval === 'APROBADO'
   const isSegundaDesaprobado = segundaEval === 'DESAPROBADO'
 
-  // Consulta el estado de cada criterio evaluado en los detalles guardados
-  const getCriterioVal = (criterioId) => {
-    if (!data.detalles || !Array.isArray(data.detalles) || data.detalles.length === 0) {
-      return 'BIEN'
-    }
-    const found = data.detalles.find((d) => Number(d.criterioId) === criterioId)
-    return found ? found.estado : 'BIEN'
+  // Cada ítem del acta corresponde al criterio con código CV-NN (NN = número del ítem).
+  // Un ítem sin resultado registrado se imprime vacío, nunca como "B".
+  const getCriterioVal = (numeroItem) => {
+    if (!Array.isArray(data.detalles)) return ''
+    const codigo = `CV-${String(numeroItem).padStart(2, '0')}`
+    const found = data.detalles.find((d) => d.codigo === codigo)
+    return found ? found.estado : ''
   }
 
   // Lista exacta de los 37 ítems oficiales de la ficha municipal organizados en 2 columnas
@@ -347,17 +347,17 @@ export function CerticavFichaPrint({ data }) {
   const renderCheckCell = (val, targetVal) => {
     const isChecked = val === targetVal
     return (
-      <span style={{ fontWeight: 900, fontSize: '9pt', color: '#000000', display: 'inline-block', lineHeight: 1 }}>
+      <span style={{ fontWeight: 900, fontSize: '10pt', color: '#000000', display: 'inline-block', lineHeight: 1 }}>
         {isChecked ? '✓' : ''}
       </span>
     )
   }
 
   const renderTableSection = (items) => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '6.4pt', border: '1.5px solid #000' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.6pt', border: '1.5px solid #000' }}>
       <thead>
         <tr style={{ background: '#004b93', color: '#ffffff', textAlign: 'left', lineHeight: 1.2 }}>
-          <th style={{ padding: '2px 4px', borderRight: '1px solid #000', textTransform: 'uppercase', fontWeight: 900, fontSize: '6.8pt' }}>
+          <th style={{ padding: '2px 4px', borderRight: '1px solid #000', textTransform: 'uppercase', fontWeight: 900, fontSize: '8pt' }}>
             {items[0].titulo}
           </th>
           <th style={{ width: '18px', textAlign: 'center', borderRight: '1px solid #000', fontWeight: 900, padding: '2px 0' }}>B</th>
@@ -370,7 +370,7 @@ export function CerticavFichaPrint({ data }) {
           if (item.tipo === 'header') {
             return (
               <tr key={'hdr-' + idx} style={{ background: '#004b93', color: '#ffffff', lineHeight: 1.2 }}>
-                <td style={{ padding: '2px 4px', borderTop: '1.5px solid #000', borderBottom: '1px solid #000', borderRight: '1px solid #000', textTransform: 'uppercase', fontWeight: 900, fontSize: '6.8pt' }}>
+                <td style={{ padding: '2px 4px', borderTop: '1.5px solid #000', borderBottom: '1px solid #000', borderRight: '1px solid #000', textTransform: 'uppercase', fontWeight: 900, fontSize: '8pt' }}>
                   {item.titulo}
                 </td>
                 <td style={{ borderTop: '1.5px solid #000', borderBottom: '1px solid #000', borderRight: '1px solid #000', textAlign: 'center', fontWeight: 900 }}>B</td>
@@ -383,7 +383,7 @@ export function CerticavFichaPrint({ data }) {
           if (item.tipo === 'sub') {
             return (
               <tr key={'sub-' + idx} style={{ background: '#f8fafc' }}>
-                <td colSpan={4} style={{ padding: '1px 4px', borderBottom: '1px solid #000', fontWeight: 800, color: '#1e293b', fontSize: '6.2pt' }}>
+                <td colSpan={4} style={{ padding: '2px 4px', borderBottom: '1px solid #000', fontWeight: 800, color: '#1e293b', fontSize: '7.4pt' }}>
                   {item.label}
                 </td>
               </tr>
@@ -393,7 +393,7 @@ export function CerticavFichaPrint({ data }) {
           const val = getCriterioVal(item.id)
 
           return (
-            <tr key={'row-' + item.id} style={{ height: '14px', lineHeight: 1 }}>
+            <tr key={'row-' + item.id} style={{ height: '17px', lineHeight: 1 }}>
               <td style={{ borderBottom: '1px solid #000', borderRight: '1px solid #000', padding: '1px 3px', paddingLeft: item.isChild ? '10px' : '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#000' }}>
                 {item.label}
               </td>
@@ -418,18 +418,12 @@ export function CerticavFichaPrint({ data }) {
       <div className="ficha-certicav-a4" style={{ width: '100%', maxWidth: '190mm', margin: '0 auto', background: '#fff', color: '#000', fontFamily: 'Arial, sans-serif', boxSizing: 'border-box', padding: '4mm 6mm' }}>
         
         {/* CABECERA INSTITUCIONAL */}
-        <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 140px', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <img src="/escudo-jlo.png" alt="MDJLO" style={{ width: '56px', height: 'auto', display: 'inline-block' }} />
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 130px', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <div />
 
           <div style={{ textAlign: 'center' }}>
-            <h1 style={{ fontSize: '12pt', fontWeight: 900, margin: 0, color: '#004b93', textTransform: 'uppercase', letterSpacing: '0.2px', lineHeight: 1.1 }}>
-              MUNICIPALIDAD DISTRITAL
-            </h1>
-            <h2 style={{ fontSize: '15pt', fontWeight: 900, margin: '1px 0 0', color: '#004b93', textTransform: 'uppercase', letterSpacing: '0.8px', lineHeight: 1.1 }}>
-              JOSÉ LEONARDO ORTIZ
-            </h2>
+            {/* El logo ya incluye "Municipalidad José Leonardo Ortiz". */}
+            <img src="/escudo-jlo.png" alt="Municipalidad Distrital de José Leonardo Ortiz" style={{ height: '72px', width: 'auto', maxWidth: '100%', display: 'block', margin: '0 auto 4px' }} />
             <p style={{ fontSize: '6.5pt', fontWeight: 800, margin: '1px 0 0', color: '#004b93', textTransform: 'uppercase' }}>
               ORDENANZA MUNICIPAL Nº 012-2012-MDJLO
             </p>
@@ -451,7 +445,7 @@ export function CerticavFichaPrint({ data }) {
         </div>
 
         {/* CUADRÍCULA DE DATOS DEL VEHÍCULO Y OPERADOR */}
-        <div style={{ border: '1.5px solid #000', marginBottom: '5px', fontSize: '6.8pt' }}>
+        <div style={{ border: '1.5px solid #000', marginBottom: '6px', fontSize: '7.8pt' }}>
           {/* Fila 1: Registro, Marca y Serie */}
           <div style={{ display: 'grid', gridTemplateColumns: '40% 30% 30%', borderBottom: '1.5px solid #000' }}>
             <div style={{ padding: '2px 5px', borderRight: '1.5px solid #000' }}>

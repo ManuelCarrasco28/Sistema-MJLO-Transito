@@ -40,6 +40,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->post('cursos/(:num)/participantes', 'CursosController::inscribirParticipante/$1');
         $routes->put('cursos/(:num)/participantes/(:num)', 'CursosController::registrarNota/$1/$2');
         $routes->resource('cursos', ['controller' => 'CursosController']);
+        $routes->get('inspecciones/siguiente-correlativo', 'InspeccionesController::siguienteCorrelativo');
         $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
         $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
         $routes->resource('internamientos', ['controller' => 'InternamientosController']);

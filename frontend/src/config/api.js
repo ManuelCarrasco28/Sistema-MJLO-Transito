@@ -30,6 +30,22 @@ export function invalidateCache(keyPrefix = null) {
   }
 }
 
+// Extrae el mensaje que devuelve CodeIgniter (failValidationErrors, failNotFound…)
+// para mostrarle al usuario el motivo real en vez de un error genérico.
+export async function leerMensajeError(response, fallback = 'Ocurrió un error en el servidor.') {
+  try {
+    const data = await response.json()
+    const mensajes = data?.messages
+    if (mensajes && typeof mensajes === 'object') {
+      const primero = mensajes.error || Object.values(mensajes)[0]
+      if (primero) return String(primero)
+    }
+    return data?.message || fallback
+  } catch {
+    return fallback
+  }
+}
+
 export async function apiFetch(endpoint, options = {}) {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options
   const url = endpoint.startsWith('http://') || endpoint.startsWith('https://')
