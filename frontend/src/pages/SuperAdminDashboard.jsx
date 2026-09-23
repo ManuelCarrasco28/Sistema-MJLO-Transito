@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
+import { Usuarios } from './Usuarios'
 
 const DEFAULT_USER_FORM = {
   id_trabajador: '',
@@ -589,56 +590,25 @@ export function SuperAdminDashboard({ user }) {
       )}
 
       {!isDashboard && (
-      <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Módulo administrativo</p>
-            <p className="mt-1 text-sm font-semibold text-slate-500">{activeModuleInfo.detail}</p>
-          </div>
-          {(activeModule === 'usuarios' || activeModule === 'roles') && (
-            <button onClick={fetchUsuarios} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white">
-              Actualizar
-            </button>
-          )}
-        </div>
-
-        {activeModule === 'usuarios' && (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {moduleStats.map((stat) => (
-                <div key={stat.label} className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{stat.label}</span>
-                    <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-                      <Icon name="people" className="size-5" />
-                    </span>
-                  </div>
-                  <p className="mt-3 text-3xl font-black text-slate-800 dark:text-white">{stat.value}</p>
-                </div>
-              ))}
+        activeModule === 'usuarios' ? (
+          <Usuarios user={user} />
+        ) : (
+          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Módulo administrativo</p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">{activeModuleInfo?.detail}</p>
+              </div>
+              {activeModule === 'roles' && (
+                <button onClick={fetchUsuarios} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white cursor-pointer">
+                  Actualizar
+                </button>
+              )}
             </div>
-            <UsersTable
-              usuarios={filteredUsers}
-              totalUsuarios={usuarios.length}
-              loading={loadingUsers}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              onCreate={() => {
-                setUserForm(DEFAULT_USER_FORM)
-                setTrabajadorSearch('')
-                setTrabajadorDropdownOpen(false)
-                setUserModalOpen(true)
-              }}
-              onEdit={setEditingUser}
-              onPassword={setPasswordUser}
-              onDelete={deleteUser}
-            />
-          </div>
-        )}
 
-        {activeModule === 'roles' && (
-          <RolesTable roles={rolesAgrupados} loading={loadingUsers} onEdit={setEditingUser} />
-        )}
+            {activeModule === 'roles' && (
+              <RolesTable roles={rolesAgrupados} loading={loadingUsers} onEdit={setEditingUser} />
+            )}
 
         {activeModule === 'configuracion' && (
           <ConfiguracionReadOnly
@@ -826,6 +796,7 @@ export function SuperAdminDashboard({ user }) {
           </div>
         )}
       </section>
+        )
       )}
 
       {editingUser && (

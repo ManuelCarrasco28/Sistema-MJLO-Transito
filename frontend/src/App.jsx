@@ -22,6 +22,7 @@ const Retenciones = lazy(() => import('./pages/Retenciones').then((module) => ({
 const Permisos = lazy(() => import('./pages/Permisos').then((module) => ({ default: module.Permisos })))
 const PermisoFormularioVentana = lazy(() => import('./pages/PermisoFormularioVentana').then((module) => ({ default: module.PermisoFormularioVentana })))
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard').then((module) => ({ default: module.SuperAdminDashboard })))
+const Usuarios = lazy(() => import('./pages/Usuarios').then((module) => ({ default: module.Usuarios })))
 const Operativos = lazy(() => import('./pages/Operativos').then((module) => ({ default: module.Operativos })))
 
 const isSuperAdminUser = (user) => user?.usuario?.toLowerCase() === 'superadmin'
@@ -156,6 +157,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
               <Route path="/superadmin" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
               <Route path="/superadmin/personas" element={isSuperAdmin ? <Personas user={user} onUserUpdate={onUserUpdate} /> : <Navigate to="/dashboard" replace />} />
               <Route path="/superadmin/trabajadores" element={isSuperAdmin ? <Trabajadores /> : <Navigate to="/dashboard" replace />} />
+              <Route path="/superadmin/usuarios" element={isSuperAdmin ? <Usuarios user={user} /> : <Navigate to="/dashboard" replace />} />
               <Route path="/superadmin/:moduleId" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
               <Route path="/admin" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
               <Route path="/dashboard" element={onlyNormalUser(<DashboardHome />)} />
