@@ -80,6 +80,11 @@
   --action-del-text: #dc2626;
   --action-del-hover: #dc2626;
 
+  --action-print-bg: #ede9fe;
+  --action-print-border: #a78bfa;
+  --action-print-text: #7c3aed;
+  --action-print-hover: #7c3aed;
+
   --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--brand);
   --shadow-surface: 0 1px 2px rgba(20, 24, 31, 0.06);
 
@@ -145,6 +150,11 @@ html.dark {
   --action-del-border: #f87171;
   --action-del-text: #f87171;
   --action-del-hover: #dc2626;
+
+  --action-print-bg: rgba(139, 92, 246, 0.16);
+  --action-print-border: #a78bfa;
+  --action-print-text: #a78bfa;
+  --action-print-hover: #7c3aed;
 
   --shadow-surface: none;
 }

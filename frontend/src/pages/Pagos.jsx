@@ -5,7 +5,22 @@ import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
-import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
+import { exportToPdf } from '../utils/exportToPdf'
+import { RoundedSelect } from '../components/ui/FormInputs'
+
+const FILTER_ESTADO_OPTIONS = [
+  { value: 'TODOS', label: 'Cualquier Estado' },
+  { value: 'PAGADO', label: 'Pagados' },
+  { value: 'PENDIENTE', label: 'Pendientes por pagar' },
+]
+
+const FILTER_TIPO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los tipos' },
+  { value: 'PAPELETA', label: 'Papeletas' },
+  { value: 'TRAMITE', label: 'Trámites' },
+  { value: 'CURSO', label: 'Cursos' },
+  { value: 'INTERNAMIENTO', label: 'Internamientos' },
+]
 
 export function Pagos() {
   const cached = getCachedData('/pagos')
@@ -131,6 +146,28 @@ export function Pagos() {
     fetchArqueo(arqueoFecha)
   }
 
+  const handleExportPdf = () => {
+    exportToPdf({
+      filename: `Pagos_${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
+      subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',
+      metadata: [
+        { label: 'Estado', value: filterEstado },
+        { label: 'Tipo', value: filterTipoPago },
+        { label: 'Total Recaudado', value: `S/ ${totalMonto.toFixed(2)}` }
+      ],
+      columns: [
+        { header: 'N° RECIBO', key: 'numeroRecibo' },
+        { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente' },
+        { header: 'TIPO PAGO', key: 'tipoPago' },
+        { header: 'MÉTODO PAGO', key: 'metodo' },
+        { header: 'MONTO', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}` },
+        { header: 'ESTADO', key: 'estado' }
+      ],
+      data: filteredPagos
+    })
+  }
+
   const handleExportExcel = () => {
     exportToExcel({
       filename: `Pagos_${new Date().toISOString().slice(0, 10)}.xls`,
@@ -231,13 +268,12 @@ export function Pagos() {
   }, [])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {loadError && <PageLoadError message={loadError} />}
       
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
-        <div className="flex items-center gap-3.5">
-          
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between print:hidden">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-600 text-white shadow-md">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -246,7 +282,7 @@ export function Pagos() {
               strokeWidth="2.2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="size-6"
+              className="size-5.5"
             >
               <rect width="20" height="12" x="2" y="6" rx="2" />
               <circle cx="12" cy="12" r="2" />
@@ -254,113 +290,106 @@ export function Pagos() {
             </svg>
           </span>
           <div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                Pagos de Tránsito
-              </h1>
-            </div>
-            <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-              Control de ingresos por papeletas de infracción, licencias, cursos de seguridad vial y tasas municipales.
-            </p>
+            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">Pagos de Tránsito</h1>
+            <p className="text-xs font-medium text-slate-500">Control de ingresos por papeletas de infracción, licencias, cursos de seguridad vial y tasas municipales.</p>
           </div>
         </div>
       </div>
 
-      
-      <div className="grid gap-4 sm:grid-cols-3 print:hidden">
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 print:hidden">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-emerald-400">Total Recaudado</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-sm">💰</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total Recaudado</span>
+            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 text-xs">
+              💰
+            </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">S/ {totalMonto.toFixed(2)}</p>
-            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Acumulado</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">S/ {totalMonto.toFixed(2)}</p>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-sky-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-sky-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-emerald-400">Operaciones</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 font-bold text-sm">🧾</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Operaciones</span>
+            <span className="grid size-6 place-items-center rounded-md bg-sky-50 text-sky-600 dark:bg-sky-950/60 text-xs">
+              🧾
+            </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{totalPagos}</p>
-            <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-950/60 dark:text-sky-300">Pagos registrados</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{totalPagos}</p>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-purple-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-emerald-400">Pagos de Hoy</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 font-bold text-sm">📅</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Pagos de Hoy</span>
+            <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60 text-xs">
+              📅
+            </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-900 dark:text-white">{pagosHoy}</p>
-            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">Jornada Actual</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{pagosHoy}</p>
           </div>
         </div>
       </div>
 
-      
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] print:hidden">
-        
-        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col print:hidden">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          <div className="relative w-full sm:max-w-xs">
+            <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por N° recibo, voucher, referencia o tipo de pago..."
+              placeholder="Buscar por N° recibo, voucher..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-emerald-200/80 bg-emerald-50/20 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-emerald-400"
+              className="w-full rounded-xl border border-slate-200/80 bg-slate-50/50 py-2 pl-9 pr-4 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-800 dark:bg-slate-900/50 dark:text-white"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <RoundedSelect
               value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-xs font-bold text-slate-700 outline-none transition focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 cursor-pointer"
-            >
-              <option value="TODOS">Cualquier Estado</option>
-              <option value="PAGADO">Pagados</option>
-              <option value="PENDIENTE">Pendientes por pagar</option>
-            </select>
-            <select
+              onChange={setFilterEstado}
+              options={FILTER_ESTADO_OPTIONS}
+            />
+            <RoundedSelect
               value={filterTipoPago}
-              onChange={(e) => setFilterTipoPago(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-xs font-bold text-slate-700 outline-none transition focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 cursor-pointer"
-            >
-              <option value="TODOS">Todos los tipos</option>
-              <option value="PAPELETA">Papeletas</option>
-              <option value="TRAMITE">Trámites</option>
-              <option value="CURSO">Cursos</option>
-              <option value="INTERNAMIENTO">Internamientos</option>
-            </select>
+              onChange={setFilterTipoPago}
+              options={FILTER_TIPO_OPTIONS}
+            />
 
             <button
               type="button"
               onClick={handleOpenArqueo}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-3.5 py-2.5 text-xs font-extrabold text-purple-700 shadow-2xs hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200/80 bg-purple-50/70 px-2.5 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-800/80 dark:bg-purple-900/40 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-all cursor-pointer"
               title="Reporte de Arqueo y Cierre Diario de Caja"
             >
-              <Icon name="chart" className="size-4" />
+              <Icon name="chart" className="size-3.5 text-purple-600 dark:text-purple-400" />
               <span>Arqueo Diario</span>
             </button>
 
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800/80 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all cursor-pointer"
               title="Descargar reporte de pagos en Excel"
             >
-              <Icon name="table" className="size-4" />
-              <span>Exportar Excel</span>
+              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Excel</span>
+            </button>
+            
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800/80 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60 transition-all cursor-pointer"
+            >
+              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
+              <span>PDF</span>
             </button>
 
             <button
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-extrabold text-white shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:scale-[1.02] hover:shadow-lg active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Registrar Pago</span>
@@ -368,30 +397,16 @@ export function Pagos() {
           </div>
         </div>
 
-        
-        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:text-slate-400">
-          <div>
-            <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-              Mostrando {filteredPagos.length}
-            </span>{" "}
-            de {pagos.length} pagos registrados
-          </div>
-          <div className="text-[11px] font-medium text-slate-400">
-            Cierre Diario Municipal - 2026
-          </div>
-        </div>
-
-        
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-y border-slate-100 bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800/50 dark:bg-[#0f172a] dark:text-slate-400">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3.5 whitespace-nowrap">N° RECIBO</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">FECHA / HORA</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">TIPO / VOUCHER</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">MÉTODO</th>
-                <th className="px-4 py-3.5 whitespace-nowrap">MONTO TOTAL</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
+                <th className="px-4 py-3.5 whitespace-nowrap text-center">MONTO TOTAL</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-4 py-3.5 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#0f172a]">
@@ -434,7 +449,7 @@ export function Pagos() {
                         {p.tipoPago} #{p.papeletaId || p.tramiteId || p.inscripcionId}
                       </p>
                     </td>
-                    <td className="px-4 py-3.5 max-w-[220px]">
+                    <td className="px-4 py-3.5">
                       <p className="font-bold text-slate-900 dark:text-white">{p.tipoPago || 'TRAMITE'}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500">{p.numeroVoucher || 'Sin voucher'}</p>
                     </td>
@@ -446,12 +461,12 @@ export function Pagos() {
                         {p.metodo || 'Sin confirmar'}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
+                    <td className="px-4 py-3.5 whitespace-nowrap text-center">
                       <p className="font-black text-slate-900 dark:text-white">S/ {p.montoTotal?.toFixed(2) || '0.00'}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">{p.estado}</p>
                     </td>
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
-                      <div className="flex items-center justify-end gap-1.5 pr-1">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                      <div className="flex items-center justify-center gap-1.5">
                         {p.estado === 'PENDIENTE' && p.tipoPago !== 'INTERNAMIENTO' && <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Confirmar recibo</button>}
                         <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="rounded-xl p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalle">
                           <Icon name="eye" className="size-4" />
@@ -494,43 +509,65 @@ export function Pagos() {
               </div>
               <button onClick={() => setIsModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 cursor-pointer">✕</button>
             </div>
-            <form onSubmit={handleFormSubmit} className="flex-1 space-y-4 overflow-y-auto p-6">
+            <form onSubmit={handleFormSubmit} className="flex-1 p-6">
               {pagoToConfirm ? (
-                <div className="space-y-4">
-                  <p className="font-bold">Monto: S/ {pagoToConfirm.montoTotal.toFixed(2)}</p>
-                  <label className="block text-sm">Número real del recibo
-                    <input required maxLength={50} value={formData.numeroRecibo} onChange={e => setFormData({ ...formData, numeroRecibo: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
-                  </label>
-                  <label className="block text-sm">Fecha que figura en el recibo
-                    <input required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
-                  </label>
-                  <label className="block text-sm">Método de pago
-                    <select value={formData.metodo} onChange={e => setFormData({ ...formData, metodo: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800">
-                      <option value="EFECTIVO">Efectivo</option><option value="TARJETA">Tarjeta</option><option value="TRANSFERENCIA">Transferencia</option>
-                    </select>
-                  </label>
-                  <label className="block text-sm">Voucher o referencia (opcional)
-                    <input maxLength={100} value={formData.referenciaPago} onChange={e => setFormData({ ...formData, referenciaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
-                  </label>
-                </div>
+                <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-slate-700">
+                  <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DETALLES DEL RECIBO</legend>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <p className="font-bold text-slate-800 dark:text-white text-lg">Monto: S/ {pagoToConfirm.montoTotal.toFixed(2)}</p>
+                    </div>
+                    <label className="block text-sm">Número real del recibo
+                      <input required maxLength={50} value={formData.numeroRecibo} onChange={e => setFormData({ ...formData, numeroRecibo: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
+                    </label>
+                    <label className="block text-sm">Fecha que figura en el recibo
+                      <input required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
+                    </label>
+                    <label className="block text-sm">Método de pago
+                      <RoundedSelect 
+                        value={formData.metodo} 
+                        onChange={v => setFormData({ ...formData, metodo: v })} 
+                        options={[
+                          { value: 'EFECTIVO', label: 'Efectivo' },
+                          { value: 'TARJETA', label: 'Tarjeta' },
+                          { value: 'TRANSFERENCIA', label: 'Transferencia' }
+                        ]} 
+                        className="mt-1" 
+                      />
+                    </label>
+                    <label className="block text-sm">Voucher o referencia (opcional)
+                      <input maxLength={100} value={formData.referenciaPago} onChange={e => setFormData({ ...formData, referenciaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
+                    </label>
+                  </div>
+                </fieldset>
               ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-slate-500">El importe se obtiene del registro seleccionado. El recibo se ingresa después de realizar el pago.</p>
-                  <label className="block text-sm">Tipo de pago
-                    <select value={formData.tipoPago} onChange={e => setFormData({ ...formData, tipoPago: e.target.value, origenId: '' })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800">
-                      <option value="TRAMITE">Trámite</option><option value="PAPELETA">Papeleta</option><option value="CURSO">Inscripción a curso</option>
-                    </select>
-                  </label>
-                  <label className="block text-sm">Registro asociado
-                    <select required value={formData.origenId || ''} onChange={e => setFormData({ ...formData, origenId: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800">
-                      <option value="">Seleccione un registro</option>
-                      {(origenes[formData.tipoPago] || []).map(o => <option key={o.id} value={o.id}>{o.nombre || formData.tipoPago} — #{o.id}</option>)}
-                    </select>
-                  </label>
-                  {!(origenes[formData.tipoPago] || []).length && <p className="text-sm text-amber-700">No hay registros disponibles para este tipo de pago.</p>}
-                </div>
+                <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-slate-700">
+                  <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DATOS DE PAGO</legend>
+                  <p className="text-sm text-slate-500 mb-4">El importe se obtiene del registro seleccionado. El recibo se ingresa después de realizar el pago.</p>
+                  <div className="space-y-4">
+                    <label className="block text-sm">Tipo de pago
+                      <RoundedSelect 
+                        value={formData.tipoPago} 
+                        onChange={v => setFormData({ ...formData, tipoPago: v, origenId: '' })} 
+                        options={[
+                          { value: 'TRAMITE', label: 'Trámite' },
+                          { value: 'PAPELETA', label: 'Papeleta' },
+                          { value: 'CURSO', label: 'Inscripción a curso' }
+                        ]}
+                        className="mt-1"
+                      />
+                    </label>
+                    <label className="block text-sm">Registro asociado
+                      <select required value={formData.origenId || ''} onChange={e => setFormData({ ...formData, origenId: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800">
+                        <option value="">Seleccione un registro</option>
+                        {(origenes[formData.tipoPago] || []).map(o => <option key={o.id} value={o.id}>{o.nombre || formData.tipoPago} — #{o.id}</option>)}
+                      </select>
+                    </label>
+                    {!(origenes[formData.tipoPago] || []).length && <p className="text-sm text-amber-700">No hay registros disponibles para este tipo de pago.</p>}
+                  </div>
+                </fieldset>
               )}
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex justify-end gap-3 pt-6">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancelar</button>
                 <button type="submit" disabled={isSaving} className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-extrabold text-white shadow-md hover:bg-emerald-700 cursor-pointer">{isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pendiente'}</button>
               </div>
@@ -872,3 +909,4 @@ export function Pagos() {
     </div>
   )
 }
+export default Pagos

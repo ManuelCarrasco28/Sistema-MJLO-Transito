@@ -6,7 +6,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { PlantillaImpresionTUC } from '../components/documentos/PlantillaImpresionTUC'
 import { exportToExcel } from '../utils/exportToExcel'
-import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
+import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -23,251 +23,6 @@ function formatFecha(fechaStr) {
   } catch {
     return fechaStr
   }
-}
-
-function FloatingInput({
-  id,
-  label,
-  value,
-  onChange,
-  type = 'text',
-  required = false,
-  maxLength,
-  optional = false,
-  autoComplete = 'off',
-  className = '',
-  inputClassName = '',
-  ...props
-}) {
-  const [isFocused, setIsFocused] = useState(false)
-  const isFloating = isFocused || (value !== undefined && value !== null && String(value).trim() !== '')
-
-  return (
-    <div className={`relative ${className}`}>
-      <input
-        id={id}
-        type={type}
-        required={required}
-        maxLength={maxLength}
-        value={value ?? ''}
-        onChange={onChange}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        autoComplete={autoComplete}
-        placeholder=" "
-        className={`peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 ${inputClassName}`}
-        {...props}
-      />
-      <label
-        htmlFor={id}
-        className={`pointer-events-none absolute left-3 select-none transition-all duration-150 ${isFloating
-            ? 'top-1 text-[9.5px] font-bold text-slate-500 dark:text-slate-400'
-            : 'top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-slate-500'
-          } ${isFocused ? '!text-blue-600 dark:!text-blue-400' : ''}`}
-      >
-        {label}
-        {optional && (
-          <span className="ml-1 text-[9px] font-normal text-slate-400 dark:text-slate-500">(Opcional)</span>
-        )}
-      </label>
-    </div>
-  )
-}
-
-function FloatingSelect({
-  id,
-  label,
-  value,
-  onChange,
-  options = [],
-  className = '',
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef(null)
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const selectedOption = options.find((opt) => opt.value === value) || options[0]
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        id={id}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-800 dark:text-white cursor-pointer ${isOpen
-            ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
-          }`}
-      >
-        <span className="truncate">{selectedOption?.label || value}</span>
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
-            }`}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      <label
-        htmlFor={id}
-        className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-blue-600 dark:!text-blue-400' : 'text-slate-500 dark:text-slate-400'
-          }`}
-      >
-        {label}
-      </label>
-
-      {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
-          <div className="space-y-0.5">
-            {options.map((opt) => {
-              const isSelected = opt.value === value
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange({ target: { value: opt.value } })
-                    setIsOpen(false)
-                  }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold'
-                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
-                    }`}
-                >
-                  <span className="whitespace-nowrap">{opt.label}</span>
-                  {isSelected && (
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="size-3 text-blue-600 dark:text-blue-400 shrink-0"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function RoundedSelect({
-  value,
-  onChange,
-  options = [],
-  className = '',
-  buttonClassName = '',
-  dropdownClassName = '',
-  placeholder = 'Seleccionar...',
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef(null)
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const selectedOption = options.find((opt) => opt.value === value)
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-between gap-2 rounded-xl border bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 transition outline-none dark:bg-slate-800 dark:text-slate-200 cursor-pointer ${isOpen
-            ? 'border-indigo-500 ring-2 ring-indigo-500/20 dark:border-indigo-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
-          } ${buttonClassName}`}
-      >
-        <span className="whitespace-nowrap">{selectedOption?.label || placeholder}</span>
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''
-            }`}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div
-          className={`absolute right-0 top-full mt-1 z-40 min-w-full w-max rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto ${dropdownClassName}`}
-        >
-          <div className="space-y-0.5">
-            {options.map((opt) => {
-              const isSelected = opt.value === value
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value)
-                    setIsOpen(false)
-                  }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
-                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
-                    }`}
-                >
-                  <span className="whitespace-nowrap">{opt.label}</span>
-                  {isSelected && (
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="size-3 text-indigo-600 dark:text-indigo-400 shrink-0"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
 }
 
 const TIPO_DOC_OPTIONS = [
@@ -287,7 +42,7 @@ const FILTER_TIPO_OPTIONS = [
   { value: 'TARJETA_OPERATIVIDAD', label: 'Tarjeta Operatividad (TUC)' },
   { value: 'SOAT', label: 'SOAT' },
   { value: 'CERTICAV', label: 'CERTICAV' },
-  { value: 'CITV', label: 'CITV' },
+  
   { value: 'TARJETA_PROPIEDAD', label: 'Tarjeta Propiedad' },
 ]
 
@@ -318,7 +73,7 @@ function getDocTypeBadge(tipo) {
           CertiCAV (Inspección)
         </span>
       )
-    case 'CITV':
+    
     case 'INSPECCION_TECNICA':
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-0.5 text-[10.5px] font-bold text-cyan-700 border border-cyan-200/80 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800">
@@ -524,13 +279,7 @@ export function Documentos() {
   }
 
   const handleDelete = async (id) => {
-    const result = await showConfirm(
-      '¿Anular documento?',
-      '¿Está seguro de anular este documento del padrón oficial?',
-      'Sí, anular',
-      'Cancelar'
-    )
-    if (result.isConfirmed) {
+    if (window.confirm('¿Está seguro de anular este documento del padrón oficial?')) {
       try {
         const response = await apiFetch(`/documentos/${id}`, { method: 'DELETE' })
         if (!response.ok) throw response
@@ -539,7 +288,7 @@ export function Documentos() {
         setCachedData('/documentos', nextDocs)
         showToast('Documento anulado con éxito')
       } catch {
-        showError('Error', 'No se pudo anular el documento.')
+        alert('No se pudo anular el documento.')
       }
     }
   }
@@ -548,12 +297,12 @@ export function Documentos() {
     e.preventDefault()
 
     if (!formData.codigo.trim() || !formData.vehiculoPlaca.trim() || !formData.tipoDocumento) {
-      showError('Validación Fallida', 'Por favor completa los campos requeridos (Placa, Tipo y Número de Documento).')
+      alert('Por favor completa los campos requeridos (Placa, Tipo y Número de Documento).')
       return
     }
 
     if (formData.fechaExpedicion && formData.fechaExpiracion && new Date(formData.fechaExpiracion) < new Date(formData.fechaExpedicion)) {
-      showError('Validación Fallida', 'La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
+      alert('La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
       return
     }
 
@@ -605,7 +354,7 @@ export function Documentos() {
           message = err.statusText || message
         }
       }
-      showError('Error', message)
+      alert(message)
     }
   }
 
@@ -637,13 +386,13 @@ export function Documentos() {
   const handleExportPdf = () => {
     const listToExport = filteredDocs.length > 0 ? filteredDocs : documentos
     if (listToExport.length === 0) {
-      showError('Error', 'No hay registros para exportar.')
+      alert('No hay registros para exportar.')
       return
     }
 
     const printWin = window.open('', '_blank', 'width=1100,height=750')
     if (!printWin) {
-      showError('Bloqueador de ventanas', 'El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
+      alert('El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
       return
     }
 

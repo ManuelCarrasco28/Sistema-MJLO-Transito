@@ -50,7 +50,7 @@ export const navigationGroups = [
     name: 'Documentación',
     items: [
       { id: 'documentos', label: 'Documentos del Vehículo', icon: 'folderShield', path: '/documentos' },
-      { id: 'certicav', label: 'CERTICAV (Inspección Técnica)', icon: 'certificate', path: '/inspecciones' },
+      { id: 'certicav', label: 'Certicav', icon: 'certificate', path: '/inspecciones' },
     ]
   },
   {

@@ -4,7 +4,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { exportToExcel } from '../utils/exportToExcel'
-import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
+import { exportToPdf } from '../utils/exportToPdf'
 
 const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 
@@ -313,6 +313,26 @@ export function Trabajadores() {
       data: filtered
     })
   }
+
+  const handleExportPdf = () => {
+    exportToPdf({
+      filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}`,
+      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Personal Municipal',
+      summaryItems: [
+        { label: 'Total registrados', value: rows.length },
+        { label: 'Exportando', value: `${filtered.length} trabajadores` },
+      ],
+      columns: [
+        { header: 'NOMBRES', render: (_, r) => `${r.nombres || ''} ${r.apellidoPaterno || ''} ${r.apellidoMaterno || ''}`.trim(), width: 200 },
+        { header: 'DNI', key: 'numeroDocumento', width: 90, align: 'center' },
+        { header: 'CARGO', key: 'cargo', width: 160 },
+        { header: 'UNIDAD ORGÁNICA', key: 'unidadOrganica', width: 180 },
+        { header: 'TELÉFONO', key: 'celular', width: 100, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
+      ],
+      data: filtered
+    })
+  }
   
   const openForm = (record) => {
     setForm({ ...emptyForm, ...record, id_persona: record?.id_persona || record?.id || '' })
@@ -485,11 +505,21 @@ export function Trabajadores() {
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-              title="Descargar padrón de trabajadores en formato Excel"
+              title="Descargar padrón en Excel (.xls)"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
             >
-              <Icon name="table" className="size-4" />
-              <span>Exportar Excel</span>
+              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Excel</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              title="Descargar o imprimir padrón en PDF"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+            >
+              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
+              <span>PDF</span>
             </button>
 
             <button
@@ -772,7 +802,12 @@ export function Trabajadores() {
                       onChange={(e) => setForm({ ...form, id_unidad_organica: e.target.value })} 
                       options={[
                         { value: '', label: 'Sin unidad asignada' },
-                        ...catalogos.unidades.map(u => ({ value: String(u.id), label: `${u.nombre} ${u.jerarquia ? `(${u.jerarquia})` : ''}` }))
+                        ...catalogos.unidades.map(u => ({ 
+                          value: String(u.id), 
+                          label: u.jerarquia && u.nombre !== u.jerarquia && !u.nombre.startsWith(u.jerarquia)
+                            ? `${u.nombre} (${u.jerarquia})` 
+                            : u.nombre 
+                        }))
                       ]}
                     />
                   </div>
@@ -853,15 +888,15 @@ export function Trabajadores() {
               )}
             </div>
 
-            {/* Footer Modal - Estilo Personas.jsx */}
-            <div className="-mx-4 sm:-mx-4.5 mt-2 flex items-center justify-end gap-3 border-t border-slate-100 px-4 sm:px-4.5 pt-3 pb-1 dark:border-slate-800">
-              <button type="button" disabled={saving} onClick={() => setForm(null)} className="rounded-xl border border-slate-200/80 bg-white px-5 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 shadow-xs cursor-pointer">
-                Cancelar
-              </button>
-              <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-6 py-2 text-xs font-extrabold text-white shadow-md shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white dark:shadow-slate-50/20">
-                {saving ? 'Guardando...' : 'Guardar trabajador'}
-              </button>
-            </div>
+              {/* Footer Modal */}
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3 dark:border-slate-800 dark:bg-slate-900/80 rounded-b-3xl">
+                <button type="button" disabled={saving} onClick={() => setForm(null)} className="rounded-xl border border-slate-200/80 bg-white px-5 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 shadow-xs cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-6 py-2 text-xs font-extrabold text-white shadow-md shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white dark:shadow-slate-50/20">
+                  {saving ? 'Guardando...' : 'Guardar trabajador'}
+                </button>
+              </div>
           </form>
           </div>
         </div>

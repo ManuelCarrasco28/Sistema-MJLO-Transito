@@ -6,8 +6,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { KpiStrip } from '../components/ui/KpiStrip'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
-import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
-
+import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
   try {
@@ -46,60 +45,17 @@ function formatSexo(val) {
   return val
 }
 
-function FloatingInput({
-  id,
-  label,
-  value,
-  onChange,
-  type = 'text',
-  required = false,
-  maxLength,
-  optional = false,
-  autoComplete = 'off',
-  className = '',
-  inputClassName = '',
-  ...props
-}) {
-  const [isFocused, setIsFocused] = useState(false)
-  const isFloating = isFocused || (value !== undefined && value !== null && String(value).trim() !== '')
-
-  return (
-    <div className={`relative ${className}`}>
-      <input
-        id={id}
-        type={type}
-        required={required}
-        maxLength={maxLength}
-        value={value ?? ''}
-        onChange={onChange}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        autoComplete={autoComplete}
-        placeholder=" "
-        className={`peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 ${inputClassName}`}
-        {...props}
-      />
-      <label
-        htmlFor={id}
-        className={`pointer-events-none absolute left-3 select-none transition-all duration-150 ${isFloating
-            ? 'top-1 text-[9.5px] font-bold text-slate-500 dark:text-slate-400'
-            : 'top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-slate-500'
-          } ${isFocused ? '!text-blue-600 dark:!text-blue-400' : ''}`}
-      >
-        {label}
-        {optional && (
-          <span className="ml-1 text-[9px] font-normal text-slate-400 dark:text-slate-500">(Opcional)</span>
-        )}
-      </label>
-    </div>
-  )
+function formatTipoDocLabel(t) {
+  const code = (t.codigo || '').toUpperCase().trim()
+  if (code === 'DNI') return 'DNI (Doc. Nacional)'
+  if (code === 'CE') return 'Carnet de Extranjería'
+  if (code === 'PAS' || code === 'PASAPORTE') return 'Pasaporte'
+  if (t.nombre) {
+    const clean = t.nombre.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+    return t.codigo ? `${t.codigo} - ${clean}` : clean
+  }
+  return t.codigo || t.nombre || 'Documento'
 }
-
-const TIPO_DOC_OPTIONS = [
-  { value: 'DNI', label: 'DNI (Doc. Nacional)' },
-  { value: 'CE', label: 'Carnet de Extranjería' },
-  { value: 'PASAPORTE', label: 'Pasaporte' },
-]
 
 const ESTADO_OPTIONS = [
   { value: 'ACTIVO', label: 'ACTIVO' },
@@ -111,202 +67,6 @@ const FILTER_ESTADO_OPTIONS = [
   { value: 'ACTIVO', label: 'Activos' },
   { value: 'INACTIVO', label: 'Inactivos' },
 ]
-
-function FloatingSelect({
-  id,
-  label,
-  value,
-  onChange,
-  options = [],
-  className = '',
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef(null)
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const selectedOption = options.find((opt) => opt.value === value) || options[0]
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        id={id}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-800 dark:text-white cursor-pointer ${isOpen
-            ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
-          }`}
-      >
-        <span className="truncate">{selectedOption?.label || value}</span>
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
-            }`}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      <label
-        htmlFor={id}
-        className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-blue-600 dark:!text-blue-400' : 'text-slate-500 dark:text-slate-400'
-          }`}
-      >
-        {label}
-      </label>
-
-      {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
-          <div className="space-y-0.5">
-            {options.map((opt) => {
-              const isSelected = opt.value === value
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange({ target: { value: opt.value } })
-                    setIsOpen(false)
-                  }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold'
-                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
-                    }`}
-                >
-                  <span className="whitespace-nowrap">{opt.label}</span>
-                  {isSelected && (
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="size-3 text-blue-600 dark:text-blue-400 shrink-0"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function RoundedSelect({
-  value,
-  onChange,
-  options = [],
-  className = '',
-  buttonClassName = '',
-  dropdownClassName = '',
-  placeholder = 'Seleccionar...',
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef(null)
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const selectedOption = options.find((opt) => opt.value === value)
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-between gap-2 rounded-xl border bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 transition outline-none dark:bg-slate-800 dark:text-slate-200 cursor-pointer ${isOpen
-            ? 'border-indigo-500 ring-2 ring-indigo-500/20 dark:border-indigo-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
-          } ${buttonClassName}`}
-      >
-        <span className="whitespace-nowrap">{selectedOption?.label || placeholder}</span>
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''
-            }`}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div
-          className={`absolute right-0 top-full mt-1 z-40 min-w-full w-max rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100 ${dropdownClassName}`}
-        >
-          <div className="space-y-0.5">
-            {options.map((opt) => {
-              const isSelected = opt.value === value
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value)
-                    setIsOpen(false)
-                  }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
-                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
-                    }`}
-                >
-                  <span className="whitespace-nowrap">{opt.label}</span>
-                  {isSelected && (
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="size-3 text-indigo-600 dark:text-indigo-400 shrink-0"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 export function Personas({ user, onUserUpdate }) {
   const cached = getCachedData('/personas')
@@ -322,6 +82,17 @@ export function Personas({ user, onUserUpdate }) {
   const [selectedPersona, setSelectedPersona] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
   const [loadError, setLoadError] = useState('')
+
+  const cachedTipos = getCachedData('/tipo-documentos')
+  const [tipoDocOptions, setTipoDocOptions] = useState(() => {
+    if (cachedTipos && Array.isArray(cachedTipos) && cachedTipos.length > 0) {
+      return cachedTipos.map((t) => ({
+        value: t.codigo || t.nombre,
+        label: formatTipoDocLabel(t),
+      }))
+    }
+    return []
+  })
 
   const [formData, setFormData] = useState({
     tipoDocumento: 'DNI',
@@ -354,6 +125,20 @@ export function Personas({ user, onUserUpdate }) {
     loadPersonas()
       .catch(() => setLoadError('No se pudo cargar el padrón de personas.'))
       .finally(() => setIsLoading(false))
+
+    apiFetch('/tipo-documentos')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (payload?.data && Array.isArray(payload.data) && payload.data.length > 0) {
+          setCachedData('/tipo-documentos', payload.data)
+          const opts = payload.data.map((t) => ({
+            value: t.codigo || t.nombre,
+            label: formatTipoDocLabel(t),
+          }))
+          setTipoDocOptions(opts)
+        }
+      })
+      .catch(() => {})
   }, [])
 
   const totalPersonas = personas.length
@@ -447,9 +232,10 @@ export function Personas({ user, onUserUpdate }) {
 
   const handleOpenEditModal = (persona) => {
     setSelectedPersona(persona)
+    const normalizedTipo = persona.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : (persona.tipoDocumento || 'DNI')
     setFormData({
       ...persona,
-      tipoDocumento: persona.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : (persona.tipoDocumento || 'DNI'),
+      tipoDocumento: normalizedTipo,
       celular: persona.celular || '',
       telefono: persona.telefono || '',
       fotoImg: persona.fotoImg || '',
@@ -882,16 +668,13 @@ export function Personas({ user, onUserUpdate }) {
       showError('Validación Fallida', 'Por favor completa todos los campos requeridos (Documento, Nombres, Apellidos, Licencia, Celular, Dirección y Email).')
       return
     }
-    if (formData.tipoDocumento === 'DNI' && (docLen !== 8 || !/^\d{8}$/.test(formData.numeroDocumento.trim()))) {
-      showError('Validación Fallida', 'El DNI debe tener exactamente 8 dígitos numéricos.')
+    const isDni = formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD'
+    if (isDni && (docLen !== 8 || !/^\d{8}$/.test(formData.numeroDocumento.trim()))) {
+      alert('El DNI debe tener exactamente 8 dígitos numéricos.')
       return
     }
-    if (formData.tipoDocumento !== 'DNI' && (docLen < 8 || docLen > 15)) {
-      showError('Validación Fallida', 'El número de documento debe tener entre 8 y 15 caracteres.')
-      return
-    }
-    if (formData.numeroLicencia.trim().length > 9) {
-      showError('Validación Fallida', 'El número de licencia no puede exceder los 9 caracteres.')
+    if (!isDni && (docLen < 8 || docLen > 15)) {
+      alert('El número de documento debe tener entre 8 y 15 caracteres.')
       return
     }
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -1517,7 +1300,7 @@ export function Personas({ user, onUserUpdate }) {
                           label="Tipo de documento"
                           value={formData.tipoDocumento}
                           onChange={(e) => setFormData({ ...formData, tipoDocumento: e.target.value })}
-                          options={TIPO_DOC_OPTIONS}
+                          options={tipoDocOptions}
                         />
                       </div>
                       <div className="sm:col-span-7">
@@ -1525,12 +1308,13 @@ export function Personas({ user, onUserUpdate }) {
                           id="per_num_doc"
                           label="Número de documento"
                           required
-                          maxLength={formData.tipoDocumento === 'DNI' ? 8 : 15}
+                          maxLength={(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') ? 8 : 15}
                           value={formData.numeroDocumento}
                           inputClassName="font-mono font-bold"
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (formData.tipoDocumento === 'DNI' && !/^\d*$/.test(val)) return;
+                            const isDni = formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD';
+                            if (isDni && !/^\d*$/.test(val)) return;
                             setFormData({ ...formData, numeroDocumento: val })
                           }}
                         />

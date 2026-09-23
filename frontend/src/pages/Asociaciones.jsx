@@ -4,103 +4,28 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
-import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
+import { exportToPdf } from '../utils/exportToPdf'
 
-function FloatingInput({ id, label, type = "text", ...props }) {
-  return (
-    <div className="relative">
-      <input
-        id={id}
-        type={type}
-        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-        placeholder=" "
-        autoComplete="off"
-        {...props}
-      />
-      <label
-        htmlFor={id}
-        className="pointer-events-none absolute left-3 right-3 truncate whitespace-nowrap top-1/2 -translate-y-1/2 select-none text-xs font-medium text-slate-400 transition-all duration-150 peer-focus:top-1 peer-focus:-translate-y-0 peer-focus:text-[9.5px] peer-focus:font-bold peer-focus:text-indigo-600 peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:-translate-y-0 peer-[:not(:placeholder-shown)]:text-[9.5px] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:text-slate-500 dark:peer-[:not(:placeholder-shown)]:text-slate-400"
-      >
-        {label}
-      </label>
-    </div>
-  )
-}
+import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 
-function FloatingSelect({ id, label, value, onChange, options = [], className = '' }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef(null)
+const FILTER_TIPO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los tipos' },
+  { value: 'ASOCIACION', label: 'Asociaciones' },
+  { value: 'PARTICULAR', label: 'Particulares' },
+]
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+const FILTER_ESTADO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'ACTIVO', label: 'Activas' },
+  { value: 'SUSPENDIDO', label: 'Suspendidas' },
+]
 
-  const selectedOption = options.find((opt) => String(opt.value) === String(value)) || options[0]
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        id={id}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-900 dark:text-white cursor-pointer ${isOpen
-            ? 'border-indigo-500 ring-1 ring-indigo-500/20 dark:border-indigo-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
-          }`}
-      >
-        <span className="truncate">{selectedOption?.label || value}</span>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''}`}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      <label htmlFor={id} className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-indigo-600 dark:!text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`}>
-        {label}
-      </label>
-
-      {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
-          <div className="space-y-0.5">
-            {options.map((opt) => {
-              const isSelected = String(opt.value) === String(value)
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange({ target: { value: opt.value } })
-                    setIsOpen(false)
-                  }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
-                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
-                    }`}
-                >
-                  <span className="whitespace-nowrap">{opt.label}</span>
-                  {isSelected && (
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3 text-indigo-600 dark:text-indigo-400 shrink-0">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 export function Asociaciones() {
   const cached = getCachedData('/asociaciones')
+  const cachedPersonas = getCachedData('/personas')
   const [asociaciones, setAsociaciones] = useState(cached || [])
+  const [personas, setPersonas] = useState(cachedPersonas || [])
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
@@ -117,9 +42,26 @@ export function Asociaciones() {
   const [isEditing, setIsEditing] = useState(false)
   const [loadError, setLoadError] = useState('')
 
+  const [repSearch, setRepSearch] = useState('')
+  const [showRepResults, setShowRepResults] = useState(false)
+  const repDropdownRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (repDropdownRef.current && !repDropdownRef.current.contains(e.target)) {
+        setShowRepResults(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const emptyForm = {
     tipo: 'ASOCIACION',
     razonSocial: '',
+    idRepresentanteLegal: null,
+    representanteNombre: '',
+    representanteDni: '',
     ruc: '',
     partidaRegistral: '',
     fechaCreacion: '',
@@ -147,7 +89,59 @@ export function Asociaciones() {
       })
       .catch(() => setLoadError('No se pudo cargar el padrón de asociaciones.'))
       .finally(() => setIsLoading(false))
+
+    if (!cachedPersonas || cachedPersonas.length === 0) {
+      apiFetch('/personas')
+        .then((response) => response.ok ? response.json() : Promise.reject(response))
+        .then((payload) => {
+          const pData = payload.data ?? []
+          setPersonas(pData)
+          setCachedData('/personas', pData)
+        })
+        .catch(() => {})
+    }
   }, [])
+
+  const getPersonaNombre = (p) => {
+    if (!p) return ''
+    if (p.nombreCompleto) return p.nombreCompleto
+    const full = `${p.nombres || ''} ${p.apellidoPaterno || p.apellido_paterno || ''} ${p.apellidoMaterno || p.apellido_materno || ''}`.trim()
+    return full || p.razon_social || p.razonSocial || 'Sin Nombre'
+  }
+
+  const repResults = personas
+    .filter((p) => {
+      const q = repSearch.trim().toLowerCase()
+      if (!q) return true
+      const doc = String(p.numeroDocumento || p.numero || '').toLowerCase()
+      const nom = getPersonaNombre(p).toLowerCase()
+      return doc.includes(q) || nom.includes(q)
+    })
+    .slice(0, 10)
+
+  const selectRepresentante = (p) => {
+    const dni = String(p.numeroDocumento || p.numero || '')
+    const nom = getPersonaNombre(p)
+    setFormData((prev) => ({
+      ...prev,
+      idRepresentanteLegal: p.id,
+      representanteDni: dni,
+      representanteNombre: nom,
+    }))
+    setRepSearch('')
+    setShowRepResults(false)
+  }
+
+  const clearRepresentante = () => {
+    setFormData((prev) => ({
+      ...prev,
+      idRepresentanteLegal: null,
+      representanteDni: '',
+      representanteNombre: '',
+    }))
+    setRepSearch('')
+    setShowRepResults(false)
+  }
 
   const totalOrgs = asociaciones.length
   const particulares = asociaciones.filter((o) => o.tipo === 'PARTICULAR').length
@@ -166,7 +160,6 @@ export function Asociaciones() {
         { label: 'Filtro Tipo', value: filterTipo },
         { label: 'Filtro Estado', value: filterEstado },
         { label: 'Flota Total Registrada', value: `${flotaAcumulada} unidades` },
-        { label: 'Capacidad Global Autorizada', value: `${flotaAutorizadaTotal} cupos` },
       ],
       columns: [
         { header: 'N°', align: 'center', width: 45, render: (_, __, i) => i + 1 },
@@ -175,11 +168,7 @@ export function Asociaciones() {
         { header: 'RUC', key: 'ruc', width: 120, align: 'center', isText: true },
         { header: 'Partida Registral', key: 'partidaRegistral', width: 130, align: 'center', isText: true },
         { header: 'Resolución Alcaldía', key: 'resolucionAlcaldia', width: 160, align: 'center' },
-        { header: 'Flota Autorizada (Cupo)', key: 'flotaAutorizada', width: 120, align: 'center' },
         { header: 'Flota Registrada', key: 'flotaTotal', width: 110, align: 'center' },
-        { header: 'Cupos Disponibles', key: 'cuposDisponibles', width: 120, align: 'center' },
-        { header: 'Ocupación (%)', width: 100, align: 'center', render: (_, r) => `${r.porcentajeOcupacion ?? 0}%` },
-        { header: 'Estado Cupo', key: 'estadoCupo', width: 110, align: 'center' },
         { header: 'Teléfono', key: 'telefono', width: 110, align: 'center', isText: true },
         { header: 'Correo Electrónico', key: 'email', width: 180 },
         { header: 'Dirección', key: 'direccion', width: 220 },
@@ -189,8 +178,34 @@ export function Asociaciones() {
     })
   }
 
+  const handleExportPdf = () => {
+    const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
+    exportToPdf({
+      filename: `Padron_Asociaciones_${new Date().getFullYear()}`,
+      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
+      summaryItems: [
+        { label: 'Total registros', value: totalOrgs },
+        { label: 'Exportando', value: `${listToExport.length} registros` },
+        { label: 'Asociaciones', value: asociacionesCount },
+        { label: 'Particulares', value: particulares },
+        { label: 'Flota registrada', value: `${flotaAcumulada} vehículos` },
+      ],
+      columns: [
+        { header: 'RAZÓN SOCIAL', key: 'razonSocial', width: 220 },
+        { header: 'RUC', key: 'ruc', width: 100, align: 'center' },
+        { header: 'REPRESENTANTE', key: 'representanteNombre', width: 180 },
+        { header: 'DNI REP.', key: 'representanteDni', width: 90, align: 'center' },
+        { header: 'TIPO', key: 'tipo', width: 110, align: 'center' },
+        { header: 'FLOTA', key: 'flotaTotal', width: 60, align: 'center' },
+        { header: 'EXPEDIENTE', key: 'expediente', width: 110, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 90, align: 'center' },
+      ],
+      data: listToExport
+    })
+  }
+
   const filteredOrgs = asociaciones.filter((o) => {
-    const fullSearch = `${o.razonSocial} ${o.ruc} ${o.partidaRegistral} ${o.direccion} ${o.numeroLicencia} ${o.resolucionAlcaldia || ''}`.toLowerCase()
+    const fullSearch = `${o.razonSocial} ${o.ruc} ${o.partidaRegistral || ''} ${o.direccion || ''} ${o.numeroLicencia || ''} ${o.resolucionAlcaldia || ''} ${o.representanteNombre || ''} ${o.representanteDni || ''}`.toLowerCase()
     const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
     const matchesTipo = filterTipo === 'TODOS' || o.tipo === filterTipo
     const matchesEstado = filterEstado === 'TODOS' || o.estado === filterEstado
@@ -209,13 +224,23 @@ export function Asociaciones() {
 
   const handleOpenCreateModal = () => {
     setFormData(emptyForm)
+    setRepSearch('')
+    setShowRepResults(false)
     setIsEditing(false)
     setIsModalOpen(true)
   }
 
   const handleOpenEditModal = (org) => {
     setSelectedOrg(org)
-    setFormData({ ...emptyForm, ...org })
+    setFormData({
+      ...emptyForm,
+      ...org,
+      idRepresentanteLegal: org.idRepresentanteLegal || null,
+      representanteNombre: org.representanteNombre || '',
+      representanteDni: org.representanteDni || '',
+    })
+    setRepSearch('')
+    setShowRepResults(false)
     setIsEditing(true)
     setIsModalOpen(true)
   }
@@ -246,8 +271,9 @@ export function Asociaciones() {
     if (result.isConfirmed) {
       try {
         await apiFetch(`/asociaciones/${id}`, { method: 'DELETE' })
-        setAsociaciones(asociaciones.filter((o) => o.id !== id))
-        showToast('Asociación eliminada correctamente')
+        const nextList = asociaciones.filter((o) => o.id !== id)
+        setAsociaciones(nextList)
+        setCachedData('/asociaciones', nextList)
       } catch (err) {
         showError('Error', 'No se pudo eliminar la asociación.')
       }
@@ -278,11 +304,14 @@ export function Asociaciones() {
           method: 'PUT',
           body: formData,
         })
-        const resData = await res.json()
-        if (!res.ok) throw new Error(resData.messages?.error || 'Error al actualizar')
-        
-        setAsociaciones(asociaciones.map((o) => (o.id === selectedOrg.id ? { ...formData, id: o.id } : o)))
-        showToast('Asociación actualizada exitosamente')
+        const updated = {
+          ...selectedOrg,
+          ...formData,
+          id: selectedOrg.id,
+        }
+        const nextList = asociaciones.map((o) => (o.id === selectedOrg.id ? updated : o))
+        setAsociaciones(nextList)
+        setCachedData('/asociaciones', nextList)
       } else {
         const res = await apiFetch('/asociaciones', {
           method: 'POST',
@@ -295,7 +324,9 @@ export function Asociaciones() {
           ...formData,
           id: Date.now(),
         }
-        setAsociaciones([newOrg, ...asociaciones])
+        const nextList = [newOrg, ...asociaciones]
+        setAsociaciones(nextList)
+        setCachedData('/asociaciones', nextList)
         setCurrentPage(1)
         showToast('Asociación registrada exitosamente')
       }
@@ -385,18 +416,18 @@ export function Asociaciones() {
           </div>
         </div>
 
-        {/* 4. Flota y Capacidad de Cupos */}
+        {/* 4. Flota Registrada */}
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Control de Cupos</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Flota Registrada</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(flotaAcumulada)} <span className="text-xs font-bold text-slate-400">/ {new Intl.NumberFormat('es-PE').format(flotaAutorizadaTotal)}</span>
+              {new Intl.NumberFormat('es-PE').format(flotaAcumulada)}
             </p>
             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">
-              {flotaAutorizadaTotal > 0 ? `${Math.round((flotaAcumulada / flotaAutorizadaTotal) * 100)}% ocupado` : 'Capacidad'}
+              Vehículos
             </span>
           </div>
         </div>
@@ -426,25 +457,17 @@ export function Asociaciones() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <RoundedSelect
               value={filterTipo}
-              onChange={(e) => setFilterTipo(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-1.5 px-2.5 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODOS">Todos los tipos</option>
-              <option value="ASOCIACION">Asociaciones</option>
-              <option value="PARTICULAR">Particulares</option>
-            </select>
+              onChange={setFilterTipo}
+              options={FILTER_TIPO_OPTIONS}
+            />
 
-            <select
+            <RoundedSelect
               value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-1.5 px-2.5 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODOS">Todos los estados</option>
-              <option value="ACTIVO">Activas</option>
-              <option value="SUSPENDIDO">Suspendidas</option>
-            </select>
+              onChange={setFilterEstado}
+              options={FILTER_ESTADO_OPTIONS}
+            />
 
             {(filterTipo !== 'TODOS' || filterEstado !== 'TODOS' || searchTerm !== '') && (
               <button
@@ -464,11 +487,21 @@ export function Asociaciones() {
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-              title="Descargar padrón en formato Excel"
+              title="Descargar padrón en Excel (.xls)"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
             >
-              <Icon name="table" className="size-4" />
-              <span>Exportar Excel</span>
+              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Excel</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              title="Descargar o imprimir padrón en PDF"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+            >
+              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
+              <span>PDF</span>
             </button>
 
             <button
@@ -491,9 +524,9 @@ export function Asociaciones() {
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[220px]">Asociación / Particular</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[125px]">RUC / Partida</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[170px]">Contacto</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[240px]">Ubicación</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[105px]">Flota</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[170px]">Representante Legal</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">Contacto</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[200px]">Ubicación</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[90px] text-center">Estado</th>
                 <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-slate-800/40 px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
@@ -512,24 +545,42 @@ export function Asociaciones() {
                       </div>
                     </td>
                     <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-14 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-14 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3.5 py-3 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"><div className="mx-auto h-6 w-16 rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3 min-w-[170px]">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 min-w-[150px]">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-24 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-32 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 min-w-[200px]">
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-48 rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-2.5 w-16 rounded bg-slate-100 dark:bg-slate-800/60" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 min-w-[90px] text-center">
+                      <div className="mx-auto h-5 w-14 rounded-full bg-slate-200 dark:bg-slate-800" />
+                    </td>
+                    <td className="sticky right-0 bg-white/50 dark:bg-[#0f172a]/50 px-3.5 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-slate-800" />
+                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-slate-800" />
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : filteredOrgs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-5 py-10 text-center text-slate-400">
-                    <div className="mx-auto max-w-xs space-y-2">
-                      <Icon name="building" className="size-8" />
-                      <p className="font-bold text-slate-600 dark:text-slate-300">
-                        No se encontraron asociaciones
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        Modifica los términos de búsqueda o los filtros seleccionados.
-                      </p>
+                  <td colSpan="7" className="px-4 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <Icon name="building" className="size-12 text-slate-300 dark:text-slate-600 mb-4" />
+                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200">No se encontraron asociaciones</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Modifica los términos de búsqueda o los filtros seleccionados.</p>
                     </div>
                   </td>
                 </tr>
@@ -538,12 +589,12 @@ export function Asociaciones() {
                   <tr key={o.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
                     <td className="px-3.5 py-2.5 min-w-[220px]">
                       <div className="flex items-center gap-2.5">
-                        <span className={`grid size-8 shrink-0 place-items-center rounded-xl text-base font-bold shadow-xs ${o.tipo === 'ASOCIACION'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        <div className={`grid size-9 shrink-0 place-items-center rounded-xl font-bold shadow-xs ${o.tipo === 'ASOCIACION'
+                            ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
+                            : 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400'
                           }`}>
-                          {o.tipo === 'ASOCIACION' ? '🛺' : '👤'}
-                        </span>
+                          <Icon name={o.tipo === 'ASOCIACION' ? 'motoTaxi' : 'building'} className="size-4.5" />
+                        </div>
                         <div className="flex-1">
                           <p className="font-normal text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-snug" title={o.razonSocial}>{o.razonSocial}</p>
                           <span className="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300 mt-0.5">
@@ -557,10 +608,24 @@ export function Asociaciones() {
                       <p className="text-[11px] font-mono text-slate-400">{o.partidaRegistral || o.numeroLicencia || '—'}</p>
                     </td>
                     <td className="px-3 py-2.5 min-w-[170px]">
+                      {o.representanteNombre ? (
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug" title={o.representanteNombre}>
+                            {o.representanteNombre}
+                          </p>
+                          <p className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                            DNI: {o.representanteDni}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic font-medium">— No asignado —</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 min-w-[150px]">
                       <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{o.telefono || '—'}</p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap" title={o.email}>{o.email || '—'}</p>
                     </td>
-                    <td className="px-3 py-2.5 min-w-[240px]">
+                    <td className="px-3 py-2.5 min-w-[200px]">
                       <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug" title={o.direccion}>{o.direccion || '—'}</p>
                       <button
                         type="button"
@@ -570,36 +635,6 @@ export function Asociaciones() {
                       >
                         {o.coordenadas ? 'Ver mapa' : 'Sin coordenadas'}
                       </button>
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-black text-slate-800 dark:text-slate-200">
-                            {o.flotaTotal} <span className="text-[10px] font-bold text-slate-400">/ {o.flotaAutorizada ?? 50}</span>
-                          </span>
-                          <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase ${
-                            (o.flotaTotal > (o.flotaAutorizada ?? 50))
-                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
-                              : (o.flotaTotal === (o.flotaAutorizada ?? 50))
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                          }`}>
-                            {o.flotaTotal > (o.flotaAutorizada ?? 50) ? 'Sobrecupo' : (o.flotaTotal === (o.flotaAutorizada ?? 50) ? 'Completo' : `${Math.max(0, (o.flotaAutorizada ?? 50) - o.flotaTotal)} libres`)}
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                          <div 
-                            className={`h-full transition-all duration-300 ${
-                              (o.flotaTotal > (o.flotaAutorizada ?? 50))
-                                ? 'bg-rose-500'
-                                : (o.flotaTotal === (o.flotaAutorizada ?? 50))
-                                ? 'bg-amber-500'
-                                : 'bg-emerald-500'
-                            }`}
-                            style={{ width: `${Math.min(100, Math.round((o.flotaTotal / Math.max(1, o.flotaAutorizada ?? 50)) * 100))}%` }}
-                          />
-                        </div>
-                      </div>
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-center">
                       <span
@@ -661,10 +696,10 @@ export function Asociaciones() {
 
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
-            {/* Cabecera del Modal (Limpia, sin morado) */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter overflow-y-auto">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800 my-auto">
+            {/* Cabecera del Modal */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900 rounded-t-2xl">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                   <Icon name="building" className="size-4" />
@@ -683,13 +718,12 @@ export function Asociaciones() {
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} autoComplete="off" className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleFormSubmit} autoComplete="off" className="p-4 sm:p-5 space-y-4">
 
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-indigo-600" />
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Identificación Institucional
-                </h4>
+                </legend>
                 <div className="grid gap-4 sm:grid-cols-3">
                   <FloatingSelect
                     id="org_tipo"
@@ -749,6 +783,102 @@ export function Asociaciones() {
                     </button>
                   </div>
 
+                  {/* Selector de Representante Legal vinculado a Personas */}
+                  <div className="sm:col-span-3">
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Icon name="user" className="size-3.5 text-indigo-500" />
+                      <span>Representante Legal (Persona Natural)</span>
+                    </label>
+
+                    {formData.idRepresentanteLegal ? (
+                      <div className="flex items-center justify-between gap-3 p-3 rounded-2xl border border-indigo-200/80 bg-indigo-50/60 dark:border-indigo-900/60 dark:bg-indigo-950/30">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="size-9 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold text-xs shrink-0 shadow-xs">
+                            <Icon name="idCard" className="size-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-slate-800 dark:text-slate-100">
+                              {formData.representanteNombre || 'Nombre no disponible'}
+                            </p>
+                            <p className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                              DNI: {formData.representanteDni || '—'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={clearRepresentante}
+                          className="px-2.5 py-1 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/60 rounded-lg transition-colors cursor-pointer shrink-0"
+                          title="Cambiar o quitar representante"
+                        >
+                          ✕ Quitar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="relative" ref={repDropdownRef}>
+                        <div className="relative">
+                          <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            placeholder="Buscar representante por DNI o Nombres y Apellidos..."
+                            value={repSearch}
+                            onFocus={() => setShowRepResults(true)}
+                            onChange={(e) => {
+                              setRepSearch(e.target.value)
+                              setShowRepResults(true)
+                            }}
+                            className="w-full h-[42px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        {showRepResults && (
+                          <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                            <div className="flex items-center justify-between px-2.5 py-1 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 uppercase">
+                              <span>Personas registradas ({repResults.length})</span>
+                              <button
+                                type="button"
+                                onClick={() => setShowRepResults(false)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                              >
+                                ✕ Cerrar
+                              </button>
+                            </div>
+                            {repResults.length === 0 ? (
+                              <div className="p-3 text-center text-xs text-slate-400 font-medium">
+                                No se encontraron personas con ese DNI o nombre.
+                              </div>
+                            ) : (
+                              repResults.map((p) => {
+                                const dni = p.numeroDocumento || p.numero || ''
+                                const nombre = getPersonaNombre(p)
+                                return (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => selectRepresentante(p)}
+                                    className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center justify-between gap-3 transition-colors cursor-pointer group"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                                        {nombre}
+                                      </p>
+                                      <p className="font-mono text-[11px] text-slate-400">
+                                        DNI: {dni}
+                                      </p>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      Seleccionar →
+                                    </span>
+                                  </button>
+                                )
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {formData.tipo === 'ASOCIACION' && (
                     <>
                       <FloatingInput
@@ -768,14 +898,13 @@ export function Asociaciones() {
                     </>
                   )}
                 </div>
-              </div>
+              </fieldset>
 
 
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-cyan-500" />
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Contacto, ubicación y autorización
-                </h4>
+                </legend>
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="sm:col-span-2">
                     <FloatingInput
@@ -818,16 +947,7 @@ export function Asociaciones() {
                     />
                   </div>
 
-                  <div className="sm:col-span-1">
-                    <FloatingInput
-                      id="org_flota_autorizada"
-                      label="Flota Autorizada (Cupo)"
-                      type="number"
-                      min="1"
-                      value={formData.flotaAutorizada ?? 50}
-                      onChange={(e) => setFormData({ ...formData, flotaAutorizada: Math.max(1, parseInt(e.target.value) || 1) })}
-                    />
-                  </div>
+
 
                   {formData.tipo === 'ASOCIACION' && (
                     <FloatingInput
@@ -891,9 +1011,35 @@ export function Asociaciones() {
                   )}
 
                 </div>
-              </div>
+              </fieldset>
 
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Control y Estado
+                </legend>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FloatingInput
+                    id="org_flota"
+                    type="number"
+                    min={1}
+                    label={formData.tipo === 'PARTICULAR' ? 'Flota permitida' : 'Flota Autorizada (máx vehículos)'}
+                    value={formData.flotaAutorizada}
+                    onChange={(e) => setFormData({ ...formData, flotaAutorizada: Number(e.target.value) || 0 })}
+                  />
 
+                  <FloatingSelect
+                    id="org_estado"
+                    label="Estado de la Organización"
+                    value={formData.estado}
+                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                    options={[
+                      { value: 'ACTIVO', label: 'ACTIVO' },
+                      { value: 'SUSPENDIDO', label: 'SUSPENDIDO' },
+                      { value: 'BAJA', label: 'DADO DE BAJA' }
+                    ]}
+                  />
+                </div>
+              </fieldset>
               <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                 <button
                   type="button"
@@ -937,6 +1083,20 @@ export function Asociaciones() {
               <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/60">
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                    <span className="font-bold text-slate-400">Representante Legal</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100 text-right">
+                      {detailOrg.representanteNombre || '—'}
+                    </span>
+                  </div>
+                  {detailOrg.representanteDni && (
+                    <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                      <span className="font-bold text-slate-400">DNI Representante</span>
+                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                        {detailOrg.representanteDni}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
                     <span className="font-bold text-slate-400">Partida Registral SUNARP</span>
                     <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{detailOrg.partidaRegistral || '—'}</span>
                   </div>
@@ -945,20 +1105,8 @@ export function Asociaciones() {
                     <span className="font-semibold text-slate-700 dark:text-slate-200">{detailOrg.fechaCreacion || '—'}</span>
                   </div>
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                    <span className="font-bold text-slate-400">Flota Registrada / Cupo</span>
-                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{detailOrg.flotaTotal} / {detailOrg.flotaAutorizada ?? 50} Unidades</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
-                    <span className="font-bold text-slate-400">Estado de Cupo</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                      detailOrg.flotaTotal > (detailOrg.flotaAutorizada ?? 50)
-                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
-                        : detailOrg.flotaTotal === (detailOrg.flotaAutorizada ?? 50)
-                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                    }`}>
-                      {detailOrg.flotaTotal > (detailOrg.flotaAutorizada ?? 50) ? 'Sobrecupo excedido' : `${Math.max(0, (detailOrg.flotaAutorizada ?? 50) - detailOrg.flotaTotal)} cupos libres`}
-                    </span>
+                    <span className="font-bold text-slate-400">Flota Registrada</span>
+                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{detailOrg.flotaTotal} Vehículos</span>
                   </div>
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
                     <span className="font-bold text-slate-400">Teléfono de contacto</span>

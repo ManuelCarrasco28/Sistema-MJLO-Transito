@@ -20,6 +20,7 @@ const CursosSeguridad = lazy(() => import('./pages/CursosSeguridad').then((modul
 const Pagos = lazy(() => import('./pages/Pagos').then((module) => ({ default: module.Pagos })))
 const Retenciones = lazy(() => import('./pages/Retenciones').then((module) => ({ default: module.Retenciones })))
 const Permisos = lazy(() => import('./pages/Permisos').then((module) => ({ default: module.Permisos })))
+const PermisoFormularioVentana = lazy(() => import('./pages/PermisoFormularioVentana').then((module) => ({ default: module.PermisoFormularioVentana })))
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard').then((module) => ({ default: module.SuperAdminDashboard })))
 const Operativos = lazy(() => import('./pages/Operativos').then((module) => ({ default: module.Operativos })))
 
@@ -35,7 +36,7 @@ function ModuleFallback() {
 
 function Layout({ onLogout, user, onUserUpdate }) {
   const location = useLocation()
-  
+
   const getActiveItem = () => {
     const path = location.pathname
     if (path.includes('/superadmin/respaldo')) return 'Respaldo'
@@ -112,9 +113,8 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
   return (
     <main
-      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white ${
-        sidebarCollapsed ? 'lg:grid-cols-[5.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[19.5rem_minmax(0,1fr)]'
-      }`}
+      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden ${sidebarCollapsed ? 'lg:grid-cols-[5.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[19.5rem_minmax(0,1fr)]'
+        }`}
     >
       <div className="print:hidden">
         <Sidebar
@@ -311,6 +311,22 @@ function App() {
           <Route
             path="/login"
             element={user ? <Navigate to={isSuperAdminUser(user) ? "/superadmin" : "/dashboard"} replace /> : <LoginRoute onLogin={handleLogin} />}
+          />
+          <Route
+            path="/permisos-formulario"
+            element={user ? (
+              <Suspense fallback={<ModuleFallback />}>
+                <PermisoFormularioVentana />
+              </Suspense>
+            ) : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/permisos/formulario"
+            element={user ? (
+              <Suspense fallback={<ModuleFallback />}>
+                <PermisoFormularioVentana />
+              </Suspense>
+            ) : <Navigate to="/login" replace />}
           />
           <Route
             path="/*"

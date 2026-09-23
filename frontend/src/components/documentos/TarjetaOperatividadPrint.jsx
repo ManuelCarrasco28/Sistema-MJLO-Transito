@@ -1309,9 +1309,16 @@ export function ResolucionPermisoPrint({ data }) {
           <h4 style={{ fontSize: '8pt', fontWeight: 900, color: '#0f172a', margin: '0 0 6px', textTransform: 'uppercase' }}>
             Parte Resolutiva Oficial:
           </h4>
-          <p style={{ fontSize: '7.5pt', lineHeight: 1.4, color: '#334155', whiteSpace: 'pre-line' }}>
-            {data.contenido || 'Se autoriza la prestación de servicios de transporte especial en estricto cumplimiento del Reglamento Nacional de Tránsito y las Ordenanzas Municipales vigentes del distrito de José Leonardo Ortiz, quedando sujeto a la fiscalización continua de los inspectores municipales de transporte.'}
-          </p>
+          {data.contenido && data.contenido.includes('<') ? (
+            <div
+              style={{ fontSize: '7.5pt', lineHeight: 1.4, color: '#334155' }}
+              dangerouslySetInnerHTML={{ __html: data.contenido }}
+            />
+          ) : (
+            <p style={{ fontSize: '7.5pt', lineHeight: 1.4, color: '#334155', whiteSpace: 'pre-line' }}>
+              {data.contenido || 'Se autoriza la prestación de servicios de transporte especial en estricto cumplimiento del Reglamento Nacional de Tránsito y las Ordenanzas Municipales vigentes del distrito de José Leonardo Ortiz, quedando sujeto a la fiscalización continua de los inspectores municipales de transporte.'}
+            </p>
+          )}
         </div>
 
         {/* Vigencia y Fechas */}

@@ -4,7 +4,34 @@ import { Pagination } from '../components/ui/Pagination'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
-import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
+import { exportToPdf } from '../utils/exportToPdf'
+import { RoundedSelect } from '../components/ui/FormInputs'
+
+const FILTER_ORIGEN_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los orígenes' },
+  { value: 'OPERATIVO', label: '🚨 Solo Operativos' },
+  { value: 'RUTINA', label: '📋 Solo Rutina' }
+];
+
+const FILTER_ESTADO_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'PENDIENTE_PAGO', label: 'Pendientes de Pago' },
+  { value: 'PAGADA', label: 'Pagadas' },
+  { value: 'ANULADA', label: 'Anuladas' }
+];
+
+const FILTER_FORMALIDAD_OPTIONS = [
+  { value: 'TODOS', label: 'Formal / Informal' },
+  { value: 'FORMAL', label: 'Formales' },
+  { value: 'INFORMAL', label: 'Informales' }
+];
+
+const FILTER_FECHA_OPTIONS = [
+  { value: 'TODAS', label: 'Todas las fechas' },
+  { value: 'HOY', label: 'Hoy' },
+  { value: 'SEMANA', label: 'Últimos 7 días' },
+  { value: 'MES', label: 'Este mes' }
+];
 
 export function Papeletas() {
   const cachedPapeletas = getCachedData('/papeletas')
@@ -150,6 +177,35 @@ export function Papeletas() {
     currentPage * itemsPerPage
   )
 
+  const tipoInfraccionOptions = [
+    { value: 'TODOS', label: 'Todas las infracciones' },
+    ...tiposInfraccion.map((t) => ({ value: t.codigo || t.id, label: `${t.codigo} - ${t.descripcion}` }))
+  ];
+
+  const handleExportPdf = () => {
+    exportToPdf({
+      filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
+      subtitle: 'Subgerencia de Tránsito y Transporte - Fiscalización Municipal',
+      metadata: [
+        { label: 'Estado', value: filterEstado },
+        { label: 'Formalidad', value: filterFormalidad },
+        { label: 'Total Papeletas', value: String(filteredPapeletas.length) }
+      ],
+      columns: [
+        { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 80, align: 'center' },
+        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 60, align: 'center' },
+        { header: 'CÓDIGO', key: 'infraccionCodigo', isText: true, width: 60, align: 'center' },
+        { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 80 },
+        { header: 'CONDUCTOR', key: 'conductorNombre', width: 120 },
+        { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 120 },
+        { header: 'FECHA', key: 'fechaHora', render: (_, p) => new Date(p.fechaHora).toLocaleDateString(), width: 80, align: 'center' },
+        { header: 'ESTADO', key: 'estado', width: 80, align: 'center' }
+      ],
+      data: filteredPapeletas
+    })
+  }
+
   const handleExportExcel = () => {
     exportToExcel({
       filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.xls`,
@@ -239,11 +295,11 @@ export function Papeletas() {
 
   const handleOpenPagar = (papeleta) => {
     if (papeleta.estado === 'ANULADA') {
-      showError('No Permitido', 'Esta papeleta está anulada y no puede ser cancelada ni pagada.')
+      alert('Esta papeleta está anulada y no puede ser cancelada ni pagada.')
       return
     }
     if (papeleta.estado === 'PAGADA') {
-      showError('No Permitido', 'Esta papeleta ya se encuentra pagada.')
+      alert('Esta papeleta ya se encuentra pagada.')
       return
     }
     setPapeletaToAction(papeleta)
@@ -258,11 +314,11 @@ export function Papeletas() {
 
     // Validaciones
     if (!numeroRecibo.trim() || !fechaPago) {
-      showError('Validación Fallida', 'Por favor ingresa el número de recibo y la fecha de pago.')
+      alert('Por favor ingresa el número de recibo y la fecha de pago.')
       return
     }
     if (new Date(fechaPago) > new Date()) {
-      showError('Validación Fallida', 'La fecha de pago no puede ser futura.')
+      alert('La fecha de pago no puede ser futura.')
       return
     }
 
@@ -279,13 +335,13 @@ export function Papeletas() {
         } : p))
         setIsPagarModalOpen(false)
         setPapeletaToAction(null)
-        showToast('Pago procesado correctamente')
       } else {
         const error = await res.json()
-        showError('Error', Object.values(error.messages || {}).join(' ') || 'Error al procesar el pago')
+        alert(Object.values(error.messages || {}).join(' ') || 'Error al procesar el pago')
       }
     } catch (err) {
-      showError('Error de Conexión', 'Error de conexión al procesar el pago')
+      console.error(err)
+      alert('Error de conexión al procesar el pago')
     } finally {
       setIsProcessingAction(false)
     }
@@ -307,11 +363,11 @@ export function Papeletas() {
     if (!reporteToConvert) return
     const validInfracciones = convertForm.infraccionesIds.filter(id => id).map(Number)
     if (validInfracciones.length === 0) {
-      showError('Validación Fallida', 'Selecciona al menos una infracción.')
+      alert('Selecciona al menos una infracción.')
       return
     }
     if (!convertForm.vehiculoId) {
-      showError('Validación Fallida', 'Para generar papeleta primero debes identificar o registrar el vehículo.')
+      alert('Para generar papeleta primero debes identificar o registrar el vehículo.')
       return
     }
     setIsProcessingAction(true)
@@ -329,9 +385,9 @@ export function Papeletas() {
       if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo convertir el reporte.')
       setReporteToConvert(null)
       loadData()
-      showToast(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim())
+      alert(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim())
     } catch (error) {
-      showError('Error', error.message || 'Error al convertir reporte.')
+      alert(error.message || 'Error al convertir reporte.')
     } finally {
       setIsProcessingAction(false)
     }
@@ -341,7 +397,7 @@ export function Papeletas() {
     event.preventDefault()
     if (!reporteToReject) return
     if (!motivoRechazo.trim()) {
-      showError('Validación Fallida', 'Ingresa el motivo de rechazo.')
+      alert('Ingresa el motivo de rechazo.')
       return
     }
     setIsProcessingAction(true)
@@ -355,81 +411,80 @@ export function Papeletas() {
       setReporteToReject(null)
       setMotivoRechazo('')
       loadData()
-      showToast('Reporte rechazado')
     } catch (error) {
-      showError('Error', error.message || 'Error al rechazar reporte.')
+      alert(error.message || 'Error al rechazar reporte.')
     } finally {
       setIsProcessingAction(false)
     }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {loadError && <PageLoadError message={loadError} />}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 text-white shadow-md shadow-rose-500/20">
-              <Icon name="ticket" className="size-6" />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black tracking-tight text-slate-800 dark:text-white sm:text-3xl">
-                  Control de Papeletas e Infracciones
-                </h1>
-              </div>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                Registro, notificación y gestión de cobro de actas de infracción al tránsito municipal.
-              </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between print:hidden">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose-600 to-rose-600 text-white shadow-md">
+            <Icon name="ticket" className="size-5.5" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                Control de Papeletas e Infracciones
+              </h1>
             </div>
+            <p className="text-xs font-medium text-slate-500">
+              Registro, notificación y gestión de cobro de actas de infracción al tránsito municipal.
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 print:hidden">
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 print:hidden">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Impuestas</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-400">
-              <Icon name="ticket" className="size-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Total Impuestas</span>
+            <span className="grid size-6 place-items-center rounded-md bg-slate-50 text-slate-600 dark:bg-slate-950/60">
+              <Icon name="ticket" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{totales}</p>
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Histórico</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{totales}</p>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-amber-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pendientes</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold">⏳</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pendientes</span>
+            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 font-bold text-xs">
+              ⏳
+            </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{pendientes}</p>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">Por Cobrar</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{pendientes}</p>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Pagadas</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">✓</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Pagadas</span>
+            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 font-bold text-xs">
+              ✓
+            </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{pagadas}</p>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">S/ {montoRecaudado.toFixed(2)}</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{pagadas}</p>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-md dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Anuladas</span>
-            <span className="grid size-10 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">✕</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Anuladas</span>
+            <span className="grid size-6 place-items-center rounded-md bg-slate-50 text-slate-600 dark:bg-slate-950/60 font-bold text-xs">
+              ✕
+            </span>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-black text-slate-800 dark:text-white">{anuladas}</p>
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Prescritas</span>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{anuladas}</p>
           </div>
         </div>
       </div>
@@ -465,7 +520,7 @@ export function Papeletas() {
             {reportes.length ? reportes.map((reporte) => (
               <div key={reporte.id} className="grid gap-4 p-5 lg:grid-cols-[1fr_220px] lg:items-center">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 flex-1">
                     <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${reporte.estado === 'PENDIENTE' ? 'bg-amber-100 text-amber-800' : reporte.estado === 'CONVERTIDO_PAPELETA' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
                       {reporte.estado}
                     </span>
@@ -519,100 +574,98 @@ export function Papeletas() {
         </div>
       )}
 
-      {activeView === 'PAPELETAS' && <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] print:hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative flex-1 min-w-[220px]">
-            <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar por código PAP, placa, infractor, DNI..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white focus:ring-2 focus:ring-rose-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-rose-400"
-            />
-            {searchTerm && (
-              <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
-                ✕
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={filterOrigen}
-              onChange={(e) => setFilterOrigen(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
-            >
-              <option value="TODOS">Todos los orígenes</option>
-              <option value="OPERATIVO">🚨 Solo Operativos</option>
-              <option value="RUTINA">📋 Solo Rutina</option>
-            </select>
-
-            <select
-              value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
-            >
-              <option value="TODOS">Todos los estados</option>
-              <option value="PENDIENTE_PAGO">Pendientes de Pago</option>
-              <option value="PAGADA">Pagadas</option>
-              <option value="ANULADA">Anuladas</option>
-            </select>
-
-            <select
-              value={filterFormalidad}
-              onChange={(e) => setFilterFormalidad(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
-            >
-              <option value="TODOS">Formal / Informal</option>
-              <option value="FORMAL">Formales</option>
-              <option value="INFORMAL">Informales</option>
-            </select>
-
-            {tiposInfraccion.length > 0 && (
-              <select
-                value={filterTipoInfraccion}
-                onChange={(e) => setFilterTipoInfraccion(e.target.value)}
-                className="max-w-[170px] truncate rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
-              >
-                <option value="TODOS">Todas las infracciones</option>
-                {tiposInfraccion.map((t) => (
-                  <option key={t.id} value={t.codigo || t.id}>
-                    {t.codigo} - {t.descripcion}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <select
-              value={filterFecha}
-              onChange={(e) => setFilterFecha(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
-            >
-              <option value="TODAS">Todas las fechas</option>
-              <option value="HOY">Hoy</option>
-              <option value="SEMANA">Últimos 7 días</option>
-              <option value="MES">Este mes</option>
-            </select>
-
-            {hasActiveFilters && (
+      {activeView === 'PAPELETAS' && <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col print:hidden">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 dark:border-slate-800">
+          {/* Top row: Search and Action Buttons */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-md">
+              <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar por código PAP, placa, infractor, DNI..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white focus:ring-2 focus:ring-rose-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-rose-400"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors"
+                >
+                  Limpiar Filtros
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleClearFilters}
-                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors"
+                onClick={handleExportExcel}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all cursor-pointer whitespace-nowrap"
+                title="Descargar padrón de papeletas en Excel"
               >
-                Limpiar Filtros
+                <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600" />
+                <span>Excel</span>
               </button>
+              
+              <button 
+                type="button"
+                onClick={handleExportPdf} 
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 dark:hover:bg-rose-900/60 transition-all cursor-pointer whitespace-nowrap"
+                title="Exportar a PDF"
+              >
+                <Icon name="filePdf" className="size-3.5 text-rose-600" />
+                <span>PDF</span>
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => alert("En desarrollo")} 
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:from-indigo-500 hover:to-violet-500 active:scale-95 cursor-pointer whitespace-nowrap"
+              >
+                <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom row: Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <RoundedSelect
+              value={filterOrigen}
+              onChange={setFilterOrigen}
+              options={FILTER_ORIGEN_OPTIONS}
+            />
+
+            <RoundedSelect
+              value={filterEstado}
+              onChange={setFilterEstado}
+              options={FILTER_ESTADO_OPTIONS}
+            />
+
+            <RoundedSelect
+              value={filterFormalidad}
+              onChange={setFilterFormalidad}
+              options={FILTER_FORMALIDAD_OPTIONS}
+            />
+
+            {tiposInfraccion.length > 0 && (
+              <RoundedSelect
+                value={filterTipoInfraccion}
+                onChange={setFilterTipoInfraccion}
+                options={tipoInfraccionOptions}
+              />
             )}
 
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-              title="Descargar padrón de papeletas en Excel"
-            >
-              <Icon name="table" className="size-4" />
-              <span>Exportar Excel</span>
-            </button>
+            <RoundedSelect
+              value={filterFecha}
+              onChange={setFilterFecha}
+              options={FILTER_FECHA_OPTIONS}
+            />
           </div>
         </div>
 
@@ -645,16 +698,16 @@ export function Papeletas() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
               <tr>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">N° Papeleta</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Propietario</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Infractor</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Vehículo</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Tipo Infractor</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Infracción</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap">Fecha & Hora</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap text-right">Monto</th>
-                <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Estado Pago</th>
-                <th className="px-3.5 py-3.5 text-right whitespace-nowrap">Acciones</th>
+                <th className="px-3.5 py-3.5 text-center">N° Papeleta</th>
+                <th className="px-3.5 py-3.5">Propietario</th>
+                <th className="px-3.5 py-3.5">Infractor</th>
+                <th className="px-3.5 py-3.5">Vehículo</th>
+                <th className="px-3.5 py-3.5 text-center">Tipo Infractor</th>
+                <th className="px-3.5 py-3.5 text-center">Infracción</th>
+                <th className="px-3.5 py-3.5 text-center">Fecha & Hora</th>
+                <th className="px-3.5 py-3.5 text-center">Monto</th>
+                <th className="px-3.5 py-3.5 text-center">Estado Pago</th>
+                <th className="px-3.5 py-3.5 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -685,19 +738,19 @@ export function Papeletas() {
                   const tipoInf = tiposInfraccion.find((t) => t.id === p.detalles?.[0]?.tipoInfraccionId)
                   return (
                     <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-slate-800/40">
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
+                      <td className="px-3.5 py-3.5 text-center">
                         <span className="font-mono font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
                         <div className="mt-0.5">{renderOrigen(p)}</div>
                       </td>
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
+                      <td className="px-3.5 py-3.5">
                         <p className="font-bold text-slate-800 dark:text-slate-100 text-xs">{p.propietarioNombre || 'No Registrado'}</p>
                         <p className="font-mono text-xs text-slate-400">DNI: {p.propietarioDni || 'S/D'}</p>
                       </td>
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
+                      <td className="px-3.5 py-3.5">
                         <p className="font-bold text-slate-800 dark:text-slate-100 text-xs">{p.conductorNombre || p.infractor || 'No Identificado'}</p>
                         <p className="font-mono text-xs text-slate-400">DNI: {p.conductorDni || 'S/D'}</p>
                       </td>
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
+                      <td className="px-3.5 py-3.5">
                         {p.vehiculoPlaca && p.vehiculoPlaca !== 'SIN PLACA' ? (
                           <div>
                             <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
@@ -718,7 +771,7 @@ export function Papeletas() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3.5 py-3.5 whitespace-nowrap text-center">
+                      <td className="px-3.5 py-3.5 text-center">
                         {p.tipoInfractor === 'FORMAL' ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                             <span className="size-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" />
@@ -731,7 +784,7 @@ export function Papeletas() {
                           </span>
                         )}
                       </td>
-                      <td className="px-3.5 py-3.5 whitespace-nowrap text-center">
+                      <td className="px-3.5 py-3.5 text-center">
                         <button
                           type="button"
                           onClick={() => {
@@ -754,21 +807,21 @@ export function Papeletas() {
                           <span>{p.tipoInfraccionCodigo || tipoInf?.codigo || 'G01'}</span>
                         </button>
                       </td>
-                      <td className="px-3.5 py-3.5 whitespace-nowrap text-slate-600 dark:text-slate-400">
+                      <td className="px-3.5 py-3.5 text-center text-slate-600 dark:text-slate-400">
                         <p className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-xs">{new Date(p.fechaHora).toLocaleDateString()}</p>
                         <p className="text-[11px] text-slate-400">{new Date(p.fechaHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </td>
-                      <td className="px-3.5 py-3.5 whitespace-nowrap text-right">
+                      <td className="px-3.5 py-3.5 text-center">
                         <span className="font-mono font-black text-slate-800 dark:text-white text-sm">S/ {p.montoTotal.toFixed(2)}</span>
                       </td>
-                      <td className="px-3 py-3.5 whitespace-nowrap text-center">
+                      <td className="px-3 py-3.5 text-center">
                         <span className={`mx-auto inline-flex min-w-[92px] items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ${p.estado === 'PAGADA' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : p.estado === 'PENDIENTE_PAGO' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
                           <span className="size-2 rounded-full bg-current" />
                           {p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado}
                         </span>
                       </td>
-                      <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="px-3 py-3.5 text-center">
+                        <div className="flex items-center justify-center gap-1">
                           {p.estado === 'ANULADA' ? (
                             <button
                               type="button"
@@ -988,58 +1041,72 @@ export function Papeletas() {
               </div>
               <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-full p-1 text-slate-400 hover:bg-white">✕</button>
             </div>
-            <div className="space-y-4 p-6">
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+            <div className="p-6 space-y-4">
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600 border border-slate-200">
                 <p><strong>Reporte:</strong> #{reporteToConvert.id} · {reporteToConvert.placa_visual || 'SIN PLACA'}</p>
                 <p><strong>Lugar:</strong> {reporteToConvert.lugar}</p>
                 <p><strong>Observación:</strong> {reporteToConvert.observaciones}</p>
               </div>
-              <label className="block space-y-1">
-                <span className="text-xs font-black uppercase text-slate-400">Vehículo identificado</span>
-                <select required value={convertForm.vehiculoId} onChange={(e) => setConvertForm({ ...convertForm, vehiculoId: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold">
-                  <option value="">Selecciona vehículo</option>
-                  {vehiculos.map((v) => (
-                    <option key={v.id} value={v.id}>{v.placa} — {v.marca || ''} {v.modelo || ''}</option>
-                  ))}
-                </select>
-              </label>
-              <div className="space-y-2">
-                <span className="text-xs font-black uppercase text-slate-400">Infracciones a Aplicar</span>
-                {convertForm.infraccionesIds.map((infId, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <select required value={infId} onChange={(e) => {
-                      const newIds = [...convertForm.infraccionesIds]
-                      newIds[idx] = e.target.value
-                      setConvertForm({ ...convertForm, infraccionesIds: newIds })
-                    }} className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold">
-                      <option value="">Selecciona infracción</option>
-                      {tiposInfraccion.map((tipo) => (
-                        <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
+
+              <fieldset className="border border-slate-200 rounded-xl p-4">
+                <legend className="text-[11px] font-black uppercase tracking-wider text-emerald-600 px-2 ml-2 bg-white">Datos Generales</legend>
+                <div className="space-y-4">
+                  <label className="block space-y-1.5">
+                    <span className="text-[11px] font-bold uppercase text-slate-500">Vehículo identificado</span>
+                    <select required value={convertForm.vehiculoId} onChange={(e) => setConvertForm({ ...convertForm, vehiculoId: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white">
+                      <option value="">Selecciona vehículo</option>
+                      {vehiculos.map((v) => (
+                        <option key={v.id} value={v.id}>{v.placa} — {v.marca || ''} {v.modelo || ''}</option>
                       ))}
                     </select>
-                    {convertForm.infraccionesIds.length > 1 && (
-                      <button type="button" onClick={() => {
-                        const newIds = [...convertForm.infraccionesIds]
-                        newIds.splice(idx, 1)
-                        setConvertForm({ ...convertForm, infraccionesIds: newIds })
-                      }} className="flex items-center justify-center rounded-xl bg-rose-100 px-3 py-2 text-rose-600 hover:bg-rose-200">
-                        ✕
-                      </button>
-                    )}
+                  </label>
+
+                  <label className="block space-y-1.5">
+                    <span className="text-[11px] font-bold uppercase text-slate-500">DNI del infractor/intervenido opcional</span>
+                    <input value={convertForm.conductorDni} onChange={(e) => setConvertForm({ ...convertForm, conductorDni: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="Vacío = CONDUCTOR NO PRESENTE" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white" />
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset className="border border-slate-200 rounded-xl p-4">
+                <legend className="text-[11px] font-black uppercase tracking-wider text-rose-600 px-2 ml-2 bg-white">Infracciones y Observaciones</legend>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase text-slate-500">Infracciones a Aplicar</span>
+                    {convertForm.infraccionesIds.map((infId, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <select required value={infId} onChange={(e) => {
+                          const newIds = [...convertForm.infraccionesIds]
+                          newIds[idx] = e.target.value
+                          setConvertForm({ ...convertForm, infraccionesIds: newIds })
+                        }} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white">
+                          <option value="">Selecciona infracción</option>
+                          {tiposInfraccion.map((tipo) => (
+                            <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
+                          ))}
+                        </select>
+                        {convertForm.infraccionesIds.length > 1 && (
+                          <button type="button" onClick={() => {
+                            const newIds = [...convertForm.infraccionesIds]
+                            newIds.splice(idx, 1)
+                            setConvertForm({ ...convertForm, infraccionesIds: newIds })
+                          }} className="flex items-center justify-center rounded-xl bg-rose-100 px-3 py-2 text-rose-600 hover:bg-rose-200 font-bold transition">
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setConvertForm({ ...convertForm, infraccionesIds: [...convertForm.infraccionesIds, ''] })} className="text-xs font-black text-emerald-600 hover:text-emerald-700 mt-2 block">
+                      + Añadir otra infracción
+                    </button>
                   </div>
-                ))}
-                <button type="button" onClick={() => setConvertForm({ ...convertForm, infraccionesIds: [...convertForm.infraccionesIds, ''] })} className="text-sm font-bold text-emerald-600 hover:text-emerald-700">
-                  + Añadir otra infracción
-                </button>
-              </div>
-              <label className="block space-y-1">
-                <span className="text-xs font-black uppercase text-slate-400">DNI del infractor/intervenido opcional</span>
-                <input value={convertForm.conductorDni} onChange={(e) => setConvertForm({ ...convertForm, conductorDni: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="Vacío = CONDUCTOR NO PRESENTE" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold" />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-black uppercase text-slate-400">Observación de autoridad</span>
-                <textarea value={convertForm.observacionesAutoridad} onChange={(e) => setConvertForm({ ...convertForm, observacionesAutoridad: e.target.value })} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold" />
-              </label>
+
+                  <label className="block space-y-1.5">
+                    <span className="text-[11px] font-bold uppercase text-slate-500">Observación de autoridad</span>
+                    <textarea value={convertForm.observacionesAutoridad} onChange={(e) => setConvertForm({ ...convertForm, observacionesAutoridad: e.target.value })} rows={3} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white" />
+                  </label>
+                </div>
+              </fieldset>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
               <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600">Cancelar</button>
@@ -1392,3 +1459,4 @@ export function Papeletas() {
     </div>
   )
 }
+export default Papeletas
