@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
@@ -80,6 +80,26 @@ export function Permisos() {
 
   useEffect(() => {
     loadData()
+
+    const handleMessage = (e) => {
+      if (e.data?.type === 'PERMISO_GUARDADO') {
+        invalidateCache('/permisos')
+        loadData()
+      }
+    }
+    const handleStorage = (e) => {
+      if (e.key === 'mjlo_permisos_updated') {
+        invalidateCache('/permisos')
+        loadData()
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('message', handleMessage)
+      window.removeEventListener('storage', handleStorage)
+    }
   }, [])
 
   const totalPermisos = permisos.length
@@ -179,13 +199,39 @@ export function Permisos() {
   }
 
   const handleOpenCreate = () => {
-    setEditingPermiso(null)
-    setIsCreateModalOpen(true)
+    const w = 1250
+    const h = 920
+    const left = Math.max(0, (window.screen.width - w) / 2)
+    const top = Math.max(0, (window.screen.height - h) / 2)
+    const win = window.open(
+      '/permisos-formulario',
+      'PermisoVentana',
+      `width=${w},height=${h},top=${top},left=${left},scrollbars=yes,resizable=yes,status=no,toolbar=no,menubar=no`
+    )
+    if (win) {
+      win.focus()
+    } else {
+      setEditingPermiso(null)
+      setIsCreateModalOpen(true)
+    }
   }
 
   const handleOpenEdit = (p) => {
-    setEditingPermiso(p)
-    setIsCreateModalOpen(true)
+    const w = 1250
+    const h = 920
+    const left = Math.max(0, (window.screen.width - w) / 2)
+    const top = Math.max(0, (window.screen.height - h) / 2)
+    const win = window.open(
+      `/permisos-formulario?id=${p.id}`,
+      'PermisoVentana',
+      `width=${w},height=${h},top=${top},left=${left},scrollbars=yes,resizable=yes,status=no,toolbar=no,menubar=no`
+    )
+    if (win) {
+      win.focus()
+    } else {
+      setEditingPermiso(p)
+      setIsCreateModalOpen(true)
+    }
   }
 
   const handlePrint = () => {
