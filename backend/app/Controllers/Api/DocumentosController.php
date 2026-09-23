@@ -8,42 +8,18 @@ class DocumentosController extends ResourceController
 {
     protected $format = 'json';
 
-    private function documentColumn(string $column, string $alias): string
+    // Columnas reales de documentos_vehiculo: cualquier otro dato del formulario se descarta.
+    private const COLUMNAS = ['id_vehiculo', 'fecha_expedicion', 'fecha_expiracion', 'tipo_documento', 'codigo', 'estado'];
+
+    private function soloColumnasReales(array $record): array
     {
-        $db = \Config\Database::connect();
-
-        if ($db->fieldExists($column, 'documentos_vehiculo')) {
-            return "d.$column AS $alias";
-        }
-
-        return "NULL AS $alias";
-    }
-
-    private function filterExistingDocumentColumns(array $record): array
-    {
-        $db = \Config\Database::connect();
-
-        return array_filter(
-            $record,
-            static fn ($value, string $column): bool => $db->fieldExists($column, 'documentos_vehiculo'),
-            ARRAY_FILTER_USE_BOTH
-        );
+        return array_intersect_key($record, array_flip(self::COLUMNAS));
     }
 
     public function index()
     {
         $db = \Config\Database::connect();
-
-        $optionalColumns = [
-            $this->documentColumn('aseguradora', 'aseguradora'),
-            $this->documentColumn('numero_licencia', 'numeroLicencia'),
-            $this->documentColumn('id_inspeccion', 'idInspeccion'),
-            $this->documentColumn('numero_inspeccion', 'numeroInspeccion'),
-        ];
-
-        $resMunicipalCol = $db->fieldExists('resolucion_alcaldia', 'asociaciones')
-            ? "COALESCE(o.resolucion_alcaldia, '')"
-            : ($db->fieldExists('numero_licencia', 'asociaciones') ? "COALESCE(o.numero_licencia, '')" : "''");
+        $resMunicipalCol = "COALESCE(o.resolucion_alcaldia, '')";
 
         $rows = $db->table('documentos_vehiculo d')
             ->select("
@@ -61,7 +37,6 @@ class DocumentosController extends ResourceController
                 COALESCE(v.codigo_qr, '') AS codigoQr,
                 d.tipo_documento AS tipoDocumento,
                 d.codigo,
-                " . implode(",\n                ", $optionalColumns) . ",
                 d.fecha_expedicion AS fechaExpedicion,
                 d.fecha_expiracion AS fechaExpiracion,
                 d.estado,
@@ -93,9 +68,7 @@ class DocumentosController extends ResourceController
             $row['conductorNombres'] = trim($row['propietarioNombres'] ?? '');
             $row['conductorApellidos'] = $apellidos;
             $row['conductorDni'] = $row['propietarioDni'] ?? '';
-            if (empty($row['numeroLicencia']) && !empty($row['conductorLicencia'])) {
-                $row['numeroLicencia'] = $row['conductorLicencia'];
-            }
+            $row['numeroLicencia'] = $row['conductorLicencia'] ?? '';
             $row['hasPropietario'] = !empty($propietario);
             unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
             return $row;
@@ -160,7 +133,7 @@ class DocumentosController extends ResourceController
 
         // Check owner if issuing TUC
         $propietarioRow = $db->table('vehiculo_propietarios vp')
-            ->select("COALESCE(c.nombres, '') AS nombres, COALESCE(c.apellido_paterno, '') AS apePaterno, COALESCE(c.apellido_materno, '') AS apeMaterno, COALESCE(c.foto, '') AS foto, COALESCE(p.numero, '') AS dni, COALESCE(p.direccion, '') AS direccion")
+            ->select("COALESCE(c.nombres, '') AS nombres, COALESCE(c.apellido_paterno, '') AS apePaterno, COALESCE(c.apellido_materno, '') AS apeMaterno, COALESCE(c.foto, '') AS foto, COALESCE(p.numero, '') AS dni, COALESCE(p.direccion, '') AS direccion, COALESCE(c.numero_licencia, '') AS licencia")
             ->join('personas p', 'p.id = vp.id_persona', 'inner')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'inner')
             ->where('vp.id_vehiculo', $vehiculoId)
@@ -201,12 +174,7 @@ class DocumentosController extends ResourceController
             'fecha_expedicion'   => !empty($input['fechaExpedicion']) ? $input['fechaExpedicion'] : date('Y-m-d'),
             'fecha_expiracion'   => !empty($input['fechaExpiracion']) ? $input['fechaExpiracion'] : date('Y-m-d', strtotime('+1 year')),
             'estado'             => strtoupper($input['estado'] ?? 'VIGENTE'),
-            'aseguradora'        => !empty($input['aseguradora']) ? trim($input['aseguradora']) : null,
-            'numero_licencia'    => !empty($input['numeroLicencia']) ? trim($input['numeroLicencia']) : null,
-            'id_inspeccion'      => !empty($input['idInspeccion']) ? (int)$input['idInspeccion'] : null,
-            'numero_inspeccion'  => !empty($input['numeroInspeccion']) ? trim($input['numeroInspeccion']) : null,
         ];
-        $record = $this->filterExistingDocumentColumns($record);
 
         $db->table('documentos_vehiculo')->insert($record);
         $insertId = (int)$db->insertID();
@@ -238,16 +206,15 @@ class DocumentosController extends ResourceController
             'fechaExpedicion'          => $record['fecha_expedicion'],
             'fechaExpiracion'          => $record['fecha_expiracion'],
             'estado'                   => $record['estado'],
-            'aseguradora'              => $record['aseguradora'] ?? null,
-            'numeroLicencia'           => $record['numero_licencia'] ?? null,
+            'numeroLicencia'           => $propietarioRow['licencia'] ?? '',
             'fotoConductor'            => $propietarioRow['foto'] ?? '',
             'conductorNombres'         => $propietarioRow['nombres'] ?? '',
             'conductorApellidos'       => trim(($propietarioRow['apePaterno'] ?? '') . ' ' . ($propietarioRow['apeMaterno'] ?? '')),
             'conductorDni'             => $propietarioRow['dni'] ?? '',
             'resMunicipal'             => $asocRow['resolucion_alcaldia'] ?? '',
             'direccion'                => $propietarioRow['direccion'] ?? '',
-            'idInspeccion'             => $record['id_inspeccion'] ?? null,
-            'numeroInspeccion'         => $record['numero_inspeccion'] ?? null,
+            'idInspeccion'             => $input['idInspeccion'] ?? null,
+            'numeroInspeccion'         => $input['numeroInspeccion'] ?? null,
             'propietario'              => $propietarioNombre ?: 'Sin Propietario Asignado',
             'propietarioDni'           => $propietarioRow['dni'] ?? '',
             'hasPropietario'           => !empty($propietarioNombre),
@@ -266,22 +233,16 @@ class DocumentosController extends ResourceController
             return $this->failNotFound('ID de documento no especificado.');
         }
 
-        $rules = [
-            'tipoDocumento' => [
-                'rules' => 'permit_empty|in_list[TARJETA_OPERATIVIDAD,SOAT,CERTICAV]',
-                'errors' => [
-                    'in_list' => 'Tipo de documento vehicular no válido.'
-                ]
-            ],
-        ];
-
-        if (!$this->validateData($input, $rules)) {
-            return $this->failValidationErrors($this->validator->getErrors());
+        $actual = $db->table('documentos_vehiculo')->select('tipo_documento')->where('id', $id)->get()->getRowArray();
+        if (!$actual) {
+            return $this->failNotFound('Documento no encontrado.');
         }
 
         $record = [];
-        if (isset($input['tipoDocumento'])) {
-            $tipoDocumento = strtoupper(trim($input['tipoDocumento']));
+        $tipoDocumento = isset($input['tipoDocumento']) ? strtoupper(trim($input['tipoDocumento'])) : null;
+        // Solo se valida si cambia el tipo: un CITV o Tarjeta de Propiedad ya
+        // registrado debe poder editarse (p. ej. marcarlo VENCIDO).
+        if ($tipoDocumento !== null && $tipoDocumento !== $actual['tipo_documento']) {
             if ($tipoDocumento === 'TARJETA_PROPIEDAD') {
                 return $this->failValidationErrors('La Tarjeta de Propiedad es de SUNARP y no es un documento emitible por la Municipalidad.');
             }
@@ -298,11 +259,7 @@ class DocumentosController extends ResourceController
         if (isset($input['fechaExpedicion'])) $record['fecha_expedicion'] = $input['fechaExpedicion'];
         if (isset($input['fechaExpiracion'])) $record['fecha_expiracion'] = $input['fechaExpiracion'];
         if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
-        if (array_key_exists('aseguradora', $input)) $record['aseguradora'] = trim($input['aseguradora'] ?? '') ?: null;
-        if (array_key_exists('numeroLicencia', $input)) $record['numero_licencia'] = trim($input['numeroLicencia'] ?? '') ?: null;
-        if (array_key_exists('idInspeccion', $input)) $record['id_inspeccion'] = $input['idInspeccion'] ? (int)$input['idInspeccion'] : null;
-        if (array_key_exists('numeroInspeccion', $input)) $record['numero_inspeccion'] = trim($input['numeroInspeccion'] ?? '') ?: null;
-        $record = $this->filterExistingDocumentColumns($record);
+        $record = $this->soloColumnasReales($record);
 
         if (!empty($record)) {
             $db->table('documentos_vehiculo')->where('id', $id)->update($record);

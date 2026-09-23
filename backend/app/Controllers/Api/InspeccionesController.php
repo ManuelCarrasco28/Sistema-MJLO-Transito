@@ -33,6 +33,20 @@ class InspeccionesController extends ResourceController
         }
     }
 
+    /**
+     * Vista previa de los correlativos que se asignarán al registrar. Se muestra
+     * bloqueada en el formulario; el valor definitivo se reasigna al guardar.
+     */
+    public function siguienteCorrelativo()
+    {
+        $db = \Config\Database::connect();
+        $anio = preg_match('/^\d{4}$/', (string)$this->request->getGet('anio')) ? $this->request->getGet('anio') : date('Y');
+        return $this->respond(['data' => [
+            'numeroRegistro'      => $this->siguienteNumeroRegistro($db, $anio),
+            'numeroSerieCerticav' => $this->siguienteSerieCerticav($db),
+        ]]);
+    }
+
     public function show($id = null)
     {
         $db = \Config\Database::connect();
@@ -47,9 +61,9 @@ class InspeccionesController extends ResourceController
                     i.numero_serie_certicav as numeroSerieCerticav,
                     COALESCE(i.primera_evaluacion, 'APROBADO') as primeraEvaluacion,
                     COALESCE(i.segunda_evaluacion, '') as segundaEvaluacion,
-                    COALESCE(i.conductor_nombre, '') as conductorNombre,
-                    COALESCE(i.conductor_dni, '') as conductorDni,
-                    COALESCE(i.conductor_licencia, '') as conductorLicencia,
+                    COALESCE(CONCAT(cc.nombres, ' ', cc.apellido_paterno, ' ', COALESCE(cc.apellido_materno, '')), '') as conductorNombre,
+                    COALESCE(pc.numero, '') as conductorDni,
+                    COALESCE(cc.numero_licencia, '') as conductorLicencia,
                     v.placa as vehiculoPlaca,
                     COALESCE(v.marca, '') as vehiculoMarca,
                     COALESCE(v.modelo, '') as vehiculoModelo,
@@ -61,6 +75,7 @@ class InspeccionesController extends ResourceController
                     COALESCE(pp.numero, '') as propietarioDni,
                     COALESCE(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')), 'Inspector Técnico Municipal') as inspector,
                     i.fecha as fecha,
+                    i.fecha_segunda_evaluacion as fechaSegundaEvaluacion,
                     i.resultado,
                     i.observaciones,
                     i.estado
@@ -71,6 +86,8 @@ class InspeccionesController extends ResourceController
                 ->join('personas pp', 'pp.id = vp.id_persona', 'left')
                 ->join('ciudadanos cp', 'cp.id_persona = pp.id', 'left')
                 ->join('ciudadanos c', 'c.id_persona = i.id_tecnico', 'left')
+                ->join('personas pc', 'pc.id = i.id_conductor', 'left')
+                ->join('ciudadanos cc', 'cc.id_persona = pc.id', 'left')
                 ->groupBy('i.id');
 
             if (is_numeric($id)) {
@@ -87,36 +104,10 @@ class InspeccionesController extends ResourceController
                 return $this->failNotFound('Inspección / CertiCAV no encontrado.');
             }
 
-            $row['id'] = (int)$row['id'];
-            $fechaEmision = $row['fecha'] ?: date('Y-m-d');
-            $fechaVencimiento = date('Y-m-d', strtotime('+6 months', strtotime($fechaEmision)));
-            $row['fechaVencimiento'] = $fechaVencimiento;
-            $row['vigenciaMeses'] = 6;
+            $row = $this->aplicarVigencia($row);
 
-            if (empty($row['numeroSerieCerticav'])) {
-                $row['numeroSerieCerticav'] = str_pad((string)$row['id'], 7, '0', STR_PAD_LEFT);
-            }
-
-            $hoy = date('Y-m-d');
-            if ($row['resultado'] === 'APROBADO') {
-                if ($hoy <= $fechaVencimiento) {
-                    $row['estadoVigencia'] = 'VIGENTE';
-                    $row['diasRestantes'] = max(0, (int)((strtotime($fechaVencimiento) - strtotime($hoy)) / 86400));
-                } else {
-                    $row['estadoVigencia'] = 'VENCIDO';
-                    $row['diasRestantes'] = 0;
-                }
-            } elseif ($row['resultado'] === 'OBSERVADO') {
-                $row['estadoVigencia'] = 'OBSERVADO';
-                $row['diasRestantes'] = 0;
-            } else {
-                $row['estadoVigencia'] = 'DESAPROBADO';
-                $row['diasRestantes'] = 0;
-            }
-
-            $detalles = $db->table('certicav_detalles id')
-                ->select('id.id_criterio as criterioId, id.estado_revision as estado, id.observacion as obs')
-                ->where('id.id_certicav', $row['id'])
+            $detalles = $this->consultaDetalles($db)
+                ->where('d.id_certicav', $row['id'])
                 ->get()
                 ->getResultArray();
 
@@ -146,9 +137,9 @@ class InspeccionesController extends ResourceController
                     i.numero_serie_certicav as numeroSerieCerticav,
                     COALESCE(i.primera_evaluacion, 'APROBADO') as primeraEvaluacion,
                     COALESCE(i.segunda_evaluacion, '') as segundaEvaluacion,
-                    COALESCE(i.conductor_nombre, '') as conductorNombre,
-                    COALESCE(i.conductor_dni, '') as conductorDni,
-                    COALESCE(i.conductor_licencia, '') as conductorLicencia,
+                    COALESCE(CONCAT(cc.nombres, ' ', cc.apellido_paterno, ' ', COALESCE(cc.apellido_materno, '')), '') as conductorNombre,
+                    COALESCE(pc.numero, '') as conductorDni,
+                    COALESCE(cc.numero_licencia, '') as conductorLicencia,
                     v.placa as vehiculoPlaca,
                     COALESCE(v.marca, '') as vehiculoMarca,
                     COALESCE(v.modelo, '') as vehiculoModelo,
@@ -160,6 +151,7 @@ class InspeccionesController extends ResourceController
                     COALESCE(pp.numero, '') as propietarioDni,
                     COALESCE(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')), 'Inspector Técnico Municipal') as inspector,
                     i.fecha as fecha,
+                    i.fecha_segunda_evaluacion as fechaSegundaEvaluacion,
                     i.resultado,
                     i.observaciones,
                     i.estado
@@ -170,52 +162,34 @@ class InspeccionesController extends ResourceController
                 ->join('personas pp', 'pp.id = vp.id_persona', 'left')
                 ->join('ciudadanos cp', 'cp.id_persona = pp.id', 'left')
                 ->join('ciudadanos c', 'c.id_persona = i.id_tecnico', 'left')
+                ->join('personas pc', 'pc.id = i.id_conductor', 'left')
+                ->join('ciudadanos cc', 'cc.id_persona = pc.id', 'left')
+                ->where('i.estado !=', 'ANULADA')
                 ->groupBy('i.id')
                 ->orderBy('i.id', 'DESC')
                 ->get()
                 ->getResultArray();
 
-            $hoy = date('Y-m-d');
-            $data = [];
-            foreach ($rows as $row) {
-                $row['id'] = (int)$row['id'];
-                $fechaEmision = $row['fecha'] ?: date('Y-m-d');
-                $fechaVencimiento = date('Y-m-d', strtotime('+6 months', strtotime($fechaEmision)));
-                $row['fechaVencimiento'] = $fechaVencimiento;
-                $row['vigenciaMeses'] = 6;
-
-                // Correlativo de 7 dígitos si no existe
-                if (empty($row['numeroSerieCerticav'])) {
-                    $row['numeroSerieCerticav'] = str_pad((string)$row['id'], 7, '0', STR_PAD_LEFT);
-                }
-
-                // Cálculo de vigencia oficial de 6 meses
-                if ($row['resultado'] === 'APROBADO') {
-                    if ($hoy <= $fechaVencimiento) {
-                        $row['estadoVigencia'] = 'VIGENTE';
-                        $row['diasRestantes'] = max(0, (int)((strtotime($fechaVencimiento) - strtotime($hoy)) / 86400));
-                    } else {
-                        $row['estadoVigencia'] = 'VENCIDO';
-                        $row['diasRestantes'] = 0;
-                    }
-                } elseif ($row['resultado'] === 'OBSERVADO') {
-                    $row['estadoVigencia'] = 'OBSERVADO';
-                    $row['diasRestantes'] = 0;
-                } else {
-                    $row['estadoVigencia'] = 'DESAPROBADO';
-                    $row['diasRestantes'] = 0;
-                }
-
-                $detalles = $db->table('certicav_detalles id')
-                    ->select('id.id_criterio as criterioId, id.estado_revision as estado, id.observacion as obs')
-                    ->where('id.id_certicav', $row['id'])
+            $detallesPorInspeccion = [];
+            $ids = array_map(static fn (array $r) => (int)$r['id'], $rows);
+            if ($ids) {
+                $todos = $this->consultaDetalles($db)
+                    ->select('d.id_certicav')
+                    ->whereIn('d.id_certicav', $ids)
                     ->get()
                     ->getResultArray();
-
-                $row['detalles'] = array_map(static function (array $d) {
+                foreach ($todos as $d) {
+                    $idCerticav = (int)$d['id_certicav'];
+                    unset($d['id_certicav']);
                     $d['criterioId'] = (int)$d['criterioId'];
-                    return $d;
-                }, $detalles);
+                    $detallesPorInspeccion[$idCerticav][] = $d;
+                }
+            }
+
+            $data = [];
+            foreach ($rows as $row) {
+                $row = $this->aplicarVigencia($row);
+                $row['detalles'] = $detallesPorInspeccion[$row['id']] ?? [];
 
                 $data[] = $row;
             }
@@ -259,25 +233,11 @@ class InspeccionesController extends ResourceController
         $detalles = $input['detalles'] ?? [];
 
         try {
-            $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
+            $vehiculo = $placa !== '' ? $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray() : null;
             if (!$vehiculo) {
-                // Keep backward compatibility for test script auto-creation
-                $firstVeh = $db->table('vehiculos')->limit(1)->get()->getRowArray();
-                if ($firstVeh) {
-                    $vehiculoId = (int)$firstVeh['id'];
-                    $placa = $firstVeh['placa'];
-                } else {
-                    $tipoRow = $db->table('tipos_vehiculo')->limit(1)->get()->getRowArray();
-                    $tipoId = $tipoRow ? (int)$tipoRow['id'] : null;
-                    $db->table('vehiculos')->insert([
-                        'placa'                => $placa ?: ('NC-' . random_int(1000, 9999)),
-                        'id_tipo_vehiculo'     => $tipoId
-                    ]);
-                    $vehiculoId = (int)$db->insertID();
-                }
-            } else {
-                $vehiculoId = (int)$vehiculo['id'];
+                throw new \DomainException("La placa {$placa} no está registrada en el padrón vehicular. Regístrela primero en Vehículos.");
             }
+            $vehiculoId = (int)$vehiculo['id'];
 
             // Actualizar datos técnicos del vehículo si se ingresaron en la inspección
             $vehUpdate = [];
@@ -299,19 +259,27 @@ class InspeccionesController extends ResourceController
                 $tecnicoId = $tecnico ? (int)$tecnico['id_persona'] : null;
             }
 
-            if (method_exists($this, 'validarDetalles')) {
-                $detalles = $this->validarDetalles($db, $detalles);
-            }
-            $db->transException(true)->transBegin();
+            $detalles = $this->validarDetalles($db, $detalles);
 
             $fecha = !empty($input['fecha']) ? trim($input['fecha']) : date('Y-m-d');
-            $numeroInspeccion = !empty($input['numeroRegistro']) ? trim($input['numeroRegistro']) : (!empty($input['numeroInspeccion']) ? trim($input['numeroInspeccion']) : ('REG-' . date('Y') . '-' . str_pad((string)random_int(1, 999), 3, '0', STR_PAD_LEFT)));
-            $numeroSerieCerticav = !empty($input['numeroSerieCerticav']) ? trim($input['numeroSerieCerticav']) : null;
+            $numeroInspeccion = trim((string)($input['numeroRegistro'] ?? ($input['numeroInspeccion'] ?? '')));
+            $numeroSerieCerticav = trim((string)($input['numeroSerieCerticav'] ?? ''));
+            $this->validarCorrelativos($db, $numeroInspeccion, $numeroSerieCerticav);
+
+            $db->transException(true)->transBegin();
+
+            if ($numeroInspeccion === '') {
+                $numeroInspeccion = $this->siguienteNumeroRegistro($db, substr($fecha, 0, 4));
+            }
+            if ($numeroSerieCerticav === '') {
+                $numeroSerieCerticav = $this->siguienteSerieCerticav($db);
+            }
             $primeraEvaluacion = trim($input['primeraEvaluacion'] ?? ($resultado === 'DESAPROBADO' ? 'DESAPROBADO' : 'APROBADO'));
             $segundaEvaluacion = !empty($input['segundaEvaluacion']) ? trim($input['segundaEvaluacion']) : null;
             $conductorNombre = trim($input['conductorNombre'] ?? ($input['conductor'] ?? ''));
             $conductorDni = trim($input['conductorDni'] ?? '');
             $conductorLicencia = trim($input['conductorLicencia'] ?? '');
+            $conductorId = $this->resolverConductor($db, $conductorNombre, $conductorDni, $conductorLicencia);
 
             $fechaVencimiento = date('Y-m-d', strtotime('+6 months', strtotime($fecha)));
             $hoy = date('Y-m-d');
@@ -321,9 +289,7 @@ class InspeccionesController extends ResourceController
                 'numero_serie_certicav' => $numeroSerieCerticav,
                 'primera_evaluacion'    => $primeraEvaluacion,
                 'segunda_evaluacion'    => $segundaEvaluacion,
-                'conductor_nombre'      => $conductorNombre ?: null,
-                'conductor_dni'         => $conductorDni ?: null,
-                'conductor_licencia'    => $conductorLicencia ?: null,
+                'id_conductor'          => $conductorId,
                 'id_vehiculo'           => $vehiculoId,
                 'id_tecnico'            => $tecnicoId,
                 'fecha'                 => $fecha,
@@ -333,12 +299,6 @@ class InspeccionesController extends ResourceController
             ];
             $db->table('certicav')->insert($inspData);
             $inspeccionId = (int)$db->insertID();
-
-            // Si no se proveyó número de serie oficial, generamos el correlativo de 7 dígitos tipo sello (ej: 0008180)
-            if (empty($numeroSerieCerticav)) {
-                $numeroSerieCerticav = str_pad((string)$inspeccionId, 7, '0', STR_PAD_LEFT);
-                $db->table('certicav')->where('id', $inspeccionId)->update(['numero_serie_certicav' => $numeroSerieCerticav]);
-            }
 
             // Vigencia oficial de 6 meses
             if ($resultado === 'APROBADO') {
@@ -353,38 +313,21 @@ class InspeccionesController extends ResourceController
             }
 
             $savedDetalles = [];
-            if (is_array($detalles) && !empty($detalles)) {
-                foreach ($detalles as $det) {
-                    $criterioId = (int)($det['criterioId'] ?? 0);
-                    if ($criterioId <= 0) continue;
-
-                    $criterioExists = $db->table('inspeccion_criterios')->where('id', $criterioId)->countAllResults();
-                    if (!$criterioExists) {
-                        $db->table('inspeccion_criterios')->insert([
-                            'codigo'      => 'CRIT-' . str_pad((string)$criterioId, 2, '0', STR_PAD_LEFT),
-                            'nombre'      => 'Criterio ' . $criterioId,
-                            'descripcion' => 'Evaluación de seguridad e inspección técnica',
-                            'obligatorio' => 1,
-                            'orden'       => $criterioId,
-                            'estado'      => 'ACTIVO'
-                        ]);
-                        $criterioId = (int)$db->insertID();
-                    }
-
-                    $estadoRev = trim($det['estado'] ?? 'BIEN');
-                    $obs = trim($det['obs'] ?? '');
-                    $db->table('certicav_detalles')->insert([
-                        'id_certicav'     => $inspeccionId,
-                        'id_criterio'     => $criterioId,
-                        'estado_revision' => $estadoRev,
-                        'observacion'     => $obs
-                    ]);
-                    $savedDetalles[] = [
-                        'criterioId' => $criterioId,
-                        'estado'     => $estadoRev,
-                        'obs'        => $obs
-                    ];
-                }
+            $filas = [];
+            foreach ($detalles as $det) {
+                $criterioId = (int)($det['criterioId'] ?? 0);
+                $estadoRev = trim($det['estado'] ?? 'BIEN');
+                $obs = trim($det['obs'] ?? '');
+                $filas[] = [
+                    'id_certicav'     => $inspeccionId,
+                    'id_criterio'     => $criterioId,
+                    'estado_revision' => $estadoRev,
+                    'observacion'     => $obs
+                ];
+                $savedDetalles[] = ['criterioId' => $criterioId, 'estado' => $estadoRev, 'obs' => $obs];
+            }
+            if ($filas) {
+                $db->table('certicav_detalles')->insertBatch($filas);
             }
             $db->transComplete();
 
@@ -456,8 +399,15 @@ class InspeccionesController extends ResourceController
         }
 
         try {
-            if (!$db->table('certicav')->where('id', $id)->countAllResults()) return $this->failNotFound('Inspección no encontrada.');
-            if (isset($input['detalles']) && method_exists($this, 'validarDetalles')) $input['detalles'] = $this->validarDetalles($db, $input['detalles']);
+            $actual = $db->table('certicav')->where('id', $id)->get()->getRowArray();
+            if (!$actual) return $this->failNotFound('Inspección no encontrada.');
+            if (isset($input['detalles'])) $input['detalles'] = $this->validarDetalles($db, $input['detalles']);
+            $this->validarCorrelativos(
+                $db,
+                trim((string)($input['numeroRegistro'] ?? '')),
+                trim((string)($input['numeroSerieCerticav'] ?? '')),
+                (int)$id
+            );
             $db->transException(true)->transBegin();
             $data = [];
             if (isset($input['resultado'])) {
@@ -469,26 +419,35 @@ class InspeccionesController extends ResourceController
             if (isset($input['tecnicoId']) && (int)$input['tecnicoId'] > 0) {
                 $data['id_tecnico'] = (int)$input['tecnicoId'];
             }
-            if (isset($input['numeroRegistro'])) {
+            if (!empty(trim((string)($input['numeroRegistro'] ?? '')))) {
                 $data['numero_registro'] = trim($input['numeroRegistro']);
             }
-            if (isset($input['numeroSerieCerticav'])) {
+            if (!empty(trim((string)($input['numeroSerieCerticav'] ?? '')))) {
                 $data['numero_serie_certicav'] = trim($input['numeroSerieCerticav']);
             }
             if (isset($input['primeraEvaluacion'])) {
                 $data['primera_evaluacion'] = trim($input['primeraEvaluacion']);
             }
-            if (isset($input['segundaEvaluacion'])) {
-                $data['segunda_evaluacion'] = trim($input['segundaEvaluacion']);
+            if (array_key_exists('segundaEvaluacion', $input)) {
+                $segunda = trim((string)$input['segundaEvaluacion']) ?: null;
+                $data['segunda_evaluacion'] = $segunda;
+                // La vigencia se cuenta desde el día en que se registra la segunda evaluación.
+                if ($segunda === null) {
+                    $data['fecha_segunda_evaluacion'] = null;
+                } elseif ($segunda !== ($actual['segunda_evaluacion'] ?? null)) {
+                    $data['fecha_segunda_evaluacion'] = date('Y-m-d');
+                }
             }
-            if (isset($input['conductorNombre'])) {
-                $data['conductor_nombre'] = trim($input['conductorNombre']);
-            }
-            if (isset($input['conductorDni'])) {
-                $data['conductor_dni'] = trim($input['conductorDni']);
-            }
-            if (isset($input['conductorLicencia'])) {
-                $data['conductor_licencia'] = trim($input['conductorLicencia']);
+            if (isset($input['conductorNombre']) || isset($input['conductorDni']) || isset($input['conductorLicencia'])) {
+                $conductorId = $this->resolverConductor(
+                    $db,
+                    trim($input['conductorNombre'] ?? ''),
+                    trim($input['conductorDni'] ?? ''),
+                    trim($input['conductorLicencia'] ?? '')
+                );
+                if ($conductorId) {
+                    $data['id_conductor'] = $conductorId;
+                }
             }
             if (isset($input['fecha'])) {
                 $data['fecha'] = trim($input['fecha']);
@@ -515,15 +474,19 @@ class InspeccionesController extends ResourceController
 
             if (isset($input['detalles']) && is_array($input['detalles'])) {
                 $db->table('certicav_detalles')->where('id_certicav', $id)->delete();
+                $filas = [];
                 foreach ($input['detalles'] as $det) {
                     $criterioId = (int)($det['criterioId'] ?? 0);
                     if ($criterioId <= 0) continue;
-                    $db->table('certicav_detalles')->insert([
+                    $filas[] = [
                         'id_certicav' => $id,
                         'id_criterio' => $criterioId,
                         'estado_revision' => trim($det['estado'] ?? 'BIEN'),
                         'observacion' => trim($det['obs'] ?? '')
-                    ]);
+                    ];
+                }
+                if ($filas) {
+                    $db->table('certicav_detalles')->insertBatch($filas);
                 }
             }
 
@@ -555,14 +518,148 @@ class InspeccionesController extends ResourceController
         }
     }
 
+    /**
+     * Busca a la persona conductora por DNI; si no existe la crea con los datos
+     * capturados en el formulario de CERTICAV (nombre, licencia). Devuelve el id
+     * de personas.id o null si no se proporcionó DNI.
+     */
+    private function resolverConductor($db, string $nombre, string $dni, string $licencia): ?int
+    {
+        if ($dni === '') {
+            return null;
+        }
+
+        $persona = $db->table('personas')->where('numero', $dni)->limit(1)->get()->getRowArray();
+
+        if ($persona) {
+            $conductorId = (int)$persona['id'];
+            if ($licencia !== '' && $licencia !== $dni) {
+                $db->table('ciudadanos')->where('id_persona', $conductorId)->update(['numero_licencia' => $licencia]);
+            }
+            return $conductorId;
+        }
+
+        // Convención peruana: los dos últimos términos son los apellidos y el
+        // resto los nombres ("Juan Carlos Coronado Rojas").
+        $partes = array_values(array_filter(preg_split('/\s+/', trim($nombre)) ?: [], 'strlen'));
+        $total = count($partes);
+        if ($total >= 3) {
+            $apellidoMaterno = $partes[$total - 1];
+            $apellidoPaterno = $partes[$total - 2];
+            $nombres = implode(' ', array_slice($partes, 0, $total - 2));
+        } elseif ($total === 2) {
+            [$nombres, $apellidoPaterno] = $partes;
+            $apellidoMaterno = null;
+        } else {
+            $nombres = $partes[0] ?? 'CONDUCTOR';
+            $apellidoPaterno = 'SIN REGISTRAR';
+            $apellidoMaterno = null;
+        }
+
+        $db->table('personas')->insert([
+            'id_tipo_documento' => 1,
+            'numero'            => $dni,
+            'estado'            => 'ACTIVO',
+        ]);
+        $conductorId = (int)$db->insertID();
+
+        $db->table('ciudadanos')->insert([
+            'id_persona'       => $conductorId,
+            'nombres'          => $nombres,
+            'apellido_paterno' => $apellidoPaterno,
+            'apellido_materno' => $apellidoMaterno,
+            'numero_licencia'  => ($licencia !== '' && $licencia !== $dni) ? $licencia : null,
+        ]);
+
+        return $conductorId;
+    }
+
+    /**
+     * Resultados del checklist con los datos del criterio con que se evaluó
+     * (puede ser un criterio ya desactivado en inspecciones antiguas).
+     */
+    private function consultaDetalles($db)
+    {
+        return $db->table('certicav_detalles d')
+            ->select('d.id_criterio as criterioId, d.estado_revision as estado, d.observacion as obs, ic.codigo, ic.nombre, ic.seccion, ic.orden')
+            ->join('inspeccion_criterios ic', 'ic.id = d.id_criterio', 'left')
+            ->orderBy('ic.orden', 'ASC');
+    }
+
+    /**
+     * Vigencia oficial de 6 meses. Si la inspección se aprobó en la segunda
+     * evaluación, se cuenta desde esa fecha y no desde la primera.
+     */
+    private function aplicarVigencia(array $row): array
+    {
+        $row['id'] = (int)$row['id'];
+        $base = ($row['resultado'] === 'APROBADO' && ($row['segundaEvaluacion'] ?? '') === 'APROBADO' && !empty($row['fechaSegundaEvaluacion']))
+            ? $row['fechaSegundaEvaluacion']
+            : ($row['fecha'] ?: date('Y-m-d'));
+        $fechaVencimiento = date('Y-m-d', strtotime('+6 months', strtotime($base)));
+        $hoy = date('Y-m-d');
+
+        $row['fechaVencimiento'] = $fechaVencimiento;
+        $row['vigenciaMeses'] = 6;
+        $row['diasRestantes'] = 0;
+
+        if (($row['estado'] ?? '') === 'ANULADA') {
+            $row['estadoVigencia'] = 'ANULADA';
+        } elseif ($row['resultado'] === 'APROBADO') {
+            $row['estadoVigencia'] = $hoy <= $fechaVencimiento ? 'VIGENTE' : 'VENCIDO';
+            $row['diasRestantes'] = max(0, (int)((strtotime($fechaVencimiento) - strtotime($hoy)) / 86400));
+        } elseif ($row['resultado'] === 'OBSERVADO') {
+            $row['estadoVigencia'] = 'OBSERVADO';
+        } else {
+            $row['estadoVigencia'] = 'DESAPROBADO';
+        }
+
+        return $row;
+    }
+
+    private function validarCorrelativos($db, string $numeroRegistro, string $numeroSerie, ?int $excluirId = null): void
+    {
+        foreach (['numero_registro' => $numeroRegistro, 'numero_serie_certicav' => $numeroSerie] as $columna => $valor) {
+            if ($valor === '') continue;
+            $q = $db->table('certicav')->where($columna, $valor);
+            if ($excluirId) $q->where('id !=', $excluirId);
+            if ($q->countAllResults()) {
+                $etiqueta = $columna === 'numero_registro' ? 'N° de registro' : 'N° de serie CERTICAV';
+                throw new \DomainException("El {$etiqueta} {$valor} ya está usado por otra inspección.");
+            }
+        }
+    }
+
+    private function siguienteNumeroRegistro($db, string $anio): string
+    {
+        $prefijo = "INSP-{$anio}-";
+        $row = $db->query(
+            'SELECT MAX(CAST(SUBSTRING(numero_registro, ?) AS UNSIGNED)) AS n FROM certicav WHERE numero_registro LIKE ?',
+            [strlen($prefijo) + 1, $prefijo . '%']
+        )->getRowArray();
+        return $prefijo . str_pad((string)(((int)($row['n'] ?? 0)) + 1), 3, '0', STR_PAD_LEFT);
+    }
+
+    private function siguienteSerieCerticav($db): string
+    {
+        $row = $db->query(
+            "SELECT MAX(CAST(numero_serie_certicav AS UNSIGNED)) AS n FROM certicav WHERE numero_serie_certicav REGEXP '^[0-9]+$'"
+        )->getRowArray();
+        return str_pad((string)(((int)($row['n'] ?? 0)) + 1), 7, '0', STR_PAD_LEFT);
+    }
+
     private function validarDetalles($db, $detalles): array
     {
         if (is_string($detalles)) $detalles = json_decode($detalles, true);
         if (!is_array($detalles)) throw new \DomainException('Los criterios de inspección no son válidos.');
+        $existentes = array_flip(array_map('intval', array_column(
+            $db->table('inspeccion_criterios')->select('id')->where('estado', 'ACTIVO')->get()->getResultArray(),
+            'id'
+        )));
         $seen = [];
         foreach ($detalles as $detalle) {
             $id = (int)($detalle['criterioId'] ?? 0);
-            if ($id <= 0 || isset($seen[$id]) || !$db->table('inspeccion_criterios')->where('id', $id)->countAllResults()) throw new \DomainException('Hay criterios inexistentes o repetidos.');
+            if ($id <= 0 || isset($seen[$id]) || !isset($existentes[$id])) throw new \DomainException('Hay criterios inexistentes o repetidos.');
             if (!in_array($detalle['estado'] ?? '', ['BIEN','MAL_ESTADO','NO_TIENE'], true)) throw new \DomainException('Estado de revisión inválido.');
             $seen[$id] = true;
         }

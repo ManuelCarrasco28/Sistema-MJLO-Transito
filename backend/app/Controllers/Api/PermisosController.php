@@ -11,19 +11,26 @@ class PermisosController extends ResourceController
     private function getBaseQuery()
     {
         $db = \Config\Database::connect();
+        // Placa, solicitante, expediente y recibo no son columnas propias: se
+        // derivan de las FK del permiso (o del trámite vinculado) y del pago real.
+        $nombreCiudadano = "TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')))";
+
         return $db->table('permisos_circulacion pc')
             ->select("
                 pc.id,
                 pc.id_tramite as tramiteId,
+                pc.id_persona as personaId,
+                pc.id_asociacion as asociacionId,
+                pc.id_vehiculo as vehiculoId,
                 pc.numero_autorizacion as numeroAutorizacion,
-                pc.vehiculo_placa as vehiculoPlaca,
-                pc.solicitante_nombre as solicitanteNombre,
-                pc.solicitante_documento as solicitanteDocumento,
+                COALESCE(v.placa, '') as vehiculoPlaca,
+                COALESCE(o.razon_social, NULLIF($nombreCiudadano, ''), '') as solicitanteNombre,
+                COALESCE(o.ruc, p.numero, '') as solicitanteDocumento,
                 pc.representante_legal as representanteLegal,
                 pc.tipo_permiso as tipoPermiso,
                 pc.asunto,
                 pc.referencia_sisgedo as referenciaSisgedo,
-                pc.expediente,
+                COALESCE(td.numero_expediente, pc.referencia_sisgedo, '') as expediente,
                 pc.registro_numero as registroNumero,
                 pc.contenido,
                 pc.zona_circulacion as zonaCirculacion,
@@ -31,9 +38,9 @@ class PermisosController extends ResourceController
                 pc.recorrido_ingreso as recorridoIngreso,
                 pc.recorrido_salida as recorridoSalida,
                 pc.flota_placas as flotaPlacas,
-                pc.recibo_ingreso_numero as reciboIngresoNumero,
-                pc.recibo_ingreso_monto as reciboIngresoMonto,
-                pc.recibo_ingreso_fecha as reciboIngresoFecha,
+                COALESCE(pt.numero_recibo, '') as reciboIngresoNumero,
+                pt.total as reciboIngresoMonto,
+                pt.fecha_pago as reciboIngresoFecha,
                 pc.tonelaje,
                 pc.numero_seguridad as numeroSeguridad,
                 pc.observaciones,
@@ -43,22 +50,77 @@ class PermisosController extends ResourceController
                 pc.fecha_inicio_vigencia as fechaInicioVigencia,
                 pc.fecha_fin_vigencia as fechaFinVigencia,
                 pc.estado,
-                
-                -- Datos relacionados derivados de tramites, vehiculos, personas, asociaciones y pagos
-                COALESCE(NULLIF(pc.expediente, ''), td.numero_expediente, '') as expedienteNumero,
+                COALESCE(td.numero_expediente, pc.referencia_sisgedo, '') as expedienteNumero,
                 td.fecha_solicitud as fechaSolicitud,
                 pa.nombre as procedimientoNombre,
                 pa.codigo as procedimientoCodigo,
-                COALESCE(NULLIF(pc.solicitante_nombre, ''), o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as solicitante,
-                COALESCE(NULLIF(pc.solicitante_documento, ''), o.ruc, p.numero, '') as solicitanteDoc,
+                COALESCE(o.razon_social, NULLIF($nombreCiudadano, ''), '') as solicitante,
+                COALESCE(o.ruc, p.numero, '') as solicitanteDoc,
                 o.ruc as solicitanteRuc,
                 p.numero as solicitanteDni
             ", false)
             ->join('tramites_documentarios td', 'td.id = pc.id_tramite', 'left')
             ->join('procedimientos_administrativos pa', 'pa.id = td.id_procedimiento_admin', 'left')
-            ->join('asociaciones o', 'o.id = td.id_asociacion', 'left')
-            ->join('personas p', 'p.id = td.id_persona', 'left')
-            ->join('ciudadanos c', 'c.id_persona = p.id', 'left');
+            ->join('asociaciones o', 'o.id = COALESCE(pc.id_asociacion, td.id_asociacion)', 'left', false)
+            ->join('personas p', 'p.id = COALESCE(pc.id_persona, td.id_persona)', 'left', false)
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->join('vehiculos v', 'v.id = COALESCE(pc.id_vehiculo, td.id_vehiculo)', 'left', false)
+            ->join('(SELECT id_tramite, MAX(id) AS id FROM pagos_transito WHERE id_tramite IS NOT NULL GROUP BY id_tramite) pm', 'pm.id_tramite = pc.id_tramite', 'left', false)
+            ->join('pagos_transito pt', 'pt.id = pm.id', 'left');
+    }
+
+    /**
+     * Traduce los datos del formulario (placa, documento del solicitante,
+     * expediente) a las columnas reales de permisos_circulacion.
+     */
+    private function resolverRelaciones($db, array $payload, bool $esCreacion): array
+    {
+        $data = [];
+
+        if ($esCreacion || array_key_exists('vehiculoPlaca', $payload)) {
+            $placa = strtoupper(trim((string)($payload['vehiculoPlaca'] ?? '')));
+            $data['id_vehiculo'] = null;
+            if ($placa !== '') {
+                $vehiculo = $db->table('vehiculos')->select('id')->where('placa', $placa)->get()->getRowArray();
+                if ($vehiculo) {
+                    $data['id_vehiculo'] = (int)$vehiculo['id'];
+                } elseif (empty($payload['flotaPlacas'])) {
+                    // Vehículo fuera del padrón (p. ej. camión de carga): se conserva la placa.
+                    $data['flota_placas'] = $placa;
+                }
+            }
+        }
+
+        $claveDoc = array_key_exists('solicitanteDocumento', $payload) ? 'solicitanteDocumento'
+            : (array_key_exists('solicitanteDoc', $payload) ? 'solicitanteDoc' : null);
+        if ($esCreacion || $claveDoc) {
+            $documento = trim((string)($claveDoc ? $payload[$claveDoc] : ''));
+            $data['id_persona'] = null;
+            $data['id_asociacion'] = null;
+            if ($documento !== '') {
+                $asociacion = strlen($documento) === 11
+                    ? $db->table('asociaciones')->select('id')->where('ruc', $documento)->get()->getRowArray()
+                    : null;
+                if ($asociacion) {
+                    $data['id_asociacion'] = (int)$asociacion['id'];
+                } else {
+                    $persona = $db->table('personas')->select('id')->where('numero', $documento)->get()->getRowArray();
+                    if (!$persona) {
+                        throw new \DomainException("El solicitante con documento {$documento} no está registrado. Regístrelo en Personas o Asociaciones.");
+                    }
+                    $data['id_persona'] = (int)$persona['id'];
+                }
+            }
+        }
+
+        foreach (['referenciaSisgedo', 'expediente', 'expedienteNumero'] as $clave) {
+            if (!empty($payload[$clave])) {
+                $data['referencia_sisgedo'] = trim((string)$payload[$clave]);
+                break;
+            }
+        }
+
+        return $data;
     }
 
     public function index()
@@ -69,12 +131,7 @@ class PermisosController extends ResourceController
                 ->get()
                 ->getResultArray();
 
-            $data = array_map(static function (array $r): array {
-                $r['id'] = (int)$r['id'];
-                $r['tramiteId'] = $r['tramiteId'] ? (int)$r['tramiteId'] : null;
-                $r['reciboIngresoMonto'] = $r['reciboIngresoMonto'] ? (float)$r['reciboIngresoMonto'] : null;
-                return $r;
-            }, $rows);
+            $data = array_map([$this, 'normalizarFila'], $rows);
 
             return $this->respond(['data' => $data]);
         } catch (\Throwable $e) {
@@ -94,11 +151,7 @@ class PermisosController extends ResourceController
                 return $this->failNotFound('Permiso no encontrado.');
             }
 
-            $row['id'] = (int)$row['id'];
-            $row['tramiteId'] = $row['tramiteId'] ? (int)$row['tramiteId'] : null;
-            $row['reciboIngresoMonto'] = $row['reciboIngresoMonto'] ? (float)$row['reciboIngresoMonto'] : null;
-
-            return $this->respond(['data' => $row]);
+            return $this->respond(['data' => $this->normalizarFila($row)]);
         } catch (\Throwable $e) {
             return $this->failServerError('Error consultando detalle del permiso: ' . $e->getMessage());
         }
@@ -111,7 +164,7 @@ class PermisosController extends ResourceController
 
         $rules = [
             'tipoPermiso' => [
-                'rules' => 'permit_empty|in_list[CARGA_DESCARGA,USO_VIAS]',
+                'rules' => 'permit_empty|in_list[CARGA_DESCARGA,USO_VIAS,OPERACION,RENOVACION_OPERACION]',
                 'errors' => ['in_list' => 'Tipo de permiso no válido.']
             ]
         ];
@@ -133,81 +186,16 @@ class PermisosController extends ResourceController
             }
 
             $idTramite = !empty($payload['tramiteId']) ? (int)$payload['tramiteId'] : (!empty($payload['id_tramite']) ? (int)$payload['id_tramite'] : null);
-            $refSisgedo = !empty($payload['referenciaSisgedo']) ? trim($payload['referenciaSisgedo']) : (!empty($payload['expediente']) ? trim($payload['expediente']) : null);
-            $expediente = !empty($payload['expediente']) ? trim($payload['expediente']) : (!empty($payload['expedienteNumero']) ? trim($payload['expedienteNumero']) : null);
-            $vehiculoPlaca = !empty($payload['vehiculoPlaca']) ? strtoupper(trim($payload['vehiculoPlaca'])) : null;
-            $solicitanteNombre = !empty($payload['solicitanteNombre']) ? strtoupper(trim($payload['solicitanteNombre'])) : (!empty($payload['solicitante']) ? strtoupper(trim($payload['solicitante'])) : null);
-            $solicitanteDocumento = !empty($payload['solicitanteDocumento']) ? trim($payload['solicitanteDocumento']) : (!empty($payload['solicitanteDoc']) ? trim($payload['solicitanteDoc']) : null);
-            $reciboIngresoNumero = !empty($payload['reciboIngresoNumero']) ? trim($payload['reciboIngresoNumero']) : null;
-            $reciboIngresoMonto = isset($payload['reciboIngresoMonto']) && $payload['reciboIngresoMonto'] !== '' ? (float)$payload['reciboIngresoMonto'] : null;
-            $reciboIngresoFecha = !empty($payload['reciboIngresoFecha']) ? trim($payload['reciboIngresoFecha']) : date('Y-m-d');
 
-            // Auto-heredar datos del trámite si se vinculó un trámite documentario y faltaban datos
-            if ($idTramite) {
-                $tramite = $db->table('tramites_documentarios td')
-                    ->select("
-                        td.numero_expediente,
-                        v.placa as vehiculo_placa,
-                        COALESCE(o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')))) as solicitante_nombre,
-                        COALESCE(o.ruc, p.numero) as solicitante_documento,
-                        pt.numero_recibo,
-                        pt.total as recibo_total,
-                        pt.fecha_pago
-                    ")
-                    ->join('asociaciones o', 'o.id = td.id_asociacion', 'left')
-                    ->join('personas p', 'p.id = td.id_persona', 'left')
-                    ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-                    ->join('vehiculos v', 'v.id = td.id_vehiculo', 'left')
-                    ->join('pagos_transito pt', 'pt.id_tramite = td.id', 'left')
-                    ->where('td.id', $idTramite)
-                    ->get()
-                    ->getRowArray();
-
-                if ($tramite) {
-                    if (!$expediente && !empty($tramite['numero_expediente'])) {
-                        $expediente = $tramite['numero_expediente'];
-                    }
-                    if (!$refSisgedo && !empty($tramite['numero_expediente'])) {
-                        $refSisgedo = $tramite['numero_expediente'];
-                    }
-                    if (!$vehiculoPlaca && !empty($tramite['vehiculo_placa'])) {
-                        $vehiculoPlaca = strtoupper($tramite['vehiculo_placa']);
-                    }
-                    if (!$solicitanteNombre && !empty($tramite['solicitante_nombre'])) {
-                        $solicitanteNombre = strtoupper($tramite['solicitante_nombre']);
-                    }
-                    if (!$solicitanteDocumento && !empty($tramite['solicitante_documento'])) {
-                        $solicitanteDocumento = $tramite['solicitante_documento'];
-                    }
-                    if (!$reciboIngresoNumero && !empty($tramite['numero_recibo'])) {
-                        $reciboIngresoNumero = $tramite['numero_recibo'];
-                    }
-                    if ($reciboIngresoMonto === null && !empty($tramite['recibo_total'])) {
-                        $reciboIngresoMonto = (float)$tramite['recibo_total'];
-                    }
-                    if (!empty($tramite['fecha_pago'])) {
-                        $reciboIngresoFecha = $tramite['fecha_pago'];
-                    }
-                }
-            }
-
-            $data = [
+            $data = array_merge([
                 'id_tramite'             => $idTramite,
                 'numero_autorizacion'    => $numeroAutorizacion,
-                'vehiculo_placa'         => $vehiculoPlaca,
-                'solicitante_nombre'     => $solicitanteNombre,
-                'solicitante_documento'  => $solicitanteDocumento,
                 'representante_legal'    => !empty($payload['representanteLegal']) ? strtoupper(trim($payload['representanteLegal'])) : null,
                 'tipo_permiso'           => $tipoPermiso,
                 'asunto'                 => !empty($payload['asunto']) ? trim($payload['asunto']) : ($tipoPermiso === 'CARGA_DESCARGA' ? 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA' : 'AUTORIZACION PROVISIONAL DE USO DE VIAS'),
-                'referencia_sisgedo'     => $refSisgedo,
-                'expediente'             => $expediente,
                 'registro_numero'        => !empty($payload['registroNumero']) ? trim($payload['registroNumero']) : null,
                 'contenido'              => !empty($payload['contenido']) ? trim($payload['contenido']) : 'Autorización oficial emitida por la Subgerencia de Tránsito y Transporte.',
                 'zona_circulacion'       => !empty($payload['zonaCirculacion']) ? trim($payload['zonaCirculacion']) : 'Anillo Vial - Distrito de José Leonardo Ortiz',
-                'recibo_ingreso_numero'  => $reciboIngresoNumero,
-                'recibo_ingreso_monto'   => $reciboIngresoMonto,
-                'recibo_ingreso_fecha'   => $reciboIngresoFecha,
                 'ubicacion'              => !empty($payload['ubicacion']) ? trim($payload['ubicacion']) : null,
                 'recorrido_ingreso'      => !empty($payload['recorridoIngreso']) ? trim($payload['recorridoIngreso']) : null,
                 'recorrido_salida'       => !empty($payload['recorridoSalida']) ? trim($payload['recorridoSalida']) : null,
@@ -221,17 +209,21 @@ class PermisosController extends ResourceController
                 'fecha_inicio_vigencia'  => !empty($payload['fechaInicioVigencia']) ? trim($payload['fechaInicioVigencia']) : date('Y-m-d'),
                 'fecha_fin_vigencia'     => !empty($payload['fechaFinVigencia']) ? trim($payload['fechaFinVigencia']) : date('Y-m-d', strtotime('+1 year')),
                 'estado'                 => !empty($payload['estado']) ? strtoupper(trim($payload['estado'])) : 'VIGENTE',
-            ];
+            ], $this->resolverRelaciones($db, $payload, true));
 
             $db->table('permisos_circulacion')->insert($data);
             $newId = (int)$db->insertID();
+
+            $creado = $this->getBaseQuery()->where('pc.id', $newId)->get()->getRowArray();
 
             return $this->respondCreated([
                 'status'  => 201,
                 'message' => 'Autorización municipal registrada exitosamente.',
                 'id'      => $newId,
-                'data'    => array_merge(['id' => $newId], $data)
+                'data'    => $creado ? $this->normalizarFila($creado) : ['id' => $newId]
             ]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
         } catch (\Throwable $e) {
             return $this->failServerError('Error registrando permiso: ' . $e->getMessage());
         }
@@ -251,20 +243,12 @@ class PermisosController extends ResourceController
             $allowedFields = [
                 'id_tramite'            => 'tramiteId',
                 'numero_autorizacion'   => 'numeroAutorizacion',
-                'vehiculo_placa'        => 'vehiculoPlaca',
-                'solicitante_nombre'    => 'solicitanteNombre',
-                'solicitante_documento' => 'solicitanteDocumento',
                 'representante_legal'   => 'representanteLegal',
                 'tipo_permiso'          => 'tipoPermiso',
                 'asunto'                => 'asunto',
-                'referencia_sisgedo'    => 'referenciaSisgedo',
-                'expediente'            => 'expediente',
                 'registro_numero'       => 'registroNumero',
                 'contenido'             => 'contenido',
                 'zona_circulacion'      => 'zonaCirculacion',
-                'recibo_ingreso_numero' => 'reciboIngresoNumero',
-                'recibo_ingreso_monto'  => 'reciboIngresoMonto',
-                'recibo_ingreso_fecha'  => 'reciboIngresoFecha',
                 'ubicacion'             => 'ubicacion',
                 'recorrido_ingreso'     => 'recorridoIngreso',
                 'recorrido_salida'      => 'recorridoSalida',
@@ -284,18 +268,18 @@ class PermisosController extends ResourceController
             foreach ($allowedFields as $col => $jsonKey) {
                 if (array_key_exists($jsonKey, $payload)) {
                     $val = $payload[$jsonKey];
-                    if ($col === 'representante_legal' || $col === 'solicitante_nombre' || $col === 'vehiculo_placa' || $col === 'estado') {
+                    if ($col === 'representante_legal' || $col === 'estado') {
                         $val = !empty($val) ? strtoupper(trim((string)$val)) : null;
                     } elseif ($col === 'id_tramite') {
                         $val = !empty($val) ? (int)$val : null;
-                    } elseif ($col === 'recibo_ingreso_monto') {
-                        $val = (isset($val) && $val !== '') ? (float)$val : null;
                     } else {
                         $val = !empty($val) ? trim((string)$val) : null;
                     }
                     $data[$col] = $val;
                 }
             }
+
+            $data = array_merge($data, $this->resolverRelaciones($db, $payload, false));
 
             if (!empty($data)) {
                 $db->table('permisos_circulacion')->where('id', $id)->update($data);
@@ -305,6 +289,8 @@ class PermisosController extends ResourceController
                 'status'  => 200,
                 'message' => 'Autorización actualizada correctamente.'
             ]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
         } catch (\Throwable $e) {
             return $this->failServerError('Error actualizando permiso: ' . $e->getMessage());
         }
@@ -529,6 +515,16 @@ class PermisosController extends ResourceController
         } catch (\Throwable $e) {
             return $this->failServerError('Error buscando administrados: ' . $e->getMessage());
         }
+    }
+
+    private function normalizarFila(array $r): array
+    {
+        $r['id'] = (int)$r['id'];
+        foreach (['tramiteId', 'personaId', 'asociacionId', 'vehiculoId'] as $k) {
+            $r[$k] = $r[$k] ? (int)$r[$k] : null;
+        }
+        $r['reciboIngresoMonto'] = $r['reciboIngresoMonto'] !== null ? (float)$r['reciboIngresoMonto'] : null;
+        return $r;
     }
 
     public function procedimientos()
