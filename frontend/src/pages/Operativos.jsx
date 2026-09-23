@@ -472,7 +472,7 @@ export function Operativos({ user }) {
           ['Finalizados', finalizados, '✅'],
           ['Papeletas vinculadas', papeletas, '🎫'],
         ].map(([label, value, icon]) => (
-          <div key={label} className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-rose-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+          <div key={label} className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">{label}</span>
               <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60">

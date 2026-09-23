@@ -157,7 +157,7 @@ export function Personas({ user, onUserUpdate }) {
       icon: 'people',
       accentColor: '#1d4f91',
       borderColor: '#93c5fd',
-      borderClass: 'border-2 border-blue-400 dark:border-blue-500/80 shadow-xs',
+      borderClass: 'border-2 border-blue-400 dark:border-slate-800 shadow-xs',
       iconClass: 'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700',
     },
     {
@@ -167,7 +167,7 @@ export function Personas({ user, onUserUpdate }) {
       icon: 'permit',
       accentColor: '#0284c7',
       borderColor: '#7dd3fc',
-      borderClass: 'border-2 border-sky-400 dark:border-sky-500/80 shadow-xs',
+      borderClass: 'border-2 border-sky-400 dark:border-slate-800 shadow-xs',
       iconClass: 'bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-950/80 dark:text-sky-300 dark:border-sky-700',
     },
     {
@@ -177,7 +177,7 @@ export function Personas({ user, onUserUpdate }) {
       icon: 'vehicle',
       accentColor: '#6366f1',
       borderColor: '#a5b4fc',
-      borderClass: 'border-2 border-indigo-400 dark:border-indigo-500/80 shadow-xs',
+      borderClass: 'border-2 border-indigo-400 dark:border-slate-800 shadow-xs',
       iconClass: 'bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-indigo-700',
     },
     {
@@ -189,7 +189,7 @@ export function Personas({ user, onUserUpdate }) {
       accentColor: '#10b981',
       borderColor: '#6ee7b7',
       progressColor: '#10b981',
-      borderClass: 'border-2 border-emerald-400 dark:border-emerald-500/80 shadow-xs',
+      borderClass: 'border-2 border-emerald-400 dark:border-slate-800 shadow-xs',
       iconClass: 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700',
     },
   ]
@@ -769,7 +769,7 @@ export function Personas({ user, onUserUpdate }) {
       {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas separadas compactas */}
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {/* 1. Total registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-indigo-500/80 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registros</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -784,7 +784,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 2. Con licencia */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-amber-500/80 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Con Licencia</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
@@ -799,7 +799,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 3. Sin licencia */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-cyan-500/80 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Sin Licencia</span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
@@ -814,7 +814,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 4. Activos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-emerald-500/80 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Activos</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
@@ -829,7 +829,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 5. Inactivos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-rose-500/80 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Inactivos</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">

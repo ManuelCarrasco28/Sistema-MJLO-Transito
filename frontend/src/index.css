@@ -112,13 +112,13 @@ html.dark {
   --bg-page: #0f1424;
   --bg-surface: #161c2e;
   --bg-subtle: #1d2439;
-  --border: #28334e;
-  --border-strong: #3b486d;
-  --border-brand: #3b82f6;
-  --border-brand-subtle: rgba(59, 130, 246, 0.35);
-  --border-ok: rgba(34, 197, 94, 0.35);
-  --border-warn: rgba(234, 179, 8, 0.35);
-  --border-danger: rgba(239, 68, 68, 0.35);
+  --border: #242c40;
+  --border-strong: #2e3852;
+  --border-brand: rgba(59, 130, 246, 0.4);
+  --border-brand-subtle: rgba(59, 130, 246, 0.18);
+  --border-ok: rgba(34, 197, 94, 0.2);
+  --border-warn: rgba(234, 179, 8, 0.2);
+  --border-danger: rgba(239, 68, 68, 0.2);
 
   --text: #e6e9f2;
   --text-muted: #98a1b8;
@@ -126,33 +126,33 @@ html.dark {
   --brand: #2f6fc4;
   --brand-hover: #3a7dd6;
   --brand-text: #ffffff;
-  --brand-soft: rgba(47, 111, 196, 0.15);
-  --brand-soft-hover: rgba(47, 111, 196, 0.22);
+  --brand-soft: rgba(47, 111, 196, 0.12);
+  --brand-soft-hover: rgba(47, 111, 196, 0.18);
   --on-brand: #ffffff;
 
-  --ok-fg: #6fcf8f;      --ok-bg: rgba(63, 185, 110, 0.14);
-  --warn-fg: #e8b04a;    --warn-bg: rgba(232, 176, 74, 0.14);
-  --danger-fg: #f08080;  --danger-bg: rgba(240, 110, 110, 0.14);
-  --neutral-fg: #b0b7c2; --neutral-bg: rgba(255, 255, 255, 0.06);
+  --ok-fg: #6fcf8f;      --ok-bg: rgba(63, 185, 110, 0.12);
+  --warn-fg: #e8b04a;    --warn-bg: rgba(232, 176, 74, 0.12);
+  --danger-fg: #f08080;  --danger-bg: rgba(240, 110, 110, 0.12);
+  --neutral-fg: #b0b7c2; --neutral-bg: rgba(255, 255, 255, 0.05);
 
-  /* Acciones funcionales de tabla (Tema oscuro) */
-  --action-eye-bg: rgba(14, 165, 233, 0.16);
-  --action-eye-border: #38bdf8;
+  /* Acciones funcionales de tabla (Tema oscuro) - bordes suaves y atenuados sin efecto neon */
+  --action-eye-bg: rgba(14, 165, 233, 0.12);
+  --action-eye-border: rgba(56, 189, 248, 0.25);
   --action-eye-text: #38bdf8;
   --action-eye-hover: #0284c7;
 
-  --action-edit-bg: rgba(245, 158, 11, 0.16);
-  --action-edit-border: #f59e0b;
+  --action-edit-bg: rgba(245, 158, 11, 0.12);
+  --action-edit-border: rgba(245, 158, 11, 0.25);
   --action-edit-text: #fbbf24;
   --action-edit-hover: #d97706;
 
-  --action-del-bg: rgba(239, 68, 68, 0.16);
-  --action-del-border: #f87171;
+  --action-del-bg: rgba(239, 68, 68, 0.12);
+  --action-del-border: rgba(248, 113, 113, 0.25);
   --action-del-text: #f87171;
   --action-del-hover: #dc2626;
 
-  --action-print-bg: rgba(139, 92, 246, 0.16);
-  --action-print-border: #a78bfa;
+  --action-print-bg: rgba(139, 92, 246, 0.12);
+  --action-print-border: rgba(167, 139, 250, 0.25);
   --action-print-text: #a78bfa;
   --action-print-hover: #7c3aed;
 
