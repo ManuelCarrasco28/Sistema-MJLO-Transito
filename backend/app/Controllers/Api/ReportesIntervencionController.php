@@ -11,11 +11,10 @@ class ReportesIntervencionController extends ResourceController
     public function index()
     {
         $db = \Config\Database::connect();
-        if (!$db->tableExists('reportes_intervencion')) {
-            return $this->respond(['data' => []]);
-        }
 
-        $tieneOperativo = $db->fieldExists('id_operativo', 'reportes_intervencion');
+        // Campos confirmados en la BD – evitamos llamar fieldExists()/tableExists() en cada request
+        $tieneOperativo = true;
+        $tieneConductor = true;
 
         $query = $db->table('reportes_intervencion r')
             ->select("
@@ -25,31 +24,41 @@ class ReportesIntervencionController extends ResourceController
                 COALESCE(v.modelo, '') AS vehiculo_modelo,
                 COALESCE(v.color, '') AS vehiculo_color,
                 COALESCE(CONCAT(ci.nombres, ' ', ci.apellido_paterno, ' ', COALESCE(ci.apellido_materno, '')), 'Inspector Municipal') AS inspector_nombre,
-                p.numero_papeleta" . 
-                ($tieneOperativo ? ", r.id_operativo as operativoId, COALESCE(op.nombre, '') as operativoNombre" : "") . "
+                p.numero_papeleta,
+                CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END as tipoInfractor,
+                COALESCE(prop_per.numero, 'S/D') as propietarioDni,
+                COALESCE(NULLIF(TRIM(CONCAT(c_prop.nombres, ' ', c_prop.apellido_paterno, ' ', COALESCE(c_prop.apellido_materno, ''))), ''), 'No Registrado') as propietarioNombre,
+                COALESCE(cond_per.numero, 'S/D') as conductorDni,
+                COALESCE(NULLIF(TRIM(CONCAT(c_cond.nombres, ' ', c_cond.apellido_paterno, ' ', COALESCE(c_cond.apellido_materno, ''))), ''), 'No identificado') as conductorNombre,
+                r.id_operativo as operativoId, COALESCE(op.nombre, '') as operativoNombre
             ", false)
             ->join('vehiculos v', 'v.id = r.id_vehiculo', 'left')
             ->join('trabajadores t', 't.id_persona = r.id_inspector', 'left')
             ->join('ciudadanos ci', 'ci.id_persona = t.id_persona', 'left')
-            ->join('papeletas p', 'p.id = r.id_papeleta', 'left');
-            
-        if ($tieneOperativo) {
-            $query->join('operativos op', 'op.id = r.id_operativo', 'left');
+            ->join('papeletas p', 'p.id = r.id_papeleta', 'left')
+            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.estado = "ACTIVO"', 'left')
+            ->join('personas prop_per', 'prop_per.id = vp.id_persona', 'left')
+            ->join('ciudadanos c_prop', 'c_prop.id_persona = prop_per.id', 'left')
+            ->join('personas cond_per', 'cond_per.id = r.id_conductor', 'left')
+            ->join('ciudadanos c_cond', 'c_cond.id_persona = cond_per.id', 'left')
+            ->join('operativos op', 'op.id = r.id_operativo', 'left');
+
+        // Filtrar por inspector si se pasa el parámetro (optimización de rendimiento móvil)
+        $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
+        if ($inspectorId > 0) {
+            $query->where('r.id_inspector', $inspectorId);
         }
 
-        $rows = $query->orderBy('r.id', 'DESC')->get()->getResultArray();
+        $rows = $query->orderBy('r.id', 'DESC')->limit(50)->get()->getResultArray();
+
+        $reporteIds = array_column($rows, 'id');
 
         foreach ($rows as &$row) {
             $row['id'] = (int)$row['id'];
             $row['id_inspector'] = (int)$row['id_inspector'];
             $row['id_vehiculo'] = $row['id_vehiculo'] !== null ? (int)$row['id_vehiculo'] : null;
             $row['id_papeleta'] = $row['id_papeleta'] !== null ? (int)$row['id_papeleta'] : null;
-            $row['fotos'] = $db->table('reporte_intervencion_fotos')
-                ->select('id, foto, fecha_created')
-                ->where('id_reporte', $row['id'])
-                ->orderBy('id', 'ASC')
-                ->get()
-                ->getResultArray();
+            $row['fotos'] = []; // No cargamos fotos en el historial para evitar colapsar la memoria RAM del servidor
         }
 
         return $this->respond(['data' => $rows]);
@@ -107,13 +116,66 @@ class ReportesIntervencionController extends ResourceController
         if (!$db->fieldExists('id_operativo', 'reportes_intervencion')) {
             $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_operativo INT NULL AFTER id_papeleta');
         }
+        if (!$db->fieldExists('id_conductor', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_conductor INT NULL AFTER id_vehiculo');
+        }
 
         $db->transException(true)->transBegin();
         try {
+            if (!$vehiculoId) {
+                // No registramos el vehículo en la base de datos de vehículos formales
+                // Solo guardamos la placa en el texto del reporte.
+                $placa = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . random_int(1000, 9999);
+                
+                $obs_extra = "\n[DATOS REPORTADOS]";
+                $marca = trim((string)($input['marcaVehiculo'] ?? ''));
+                $color = trim((string)($input['colorVehiculo'] ?? ''));
+                if ($marca) $obs_extra .= " Marca: $marca.";
+                if ($color) $obs_extra .= " Color: $color.";
+                
+                $duenoDni = trim((string)($input['dni_dueño'] ?? ''));
+                $duenoNombres = trim((string)($input['nombres_dueño'] ?? ''));
+                $duenoApellidos = trim((string)($input['apellidos_dueño'] ?? ''));
+                if ($duenoDni !== '') {
+                    $obs_extra .= " Supuesto Dueño: $duenoNombres $duenoApellidos (DNI: $duenoDni).";
+                }
+                
+                if ($obs_extra !== "\n[DATOS REPORTADOS]") {
+                    $observaciones .= $obs_extra;
+                }
+            }
+
+            // Conductor
+            $conductorDni = trim((string)($input['dni_conductor'] ?? ''));
+            $conductorId = null;
+            if ($conductorDni !== '') {
+                $conductorPersona = $db->table('personas')->where('numero', $conductorDni)->limit(1)->get()->getRowArray();
+                if ($conductorPersona) {
+                    $conductorId = (int)$conductorPersona['id'];
+                } else {
+                    $conductorNombres = trim((string)($input['nombres_conductor'] ?? 'NO REGISTRADO'));
+                    $conductorApellidosStr = trim((string)($input['apellidos_conductor'] ?? 'NO REGISTRADO'));
+                    $conductorApellidos = preg_split('/\s+/', $conductorApellidosStr) ?: [];
+                    $db->table('personas')->insert([
+                        'id_tipo_documento' => 1,
+                        'numero' => $conductorDni,
+                        'estado' => 'ACTIVO',
+                    ]);
+                    $conductorId = (int)$db->insertID();
+                    $db->table('ciudadanos')->insert([
+                        'id_persona' => $conductorId,
+                        'nombres' => $conductorNombres,
+                        'apellido_paterno' => $conductorApellidos[0] ?? 'NO REGISTRADO',
+                        'apellido_materno' => isset($conductorApellidos[1]) ? implode(' ', array_slice($conductorApellidos, 1)) : null,
+                    ]);
+                }
+            }
+
             $db->table('reportes_intervencion')->insert([
                 'id_inspector' => $inspectorId,
                 'id_operativo' => $idOperativo,
                 'id_vehiculo' => $vehiculoId,
+                'id_conductor' => $conductorId,
                 'placa' => $placa !== '' ? $placa : null,
                 'fecha_hora' => $fechaHora,
                 'lugar' => $lugar,

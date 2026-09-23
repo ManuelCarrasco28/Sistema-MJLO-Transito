@@ -20,18 +20,16 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final int _selectedIndex = 0;
   int _registradasHoy = 0;
+  int _reportesHoy = 0;
   Map<String, dynamic>? _operativoActivo;
   bool? _permitePapeletaMovil;
-  bool _isLoadingMobileConfig = true;
-  int _mobileConfigRequestSeq = 0;
   Timer? _mobileConfigTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadDashboardData();
-    _loadMobileConfig();
+    _loadDashboardData(); // Carga dashboard + permisos en un solo request
     _startMobileConfigAutoRefresh();
   }
 
@@ -45,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void reassemble() {
     super.reassemble();
-    _loadMobileConfig(silent: true);
+    _loadDashboardData();
     _startMobileConfigAutoRefresh();
   }
 
@@ -53,7 +51,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadDashboardData();
-      _loadMobileConfig(silent: true);
       _startMobileConfigAutoRefresh();
     } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _mobileConfigTimer?.cancel();
@@ -63,31 +60,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _startMobileConfigAutoRefresh() {
     _mobileConfigTimer?.cancel();
-    _mobileConfigTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    _mobileConfigTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;
-      _loadMobileConfig(silent: true);
       _loadDashboardData();
     });
   }
 
   Future<void> _loadDashboardData() async {
     try {
-      final papeletas = await ApiService.getPapeletas();
+      // Un solo endpoint liviano en lugar de 3 peticiones pesadas
+      final dashData = await ApiService.getMobileDashboard();
       final op = await ApiService.getOperativoActivo();
-      final todayStr = DateTime.now().toIso8601String().split('T').first;
-      
-      int count = 0;
-      for (var p in papeletas) {
-        final date = p['fechaHora']?.toString() ?? p['fecha_hora']?.toString() ?? p['created_at']?.toString() ?? '';
-        if (date.startsWith(todayStr)) {
-          count++;
-        }
-      }
-      
+
       if (mounted) {
         setState(() {
-          _registradasHoy = count;
+          _registradasHoy = dashData['papeletas_hoy'] as int? ?? 0;
+          _reportesHoy = dashData['reportes_hoy'] as int? ?? 0;
           _operativoActivo = op;
+          // Actualizar permiso de papeleta si viene en el dashboard
+          if (dashData.containsKey('permite_aplicar_papeleta')) {
+            _permitePapeletaMovil = dashData['permite_aplicar_papeleta'] as bool? ?? false;
+          }
         });
       }
     } catch (e) {
@@ -95,37 +88,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<bool> _loadMobileConfig({bool silent = false}) async {
-    final int requestId = ++_mobileConfigRequestSeq;
-    if (!silent && mounted) {
-      setState(() => _isLoadingMobileConfig = true);
-    }
 
-    bool permitido = false;
-    try {
-      permitido = await ApiService.permiteAplicarPapeletaMovil();
-    } catch (_) {
-      permitido = false;
-    }
-
-    if (mounted && requestId == _mobileConfigRequestSeq) {
-      setState(() {
-        _permitePapeletaMovil = permitido;
-        _isLoadingMobileConfig = false;
-      });
-    }
-    return permitido;
-  }
 
   void _handlePrimaryControlAction() {
-    if (_permitePapeletaMovil == true) {
-      _showSearchTypeSelectionDialog(context);
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
-      ).then((_) => _loadMobileConfig(silent: true));
-    }
+    _showSearchTypeSelectionDialog(context);
   }
 
   void _logout(BuildContext context) async {
@@ -233,14 +199,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       searchType: searchType,
                     ),
                   ),
-                );
+                ).then((_) {
+                  if (mounted) _loadDashboardData();
+                });
               } else {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => PersonDetailsScreen(dni: value),
                   ),
-                );
+                ).then((_) {
+                  if (mounted) _loadDashboardData();
+                });
               }
             },
             child: const Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -370,11 +340,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             const SizedBox(height: 12),
             _buildDialogRow(Icons.location_on, 'Lugar', op['lugar'] ?? '-'),
             const SizedBox(height: 12),
-            _buildDialogRow(Icons.event, 'Fecha y Hora', '${op['fecha']} ${op['hora_inicio']}'),
+            _buildDialogRow(Icons.event, 'Fecha y Hora', '${op['fecha']}\nInicio: ${op['hora_inicio'] ?? '-'} | Fin: ${op['hora_fin'] ?? '--:--'}'),
             const SizedBox(height: 12),
             _buildDialogRow(Icons.assignment_ind, 'Su cargo', op['cargo_inspector'] ?? 'Inspector'),
             const SizedBox(height: 12),
-            _buildDialogRow(Icons.info_outline, 'Estado', op['estado'] ?? '-'),
+            _buildDialogRow(Icons.info_outline, 'Estado', (op['estado'] ?? '-').toString().replaceAll('_', ' ')),
           ],
         ),
         actions: [
@@ -518,12 +488,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Registrados hoy', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text('$_reportesHoy', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.orange)),
+                    const SizedBox(width: 4),
+                    Text('reportes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildActionGrid(BuildContext context) {
-    final bool configReady = _permitePapeletaMovil != null && !_isLoadingMobileConfig;
+    final bool configReady = _permitePapeletaMovil != null;
     final bool permitePapeleta = _permitePapeletaMovil == true;
     if (!configReady) {
       return const SizedBox(
@@ -583,7 +580,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const HistoryScreen()),
-            );
+            ).then((_) {
+              // Recargar conteos del dashboard al volver del historial
+              if (mounted) _loadDashboardData();
+            });
           },
         ),
       ],

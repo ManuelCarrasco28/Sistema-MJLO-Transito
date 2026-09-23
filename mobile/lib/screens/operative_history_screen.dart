@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import '../services/api_service.dart';
 import '../theme.dart';
 
 class OperativeHistoryScreen extends StatelessWidget {
@@ -44,28 +46,35 @@ class OperativeHistoryScreen extends StatelessWidget {
                 final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
                 final identificador = esReporte ? (data['placa_visual'] ?? 'Sin placa') : (data['vehiculoPlaca'] ?? 'Sin placa');
                 
-                final isFormal = !esReporte && data['tipoInfractor'] == 'FORMAL';
+                final isFormal = data['tipoInfractor'] == 'FORMAL';
+                
+                final placa = (data['vehiculoPlaca']?.toString() ?? data['placa_visual']?.toString() ?? '');
+                final isSinPlaca = placa.isEmpty || placa.startsWith('SIN-PLACA') || placa == 'SIN PLACA' || placa == 'Sin placa';
+                final isSinConductor = (data['conductorNombre'] == null || data['conductorNombre'] == 'No identificado' || data['conductorDni'] == 'S/D');
+                final isSinDueno = (data['propietarioNombre'] == null || data['propietarioNombre'] == 'No Registrado' || data['propietarioDni'] == 'S/D');
+                
+                final esSinIdentificar = isSinPlaca && isSinConductor && isSinDueno;
                 
                 Color cardColor;
                 Color avatarBgColor;
                 IconData iconData;
                 String tipoTexto;
                 
-                if (esReporte) {
+                if (esSinIdentificar) {
                   cardColor = Colors.orange;
                   avatarBgColor = Colors.orange.shade100;
                   iconData = Icons.help_outline;
-                  tipoTexto = 'Sin Identificar (Reporte)';
+                  tipoTexto = esReporte ? 'Sin Identificar (Reporte)' : 'Sin Identificar (Infracción)';
                 } else if (isFormal) {
                   cardColor = Colors.blue;
                   avatarBgColor = Colors.blue.shade100;
                   iconData = Icons.receipt_long;
-                  tipoTexto = 'Formal (Infracción)';
+                  tipoTexto = esReporte ? 'Formal (Reporte)' : 'Formal (Infracción)';
                 } else {
                   cardColor = Colors.red;
                   avatarBgColor = Colors.red.shade100;
                   iconData = Icons.report_problem;
-                  tipoTexto = 'Informal (Infracción)';
+                  tipoTexto = esReporte ? 'Informal (Reporte)' : 'Informal (Infracción)';
                 }
 
                 final montoText = esReporte ? '' : '\nMonto Total: S/ ${data['montoTotal'] ?? 0}';
@@ -98,27 +107,122 @@ class OperativeHistoryScreen extends StatelessWidget {
       builder: (context) {
         final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
         
+        final placa = (data['vehiculoPlaca']?.toString() ?? data['placa_visual']?.toString() ?? '');
+        final isSinPlaca = placa.isEmpty || placa.startsWith('SIN-PLACA') || placa == 'SIN PLACA' || placa == 'Sin placa';
+        final isSinConductor = (data['conductorNombre'] == null || data['conductorNombre'] == 'No identificado' || data['conductorDni'] == 'S/D');
+        final isSinDueno = (data['propietarioNombre'] == null || data['propietarioNombre'] == 'No Registrado' || data['propietarioDni'] == 'S/D');
+        final esSinIdentificar = isSinPlaca && isSinConductor && isSinDueno;
+
+        final tipoTextoVehiculo = esSinIdentificar ? "Sin identificar" : (isFormal ? "Formal" : "Informal");
+
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Detalles de la Actividad', style: TextStyle(color: esReporte ? Colors.orange.shade800 : (isFormal ? Colors.blue.shade800 : Colors.red.shade800), fontWeight: FontWeight.bold)),
+          title: Text('Detalles de la Actividad', style: TextStyle(color: esSinIdentificar ? Colors.orange.shade800 : (isFormal ? Colors.blue.shade800 : Colors.red.shade800), fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildDetailRow('Documento:', numDoc, isBold: true),
-                _buildDetailRow('Vehículo:', '$identificador (${esReporte ? "Sin identificar" : (isFormal ? "Formal" : "Informal")})'),
+                _buildDetailRow('Vehículo:', '$identificador ($tipoTextoVehiculo)'),
                 if (!esReporte && isFormal && data['vehiculoAsociacion'] != null)
                   _buildDetailRow('Asociación:', data['vehiculoAsociacion']),
                 _buildDetailRow('Lugar:', data['lugar'] ?? 'No especificado'),
                 if (!esReporte)
-                  _buildDetailRow('Obs. Inspector:', data['observacionesAutoridad'] ?? 'Ninguna'),
+                  _buildFormattedObservaciones('Obs. Inspector:', data['observacionesAutoridad'] ?? 'Ninguna'),
                 if (esReporte)
-                  _buildDetailRow('Observaciones:', data['observaciones'] ?? 'Ninguna'),
-                _buildDetailRow('Obs. Conductor:', data['observacionesConductor'] ?? 'Ninguna'),
+                  _buildFormattedObservaciones('Observaciones:', data['observaciones'] ?? 'Ninguna'),
+                if (!esReporte && (data['observacionesConductor'] != null && data['observacionesConductor'].toString().trim().isNotEmpty))
+                  _buildFormattedObservaciones('Obs. Conductor:', data['observacionesConductor']),
                 const Divider(height: 24),
-                if (!esReporte)
-                  _buildDetailRow('Conductor:', '${data['conductorNombre'] ?? 'No identificado'}\nDNI: ${data['conductorDni'] ?? 'S/D'}'),
+                if (data['conductorNombre'] != null && data['conductorNombre'].toString().trim().isNotEmpty)
+                  _buildDetailRow('Conductor:', '${data['conductorNombre']}\nDNI: ${data['conductorDni'] ?? 'S/D'}')
+                else
+                  _buildDetailRow('Conductor:', 'No identificado'),
+                const SizedBox(height: 8),
+                if (data['propietarioNombre'] != null && data['propietarioNombre'].toString().trim().isNotEmpty)
+                  _buildDetailRow('Dueño:', '${data['propietarioNombre']}\nDNI: ${data['propietarioDni'] ?? 'S/D'}')
+                else
+                  _buildDetailRow('Dueño:', 'No identificado'),
+                const Divider(height: 24),
+                
+                if (!esReporte) ...[
+                  if (data['detalles'] != null && (data['detalles'] as List).isNotEmpty)
+                    ...((data['detalles'] as List).map((det) => _buildDetailRow('Infracción:', '${det['codigo']} - ${det['gravedad']}')))
+                  else
+                    _buildDetailRow('Infracción:', '${data['tipoInfraccionCodigo'] ?? ''} - ${data['tipoInfraccionGravedad'] ?? ''}'),
+                  _buildDetailRow('Monto Total:', 'S/ ${data['montoTotal']}', isBold: true),
+                ],
+                _buildDetailRow('Estado:', (data['estado'] ?? (esReporte ? 'PENDIENTE' : 'PENDIENTE_PAGO')).toString().replaceAll('_', ' ')),
+                const SizedBox(height: 12),
+                if (!esReporte && data['firmaConductorImg'] != null) ...[
+                  const Text('Firma del Conductor:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300)),
+                    child: data['firmaConductorImg'].toString().startsWith('data:image')
+                        ? Image.memory(
+                            base64Decode(data['firmaConductorImg'].toString().split(',').last),
+                            height: 100,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
+                          )
+                        : Image.network(
+                            '${ApiService.fileBaseUrl}/${data['firmaConductorImg']}',
+                            height: 100,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
+                          ),
+                  ),
+                ],
+                if (data['fotos'] != null) ...() {
+                  List<dynamic> fotosList = [];
+                  if (data['fotos'] is List) {
+                    fotosList = data['fotos'];
+                  } else if (data['fotos'] is String) {
+                    try { fotosList = jsonDecode(data['fotos']); } catch (_) {}
+                  }
+                  if (fotosList.isEmpty) return <Widget>[];
+                  
+                  return [
+                    const Divider(height: 24),
+                    const Text('Fotos de Evidencia:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 120,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: fotosList.map((fotoInfo) {
+                            final fotoUrl = fotoInfo is Map ? fotoInfo['foto'] : fotoInfo;
+                            if (fotoUrl == null) return const SizedBox();
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: Container(
+                                decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300)),
+                                child: fotoUrl.toString().startsWith('data:image')
+                                    ? Image.memory(
+                                        base64Decode(fotoUrl.toString().split(',').last),
+                                        height: 100,
+                                        width: 100,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Text('Error al cargar'),
+                                      )
+                                    : Image.network(
+                                        '${ApiService.fileBaseUrl}/$fotoUrl',
+                                        height: 100,
+                                        width: 100,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Text('Error al cargar'),
+                                      ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ];
+                }(),
               ],
             ),
           ),
@@ -147,6 +251,45 @@ class OperativeHistoryScreen extends StatelessWidget {
             flex: 3,
             child: Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: Colors.black87)),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormattedObservaciones(String label, String value) {
+    if (!value.contains('[DATOS REPORTADOS]')) {
+      return _buildDetailRow(label, value);
+    }
+
+    final parts = value.split('[DATOS REPORTADOS]');
+    final obsNormal = parts[0].trim();
+    final datosReportados = parts.length > 1 ? parts[1].trim() : '';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (obsNormal.isNotEmpty) _buildDetailRow(label, obsNormal),
+          if (datosReportados.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('DATOS REPORTADOS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+                  const SizedBox(height: 4),
+                  Text(datosReportados, style: const TextStyle(color: Colors.black87)),
+                ],
+              ),
+            ),
+          ]
         ],
       ),
     );

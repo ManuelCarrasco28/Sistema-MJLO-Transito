@@ -107,13 +107,13 @@ class OperativosController extends ResourceController
         $db = \Config\Database::connect();
         
         $operativo = $db->table('operativos o')
-            ->select('o.id, o.nombre, o.lugar, o.fecha, o.hora_inicio, o.estado, ca.nombre as cargo_inspector')
+            ->select('o.id, o.nombre, o.lugar, o.fecha, o.hora_inicio, o.hora_fin, o.estado, ca.nombre as cargo_inspector')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id', 'inner')
             ->join('desplazamiento_oficina dof', 'dof.id_trabajador = oi.id_inspector AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
             ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
             ->where('oi.id_inspector', $idInspector)
             ->where('oi.estado', 'ASIGNADO')
-            ->whereIn('o.estado', ['PROGRAMADO', 'EN CURSO'])
+            ->whereIn('o.estado', ['PROGRAMADO', 'EN_CURSO'])
             ->orderBy('o.fecha', 'DESC')
             ->orderBy('o.hora_inicio', 'DESC')
             ->limit(1)

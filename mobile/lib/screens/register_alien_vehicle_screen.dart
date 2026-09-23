@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 import 'issue_ticket_informal_screen.dart';
@@ -27,18 +29,127 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
   final _claseController = TextEditingController();
   final _marcaController = TextEditingController();
   final _colorController = TextEditingController();
-  final _motorController = TextEditingController();
+  final _chasisController = TextEditingController();
+  Map<String, dynamic>? _vehiculoData;
 
   // GPS y Evidencias
   bool _isLoadingLocation = false;
   final List<XFile> _fotos = [];
   Position? _currentPosition;
   final ImagePicker _picker = ImagePicker();
+  final MapController _mapController = MapController();
   final _lugarController = TextEditingController();
   final _coordenadasController = TextEditingController();
   final _observacionesController = TextEditingController();
+  
+  final _duenioDniController = TextEditingController();
+  final _duenioNombresController = TextEditingController();
+  final _duenioApellidosController = TextEditingController();
 
   bool _isSearching = false;
+  bool _vehiculoEncontrado = false;
+  bool? _permitePapeleta;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadPermiso();
+  }
+  
+  Future<void> _loadPermiso() async {
+    final permite = await ApiService.permiteAplicarPapeletaMovil();
+    if (mounted) {
+      setState(() {
+        _permitePapeleta = permite;
+      });
+    }
+  }
+
+  Future<void> _searchPersona(TextEditingController dniCtrl, TextEditingController nomCtrl, TextEditingController apeCtrl) async {
+    final dni = dniCtrl.text.trim();
+    if (dni.isEmpty) {
+      _showError('Ingrese un DNI para buscar');
+      return;
+    }
+    setState(() => _isSearching = true);
+    try {
+      final persona = await ApiService.getPersonaByDni(dni);
+      if (persona != null) {
+        setState(() {
+          nomCtrl.text = persona['nombres'] ?? '';
+          apeCtrl.text = '${persona['apellidoPaterno'] ?? ''} ${persona['apellidoMaterno'] ?? ''}'.trim();
+        });
+      } else {
+        _showError('DNI no encontrado');
+        setState(() {
+          nomCtrl.text = '';
+          apeCtrl.text = '';
+        });
+      }
+    } catch (e) {
+      _showError('Error al buscar: $e');
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  Future<void> _searchVehiculo() async {
+    final placa = _placaController.text.trim();
+    if (placa.isEmpty) {
+      _showError('Ingrese una placa para buscar');
+      return;
+    }
+    setState(() {
+      _isSearching = true;
+    });
+    try {
+      final vehiculo = await ApiService.buscarVehiculo('placa', placa);
+      if (vehiculo != null) {
+        setState(() {
+          _vehiculoEncontrado = true;
+          _vehiculoData = vehiculo;
+          _marcaController.text = vehiculo['marca'] ?? '';
+          _colorController.text = vehiculo['color'] ?? '';
+          _claseController.text = vehiculo['modelo'] ?? '';
+          _chasisController.text = vehiculo['numeroSerie'] ?? vehiculo['chasis'] ?? '';
+          
+          if (vehiculo['propietario'] != null && vehiculo['propietario'] != 'Sin Propietario Asignado') {
+             _duenioDniController.text = vehiculo['propietarioDni'] ?? '';
+             _duenioNombresController.text = vehiculo['propietario'] ?? '';
+             _duenioApellidosController.text = '';
+          } else {
+             _duenioDniController.text = '';
+             _duenioNombresController.text = '';
+             _duenioApellidosController.text = '';
+          }
+        });
+      } else {
+        setState(() {
+          _vehiculoEncontrado = false;
+          _vehiculoData = null;
+          _marcaController.text = '';
+          _colorController.text = '';
+          _claseController.text = '';
+          _duenioDniController.text = '';
+          _duenioNombresController.text = '';
+          _duenioApellidosController.text = '';
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vehículo no encontrado. Ingrese características manualmente.')));
+        }
+      }
+    } catch (e) {
+        setState(() {
+          _vehiculoEncontrado = false;
+          _vehiculoData = null;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error o vehículo no encontrado. Ingrese datos manualmente.')));
+        }
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
 
   Future<void> _takePhoto() async {
     try {
@@ -108,11 +219,16 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
         // Fallback a coordenadas si falla
       }
 
+      bool wasNull = _currentPosition == null;
       setState(() {
         _currentPosition = position;
         _lugarController.text = address;
         _coordenadasController.text = '${position.latitude}, ${position.longitude}';
       });
+      
+      if (!wasNull) {
+        _mapController.move(LatLng(position.latitude, position.longitude), 16.0);
+      }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,20 +251,37 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
       _showError('Ingresa la placa del vehículo');
       return;
     }
+    
+    final bool permite = _permitePapeleta ?? true;
+    if (!permite) {
+      if (_lugarController.text.trim().isEmpty) {
+        _showError('Falta ingresar el lugar de intervención (ubicación)');
+        return;
+      }
+      if (_observacionesController.text.trim().isEmpty) {
+        _showError('Falta ingresar las observaciones obligatorias para el reporte');
+        return;
+      }
+    }
 
     final Map<String, dynamic> reporteData = {
       'dni_conductor': widget.conductor['numeroDocumento'] ?? '',
       'nombres_conductor': widget.conductor['nombres'] ?? '',
       'apellidos_conductor': '${widget.conductor['apellidoPaterno'] ?? ''} ${widget.conductor['apellidoMaterno'] ?? ''}'.trim(),
       
+      'dueño_es_conductor': false,
+      'dni_dueño': _duenioDniController.text,
+      'nombres_dueño': _duenioNombresController.text,
+      'apellidos_dueño': _duenioApellidosController.text,
+      
       'estado_placa': _estadoPlaca,
       'placa': _estadoPlaca == 'CON_PLACA' ? _placaController.text.trim().toUpperCase() : null,
-      'chasis': null,
+      'chasis': _chasisController.text.trim().toUpperCase(),
       
       'clase_vehiculo': _claseController.text.trim().toUpperCase(),
       'marca_vehiculo': _marcaController.text.trim().toUpperCase(),
       'color_vehiculo': _colorController.text.trim().toUpperCase(),
-      'motor_vehiculo': _motorController.text.trim().toUpperCase(),
+      'motor_vehiculo': '',
       
       'lugar': _lugarController.text.trim(),
       'observaciones': _observacionesController.text.trim(),
@@ -166,6 +299,7 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
 
   void _showError(String msg) {
     if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
     }
   }
@@ -176,7 +310,7 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
     _claseController.dispose();
     _marcaController.dispose();
     _colorController.dispose();
-    _motorController.dispose();
+    _chasisController.dispose();
     _lugarController.dispose();
     _coordenadasController.dispose();
     _observacionesController.dispose();
@@ -197,7 +331,7 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('1. Datos del Conductor (Autocompletado)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+            const Text('1. Datos del Conductor', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -216,7 +350,7 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
             ),
             
             const SizedBox(height: 24),
-            const Text('2. Datos del Vehículo y Evidencia', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+            const Text('2. Datos del Vehículo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
             const SizedBox(height: 12),
             
             Container(
@@ -231,23 +365,43 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                     title: const Text('Tiene Placa', style: TextStyle(fontWeight: FontWeight.w600)),
                     value: 'CON_PLACA',
                     groupValue: _estadoPlaca,
-                    onChanged: (val) => setState(() => _estadoPlaca = val!),
+                    onChanged: (val) {
+                      setState(() {
+                        _estadoPlaca = val!;
+                        if (val != 'CON_PLACA') {
+                          // SIN_PLACA: limpia placa
+                          _placaController.clear();
+                        }
+                      });
+                    },
                   ),
                   const Divider(height: 1),
                   RadioListTile<String>(
-                    title: const Text('Sin Placa (Informal)', style: TextStyle(fontWeight: FontWeight.w600)),
+                    title: const Text('Sin Placa', style: TextStyle(fontWeight: FontWeight.w600)),
                     value: 'SIN_PLACA',
                     groupValue: _estadoPlaca,
-                    onChanged: (val) => setState(() => _estadoPlaca = val!),
+                    onChanged: (val) {
+                      setState(() {
+                        _estadoPlaca = val!;
+                        _placaController.clear();
+                      });
+                    },
                   ),
                 ],
               ),
             ),
             
             const SizedBox(height: 16),
-            if (_estadoPlaca == 'CON_PLACA')
-              _buildTextField(_placaController, 'Número de Placa (Ej: M1-5678)', Icons.directions_car, TextInputType.text)
-            else ...[
+            if (_estadoPlaca == 'CON_PLACA') ...[
+              _buildTextField(_placaController, 'Número de Placa (Ej: M1-5678)', Icons.directions_car, TextInputType.text, hasSearch: true, onSearch: _searchVehiculo),
+              const SizedBox(height: 16),
+            ],
+            
+            if (_estadoPlaca == 'CON_PLACA' && _vehiculoEncontrado) ...[
+              _buildVehicleSummaryCard(),
+            ],
+            
+            if (_estadoPlaca == 'SIN_PLACA') ...[
               const Padding(
                 padding: EdgeInsets.only(bottom: 8.0),
                 child: Text('Características del Vehículo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
@@ -258,8 +412,22 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
               const SizedBox(height: 12),
               _buildTextField(_colorController, 'Color', Icons.color_lens, TextInputType.text),
               const SizedBox(height: 12),
-              _buildTextField(_motorController, 'Código de Motor', Icons.settings, TextInputType.text),
+              _buildTextField(_chasisController, 'Número de Serie (Chasis)', Icons.settings, TextInputType.text),
             ],
+
+            if (_estadoPlaca == 'SIN_PLACA') ...[
+              const SizedBox(height: 24),
+              const Text('3. Datos del Supuesto Propietario', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+              const SizedBox(height: 12),
+              _buildTextField(_duenioDniController, 'DNI del Propietario', Icons.badge, TextInputType.number, 
+                hasSearch: true, 
+                onSearch: () => _searchPersona(_duenioDniController, _duenioNombresController, _duenioApellidosController)),
+              const SizedBox(height: 12),
+              _buildTextField(_duenioNombresController, 'Nombres del Propietario', Icons.person, TextInputType.text),
+              const SizedBox(height: 12),
+              _buildTextField(_duenioApellidosController, 'Apellidos del Propietario', Icons.person_outline, TextInputType.text),
+            ],
+
             
             const SizedBox(height: 16),
             const Padding(
@@ -304,6 +472,61 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                 prefixIcon: const Icon(Icons.gps_fixed, color: Colors.grey),
               ),
             ),
+            
+            if (_currentPosition != null) ...[
+              const SizedBox(height: 12),
+              const Text('Ajuste manual (toca el mapa para cambiar la ubicación exacta)', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 4),
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                    initialZoom: 16.0,
+                    onTap: (tapPosition, point) {
+                      setState(() {
+                        _currentPosition = Position(
+                          latitude: point.latitude,
+                          longitude: point.longitude,
+                          timestamp: DateTime.now(),
+                          accuracy: 0.0,
+                          altitude: 0.0,
+                          heading: 0.0,
+                          speed: 0.0,
+                          speedAccuracy: 0.0,
+                          altitudeAccuracy: 0.0,
+                          headingAccuracy: 0.0,
+                        );
+                        _coordenadasController.text = '${point.latitude}, ${point.longitude}';
+                      });
+                    },
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.mjlo.transito',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                          width: 40,
+                          height: 40,
+                          child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
             const SizedBox(height: 12),
             TextField(
               controller: _observacionesController,
@@ -418,9 +641,11 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                 elevation: 5,
               ),
               icon: const Icon(Icons.arrow_forward),
-              label: const Text(
-                'Siguiente: Generar Papeleta',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+              label: Text(
+                _permitePapeleta == null 
+                  ? 'Cargando...' 
+                  : (_permitePapeleta! ? 'Siguiente: Generar Papeleta' : 'Siguiente: Enviar Reporte'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
               ),
             ),
           ),
@@ -429,11 +654,12 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, TextInputType type, {bool hasSearch = false, VoidCallback? onSearch}) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, TextInputType type, {bool hasSearch = false, VoidCallback? onSearch, bool readOnly = false}) {
     return TextField(
       controller: controller,
       keyboardType: type,
       textCapitalization: TextCapitalization.characters,
+      readOnly: readOnly,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey.shade600),
@@ -456,8 +682,99 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
             : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: readOnly ? Colors.grey.shade200 : Colors.white,
       ),
+    );
+  }
+
+  Widget _buildVehicleSummaryCard() {
+    final isFormal = _vehiculoData?['asociacion'] != null;
+    final estadoTexto = isFormal ? 'FORMAL' : 'INFORMAL';
+    final estadoColor = isFormal ? Colors.blueAccent : Colors.redAccent;
+    final List<dynamic> documentos = _vehiculoData?['documentosVehiculo'] ?? [];
+
+    return Card(
+      color: const Color(0xFF0F172A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.greenAccent, size: 20),
+                    SizedBox(width: 8),
+                    Text('VEHÍCULO ENCONTRADO', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: estadoColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: estadoColor),
+                  ),
+                  child: Text(estadoTexto, style: TextStyle(color: estadoColor, fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildSummaryRow('MARCA', _marcaController.text, 'CLASE', _claseController.text),
+            const SizedBox(height: 12),
+            _buildSummaryRow('COLOR', _colorController.text, 'CHASIS', _chasisController.text),
+            const Divider(color: Colors.white24, height: 24),
+            const Text('PROPIETARIO REGISTRADO', style: TextStyle(color: Colors.white54, fontSize: 11)),
+            const SizedBox(height: 4),
+            Text(_duenioNombresController.text.isNotEmpty ? _duenioNombresController.text : 'Sin Propietario Asignado', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+            const SizedBox(height: 4),
+            Text('DNI/RUC: ${_duenioDniController.text.isNotEmpty ? _duenioDniController.text : "N/A"}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            
+            if (documentos.isNotEmpty) ...[
+              const Divider(color: Colors.white24, height: 24),
+              const Text('DOCUMENTOS REGISTRADOS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              ...documentos.map((doc) {
+                final bool isVigente = doc['estado'] == 'VIGENTE';
+                final docColor = isVigente ? Colors.greenAccent : Colors.redAccent;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6.0),
+                  child: Row(
+                    children: [
+                      Icon(isVigente ? Icons.verified : Icons.warning_amber_rounded, color: docColor, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('${doc['tipoDocumento']}${doc['numero'] != null && doc['numero'] != 'null' ? ' - ${doc['numero']}' : ''}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      ),
+                      Text(doc['estado'] ?? '', style: TextStyle(color: docColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String label1, String val1, String label2, String val2) {
+    return Row(
+      children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label1, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          const SizedBox(height: 2),
+          Text(val1.isNotEmpty ? val1 : '-', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ])),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label2, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          const SizedBox(height: 2),
+          Text(val2.isNotEmpty ? val2 : '-', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ])),
+      ],
     );
   }
 }

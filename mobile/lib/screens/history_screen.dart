@@ -5,13 +5,16 @@ import '../theme.dart';
 import 'operative_history_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  final String? filterPlaca;
+  final String? filterDni;
+
+  const HistoryScreen({super.key, this.filterPlaca, this.filterDni});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
   List<dynamic> _todasActividades = [];
   List<Map<String, dynamic>> _listaOperativos = [];
   bool _isLoading = true;
@@ -19,6 +22,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
+    _loadHistory();
+  }
+
+  @override
+  void didPopNext() {
+    // Se llama automáticamente cuando el usuario REGRESA a esta pantalla
+    // (ej: después de generar un reporte o papeleta)
+    _refresh();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() => _isLoading = true);
     _loadHistory();
   }
 
@@ -59,12 +74,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
         return dateB.compareTo(dateA);
       });
 
+      // Aplicar filtros si existen
+      if (widget.filterPlaca != null || widget.filterDni != null) {
+        todas = todas.where((act) {
+          if (widget.filterPlaca != null && widget.filterPlaca!.trim().isNotEmpty) {
+            final placa = act['vehiculoPlaca'] ?? act['placa'] ?? '';
+            if (placa != widget.filterPlaca) return false;
+          }
+          if (widget.filterDni != null && widget.filterDni!.trim().isNotEmpty) {
+            final conductorDni = act['conductorDni'] ?? '';
+            final propDni = act['propietarioDni'] ?? '';
+            if (conductorDni != widget.filterDni && propDni != widget.filterDni) return false;
+          }
+          return true;
+        }).toList();
+      }
+
       setState(() {
         _todasActividades = todas;
         _listaOperativos = opsMap.values.toList();
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stacktrace) {
+      debugPrint('Error en _loadHistory: $e');
+      debugPrint('Stacktrace: $stacktrace');
       if (mounted) {
         setState(() {
           _todasActividades = [];
@@ -85,6 +118,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
           title: const Text('Historial de Actividades', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           backgroundColor: AppTheme.primaryBlue,
           iconTheme: const IconThemeData(color: Colors.white),
+          actions: [
+            IconButton(
+              icon: _isLoading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.refresh, color: Colors.white),
+              tooltip: 'Actualizar historial',
+              onPressed: _isLoading ? null : _refresh,
+            ),
+          ],
           bottom: const TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
@@ -175,8 +217,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
         final identificador = esReporte ? (data['placa_visual'] ?? 'Sin placa') : (data['vehiculoPlaca'] ?? 'Sin placa');
         
-        final isFormal = !esReporte && data['tipoInfractor'] == 'FORMAL';
-        final esSinIdentificar = esReporte || (data['vehiculoPlaca'] != null && data['vehiculoPlaca'].toString().startsWith('SIN-PLACA'));
+        final isFormal = data['tipoInfractor'] == 'FORMAL';
+        
+        final placa = (data['vehiculoPlaca']?.toString() ?? data['placa_visual']?.toString() ?? '');
+        final isSinPlaca = placa.isEmpty || placa.startsWith('SIN-PLACA') || placa == 'SIN PLACA' || placa == 'Sin placa';
+        final isSinConductor = (data['conductorNombre'] == null || data['conductorNombre'] == 'No identificado' || data['conductorDni'] == 'S/D');
+        final isSinDueno = (data['propietarioNombre'] == null || data['propietarioNombre'] == 'No Registrado' || data['propietarioDni'] == 'S/D');
+        
+        final esSinIdentificar = isSinPlaca && isSinConductor && isSinDueno;
         
         Color cardColor;
         Color avatarBgColor;
@@ -192,12 +240,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
           cardColor = Colors.blue;
           avatarBgColor = Colors.blue.shade100;
           iconData = Icons.receipt_long;
-          tipoTexto = 'Formal (Infracción)';
+          tipoTexto = esReporte ? 'Formal (Reporte)' : 'Formal (Infracción)';
         } else {
           cardColor = Colors.red;
           avatarBgColor = Colors.red.shade100;
           iconData = Icons.report_problem;
-          tipoTexto = 'Informal (Infracción)';
+          tipoTexto = esReporte ? 'Informal (Reporte)' : 'Informal (Infracción)';
         }
 
         final opName = data['operativoNombre'] != null && data['operativoNombre'].toString().isNotEmpty 
@@ -232,34 +280,53 @@ class _HistoryScreenState extends State<HistoryScreen> {
       context: context,
       builder: (context) {
         final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
+        final placaForCheck = (data['vehiculoPlaca']?.toString() ?? data['placa_visual']?.toString() ?? '');
+        final isSinPlaca = placaForCheck.isEmpty || placaForCheck.startsWith('SIN-PLACA') || placaForCheck == 'SIN PLACA' || placaForCheck == 'Sin placa';
+        final isSinConductor = (data['conductorNombre'] == null || data['conductorNombre'] == 'No identificado' || data['conductorDni'] == 'S/D');
+        final isSinDueno = (data['propietarioNombre'] == null || data['propietarioNombre'] == 'No Registrado' || data['propietarioDni'] == 'S/D');
+        final esSinIdentificar = isSinPlaca && isSinConductor && isSinDueno;
         
+        final tipoTextoVehiculo = esSinIdentificar ? "Sin identificar" : (isFormal ? "Formal" : "Informal");
+
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Detalles de la Actividad', style: TextStyle(color: esReporte ? Colors.orange.shade800 : (isFormal ? Colors.blue.shade800 : Colors.red.shade800), fontWeight: FontWeight.bold)),
+          title: Text('Detalles de la Actividad', style: TextStyle(color: esSinIdentificar ? Colors.orange.shade800 : (isFormal ? Colors.blue.shade800 : Colors.red.shade800), fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildDetailRow('Documento:', numDoc, isBold: true),
-                _buildDetailRow('Vehículo:', '$identificador (${esReporte ? "Sin identificar" : (isFormal ? "Formal" : "Informal")})'),
+                _buildDetailRow('Vehículo:', '$identificador ($tipoTextoVehiculo)'),
                 if (!esReporte && isFormal && data['vehiculoAsociacion'] != null)
                   _buildDetailRow('Asociación:', data['vehiculoAsociacion']),
                 _buildDetailRow('Lugar:', data['lugar'] ?? 'No especificado'),
                 if (!esReporte)
-                  _buildDetailRow('Obs. Inspector:', data['observacionesAutoridad'] ?? 'Ninguna'),
+                  _buildFormattedObservaciones('Obs. Inspector:', data['observacionesAutoridad'] ?? 'Ninguna'),
                 if (esReporte)
-                  _buildDetailRow('Observaciones:', data['observaciones'] ?? 'Ninguna'),
-
-                _buildDetailRow('Obs. Conductor:', data['observacionesConductor'] ?? 'Ninguna'),
+                  _buildFormattedObservaciones('Observaciones:', data['observaciones'] ?? 'Ninguna'),
+                if (!esReporte && (data['observacionesConductor'] != null && data['observacionesConductor'].toString().trim().isNotEmpty))
+                  _buildFormattedObservaciones('Obs. Conductor:', data['observacionesConductor']),
                 const Divider(height: 24),
-                _buildDetailRow('Conductor:', '${data['conductorNombre'] ?? 'No identificado'}\nDNI: ${data['conductorDni'] ?? 'S/D'}'),
+                if (data['conductorNombre'] != null && data['conductorNombre'].toString().trim().isNotEmpty)
+                  _buildDetailRow('Conductor:', '${data['conductorNombre']}\nDNI: ${data['conductorDni'] ?? 'S/D'}')
+                else
+                  _buildDetailRow('Conductor:', 'No identificado'),
                 const SizedBox(height: 8),
-                _buildDetailRow('Dueño:', '${data['propietarioNombre'] ?? 'No identificado'}\nDNI: ${data['propietarioDni'] ?? 'S/D'}'),
+                if (data['propietarioNombre'] != null && data['propietarioNombre'].toString().trim().isNotEmpty)
+                  _buildDetailRow('Dueño:', '${data['propietarioNombre']}\nDNI: ${data['propietarioDni'] ?? 'S/D'}')
+                else
+                  _buildDetailRow('Dueño:', 'No identificado'),
                 const Divider(height: 24),
-                _buildDetailRow('Infracción:', '${data['tipoInfraccionCodigo']} - ${data['tipoInfraccionGravedad']}'),
-                _buildDetailRow('Monto Total:', 'S/ ${data['montoTotal']}', isBold: true),
-                _buildDetailRow('Estado:', data['estado'] ?? 'PENDIENTE_PAGO'),
+                
+                if (!esReporte) ...[
+                  if (data['detalles'] != null && (data['detalles'] as List).isNotEmpty)
+                    ...((data['detalles'] as List).map((det) => _buildDetailRow('Infracción:', '${det['codigo']} - ${det['gravedad']}')))
+                  else
+                    _buildDetailRow('Infracción:', '${data['tipoInfraccionCodigo'] ?? ''} - ${data['tipoInfraccionGravedad'] ?? ''}'),
+                  _buildDetailRow('Monto Total:', 'S/ ${data['montoTotal']}', isBold: true),
+                ],
+                _buildDetailRow('Estado:', (data['estado'] ?? (esReporte ? 'PENDIENTE' : 'PENDIENTE_PAGO')).toString().replaceAll('_', ' ')),
                 const SizedBox(height: 12),
                 if (data['firmaConductorImg'] != null) ...[
                   const Text('Firma del Conductor:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
@@ -280,7 +347,55 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
                           ),
                   ),
-                ]
+                ],
+                if (data['fotos'] != null) ...() {
+                  List<dynamic> fotosList = [];
+                  if (data['fotos'] is List) {
+                    fotosList = data['fotos'];
+                  } else if (data['fotos'] is String) {
+                    try { fotosList = jsonDecode(data['fotos']); } catch (_) {}
+                  }
+                  if (fotosList.isEmpty) return <Widget>[];
+                  
+                  return [
+                    const Divider(height: 24),
+                    const Text('Fotos de Evidencia:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 120,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: fotosList.map((fotoInfo) {
+                            final fotoUrl = fotoInfo is Map ? fotoInfo['foto'] : fotoInfo;
+                            if (fotoUrl == null) return const SizedBox();
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: Container(
+                                decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300)),
+                                child: fotoUrl.toString().startsWith('data:image')
+                                    ? Image.memory(
+                                        base64Decode(fotoUrl.toString().split(',').last),
+                                        height: 100,
+                                        width: 100,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Text('Error al cargar'),
+                                      )
+                                    : Image.network(
+                                        '${ApiService.fileBaseUrl}/$fotoUrl',
+                                        height: 100,
+                                        width: 100,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Text('Error al cargar'),
+                                      ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ];
+                }(),
               ],
             ),
           ),
@@ -297,17 +412,57 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Widget _buildDetailRow(String label, String value, {bool isBold = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+          Expanded(
+            flex: 2,
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
           ),
           Expanded(
-            child: Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
+            flex: 3,
+            child: Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: Colors.black87)),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormattedObservaciones(String label, String value) {
+    if (!value.contains('[DATOS REPORTADOS]')) {
+      return _buildDetailRow(label, value);
+    }
+
+    final parts = value.split('[DATOS REPORTADOS]');
+    final obsNormal = parts[0].trim();
+    final datosReportados = parts.length > 1 ? parts[1].trim() : '';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (obsNormal.isNotEmpty) _buildDetailRow(label, obsNormal),
+          if (datosReportados.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('DATOS REPORTADOS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+                  const SizedBox(height: 4),
+                  Text(datosReportados, style: const TextStyle(color: Colors.black87)),
+                ],
+              ),
+            ),
+          ]
         ],
       ),
     );

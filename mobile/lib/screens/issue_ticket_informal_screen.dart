@@ -109,19 +109,28 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
           ? widget.reporteData['placa']
           : 'SIN_PLACA';
 
+      List<String> fotosBase64 = [];
+      if (widget.reporteData['fotos'] != null) {
+        final List<dynamic> receivedFotos = widget.reporteData['fotos'];
+        for (var foto in receivedFotos) {
+          final bytes = await foto.readAsBytes();
+          fotosBase64.add(base64Encode(bytes));
+        }
+      }
+
       final requestData = {
         'vehiculoPlaca': placa,
         'claseVehiculo': widget.reporteData['clase_vehiculo'] ?? '',
         'marcaVehiculo': widget.reporteData['marca_vehiculo'] ?? '',
         'colorVehiculo': widget.reporteData['color_vehiculo'] ?? '',
-        'motorVehiculo': widget.reporteData['motor_vehiculo'] ?? '',
+        'motorVehiculo': widget.reporteData['chasis'] ?? '',
         'infractor': widget.reporteData['fuga'] == true ? 'CONDUCTOR FUGADO / DUEÑO' : (conductorNombre.trim().isEmpty ? 'CONDUCTOR NO IDENTIFICADO' : conductorNombre),
         'conductorDni': widget.reporteData['dni_conductor'] ?? '',
         'conductorNombres': widget.reporteData['nombres_conductor'] ?? '',
         'conductorApellidos': widget.reporteData['apellidos_conductor'] ?? '',
-        'duenoDni': widget.reporteData['dni_dueno'] ?? '',
-        'duenoNombres': widget.reporteData['nombres_dueno'] ?? '',
-        'duenoApellidos': widget.reporteData['apellidos_dueno'] ?? '',
+        'duenoDni': widget.reporteData['dni_dueño'] ?? '',
+        'duenoNombres': widget.reporteData['nombres_dueño'] ?? '',
+        'duenoApellidos': widget.reporteData['apellidos_dueño'] ?? '',
         'lugar': widget.reporteData['lugar'] ?? '',
         'infraccionesIds': infraccionesInts,
         'observacionesAutoridad': widget.reporteData['observaciones'] ?? '',
@@ -129,6 +138,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
         'fuga': widget.reporteData['fuga'] ?? false,
         'fugaLatitud': widget.reporteData['fuga_latitud'],
         'fugaLongitud': widget.reporteData['fuga_longitud'],
+        'fotos': fotosBase64,
       };
 
       final result = await ApiService.createPapeleta(requestData);
@@ -199,6 +209,16 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
         'observaciones': obs,
         'coordenadas': widget.reporteData['coordenadas'] ?? '',
         'fotos': fotosBase64,
+        'dni_conductor': widget.reporteData['dni_conductor'] ?? '',
+        'nombres_conductor': widget.reporteData['nombres_conductor'] ?? '',
+        'apellidos_conductor': widget.reporteData['apellidos_conductor'] ?? '',
+        'dni_dueño': widget.reporteData['dni_dueño'] ?? '',
+        'nombres_dueño': widget.reporteData['nombres_dueño'] ?? '',
+        'apellidos_dueño': widget.reporteData['apellidos_dueño'] ?? '',
+        'claseVehiculo': widget.reporteData['clase_vehiculo'] ?? '',
+        'marcaVehiculo': widget.reporteData['marca_vehiculo'] ?? '',
+        'colorVehiculo': widget.reporteData['color_vehiculo'] ?? '',
+        'motorVehiculo': widget.reporteData['chasis'] ?? '',
       });
 
       if (mounted) {
@@ -226,7 +246,9 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String identificador = widget.reporteData['placa'] ?? widget.reporteData['chasis'] ?? 'Sin Identificar';
+    String identificador = widget.reporteData['placa'] ?? '';
+    if (identificador.isEmpty) identificador = widget.reporteData['chasis'] ?? '';
+    if (identificador.isEmpty) identificador = 'SIN PLACA';
     final bool permisoVerificado = _permitePapeletaMovil != null;
     final bool permitePapeleta = _permitePapeletaMovil == true;
     final Color accentColor = permitePapeleta ? Colors.red.shade700 : AppTheme.primaryBlue;

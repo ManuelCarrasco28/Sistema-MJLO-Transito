@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
 import '../theme.dart';
+import '../services/api_service.dart';
 import 'issue_ticket_screen.dart';
+import 'history_screen.dart';
 import 'person_details_screen.dart';
 
 class VehicleDetailsScreen extends StatefulWidget {
@@ -138,25 +139,59 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       width: double.infinity,
-      height: 60,
-      child: ElevatedButton.icon(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => IssueTicketScreen(vehicleData: _vehicleData!),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HistoryScreen(filterPlaca: _vehicleData!['placa']),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 5,
+              ),
+              icon: const Icon(Icons.history),
+              label: const Text('Ver Historial de Actividades', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: hasExpiredDocs ? Colors.red.shade600 : Colors.orange.shade700,
-          foregroundColor: Colors.white,
-          elevation: 8,
-          shadowColor: (hasExpiredDocs ? Colors.red : Colors.orange).withOpacity(0.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        icon: const Icon(Icons.assignment_late, size: 28),
-        label: const Text('Continuar intervención', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => IssueTicketScreen(vehicleData: _vehicleData!),
+                  ),
+                ).then((_) {
+                  // Recargar datos del vehículo al volver (puede haber cambiado estado)
+                  if (mounted) _fetchVehicleDetails();
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: hasExpiredDocs ? Colors.red.shade600 : Colors.orange.shade700,
+                foregroundColor: Colors.white,
+                elevation: 8,
+                shadowColor: (hasExpiredDocs ? Colors.red : Colors.orange).withOpacity(0.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              icon: const Icon(Icons.assignment_late, size: 28),
+              label: const Text('Continuar intervención', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+            ),
+          ),
+        ],
       ),
     );
   }

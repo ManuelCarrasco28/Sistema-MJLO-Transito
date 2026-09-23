@@ -46,6 +46,51 @@ class MunicipalidadController extends ResourceController
         ]);
     }
 
+    /**
+     * Endpoint ligero para el dashboard móvil.
+     * Retorna sólo los conteos del día para el inspector + config de permisos.
+     * Evita descargar todo el historial de papeletas y reportes.
+     */
+    public function mobileDashboard()
+    {
+        $db = \Config\Database::connect();
+        $config = $this->configuracionSistema($db);
+        $permitePapeleta = ($config['mobile_permite_aplicar_papeleta']['valor'] ?? '0') === '1';
+
+        $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
+        $hoy = date('Y-m-d');
+
+        $papeletasHoy = 0;
+        $reportesHoy = 0;
+
+        if ($inspectorId > 0) {
+            $papeletasHoy = (int)$db->table('papeletas')
+                ->where('id_inspector', $inspectorId)
+                ->where('fecha_hora >=', $hoy . ' 00:00:00')
+                ->where('fecha_hora <=', $hoy . ' 23:59:59')
+                ->countAllResults();
+
+            if ($db->tableExists('reportes_intervencion')) {
+                $reportesHoy = (int)$db->table('reportes_intervencion')
+                    ->where('id_inspector', $inspectorId)
+                    ->where('fecha_hora >=', $hoy . ' 00:00:00')
+                    ->where('fecha_hora <=', $hoy . ' 23:59:59')
+                    ->countAllResults();
+            }
+        }
+
+        return $this->response
+            ->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->setHeader('Pragma', 'no-cache')
+            ->setJSON([
+            'data' => [
+                'permite_aplicar_papeleta' => $permitePapeleta,
+                'papeletas_hoy' => $papeletasHoy,
+                'reportes_hoy' => $reportesHoy,
+            ],
+        ]);
+    }
+
     public function mobileConfig()
     {
         $db = \Config\Database::connect();

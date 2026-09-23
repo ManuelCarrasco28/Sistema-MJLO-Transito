@@ -8,6 +8,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
 import '../services/api_service.dart';
 import '../theme.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 class IssueTicketScreen extends StatefulWidget {
   final Map<String, dynamic> vehicleData;
@@ -43,6 +45,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   
   late TextEditingController _lugarController;
   final TextEditingController _coordenadasController = TextEditingController();
+  final MapController _mapController = MapController();
 
   // Datos del Conductor (si es distinto al dueño)
   bool _conductorEsDueno = true;
@@ -251,6 +254,12 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
           ? '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim()
           : _apellidosConductor.text.trim();
 
+      List<String> fotosBase64 = [];
+      for (var foto in _fotos) {
+        final bytes = await foto.readAsBytes();
+        fotosBase64.add(base64Encode(bytes));
+      }
+
       final requestData = {
         'vehiculoPlaca': widget.vehicleData['placa'] ?? widget.vehicleData['chasis'],
         'infractor': conductorNombre,
@@ -261,6 +270,13 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'infraccionesIds': infraccionesInts,
         'observacionesAutoridad': _observaciones,
         'inspectorId': inspectorId,
+        'fotos': fotosBase64,
+        'claseVehiculo': widget.vehicleData['tipo'] ?? '',
+        'marcaVehiculo': widget.vehicleData['marca'] ?? '',
+        'colorVehiculo': widget.vehicleData['color'] ?? '',
+        'duenoDni': widget.vehicleData['propietarioDni'] ?? '',
+        'duenoNombres': widget.vehicleData['propietarioNombres'] ?? '',
+        'duenoApellidos': '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim(),
       };
 
       final result = await ApiService.createPapeleta(requestData);
@@ -279,7 +295,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('¡Papeleta generada con éxito!'), backgroundColor: Colors.green),
         );
-        Navigator.pop(context); // Volver al detalle
+        Navigator.of(context).popUntil((route) => route.isFirst); // Volver al detalle
       }
     } catch (e) {
       _showError('Error al generar papeleta: $e');
@@ -289,8 +305,12 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   }
 
   Future<void> _submitOnlyReport() async {
-    if (_lugar.trim().isEmpty || _observaciones.trim().isEmpty) {
-      _showError('Ingrese lugar y observaciones del reporte');
+    if (_lugar.trim().isEmpty) {
+      _showError('Falta ingresar el lugar de intervención (ubicación)');
+      return;
+    }
+    if (_observaciones.trim().isEmpty) {
+      _showError('Falta ingresar las observaciones obligatorias para el reporte');
       return;
     }
 
@@ -307,6 +327,19 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         fotosBase64.add(base64Encode(bytes));
       }
 
+      String conductorNombre = _conductorEsDueno 
+          ? (widget.vehicleData['propietario'] ?? 'Dueño')
+          : '${_nombresConductor.text.trim()} ${_apellidosConductor.text.trim()}';
+      String conductorDni = _conductorEsDueno
+          ? (widget.vehicleData['propietarioDni'] ?? '').toString()
+          : _dniConductor.text.trim();
+      String conductorNombres = _conductorEsDueno
+          ? (widget.vehicleData['propietarioNombres'] ?? conductorNombre).toString()
+          : _nombresConductor.text.trim();
+      String conductorApellidos = _conductorEsDueno
+          ? '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim()
+          : _apellidosConductor.text.trim();
+
       await ApiService.createReporteIntervencion({
         'inspectorId': inspectorId,
         'placa': placa,
@@ -314,13 +347,23 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'observaciones': _observaciones,
         'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : '',
         'fotos': fotosBase64,
+        'dni_conductor': conductorDni,
+        'nombres_conductor': conductorNombres,
+        'apellidos_conductor': conductorApellidos,
+        'dni_dueño': widget.vehicleData['propietarioDni'] ?? '',
+        'nombres_dueño': widget.vehicleData['propietarioNombres'] ?? '',
+        'apellidos_dueño': '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim(),
+        'claseVehiculo': widget.vehicleData['tipo'] ?? '',
+        'marcaVehiculo': widget.vehicleData['marca'] ?? '',
+        'colorVehiculo': widget.vehicleData['color'] ?? '',
+        'motorVehiculo': '', // Not easily available in simple formal view sometimes
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Reporte enviado a administración para revisión.'), backgroundColor: Colors.green),
         );
-        Navigator.pop(context); // Volver al detalle
+        Navigator.of(context).popUntil((route) => route.isFirst); // Volver al detalle
       }
     } catch (e) {
       _showError('Error al guardar reporte: $e');
@@ -330,7 +373,10 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   }
 
   void _showError(String msg) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+    }
   }
 
   @override
@@ -566,6 +612,60 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                             prefixIcon: const Icon(Icons.gps_fixed, color: Colors.grey),
                           ),
                         ),
+                        if (_currentPosition != null) ...[
+                          const SizedBox(height: 12),
+                          const Text('Ajuste manual (toca el mapa para cambiar la ubicación exacta)', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          const SizedBox(height: 4),
+                          Container(
+                            height: 200,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: FlutterMap(
+                              mapController: _mapController,
+                              options: MapOptions(
+                                initialCenter: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                                initialZoom: 16.0,
+                                onTap: (tapPosition, point) {
+                                  setState(() {
+                                    _currentPosition = Position(
+                                      latitude: point.latitude,
+                                      longitude: point.longitude,
+                                      timestamp: DateTime.now(),
+                                      accuracy: 0.0,
+                                      altitude: 0.0,
+                                      heading: 0.0,
+                                      speed: 0.0,
+                                      speedAccuracy: 0.0,
+                                      altitudeAccuracy: 0.0,
+                                      headingAccuracy: 0.0,
+                                    );
+                                    _coordenadasController.text = '${point.latitude}, ${point.longitude}';
+                                    _lugar = _lugarController.text; // Ensure lugar is updated
+                                  });
+                                },
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  userAgentPackageName: 'com.mjlo.transito',
+                                ),
+                                MarkerLayer(
+                                  markers: [
+                                    Marker(
+                                      point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                                      width: 40,
+                                      height: 40,
+                                      child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         TextFormField(
                           decoration: InputDecoration(

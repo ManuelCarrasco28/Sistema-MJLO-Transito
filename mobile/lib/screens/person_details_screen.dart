@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
 import '../theme.dart';
-import 'vehicle_details_screen.dart';
+import '../services/api_service.dart';
 import 'register_alien_vehicle_screen.dart';
+import 'history_screen.dart';
+import 'vehicle_details_screen.dart';
 
 class PersonDetailsScreen extends StatefulWidget {
   final String dni;
@@ -14,6 +15,7 @@ class PersonDetailsScreen extends StatefulWidget {
 
 class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
   bool _isLoading = true;
+  bool _permitePapeleta = true;
   Map<String, dynamic>? _persona;
   List<dynamic> _vehiculos = [];
 
@@ -27,10 +29,12 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
     try {
       final p = await ApiService.getPersonaByDni(widget.dni);
       final v = await ApiService.getVehiculosByPersonaDni(widget.dni);
+      final permite = await ApiService.permiteAplicarPapeletaMovil();
       if (mounted) {
         setState(() {
           _persona = p;
           _vehiculos = v;
+          _permitePapeleta = permite;
           _isLoading = false;
         });
       }
@@ -122,30 +126,58 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => RegisterAlienVehicleScreen(conductor: _persona!),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => HistoryScreen(filterDni: _persona!['numeroDocumento']),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 5,
                   ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 5,
+                  icon: const Icon(Icons.history),
+                  label: const Text('Ver Historial de Actividades', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
               ),
-              icon: const Icon(Icons.car_crash),
-              label: const Text(
-                'Infracción a Vehículo Distinto',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RegisterAlienVehicleScreen(conductor: _persona!),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 5,
+                  ),
+                  icon: const Icon(Icons.car_crash),
+                  label: Text(
+                    _permitePapeleta ? 'Infracción a Vehículo Distinto' : 'Reportar Vehículo Distinto',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),

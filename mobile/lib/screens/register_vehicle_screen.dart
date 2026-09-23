@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
-
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../services/api_service.dart';
 import '../theme.dart';
 import 'issue_ticket_informal_screen.dart';
 class RegisterVehicleScreen extends StatefulWidget {
@@ -27,9 +29,27 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
   final List<XFile> _fotos = [];
   Position? _currentPosition;
   final ImagePicker _picker = ImagePicker();
+  final MapController _mapController = MapController();
   final _lugarController = TextEditingController();
   final _coordenadasController = TextEditingController();
   final _observacionesController = TextEditingController();
+
+  bool? _permitePapeleta;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadPermiso();
+  }
+  
+  Future<void> _loadPermiso() async {
+    final permite = await ApiService.permiteAplicarPapeletaMovil();
+    if (mounted) {
+      setState(() {
+        _permitePapeleta = permite;
+      });
+    }
+  }
 
   Future<void> _takePhoto() async {
     try {
@@ -100,11 +120,16 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
         // Fallback a coordenadas si falla
       }
 
+      bool wasNull = _currentPosition == null;
       setState(() {
         _currentPosition = position;
         _lugarController.text = address;
         _coordenadasController.text = '${position.latitude}, ${position.longitude}';
       });
+      
+      if (!wasNull) {
+        _mapController.move(LatLng(position.latitude, position.longitude), 16.0);
+      }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -123,6 +148,24 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
   }
 
   void _continuarAEvidencia() {
+    final bool permite = _permitePapeleta ?? true;
+    if (!permite) {
+      if (_lugarController.text.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Falta ingresar el lugar de intervención (ubicación)'), backgroundColor: Colors.red));
+        }
+        return;
+      }
+      if (_observacionesController.text.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Falta ingresar las observaciones obligatorias para el reporte'), backgroundColor: Colors.red));
+        }
+        return;
+      }
+    }
+    
     final Map<String, dynamic> reporteData = {
       'dni_conductor': '',
       'nombres_conductor': '',
@@ -190,7 +233,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             
             const Padding(
               padding: EdgeInsets.only(bottom: 8.0),
-              child: Text('Características del Vehículo (Opcional)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+              child: Text('Características del Vehículo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
             ),
             _buildTextField(_claseController, 'Clase (Ej: Mototaxi)', Icons.category, TextInputType.text),
             const SizedBox(height: 12),
@@ -198,7 +241,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             const SizedBox(height: 12),
             _buildTextField(_colorController, 'Color', Icons.color_lens, TextInputType.text),
             const SizedBox(height: 12),
-            _buildTextField(_motorController, 'Código de Motor', Icons.settings, TextInputType.text),
+            _buildTextField(_motorController, 'Número de Serie (Chasis)', Icons.settings, TextInputType.text),
             
             const SizedBox(height: 16),
             const Padding(
@@ -243,6 +286,59 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
                 prefixIcon: const Icon(Icons.gps_fixed, color: Colors.grey),
               ),
             ),
+            if (_currentPosition != null) ...[
+              const SizedBox(height: 12),
+              const Text('Ajuste manual (toca el mapa para cambiar la ubicación exacta)', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 4),
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                    initialZoom: 16.0,
+                    onTap: (tapPosition, point) {
+                      setState(() {
+                        _currentPosition = Position(
+                          latitude: point.latitude,
+                          longitude: point.longitude,
+                          timestamp: DateTime.now(),
+                          accuracy: 0.0,
+                          altitude: 0.0,
+                          heading: 0.0,
+                          speed: 0.0,
+                          speedAccuracy: 0.0,
+                          altitudeAccuracy: 0.0,
+                          headingAccuracy: 0.0,
+                        );
+                        _coordenadasController.text = '${point.latitude}, ${point.longitude}';
+                      });
+                    },
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.mjlo.transito',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                          width: 40,
+                          height: 40,
+                          child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _observacionesController,
@@ -357,9 +453,11 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
                 elevation: 5,
               ),
               icon: const Icon(Icons.arrow_forward),
-              label: const Text(
-                'Siguiente: Registrar evidencia',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+              label: Text(
+                _permitePapeleta == null
+                  ? 'Cargando...'
+                  : (_permitePapeleta! ? 'Siguiente: Registrar evidencia' : 'Siguiente: Enviar Reporte'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
               ),
             ),
           ),

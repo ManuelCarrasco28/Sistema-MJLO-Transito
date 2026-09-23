@@ -9,8 +9,7 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  // 2. Producción: Puedes pasar --dart-define=API_URL=https://api.tudominio.com/api
-  static const String _defaultUrl = 'http://10.227.15.109:8080/api';
+  static const String _defaultUrl = 'http://192.168.101.47:8080/api'; // Cambiado a IP actual
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb
@@ -87,9 +86,11 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getPapeletas() async {
+    final int? idPersona = await getPersonalId();
+    if (idPersona == null) return [];
     final response = await http
         .get(
-          Uri.parse('$baseUrl/papeletas'),
+          Uri.parse('$baseUrl/papeletas?inspector_id=$idPersona'),
           headers: await _getHeaders(isJson: false),
         )
         .timeout(_requestTimeout);
@@ -101,9 +102,11 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getReportes() async {
+    final int? idPersona = await getPersonalId();
+    if (idPersona == null) return [];
     final response = await http
         .get(
-          Uri.parse('$baseUrl/reportes-intervencion'),
+          Uri.parse('$baseUrl/reportes-intervencion?inspector_id=$idPersona'),
           headers: await _getHeaders(isJson: false),
         )
         .timeout(_requestTimeout);
@@ -112,6 +115,32 @@ class ApiService {
       return data['data'] ?? [];
     }
     throw Exception('Error al cargar historial de reportes');
+  }
+
+  /// Endpoint ligero para el dashboard: retorna conteos del día + permiso de papeleta
+  static Future<Map<String, dynamic>> getMobileDashboard() async {
+    final int? idPersona = await getPersonalId();
+    final uri = Uri.parse('$baseUrl/mobile/dashboard').replace(
+      queryParameters: {
+        if (idPersona != null) 'inspector_id': idPersona.toString(),
+        '_': DateTime.now().millisecondsSinceEpoch.toString(),
+      },
+    );
+    final response = await http
+        .get(
+          uri,
+          headers: {
+            ...await _getHeaders(isJson: false),
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        )
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data'] ?? {};
+    }
+    return {};
   }
 
   static Future<Map<String, dynamic>?> getOperativoActivo() async {
@@ -328,7 +357,7 @@ class ApiService {
     try {
       return await request().timeout(_requestTimeout);
     } on TimeoutException {
-      throw Exception('No se pudo conectar con el servidor. Verifica que el backend esté encendido en http://10.0.2.2:8080/api o configura API_URL si usas celular físico.');
+      throw Exception('No se pudo conectar con el servidor en $baseUrl. Verifica que tu PC y celular estén en el mismo Wi-Fi y el servidor esté encendido.');
     } catch (_) {
       throw Exception('No se pudo conectar con el servidor. Verifica la conexión y que el backend esté levantado.');
     }
