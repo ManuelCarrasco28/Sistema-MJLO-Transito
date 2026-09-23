@@ -15,14 +15,14 @@ function FloatingInput({ id, label, type = "text", ...props }) {
       <input
         id={id}
         type={type}
-        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+        className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
         placeholder=" "
         autoComplete="off"
         {...props}
       />
       <label
         htmlFor={id}
-        className="pointer-events-none absolute left-3 right-3 truncate whitespace-nowrap top-1/2 -translate-y-1/2 select-none text-xs font-medium text-slate-400 transition-all duration-150 peer-focus:top-1 peer-focus:-translate-y-0 peer-focus:text-[9.5px] peer-focus:font-bold peer-focus:text-indigo-600 peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:-translate-y-0 peer-[:not(:placeholder-shown)]:text-[9.5px] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:text-slate-500 dark:peer-[:not(:placeholder-shown)]:text-slate-400"
+        className="pointer-events-none absolute left-3 right-3 truncate whitespace-nowrap top-1/2 -translate-y-1/2 select-none text-xs font-medium text-slate-400 transition-all duration-150 peer-focus:top-1 peer-focus:translate-y-0 peer-focus:text-[9.5px] peer-focus:font-bold peer-focus:text-indigo-600 peer-not-placeholder-shown:top-1 peer-not-placeholder-shown:translate-y-0 peer-not-placeholder-shown:text-[9.5px] peer-not-placeholder-shown:font-bold peer-not-placeholder-shown:text-slate-500 dark:peer-not-placeholder-shown:text-slate-400"
       >
         {label}
       </label>
@@ -52,7 +52,7 @@ function FloatingSelect({ id, label, value, onChange, options = [], className = 
         type="button"
         id={id}
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-900 dark:text-white cursor-pointer ${isOpen
+        className={`flex h-10.5 w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-900 dark:text-white cursor-pointer ${isOpen
             ? 'border-indigo-500 ring-1 ring-indigo-500/20 dark:border-indigo-400'
             : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
           }`}
@@ -63,7 +63,7 @@ function FloatingSelect({ id, label, value, onChange, options = [], className = 
         </svg>
       </button>
 
-      <label htmlFor={id} className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-indigo-600 dark:!text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`}>
+      <label htmlFor={id} className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? 'text-indigo-600! dark:text-indigo-400!' : 'text-slate-500 dark:text-slate-400'}`}>
         {label}
       </label>
 
@@ -502,7 +502,7 @@ export function Vehiculos() {
       {/* Cabecera Principal */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-linear-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
             <Icon name="vehicle" className="size-5.5" />
           </span>
           <div>
@@ -630,7 +630,7 @@ export function Vehiculos() {
                   setSearchTerm('')
                 }}
                 title="Limpiar filtros"
-                className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                className="grid size-8.5 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
                 <Icon name="filterX" className="size-4" />
               </button>
@@ -659,7 +659,7 @@ export function Vehiculos() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Nuevo Vehículo</span>
@@ -912,7 +912,7 @@ export function Vehiculos() {
                         if (/[^A-Z0-9-]/.test(val)) return;
                         setFormData({ ...formData, placa: val });
                       }}
-                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-black uppercase"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-black uppercase"
                     />
 
                     <FloatingSelect
@@ -965,7 +965,7 @@ export function Vehiculos() {
                       label="Categoría SUNARP"
                       value={formData.categoria || ''}
                       onChange={(e) => setFormData({ ...formData, categoria: e.target.value.toUpperCase() })}
-                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
                     />
 
                     <FloatingInput
@@ -973,7 +973,7 @@ export function Vehiculos() {
                       label="Carrocería"
                       value={formData.carroceria || ''}
                       onChange={(e) => setFormData({ ...formData, carroceria: e.target.value.toUpperCase() })}
-                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
                     />
 
                     <FloatingInput
@@ -981,7 +981,7 @@ export function Vehiculos() {
                       label="Tipo Carrocería"
                       value={formData.tipoCarroceria || ''}
                       onChange={(e) => setFormData({ ...formData, tipoCarroceria: e.target.value.toUpperCase() })}
-                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase font-mono"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase font-mono"
                     />
 
                     <FloatingInput
@@ -989,7 +989,7 @@ export function Vehiculos() {
                       label="Sede SUNARP"
                       value={formData.sedeRegistro || ''}
                       onChange={(e) => setFormData({ ...formData, sedeRegistro: e.target.value.toUpperCase() })}
-                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
                     />
                   </div>
                 </div>
@@ -1007,7 +1007,7 @@ export function Vehiculos() {
                     label="Número de Serie (VIN)"
                     value={formData.numeroSerie}
                     onChange={(e) => setFormData({ ...formData, numeroSerie: e.target.value.toUpperCase() })}
-                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
                   />
 
                   <FloatingInput
@@ -1015,7 +1015,7 @@ export function Vehiculos() {
                     label="Serie del Motor"
                     value={formData.serieMotor}
                     onChange={(e) => setFormData({ ...formData, serieMotor: e.target.value.toUpperCase() })}
-                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
                   />
 
                   <FloatingInput
@@ -1023,7 +1023,7 @@ export function Vehiculos() {
                     label="Partida Registral SUNARP"
                     value={formData.partidaRegistral}
                     onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
-                    className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
                   />
                 </div>
               </fieldset>
@@ -1191,7 +1191,7 @@ export function Vehiculos() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-2 text-xs font-black text-white hover:from-blue-700 hover:to-cyan-700 shadow-md shadow-blue-600/25 transition-all cursor-pointer"
+                  className="rounded-xl bg-linear-to-r from-blue-600 to-cyan-600 px-6 py-2 text-xs font-black text-white hover:from-blue-700 hover:to-cyan-700 shadow-md shadow-blue-600/25 transition-all cursor-pointer"
                 >
                   {isEditing ? 'Guardar Cambios' : 'Registrar Vehículo'}
                 </button>
