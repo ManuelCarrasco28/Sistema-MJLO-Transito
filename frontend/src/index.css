@@ -488,8 +488,8 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     box-sizing: border-box !important;
   }
 
-  /* Ocultar TODO el árbol de React en #root para eliminar modales, tablas, scrolls y alturas fantasmas */
-  body > #root {
+  /* Ocultar TODO el árbol de React en #root SOLAMENTE cuando hay un documento oficial/carnet inyectado en el body vía portal */
+  body:has(> #seccion-impresion, > #seccion-impresion-tuc, > #seccion-impresion-ticket, > .seccion-impresion-portal) > #root {
     display: none !important;
   }
 
@@ -504,8 +504,8 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     overflow: visible !important;
   }
 
-  /* Ocultar toda la interfaz web del dashboard (sidebar, header, modales, botones) */
-  body * {
+  /* Ocultar elementos generales SOLO cuando imprimimos portals. Para el resto de la app, dejamos que Tailwind (print:hidden) haga su trabajo */
+  body:has(> #seccion-impresion, > #seccion-impresion-tuc, > #seccion-impresion-ticket, > .seccion-impresion-portal) * {
     visibility: hidden !important;
   }
 

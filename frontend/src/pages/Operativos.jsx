@@ -4,6 +4,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 const getPeruDateInputValue = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -165,7 +166,7 @@ export function Operativos({ user }) {
   const save = async (event) => {
     event.preventDefault()
     if (!form.nombre.trim() || !form.lugar.trim() || !form.fecha || !form.hora_inicio) {
-      alert('Completa nombre, lugar, fecha y hora de inicio.')
+      showError('Validación Fallida', 'Completa nombre, lugar, fecha y hora de inicio.')
       return
     }
     setSaving(true)
@@ -182,25 +183,33 @@ export function Operativos({ user }) {
       const result = await response.json()
       if (!response.ok) throw new Error(result.message || result.messages?.error || 'No se pudo guardar el operativo.')
       await loadOperativos()
+      showToast('Operativo guardado con éxito')
       setModalOpen(false)
     } catch (error) {
-      alert(error.message || 'No se pudo guardar el operativo.')
+      showError('Error', error.message || 'No se pudo guardar el operativo.')
     } finally {
       setSaving(false)
     }
   }
 
   const remove = async (id) => {
-    if (!window.confirm('¿Eliminar este operativo? Solo se eliminará si no tiene papeletas vinculadas.')) return
+    const result = await showConfirm(
+      '¿Eliminar operativo?',
+      '¿Eliminar este operativo? Solo se eliminará si no tiene papeletas vinculadas.',
+      'Sí, eliminar',
+      'Cancelar'
+    )
+    if (!result.isConfirmed) return
     const response = await apiFetch(`/operativos/${id}`, { method: 'DELETE' })
     if (response.ok) {
       const next = operativos.filter((op) => op.id !== id)
       setOperativos(next)
       setCachedData('/operativos', next)
+      showToast('Operativo eliminado')
       return
     }
-    const result = await response.json().catch(() => ({}))
-    alert(result.message || result.messages?.error || 'No se pudo eliminar el operativo.')
+    const resBody = await response.json().catch(() => ({}))
+    showError('Error', resBody.message || resBody.messages?.error || 'No se pudo eliminar el operativo.')
   }
 
   const openDetail = async (op) => {
@@ -361,7 +370,7 @@ export function Operativos({ user }) {
   const exportOperativoPdf = (op) => {
     const printable = window.open('', '_blank', 'width=1200,height=800')
     if (!printable) {
-      alert('No se pudo abrir la vista para PDF. Permite ventanas emergentes en el navegador.')
+      showError('Bloqueador de ventanas', 'No se pudo abrir la vista para PDF. Permite ventanas emergentes en el navegador.')
       return
     }
     printable.document.write(`

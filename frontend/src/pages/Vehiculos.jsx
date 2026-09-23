@@ -6,6 +6,7 @@ import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 function FloatingInput({ id, label, type = "text", ...props }) {
   return (
@@ -407,12 +408,19 @@ export function Vehiculos() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de eliminar este vehículo del registro municipal?')) {
+    const result = await showConfirm(
+      '¿Eliminar vehículo?',
+      '¿Está seguro de eliminar este vehículo del registro municipal?',
+      'Sí, eliminar',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         await apiFetch(`/vehiculos/${id}`, { method: 'DELETE' })
         setVehiculos(vehiculos.filter((v) => v.id !== id))
+        showToast('Vehículo eliminado con éxito')
       } catch (err) {
-        alert('No se pudo eliminar el vehículo.')
+        showError('Error', 'No se pudo eliminar el vehículo.')
       }
     }
   }
@@ -422,16 +430,16 @@ export function Vehiculos() {
     // Validaciones
     const placaClean = formData.placa.trim().toUpperCase()
     if (!placaClean || !formData.propietarioDni.trim()) {
-      alert('Por favor completa los campos requeridos (Placa y Propietario registrado).')
+      showError('Validación Fallida', 'Por favor completa los campos requeridos (Placa y Propietario registrado).')
       return
     }
     if (placaClean.length < 6) {
-      alert('La placa debe tener al menos 6 caracteres.')
+      showError('Validación Fallida', 'La placa debe tener al menos 6 caracteres.')
       return
     }
     const anioActual = new Date().getFullYear()
     if (formData.anio && (formData.anio < 1950 || formData.anio > anioActual + 1)) {
-      alert(`El año de fabricación debe ser válido (entre 1950 y ${anioActual + 1}).`)
+      showError('Validación Fallida', `El año de fabricación debe ser válido (entre 1950 y ${anioActual + 1}).`)
       return
     }
 
@@ -460,8 +468,9 @@ export function Vehiculos() {
         setCurrentPage(1)
       }
       setIsModalOpen(false)
+      showToast('Vehículo guardado exitosamente')
     } catch (err) {
-      alert(err.message || 'Error al guardar el vehículo en el servidor.')
+      showError('Error', err.message || 'Error al guardar el vehículo en el servidor.')
     }
   }
 

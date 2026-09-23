@@ -80,6 +80,32 @@ class CursosController extends ResourceController
             $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
         }
 
+        $rules = [
+            'titulo' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El título del curso es obligatorio.']
+            ],
+            'fecha' => [
+                'rules' => 'required|valid_date',
+                'errors' => [
+                    'required' => 'La fecha de inicio es obligatoria.',
+                    'valid_date' => 'La fecha de inicio no es válida.'
+                ]
+            ],
+            'cuposTotales' => [
+                'rules' => 'permit_empty|is_natural_no_zero',
+                'errors' => ['is_natural_no_zero' => 'La cantidad de cupos debe ser un número mayor a 0.']
+            ],
+            'costo' => [
+                'rules' => 'permit_empty|numeric',
+                'errors' => ['numeric' => 'El costo debe ser un valor numérico.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
+        }
+
         $codigo = trim($input['codigo'] ?? ('CUR-' . date('Y') . '-' . str_pad((string)random_int(1, 999), 3, '0', STR_PAD_LEFT)));
         $titulo = trim($input['titulo'] ?? '');
         $descripcion = trim($input['descripcion'] ?? '');
@@ -141,6 +167,28 @@ class CursosController extends ResourceController
             $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
         }
 
+        $rules = [
+            'titulo' => [
+                'rules' => 'permit_empty',
+            ],
+            'fecha' => [
+                'rules' => 'permit_empty|valid_date',
+                'errors' => ['valid_date' => 'La fecha de inicio no es válida.']
+            ],
+            'cuposTotales' => [
+                'rules' => 'permit_empty|is_natural_no_zero',
+                'errors' => ['is_natural_no_zero' => 'La cantidad de cupos debe ser un número mayor a 0.']
+            ],
+            'costo' => [
+                'rules' => 'permit_empty|numeric',
+                'errors' => ['numeric' => 'El costo debe ser un valor numérico.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
+        }
+
         $data = [];
         if (isset($input['titulo'])) {
             $data['nombre'] = trim($input['titulo']);
@@ -194,6 +242,17 @@ class CursosController extends ResourceController
         $input = $this->request->getJSON(true);
         if (!is_array($input)) {
             $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
+
+        $rules = [
+            'dni' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El DNI es obligatorio para la inscripción.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $dni = trim($input['dni'] ?? '');

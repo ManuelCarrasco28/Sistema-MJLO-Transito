@@ -4,6 +4,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { exportToExcel } from '../utils/exportToExcel'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 
@@ -321,12 +322,19 @@ export function Trabajadores() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de desactivar/eliminar a este trabajador?')) {
+    const result = await showConfirm(
+      '¿Desactivar trabajador?',
+      '¿Está seguro de desactivar/eliminar a este trabajador?',
+      'Sí, desactivar',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         await apiFetch(`/personal/${id}`, { method: 'DELETE' })
         setRows(rows.filter((p) => p.id !== id))
+        showToast('Trabajador desactivado/eliminado')
       } catch (err) {
-        alert('No se pudo eliminar al trabajador.')
+        showError('Error', 'No se pudo eliminar al trabajador.')
       }
     }
   }

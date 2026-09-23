@@ -238,6 +238,21 @@ class InspeccionesController extends ResourceController
             $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
         }
 
+        $rules = [
+            'vehiculoPlaca' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'La placa del vehículo es obligatoria.']
+            ],
+            'resultado' => [
+                'rules' => 'permit_empty|in_list[APROBADO,OBSERVADO,DESAPROBADO]',
+                'errors' => ['in_list' => 'El resultado de la inspección no es válido.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
+        }
+
         $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
         $resultado = trim($input['resultado'] ?? 'APROBADO');
         $observaciones = trim($input['observaciones'] ?? '');
@@ -427,6 +442,17 @@ class InspeccionesController extends ResourceController
         }
         if (!is_array($input)) {
             $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
+
+        $rules = [
+            'resultado' => [
+                'rules' => 'permit_empty|in_list[APROBADO,OBSERVADO,DESAPROBADO]',
+                'errors' => ['in_list' => 'El resultado de la inspección no es válido.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         try {

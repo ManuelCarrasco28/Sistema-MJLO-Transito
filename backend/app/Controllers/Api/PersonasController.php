@@ -159,8 +159,53 @@ class PersonasController extends ResourceController
         $db = \Config\Database::connect();
         $input = $this->request->getJSON(true) ?: $this->request->getPost();
 
-        if (empty($input['numeroDocumento']) || empty($input['nombres']) || empty($input['apellidoPaterno'])) {
-            return $this->failValidationErrors('Número de documento, nombres y apellido paterno son requeridos.');
+        $rules = [
+            'numeroDocumento' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El número de documento es requerido.']
+            ],
+            'nombres' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'Los nombres son requeridos.']
+            ],
+            'apellidoPaterno' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El apellido paterno es requerido.']
+            ],
+            'apellidoMaterno' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El apellido materno es requerido.']
+            ],
+            'numeroLicencia' => [
+                'rules' => 'required|max_length[9]',
+                'errors' => [
+                    'required' => 'El número de licencia es requerido.',
+                    'max_length' => 'El número de licencia no puede exceder los 9 caracteres.'
+                ]
+            ],
+            'direccion' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'La dirección es requerida.']
+            ],
+            'email' => [
+                'rules' => 'required|valid_email',
+                'errors' => [
+                    'required' => 'El correo electrónico es requerido.',
+                    'valid_email' => 'Por favor ingresa un correo electrónico válido.'
+                ]
+            ],
+            'celular' => [
+                'rules' => 'required|numeric|exact_length[9]',
+                'errors' => [
+                    'required' => 'El número de celular es requerido.',
+                    'numeric' => 'El número de celular debe contener solo números.',
+                    'exact_length' => 'El número de celular debe tener exactamente 9 dígitos.'
+                ]
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $numeroDoc = trim($input['numeroDocumento']);
@@ -172,14 +217,6 @@ class PersonasController extends ResourceController
         }
         if ($tipoDocName !== 'DNI' && ($docLen < 8 || $docLen > 15)) {
             return $this->failValidationErrors('El número de documento debe tener entre 8 y 15 caracteres.');
-        }
-
-        if (!empty($input['email']) && !filter_var(trim($input['email']), FILTER_VALIDATE_EMAIL)) {
-            return $this->failValidationErrors('Por favor ingresa un correo electrónico válido.');
-        }
-
-        if (!empty($input['celular']) && (!ctype_digit(trim($input['celular'])) || strlen(trim($input['celular'])) !== 9)) {
-            return $this->failValidationErrors('El número de celular debe tener exactamente 9 dígitos numéricos.');
         }
 
         if ($db->table('personas')->where('numero', $numeroDoc)->countAllResults() > 0) {
@@ -263,18 +300,49 @@ class PersonasController extends ResourceController
             }
         }
 
-        if (isset($input['email'])) {
-            $email = trim($input['email']);
-            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                return $this->failValidationErrors('Por favor ingresa un correo electrónico válido.');
-            }
-        }
+        $rules = [
+            'nombres' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'Los nombres son requeridos.']
+            ],
+            'apellidoPaterno' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El apellido paterno es requerido.']
+            ],
+            'apellidoMaterno' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El apellido materno es requerido.']
+            ],
+            'numeroLicencia' => [
+                'rules' => 'required|max_length[9]',
+                'errors' => [
+                    'required' => 'El número de licencia es requerido.',
+                    'max_length' => 'El número de licencia no puede exceder los 9 caracteres.'
+                ]
+            ],
+            'direccion' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'La dirección es requerida.']
+            ],
+            'email' => [
+                'rules' => 'required|valid_email',
+                'errors' => [
+                    'required' => 'El correo electrónico es requerido.',
+                    'valid_email' => 'Por favor ingresa un correo electrónico válido.'
+                ]
+            ],
+            'celular' => [
+                'rules' => 'required|numeric|exact_length[9]',
+                'errors' => [
+                    'required' => 'El número de celular es requerido.',
+                    'numeric' => 'El número de celular debe contener solo números.',
+                    'exact_length' => 'El número de celular debe tener exactamente 9 dígitos.'
+                ]
+            ]
+        ];
 
-        if (isset($input['celular'])) {
-            $celular = trim($input['celular']);
-            if ($celular !== '' && (!ctype_digit($celular) || strlen($celular) !== 9)) {
-                return $this->failValidationErrors('El número de celular debe tener exactamente 9 dígitos numéricos.');
-            }
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $db->transStart();

@@ -4,6 +4,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 export function Papeletas() {
   const cachedPapeletas = getCachedData('/papeletas')
@@ -238,11 +239,11 @@ export function Papeletas() {
 
   const handleOpenPagar = (papeleta) => {
     if (papeleta.estado === 'ANULADA') {
-      alert('Esta papeleta está anulada y no puede ser cancelada ni pagada.')
+      showError('No Permitido', 'Esta papeleta está anulada y no puede ser cancelada ni pagada.')
       return
     }
     if (papeleta.estado === 'PAGADA') {
-      alert('Esta papeleta ya se encuentra pagada.')
+      showError('No Permitido', 'Esta papeleta ya se encuentra pagada.')
       return
     }
     setPapeletaToAction(papeleta)
@@ -257,11 +258,11 @@ export function Papeletas() {
 
     // Validaciones
     if (!numeroRecibo.trim() || !fechaPago) {
-      alert('Por favor ingresa el número de recibo y la fecha de pago.')
+      showError('Validación Fallida', 'Por favor ingresa el número de recibo y la fecha de pago.')
       return
     }
     if (new Date(fechaPago) > new Date()) {
-      alert('La fecha de pago no puede ser futura.')
+      showError('Validación Fallida', 'La fecha de pago no puede ser futura.')
       return
     }
 
@@ -278,13 +279,13 @@ export function Papeletas() {
         } : p))
         setIsPagarModalOpen(false)
         setPapeletaToAction(null)
+        showToast('Pago procesado correctamente')
       } else {
         const error = await res.json()
-        alert(Object.values(error.messages || {}).join(' ') || 'Error al procesar el pago')
+        showError('Error', Object.values(error.messages || {}).join(' ') || 'Error al procesar el pago')
       }
     } catch (err) {
-      console.error(err)
-      alert('Error de conexión al procesar el pago')
+      showError('Error de Conexión', 'Error de conexión al procesar el pago')
     } finally {
       setIsProcessingAction(false)
     }
@@ -306,11 +307,11 @@ export function Papeletas() {
     if (!reporteToConvert) return
     const validInfracciones = convertForm.infraccionesIds.filter(id => id).map(Number)
     if (validInfracciones.length === 0) {
-      alert('Selecciona al menos una infracción.')
+      showError('Validación Fallida', 'Selecciona al menos una infracción.')
       return
     }
     if (!convertForm.vehiculoId) {
-      alert('Para generar papeleta primero debes identificar o registrar el vehículo.')
+      showError('Validación Fallida', 'Para generar papeleta primero debes identificar o registrar el vehículo.')
       return
     }
     setIsProcessingAction(true)
@@ -328,9 +329,9 @@ export function Papeletas() {
       if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo convertir el reporte.')
       setReporteToConvert(null)
       loadData()
-      alert(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim())
+      showToast(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim())
     } catch (error) {
-      alert(error.message || 'Error al convertir reporte.')
+      showError('Error', error.message || 'Error al convertir reporte.')
     } finally {
       setIsProcessingAction(false)
     }
@@ -340,7 +341,7 @@ export function Papeletas() {
     event.preventDefault()
     if (!reporteToReject) return
     if (!motivoRechazo.trim()) {
-      alert('Ingresa el motivo de rechazo.')
+      showError('Validación Fallida', 'Ingresa el motivo de rechazo.')
       return
     }
     setIsProcessingAction(true)
@@ -354,8 +355,9 @@ export function Papeletas() {
       setReporteToReject(null)
       setMotivoRechazo('')
       loadData()
+      showToast('Reporte rechazado')
     } catch (error) {
-      alert(error.message || 'Error al rechazar reporte.')
+      showError('Error', error.message || 'Error al rechazar reporte.')
     } finally {
       setIsProcessingAction(false)
     }

@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { CerticavFichaPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -603,7 +604,13 @@ export function Inspecciones() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de eliminar esta inspección técnica del sistema?')) {
+    const result = await showConfirm(
+      '¿Eliminar inspección?',
+      '¿Está seguro de eliminar esta inspección técnica del sistema?',
+      'Sí, eliminar',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         const res = await apiFetch(`/inspecciones/${id}`, { method: 'DELETE' })
         if (!res.ok) throw res
@@ -612,7 +619,7 @@ export function Inspecciones() {
         setCachedData('/inspecciones', next)
         showToast('Inspección eliminada con éxito')
       } catch {
-        alert('Error al eliminar la inspección.')
+        showError('Error', 'Error al eliminar la inspección.')
       }
     }
   }
@@ -649,7 +656,7 @@ export function Inspecciones() {
   const handleFormSubmit = async (e) => {
     e.preventDefault()
     if (!formData.vehiculoPlaca.trim()) {
-      alert('Por favor ingrese la placa del vehículo.')
+      showError('Validación Fallida', 'Por favor ingrese la placa del vehículo.')
       return
     }
 
@@ -710,7 +717,7 @@ export function Inspecciones() {
       }
       setIsModalOpen(false)
     } catch (err) {
-      alert('Error de comunicación con el servidor al guardar la inspección.')
+      showError('Error de comunicación', 'Error con el servidor al guardar la inspección.')
     }
   }
 
@@ -742,13 +749,13 @@ export function Inspecciones() {
   const handleExportPdf = () => {
     const listToExport = filteredInspecciones.length > 0 ? filteredInspecciones : inspecciones
     if (listToExport.length === 0) {
-      alert('No hay registros para exportar.')
+      showError('Atención', 'No hay registros para exportar.')
       return
     }
 
     const printWin = window.open('', '_blank', 'width=1100,height=750')
     if (!printWin) {
-      alert('El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
+      showError('Atención', 'El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
       return
     }
 

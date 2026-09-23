@@ -153,28 +153,31 @@ class AsociacionesController extends ResourceController
         $db = \Config\Database::connect();
         $input = $this->request->getJSON(true) ?: $this->request->getPost();
 
-        if (empty($input['razonSocial'])) {
-            return $this->failValidationErrors('La razón social es obligatoria.');
-        }
+        $rules = [
+            'razonSocial' => [
+                'rules'  => 'required',
+                'errors' => ['required' => 'La razón social es obligatoria.']
+            ],
+            'ruc' => [
+                'rules'  => 'permit_empty|numeric|exact_length[11]|is_unique[asociaciones.ruc]',
+                'errors' => [
+                    'numeric'      => 'El RUC debe tener exactamente 11 dígitos numéricos.',
+                    'exact_length' => 'El RUC debe tener exactamente 11 dígitos numéricos.',
+                    'is_unique'    => 'El RUC ya se encuentra registrado en otra asociación o empresa.'
+                ]
+            ],
+            'email' => [
+                'rules'  => 'permit_empty|valid_email',
+                'errors' => ['valid_email' => 'El correo electrónico no es válido.']
+            ],
+            'telefono' => [
+                'rules'  => 'permit_empty|numeric',
+                'errors' => ['numeric' => 'El teléfono debe contener solo números.']
+            ]
+        ];
 
-        $ruc = trim($input['ruc'] ?? '');
-        if ($ruc !== '') {
-            if (!ctype_digit($ruc) || strlen($ruc) !== 11) {
-                return $this->failValidationErrors('El RUC debe tener exactamente 11 dígitos numéricos.');
-            }
-            if ($db->table('asociaciones')->where('ruc', $ruc)->countAllResults() > 0) {
-                return $this->failValidationErrors('El RUC ya se encuentra registrado en otra asociación o empresa.');
-            }
-        }
-
-        $email = trim($input['email'] ?? '');
-        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return $this->failValidationErrors('El correo electrónico no es válido.');
-        }
-
-        $telefono = trim($input['telefono'] ?? '');
-        if ($telefono !== '' && !ctype_digit($telefono)) {
-            return $this->failValidationErrors('El teléfono debe contener solo números.');
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $flotaAutorizada = isset($input['flotaAutorizada']) ? max(1, (int)$input['flotaAutorizada']) : 50;
@@ -245,43 +248,42 @@ class AsociacionesController extends ResourceController
             return $this->failNotFound('Asociación no encontrada.');
         }
 
+        $rules = [
+            'razonSocial' => [
+                'rules'  => 'permit_empty',
+            ],
+            'ruc' => [
+                'rules'  => "permit_empty|numeric|exact_length[11]|is_unique[asociaciones.ruc,id,{$id}]",
+                'errors' => [
+                    'numeric'      => 'El RUC debe tener exactamente 11 dígitos numéricos.',
+                    'exact_length' => 'El RUC debe tener exactamente 11 dígitos numéricos.',
+                    'is_unique'    => 'El RUC ya se encuentra registrado en otra asociación o empresa.'
+                ]
+            ],
+            'email' => [
+                'rules'  => 'permit_empty|valid_email',
+                'errors' => ['valid_email' => 'El correo electrónico no es válido.']
+            ],
+            'telefono' => [
+                'rules'  => 'permit_empty|numeric',
+                'errors' => ['numeric' => 'El teléfono debe contener solo números.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
+        }
+
         $record = [];
         if (isset($input['tipo'])) $record['tipo'] = strtoupper($input['tipo']);
         if (isset($input['razonSocial'])) $record['razon_social'] = trim($input['razonSocial']);
-        
-        if (isset($input['ruc'])) {
-            $ruc = trim($input['ruc']);
-            if ($ruc !== '') {
-                if (!ctype_digit($ruc) || strlen($ruc) !== 11) {
-                    return $this->failValidationErrors('El RUC debe tener exactamente 11 dígitos numéricos.');
-                }
-                if ($db->table('asociaciones')->where('ruc', $ruc)->where('id !=', $id)->countAllResults() > 0) {
-                    return $this->failValidationErrors('El RUC ya se encuentra registrado en otra asociación o empresa.');
-                }
-            }
-            $record['ruc'] = $ruc;
-        }
-
+        if (isset($input['ruc'])) $record['ruc'] = trim($input['ruc']);
         if (isset($input['partidaRegistral'])) $record['partida_registral'] = trim($input['partidaRegistral']);
         if (isset($input['fechaCreacion'])) $record['fecha_creacion'] = $input['fechaCreacion'] ?: null;
         if (isset($input['direccion'])) $record['direccion'] = trim($input['direccion']);
         if (isset($input['coordenadas'])) $record['coordenadas'] = trim($input['coordenadas']);
-        
-        if (isset($input['telefono'])) {
-            $telefono = trim($input['telefono']);
-            if ($telefono !== '' && !ctype_digit($telefono)) {
-                return $this->failValidationErrors('El teléfono debe contener solo números.');
-            }
-            $record['telefono_contacto'] = $telefono;
-        }
-        
-        if (isset($input['email'])) {
-            $email = trim($input['email']);
-            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                return $this->failValidationErrors('El correo electrónico no es válido.');
-            }
-            $record['email_contacto'] = $email;
-        }
+        if (isset($input['telefono'])) $record['telefono_contacto'] = trim($input['telefono']);
+        if (isset($input['email'])) $record['email_contacto'] = trim($input['email']);
         if (isset($input['tipoAmbiente'])) $record['tipo_ambiente'] = trim($input['tipoAmbiente']);
         if (isset($input['numeroLicencia'])) $record['numero_licencia'] = trim($input['numeroLicencia']);
         if (isset($input['resolucionAlcaldia'])) $record['resolucion_alcaldia'] = trim($input['resolucionAlcaldia']);

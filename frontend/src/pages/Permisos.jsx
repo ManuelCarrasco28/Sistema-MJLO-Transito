@@ -4,6 +4,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { ResolucionPermisoPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 export function Permisos() {
   const cachedPermisos = getCachedData('/permisos')
@@ -228,8 +229,9 @@ export function Permisos() {
       setIsCreateModalOpen(false)
       invalidateCache('/permisos')
       loadData()
+      showToast('Autorización guardada exitosamente')
     } catch (err) {
-      alert(err.message || 'Ocurrió un error al guardar la autorización.')
+      showError('Error', err.message || 'Ocurrió un error al guardar la autorización.')
     } finally {
       setIsSubmitting(false)
     }

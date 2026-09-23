@@ -4,6 +4,7 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 function FloatingInput({ id, label, type = "text", ...props }) {
   return (
@@ -236,12 +237,19 @@ export function Asociaciones() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de eliminar esta asociación del registro municipal?')) {
+    const result = await showConfirm(
+      '¿Eliminar asociación?',
+      '¿Está seguro de eliminar esta asociación del registro municipal? Esta acción no se puede deshacer.',
+      'Sí, eliminar',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         await apiFetch(`/asociaciones/${id}`, { method: 'DELETE' })
         setAsociaciones(asociaciones.filter((o) => o.id !== id))
+        showToast('Asociación eliminada correctamente')
       } catch (err) {
-        alert('No se pudo eliminar la asociación.')
+        showError('Error', 'No se pudo eliminar la asociación.')
       }
     }
   }
@@ -249,39 +257,51 @@ export function Asociaciones() {
   const handleFormSubmit = async (e) => {
     e.preventDefault()
     if (!formData.razonSocial.trim() || !formData.ruc.trim()) {
-      alert('Por favor completa los campos requeridos.')
+      showError('Validación Fallida', 'Por favor completa los campos requeridos (Razón Social y RUC).')
       return
     }
 
     const documentNumber = formData.ruc.trim()
     if (!/^\d{11}$/.test(documentNumber)) {
-      alert('El RUC debe tener exactamente 11 dígitos numéricos.')
+      showError('Formato Inválido', 'El RUC debe tener exactamente 11 dígitos numéricos.')
+      return
+    }
+
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      showError('Formato Inválido', 'El correo electrónico no es válido.')
       return
     }
 
     try {
       if (isEditing) {
-        await apiFetch(`/asociaciones/${selectedOrg.id}`, {
+        const res = await apiFetch(`/asociaciones/${selectedOrg.id}`, {
           method: 'PUT',
           body: formData,
         })
+        const resData = await res.json()
+        if (!res.ok) throw new Error(resData.messages?.error || 'Error al actualizar')
+        
         setAsociaciones(asociaciones.map((o) => (o.id === selectedOrg.id ? { ...formData, id: o.id } : o)))
+        showToast('Asociación actualizada exitosamente')
       } else {
         const res = await apiFetch('/asociaciones', {
           method: 'POST',
           body: formData,
         })
         const resData = await res.json()
+        if (!res.ok) throw new Error(resData.messages?.error || 'Error al crear')
+        
         const newOrg = resData.data || {
           ...formData,
           id: Date.now(),
         }
         setAsociaciones([newOrg, ...asociaciones])
         setCurrentPage(1)
+        showToast('Asociación registrada exitosamente')
       }
       setIsModalOpen(false)
     } catch (err) {
-      alert('Error al guardar la asociación en el servidor.')
+      showError('Error al guardar', err.message || 'Error al guardar la asociación en el servidor.')
     }
   }
 
@@ -721,7 +741,7 @@ export function Asociaciones() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => alert('Búsqueda por RUC pendiente de conectar.')}
+                      onClick={() => showToast('Búsqueda por RUC pendiente de conectar', 'info')}
                       className="inline-flex min-w-28 items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-extrabold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300"
                     >
                       <Icon name="search" className="size-4" />

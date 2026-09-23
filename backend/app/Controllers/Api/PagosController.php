@@ -86,8 +86,38 @@ class PagosController extends ResourceController
     {
         try {
             $input = $this->request->getJSON(true) ?? [];
+
+            $rules = [
+                'tipoPago' => [
+                    'rules' => 'required|in_list[PAPELETA,TRAMITE,CURSO]',
+                    'errors' => [
+                        'required' => 'El tipo de pago es obligatorio.',
+                        'in_list' => 'El tipo de pago no es válido.'
+                    ]
+                ]
+            ];
+
+            if (!$this->validateData($input, $rules)) {
+                return $this->failValidationErrors($this->validator->getErrors());
+            }
+
             $tipo = strtoupper(trim($input['tipoPago'] ?? ''));
             $key = ['PAPELETA' => 'papeletaId', 'TRAMITE' => 'tramiteId', 'CURSO' => 'inscripcionId'][$tipo] ?? '';
+            
+            $rulesId = [
+                $key => [
+                    'rules' => 'required|is_natural_no_zero',
+                    'errors' => [
+                        'required' => "El ID de $tipo es obligatorio.",
+                        'is_natural_no_zero' => "El ID de $tipo debe ser un número válido."
+                    ]
+                ]
+            ];
+
+            if (!$this->validateData($input, $rulesId)) {
+                return $this->failValidationErrors($this->validator->getErrors());
+            }
+
             $pago = (new PagosTransito(\Config\Database::connect()))->generar($tipo, (int)($input[$key] ?? 0));
             return $this->respondCreated(['data' => $this->present($pago)]);
         } catch (\DomainException $e) {
@@ -202,10 +232,10 @@ class PagosController extends ResourceController
         $totalTarjeta = 0;
         $totalTransferencia = 0;
         $porConcepto = [
-            'PAPELETA' => 0,
-            'TRAMITE' => 0,
-            'CURSO' => 0,
-            'INTERNAMIENTO' => 0,
+            'PAPELETA' => ['tipoPago' => 'PAPELETA', 'cantidad' => 0, 'total' => 0],
+            'TRAMITE' => ['tipoPago' => 'TRAMITE', 'cantidad' => 0, 'total' => 0],
+            'CURSO' => ['tipoPago' => 'CURSO', 'cantidad' => 0, 'total' => 0],
+            'INTERNAMIENTO' => ['tipoPago' => 'INTERNAMIENTO', 'cantidad' => 0, 'total' => 0],
         ];
         $porCajero = [];
 
@@ -224,9 +254,10 @@ class PagosController extends ResourceController
 
             $c = $item['tipoPago'];
             if (!isset($porConcepto[$c])) {
-                $porConcepto[$c] = 0;
+                $porConcepto[$c] = ['tipoPago' => $c, 'cantidad' => 0, 'total' => 0];
             }
-            $porConcepto[$c] += $m;
+            $porConcepto[$c]['cantidad']++;
+            $porConcepto[$c]['total'] += $m;
 
             $caj = $item['cajero'];
             if (!isset($porCajero[$caj])) {
@@ -244,7 +275,7 @@ class PagosController extends ResourceController
                 'totalEfectivo' => round($totalEfectivo, 2),
                 'totalTarjeta' => round($totalTarjeta, 2),
                 'totalTransferencia' => round($totalTransferencia, 2),
-                'porConcepto' => $porConcepto,
+                'porConcepto' => array_values($porConcepto),
                 'porCajero' => array_values($porCajero),
                 'detalles' => $todosPagos,
             ]

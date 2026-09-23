@@ -155,10 +155,34 @@ class OperativosController extends ResourceController
         $db = \Config\Database::connect();
         $input = $this->parseInput();
 
-        foreach (['nombre', 'lugar', 'fecha', 'hora_inicio'] as $field) {
-            if (empty($input[$field])) {
-                return $this->failValidationErrors('Complete nombre, lugar, fecha y hora de inicio.');
-            }
+        $rules = [
+            'nombre' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El nombre del operativo es obligatorio.']
+            ],
+            'lugar' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El lugar del operativo es obligatorio.']
+            ],
+            'fecha' => [
+                'rules' => 'required|valid_date',
+                'errors' => [
+                    'required' => 'La fecha del operativo es obligatoria.',
+                    'valid_date' => 'La fecha del operativo no es válida.'
+                ]
+            ],
+            'hora_inicio' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'La hora de inicio es obligatoria.']
+            ],
+            'estado' => [
+                'rules' => 'permit_empty|in_list[PROGRAMADO,EN CURSO,FINALIZADO,CANCELADO]',
+                'errors' => ['in_list' => 'Estado de operativo no válido.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $db->transStart();
@@ -203,6 +227,30 @@ class OperativosController extends ResourceController
         $current = $db->table('operativos')->where('id', $id)->get()->getRowArray();
         if (!$id || !$current) {
             return $this->failNotFound('Operativo no encontrado.');
+        }
+
+        $rules = [
+            'nombre' => [
+                'rules' => 'permit_empty',
+            ],
+            'lugar' => [
+                'rules' => 'permit_empty',
+            ],
+            'fecha' => [
+                'rules' => 'permit_empty|valid_date',
+                'errors' => ['valid_date' => 'La fecha del operativo no es válida.']
+            ],
+            'hora_inicio' => [
+                'rules' => 'permit_empty',
+            ],
+            'estado' => [
+                'rules' => 'permit_empty|in_list[PROGRAMADO,EN CURSO,FINALIZADO,CANCELADO]',
+                'errors' => ['in_list' => 'Estado de operativo no válido.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $data = [];

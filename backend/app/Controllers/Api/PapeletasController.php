@@ -163,6 +163,27 @@ class PapeletasController extends ResourceController
             $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
         }
 
+        $rules = [
+            'vehiculoPlaca' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'La placa del vehículo es obligatoria.']
+            ],
+            'infractor' => [
+                'rules' => 'permit_empty',
+            ],
+            'conductorDni' => [
+                'rules' => 'permit_empty',
+            ],
+            'lugar' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El lugar de la infracción es obligatorio.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
+        }
+
         $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
         $infractor = trim($input['infractor'] ?? '');
         $conductorDni = trim($input['conductorDni'] ?? '');

@@ -136,6 +136,17 @@ class PermisosController extends ResourceController
         $db = \Config\Database::connect();
         $payload = $this->request->getJSON(true) ?? $this->request->getPost();
 
+        $rules = [
+            'tipoPermiso' => [
+                'rules' => 'permit_empty|in_list[CARGA_DESCARGA,USO_VIAS]',
+                'errors' => ['in_list' => 'Tipo de permiso no válido.']
+            ]
+        ];
+
+        if (!$this->validateData($payload, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
+        }
+
         try {
             $tipoPermiso = trim($payload['tipoPermiso'] ?? 'CARGA_DESCARGA');
             $year = date('Y');

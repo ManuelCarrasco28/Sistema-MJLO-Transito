@@ -101,19 +101,33 @@ class PersonalController extends ResourceController
     private function saveRecord($id = null)
     {
         $input = $this->request->getJSON(true) ?: [];
-        foreach (['cargo', 'estado'] as $field) {
-            if (!isset($input[$field]) || !is_string($input[$field]) || trim($input[$field]) === '') {
-                return $this->failValidationErrors('Complete todos los campos del trabajador.');
-            }
+
+        $rules = [
+            'cargo' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El cargo es obligatorio.']
+            ],
+            'estado' => [
+                'rules' => 'required|in_list[ACTIVO,INACTIVO]',
+                'errors' => [
+                    'required' => 'El estado es obligatorio.',
+                    'in_list' => 'Estado no válido.'
+                ]
+            ]
+        ];
+
+        if ($id === null) {
+            $rules['id_persona'] = [
+                'rules' => 'required',
+                'errors' => ['required' => 'Seleccione una persona registrada para crear el trabajador.']
+            ];
         }
-        if ($id === null && empty($input['id_persona'])) {
-            return $this->failValidationErrors('Seleccione una persona registrada para crear el trabajador.');
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $estado = trim($input['estado']);
-        if (!in_array($estado, ['ACTIVO', 'INACTIVO'], true)) {
-            return $this->failValidationErrors('Estado no válido.');
-        }
 
         $db = \Config\Database::connect();
         $db->transStart();

@@ -105,22 +105,6 @@ export function Retenciones() {
   }
 
   const getStatusBadge = (estado) => {
-    if (estado === 'RETENIDO') {
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-black text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
-          <span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
-          EN DEPÓSITO
-        </span>
-      )
-    }
-    if (estado === 'LIBERADO') {
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-black text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-          <span className="size-1.5 rounded-full bg-emerald-500" />
-          LIBERADO
-        </span>
-      )
-    }
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-black text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
         {estado}
@@ -136,15 +120,15 @@ export function Retenciones() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
-        <div className="flex items-center gap-3.5">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose-600 to-orange-600 text-white shadow-lg shadow-rose-500/30">
+    <div className="space-y-6 print:p-8">
+      <div className={`flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${isDetailModalOpen ? 'print:hidden' : ''} print:mb-6`}>
+        <div className="flex items-center gap-3.5 print:gap-2">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose-600 to-orange-600 text-white shadow-lg shadow-rose-500/30 print:hidden">
             <Icon name="retention" className="size-6" />
           </span>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-              Internamientos Vehiculares
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl print:text-xl print:uppercase print:tracking-widest">
+              Reporte de Internamientos Vehiculares
             </h1>
             <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
               Control de depósito municipal, actas de internamiento, inventario de custodia y órdenes de libertad.
@@ -152,7 +136,7 @@ export function Retenciones() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 print:hidden">
           <button
             type="button"
             onClick={() => window.print()}
@@ -161,77 +145,77 @@ export function Retenciones() {
             <Icon name="print" className="size-4 text-slate-500" />
             <span>Imprimir Resumen</span>
           </button>
-          <span className="rounded-xl border border-rose-200/80 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 shadow-xs dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
+          <span className="rounded-xl border border-rose-200/80 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 shadow-xs dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 print:border-none print:bg-transparent print:text-black print:p-0 print:text-sm">
             Depósito Oficial N° 1
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4 print:hidden">
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44]">
+      <div className={`grid grid-cols-2 gap-3.5 sm:grid-cols-4 ${isDetailModalOpen ? 'print:hidden' : ''} print:gap-1 print:border-y print:border-black print:py-3 print:mb-4`}>
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44] print:border-none print:shadow-none print:p-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 print:text-black print:text-[10px]">
               Total Internamientos
             </span>
-            <span className="grid size-8 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+            <span className="grid size-8 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 print:hidden">
               <Icon name="retention" className="size-4.5" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+          <p className="mt-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white print:text-xl print:text-black print:mt-1">
             {totalInternados}
           </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 print:hidden">
             Registros históricos de custodia
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44]">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44] print:border-none print:shadow-none print:p-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 print:text-black print:text-[10px]">
               En Depósito
             </span>
-            <span className="grid size-8 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
+            <span className="grid size-8 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 print:hidden">
               <Icon name="lock" className="size-4.5" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400">
+          <p className="mt-2 text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400 print:text-xl print:text-black print:mt-1">
             {enDeposito}
           </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 print:hidden">
             Vehículos bajo custodia activa
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44]">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44] print:border-none print:shadow-none print:p-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 print:text-black print:text-[10px]">
               Liberados
             </span>
-            <span className="grid size-8 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+            <span className="grid size-8 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 print:hidden">
               <Icon name="check" className="size-4.5" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400">
+          <p className="mt-2 text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 print:text-xl print:text-black print:mt-1">
             {liberados}
           </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 print:hidden">
             Con orden de entrega formal
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44]">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-horizon dark:shadow-none dark:border-slate-800/80 dark:bg-[#111C44] print:border-none print:shadow-none print:p-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 print:text-black print:text-[10px]">
               Días Promedio
             </span>
-            <span className="grid size-8 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+            <span className="grid size-8 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 print:hidden">
               <Icon name="clock" className="size-4.5" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+          <p className="mt-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white print:text-xl print:text-black print:mt-1">
             {avgDias} días
           </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 print:hidden">
             Permanencia en depósito
           </p>
         </div>
@@ -278,21 +262,21 @@ export function Retenciones() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-horizon dark:shadow-none dark:border-slate-800 dark:bg-[#111C44] print:hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
-            <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-[#111C44]/60 dark:text-slate-400">
+      <div className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-horizon dark:shadow-none dark:border-slate-800 dark:bg-[#111C44] print:border-none print:shadow-none print:overflow-visible ${isDetailModalOpen ? 'print:hidden' : ''}`}>
+        <div className="overflow-x-auto print:overflow-visible">
+          <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300 print:text-[9px] print:text-black">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-[#111C44]/60 dark:text-slate-400 print:bg-transparent print:border-black print:text-black print:text-[9px]">
               <tr>
-                <th className="px-4 py-3.5">Boleta / Depósito</th>
-                <th className="px-4 py-3.5">Vehículo & Placa</th>
-                <th className="px-4 py-3.5">Motivo / Infracción</th>
-                <th className="px-4 py-3.5">Interesado / Conductor</th>
-                <th className="px-4 py-3.5">Ingreso & Custodia</th>
-                <th className="px-4 py-3.5">Estado</th>
-                <th className="px-4 py-3.5 text-right">Acciones</th>
+                <th className="px-4 py-3.5 print:px-1 print:py-1">Boleta / Depósito</th>
+                <th className="px-4 py-3.5 print:px-1 print:py-1">Vehículo & Placa</th>
+                <th className="px-4 py-3.5 print:px-1 print:py-1">Motivo / Infracción</th>
+                <th className="px-4 py-3.5 print:px-1 print:py-1">Interesado / Conductor</th>
+                <th className="px-4 py-3.5 print:px-1 print:py-1">Ingreso & Custodia</th>
+                <th className="px-4 py-3.5 print:px-1 print:py-1">Estado</th>
+                <th className="px-4 py-3.5 text-right print:hidden">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 print:divide-black">
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
@@ -308,8 +292,8 @@ export function Retenciones() {
               ) : (
                 paginatedItems.map((item) => (
                   <tr key={item.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                    <td className="px-4 py-3.5">
-                      <div className="font-extrabold text-slate-900 dark:text-white">
+                    <td className="px-4 py-3.5 print:px-1 print:py-1">
+                      <div className="font-extrabold text-slate-900 dark:text-white print:text-black print:text-[10px]">
                         {item.numeroBoleta || `BOL-DEP-${String(item.id).padStart(4, '0')}`}
                       </div>
                       <div className="mt-0.5 text-[11px] text-slate-400 truncate max-w-[180px]" title={item.deposito}>
@@ -317,13 +301,13 @@ export function Retenciones() {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-black tracking-wider text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                    <td className="px-4 py-3.5 print:px-1 print:py-1">
+                      <div className="flex items-center gap-2 print:gap-1">
+                        <span className="font-mono text-xs font-black tracking-wider text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 print:border-none print:bg-transparent print:p-0 print:text-black">
                           {item.vehiculoPlaca}
                         </span>
                         <span
-                          className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                          className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold print:border print:border-black print:bg-transparent print:text-black ${
                             item.vehiculoFormalidad === 'FORMAL'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300'
                               : 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300'
@@ -337,21 +321,21 @@ export function Retenciones() {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5 max-w-[220px]">
-                      <div className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={item.motivo}>
+                    <td className="px-4 py-3.5 max-w-[220px] print:px-1 print:py-1 print:max-w-none">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200 truncate print:text-black print:whitespace-normal" title={item.motivo}>
                         {item.motivo}
                       </div>
                       {item.numeroPapeleta && (
-                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-rose-600 dark:text-rose-400">
-                          <Icon name="ticket" className="size-3.5" />
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-rose-600 dark:text-rose-400 print:text-black">
+                          <Icon name="ticket" className="size-3.5 print:hidden" />
                           <span>{item.numeroPapeleta}</span>
                           <span className="font-bold">S/ {Number(item.montoPapeleta).toFixed(2)}</span>
                         </div>
                       )}
                     </td>
 
-                    <td className="px-4 py-3.5">
-                      <div className="font-semibold text-slate-800 dark:text-slate-200">
+                    <td className="px-4 py-3.5 print:px-1 print:py-1">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200 print:text-black">
                         {item.interesadoNombre}
                       </div>
                       <div className="mt-0.5 text-[11px] text-slate-400">
@@ -359,21 +343,21 @@ export function Retenciones() {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5">
-                      <div className="text-slate-800 dark:text-slate-200 font-medium">
+                    <td className="px-4 py-3.5 print:px-1 print:py-1">
+                      <div className="text-slate-800 dark:text-slate-200 font-medium print:text-black">
                         {item.fechaIngreso ? new Date(item.fechaIngreso).toLocaleDateString('es-PE') : 'S/F'}
                       </div>
-                      <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                        <Icon name="clock" className="size-3" />
+                      <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 print:text-black">
+                        <Icon name="clock" className="size-3 print:hidden" />
                         <span>{item.totalDias} días en custodia</span>
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5 print:px-1 print:py-1">
                       {getStatusBadge(item.estado)}
                     </td>
 
-                    <td className="px-4 py-3.5 text-right">
+                    <td className="px-4 py-3.5 text-right print:hidden">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"

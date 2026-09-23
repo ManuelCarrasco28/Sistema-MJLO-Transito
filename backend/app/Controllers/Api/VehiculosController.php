@@ -121,12 +121,11 @@ class VehiculosController extends ResourceController
             $internamientos = $db->table('ordenes_internamiento')
                 ->select("
                     id_vehiculo,
-                    numero_orden,
+                    numero_boleta as numero_orden,
                     fecha_ingreso,
                     fecha_salida,
                     motivo,
-                    estado,
-                    lugar_intervencion
+                    estado
                 ")
                 ->whereIn('id_vehiculo', $vehiculoIds)
                 ->orderBy('fecha_ingreso', 'DESC')
@@ -240,8 +239,19 @@ class VehiculosController extends ResourceController
         $db = \Config\Database::connect();
         $input = $this->request->getJSON(true) ?: $this->request->getPost();
 
-        if (empty($input['placa'])) {
-            return $this->failValidationErrors('La placa del vehículo es requerida.');
+        $rules = [
+            'placa' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'La placa del vehículo es requerida.']
+            ],
+            'propietarioDni' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'Debe seleccionar un propietario registrado en Personas.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $placa = strtoupper(trim($input['placa']));
@@ -294,10 +304,6 @@ class VehiculosController extends ResourceController
 
         $propietarioNombre = trim($input['propietario'] ?? '');
         $propietarioDni = trim($input['propietarioDni'] ?? '');
-
-        if ($propietarioDni === '') {
-            return $this->failValidationErrors('Debe seleccionar un propietario registrado en Personas.');
-        }
 
         $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
         if (!$personaRow) {

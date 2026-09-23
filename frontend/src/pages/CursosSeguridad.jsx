@@ -3,6 +3,7 @@ import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { CarnetCursoVialPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
 
@@ -43,7 +44,7 @@ export function CursosSeguridad() {
 
   const handlePrintBatch = (curso) => {
     if (!curso.participantes || curso.participantes.length === 0) {
-      alert('No hay participantes inscritos en este curso para imprimir.');
+      showError('Error de Impresión', 'No hay participantes inscritos en este curso para imprimir.');
       return;
     }
     setPrintCurso(curso);
@@ -68,13 +69,19 @@ export function CursosSeguridad() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Estás seguro de eliminar este curso?')) {
+    const result = await showConfirm(
+      '¿Eliminar curso?',
+      '¿Estás seguro de eliminar este curso? Esta acción no se puede deshacer.',
+      'Sí, eliminar',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         await apiFetch(`/cursos/${id}`, { method: 'DELETE' })
         setCursos(cursos.filter(c => c.id !== id))
+        showToast('Curso eliminado correctamente')
       } catch (err) {
-        console.error('Error eliminando curso:', err)
-        alert('Error al eliminar curso')
+        showError('Error', 'Error al eliminar curso')
       }
     }
   }
@@ -83,12 +90,12 @@ export function CursosSeguridad() {
     e.preventDefault()
 
     if (!formData.titulo.trim() || !formData.fecha) {
-      alert('Por favor completa los campos requeridos.')
+      showError('Validación Fallida', 'Por favor completa los campos requeridos.')
       return
     }
 
     if (formData.capacidad < 1 || formData.capacidad > 100) {
-      alert('El aforo del curso debe ser entre 1 y 100 personas.')
+      showError('Validación Fallida', 'El aforo del curso debe ser entre 1 y 100 personas.')
       return
     }
 
@@ -96,7 +103,7 @@ export function CursosSeguridad() {
     const today = new Date()
     today.setHours(0,0,0,0)
     if (courseDate < today && !selectedCurso) {
-      alert('La fecha del nuevo curso no puede estar en el pasado.')
+      showError('Validación Fallida', 'La fecha del nuevo curso no puede estar en el pasado.')
       return
     }
 
@@ -111,16 +118,19 @@ export function CursosSeguridad() {
           method: 'PUT',
           body: payload
         })
-        if (response.ok) {
-          setCursos(cursos.map(c => c.id === selectedCurso.id ? { ...formData, id: c.id } : c))
-        }
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.messages?.error || 'Error al guardar el curso')
+        
+        setCursos(cursos.map(c => c.id === selectedCurso.id ? { ...formData, id: c.id } : c))
+        showToast('Curso editado exitosamente')
       } else {
         const response = await apiFetch('/cursos', {
           method: 'POST',
           body: payload
         })
         const result = await response.json()
-        if (response.ok && result.data) {
+        if (!response.ok) throw new Error(result.messages?.error || 'Error al guardar el curso')
+        if (result.data) {
           const newCurso = {
             ...result.data,
             capacidad: result.data.cuposTotales,
@@ -128,12 +138,12 @@ export function CursosSeguridad() {
             tipo: formData.tipo
           }
           setCursos([newCurso, ...cursos])
+          showToast('Curso registrado exitosamente')
         }
       }
       setIsModalOpen(false)
     } catch (err) {
-      console.error('Error guardando curso:', err)
-      alert('Error al guardar el curso')
+      showError('Error', err.message || 'Error al guardar el curso')
     }
   }
 
@@ -731,7 +741,14 @@ export function CursosSeguridad() {
                       onClick={async () => {
                         const dniInput = document.getElementById('nuevoDniParticipante');
                         const dni = dniInput.value.trim();
-                        if (!dni) return alert('Ingrese un DNI');
+                        if (!dni) {
+                          showError('Atención', 'Ingrese un DNI');
+                          return;
+                        }
+                        if (!/^\d{8}$/.test(dni)) {
+                          showError('Formato Inválido', 'El DNI debe tener 8 dígitos.');
+                          return;
+                        }
                         
                         try {
                           const res = await apiFetch(`/cursos/${selectedCurso.id}/participantes`, {
@@ -742,7 +759,7 @@ export function CursosSeguridad() {
                           
                           if (!res.ok) throw new Error(result.messages?.error || 'Error al inscribir');
                           
-                          alert('Participante inscrito correctamente');
+                          showToast('Participante inscrito correctamente');
                           dniInput.value = '';
                           
                           // Actualizar estado local
@@ -751,7 +768,7 @@ export function CursosSeguridad() {
                           setSelectedCurso(updatedCurso);
                           setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
                         } catch (err) {
-                          alert(err.message);
+                          showError('Error de inscripción', err.message);
                         }
                       }}
                       className="rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-bold text-white shadow-md hover:bg-purple-700 cursor-pointer"
@@ -794,15 +811,19 @@ export function CursosSeguridad() {
                                       method: 'PUT',
                                       body: { asistio }
                                     });
-                                    if (!res.ok) throw new Error('Error al guardar asistencia');
+                                    if (!res.ok) {
+                                      const payload = await res.json();
+                                      throw new Error(payload.messages?.error || 'Error al guardar asistencia');
+                                    }
                                     
                                     const updatedParticipantes = [...selectedCurso.participantes];
                                     updatedParticipantes[i] = { ...p, asistio };
                                     const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes };
                                     setSelectedCurso(updatedCurso);
                                     setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
+                                    showToast(asistio ? 'Marcado como asistente' : 'Desmarcado como asistente');
                                   } catch (err) {
-                                    alert(err.message);
+                                    showError('Error', err.message);
                                   }
                                 }}
                                 className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer"

@@ -5,6 +5,7 @@ import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 export function Pagos() {
   const cached = getCachedData('/pagos')
@@ -44,7 +45,7 @@ export function Pagos() {
       const data = await res.json()
       if (!res.ok) throw new Error('No se pudieron cargar los registros de origen.')
       setOrigenes(data.data)
-    } catch (error) { alert(error.message) }
+    } catch (error) { showError('Error', error.message) }
   }
 
   const handleConfirm = (pago) => {
@@ -56,14 +57,20 @@ export function Pagos() {
   useQuickCreate(handleOpenCreateModal, !isLoading)
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro que desea anular este recibo de pago?')) {
+    const result = await showConfirm(
+      '¿Anular recibo?',
+      '¿Está seguro que desea anular este recibo de pago? Esta acción no se puede revertir.',
+      'Sí, anular',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         const response = await apiFetch(`/pagos/${id}`, { method: 'DELETE' })
         if (!response.ok) throw new Error('No se pudo anular el pago')
         setPagos(pagos.map(p => p.id === id ? { ...p, estado: 'ANULADO' } : p))
+        showToast('Pago anulado exitosamente')
       } catch (err) {
-        console.error('Error al anular:', err)
-        alert('Error al anular el pago')
+        showError('Error', 'Error al anular el pago')
       }
     }
   }
@@ -75,16 +82,16 @@ export function Pagos() {
     // Validaciones
     if (pagoToConfirm) {
       if (!formData.numeroRecibo.trim() || !formData.fechaPago) {
-        alert('Por favor ingresa el número de recibo y la fecha de pago.')
+        showError('Validación Fallida', 'Por favor ingresa el número de recibo y la fecha de pago.')
         return
       }
       if (new Date(formData.fechaPago) > new Date()) {
-        alert('La fecha de pago no puede ser futura.')
+        showError('Validación Fallida', 'La fecha de pago no puede ser futura.')
         return
       }
     } else {
       if (!formData.origenId) {
-        alert('Por favor selecciona un registro asociado para generar el pago.')
+        showError('Validación Fallida', 'Por favor selecciona un registro asociado para generar el pago.')
         return
       }
     }
@@ -100,7 +107,8 @@ export function Pagos() {
       if (!response.ok) throw new Error(Object.values(result.messages || {}).join(' ') || result.message || 'No se pudo guardar el pago.')
       setPagos(prev => [result.data, ...prev.filter(p => p.id !== result.data.id)])
       setIsModalOpen(false)
-    } catch (err) { alert(err.message) }
+      showToast('Pago registrado exitosamente')
+    } catch (err) { showError('Error', err.message) }
     finally { setIsSaving(false) }
   }
 
@@ -112,8 +120,7 @@ export function Pagos() {
       if (!res.ok) throw new Error(json.message || 'Error al obtener el arqueo diario')
       setArqueoData(json.data)
     } catch (err) {
-      console.error(err)
-      alert(err.message || 'Error al cargar arqueo de caja')
+      showError('Error', err.message || 'Error al cargar arqueo de caja')
     } finally {
       setIsLoadingArqueo(false)
     }
@@ -151,7 +158,7 @@ export function Pagos() {
 
   const handleExportArqueoExcel = () => {
     if (!arqueoData || !arqueoData.pagos || arqueoData.pagos.length === 0) {
-      alert('No hay movimientos registrados en la fecha seleccionada para exportar.')
+      showError('Atención', 'No hay movimientos registrados en la fecha seleccionada para exportar.')
       return
     }
     exportToExcel({
@@ -578,24 +585,24 @@ export function Pagos() {
 
       {/* MODAL DE ARQUEO Y CIERRE DE CAJA DIARIO */}
       {isArqueoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-enter print:static print:block print:p-8 print:bg-transparent print:overflow-visible">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a] print:max-h-none print:border-none print:shadow-none print:rounded-none">
             {/* Cabecera del modal */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80 print:bg-transparent print:border-black print:pb-2 print:mb-4 print:px-0">
+              <div className="flex items-center gap-3 print:w-full print:justify-center print:flex-col print:gap-1">
+                <span className="grid size-10 place-items-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 print:hidden">
                   <Icon name="chart" className="size-5" />
                 </span>
-                <div>
-                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                <div className="print:text-center">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white print:text-xl print:uppercase print:tracking-widest print:text-black">
                     Arqueo y Cierre Diario de Caja
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 print:text-black">
                     Conciliación de recaudación municipal, métodos de pago y rendición por cajero.
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 print:hidden">
                 <input
                   type="date"
                   value={arqueoFecha}
@@ -625,7 +632,7 @@ export function Pagos() {
             </div>
 
             {/* Contenido scrolleable */}
-            <div className="flex-1 space-y-6 overflow-y-auto p-6">
+            <div className="flex-1 space-y-6 overflow-y-auto p-6 print:overflow-visible print:p-0">
               {isLoadingArqueo ? (
                 <div className="py-16 text-center">
                   <div className="inline-block size-8 animate-spin rounded-full border-4 border-purple-600 border-t-transparent"></div>
@@ -638,70 +645,70 @@ export function Pagos() {
               ) : (
                 <>
                   {/* Tarjetas de Balance */}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/60 dark:bg-purple-950/30">
-                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:gap-2">
+                    <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/60 dark:bg-purple-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 print:text-black">
                         <span>Total Recaudado</span>
-                        <span>💰</span>
+                        <span className="print:hidden">💰</span>
                       </div>
-                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
                         S/ {Number(arqueoData.totalRecaudado || 0).toFixed(2)}
                       </p>
-                      <span className="mt-1 inline-block rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                      <span className="mt-1 inline-block rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900 dark:text-purple-300 print:bg-transparent print:p-0 print:text-black font-mono">
                         {arqueoData.totalOperaciones} operaciones
                       </span>
                     </div>
 
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 print:text-black">
                         <span>Efectivo en Caja</span>
-                        <span>💵</span>
+                        <span className="print:hidden">💵</span>
                       </div>
-                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
                         S/ {Number(arqueoData.porMetodo?.efectivo || 0).toFixed(2)}
                       </p>
-                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 print:text-black font-mono">
                         Caja física para custodia
                       </p>
                     </div>
 
-                    <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-900/60 dark:bg-sky-950/30">
-                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                    <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-900/60 dark:bg-sky-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 print:text-black">
                         <span>Tarjetas (POS)</span>
-                        <span>💳</span>
+                        <span className="print:hidden">💳</span>
                       </div>
-                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
                         S/ {Number(arqueoData.porMetodo?.tarjeta || 0).toFixed(2)}
                       </p>
-                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 print:text-black font-mono">
                         Liquidación electrónica
                       </p>
                     </div>
 
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
-                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 print:text-black">
                         <span>Transferencias</span>
-                        <span>🏦</span>
+                        <span className="print:hidden">🏦</span>
                       </div>
-                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
                         S/ {Number(arqueoData.porMetodo?.transferencia || 0).toFixed(2)}
                       </p>
-                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 print:text-black font-mono">
                         Banco de la Nación / Cta Cte
                       </p>
                     </div>
                   </div>
 
                   {/* Tablas de Desglose */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 print:gap-6">
                     {/* Desglose por concepto */}
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                      <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        📊 Recaudación por Concepto
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40 print:bg-transparent print:border-none print:p-0">
+                      <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-black print:border-b print:border-black print:pb-1">
+                        <span className="print:hidden">📊 </span>Recaudación por Concepto
                       </h4>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
-                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800">
+                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800 print:text-black print:border-black">
                             <tr>
                               <th className="pb-2">Concepto</th>
                               <th className="pb-2 text-center">Cant.</th>
@@ -716,9 +723,9 @@ export function Pagos() {
                             ) : (
                               arqueoData.porConcepto?.map((c, i) => (
                                 <tr key={i} className="hover:bg-white/60 dark:hover:bg-slate-800/30">
-                                  <td className="py-2 font-bold text-slate-800 dark:text-slate-200">{c.tipoPago}</td>
-                                  <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.cantidad}</td>
-                                  <td className="py-2 text-right font-black text-slate-900 dark:text-white">
+                                  <td className="py-2 font-bold text-slate-800 dark:text-slate-200 print:text-black">{c.tipoPago}</td>
+                                  <td className="py-2 text-center text-slate-600 dark:text-slate-400 print:text-black">{c.cantidad}</td>
+                                  <td className="py-2 text-right font-black text-slate-900 dark:text-white print:text-black">
                                     S/ {Number(c.total || 0).toFixed(2)}
                                   </td>
                                 </tr>
@@ -730,13 +737,13 @@ export function Pagos() {
                     </div>
 
                     {/* Desglose por cajero */}
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                      <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        👤 Rendición por Cajero / Operador
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40 print:bg-transparent print:border-none print:p-0">
+                      <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-black print:border-b print:border-black print:pb-1">
+                        <span className="print:hidden">👤 </span>Rendición por Cajero / Operador
                       </h4>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
-                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800">
+                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800 print:text-black print:border-black">
                             <tr>
                               <th className="pb-2">Cajero</th>
                               <th className="pb-2 text-center">Operaciones</th>
@@ -751,9 +758,9 @@ export function Pagos() {
                             ) : (
                               arqueoData.porCajero?.map((c, i) => (
                                 <tr key={i} className="hover:bg-white/60 dark:hover:bg-slate-800/30">
-                                  <td className="py-2 font-bold text-slate-800 dark:text-slate-200">{c.usuario}</td>
-                                  <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.cantidad}</td>
-                                  <td className="py-2 text-right font-black text-emerald-600 dark:text-emerald-400">
+                                  <td className="py-2 font-bold text-slate-800 dark:text-slate-200 print:text-black">{c.usuario}</td>
+                                  <td className="py-2 text-center text-slate-600 dark:text-slate-400 print:text-black">{c.cantidad}</td>
+                                  <td className="py-2 text-right font-black text-emerald-600 dark:text-emerald-400 print:text-black">
                                     S/ {Number(c.total || 0).toFixed(2)}
                                   </td>
                                 </tr>
@@ -766,56 +773,56 @@ export function Pagos() {
                   </div>
 
                   {/* Detalle de Movimientos del Día */}
-                  <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-                    <div className="mb-3 flex items-center justify-between">
-                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        🧾 Movimientos y Recibos Emitidos ({arqueoData.pagos?.length || 0})
+                  <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800 print:bg-transparent print:border-none print:p-0 print:mt-6">
+                    <div className="mb-3 flex items-center justify-between print:border-b print:border-black print:pb-2">
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-black print:text-sm">
+                        <span className="print:hidden">🧾 </span>Movimientos y Recibos Emitidos ({arqueoData.pagos?.length || 0})
                       </h4>
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-400 print:text-black font-mono">
                         Fecha: {arqueoData.fecha}
                       </span>
                     </div>
 
-                    <div className="max-h-56 overflow-y-auto">
+                    <div className="max-h-56 overflow-y-auto print:max-h-none print:overflow-visible">
                       <table className="w-full text-left text-xs">
-                        <thead className="sticky top-0 bg-white border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:bg-[#0f172a] dark:border-slate-800">
+                        <thead className="sticky top-0 bg-white border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:bg-[#0f172a] dark:border-slate-800 print:static print:bg-transparent print:text-black print:border-black">
                           <tr>
-                            <th className="py-2">N° Recibo</th>
-                            <th className="py-2">Hora</th>
-                            <th className="py-2">Concepto</th>
-                            <th className="py-2">Método</th>
-                            <th className="py-2">Cajero</th>
-                            <th className="py-2 text-right">Monto</th>
+                            <th className="py-2 print:py-1">N° Recibo</th>
+                            <th className="py-2 print:py-1">Hora</th>
+                            <th className="py-2 print:py-1">Concepto</th>
+                            <th className="py-2 print:py-1">Método</th>
+                            <th className="py-2 print:py-1">Cajero</th>
+                            <th className="py-2 print:py-1 text-right">Monto</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 print:divide-slate-300">
                           {arqueoData.pagos?.length === 0 ? (
                             <tr>
-                              <td colSpan="6" className="py-6 text-center text-slate-400">
+                              <td colSpan="6" className="py-6 text-center text-slate-400 print:text-black">
                                 No se registraron cobros en esta jornada.
                               </td>
                             </tr>
                           ) : (
                             arqueoData.pagos?.map((p) => (
                               <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                                <td className="py-2 font-mono font-bold text-slate-900 dark:text-white">
+                                <td className="py-2 font-mono font-bold text-slate-900 dark:text-white print:text-black print:py-1">
                                   {p.numeroRecibo || `#${p.id}`}
                                 </td>
-                                <td className="py-2 text-slate-500">
+                                <td className="py-2 text-slate-500 print:text-black print:py-1 font-mono">
                                   {p.fecha ? p.fecha.split(' ')[1] || p.fecha : '---'}
                                 </td>
-                                <td className="py-2">
-                                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                <td className="py-2 print:py-1">
+                                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300 print:bg-transparent print:p-0 print:text-black">
                                     {p.tipoPago}
                                   </span>
                                 </td>
-                                <td className="py-2 text-slate-600 dark:text-slate-300">
+                                <td className="py-2 text-slate-600 dark:text-slate-300 print:text-black print:py-1">
                                   {p.metodo}
                                 </td>
-                                <td className="py-2 text-slate-600 dark:text-slate-400">
+                                <td className="py-2 text-slate-600 dark:text-slate-400 print:text-black print:py-1">
                                   {p.cajero}
                                 </td>
-                                <td className="py-2 text-right font-black text-slate-900 dark:text-white">
+                                <td className="py-2 text-right font-black text-slate-900 dark:text-white print:text-black print:py-1">
                                   S/ {Number(p.montoTotal || 0).toFixed(2)}
                                 </td>
                               </tr>
@@ -830,7 +837,7 @@ export function Pagos() {
             </div>
 
             {/* Footer de Acciones del Arqueo */}
-            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900 print:hidden">
               <div className="flex items-center gap-2">
                 <button
                   type="button"

@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { PlantillaImpresionTUC } from '../components/documentos/PlantillaImpresionTUC'
 import { exportToExcel } from '../utils/exportToExcel'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -523,7 +524,13 @@ export function Documentos() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de anular este documento del padrón oficial?')) {
+    const result = await showConfirm(
+      '¿Anular documento?',
+      '¿Está seguro de anular este documento del padrón oficial?',
+      'Sí, anular',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         const response = await apiFetch(`/documentos/${id}`, { method: 'DELETE' })
         if (!response.ok) throw response
@@ -532,7 +539,7 @@ export function Documentos() {
         setCachedData('/documentos', nextDocs)
         showToast('Documento anulado con éxito')
       } catch {
-        alert('No se pudo anular el documento.')
+        showError('Error', 'No se pudo anular el documento.')
       }
     }
   }
@@ -541,12 +548,12 @@ export function Documentos() {
     e.preventDefault()
 
     if (!formData.codigo.trim() || !formData.vehiculoPlaca.trim() || !formData.tipoDocumento) {
-      alert('Por favor completa los campos requeridos (Placa, Tipo y Número de Documento).')
+      showError('Validación Fallida', 'Por favor completa los campos requeridos (Placa, Tipo y Número de Documento).')
       return
     }
 
     if (formData.fechaExpedicion && formData.fechaExpiracion && new Date(formData.fechaExpiracion) < new Date(formData.fechaExpedicion)) {
-      alert('La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
+      showError('Validación Fallida', 'La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
       return
     }
 
@@ -598,7 +605,7 @@ export function Documentos() {
           message = err.statusText || message
         }
       }
-      alert(message)
+      showError('Error', message)
     }
   }
 
@@ -630,13 +637,13 @@ export function Documentos() {
   const handleExportPdf = () => {
     const listToExport = filteredDocs.length > 0 ? filteredDocs : documentos
     if (listToExport.length === 0) {
-      alert('No hay registros para exportar.')
+      showError('Error', 'No hay registros para exportar.')
       return
     }
 
     const printWin = window.open('', '_blank', 'width=1100,height=750')
     if (!printWin) {
-      alert('El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
+      showError('Bloqueador de ventanas', 'El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
       return
     }
 

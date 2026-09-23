@@ -6,6 +6,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { KpiStrip } from '../components/ui/KpiStrip'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
+import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
@@ -320,7 +321,6 @@ export function Personas({ user, onUserUpdate }) {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedPersona, setSelectedPersona] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [toast, setToast] = useState(null)
   const [loadError, setLoadError] = useState('')
 
   const [formData, setFormData] = useState({
@@ -420,19 +420,6 @@ export function Personas({ user, onUserUpdate }) {
     setCurrentPage(1)
   }, [searchTerm, filterEstado])
 
-  useEffect(() => {
-    if (!toast) return undefined
-    const timer = window.setTimeout(() => setToast(null), 3000)
-    return () => window.clearTimeout(timer)
-  }, [toast])
-
-  const showToast = (message, type = 'success') => {
-    setToast({
-      id: Date.now(),
-      message,
-      type,
-    })
-  }
 
   const paginatedPersonas = filteredPersonas.slice(
     (currentPage - 1) * itemsPerPage,
@@ -462,6 +449,7 @@ export function Personas({ user, onUserUpdate }) {
     setSelectedPersona(persona)
     setFormData({
       ...persona,
+      tipoDocumento: persona.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : (persona.tipoDocumento || 'DNI'),
       celular: persona.celular || '',
       telefono: persona.telefono || '',
       fotoImg: persona.fotoImg || '',
@@ -474,7 +462,7 @@ export function Personas({ user, onUserUpdate }) {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP).')
+      showError('Formato Inválido', 'Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP).')
       return
     }
     const reader = new FileReader()
@@ -521,7 +509,13 @@ export function Personas({ user, onUserUpdate }) {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de eliminar a esta persona del padrón municipal?')) {
+    const result = await showConfirm(
+      '¿Eliminar persona?',
+      '¿Está seguro de eliminar a esta persona del padrón municipal?',
+      'Sí, eliminar',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         await apiFetch(`/personas/${id}`, { method: 'DELETE' })
         const nextPersonas = personas.filter((p) => p.id !== id)
@@ -529,7 +523,7 @@ export function Personas({ user, onUserUpdate }) {
         setCachedData('/personas', nextPersonas)
         showToast('Se ha eliminado')
       } catch (err) {
-        alert('No se pudo eliminar a la persona.')
+        showError('Error', 'No se pudo eliminar a la persona.')
       }
     }
   }
@@ -547,7 +541,7 @@ export function Personas({ user, onUserUpdate }) {
   const handleExportExcel = () => {
     const listToExport = filteredPersonas.length > 0 ? filteredPersonas : personas
     if (listToExport.length === 0) {
-      alert('No hay registros de personas para exportar.')
+      showError('Atención', 'No hay registros de personas para exportar.')
       return
     }
 
@@ -660,13 +654,13 @@ export function Personas({ user, onUserUpdate }) {
   const handleExportPdf = () => {
     const listToExport = filteredPersonas.length > 0 ? filteredPersonas : personas
     if (listToExport.length === 0) {
-      alert('No hay registros de personas para exportar.')
+      showError('Atención', 'No hay registros de personas para exportar.')
       return
     }
 
     const printWin = window.open('', '_blank', 'width=1200,height=800')
     if (!printWin) {
-      alert('No se pudo abrir la vista previa de impresión. Por favor habilita las ventanas emergentes en tu navegador.')
+      showError('Bloqueador de ventanas', 'No se pudo abrir la vista previa de impresión. Por favor habilita las ventanas emergentes en tu navegador.')
       return
     }
 
@@ -875,24 +869,37 @@ export function Personas({ user, onUserUpdate }) {
     e.preventDefault()
     // Validaciones
     const docLen = formData.numeroDocumento.trim().length
-    if (!formData.numeroDocumento.trim() || !formData.nombres.trim() || !formData.apellidoPaterno.trim()) {
-      alert('Por favor completa los campos requeridos (Documento, Nombres, Apellido Paterno).')
+    if (
+      !formData.numeroDocumento.trim() ||
+      !formData.nombres.trim() ||
+      !formData.apellidoPaterno.trim() ||
+      !formData.apellidoMaterno.trim() ||
+      !formData.numeroLicencia.trim() ||
+      !formData.celular.trim() ||
+      !formData.direccion.trim() ||
+      !formData.email.trim()
+    ) {
+      showError('Validación Fallida', 'Por favor completa todos los campos requeridos (Documento, Nombres, Apellidos, Licencia, Celular, Dirección y Email).')
       return
     }
     if (formData.tipoDocumento === 'DNI' && (docLen !== 8 || !/^\d{8}$/.test(formData.numeroDocumento.trim()))) {
-      alert('El DNI debe tener exactamente 8 dígitos numéricos.')
+      showError('Validación Fallida', 'El DNI debe tener exactamente 8 dígitos numéricos.')
       return
     }
     if (formData.tipoDocumento !== 'DNI' && (docLen < 8 || docLen > 15)) {
-      alert('El número de documento debe tener entre 8 y 15 caracteres.')
+      showError('Validación Fallida', 'El número de documento debe tener entre 8 y 15 caracteres.')
+      return
+    }
+    if (formData.numeroLicencia.trim().length > 9) {
+      showError('Validación Fallida', 'El número de licencia no puede exceder los 9 caracteres.')
       return
     }
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      alert('Por favor ingresa un correo electrónico válido.')
+      showError('Validación Fallida', 'Por favor ingresa un correo electrónico válido.')
       return
     }
     if (formData.celular && !/^\d{9}$/.test(formData.celular)) {
-      alert('El número de celular debe tener exactamente 9 dígitos numéricos.')
+      showError('Validación Fallida', 'El número de celular debe tener exactamente 9 dígitos numéricos.')
       return
     }
 
@@ -947,36 +954,13 @@ export function Personas({ user, onUserUpdate }) {
           message = err.statusText || message
         }
       }
-      alert(message)
+      showError('Error', message)
     }
   }
 
   return (
     <div className="space-y-4">
-      {toast && (
-        <div
-          key={toast.id}
-          className="fixed right-6 top-6 z-[80] flex items-center gap-2.5 rounded-[var(--radius)] border px-4 py-3 text-[13px] font-medium shadow-md transition-all animate-enter"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-ok)',
-            color: 'var(--text)',
-            boxShadow: 'var(--shadow-md)',
-          }}
-        >
-          <span
-            className="grid size-6 place-items-center rounded-full text-xs font-semibold shrink-0 border"
-            style={{
-              backgroundColor: 'var(--ok-bg)',
-              color: 'var(--ok-fg)',
-              borderColor: 'var(--border-ok)',
-            }}
-          >
-            ✓
-          </span>
-          <span>{toast.message}</span>
-        </div>
-      )}
+
       {loadError && <PageLoadError message={loadError} />}
 
       {/* Cabecera Principal */}
@@ -1571,6 +1555,7 @@ export function Personas({ user, onUserUpdate }) {
                       <FloatingInput
                         id="per_materno"
                         label="Apellido materno"
+                        required
                         value={formData.apellidoMaterno}
                         onChange={(e) => setFormData({ ...formData, apellidoMaterno: e.target.value })}
                       />
@@ -1589,6 +1574,8 @@ export function Personas({ user, onUserUpdate }) {
                     <FloatingInput
                       id="per_licencia"
                       label="Número de licencia"
+                      required
+                      maxLength={9}
                       value={formData.numeroLicencia}
                       inputClassName="font-mono font-bold uppercase"
                       onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() })}
@@ -1597,6 +1584,7 @@ export function Personas({ user, onUserUpdate }) {
                     <FloatingInput
                       id="per_celular"
                       label="Celular"
+                      required
                       type="tel"
                       maxLength={9}
                       value={formData.celular}
@@ -1636,6 +1624,7 @@ export function Personas({ user, onUserUpdate }) {
                     <FloatingInput
                       id="per_direccion"
                       label="Dirección"
+                      required
                       maxLength={250}
                       value={formData.direccion || ''}
                       onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
@@ -1643,6 +1632,7 @@ export function Personas({ user, onUserUpdate }) {
                     <FloatingInput
                       id="per_email"
                       label="Correo electrónico"
+                      required
                       type="email"
                       maxLength={150}
                       value={formData.email || ''}

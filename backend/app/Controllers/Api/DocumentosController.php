@@ -109,8 +109,26 @@ class DocumentosController extends ResourceController
         $db = \Config\Database::connect();
         $input = $this->request->getJSON(true) ?: $this->request->getPost();
 
-        if (empty($input['codigo'])) {
-            return $this->failValidationErrors('El número o código del documento es obligatorio.');
+        $rules = [
+            'codigo' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El número o código del documento es obligatorio.']
+            ],
+            'tipoDocumento' => [
+                'rules' => 'required|in_list[TARJETA_OPERATIVIDAD,SOAT,CERTICAV]',
+                'errors' => [
+                    'required' => 'El tipo de documento es obligatorio.',
+                    'in_list' => 'Tipo de documento vehicular no válido. Solo se permite Tarjeta de Operatividad, CertiCAV, y SOAT.'
+                ]
+            ],
+            'vehiculoPlaca' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'Debe seleccionar un vehículo registrado en el sistema.']
+            ]
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $rawTipo = strtoupper(trim($input['tipoDocumento'] ?? 'TARJETA_OPERATIVIDAD'));
@@ -246,6 +264,19 @@ class DocumentosController extends ResourceController
 
         if (!$id) {
             return $this->failNotFound('ID de documento no especificado.');
+        }
+
+        $rules = [
+            'tipoDocumento' => [
+                'rules' => 'permit_empty|in_list[TARJETA_OPERATIVIDAD,SOAT,CERTICAV]',
+                'errors' => [
+                    'in_list' => 'Tipo de documento vehicular no válido.'
+                ]
+            ],
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
 
         $record = [];
