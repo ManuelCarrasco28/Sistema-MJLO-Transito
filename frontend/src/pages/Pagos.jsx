@@ -683,7 +683,7 @@ export function Pagos() {
               ) : (
                 <>
                   {/* Tarjetas de Balance */}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:gap-2">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-2 print:gap-4">
                     <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/60 dark:bg-purple-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
                       <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 print:text-black">
                         <span>Total Recaudado</span>
@@ -738,14 +738,14 @@ export function Pagos() {
                   </div>
 
                   {/* Tablas de Desglose */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 print:gap-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 print:grid-cols-1 print:gap-6">
                     {/* Desglose por concepto */}
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40 print:bg-transparent print:border-none print:p-0">
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-black print:border-b print:border-black print:pb-1">
                         <span className="print:hidden">📊 </span>Recaudación por Concepto
                       </h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
+                      <div className="overflow-x-auto print:overflow-visible">
+                        <table className="w-full text-left text-xs print:table-fixed">
                           <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800 print:text-black print:border-black">
                             <tr>
                               <th className="pb-2">Concepto</th>
@@ -779,8 +779,8 @@ export function Pagos() {
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-black print:border-b print:border-black print:pb-1">
                         <span className="print:hidden">👤 </span>Rendición por Cajero / Operador
                       </h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
+                      <div className="overflow-x-auto print:overflow-visible">
+                        <table className="w-full text-left text-xs print:table-fixed">
                           <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800 print:text-black print:border-black">
                             <tr>
                               <th className="pb-2">Cajero</th>
@@ -822,7 +822,7 @@ export function Pagos() {
                     </div>
 
                     <div className="max-h-56 overflow-y-auto print:max-h-none print:overflow-visible">
-                      <table className="w-full text-left text-xs">
+                      <table className="w-full text-left text-xs print:table-fixed">
                         <thead className="sticky top-0 bg-white border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:bg-[#0f172a] dark:border-slate-800 print:static print:bg-transparent print:text-black print:border-black">
                           <tr>
                             <th className="py-2 print:py-1">N° Recibo</th>
