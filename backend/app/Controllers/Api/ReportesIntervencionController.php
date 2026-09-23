@@ -12,9 +12,16 @@ class ReportesIntervencionController extends ResourceController
     {
         $db = \Config\Database::connect();
 
-        // Campos confirmados en la BD – evitamos llamar fieldExists()/tableExists() en cada request
-        $tieneOperativo = true;
-        $tieneConductor = true;
+        if (!$db->tableExists('reportes_intervencion')) {
+            return $this->respond(['data' => []]);
+        }
+
+        if (!$db->fieldExists('id_operativo', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_operativo INT NULL AFTER id_papeleta');
+        }
+        if (!$db->fieldExists('id_conductor', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_conductor INT NULL AFTER id_vehiculo');
+        }
 
         $query = $db->table('reportes_intervencion r')
             ->select("
