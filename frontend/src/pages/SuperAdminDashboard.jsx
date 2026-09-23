@@ -469,7 +469,14 @@ export function SuperAdminDashboard({ user }) {
     { label: 'Usuarios activos', value: moduleStats[0].value, detail: 'Cuentas habilitadas', icon: 'people', tone: 'text-emerald-600 bg-emerald-50' },
     { label: 'Usuarios inactivos', value: moduleStats[1].value, detail: 'Cuentas bloqueadas', icon: 'lock', tone: 'text-rose-600 bg-rose-50' },
     { label: 'Roles registrados', value: moduleStats[2].value, detail: 'Perfiles administrativos', icon: 'shieldCheck', tone: 'text-blue-600 bg-blue-50' },
-    { label: 'Permiso móvil', value: mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO', detail: mobilePermitePapeleta ? 'Móvil aplica papeletas' : 'Solo reportes/evidencias', icon: 'settings', tone: mobilePermitePapeleta ? 'text-violet-600 bg-violet-50' : 'text-amber-600 bg-amber-50' }
+    {
+      label: 'Permiso móvil',
+      value: mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO',
+      detail: mobilePermitePapeleta ? 'Móvil aplica papeletas' : 'Solo reportes/evidencias',
+      icon: 'deviceMobile',
+      tone: mobilePermitePapeleta ? 'text-violet-600 bg-violet-50 dark:bg-violet-950/60 dark:text-violet-300' : 'text-amber-600 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300',
+      isToggle: true
+    }
   ]
 
   return (
@@ -504,7 +511,7 @@ export function SuperAdminDashboard({ user }) {
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {dashboardStats.map((stat) => (
-              <div key={stat.label} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+              <div key={stat.label} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-black uppercase tracking-wide text-slate-400">{stat.label}</p>
@@ -515,6 +522,34 @@ export function SuperAdminDashboard({ user }) {
                     <Icon name={stat.icon} className="size-5" />
                   </span>
                 </div>
+                {stat.isToggle && (
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300">
+                      {savingConfigSistema ? 'Guardando...' : mobilePermitePapeleta ? 'Nueva Papeleta' : 'Registrar Evidencia'}
+                    </span>
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={mobilePermitePapeleta}
+                        disabled={savingConfigSistema}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                          setMobilePermitePapeleta(next)
+                          saveConfigSistema(
+                            'mobile_permite_aplicar_papeleta',
+                            next,
+                            next
+                              ? 'Papeletas desde el móvil habilitadas: los inspectores verán "Nueva Papeleta".'
+                              : 'Papeletas desde el móvil deshabilitadas: los inspectores verán "Registrar Evidencia".'
+                          )
+                        }}
+                        className="peer sr-only"
+                      />
+                      <span className="h-6 w-11 rounded-full bg-slate-300 transition-colors peer-checked:bg-violet-600 peer-disabled:opacity-60 dark:bg-slate-700"></span>
+                      <span className="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
+                    </label>
+                  </div>
+                )}
               </div>
             ))}
           </section>
@@ -610,6 +645,17 @@ export function SuperAdminDashboard({ user }) {
             municipalidad={municipalidad}
             municipalidadAnios={municipalidadAnios}
             mobilePermitePapeleta={mobilePermitePapeleta}
+            savingConfigSistema={savingConfigSistema}
+            onToggleMobilePermitePapeleta={(next) => {
+              setMobilePermitePapeleta(next)
+              saveConfigSistema(
+                'mobile_permite_aplicar_papeleta',
+                next,
+                next
+                  ? 'Papeletas desde el móvil habilitadas: los inspectores verán "Nueva Papeleta".'
+                  : 'Papeletas desde el móvil deshabilitadas: los inspectores verán "Registrar Evidencia".'
+              )
+            }}
             loading={loadingMunicipalidad}
             onReload={fetchMunicipalidadConfig}
           />
@@ -1111,7 +1157,15 @@ function RolesTable({ roles, loading, onEdit }) {
   )
 }
 
-function ConfiguracionReadOnly({ municipalidad, municipalidadAnios, mobilePermitePapeleta, loading, onReload }) {
+function ConfiguracionReadOnly({
+  municipalidad,
+  municipalidadAnios,
+  mobilePermitePapeleta,
+  savingConfigSistema,
+  onToggleMobilePermitePapeleta,
+  loading,
+  onReload
+}) {
   const [activeTab, setActiveTab] = useState('todos')
 
   const uitVigente = useMemo(() => {
@@ -1139,7 +1193,7 @@ function ConfiguracionReadOnly({ municipalidad, municipalidadAnios, mobilePermit
       label: 'Permiso Móvil',
       value: mobilePermitePapeleta ? 'HABILITADO' : 'SOLO REPORTES',
       detail: mobilePermitePapeleta ? 'Aplica papeleta directa' : 'Reportes y evidencias',
-      icon: 'settings',
+      icon: 'deviceMobile',
       tone: mobilePermitePapeleta
         ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300'
         : 'text-amber-600 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300'
@@ -1155,6 +1209,71 @@ function ConfiguracionReadOnly({ municipalidad, municipalidadAnios, mobilePermit
 
   return (
     <div className="space-y-6">
+      {/* TARJETA INTERACTIVA DE PERMISO GENERAL MÓVIL (Conexión App Móvil Inspectores) */}
+      <div className="rounded-3xl border border-violet-200/90 bg-gradient-to-r from-violet-50/90 via-purple-50/70 to-indigo-50/80 p-5 shadow-sm dark:border-violet-900/60 dark:from-violet-950/40 dark:via-purple-950/30 dark:to-indigo-950/30">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className={`grid size-12 shrink-0 place-items-center rounded-2xl text-white shadow-md transition-all ${
+              mobilePermitePapeleta
+                ? 'bg-gradient-to-br from-violet-600 to-indigo-600 shadow-violet-500/25'
+                : 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-500/25'
+            }`}>
+              <Icon name="deviceMobile" className="size-6" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  Permiso general móvil
+                </h3>
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-black tracking-wide ${
+                  mobilePermitePapeleta
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                }`}>
+                  <span className="size-1.5 rounded-full bg-current animate-pulse" />
+                  {mobilePermitePapeleta ? 'ACTIVO (NUEVA PAPELETA)' : 'INACTIVO (REGISTRAR EVIDENCIA)'}
+                </span>
+              </div>
+              <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-600 dark:text-slate-300">
+                Si está activo, todos los inspectores podrán aplicar papeletas desde el móvil. Si está inactivo, el móvil debe ocultar esa opción y trabajar solo con reportes/evidencias.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+            <span className="text-xs font-extrabold text-slate-600 dark:text-slate-300">
+              {savingConfigSistema ? 'Guardando...' : mobilePermitePapeleta ? 'Activo' : 'Inactivo'}
+            </span>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={mobilePermitePapeleta}
+                disabled={savingConfigSistema}
+                onChange={(e) => onToggleMobilePermitePapeleta && onToggleMobilePermitePapeleta(e.target.checked)}
+                className="peer sr-only"
+              />
+              <span className="h-7 w-12 rounded-full bg-slate-300 transition-colors peer-checked:bg-violet-600 peer-disabled:opacity-60 dark:bg-slate-700"></span>
+              <span className="absolute left-1 top-1 size-5 rounded-full bg-white shadow-md transition-transform peer-checked:translate-x-5"></span>
+            </label>
+          </div>
+        </div>
+
+        <div className={`mt-3.5 rounded-xl px-3.5 py-2 text-xs font-black flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 ${
+          mobilePermitePapeleta
+            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+        }`}>
+          <span>
+            {mobilePermitePapeleta
+              ? '✓ ACTIVO: el móvil muestra “Nueva Papeleta” (infracción vehicular en tiempo real).'
+              : '⚡ INACTIVO: el móvil debe mostrar solo “Registrar reporte/evidencia” (revisión administrativa).'}
+          </span>
+          <span className="font-mono text-[10px] opacity-75">
+            Sincroniza con /api/municipalidad/config-mobile
+          </span>
+        </div>
+      </div>
+
       {/* Banner de Aviso Solo Lectura */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 p-4 text-blue-900 shadow-xs dark:border-blue-900/50 dark:from-blue-950/40 dark:to-indigo-950/30 dark:text-blue-200">
         <div className="flex items-center gap-3">
@@ -1162,9 +1281,9 @@ function ConfiguracionReadOnly({ municipalidad, municipalidadAnios, mobilePermit
             <Icon name="lock" className="size-5" />
           </div>
           <div>
-            <h4 className="text-sm font-black text-slate-900 dark:text-white">Configuración y Parámetros del Sistema (Modo Solo Lectura)</h4>
+            <h4 className="text-sm font-black text-slate-900 dark:text-white">Configuración y Parámetros del Sistema</h4>
             <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              Datos institucionales, técnicos y valores de cálculo tributario protegidos contra edición directa.
+              Datos institucionales, técnicos y valores de cálculo tributario del distrito de José Leonardo Ortiz.
             </p>
           </div>
         </div>
@@ -1422,9 +1541,17 @@ function ConfiguracionReadOnly({ municipalidad, municipalidadAnios, mobilePermit
                       : 'El aplicativo móvil opera en modo recolección preventiva (reportes de intervención con evidencia fotográfica).'}
                   </td>
                   <td className="px-5 py-4 text-right">
-                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      PROTEGIDO
-                    </span>
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={mobilePermitePapeleta}
+                        disabled={savingConfigSistema}
+                        onChange={(e) => onToggleMobilePermitePapeleta && onToggleMobilePermitePapeleta(e.target.checked)}
+                        className="peer sr-only"
+                      />
+                      <span className="h-6 w-11 rounded-full bg-slate-300 transition-colors peer-checked:bg-violet-600 peer-disabled:opacity-60 dark:bg-slate-700"></span>
+                      <span className="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
+                    </label>
                   </td>
                 </tr>
 

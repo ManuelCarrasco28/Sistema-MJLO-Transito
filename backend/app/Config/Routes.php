@@ -8,6 +8,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->options('(:any)', 'AuthController::options');
     $routes->post('login', 'AuthController::login');
     $routes->get('mobile/config', 'MunicipalidadController::mobileConfig');
+    $routes->get('municipalidad/config-mobile', 'MunicipalidadController::mobileConfig');
     $routes->get('mobile/vehiculos/buscar', 'VehiculosController::buscarMobile');
 
     $routes->get('status', 'StatusController::index');
