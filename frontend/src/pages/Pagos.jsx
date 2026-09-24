@@ -7,7 +7,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
-import { RoundedSelect } from '../components/ui/FormInputs'
+import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -33,7 +33,6 @@ export function Pagos() {
   const [itemsPerPage, setItemsPerPage] = useState(8)
   
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [origenes, setOrigenes] = useState({ PAPELETA: [], TRAMITE: [], CURSO: [] })
   const [pagoToConfirm, setPagoToConfirm] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -52,21 +51,68 @@ export function Pagos() {
     numeroVoucher: '', referenciaPago: '', origenId: '', fechaPago: ''
   })
 
-  const handleOpenCreateModal = async () => {
+  // Búsqueda de deudas por persona (DNI) para el formulario "Registrar Pago".
+  const [deudaDni, setDeudaDni] = useState('')
+  const [deudaPersona, setDeudaPersona] = useState(null)
+  const [deudaLista, setDeudaLista] = useState([])
+  const [buscandoDeuda, setBuscandoDeuda] = useState(false)
+  const [deudaError, setDeudaError] = useState('')
+  const [origenPreseleccionado, setOrigenPreseleccionado] = useState(null)
+
+  const handleOpenCreateModal = () => {
     setPagoToConfirm(null)
-    setFormData({ numeroRecibo: '', tipoPago: 'TRAMITE', metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: '', fechaPago: '' })
+    setFormData({ numeroRecibo: '', tipoPago: 'TRAMITE', metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: '', fechaPago: new Date().toISOString().slice(0, 10) })
+    setDeudaDni('')
+    setDeudaPersona(null)
+    setDeudaLista([])
+    setDeudaError('')
+    setOrigenPreseleccionado(null)
     setIsModalOpen(true)
+  }
+
+  const handleBuscarDeudas = async (e) => {
+    e.preventDefault()
+    if (!deudaDni.trim()) return
+    setBuscandoDeuda(true)
+    setDeudaError('')
+    setDeudaPersona(null)
+    setDeudaLista([])
+    setFormData({ ...formData, tipoPago: '', origenId: '' })
+    setOrigenPreseleccionado(null)
     try {
-      const res = await apiFetch('/pagos/origenes')
-      const data = await res.json()
-      if (!res.ok) throw new Error('No se pudieron cargar los registros de origen.')
-      setOrigenes(data.data)
-    } catch (error) { showError('Error', sanitizarMensaje(error.message, 'No se pudo registrar el pago.')) }
+      const res = await apiFetch(`/pagos/deudas?dni=${encodeURIComponent(deudaDni.trim())}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.messages?.error || 'No se encontró a esa persona.')
+      setDeudaPersona(data.data.persona)
+      setDeudaLista(data.data.deudas || [])
+    } catch (error) {
+      setDeudaError(sanitizarMensaje(error.message, 'No se encontró a esa persona.'))
+    } finally {
+      setBuscandoDeuda(false)
+    }
+  }
+
+  const handleSeleccionarDeuda = (deuda) => {
+    setFormData({ ...formData, tipoPago: deuda.tipoPago, origenId: String(deuda.id) })
   }
 
   const handleConfirm = (pago) => {
     setPagoToConfirm(pago)
-    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', fechaPago: '' })
+    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', fechaPago: new Date().toISOString().slice(0, 10) })
+    setIsModalOpen(true)
+  }
+
+  // Para papeletas/cursos pendientes que aún no tienen un recibo generado:
+  // abre el mismo formulario de "Registrar Pago" con el origen ya elegido,
+  // sin necesidad de volver a buscarlo por DNI.
+  const handleGenerarRecibo = (pago) => {
+    setPagoToConfirm(null)
+    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: String(pago.origenId), fechaPago: new Date().toISOString().slice(0, 10) })
+    setDeudaDni('')
+    setDeudaPersona(null)
+    setDeudaLista([])
+    setDeudaError('')
+    setOrigenPreseleccionado({ nombre: pago.referenciaPago, monto: pago.montoTotal })
     setIsModalOpen(true)
   }
 
@@ -96,20 +142,17 @@ export function Pagos() {
     if (isSaving) return
     
     // Validaciones
-    if (pagoToConfirm) {
-      if (!formData.numeroRecibo.trim() || !formData.fechaPago) {
-        showError('Validación Fallida', 'Por favor ingresa el número de recibo y la fecha de pago.')
-        return
-      }
-      if (new Date(formData.fechaPago) > new Date()) {
-        showError('Validación Fallida', 'La fecha de pago no puede ser futura.')
-        return
-      }
-    } else {
-      if (!formData.origenId) {
-        showError('Validación Fallida', 'Por favor selecciona un registro asociado para generar el pago.')
-        return
-      }
+    if (!pagoToConfirm && !formData.origenId) {
+      showError('Validación Fallida', 'Por favor busca y selecciona la deuda que vas a cobrar.')
+      return
+    }
+    if (!formData.fechaPago) {
+      showError('Validación Fallida', 'Por favor ingresa la fecha de pago.')
+      return
+    }
+    if (new Date(formData.fechaPago) > new Date()) {
+      showError('Validación Fallida', 'La fecha de pago no puede ser futura.')
+      return
     }
 
     setIsSaving(true)
@@ -117,7 +160,9 @@ export function Pagos() {
       const key = { PAPELETA: 'papeletaId', TRAMITE: 'tramiteId', CURSO: 'inscripcionId' }[formData.tipoPago]
       const response = await apiFetch(pagoToConfirm ? `/pagos/${pagoToConfirm.id}/confirmar` : '/pagos', {
         method: 'POST',
-        body: pagoToConfirm ? { ...formData, metodoPago: formData.metodo } : { tipoPago: formData.tipoPago, [key]: Number(formData.origenId) }
+        body: pagoToConfirm
+          ? { ...formData, metodoPago: formData.metodo }
+          : { tipoPago: formData.tipoPago, [key]: Number(formData.origenId), ...formData, metodoPago: formData.metodo }
       })
       const result = await response.json()
       if (!response.ok) throw new Error(Object.values(result.messages || {}).join(' ') || result.message || 'No se pudo guardar el pago.')
@@ -481,7 +526,7 @@ export function Pagos() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">{p.fecha ? new Date(p.fecha + 'T00:00:00').toLocaleDateString() : 'Sin fecha de pago'}</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{p.fecha ? new Date(String(p.fecha).slice(0, 10) + 'T00:00:00').toLocaleDateString() : 'Sin fecha de pago'}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         {p.tipoPago} #{p.papeletaId || p.tramiteId || p.inscripcionId}
                       </p>
@@ -507,15 +552,19 @@ export function Pagos() {
                     </td>
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-center gap-1.5">
-                        {p.estado === 'PENDIENTE' && p.tipoPago !== 'INTERNAMIENTO' && <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Confirmar recibo</button>}
-                        <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="rounded-xl p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalle">
+                        {p.estado === 'PENDIENTE' && p.tipoPago !== 'INTERNAMIENTO' && (
+                          typeof p.id === 'string' && (p.id.startsWith('pap_pend_') || p.id.startsWith('cur_pend_'))
+                            ? <button onClick={() => handleGenerarRecibo(p)} className="rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white hover:bg-amber-600 cursor-pointer">Generar recibo</button>
+                            : <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 cursor-pointer">Confirmar recibo</button>
+                        )}
+                        <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver Detalle">
                           <Icon name="eye" className="size-4" />
                         </button>
-                        <button disabled={p.estado !== 'PAGADO'} onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="rounded-xl p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-950/60 dark:text-sky-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Imprimir Ticket">
+                        <button disabled={p.estado !== 'PAGADO'} onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title="Imprimir Ticket">
                           <Icon name="print" className="size-4" />
                         </button>
-                        {p.tipoPago !== 'INTERNAMIENTO' && (
-                          <button disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="rounded-xl p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Anular Pago">
+                        {p.tipoPago !== 'INTERNAMIENTO' && typeof p.id === 'number' && (
+                          <button disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title="Anular Pago">
                             <Icon name="trash" className="size-4" />
                           </button>
                         )}
@@ -541,75 +590,162 @@ export function Pagos() {
       </div>
       
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <div>
-                <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">{pagoToConfirm ? 'Confirmar recibo de pago' : 'Generar pago pendiente'}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="flex w-full max-w-2xl flex-col rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] rounded-t-3xl">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                  <Icon name="payment" className="size-4" />
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">{pagoToConfirm ? 'Confirmar recibo de pago' : 'Registrar Pago'}</h3>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-[var(--bg-subtle)] cursor-pointer">✕</button>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                title="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+              >
+                <Icon name="close" className="size-5" />
+              </button>
             </div>
-            <form onSubmit={handleFormSubmit} className="flex-1 p-6">
+            <form onSubmit={handleFormSubmit} className="flex flex-col rounded-b-3xl">
+              <div className="space-y-6 p-8 min-h-[400px]">
               {pagoToConfirm ? (
-                <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-[var(--border-strong)]">
-                  <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DETALLES DEL RECIBO</legend>
+                <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
+                  <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">DETALLES DEL RECIBO</legend>
+                  <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                    <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">Monto: S/ {pagoToConfirm.montoTotal.toFixed(2)}</p>
+                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{pagoToConfirm.referenciaPago}</p>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2">
-                      <p className="font-bold text-slate-800 dark:text-white text-lg">Monto: S/ {pagoToConfirm.montoTotal.toFixed(2)}</p>
+                      <FloatingInput id="pago_recibo" label="Número de recibo" optional maxLength={50} value={formData.numeroRecibo} onChange={e => setFormData({ ...formData, numeroRecibo: e.target.value })} />
+                      <p className="mt-1 text-[10.5px] text-slate-400">Si lo dejas vacío, el sistema le asigna uno automáticamente. Solo llénalo si usas un talonario físico propio.</p>
                     </div>
-                    <label className="block text-sm">Número real del recibo
-                      <input required maxLength={50} value={formData.numeroRecibo} onChange={e => setFormData({ ...formData, numeroRecibo: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-[var(--bg-subtle)]" />
-                    </label>
-                    <label className="block text-sm">Fecha que figura en el recibo
-                      <input required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-[var(--bg-subtle)]" />
-                    </label>
-                    <label className="block text-sm">Método de pago
-                      <RoundedSelect 
-                        value={formData.metodo} 
-                        onChange={v => setFormData({ ...formData, metodo: v })} 
+                    <FloatingInput id="pago_fecha" label="Fecha que figura en el recibo" required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} />
+                    <FloatingSelect
+                      id="pago_metodo"
+                      label="Método de pago"
+                      value={formData.metodo}
+                      onChange={e => setFormData({ ...formData, metodo: e.target.value })}
+                      options={[
+                        { value: 'EFECTIVO', label: 'Efectivo' },
+                        { value: 'TARJETA', label: 'Tarjeta' },
+                        { value: 'TRANSFERENCIA', label: 'Transferencia' }
+                      ]}
+                    />
+                    <FloatingInput id="pago_voucher" label="Voucher o referencia" optional maxLength={100} value={formData.referenciaPago} onChange={e => setFormData({ ...formData, referenciaPago: e.target.value })} />
+                  </div>
+                </fieldset>
+              ) : (
+                <>
+                <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
+                  <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Buscar deudas de una persona</legend>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3">Busca por DNI para ver todas sus papeletas, trámites y cursos pendientes de pago, y elige cuál cobrar.</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={11}
+                      placeholder="DNI de la persona..."
+                      value={deudaDni}
+                      onChange={(e) => setDeudaDni(e.target.value.replace(/\D/g, ''))}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleBuscarDeudas(e) }}
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold font-mono outline-none focus:border-emerald-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                    />
+                    <button type="button" disabled={buscandoDeuda} onClick={handleBuscarDeudas} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700 transition cursor-pointer disabled:opacity-60">
+                      <Icon name="search" className="size-3.5" />
+                      {buscandoDeuda ? 'Buscando...' : 'Buscar'}
+                    </button>
+                  </div>
+
+                  {deudaError && <p className="mt-3 text-xs font-semibold text-amber-700 dark:text-amber-400">{deudaError}</p>}
+
+                  {deudaPersona && (
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
+                      <p className="text-sm font-black text-slate-800 dark:text-white">{deudaPersona.nombre}</p>
+                      <p className="text-xs font-mono text-slate-400">DNI: {deudaPersona.dni}</p>
+                    </div>
+                  )}
+
+                  {deudaPersona && deudaLista.length === 0 && (
+                    <div className="mt-3 flex flex-col items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-6 text-center dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                      <Icon name="shieldCheck" className="size-6 text-emerald-500" />
+                      <p className="text-sm font-black text-emerald-700 dark:text-emerald-300">No tiene pagos pendientes</p>
+                      <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Esta persona no registra papeletas, trámites ni cursos por cobrar.</p>
+                    </div>
+                  )}
+
+                  {deudaLista.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      {deudaLista.map((d) => {
+                        const seleccionada = formData.tipoPago === d.tipoPago && String(formData.origenId) === String(d.id)
+                        return (
+                          <button
+                            key={`${d.tipoPago}-${d.id}`}
+                            type="button"
+                            onClick={() => handleSeleccionarDeuda(d)}
+                            className={`w-full flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left transition cursor-pointer ${
+                              seleccionada
+                                ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/40'
+                                : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:hover:bg-emerald-950/20'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div>
+                                <span className="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-500 dark:bg-[var(--bg-subtle)] dark:text-slate-400 mr-1.5">
+                                  {d.tipoPago}
+                                </span>
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{d.nombre}</span>
+                              </div>
+                              <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                                <span className="size-1.5 rounded-full bg-amber-500" /> Pendiente de pago
+                              </span>
+                            </div>
+                            <span className="shrink-0 text-xs font-black text-emerald-700 dark:text-emerald-400">
+                              {d.monto != null ? `S/ ${Number(d.monto).toFixed(2)}` : '—'}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {origenPreseleccionado && (
+                    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Registro a cobrar</p>
+                      <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{origenPreseleccionado.nombre}</p>
+                      <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">S/ {Number(origenPreseleccionado.monto || 0).toFixed(2)}</p>
+                    </div>
+                  )}
+                </fieldset>
+
+                {formData.origenId && (
+                  <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
+                    <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Datos del pago recibido</legend>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-4">El número de recibo lo asigna el sistema automáticamente.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FloatingInput id="pago_fecha_directo" label="Fecha de pago" required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} />
+                      <FloatingSelect
+                        id="pago_metodo_directo"
+                        label="Método de pago"
+                        value={formData.metodo}
+                        onChange={e => setFormData({ ...formData, metodo: e.target.value })}
                         options={[
                           { value: 'EFECTIVO', label: 'Efectivo' },
                           { value: 'TARJETA', label: 'Tarjeta' },
                           { value: 'TRANSFERENCIA', label: 'Transferencia' }
-                        ]} 
-                        className="mt-1" 
-                      />
-                    </label>
-                    <label className="block text-sm">Voucher o referencia (opcional)
-                      <input maxLength={100} value={formData.referenciaPago} onChange={e => setFormData({ ...formData, referenciaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-[var(--bg-subtle)]" />
-                    </label>
-                  </div>
-                </fieldset>
-              ) : (
-                <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-[var(--border-strong)]">
-                  <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DATOS DE PAGO</legend>
-                  <p className="text-sm text-slate-500 mb-4">El importe se obtiene del registro seleccionado. El recibo se ingresa después de realizar el pago.</p>
-                  <div className="space-y-4">
-                    <label className="block text-sm">Tipo de pago
-                      <RoundedSelect 
-                        value={formData.tipoPago} 
-                        onChange={v => setFormData({ ...formData, tipoPago: v, origenId: '' })} 
-                        options={[
-                          { value: 'TRAMITE', label: 'Trámite' },
-                          { value: 'PAPELETA', label: 'Papeleta' },
-                          { value: 'CURSO', label: 'Inscripción a curso' }
                         ]}
-                        className="mt-1"
                       />
-                    </label>
-                    <label className="block text-sm">Registro asociado
-                      <select required value={formData.origenId || ''} onChange={e => setFormData({ ...formData, origenId: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-[var(--bg-subtle)]">
-                        <option value="">Seleccione un registro</option>
-                        {(origenes[formData.tipoPago] || []).map(o => <option key={o.id} value={o.id}>{o.nombre || formData.tipoPago} — #{o.id}</option>)}
-                      </select>
-                    </label>
-                    {!(origenes[formData.tipoPago] || []).length && <p className="text-sm text-amber-700">No hay registros disponibles para este tipo de pago.</p>}
-                  </div>
-                </fieldset>
+                    </div>
+                  </fieldset>
+                )}
+                </>
               )}
-              <div className="flex justify-end gap-3 pt-6">
+              </div>
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-7 py-4 dark:border-[var(--border)]">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">Cancelar</button>
-                <button type="submit" disabled={isSaving} className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-extrabold text-white shadow-md hover:bg-emerald-700 cursor-pointer">{isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pendiente'}</button>
+                <button type="submit" disabled={isSaving} className="rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-emerald-600/25 hover:brightness-105 transition-all cursor-pointer disabled:opacity-60">{isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pago'}</button>
               </div>
             </form>
           </div>

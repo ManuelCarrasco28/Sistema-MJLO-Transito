@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
-import { showError } from '../utils/SwalUtil'
+import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { ResolucionPermisoPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
 import { TramiteFormularioModal } from '../components/permisos/TramiteFormularioModal'
@@ -41,9 +41,13 @@ export function Permisos() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const handleDeletePermiso = async (id) => {
-    if (!window.confirm('¿Está seguro de eliminar esta autorización municipal? Esta acción no se puede deshacer.')) {
-      return
-    }
+    const result = await showConfirm(
+      '¿Eliminar autorización?',
+      '¿Está seguro de eliminar esta autorización municipal? Esta acción no se puede deshacer.',
+      'Sí, eliminar',
+      'Cancelar'
+    )
+    if (!result.isConfirmed) return
     try {
       const res = await apiFetch(`/permisos/${id}`, { method: 'DELETE' })
       if (!res.ok) {
@@ -51,6 +55,7 @@ export function Permisos() {
       }
       setPermisos((prev) => prev.filter((p) => p.id !== id))
       invalidateCache('/permisos')
+      showToast('Autorización eliminada correctamente')
     } catch (err) {
       showError('Error', sanitizarMensaje(err.message, 'No se pudo eliminar la autorización.'))
     }

@@ -97,7 +97,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
     const rect = e.currentTarget.getBoundingClientRect()
     setFlyoutPos({
       top: rect.top,
-      left: rect.right + 12
+      left: 80 + 12 // sidebar is 80px
     })
     setActiveFlyoutGroup(group)
     setHoveredGroup(null) // Hide tooltip when opening flyout
@@ -110,7 +110,10 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
     if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current)
     
     tooltipTimeoutRef.current = setTimeout(() => {
-      setTooltipPos({ top: rect.top + rect.height / 2, left: rect.right + 12 })
+      setTooltipPos({ 
+        top: rect.top + rect.height / 2, 
+        left: collapsedOnDesktop ? 92 : rect.right + 12 
+      })
       setHoveredGroup(label)
     }, 150)
   }
@@ -132,14 +135,14 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
       )}
       <aside
         style={{ height: '100%', maxHeight: '100dvh' }}
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen max-h-screen h-dvh max-h-dvh flex-col overflow-hidden bg-white dark:bg-[#111C44] text-slate-800 dark:text-slate-100 border-r border-slate-200/80 dark:border-white/10 shadow-2xl transition-all duration-300 lg:relative lg:z-auto lg:h-full lg:max-h-full lg:translate-x-0 lg:shadow-none shrink-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen max-h-screen h-dvh max-h-dvh flex-col overflow-hidden bg-white dark:bg-[#111C44] text-slate-800 dark:text-slate-100 border-r border-slate-200/80 dark:border-white/10 shadow-2xl transition-all duration-300 lg:relative lg:z-auto lg:h-full lg:max-h-full lg:translate-x-0 lg:shadow-none shrink-0 select-none ${
           collapsedOnDesktop ? 'w-20' : 'w-[19.5rem]'
         } ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
         data-purpose="sidebar-navigation"
       >
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-3.5 relative group/header">
+        <div className="flex h-[68px] shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-3.5 relative group/header">
           {/* Logo Container */}
           <div className={`flex items-center transition-opacity duration-200 ${
             collapsedOnDesktop 
@@ -153,13 +156,13 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 <img
                   src="/img/logo-mjlo.png"
                   alt="Logo Municipalidad JLO"
-                  className="h-10 max-w-[9rem] object-contain dark:hidden block"
+                  className="h-[52px] max-w-[11rem] object-contain dark:hidden block"
                   onError={(event) => { event.currentTarget.src = '/escudo-jlo.png' }}
                 />
                 <img
                   src="/img/logo-mjlo-blanco.png"
                   alt="Logo Municipalidad JLO"
-                  className="h-10 max-w-[9rem] object-contain dark:block hidden"
+                  className="h-[52px] max-w-[11rem] object-contain dark:block hidden"
                   onError={(event) => { event.currentTarget.src = '/escudo-jlo.png' }}
                 />
               </>
@@ -214,16 +217,22 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                         openFlyout(group, e)
                       }
                     }}
-                    className={`group flex size-8 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
+                    className={`group flex size-10 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
                       groupSelected || activeFlyoutGroup?.name === group.name
-                        ? 'bg-[#4318FF] text-white shadow-md'
-                        : `${grpCfg.bg} hover:brightness-95 dark:hover:brightness-110`
+                        ? ''
+                        : 'hover:bg-slate-50 dark:hover:bg-[#111C44]'
                     }`}
                   >
-                    <span className={`grid size-6 place-items-center rounded-lg ${groupSelected || activeFlyoutGroup?.name === group.name ? 'text-white' : grpCfg.color}`}>
+                    <span className={`grid size-[32px] place-items-center rounded-[10px] transition-all duration-200 ${
+                      groupSelected 
+                        ? 'bg-[#4318FF] text-white shadow-md' 
+                        : activeFlyoutGroup?.name === group.name
+                          ? `ring-2 ring-offset-1 ring-slate-200 dark:ring-slate-700 ${grpCfg.bg} ${grpCfg.color}`
+                          : `${grpCfg.bg} ${grpCfg.color} hover:brightness-95 dark:hover:brightness-110`
+                    }`}>
                       <Icon
                         name={isSingle ? mainItem.icon : grpCfg.icon}
-                          className="size-3.5"
+                        className="size-5"
                       />
                     </span>
                   </button>
@@ -316,12 +325,12 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
             onMouseLeave={handleMouseLeave}
             className={`group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[12.5px] font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all duration-200 cursor-pointer ${
               collapsedOnDesktop
-                ? 'lg:justify-center lg:size-8 mx-auto w-full'
+                ? 'lg:justify-center lg:size-10 mx-auto w-full'
                 : 'w-full'
             }`}
           >
-            <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-red-50 dark:bg-red-950/30 text-red-500 transition-transform duration-150 group-hover:scale-105">
-              <Icon name="logout" className="size-3.5" />
+            <span className={`grid ${collapsedOnDesktop ? 'size-[32px]' : 'size-6'} shrink-0 place-items-center rounded-lg bg-red-50 dark:bg-red-950/30 text-red-500 transition-transform duration-150 group-hover:scale-105`}>
+              <Icon name="logout" className={collapsedOnDesktop ? 'size-5' : 'size-3.5'} />
             </span>
             <span className={`text-[12.5px] font-bold tracking-tight truncate flex-1 text-red-600 dark:text-red-400 ${collapsedOnDesktop ? 'lg:hidden' : ''}`}>
               Cerrar sesión

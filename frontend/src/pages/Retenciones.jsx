@@ -421,11 +421,10 @@ export function Retenciones({ user }) {
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(item)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-rose-950/40 dark:hover:text-rose-300"
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
                           title="Ver Ficha e Inventario"
                         >
-                          <Icon name="eye" className="size-3.5" />
-                          <span>Inventario</span>
+                          <Icon name="eye" className="size-4" />
                         </button>
                       </div>
                     </td>

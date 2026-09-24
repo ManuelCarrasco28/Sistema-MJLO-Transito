@@ -289,7 +289,13 @@ export function Documentos() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de anular este documento del padrón oficial?')) {
+    const result = await showConfirm(
+      '¿Anular documento?',
+      '¿Está seguro de anular este documento del padrón oficial?',
+      'Sí, anular',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         const response = await apiFetch(`/documentos/${id}`, { method: 'DELETE' })
         if (!response.ok) throw response
@@ -298,7 +304,7 @@ export function Documentos() {
         setCachedData('/documentos', nextDocs)
         showToast('Documento anulado con éxito')
       } catch {
-        alert('No se pudo anular el documento.')
+        showError('Error', 'No se pudo anular el documento.')
       }
     }
   }

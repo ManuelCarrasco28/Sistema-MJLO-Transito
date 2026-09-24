@@ -40,7 +40,7 @@ class VehiculosController extends ResourceController
                 COALESCE(c.apellido_paterno, '') AS propietarioPaterno,
                 COALESCE(c.apellido_materno, '') AS propietarioMaterno,
                 COALESCE(p.numero, '') AS propietarioDni,
-                CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END AS estado,
+                v.estado AS estado,
                 CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END AS formalidad
             ", false)
             ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
@@ -284,6 +284,11 @@ class VehiculosController extends ResourceController
 
         $qrCode = $input['codigoQr'] ?? ('QR-VEH-' . date('Y') . '-' . str_pad(random_int(100, 999), 3, '0', STR_PAD_LEFT));
 
+        $estadoInput = strtoupper(trim($input['estado'] ?? 'ACTIVO'));
+        if (!in_array($estadoInput, ['ACTIVO', 'INACTIVO'], true)) {
+            $estadoInput = 'ACTIVO';
+        }
+
         $record = [
             'placa'                => $placa,
             'id_tipo_vehiculo'     => $tipoVehiculoId,
@@ -300,6 +305,7 @@ class VehiculosController extends ResourceController
             'partida_registral'    => trim($input['partidaRegistral'] ?? ''),
             'codigo_qr'            => $qrCode,
             'id_asociacion'        => $asociacionId,
+            'estado'               => $estadoInput,
         ];
 
         $propietarioNombre = trim($input['propietario'] ?? '');
@@ -348,7 +354,7 @@ class VehiculosController extends ResourceController
             'asociacion'     => $asociacionId ? $orgName : null,
             'propietario'      => $propietarioNombre ?: 'Sin Propietario',
             'propietarioDni'   => $propietarioDni,
-            'estado'           => $asociacionId ? 'FORMAL' : 'INFORMAL',
+            'estado'           => $record['estado'],
             'formalidad'       => $asociacionId ? 'FORMAL' : 'INFORMAL',
             'soatEstado'       => $input['soatEstado'] ?? 'VIGENTE',
             'tucNumero'        => $input['tucNumero'] ?? ('TUC-2026-' . str_pad($vehiculoId, 3, '0', STR_PAD_LEFT)),
@@ -387,6 +393,12 @@ class VehiculosController extends ResourceController
         if (isset($input['numeroSerie'])) $record['numero_serie'] = trim($input['numeroSerie']);
         if (isset($input['serieMotor'])) $record['serie_motor'] = trim($input['serieMotor']);
         if (isset($input['partidaRegistral'])) $record['partida_registral'] = trim($input['partidaRegistral']);
+        if (isset($input['estado'])) {
+            $estadoInput = strtoupper(trim($input['estado']));
+            if (in_array($estadoInput, ['ACTIVO', 'INACTIVO'], true)) {
+                $record['estado'] = $estadoInput;
+            }
+        }
 
         if (array_key_exists('asociacion', $input)) {
             $asociacionId = null;

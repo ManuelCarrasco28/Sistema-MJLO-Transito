@@ -414,18 +414,28 @@ export function CursosSeguridad() {
         </div>
       </div>
 
-      <div className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+      <div className="flex border-b border-slate-200 dark:border-[var(--border)]">
         <button
           onClick={() => setActiveView('CURSOS')}
-          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'CURSOS' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'}`}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
+            activeView === 'CURSOS'
+              ? 'border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
         >
-          Cursos programados
+          <Icon name="course" className="size-4" />
+          <span>Cursos programados</span>
         </button>
         <button
           onClick={() => setActiveView('APROBADOS')}
-          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'APROBADOS' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'}`}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
+            activeView === 'APROBADOS'
+              ? 'border-emerald-600 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
         >
-          Registros de Carnet
+          <Icon name="idCard" className="size-4" />
+          <span>Registros de Carnet</span>
         </button>
       </div>
 
@@ -563,17 +573,17 @@ export function CursosSeguridad() {
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-center gap-1">
                         {c.estado === 'FINALIZADO' && (
-                          <button onClick={() => handlePrintBatch(c)} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Descargar Carnets (Lote)">
+                          <button onClick={() => handlePrintBatch(c)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white" title="Descargar Carnets (Lote)">
                             <Icon name="print" className="size-4" />
                           </button>
                         )}
-                        <button onClick={() => { setSelectedCurso(c); setIsDetailModalOpen(true); }} className="rounded-lg p-1.5 bg-purple-50 text-purple-600 hover:bg-purple-500 hover:text-white dark:bg-purple-950/60 dark:text-purple-400 dark:hover:bg-purple-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalles">
+                        <button onClick={() => { setSelectedCurso(c); setIsDetailModalOpen(true); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver Detalles">
                           <Icon name="eye" className="size-4" />
                         </button>
-                        <button onClick={() => handleOpenEditModal(c)} className="rounded-lg p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Editar Curso">
+                        <button onClick={() => handleOpenEditModal(c)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar Curso">
                           <Icon name="pencil" className="size-4" />
                         </button>
-                        <button onClick={() => handleDelete(c.id)} className="rounded-lg p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Eliminar Curso">
+                        <button onClick={() => handleDelete(c.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar Curso">
                           <Icon name="trash" className="size-4" />
                         </button>
                       </div>

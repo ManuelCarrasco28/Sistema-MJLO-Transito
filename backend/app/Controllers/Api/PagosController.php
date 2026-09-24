@@ -69,6 +69,73 @@ class PagosController extends ResourceController
             ];
         }
 
+        // Papeletas pendientes de pago que aún no tienen un recibo generado
+        // en pagos_transito, para que se vean en Pagos sin esperar a que
+        // alguien las seleccione manualmente en "Registrar Pago".
+        $idsPapeletasConRecibo = $db->table('pagos_transito')->select('id_papeleta')->where('id_papeleta IS NOT NULL', null, false)->get()->getResultArray();
+        $idsPapeletasConRecibo = array_map(static fn($r) => (int)$r['id_papeleta'], $idsPapeletasConRecibo);
+
+        $papeletasPendientes = $db->table('papeletas p')
+            ->select("p.id, p.numero_papeleta, p.monto_total, p.fecha_hora, v.placa", false)
+            ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
+            ->where('p.estado', 'PENDIENTE_PAGO')
+            ->get()->getResultArray();
+
+        foreach ($papeletasPendientes as $p) {
+            if (in_array((int)$p['id'], $idsPapeletasConRecibo, true)) continue;
+            $pagos[] = [
+                'id' => 'pap_pend_' . $p['id'],
+                'tipoPago' => 'PAPELETA',
+                'papeletaId' => (int)$p['id'], 'tramiteId' => null, 'inscripcionId' => null,
+                'origenId' => (int)$p['id'],
+                'numeroRecibo' => null,
+                'numeroVoucher' => null,
+                'metodo' => 'SIN CONFIRMAR',
+                'metodoPago' => 'SIN CONFIRMAR',
+                'referenciaPago' => 'Papeleta ' . $p['numero_papeleta'] . ($p['placa'] ? ' — ' . $p['placa'] : ''),
+                'montoTotal' => (float)$p['monto_total'],
+                'fecha' => $p['fecha_hora'],
+                'fechaHora' => $p['fecha_hora'],
+                'estado' => 'PENDIENTE',
+                'pagadoPor' => $this->resolverPagador(['tipo_pago' => 'PAPELETA', 'id_papeleta' => (int)$p['id']]),
+            ];
+        }
+
+        // Inscripciones a cursos con costo, pendientes de pago, que aún no
+        // tienen un recibo generado.
+        $idsInscripcionesConRecibo = $db->table('pagos_transito')->select('id_inscripcion')->where('id_inscripcion IS NOT NULL', null, false)->get()->getResultArray();
+        $idsInscripcionesConRecibo = array_map(static fn($r) => (int)$r['id_inscripcion'], $idsInscripcionesConRecibo);
+
+        $cursosPendientes = $db->table('inscripciones_curso i')
+            ->select("i.id, i.fecha_inscripcion, c.nombre as curso_nombre, c.costo_inscripcion, CONCAT(ci.nombres, ' ', ci.apellido_paterno) as persona_nombre", false)
+            ->join('cursos_seguridad_vial c', 'c.id = i.id_curso')
+            ->join('personas per', 'per.id = i.id_persona', 'left')
+            ->join('ciudadanos ci', 'ci.id_persona = per.id', 'left')
+            ->where('i.estado_pago', 'PENDIENTE')
+            ->where('c.costo_inscripcion >', 0)
+            ->whereNotIn('i.estado', ['ANULADO', 'CANCELADO'])
+            ->get()->getResultArray();
+
+        foreach ($cursosPendientes as $c) {
+            if (in_array((int)$c['id'], $idsInscripcionesConRecibo, true)) continue;
+            $pagos[] = [
+                'id' => 'cur_pend_' . $c['id'],
+                'tipoPago' => 'CURSO',
+                'papeletaId' => null, 'tramiteId' => null, 'inscripcionId' => (int)$c['id'],
+                'origenId' => (int)$c['id'],
+                'numeroRecibo' => null,
+                'numeroVoucher' => null,
+                'metodo' => 'SIN CONFIRMAR',
+                'metodoPago' => 'SIN CONFIRMAR',
+                'referenciaPago' => 'Curso ' . $c['curso_nombre'] . ' — ' . trim($c['persona_nombre'] ?? ''),
+                'montoTotal' => (float)$c['costo_inscripcion'],
+                'fecha' => $c['fecha_inscripcion'],
+                'fechaHora' => $c['fecha_inscripcion'],
+                'estado' => 'PENDIENTE',
+                'pagadoPor' => $this->resolverPagador(['tipo_pago' => 'CURSO', 'id_inscripcion' => (int)$c['id']]),
+            ];
+        }
+
         usort($pagos, function($a, $b) {
             $dateA = $a['fecha'] ? strtotime($a['fecha']) : 0;
             $dateB = $b['fecha'] ? strtotime($b['fecha']) : 0;
@@ -184,7 +251,15 @@ class PagosController extends ResourceController
                 return $this->failValidationErrors($this->validator->getErrors());
             }
 
-            $pago = (new PagosTransito(\Config\Database::connect()))->generar($tipo, (int)($input[$key] ?? 0));
+            $service = new PagosTransito(\Config\Database::connect());
+            $pago = $service->generar($tipo, (int)($input[$key] ?? 0));
+
+            // Si ya vienen los datos del recibo (flujo en un solo paso desde
+            // "Registrar Pago"), se confirma de inmediato como PAGADO.
+            if (trim($input['fechaPago'] ?? '') !== '') {
+                $pago = $service->confirmar((int)$pago['id'], $input);
+            }
+
             return $this->respondCreated(['data' => $this->present($pago)]);
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
@@ -240,9 +315,80 @@ class PagosController extends ResourceController
     {
         $db = \Config\Database::connect();
         return $this->respond(['data' => [
-            'PAPELETA' => $db->table('papeletas')->select('id, numero_papeleta AS nombre')->where('estado', 'PENDIENTE_PAGO')->get()->getResultArray(),
-            'TRAMITE' => $db->table('tramites_documentarios')->select('id, numero_expediente AS nombre')->where('id_procedimiento_admin IS NOT NULL', null, false)->whereNotIn('estado', ['ANULADO','ANULADA'])->get()->getResultArray(),
-            'CURSO' => $db->table('inscripciones_curso i')->select("i.id, CONCAT(c.nombre, ' — ', ci.nombres, ' ', ci.apellido_paterno) AS nombre", false)->join('cursos_seguridad_vial c', 'c.id=i.id_curso')->join('ciudadanos ci', 'ci.id_persona=i.id_persona')->where('i.estado_pago !=', 'PAGADO')->whereNotIn('i.estado', ['ANULADO','CANCELADO'])->get()->getResultArray(),
+            'PAPELETA' => $db->table('papeletas')->select('id, numero_papeleta AS nombre, monto_total AS monto')->where('estado', 'PENDIENTE_PAGO')->get()->getResultArray(),
+            'TRAMITE' => $db->table('tramites_documentarios')->select('id, numero_expediente AS nombre, NULL AS monto', false)->where('id_procedimiento_admin IS NOT NULL', null, false)->whereNotIn('estado', ['ANULADO','ANULADA'])->get()->getResultArray(),
+            'CURSO' => $db->table('inscripciones_curso i')->select("i.id, CONCAT(c.nombre, ' — ', ci.nombres, ' ', ci.apellido_paterno) AS nombre, c.costo_inscripcion AS monto", false)->join('cursos_seguridad_vial c', 'c.id=i.id_curso')->join('ciudadanos ci', 'ci.id_persona=i.id_persona')->where('i.estado_pago !=', 'PAGADO')->whereNotIn('i.estado', ['ANULADO','CANCELADO'])->get()->getResultArray(),
+        ]]);
+    }
+
+    /**
+     * Busca a una persona por DNI y devuelve todas sus deudas pendientes
+     * (papeletas como infractor, trámites y cursos), para poder cobrarlas
+     * todas desde un mismo lugar en vez de buscar registro por registro.
+     */
+    public function deudasPorPersona()
+    {
+        $db = \Config\Database::connect();
+        $dni = trim($this->request->getGet('dni') ?? '');
+
+        if ($dni === '') {
+            return $this->failValidationErrors('Ingresa el DNI de la persona a buscar.');
+        }
+
+        $persona = $db->table('personas p')
+            ->select("p.id, p.numero, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->where('p.numero', $dni)
+            ->get()->getRowArray();
+
+        if (!$persona) {
+            return $this->failNotFound('No se encontró una persona con ese DNI en el sistema.');
+        }
+
+        $idPersona = (int)$persona['id'];
+
+        $papeletas = $db->table('papeletas p')
+            ->select("p.id, p.numero_papeleta as nombre, p.monto_total as monto", false)
+            ->where('p.id_persona_infractor', $idPersona)
+            ->where('p.estado', 'PENDIENTE_PAGO')
+            ->get()->getResultArray();
+
+        $tramites = $db->table('tramites_documentarios t')
+            ->select("t.id, t.numero_expediente as nombre, NULL as monto", false)
+            ->where('t.id_persona', $idPersona)
+            ->whereNotIn('t.estado', ['ANULADO', 'ANULADA'])
+            ->get()->getResultArray();
+
+        $cursos = $db->table('inscripciones_curso i')
+            ->select("i.id, c.nombre as nombre, c.costo_inscripcion as monto", false)
+            ->join('cursos_seguridad_vial c', 'c.id = i.id_curso')
+            ->where('i.id_persona', $idPersona)
+            ->where('i.estado_pago', 'PENDIENTE')
+            ->where('c.costo_inscripcion >', 0)
+            ->whereNotIn('i.estado', ['ANULADO', 'CANCELADO'])
+            ->get()->getResultArray();
+
+        $idsPapeletasConRecibo = array_map(static fn($r) => (int)$r['id_papeleta'], $db->table('pagos_transito')->select('id_papeleta')->where('id_papeleta IS NOT NULL', null, false)->get()->getResultArray());
+        $idsTramitesConRecibo = array_map(static fn($r) => (int)$r['id_tramite'], $db->table('pagos_transito')->select('id_tramite')->where('id_tramite IS NOT NULL', null, false)->get()->getResultArray());
+        $idsInscripcionesConRecibo = array_map(static fn($r) => (int)$r['id_inscripcion'], $db->table('pagos_transito')->select('id_inscripcion')->where('id_inscripcion IS NOT NULL', null, false)->get()->getResultArray());
+
+        $deudas = [];
+        foreach ($papeletas as $p) {
+            if (in_array((int)$p['id'], $idsPapeletasConRecibo, true)) continue;
+            $deudas[] = ['tipoPago' => 'PAPELETA', 'id' => (int)$p['id'], 'nombre' => $p['nombre'], 'monto' => (float)$p['monto']];
+        }
+        foreach ($tramites as $t) {
+            if (in_array((int)$t['id'], $idsTramitesConRecibo, true)) continue;
+            $deudas[] = ['tipoPago' => 'TRAMITE', 'id' => (int)$t['id'], 'nombre' => $t['nombre'], 'monto' => null];
+        }
+        foreach ($cursos as $c) {
+            if (in_array((int)$c['id'], $idsInscripcionesConRecibo, true)) continue;
+            $deudas[] = ['tipoPago' => 'CURSO', 'id' => (int)$c['id'], 'nombre' => $c['nombre'], 'monto' => (float)$c['monto']];
+        }
+
+        return $this->respond(['data' => [
+            'persona' => ['id' => $idPersona, 'dni' => $persona['numero'], 'nombre' => $persona['nombre']],
+            'deudas' => $deudas,
         ]]);
     }
 

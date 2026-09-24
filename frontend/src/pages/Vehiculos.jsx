@@ -6,7 +6,7 @@ import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
-import { showError } from '../utils/SwalUtil'
+import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect } from '../components/ui/FormInputs'
@@ -117,7 +117,8 @@ export function Vehiculos() {
   const [asociacionSearch, setAsociacionSearch] = useState('')
   const [showAsociacionResults, setShowAsociacionResults] = useState(false)
   const [filterTipo, setFilterTipo] = useState('TODOS')
-  const [filterEstado, setFilterEstado] = useState('TODOS')
+  const [filterEstado, setFilterEstado] = useState('FORMAL')
+  const [filterActivo, setFilterActivo] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(8)
   const [loadError, setLoadError] = useState('')
@@ -145,7 +146,7 @@ export function Vehiculos() {
     asociacion: '',
     propietario: '',
     propietarioDni: '',
-    estado: 'FORMALIZADO',
+    estado: 'ACTIVO',
     soatEstado: 'VIGENTE',
     tucNumero: 'TUC-2026-000',
   })
@@ -211,8 +212,7 @@ export function Vehiculos() {
     const nombre = org?.razonSocial || ''
     setFormData({
       ...formData,
-      asociacion: nombre,
-      estado: formData.estado === 'SUSPENDIDO' || formData.estado === 'BAJA' ? formData.estado : (nombre ? 'FORMAL' : 'INFORMAL')
+      asociacion: nombre
     })
     setAsociacionSearch(nombre)
     setShowAsociacionResults(false)
@@ -221,8 +221,7 @@ export function Vehiculos() {
   const clearAsociacion = () => {
     setFormData({
       ...formData,
-      asociacion: '',
-      estado: formData.estado === 'SUSPENDIDO' || formData.estado === 'BAJA' ? formData.estado : 'INFORMAL'
+      asociacion: ''
     })
     setAsociacionSearch('')
     setShowAsociacionResults(false)
@@ -254,15 +253,15 @@ export function Vehiculos() {
     const matchesEstado =
       filterEstado === 'TODOS' ||
       (filterEstado === 'FORMAL' && formal) ||
-      (filterEstado === 'INFORMAL' && !formal) ||
-      (filterEstado === 'SUSPENDIDO' && (v.estado === 'SUSPENDIDO' || v.estado === 'BAJA'))
+      (filterEstado === 'INFORMAL' && !formal)
+    const matchesActivo = filterActivo === 'TODOS' || v.estado === filterActivo
 
-    return matchesSearch && matchesTipo && matchesEstado
+    return matchesSearch && matchesTipo && matchesEstado && matchesActivo
   })
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterTipo, filterEstado])
+  }, [searchTerm, filterTipo, filterEstado, filterActivo])
 
   const paginatedVehiculos = filteredVehiculos.slice(
     (currentPage - 1) * itemsPerPage,
@@ -277,7 +276,8 @@ export function Vehiculos() {
       subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
       metadata: [
         { label: 'Tipo Vehículo', value: filterTipo },
-        { label: 'Estado', value: filterEstado }
+        { label: 'Formalidad', value: filterEstado },
+        { label: 'Estado', value: filterActivo }
       ],
       columns: [
         { header: 'PLACA', key: 'placa', isText: true, width: 110, align: 'center' },
@@ -404,7 +404,7 @@ export function Vehiculos() {
       asociacion: '',
       propietario: '',
       propietarioDni: '',
-      estado: 'INFORMAL',
+      estado: 'ACTIVO',
       soatEstado: 'VIGENTE',
       tucNumero: `TUC-2026-${Math.floor(100 + Math.random() * 900)}`,
     })
@@ -425,9 +425,7 @@ export function Vehiculos() {
       asociacion: isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '',
       propietarioDni: vehiculo.propietarioDni || '',
       propietario: vehiculo.propietario || '',
-      estado: vehiculo.estado === 'SUSPENDIDO' || vehiculo.estado === 'BAJA'
-        ? vehiculo.estado
-        : (isVehiculoFormal(vehiculo) ? 'FORMAL' : 'INFORMAL')
+      estado: vehiculo.estado === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'
     })
     setIsEditing(true)
     setIsModalOpen(true)
@@ -439,12 +437,19 @@ export function Vehiculos() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de eliminar este vehículo del registro municipal?')) {
+    const result = await showConfirm(
+      '¿Eliminar vehículo?',
+      '¿Está seguro de eliminar este vehículo del registro municipal?',
+      'Sí, eliminar',
+      'Cancelar'
+    )
+    if (result.isConfirmed) {
       try {
         await apiFetch(`/vehiculos/${id}`, { method: 'DELETE' })
         setVehiculos(vehiculos.filter((v) => v.id !== id))
+        showToast('Vehículo eliminado correctamente')
       } catch (err) {
-        alert('No se pudo eliminar el vehículo.')
+        showError('Error', 'No se pudo eliminar el vehículo.')
       }
     }
   }
@@ -477,13 +482,9 @@ export function Vehiculos() {
         if (!res.ok) throw new Error(resData.messages?.error || resData.message || 'No se pudo actualizar el vehículo.')
         setVehiculos(vehiculos.map((v) => (v.id === selectedVehiculo.id ? { ...v, ...formData, id: v.id } : v)))
       } else {
-        const payload = {
-          ...formData,
-          estado: formData.asociacion?.trim() ? 'FORMAL' : 'INFORMAL',
-        }
         const res = await apiFetch('/vehiculos', {
           method: 'POST',
-          body: payload,
+          body: formData,
         })
         const resData = await res.json().catch(() => ({}))
         if (!res.ok || !resData.data?.id) throw new Error(resData.messages?.error || resData.message || 'No se pudo registrar el vehículo.')
@@ -575,6 +576,34 @@ export function Vehiculos() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 dark:border-[var(--border)]">
+        <button
+          type="button"
+          onClick={() => setFilterEstado(filterEstado === 'FORMAL' ? 'TODOS' : 'FORMAL')}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
+            filterEstado === 'FORMAL'
+              ? 'border-emerald-600 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <Icon name="shieldCheck" className="size-4" />
+          <span>Vehículos Formal ({formales})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterEstado(filterEstado === 'INFORMAL' ? 'TODOS' : 'INFORMAL')}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
+            filterEstado === 'INFORMAL'
+              ? 'border-amber-500 text-amber-600 dark:border-amber-400 dark:text-amber-400'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <Icon name="alert" className="size-4" />
+          <span>Vehículos Informal ({informales})</span>
+        </button>
+      </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
@@ -607,28 +636,28 @@ export function Vehiculos() {
               options={[
                 { value: 'TODOS', label: 'Todos los tipos' },
                 { value: 'Mototaxi (Trimovil)', label: 'Mototaxi (Trimovil)' },
-                { value: 'Colectivo (Auto)', label: 'Colectivo (Auto)' },
-                { value: 'Combi / Minivan', label: 'Combi / Minivan' }
+                { value: 'Automóvil (Sedán/Hatchback)', label: 'Automóvil (Sedán/Hatchback)' },
+                { value: 'Camioneta Rural (Combi)', label: 'Camioneta Rural (Combi)' },
+                { value: 'Moto Lineal', label: 'Moto Lineal' }
               ]}
             />
 
             <RoundedSelect
-              value={filterEstado}
-              onChange={setFilterEstado}
+              value={filterActivo}
+              onChange={setFilterActivo}
               options={[
                 { value: 'TODOS', label: 'Todos los estados' },
-                { value: 'FORMAL', label: 'Formales (En Asociación)' },
-                { value: 'INFORMAL', label: 'Informales (Sin Asociación)' },
-                { value: 'SUSPENDIDO', label: 'Inhabilitados (Suspendidos/Baja)' }
+                { value: 'ACTIVO', label: 'Activos' },
+                { value: 'INACTIVO', label: 'Inactivos' }
               ]}
             />
 
-            {(filterTipo !== 'TODOS' || filterEstado !== 'TODOS' || searchTerm !== '') && (
+            {(filterTipo !== 'TODOS' || filterActivo !== 'TODOS' || searchTerm !== '') && (
               <button
                 type="button"
                 onClick={() => {
                   setFilterTipo('TODOS')
-                  setFilterEstado('TODOS')
+                  setFilterActivo('TODOS')
                   setSearchTerm('')
                 }}
                 title="Limpiar filtros"
@@ -794,7 +823,7 @@ export function Vehiculos() {
 
 
                     <td className="px-3.5 py-2.5 whitespace-nowrap text-center">
-                      <StatusBadge status={v.estado === 'SUSPENDIDO' || v.estado === 'BAJA' ? v.estado : (isVehiculoFormal(v) ? 'FORMAL' : 'INFORMAL')} />
+                      <StatusBadge status={v.estado || 'ACTIVO'} />
                     </td>
 
 
@@ -804,7 +833,7 @@ export function Vehiculos() {
                           type="button"
                           onClick={() => handleOpenDetail(v)}
                           title="Ver Ficha Técnica"
-                          className="size-8 rounded-lg grid place-items-center bg-cyan-50 text-cyan-600 hover:bg-cyan-500 hover:text-white dark:bg-cyan-950/60 dark:text-cyan-400 dark:hover:bg-cyan-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
                         >
                           <Icon name="eye" className="size-4" />
                         </button>
@@ -812,7 +841,7 @@ export function Vehiculos() {
                           type="button"
                           onClick={() => handleOpenEditModal(v)}
                           title="Editar Vehículo"
-                          className="size-8 rounded-lg grid place-items-center bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white"
                         >
                           <Icon name="pencil" className="size-4" />
                         </button>
@@ -820,7 +849,7 @@ export function Vehiculos() {
                           type="button"
                           onClick={() => handleDelete(v.id)}
                           title="Eliminar Vehículo"
-                          className="size-8 rounded-lg grid place-items-center bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white"
                         >
                           <Icon name="trash" className="size-4" />
                         </button>
@@ -909,8 +938,9 @@ export function Vehiculos() {
                       onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                       options={[
                         { value: 'Mototaxi (Trimovil)', label: 'Mototaxi (Trimovil)' },
-                        { value: 'Colectivo (Auto)', label: 'Colectivo (Auto)' },
-                        { value: 'Combi / Minivan', label: 'Combi / Minivan' },
+                        { value: 'Automóvil (Sedán/Hatchback)', label: 'Automóvil (Sedán/Hatchback)' },
+                        { value: 'Camioneta Rural (Combi)', label: 'Camioneta Rural (Combi)' },
+                        { value: 'Moto Lineal', label: 'Moto Lineal' },
                       ]}
                     />
 
@@ -1092,8 +1122,7 @@ export function Vehiculos() {
                         setAsociacionSearch(value)
                         setFormData({
                           ...formData,
-                          asociacion: '',
-                          estado: formData.estado === 'SUSPENDIDO' || formData.estado === 'BAJA' ? formData.estado : 'INFORMAL'
+                          asociacion: ''
                         })
                         setShowAsociacionResults(true)
                       }}
@@ -1144,28 +1173,24 @@ export function Vehiculos() {
               </fieldset>
 
 
-              {isEditing && (
-                <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                  <legend className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 px-1 mb-2 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-amber-500" />
-                    Estado de Operatividad Municipal
-                  </legend>
-                  <div className="grid gap-2.5 sm:grid-cols-1">
-                    <FloatingSelect
-                      id="veh_estado"
-                      label="Estado Municipal del Vehículo"
-                      value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                      options={[
-                        { value: 'FORMAL', label: 'FORMAL (Autorizado)' },
-                        { value: 'INFORMAL', label: 'INFORMAL (Sin Asociación)' },
-                        { value: 'SUSPENDIDO', label: 'SUSPENDIDO' },
-                        { value: 'BAJA', label: 'BAJA' }
-                      ]}
-                    />
-                  </div>
-                </fieldset>
-              )}
+              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
+                <legend className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 px-1 mb-2 flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-amber-500" />
+                  Estado del Vehículo
+                </legend>
+                <div className="grid gap-2.5 sm:grid-cols-1">
+                  <FloatingSelect
+                    id="veh_estado"
+                    label="Estado"
+                    value={formData.estado}
+                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                    options={[
+                      { value: 'ACTIVO', label: 'ACTIVO' },
+                      { value: 'INACTIVO', label: 'INACTIVO' }
+                    ]}
+                  />
+                </div>
+              </fieldset>
 
 
               <div className="mt-3 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-3 dark:border-[var(--border)]">
@@ -1214,6 +1239,7 @@ export function Vehiculos() {
                     >
                       {isVehiculoFormal(selectedVehiculo) ? 'FORMAL' : 'INFORMAL'}
                     </span>
+                    <StatusBadge status={selectedVehiculo.estado || 'ACTIVO'} />
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     Ficha Vehicular Municipal • {selectedVehiculo.marca || ''} {selectedVehiculo.modelo || ''}

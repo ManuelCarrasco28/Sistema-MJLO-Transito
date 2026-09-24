@@ -658,7 +658,7 @@ export function Asociaciones() {
                           type="button"
                           onClick={() => handleOpenDetail(o)}
                           title="Ver Detalle"
-                          className="size-8 rounded-lg grid place-items-center bg-cyan-50 text-cyan-600 hover:bg-cyan-500 hover:text-white dark:bg-cyan-950/60 dark:text-cyan-400 dark:hover:bg-cyan-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
                         >
                           <Icon name="eye" className="size-4" />
                         </button>
@@ -666,7 +666,7 @@ export function Asociaciones() {
                           type="button"
                           onClick={() => handleOpenEditModal(o)}
                           title="Editar Asociación"
-                          className="size-8 rounded-lg grid place-items-center bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white"
                         >
                           <Icon name="pencil" className="size-4" />
                         </button>
@@ -674,7 +674,7 @@ export function Asociaciones() {
                           type="button"
                           onClick={() => handleDelete(o.id)}
                           title="Eliminar Asociación"
-                          className="size-8 rounded-lg grid place-items-center bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white"
                         >
                           <Icon name="trash" className="size-4" />
                         </button>

@@ -85,6 +85,11 @@
   --action-print-text: #7c3aed;
   --action-print-hover: #7c3aed;
 
+  --action-pay-bg: #d1fae5;
+  --action-pay-border: #34d399;
+  --action-pay-text: #047857;
+  --action-pay-hover: #047857;
+
   --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--brand);
   --shadow-surface: 0 1px 2px rgba(20, 24, 31, 0.06);
 
@@ -155,6 +160,11 @@ html.dark {
   --action-print-border: rgba(167, 139, 250, 0.25);
   --action-print-text: #a78bfa;
   --action-print-hover: #7c3aed;
+
+  --action-pay-bg: rgba(16, 185, 129, 0.12);
+  --action-pay-border: rgba(52, 211, 153, 0.25);
+  --action-pay-text: #34d399;
+  --action-pay-hover: #059669;
 
   --shadow-surface: none;
 }

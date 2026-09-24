@@ -64,13 +64,29 @@ class PagosTransito
         });
     }
 
+    /**
+     * Genera un número de recibo correlativo del sistema (REC-AÑO-NNNNN),
+     * para cuando el cajero no tiene un talonario físico propio y quiere
+     * que el sistema lo registre automáticamente.
+     */
+    private function generarNumeroRecibo(): string
+    {
+        $anio = date('Y');
+        do {
+            $siguiente = $this->db->table('pagos_transito')->like('numero_recibo', "REC-{$anio}-", 'after')->countAllResults() + 1;
+            $numero = 'REC-' . $anio . '-' . str_pad((string)$siguiente, 5, '0', STR_PAD_LEFT);
+        } while ($this->db->table('pagos_transito')->where('numero_recibo', $numero)->countAllResults() > 0);
+        return $numero;
+    }
+
     public function confirmar(int $id, array $input): array
     {
         $recibo = trim($input['numeroRecibo'] ?? '');
         $fecha = trim($input['fechaPago'] ?? '');
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $fecha);
-        if ($recibo === '' || strlen($recibo) > 50) throw new DomainException('Ingrese el número real del recibo (máximo 50 caracteres).');
+        if ($recibo !== '' && strlen($recibo) > 50) throw new DomainException('El número de recibo no puede exceder los 50 caracteres.');
         if (!$date || $date->format('Y-m-d') !== $fecha || $fecha > date('Y-m-d')) throw new DomainException('Ingrese una fecha de pago válida, no futura.');
+        if ($recibo === '') $recibo = $this->generarNumeroRecibo();
         return $this->atomic(function () use ($id, $input, $recibo, $fecha) {
             $pago = $this->db->table('pagos_transito')->where('id', $id)->get()->getRowArray();
             if (!$pago) throw new DomainException('Pago no encontrado.');

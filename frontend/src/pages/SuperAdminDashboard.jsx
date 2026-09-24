@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
+import { showConfirm } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { Usuarios } from './Usuarios'
 
@@ -986,7 +987,10 @@ function UsersTable({ usuarios, totalUsuarios, loading, searchTerm, setSearchTer
                   <div className="flex justify-end gap-2">
                     <button onClick={() => onEdit(item)} className="rounded-xl bg-blue-50 p-2 text-blue-600 transition hover:bg-blue-500 hover:text-white dark:bg-blue-950/60 dark:text-blue-400" title="Editar"><Icon name="pencil" className="size-4" /></button>
                     <button onClick={() => onPassword(item)} className="rounded-xl bg-amber-50 p-2 text-amber-600 transition hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400" title="Contraseña"><Icon name="settings" className="size-4" /></button>
-                    <button onClick={() => { if(window.confirm('¿Está seguro de eliminar este usuario?')) { onDelete(item) } }} className="rounded-xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400" title="Eliminar"><Icon name="trash" className="size-4" /></button>
+                    <button onClick={async () => {
+                      const result = await showConfirm('¿Eliminar usuario?', '¿Está seguro de eliminar este usuario?', 'Sí, eliminar', 'Cancelar')
+                      if (result.isConfirmed) onDelete(item)
+                    }} className="rounded-xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-500 hover:text-white dark:bg-rose-950/60 dark:text-rose-400" title="Eliminar"><Icon name="trash" className="size-4" /></button>
                   </div>
                 </td>
               </tr>

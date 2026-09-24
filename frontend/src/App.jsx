@@ -130,7 +130,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
         />
       </div>
       <div className="no-scrollbar min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col print:block print:h-auto print:overflow-visible">
-        <div className="print:hidden">
+        <div className="print:hidden sticky top-0 z-40 border-b border-transparent">
           <Header
             onOpenMobile={() => setMobileOpen(true)}
             sidebarCollapsed={sidebarCollapsed}

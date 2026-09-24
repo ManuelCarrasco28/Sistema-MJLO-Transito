@@ -5,7 +5,7 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
-import { showError } from '../utils/SwalUtil'
+import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 
@@ -234,16 +234,23 @@ export function Operativos({ user }) {
   }
 
   const remove = async (id) => {
-    if (!window.confirm('¿Eliminar este operativo? Solo se eliminará si no tiene papeletas vinculadas.')) return
+    const result = await showConfirm(
+      '¿Eliminar operativo?',
+      'Solo se eliminará si no tiene papeletas vinculadas.',
+      'Sí, eliminar',
+      'Cancelar'
+    )
+    if (!result.isConfirmed) return
     const response = await apiFetch(`/operativos/${id}`, { method: 'DELETE' })
     if (response.ok) {
       const next = operativos.filter((op) => op.id !== id)
       setOperativos(next)
       setCachedData('/operativos', next)
+      showToast('Operativo eliminado correctamente')
       return
     }
-    const result = await response.json().catch(() => ({}))
-    showError('Error', sanitizarMensaje(result.message || result.messages?.error, 'No se pudo eliminar el operativo.'))
+    const data = await response.json().catch(() => ({}))
+    showError('Error', sanitizarMensaje(data.message || data.messages?.error, 'No se pudo eliminar el operativo.'))
   }
 
   const openDetail = async (op) => {
@@ -557,9 +564,9 @@ export function Operativos({ user }) {
                   <td className="px-4 py-3 text-center"><StatusBadge status={op.estado} /></td>
                   <td className="px-4 py-3">
                     <div className="flex justify-center gap-1.5">
-                      <button onClick={() => openDetail(op)} className="rounded-md bg-sky-50 p-1.5 text-sky-600 hover:bg-sky-500 hover:text-white dark:bg-sky-900/40 dark:text-sky-400 dark:hover:bg-sky-600 transition-colors" title="Ver detalle"><Icon name="eye" className="size-3.5" /></button>
-                      <button onClick={() => openEdit(op)} className="rounded-md bg-amber-50 p-1.5 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-900/40 dark:text-amber-400 dark:hover:bg-amber-600 transition-colors" title="Editar"><Icon name="pencil" className="size-3.5" /></button>
-                      <button onClick={() => remove(op.id)} className="rounded-md bg-rose-50 p-1.5 text-rose-600 hover:bg-rose-500 hover:text-white dark:bg-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-600 transition-colors" title="Eliminar"><Icon name="trash" className="size-3.5" /></button>
+                      <button onClick={() => openDetail(op)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver detalle"><Icon name="eye" className="size-4" /></button>
+                      <button onClick={() => openEdit(op)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar"><Icon name="pencil" className="size-4" /></button>
+                      <button onClick={() => remove(op.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar"><Icon name="trash" className="size-4" /></button>
                     </div>
                   </td>
                 </tr>

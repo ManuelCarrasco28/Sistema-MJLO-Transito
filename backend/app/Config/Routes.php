@@ -34,6 +34,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->post('papeletas/(:num)/firma', 'PapeletasController::firma/$1');
         $routes->get('tipos-infraccion', 'PapeletasController::tipos');
         $routes->get('pagos/origenes', 'PagosController::origenes');
+        $routes->get('pagos/deudas', 'PagosController::deudasPorPersona');
         $routes->get('pagos/arqueo-diario', 'PagosController::arqueoDiario');
         $routes->post('pagos/(:num)/confirmar', 'PagosController::confirmar/$1');
         $routes->resource('pagos', ['controller' => 'PagosController', 'only' => ['index', 'create', 'delete']]);

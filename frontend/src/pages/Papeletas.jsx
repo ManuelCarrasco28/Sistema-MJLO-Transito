@@ -558,21 +558,35 @@ export function Papeletas({ user }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden">
+      <div className="flex border-b border-slate-200 dark:border-[var(--border)] print:hidden">
         <button
           type="button"
           onClick={() => setActiveView('PAPELETAS')}
-          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'PAPELETAS' ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'}`}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
+            activeView === 'PAPELETAS'
+              ? 'border-rose-600 text-rose-600 dark:border-rose-400 dark:text-rose-400'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
         >
-          Papeletas registradas
+          <Icon name="ticket" className="size-4" />
+          <span>Papeletas registradas</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveView('REPORTES')}
-          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'REPORTES' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'}`}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
+            activeView === 'REPORTES'
+              ? 'border-amber-500 text-amber-500 dark:border-amber-400 dark:text-amber-400'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
         >
-          Reportes Evidencias
-          <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">{reportesPendientes}</span>
+          <Icon name="document" className="size-4" />
+          <span>Reportes Evidencias</span>
+          <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${
+            activeView === 'REPORTES'
+              ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+              : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+          }`}>{reportesPendientes}</span>
         </button>
       </div>
 
@@ -876,7 +890,7 @@ export function Papeletas({ user }) {
                             <button
                               type="button"
                               disabled
-                              className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-400 shadow-xs cursor-not-allowed dark:bg-[var(--bg-subtle)] dark:text-slate-500"
+                              className="size-8 rounded-lg border-[1.5px] grid place-items-center shadow-xs cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-500"
                               title="Papeleta anulada - No se puede pagar"
                             >
                               <Icon name="payment" className="size-4" />
@@ -886,19 +900,19 @@ export function Papeletas({ user }) {
                               type="button"
                               onClick={() => handleOpenPagar(p)}
                               disabled={p.estado === 'PAGADA'}
-                              className={`grid size-9 place-items-center rounded-full shadow-xs transition-all ${p.estado === 'PAGADA'
-                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-[var(--bg-subtle)] dark:text-slate-500'
-                                  : 'bg-emerald-600 text-white hover:bg-emerald-700 hover:scale-105 active:scale-95 cursor-pointer'
+                              className={`size-8 rounded-lg border-[1.5px] grid place-items-center shadow-xs transition-all active:scale-95 ${p.estado === 'PAGADA'
+                                  ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-500'
+                                  : 'cursor-pointer bg-[var(--action-pay-bg)] border-[var(--action-pay-border)] text-[var(--action-pay-text)] hover:bg-[var(--action-pay-hover)] hover:border-[var(--action-pay-hover)] hover:text-white'
                                 }`}
                               title={p.estado === 'PAGADA' ? 'Papeleta ya pagada' : 'Pagar papeleta'}
                             >
                               <Icon name="payment" className="size-4" />
                             </button>
                           )}
-                          <button onClick={() => handleOpenDetail(p)} className="grid size-9 place-items-center rounded-full bg-rose-50 text-rose-600 transition-all hover:bg-rose-500 hover:text-white hover:shadow-md dark:bg-rose-950/60 dark:text-rose-400 cursor-pointer" title="Ver Detalle">
+                          <button onClick={() => handleOpenDetail(p)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver Detalle">
                             <Icon name="eye" className="size-4" />
                           </button>
-                          <button onClick={() => handleOpenPreview(p)} className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition-all hover:bg-slate-800 hover:text-white hover:shadow-md dark:bg-[var(--bg-subtle)] dark:text-slate-300 cursor-pointer" title="Imprimir Boleta">
+                          <button onClick={() => handleOpenPreview(p)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white" title="Imprimir Boleta">
                             <Icon name="print" className="size-4" />
                           </button>
                         </div>
