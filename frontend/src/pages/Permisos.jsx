@@ -92,12 +92,46 @@ export function Permisos() {
         invalidateCache('/permisos')
         loadData()
       }
+      if (e.data?.type === 'VOLVER_A_DATOS_MODAL') {
+        let draft = e.data.draft
+        if (!draft) {
+          try {
+            draft = JSON.parse(sessionStorage.getItem('mjlo_permiso_borrador') || localStorage.getItem('mjlo_permiso_borrador'))
+          } catch (_) {}
+        }
+        if (draft) {
+          setEditingPermiso(draft)
+        }
+        setIsCreateModalOpen(true)
+      }
     }
     const handleStorage = (e) => {
       if (e.key === 'mjlo_permisos_updated') {
         invalidateCache('/permisos')
         loadData()
       }
+      if (e.key === 'mjlo_volver_a_datos') {
+        try {
+          const draft = JSON.parse(sessionStorage.getItem('mjlo_permiso_borrador') || localStorage.getItem('mjlo_permiso_borrador'))
+          if (draft) {
+            setEditingPermiso(draft)
+            setIsCreateModalOpen(true)
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Si viene redirigido con reopenDraft=1
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('reopenDraft')) {
+      try {
+        const draft = JSON.parse(sessionStorage.getItem('mjlo_permiso_borrador') || localStorage.getItem('mjlo_permiso_borrador'))
+        if (draft) {
+          setEditingPermiso(draft)
+          setIsCreateModalOpen(true)
+        }
+      } catch (_) {}
+      window.history.replaceState({}, '', '/permisos')
     }
 
     window.addEventListener('message', handleMessage)
@@ -205,39 +239,21 @@ export function Permisos() {
   }
 
   const handleOpenCreate = () => {
-    const w = 1250
-    const h = 920
-    const left = Math.max(0, (window.screen.width - w) / 2)
-    const top = Math.max(0, (window.screen.height - h) / 2)
-    const win = window.open(
-      '/permisos-formulario',
-      'PermisoVentana',
-      `width=${w},height=${h},top=${top},left=${left},scrollbars=yes,resizable=yes,status=no,toolbar=no,menubar=no`
-    )
-    if (win) {
-      win.focus()
-    } else {
-      setEditingPermiso(null)
-      setIsCreateModalOpen(true)
-    }
+    try {
+      sessionStorage.removeItem('mjlo_permiso_borrador')
+      localStorage.removeItem('mjlo_permiso_borrador')
+    } catch (_) {}
+    setEditingPermiso(null)
+    setIsCreateModalOpen(true)
   }
 
   const handleOpenEdit = (p) => {
-    const w = 1250
-    const h = 920
-    const left = Math.max(0, (window.screen.width - w) / 2)
-    const top = Math.max(0, (window.screen.height - h) / 2)
-    const win = window.open(
-      `/permisos-formulario?id=${p.id}`,
-      'PermisoVentana',
-      `width=${w},height=${h},top=${top},left=${left},scrollbars=yes,resizable=yes,status=no,toolbar=no,menubar=no`
-    )
-    if (win) {
-      win.focus()
-    } else {
-      setEditingPermiso(p)
-      setIsCreateModalOpen(true)
-    }
+    try {
+      sessionStorage.removeItem('mjlo_permiso_borrador')
+      localStorage.removeItem('mjlo_permiso_borrador')
+    } catch (_) {}
+    setEditingPermiso(p)
+    setIsCreateModalOpen(true)
   }
 
   const handlePrint = () => {

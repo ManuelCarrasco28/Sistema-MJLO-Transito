@@ -13,6 +13,8 @@ const TINYMCE_API_KEY =
 export function PermisoFormularioVentana() {
   const [searchParams] = useState(() => new URLSearchParams(window.location.search))
   const permitId = searchParams.get('id')
+  const draftParam = searchParams.get('draft')
+  const screenParam = searchParams.get('screen')
 
   const initialFormState = {
     id: permitId ? Number(permitId) : null,
@@ -47,19 +49,41 @@ export function PermisoFormularioVentana() {
   }
 
   const [formData, setFormData] = useState(initialFormState)
-  const [isLoading, setIsLoading] = useState(Boolean(permitId))
+  const [activeScreen, setActiveScreen] = useState(() => (screenParam === 'CUERPO' ? 'CUERPO' : 'DATOS'))
+  const [isLoading, setIsLoading] = useState(Boolean(permitId && !draftParam))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
 
-  // Cargar datos en caso de edición
+  // Cargar datos en caso de edición o borrador transferido
   useEffect(() => {
+    let draftData = null
+    if (draftParam) {
+      try {
+        const stored = sessionStorage.getItem('mjlo_permiso_borrador') || localStorage.getItem('mjlo_permiso_borrador')
+        if (stored) {
+          draftData = JSON.parse(stored)
+        }
+      } catch (_) {}
+    }
+
     if (!permitId) {
-      const defaultData = {
-        ...initialFormState,
-        numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000))
+      if (draftData) {
+        const cleaned = {
+          ...draftData,
+          id: null,
+          numeroAutorizacion: draftData.id ? '' : (draftData.numeroAutorizacion || '')
+        }
+        setFormData(cleaned)
+      } else {
+        const defaultData = {
+          ...initialFormState,
+          id: null,
+          numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000))
+        }
+        defaultData.contenido = generarPlantillaCuerpo(defaultData)
+        setFormData(defaultData)
       }
-      defaultData.contenido = generarPlantillaCuerpo(defaultData)
-      setFormData(defaultData)
+      setIsLoading(false)
       return
     }
 
@@ -72,8 +96,8 @@ export function PermisoFormularioVentana() {
           const json = await res.json()
           const p = json.data
           if (!cancelled && p) {
-            setFormData({
-              id: p.id,
+            const merged = {
+              id: Number(p.id || permitId),
               tipoPermiso: p.tipoPermiso || 'CARGA_DESCARGA',
               numeroAutorizacion: p.numeroAutorizacion || '',
               vehiculoPlaca: p.vehiculoPlaca || '',
@@ -102,11 +126,30 @@ export function PermisoFormularioVentana() {
               observaciones: p.observaciones || '',
               contenido: p.contenido || generarPlantillaCuerpo(p),
               estado: p.estado || 'VIGENTE'
-            })
+            }
+
+            if (draftData) {
+              Object.assign(merged, draftData)
+              merged.id = Number(p.id || permitId)
+            }
+
+            setFormData(merged)
           }
+        } else if (draftData) {
+          setFormData({
+            ...draftData,
+            id: Number(permitId)
+          })
         }
       } catch (err) {
-        showError('Error al cargar', sanitizarMensaje(err.message, 'No se pudo cargar la información del permiso.'))
+        if (draftData) {
+          setFormData({
+            ...draftData,
+            id: Number(permitId)
+          })
+        } else {
+          showError('Error al cargar', sanitizarMensaje(err.message, 'No se pudo cargar la información del permiso.'))
+        }
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -116,7 +159,7 @@ export function PermisoFormularioVentana() {
     return () => {
       cancelled = true
     }
-  }, [permitId])
+  }, [permitId, draftParam])
 
   // Sincronizar campos
   const handleInputChange = (e) => {
@@ -176,20 +219,73 @@ export function PermisoFormularioVentana() {
     setFormData((prev) => ({ ...prev, contenido: cuerpoGenerado }))
   }
 
+  // Salir de la segunda ventana y regresar a la ventana emergente de los datos
+  const handleVolverADatosModal = () => {
+    const effectiveId = formData.id || (permitId ? Number(permitId) : null)
+    const dataToSave = {
+      ...formData,
+      id: effectiveId
+    }
+
+    try {
+      sessionStorage.setItem('mjlo_permiso_borrador', JSON.stringify(dataToSave))
+      localStorage.setItem('mjlo_permiso_borrador', JSON.stringify(dataToSave))
+      localStorage.setItem('mjlo_volver_a_datos', Date.now().toString())
+    } catch (_) {}
+
+    // Notificar a la ventana principal / modal opener
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage({ type: 'VOLVER_A_DATOS_MODAL', draft: dataToSave }, '*')
+      window.opener.focus()
+      window.close()
+    } else {
+      window.location.href = `/permisos?reopenDraft=1${effectiveId ? `&id=${effectiveId}` : ''}`
+    }
+  }
+
+  // Navegar entre pantallas con scroll al inicio
+  const goToScreen = (screen) => {
+    setActiveScreen(screen)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   // Guardar documento
   const handleSubmit = async (e) => {
-    if (e) e.preventDefault()
+    if (e && e.preventDefault) e.preventDefault()
+
+    if (!formData.solicitanteNombre?.trim()) {
+      setActiveScreen('DATOS')
+      showError('Validación', 'Por favor ingresa la Razón Social o nombre del Administrado.')
+      return
+    }
+    if (!formData.solicitanteDocumento?.trim()) {
+      setActiveScreen('DATOS')
+      showError('Validación', 'Por favor ingresa el RUC o DNI del Administrado.')
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
-      const isEdit = Boolean(formData.id)
-      const url = isEdit ? `/permisos/${formData.id}` : '/permisos'
+      const effectiveId = formData.id || (permitId ? Number(permitId) : null)
+      const isEdit = Boolean(effectiveId)
+      const url = isEdit ? `/permisos/${effectiveId}` : '/permisos'
       const method = isEdit ? 'PUT' : 'POST'
+
+      const payload = {
+        ...formData,
+        id: effectiveId || undefined
+      }
+
+      // Si es creación y no se especificó un número, omitir para que el backend autogenere el correlativo único
+      if (!isEdit && !payload.numeroAutorizacion?.trim()) {
+        delete payload.numeroAutorizacion
+      }
 
       const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       })
 
       if (!res.ok) {
@@ -198,6 +294,9 @@ export function PermisoFormularioVentana() {
           const errData = await res.json()
           if (errData?.message) msg = errData.message
           else if (errData?.messages?.error) msg = errData.messages.error
+          else if (errData?.messages && typeof errData.messages === 'object') {
+            msg = Object.values(errData.messages).join(' ')
+          }
         } catch (_) {}
         throw new Error(msg)
       }
@@ -205,9 +304,14 @@ export function PermisoFormularioVentana() {
       const resData = await res.json()
       setSuccessMsg('¡Autorización municipal guardada exitosamente!')
 
+      try {
+        sessionStorage.removeItem('mjlo_permiso_borrador')
+        localStorage.removeItem('mjlo_permiso_borrador')
+      } catch (_) {}
+
       // Notificar a la ventana principal / pestaña padre
       if (window.opener) {
-        window.opener.postMessage({ type: 'PERMISO_GUARDADO', id: resData.id || formData.id }, '*')
+        window.opener.postMessage({ type: 'PERMISO_GUARDADO', id: resData.id || effectiveId }, '*')
       }
       try {
         localStorage.setItem('mjlo_permisos_updated', Date.now().toString())
@@ -263,12 +367,32 @@ export function PermisoFormularioVentana() {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Subgerencia de Tránsito, Transporte y Seguridad Vial — Segunda Ventana Oficial
+              Subgerencia de Tránsito, Transporte y Seguridad Vial — Sistema Oficial
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2.5">
+          {activeScreen === 'CUERPO' ? (
+            <button
+              type="button"
+              onClick={() => goToScreen('DATOS')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-indigo-200 dark:border-[var(--border-strong)] bg-indigo-50 dark:bg-[var(--bg-subtle)] text-indigo-700 dark:text-slate-200 hover:bg-indigo-100 dark:hover:bg-slate-700 transition cursor-pointer"
+              title="Ver y editar los datos del trámite y administrado"
+            >
+              <span>← Volver a Datos del Trámite</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => goToScreen('CUERPO')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-violet-200 dark:border-[var(--border-strong)] bg-violet-50 dark:bg-[var(--bg-subtle)] text-violet-700 dark:text-slate-200 hover:bg-violet-100 dark:hover:bg-slate-700 transition cursor-pointer"
+              title="Continuar al editor de redacción de la resolución"
+            >
+              <span>Continuar a Redacción →</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleCerrar}
@@ -308,346 +432,432 @@ export function PermisoFormularioVentana() {
           </div>
         )}
 
-        {/* 1. BUSCADOR INTELIGENTE EN BASE DE DATOS (Auto-rellenado) */}
-        <div className="rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-          <BuscadorAdministrados onSelect={handleSelectAdministrado} />
-        </div>
-
-        {/* 2. CLASIFICACIÓN / SELECTOR DE TIPO */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
-          <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-            Clasificación / Tipo de Permiso *
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={() => handleTipoChange('CARGA_DESCARGA')}
-              className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
-                formData.tipoPermiso === 'CARGA_DESCARGA'
-                  ? 'border-sky-500 bg-sky-50/70 dark:bg-sky-950/30 text-sky-950 dark:text-sky-200 shadow-sm'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-black text-xs">Carga y Descarga</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200">
-                  TUPA S/ 1030.00
-                </span>
-              </div>
-              <p className="text-[11px] opacity-80">
-                Horario nocturno / madrugada (16:00 a 05:00 hrs) para camiones y unidades de abastecimiento.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTipoChange('USO_VIAS')}
-              className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
-                formData.tipoPermiso === 'USO_VIAS'
-                  ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/30 text-indigo-950 dark:text-indigo-200 shadow-sm'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-black text-xs">Uso Provisional de Vías</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
-                  TUPA S/ 850.00
-                </span>
-              </div>
-              <p className="text-[11px] opacity-80">
-                Ocupación autorizada de vía pública para eventos, mudanzas u obras programadas.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTipoChange('OPERACION')}
-              className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
-                formData.tipoPermiso === 'OPERACION'
-                  ? 'border-violet-500 bg-violet-50/70 dark:bg-violet-950/30 text-violet-950 dark:text-violet-200 shadow-sm'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-black text-xs">Operación General TUPA</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200">
-                  TUPA S/ 450.00
-                </span>
-              </div>
-              <p className="text-[11px] opacity-80">
-                Tarjeta de operatividad y autorizaciones de servicio especial en el distrito.
-              </p>
-            </button>
-          </div>
-        </div>
-
-        {/* 3. CAMPOS DE DATOS GENERALES */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-4">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-[var(--border)] pb-2">
-            Datos del Solicitante, Vehículo y Expediente
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs">
-            {/* Administrado / Razón Social */}
-            <div className="lg:col-span-2">
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                Razón Social o Administrado *
-              </label>
-              <input
-                type="text"
-                name="solicitanteNombre"
-                value={formData.solicitanteNombre}
-                onChange={handleInputChange}
-                required
-                placeholder="Nombre completo o Empresa titular"
-                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-bold outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
-              />
+        {/* ========================================================= */}
+        {/* PANTALLA 1: DATOS DEL TRÁMITE Y ADMINISTRADO               */}
+        {/* ========================================================= */}
+        {activeScreen === 'DATOS' && (
+          <div className="space-y-5 animate-enter">
+            {/* 1. BUSCADOR INTELIGENTE EN BASE DE DATOS (Auto-rellenado) */}
+            <div className="rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <BuscadorAdministrados onSelect={handleSelectAdministrado} />
             </div>
 
-            {/* Documento RUC / DNI */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                RUC / DNI *
+            {/* 2. CLASIFICACIÓN / SELECTOR DE TIPO */}
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
+              <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Clasificación / Tipo de Permiso *
               </label>
-              <input
-                type="text"
-                name="solicitanteDocumento"
-                value={formData.solicitanteDocumento}
-                onChange={handleInputChange}
-                required
-                placeholder="20601234567 o 71234567"
-                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
-              />
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleTipoChange('CARGA_DESCARGA')}
+                  className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                    formData.tipoPermiso === 'CARGA_DESCARGA'
+                      ? 'border-sky-500 bg-sky-50/70 dark:bg-sky-950/30 text-sky-950 dark:text-sky-200 shadow-sm'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-black text-xs">Carga y Descarga</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200">
+                      TUPA S/ 1030.00
+                    </span>
+                  </div>
+                  <p className="text-[11px] opacity-80">
+                    Horario nocturno / madrugada (16:00 a 05:00 hrs) para camiones y unidades de abastecimiento.
+                  </p>
+                </button>
 
-            {/* Representante Legal */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                Representante Legal
-              </label>
-              <input
-                type="text"
-                name="representanteLegal"
-                value={formData.representanteLegal}
-                onChange={handleInputChange}
-                placeholder="Nombre del apoderado legal"
-                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
-              />
-            </div>
+                <button
+                  type="button"
+                  onClick={() => handleTipoChange('USO_VIAS')}
+                  className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                    formData.tipoPermiso === 'USO_VIAS'
+                      ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/30 text-indigo-950 dark:text-indigo-200 shadow-sm'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-black text-xs">Uso Provisional de Vías</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                      TUPA S/ 850.00
+                    </span>
+                  </div>
+                  <p className="text-[11px] opacity-80">
+                    Ocupación autorizada de vía pública para eventos, mudanzas u obras programadas.
+                  </p>
+                </button>
 
-            {/* Placa Principal */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                Vehículo / Placa
-              </label>
-              <input
-                type="text"
-                name="vehiculoPlaca"
-                value={formData.vehiculoPlaca}
-                onChange={handleInputChange}
-                placeholder="ABC-123"
-                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold uppercase outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
-              />
-            </div>
-
-            {/* Expediente UTD */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                Expediente UTD / SISGEDO
-              </label>
-              <input
-                type="text"
-                name="expediente"
-                value={formData.expediente}
-                onChange={handleInputChange}
-                placeholder="EXP-796383"
-                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
-              />
-            </div>
-
-            {/* N° Autorización Oficial */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                N° Autorización / Resolución
-              </label>
-              <input
-                type="text"
-                name="numeroAutorizacion"
-                value={formData.numeroAutorizacion}
-                onChange={handleInputChange}
-                placeholder="Generado automáticamente si se deja vacío"
-                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
-              />
-            </div>
-
-            {/* Zona de Circulación */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                Zona de Circulación / Cuadrante
-              </label>
-              <input
-                type="text"
-                name="zonaCirculacion"
-                value={formData.zonaCirculacion}
-                onChange={handleInputChange}
-                placeholder="Anillo Vial - Distrito de José Leonardo Ortiz"
-                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
-              />
-            </div>
-
-            {/* Horario */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                Horario Autorizado
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  name="horarioInicio"
-                  value={formData.horarioInicio}
-                  onChange={handleInputChange}
-                  placeholder="16:00:00"
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
-                />
-                <input
-                  type="text"
-                  name="horarioFin"
-                  value={formData.horarioFin}
-                  onChange={handleInputChange}
-                  placeholder="05:00:00"
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
-                />
+                <button
+                  type="button"
+                  onClick={() => handleTipoChange('OPERACION')}
+                  className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                    formData.tipoPermiso === 'OPERACION'
+                      ? 'border-violet-500 bg-violet-50/70 dark:bg-violet-950/30 text-violet-950 dark:text-violet-200 shadow-sm'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-black text-xs">Operación General TUPA</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200">
+                      TUPA S/ 450.00
+                    </span>
+                  </div>
+                  <p className="text-[11px] opacity-80">
+                    Tarjeta de operatividad y autorizaciones de servicio especial en el distrito.
+                  </p>
+                </button>
               </div>
             </div>
 
-            {/* Recibo TUPA */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                N° Recibo de Pago
-              </label>
-              {/* El recibo es el pago real registrado en caja para el trámite vinculado. */}
-              <input
-                type="text"
-                name="reciboIngresoNumero"
-                value={formData.reciboIngresoNumero}
-                readOnly
-                placeholder="Se toma del trámite vinculado"
-                className="w-full rounded-xl border border-slate-200 dark:border-[var(--border)] bg-slate-100 dark:bg-[var(--bg-subtle)] px-3 py-2 font-mono text-slate-600 dark:text-slate-400 outline-none cursor-not-allowed"
-              />
-            </div>
-
-            {/* Monto TUPA */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                Monto Pagado (S/)
-              </label>
-              <input
-                type="number"
-                name="reciboIngresoMonto"
-                value={formData.reciboIngresoMonto}
-                readOnly
-                className="w-full rounded-xl border border-slate-200 dark:border-[var(--border)] bg-slate-100 dark:bg-[var(--bg-subtle)] px-3 py-2 font-mono font-bold text-slate-600 dark:text-slate-400 outline-none cursor-not-allowed"
-              />
-            </div>
-
-            {/* Vigencia */}
-            <div>
-              <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                Vigencia Hasta
-              </label>
-              <input
-                type="date"
-                name="fechaFinVigencia"
-                value={formData.fechaFinVigencia}
-                onChange={handleInputChange}
-                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* 4. EDITOR ENRIQUECIDO TINYMCE */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-[var(--border)] pb-3">
-            <div>
-              <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                <Icon name="fileText" className="size-4 text-indigo-600" />
-                <span>Cuerpo Oficial de la Resolución / Autorización</span>
+            {/* 3. CAMPOS DE DATOS GENERALES */}
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-4">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-[var(--border)] pb-2">
+                Datos del Solicitante, Vehículo y Expediente
               </h2>
-              <p className="text-[11px] text-slate-400">
-                Edita libremente con formato enriquecido. Los datos del administrado se integran en la plantilla.
-              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs">
+                {/* Administrado / Razón Social */}
+                <div className="lg:col-span-2">
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    Razón Social o Administrado *
+                  </label>
+                  <input
+                    type="text"
+                    name="solicitanteNombre"
+                    value={formData.solicitanteNombre}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Nombre completo o Empresa titular"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-bold outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+
+                {/* Documento RUC / DNI */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    RUC / DNI *
+                  </label>
+                  <input
+                    type="text"
+                    name="solicitanteDocumento"
+                    value={formData.solicitanteDocumento}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="20601234567 o 71234567"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+
+                {/* Representante Legal */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    Representante Legal
+                  </label>
+                  <input
+                    type="text"
+                    name="representanteLegal"
+                    value={formData.representanteLegal}
+                    onChange={handleInputChange}
+                    placeholder="Nombre del apoderado legal"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+
+                {/* Placa Principal */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    Vehículo / Placa
+                  </label>
+                  <input
+                    type="text"
+                    name="vehiculoPlaca"
+                    value={formData.vehiculoPlaca}
+                    onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })}
+                    placeholder="ABC-123"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold uppercase outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+
+                {/* Expediente UTD */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    Expediente UTD / SISGEDO
+                  </label>
+                  <input
+                    type="text"
+                    name="expediente"
+                    value={formData.expediente}
+                    onChange={handleInputChange}
+                    placeholder="EXP-796383"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+
+                {/* N° Autorización Oficial */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    N° Autorización / Resolución
+                  </label>
+                  <input
+                    type="text"
+                    name="numeroAutorizacion"
+                    value={formData.numeroAutorizacion}
+                    onChange={handleInputChange}
+                    placeholder="Generado automáticamente si se deja vacío"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+
+                {/* Zona de Circulación */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    Zona de Circulación / Cuadrante
+                  </label>
+                  <input
+                    type="text"
+                    name="zonaCirculacion"
+                    value={formData.zonaCirculacion}
+                    onChange={handleInputChange}
+                    placeholder="Anillo Vial - Distrito de José Leonardo Ortiz"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+
+                {/* Horario */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    Horario Autorizado
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      name="horarioInicio"
+                      value={formData.horarioInicio}
+                      onChange={handleInputChange}
+                      placeholder="16:00:00"
+                      className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
+                    />
+                    <input
+                      type="text"
+                      name="horarioFin"
+                      value={formData.horarioFin}
+                      onChange={handleInputChange}
+                      placeholder="05:00:00"
+                      className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Recibo TUPA */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    N° Recibo de Pago
+                  </label>
+                  <input
+                    type="text"
+                    name="reciboIngresoNumero"
+                    value={formData.reciboIngresoNumero}
+                    onChange={handleInputChange}
+                    placeholder="REC-2026-00006"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+
+                {/* Monto TUPA */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    Monto Pagado (S/)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="reciboIngresoMonto"
+                    value={formData.reciboIngresoMonto}
+                    onChange={handleInputChange}
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+
+                {/* Vigencia */}
+                <div>
+                  <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                    Vigencia Hasta
+                  </label>
+                  <input
+                    type="date"
+                    name="fechaFinVigencia"
+                    value={formData.fechaFinVigencia}
+                    onChange={handleInputChange}
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleRecargarPlantilla}
-              className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 text-xs font-bold transition cursor-pointer"
-            >
-              <span>↺ Regenerar plantilla con datos</span>
-            </button>
+            {/* Barra Inferior en Pantalla 1: Continuar a Redacción */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-8">
+              <button
+                type="button"
+                onClick={handleCerrar}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
+              >
+                Cerrar ventana
+              </button>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer disabled:opacity-50"
+                  title="Guardar directamente con la plantilla predeterminada"
+                >
+                  <span>Guardar directamente</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => goToScreen('CUERPO')}
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 px-6 py-2.5 text-xs font-black text-white shadow-md shadow-indigo-600/30 transition active:scale-95 cursor-pointer"
+                >
+                  <span>Continuar a Redacción de Resolución (Cuerpo Oficial)</span>
+                  <span className="text-base leading-none">→</span>
+                </button>
+              </div>
+            </div>
           </div>
+        )}
 
-          <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-[var(--border-strong)]">
-            <Editor
-              apiKey={TINYMCE_API_KEY}
-              value={formData.contenido}
-              onEditorChange={handleEditorChange}
-              init={{
-                height: 480,
-                menubar: true,
-                language: 'es',
-                plugins: [
-                  'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
-                  'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-                  'insertdatetime', 'media', 'table', 'help', 'wordcount'
-                ],
-                toolbar:
-                  'undo redo | blocks | fontfamily fontsize | bold italic underline forecolor backcolor | ' +
-                  'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | ' +
-                  'table link code fullscreen | removeformat',
-                content_style:
-                  'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.6; color: #1e293b; padding: 16px; } table { border-collapse: collapse; width: 100%; margin: 8px 0; } th, td { border: 1px solid #cbd5e1; padding: 6px 10px; }'
-              }}
-            />
+        {/* ========================================================= */}
+        {/* PANTALLA 2: CUERPO OFICIAL CON EDITOR TINYMCE AMPLIO       */}
+        {/* ========================================================= */}
+        {activeScreen === 'CUERPO' && (
+          <div className="space-y-4 animate-enter">
+            {/* Barra Superior de Redacción: Información de contexto y controles */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => goToScreen('DATOS')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer"
+                >
+                  <span>← Volver a Datos del Trámite</span>
+                </button>
+
+                <div className="text-xs">
+                  <span className="font-extrabold text-slate-900 dark:text-white">
+                    {formData.solicitanteNombre || 'Sin administrado'}
+                  </span>
+                  {formData.solicitanteDocumento && (
+                    <span className="ml-1.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                      ({formData.solicitanteDocumento})
+                    </span>
+                  )}
+                  {formData.vehiculoPlaca && (
+                    <span className="ml-2 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                      Placa: {formData.vehiculoPlaca}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRecargarPlantilla}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-indigo-300 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer"
+                  title="Regenera el texto y la tabla de resolución incorporando los datos ingresados en el Paso 1"
+                >
+                  <span>↺ Regenerar plantilla con datos</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Contenedor del Editor TinyMCE: Alto y Espacioso para Redacción Cómoda */}
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[var(--border)] pb-2.5">
+                <div>
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <Icon name="fileText" className="size-4 text-indigo-600" />
+                    <span>Cuerpo Oficial de la Resolución / Autorización</span>
+                  </h2>
+                  <p className="text-[11px] text-slate-400">
+                    Espacio amplio de redacción jurídica y resolutiva. Formato enriquecido compatible con impresión A4.
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  Modo Redacción Amplia
+                </span>
+              </div>
+
+              <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-[var(--border-strong)] shadow-xs">
+                <Editor
+                  apiKey={TINYMCE_API_KEY}
+                  value={formData.contenido}
+                  onEditorChange={handleEditorChange}
+                  init={{
+                    height: 640,
+                    min_height: 520,
+                    menubar: true,
+                    language: 'es',
+                    plugins: [
+                      'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+                      'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                      'insertdatetime', 'media', 'table', 'help', 'wordcount'
+                    ],
+                    toolbar:
+                      'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor | ' +
+                      'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | ' +
+                      'table link code fullscreen | removeformat',
+                    content_style:
+                      'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13.5px; line-height: 1.6; color: #0f172a; padding: 24px; max-width: 900px; margin: 0 auto; } table { border-collapse: collapse; width: 100%; margin: 12px 0; } th, td { border: 1px solid #cbd5e1; padding: 8px 12px; } th { background-color: #f8fafc; font-weight: bold; }'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Barra Inferior de Acciones en Pantalla 2 */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-8">
+              <button
+                type="button"
+                onClick={() => goToScreen('DATOS')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
+              >
+                <span>← Volver a Datos del Trámite</span>
+              </button>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleCerrar}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-6 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-600/30 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className="animate-spin text-sm">⟳</span>
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="check" className="size-4" />
+                      <span>Guardar y Emitir Autorización</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* 5. BARRA INFERIOR DE ACCIONES */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-8">
-          <p className="text-xs text-slate-400 text-center sm:text-left">
-            Al guardar, los datos se registrarán en la base de datos municipal y se actualizará automáticamente la lista.
-          </p>
-
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={handleCerrar}
-              className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 px-6 py-2.5 text-xs font-black text-white shadow-md shadow-indigo-600/30 transition active:scale-95 cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <>
-                  <span className="animate-spin text-sm">⟳</span>
-                  <span>Guardando...</span>
-                </>
-              ) : (
-                <>
-                  <Icon name="check" className="size-4" />
-                  <span>Guardar y Emitir Autorización</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+        )}
       </main>
     </div>
   )

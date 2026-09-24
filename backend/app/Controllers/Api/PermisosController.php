@@ -177,12 +177,38 @@ class PermisosController extends ResourceController
             $tipoPermiso = !empty($payload['tipoPermiso']) ? trim($payload['tipoPermiso']) : 'CARGA_DESCARGA';
             $year = date('Y');
 
-            // Generar correlativo si no viene especificado
+            // Si se envió un ID en el payload y dicho permiso existe, actualizarlo en lugar de insertar
+            $idParam = !empty($payload['id']) ? (int)$payload['id'] : null;
+            if ($idParam && $db->table('permisos_circulacion')->where('id', $idParam)->countAllResults() > 0) {
+                return $this->update($idParam);
+            }
+
+            // Validar número de autorización o generar correlativo único
             $numeroAutorizacion = !empty($payload['numeroAutorizacion']) ? trim($payload['numeroAutorizacion']) : '';
+            if (!empty($numeroAutorizacion)) {
+                $existeColision = $db->table('permisos_circulacion')
+                    ->where('numero_autorizacion', $numeroAutorizacion)
+                    ->get()
+                    ->getRowArray();
+                if ($existeColision) {
+                    if ($idParam && (int)$existeColision['id'] === $idParam) {
+                        return $this->update($idParam);
+                    }
+                    // Si el número ya existe en otro registro, forzar la generación de un correlativo nuevo único
+                    $numeroAutorizacion = '';
+                }
+            }
+
             if (empty($numeroAutorizacion)) {
-                $count = $db->table('permisos_circulacion')->where('tipo_permiso', $tipoPermiso)->countAllResults() + 1;
                 $prefix = $tipoPermiso === 'CARGA_DESCARGA' ? "AUT. CARGA N° " : ($tipoPermiso === 'USO_VIAS' ? "AUT. VIAS N° " : "RES-SUBTRANS-{$year}-");
-                $numeroAutorizacion = $prefix . str_pad((string)$count, 3, '0', STR_PAD_LEFT) . "-{$year}-SGTTV";
+                $count = $db->table('permisos_circulacion')->where('tipo_permiso', $tipoPermiso)->countAllResults() + 1;
+                do {
+                    $numeroAutorizacion = $prefix . str_pad((string)$count, 3, '0', STR_PAD_LEFT) . "-{$year}-SGTTV";
+                    $yaExiste = $db->table('permisos_circulacion')->where('numero_autorizacion', $numeroAutorizacion)->countAllResults() > 0;
+                    if ($yaExiste) {
+                        $count++;
+                    }
+                } while ($yaExiste);
             }
 
             $idTramite = !empty($payload['tramiteId']) ? (int)$payload['tramiteId'] : (!empty($payload['id_tramite']) ? (int)$payload['id_tramite'] : null);
@@ -225,7 +251,11 @@ class PermisosController extends ResourceController
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
         } catch (\Throwable $e) {
-            return $this->failServerError('Error registrando permiso: ' . $e->getMessage());
+            $msg = $e->getMessage();
+            if (stripos($msg, 'Duplicate entry') !== false) {
+                return $this->failValidationErrors('El número de autorización ya se encuentra registrado. Se generó un nuevo registro o verifique el correlativo.');
+            }
+            return $this->failServerError('Error registrando permiso: ' . $msg);
         }
     }
 
@@ -281,6 +311,16 @@ class PermisosController extends ResourceController
 
             $data = array_merge($data, $this->resolverRelaciones($db, $payload, false));
 
+            if (!empty($data['numero_autorizacion'])) {
+                $existeOtro = $db->table('permisos_circulacion')
+                    ->where('numero_autorizacion', $data['numero_autorizacion'])
+                    ->where('id !=', $id)
+                    ->countAllResults();
+                if ($existeOtro > 0) {
+                    return $this->failValidationErrors("El número de autorización '{$data['numero_autorizacion']}' ya pertenece a otro registro.");
+                }
+            }
+
             if (!empty($data)) {
                 $db->table('permisos_circulacion')->where('id', $id)->update($data);
             }
@@ -292,7 +332,11 @@ class PermisosController extends ResourceController
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
         } catch (\Throwable $e) {
-            return $this->failServerError('Error actualizando permiso: ' . $e->getMessage());
+            $msg = $e->getMessage();
+            if (stripos($msg, 'Duplicate entry') !== false) {
+                return $this->failValidationErrors('El número de autorización ya está registrado en otro permiso.');
+            }
+            return $this->failServerError('Error actualizando permiso: ' . $msg);
         }
     }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Editor } from '@tinymce/tinymce-react'
 import { Icon } from '../ui/Icon'
-import { apiFetch } from '../../config/api'
+import { sanitizarMensaje, apiFetch } from '../../config/api'
+import { showError, showToast } from '../../utils/SwalUtil'
 import { BuscadorAdministrados } from './BuscadorAdministrados'
 import { generarPlantillaCuerpo } from '../../utils/permisosPlantilla'
 
@@ -10,7 +10,6 @@ export function TramiteFormularioModal({
   onClose,
   initialData = null,
   onSave,
-  procedimientos = [],
   tramitesDisponibles = []
 }) {
   const initialFormState = {
@@ -45,23 +44,26 @@ export function TramiteFormularioModal({
     estado: 'VIGENTE'
   }
 
-  // Estado centralizado para todos los campos del formulario
   const [formData, setFormData] = useState(initialFormState)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Carga y pre-rellenado de datos al abrir o cambiar initialData
+  // Carga o reseteo de datos al abrir (soporta datos existentes o borrador devuelto de la segunda ventana)
   useEffect(() => {
     if (!isOpen) return
 
-    if (initialData && initialData.id) {
-      // Edición de trámite existente
+    if (initialData && (initialData.id || initialData.solicitanteNombre || initialData.solicitanteDocumento)) {
       setFormData({
-        id: initialData.id,
+        id: initialData.id || null,
         tipoPermiso: initialData.tipoPermiso || 'CARGA_DESCARGA',
         numeroAutorizacion: initialData.numeroAutorizacion || '',
         vehiculoPlaca: initialData.vehiculoPlaca || '',
         solicitanteNombre: initialData.solicitanteNombre || initialData.solicitante || '',
-        solicitanteDocumento: initialData.solicitanteDocumento || initialData.solicitanteDoc || initialData.solicitanteRuc || initialData.solicitanteDni || '',
+        solicitanteDocumento:
+          initialData.solicitanteDocumento ||
+          initialData.solicitanteDoc ||
+          initialData.solicitanteRuc ||
+          initialData.solicitanteDni ||
+          '',
         representanteLegal: initialData.representanteLegal || '',
         expediente: initialData.expediente || initialData.expedienteNumero || '',
         registroNumero: initialData.registroNumero || '',
@@ -87,7 +89,6 @@ export function TramiteFormularioModal({
         estado: initialData.estado || 'VIGENTE'
       })
     } else {
-      // Nuevo trámite con datos precargados iniciales
       const defaultData = {
         ...initialFormState,
         numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000))
@@ -97,18 +98,40 @@ export function TramiteFormularioModal({
     }
   }, [isOpen, initialData])
 
-  // Manejador genérico para inputs tradicionales
+  // Escuchar si el documento es guardado en la segunda ventana o si vuelve con borrador
+  useEffect(() => {
+    if (!isOpen) return
+    const handleMsg = (e) => {
+      if (e.data?.type === 'PERMISO_GUARDADO') {
+        if (onSave) onSave()
+        onClose()
+      } else if (e.data?.type === 'VOLVER_A_DATOS_MODAL' && e.data?.draft) {
+        setFormData((prev) => ({
+          ...prev,
+          ...e.data.draft,
+          id: e.data.draft.id || prev.id || initialData?.id || null
+        }))
+      }
+    }
+    const handleStorage = (e) => {
+      if (e.key === 'mjlo_permisos_updated') {
+        if (onSave) onSave()
+        onClose()
+      }
+    }
+    window.addEventListener('message', handleMsg)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('message', handleMsg)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [isOpen, onSave, onClose, initialData])
+
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  // Manejador específico para el editor TinyMCE
-  const handleEditorChange = (content) => {
-    setFormData((prev) => ({ ...prev, contenido: content }))
-  }
-
-  // Cambio de clasificación / tipo de permiso
   const handleTipoChange = (newTipo) => {
     const updated = {
       ...formData,
@@ -118,19 +141,19 @@ export function TramiteFormularioModal({
           ? 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA'
           : newTipo === 'USO_VIAS'
             ? 'AUTORIZACION PROVISIONAL DE USO DE VIAS'
-            : 'AUTORIZACIÓN DE OPERACIÓN TUPA',
+            : 'AUTORIZACIÓN GENERAL DE OPERACIÓN TUPA',
       reciboIngresoMonto: newTipo === 'CARGA_DESCARGA' ? '1030.00' : newTipo === 'USO_VIAS' ? '850.00' : '450.00',
       zonaCirculacion:
-        newTipo === 'CARGA_DESCARGA' ? 'Anillo Vial - José Leonardo Ortiz' : 'Jurisdicción del Distrito de José Leonardo Ortiz'
+        newTipo === 'CARGA_DESCARGA'
+          ? 'Anillo Vial - José Leonardo Ortiz'
+          : 'Jurisdicción del Distrito de José Leonardo Ortiz'
     }
-    // Si el contenido estaba vacío o era la plantilla base, regenerar con el nuevo tipo
     if (!formData.contenido || formData.contenido.includes('SUBGERENCIA DE TRÁNSITO')) {
       updated.contenido = generarPlantillaCuerpo(updated)
     }
     setFormData(updated)
   }
 
-  // Cuando se selecciona un administrado desde el buscador inteligente
   const handleSelectAdministrado = (item) => {
     const updated = {
       ...formData,
@@ -149,41 +172,105 @@ export function TramiteFormularioModal({
     setFormData(updated)
   }
 
-  // Regenerar el cuerpo HTML en TinyMCE con los datos actuales
-  const handleRecargarPlantilla = () => {
-    const cuerpoGenerado = generarPlantillaCuerpo(formData)
-    setFormData((prev) => ({ ...prev, contenido: cuerpoGenerado }))
-  }
+  // Continuar a redacción abriendo una segunda ventana para mayor comodidad
+  const handleContinuarRedaccionSegundaVentana = (e) => {
+    if (e && e.preventDefault) e.preventDefault()
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSubmitting(true)
+    if (!formData.solicitanteNombre?.trim()) {
+      showError('Validación', 'Por favor ingresa o selecciona la Razón Social o Administrado antes de continuar.')
+      return
+    }
+    if (!formData.solicitanteDocumento?.trim()) {
+      showError('Validación', 'Por favor ingresa el RUC o DNI del solicitante.')
+      return
+    }
+
+    const effectiveId = formData.id || initialData?.id || null
+    const currentData = {
+      ...formData,
+      id: effectiveId
+    }
+    if (!currentData.contenido || currentData.contenido.trim() === '') {
+      currentData.contenido = generarPlantillaCuerpo(currentData)
+    }
 
     try {
-      const isEdit = Boolean(formData.id)
-      const url = isEdit ? `/permisos/${formData.id}` : '/permisos'
+      sessionStorage.setItem('mjlo_permiso_borrador', JSON.stringify(currentData))
+      localStorage.setItem('mjlo_permiso_borrador', JSON.stringify(currentData))
+    } catch (err) {
+      console.warn('Error guardando borrador temporal:', err)
+    }
+
+    const width = Math.min(1380, window.screen.availWidth - 40)
+    const height = Math.min(920, window.screen.availHeight - 60)
+    const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2))
+    const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2))
+
+    const targetUrl = effectiveId
+      ? `/permisos-formulario?id=${effectiveId}&draft=1&screen=CUERPO`
+      : `/permisos-formulario?draft=1&screen=CUERPO`
+
+    const popup = window.open(
+      targetUrl,
+      'MJLO_Redaccion_Resolucion',
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no`
+    )
+
+    if (popup) {
+      popup.focus()
+      showToast('Abriendo segunda ventana para redacción de resolución...')
+      onClose()
+    } else {
+      showError('Ventana bloqueada', 'Por favor habilita las ventanas emergentes en tu navegador para continuar a la redacción.')
+    }
+  }
+
+  // Guardar directamente sin abrir segunda ventana
+  const handleSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+
+    if (!formData.solicitanteNombre.trim()) {
+      showError('Validación', 'Por favor ingresa o selecciona la Razón Social o Administrado.')
+      return
+    }
+    if (!formData.solicitanteDocumento.trim()) {
+      showError('Validación', 'Por favor ingresa el RUC o DNI del solicitante.')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const effectiveId = formData.id || initialData?.id || null
+      const isEdit = Boolean(effectiveId)
+      const url = isEdit ? `/permisos/${effectiveId}` : '/permisos'
       const method = isEdit ? 'PUT' : 'POST'
+
+      const currentData = {
+        ...formData,
+        id: effectiveId || undefined
+      }
+      if (!currentData.contenido || currentData.contenido.trim() === '') {
+        currentData.contenido = generarPlantillaCuerpo(currentData)
+      }
+      if (!isEdit && !currentData.numeroAutorizacion?.trim()) {
+        delete currentData.numeroAutorizacion
+      }
 
       const res = await apiFetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: currentData
       })
 
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        let msg = 'Error al procesar la autorización municipal.'
-        try {
-          const errData = await res.json()
-          if (errData?.message) msg = errData.message
-          else if (errData?.messages?.error) msg = errData.messages.error
-        } catch (_) {}
-        throw new Error(msg)
+        throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'Error al procesar la autorización municipal.')
       }
 
+      showToast(isEdit ? 'Autorización actualizada correctamente' : 'Autorización emitida correctamente')
       if (onSave) onSave()
       onClose()
     } catch (err) {
-      alert(err.message || 'Ocurrió un error al guardar la autorización.')
+      showError('Error', sanitizarMensaje(err.message, 'No se pudo guardar la autorización.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -192,43 +279,52 @@ export function TramiteFormularioModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xs animate-enter overflow-y-auto">
-      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter overflow-y-auto">
+      <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] my-auto w-full max-w-4xl max-h-[92vh] transition-all duration-200">
         
-        {/* Cabecera del Modal */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-[var(--border)] bg-slate-50/50 dark:bg-slate-900/40">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-600/30">
-              <Icon name="routePermit" className="size-5" />
+        {/* Cabecera del Modal Estilo /personas */}
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+              <Icon name="routePermit" className="size-4" />
             </span>
-            <div>
-              <h3 className="text-lg font-black text-slate-900 dark:text-white">
-                {formData.id ? 'Editar Trámite / Autorización' : 'Emitir Trámite y Autorización'}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Formulario Oficial con Editor Enriquecido TinyMCE para Referencia Textual y Resolución
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                  {formData.id ? 'Editar Autorización Municipal' : 'Nueva Autorización Municipal'}
+                </h3>
+                <span className="shrink-0 rounded-full font-mono text-[10px] font-bold px-2 py-0.5 border border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300">
+                  {formData.numeroAutorizacion || 'Borrador'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                Subgerencia de Tránsito, Transporte y Seguridad Vial • Trámite Oficial
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
-          >
-            <Icon name="close" className="size-5" />
-          </button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              title="Cerrar ventana"
+              className="grid size-8 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+            >
+              <Icon name="close" className="size-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Cuerpo del Formulario con Scroll */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
-          {/* Selector opcional de Trámite / Expediente Previo */}
+        {/* FORMULARIO DE DATOS DEL TRÁMITE */}
+        <form onSubmit={handleContinuarRedaccionSegundaVentana} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
+          {/* Opcional: Vincular con Trámite / Expediente Previo */}
           {!formData.id && tramitesDisponibles.length > 0 && (
-            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-3.5 dark:border-indigo-900/60 dark:bg-indigo-950/30">
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-[var(--border)] dark:bg-indigo-950/30">
               <label className="mb-1 block font-extrabold uppercase tracking-wider text-indigo-900 dark:text-indigo-200 text-xs">
                 Vincular con Trámite / Mesa de Partes Existente (Opcional)
               </label>
               <select
-                className="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 dark:border-indigo-700 dark:bg-[var(--bg-subtle)] dark:text-white"
+                className="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
                 onChange={(e) => {
                   const tId = Number(e.target.value)
                   if (!tId) return
@@ -237,116 +333,127 @@ export function TramiteFormularioModal({
                     const updated = {
                       ...formData,
                       tramiteId: t.id,
-                      solicitanteNombre: t.solicitanteNombre || t.personaNombre || t.asociacionNombre || formData.solicitanteNombre,
-                      solicitanteDocumento: t.solicitanteDocumento || t.personaDocumento || t.asociacionRuc || formData.solicitanteDocumento,
+                      solicitanteNombre: t.persona?.razonSocial || `${t.persona?.nombres || ''} ${t.persona?.apellidos || ''}`.trim() || formData.solicitanteNombre,
+                      solicitanteDocumento: t.persona?.numeroDocumento || formData.solicitanteDocumento,
+                      representanteLegal: t.persona?.representanteLegal || formData.representanteLegal,
                       expediente: t.numeroExpediente || formData.expediente,
-                      vehiculoPlaca: t.vehiculoPlaca || formData.vehiculoPlaca,
-                      reciboIngresoNumero: t.reciboIngresoNumero || formData.reciboIngresoNumero,
-                      reciboIngresoMonto: t.reciboIngresoMonto ? String(t.reciboIngresoMonto) : formData.reciboIngresoMonto,
-                      representanteLegal: t.representanteLegalNombre || formData.representanteLegal,
+                      referenciaSisgedo: t.numeroExpediente || formData.referenciaSisgedo,
+                      reciboIngresoNumero: t.reciboNumero || formData.reciboIngresoNumero,
+                      reciboIngresoMonto: t.reciboMonto ? String(t.reciboMonto) : formData.reciboIngresoMonto,
+                      reciboIngresoFecha: t.reciboFecha || formData.reciboIngresoFecha
                     }
-                    updated.contenido = generarPlantillaCuerpo(updated)
                     setFormData(updated)
                   }
                 }}
               >
-                <option value="">-- Trámite directo / Sin vincular expediente previo --</option>
+                <option value="">-- Seleccionar trámite de mesa de partes --</option>
                 {tramitesDisponibles.map((t) => (
                   <option key={t.id} value={t.id}>
-                    Exp. {t.numeroExpediente || 'S/N'} — {t.solicitanteNombre || t.personaNombre || 'Sin nombre'} {t.procedimientoNombre ? `(${t.procedimientoNombre})` : ''}
+                    {t.numeroExpediente} • {t.persona?.razonSocial || `${t.persona?.nombres || ''} ${t.persona?.apellidos || ''}`.trim()} ({t.tipoProcedimiento?.nombre || 'TUPA'})
                   </option>
                 ))}
               </select>
             </div>
           )}
-          
-          {/* Buscador inteligente en base de datos para auto-rellenado */}
-          <div className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40">
+
+          {/* 1. BUSCADOR INTELIGENTE EN BASE DE DATOS */}
+          <div className="rounded-2xl border border-indigo-200 bg-white p-3 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] shadow-2xs">
             <BuscadorAdministrados onSelect={handleSelectAdministrado} />
           </div>
 
-          {/* Clasificación / Selector de Tipo de Trámite */}
-          <div>
-            <label className="mb-2 block font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+          {/* 2. CLASIFICACIÓN / SELECTOR DE TIPO */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-2">
+            <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
               Clasificación / Tipo de Permiso *
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <button
                 type="button"
                 onClick={() => handleTipoChange('CARGA_DESCARGA')}
-                className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'CARGA_DESCARGA'
-                    ? 'border-sky-500 bg-sky-50/70 dark:bg-sky-950/30 text-sky-950 dark:text-sky-200'
+                    ? 'border-sky-500 bg-sky-50/70 dark:bg-sky-950/30 text-sky-950 dark:text-sky-200 shadow-xs'
                     : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
                 }`}
               >
-                <div>
-                  <span className="font-black flex items-center gap-1.5 text-xs"><Icon name="vehicle" className="size-3.5" /> Carga y Descarga</span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                    Horario Anillo Vial 4:00 PM a 5:00 AM.
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black text-xs">Carga y Descarga</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200">
+                    TUPA S/ 1030
                   </span>
                 </div>
+                <p className="text-[10px] opacity-80 leading-snug">
+                  Horario nocturno / madrugada (16:00 a 05:00 hrs) para camiones y abastecimiento.
+                </p>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleTipoChange('USO_VIAS')}
-                className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'USO_VIAS'
-                    ? 'border-amber-500 bg-amber-50/70 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200'
+                    ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/30 text-indigo-950 dark:text-indigo-200 shadow-xs'
                     : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
                 }`}
               >
-                <div>
-                  <span className="font-black flex items-center gap-1.5 text-xs"><Icon name="routePermit" className="size-3.5" /> Uso Provisional de Vías</span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                    Recorridos y flota vehicular autorizada.
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black text-xs">Uso Provisional de Vías</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                    TUPA S/ 850
                   </span>
                 </div>
+                <p className="text-[10px] opacity-80 leading-snug">
+                  Ocupación autorizada de vía pública para eventos, mudanzas u obras programadas.
+                </p>
               </button>
 
               <button
                 type="button"
-                onClick={() => handleTipoChange('RENOVACION_OPERACION')}
-                className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
-                  formData.tipoPermiso === 'RENOVACION_OPERACION'
-                    ? 'border-violet-500 bg-violet-50/70 dark:bg-violet-950/30 text-violet-950 dark:text-violet-200'
+                onClick={() => handleTipoChange('OPERACION')}
+                className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                  formData.tipoPermiso === 'OPERACION'
+                    ? 'border-violet-500 bg-violet-50/70 dark:bg-violet-950/30 text-violet-950 dark:text-violet-200 shadow-xs'
                     : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
                 }`}
               >
-                <div>
-                  <span className="font-black flex items-center gap-1.5 text-xs"><Icon name="document" className="size-3.5" /> Operación / TUPA</span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                    Resolución subgerencial de servicio.
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black text-xs">Operación General TUPA</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200">
+                    TUPA S/ 450
                   </span>
                 </div>
+                <p className="text-[10px] opacity-80 leading-snug">
+                  Tarjeta de operatividad y autorizaciones de servicio especial en el distrito.
+                </p>
               </button>
             </div>
           </div>
 
-          {/* BLOQUE 1: Administrado y Expediente */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-[var(--border)] dark:bg-slate-900/40 space-y-3">
-            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
-              <span className="grid size-5 place-items-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-400 text-[10px]">1</span>
-              Datos del Administrado y Expediente
-            </span>
+          {/* 3. CAMPOS DE DATOS GENERALES */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-[var(--border)] pb-1.5 flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-indigo-600"></span>
+              <span>Datos del Solicitante, Vehículo y Expediente</span>
+            </h4>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="sm:col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+              {/* Administrado / Razón Social */}
+              <div className="lg:col-span-2">
                 <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
                   Razón Social o Administrado *
                 </label>
                 <input
                   type="text"
                   name="solicitanteNombre"
-                  required
-                  placeholder="Ej. EMPRESA DE TRANSPORTE DOÑA PEPE"
                   value={formData.solicitanteNombre}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none focus:border-violet-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                  required
+                  placeholder="Ej. ASOCIACIÓN DE TRANSPORTISTAS..."
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-bold outline-none focus:border-indigo-500"
                 />
               </div>
 
+              {/* Documento RUC / DNI */}
               <div>
                 <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
                   RUC / DNI *
@@ -354,42 +461,15 @@ export function TramiteFormularioModal({
                 <input
                   type="text"
                   name="solicitanteDocumento"
-                  required
-                  placeholder="20601234567"
                   value={formData.solicitanteDocumento}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none focus:border-violet-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                  required
+                  placeholder="20601234561 o 47589632"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  N° Expediente UTD / SISGEDO
-                </label>
-                <input
-                  type="text"
-                  name="expediente"
-                  placeholder="796383"
-                  value={formData.expediente}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none focus:border-violet-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  N° Registro Municipal
-                </label>
-                <input
-                  type="text"
-                  name="registroNumero"
-                  placeholder="Ej. 610"
-                  value={formData.registroNumero}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                />
-              </div>
-
+              {/* Representante Legal */}
               <div>
                 <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
                   Representante Legal
@@ -397,69 +477,117 @@ export function TramiteFormularioModal({
                 <input
                   type="text"
                   name="representanteLegal"
-                  placeholder="Ej. DENISS ALTAMIRANO"
                   value={formData.representanteLegal}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                  placeholder="Nombres del titular o apoderado"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div className="sm:col-span-3">
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Asunto del Documento *
-                </label>
-                <input
-                  type="text"
-                  name="asunto"
-                  required
-                  placeholder="SE APRUEBA USO DE VÍA O CARGA Y DESCARGA..."
-                  value={formData.asunto}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold outline-none focus:border-violet-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* BLOQUE 2: Parámetros del Vehículo / Flota y Zona */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-[var(--border)] dark:bg-slate-900/40 space-y-3">
-            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
-              <span className="grid size-5 place-items-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-400 text-[10px]">2</span>
-              Parámetros Operativos y Vehiculares
-            </span>
-
-            <div className="grid gap-3 sm:grid-cols-3">
+              {/* Vehículo / Placa */}
               <div>
                 <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Placa del Vehículo
+                  Vehículo / Placa
                 </label>
                 <input
                   type="text"
                   name="vehiculoPlaca"
-                  placeholder="ABC-123"
                   value={formData.vehiculoPlaca}
                   onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })}
-                  className="w-full rounded-xl border-2 border-sky-400 bg-white px-3 py-2 font-mono font-black outline-none focus:border-sky-600 dark:border-sky-700 dark:bg-[var(--bg-subtle)] dark:text-white"
+                  placeholder="ABC-123 O FLOTA"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono uppercase font-bold outline-none focus:border-indigo-500"
                 />
               </div>
 
+              {/* Expediente UTD */}
               <div>
                 <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Recibo de Ingreso N°
+                  Expediente UTD / SISGEDO
+                </label>
+                <input
+                  type="text"
+                  name="expediente"
+                  value={formData.expediente}
+                  onChange={handleInputChange}
+                  placeholder="EXP-2026-00451"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* N° Autorización / Resolución */}
+              <div>
+                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                  N° Autorización / Resolución
+                </label>
+                <input
+                  type="text"
+                  name="numeroAutorizacion"
+                  value={formData.numeroAutorizacion}
+                  onChange={handleInputChange}
+                  placeholder="Generado automáticamente si se deja vacío"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Zona de Circulación */}
+              <div>
+                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                  Zona de Circulación / Cuadrante
+                </label>
+                <input
+                  type="text"
+                  name="zonaCirculacion"
+                  value={formData.zonaCirculacion}
+                  onChange={handleInputChange}
+                  placeholder="Anillo Vial - Distrito de José Leonardo Ortiz"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Horario */}
+              <div>
+                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                  Horario Autorizado
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    name="horarioInicio"
+                    value={formData.horarioInicio}
+                    onChange={handleInputChange}
+                    placeholder="16:00:00"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
+                  />
+                  <input
+                    type="text"
+                    name="horarioFin"
+                    value={formData.horarioFin}
+                    onChange={handleInputChange}
+                    placeholder="05:00:00"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Recibo TUPA */}
+              <div>
+                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
+                  N° Recibo de Pago
                 </label>
                 <input
                   type="text"
                   name="reciboIngresoNumero"
-                  placeholder="202400028830"
                   value={formData.reciboIngresoNumero}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono font-bold outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                  placeholder="REC-2026-00006"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500"
                 />
               </div>
 
+              {/* Monto TUPA */}
               <div>
                 <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Monto Cancelado (S/)
+                  Monto Pagado (S/)
                 </label>
                 <input
                   type="number"
@@ -467,175 +595,60 @@ export function TramiteFormularioModal({
                   name="reciboIngresoMonto"
                   value={formData.reciboIngresoMonto}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Zona de Circulación o Recorrido
-                </label>
-                <input
-                  type="text"
-                  name="zonaCirculacion"
-                  value={formData.zonaCirculacion}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                />
-              </div>
-
+              {/* Vigencia Hasta */}
               <div>
                 <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Horario Autorizado
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="time"
-                    name="horarioInicio"
-                    value={formData.horarioInicio}
-                    onChange={handleInputChange}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-2 py-1.5 outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                  />
-                  <span className="text-slate-400 font-bold">-</span>
-                  <input
-                    type="time"
-                    name="horarioFin"
-                    value={formData.horarioFin}
-                    onChange={handleInputChange}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-2 py-1.5 outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* BLOQUE 3: Vigencia y Estado Oficial */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-[var(--border)] dark:bg-slate-900/40 space-y-3">
-            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
-              <span className="grid size-5 place-items-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 text-[10px]">3</span>
-              Vigencia Temporal y Estado Administrativo
-            </span>
-
-            <div className="grid gap-3 sm:grid-cols-4">
-              <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Fecha de Emisión
-                </label>
-                <input
-                  type="date"
-                  name="fechaEmision"
-                  value={formData.fechaEmision}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Inicio de Vigencia
-                </label>
-                <input
-                  type="date"
-                  name="fechaInicioVigencia"
-                  value={formData.fechaInicioVigencia}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Fin de Vigencia
+                  Vigencia Hasta
                 </label>
                 <input
                   type="date"
                   name="fechaFinVigencia"
                   value={formData.fechaFinVigencia}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500"
                 />
               </div>
-
-              <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Estado Oficial
-                </label>
-                <select
-                  name="estado"
-                  value={formData.estado}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                >
-                  <option value="VIGENTE">VIGENTE</option>
-                  <option value="VENCIDO">VENCIDO</option>
-                  <option value="SUSPENDIDO">SUSPENDIDO</option>
-                  <option value="ANULADO">ANULADO</option>
-                </select>
-              </div>
             </div>
           </div>
 
-          {/* BLOQUE 4: Editor TinyMCE para la Referencia Textual / Cuerpo */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] space-y-2.5 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-[var(--border)]">
-              <div>
-                <label className="font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-100 text-xs flex items-center gap-2">
-                  <span className="grid size-5 place-items-center rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400 text-[10px]">4</span>
-                  Referencia Textual / Cuerpo de la Resolución (TinyMCE)
-                </label>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Edita la descripción formal, agrega tablas de vehículos, cláusulas normativas y formato oficial.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleRecargarPlantilla}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 shadow-2xs hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300 transition active:scale-95 cursor-pointer whitespace-nowrap self-start sm:self-auto"
-                title="Genera o restablece la plantilla HTML con los datos actuales del formulario"
-              >
-                <Icon name="rotateCcw" className="size-3.5" />
-                <span>Recargar Plantilla Oficial</span>
-              </button>
-            </div>
-
-            {/* Componente TinyMCE React Oficial */}
-            <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-[var(--border-strong)]">
-              <Editor
-                apiKey={import.meta.env.VITE_TINYMCE_API_KEY || 'unmcqzdx4e88wfy3gqtlbelk1w21unqt3sl8hlcltd49u0o8'}
-                value={formData.contenido}
-                onEditorChange={handleEditorChange}
-                init={{
-                  height: 320,
-                  menubar: false,
-                  plugins: [
-                    'lists', 'link', 'table', 'code', 'wordcount'
-                  ],
-                  toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright alignjustify | bullist numlist | table | code',
-                  content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1e293b; line-height: 1.5; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #cbd5e1; padding: 6px; } th { background-color: #f8fafc; }'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Botones de Acción */}
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-[var(--border)]">
+          {/* Barra de Navegación Inferior */}
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-[var(--border)]">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-300 px-5 py-2.5 font-bold text-slate-600 hover:bg-slate-100 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
             >
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-2.5 font-black text-white shadow-md shadow-violet-600/20 hover:scale-[1.01] active:scale-95 transition cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? 'Guardando Documento...' : formData.id ? 'Actualizar Documento' : 'Guardar Documento'}
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-100 dark:bg-[var(--bg-subtle)] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer disabled:opacity-50"
+                title="Guardar directamente con la plantilla predeterminada"
+              >
+                <span>Guardar directamente</span>
+              </button>
+
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2 text-xs font-black text-white shadow-md shadow-indigo-600/25 transition active:scale-95 cursor-pointer hover:from-indigo-500 hover:to-violet-500"
+                title="Abrir editor de resolución en una segunda ventana emergente amplia"
+              >
+                <span>Continuar a Redacción de Resolución (Cuerpo Oficial)</span>
+                <span className="text-sm font-bold">↗</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
     </div>
   )
 }
+export default TramiteFormularioModal
