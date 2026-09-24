@@ -302,9 +302,18 @@ export function Papeletas({ user }) {
     setLoadingPapeletaFotos(true)
     setSelectedPapeletaFotos([])
     try {
-      const res = await apiFetch(`/papeletas/${papeleta.id}/fotos`)
+      const res = await apiFetch(`/papeletas/${papeleta.id}/fotos?t=${Date.now()}`)
       const data = await res.json()
-      const fotosList = Array.isArray(data) ? data : (data?.data || [])
+      let fotosList = []
+      if (Array.isArray(data)) {
+        fotosList = data
+      } else if (data && Array.isArray(data.data)) {
+        fotosList = data.data
+      } else if (data && data.data && Array.isArray(data.data.data)) {
+        fotosList = data.data.data
+      } else if (data && data.fotos && Array.isArray(data.fotos)) {
+        fotosList = data.fotos
+      }
       setSelectedPapeletaFotos(fotosList)
     } catch (error) {
       console.error('Error cargando fotos:', error)
@@ -1094,6 +1103,7 @@ export function Papeletas({ user }) {
                         <Icon name="image-off" className="mx-auto mb-2 size-8 text-slate-400 opacity-50" />
                         <p className="font-bold text-slate-500">Sin evidencia fotográfica</p>
                         <p className="mt-1 text-[10px] text-slate-400">Esta papeleta no tiene fotos adjuntas</p>
+                        <pre className="mt-2 text-[8px] text-left text-red-500 max-h-32 overflow-auto break-all">{JSON.stringify(selectedPapeletaFotos, null, 2)}</pre>
                       </div>
                     )}
                   </div>
