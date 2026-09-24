@@ -302,8 +302,9 @@ export function Papeletas({ user }) {
     setLoadingPapeletaFotos(true)
     setSelectedPapeletaFotos([])
     try {
-      const res = await api.get(`/papeletas/${papeleta.id}/fotos`)
-      setSelectedPapeletaFotos(res.data || [])
+      const res = await apiFetch(`/papeletas/${papeleta.id}/fotos`)
+      const data = await res.json()
+      setSelectedPapeletaFotos(data || [])
     } catch (error) {
       console.error('Error cargando fotos:', error)
     } finally {
@@ -1120,12 +1121,6 @@ export function Papeletas({ user }) {
                         {selectedPapeleta.firmaConductorFecha
                           ? new Date(selectedPapeleta.firmaConductorFecha).toLocaleString()
                           : 'Sin fecha registrada'}
-                      </p>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <p className="text-slate-400">Observación</p>
-                      <p className="font-medium text-slate-700 dark:text-slate-300">
-                        {selectedPapeleta.firmaConductorObservacion || 'Sin observación'}
                       </p>
                     </div>
                     {selectedPapeleta.firmaConductorImg && (
