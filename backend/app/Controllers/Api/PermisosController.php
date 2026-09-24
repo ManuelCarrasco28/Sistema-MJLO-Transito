@@ -164,7 +164,7 @@ class PermisosController extends ResourceController
 
         $rules = [
             'tipoPermiso' => [
-                'rules' => 'permit_empty|in_list[CARGA_DESCARGA,USO_VIAS,OPERACION,RENOVACION_OPERACION]',
+                'rules' => 'permit_empty|in_list[CARGA_DESCARGA,USO_VIAS,OPERACION,RENOVACION_OPERACION,CONTROL_VEHICULAR,ZONAS_RESERVADAS,ZONA_RESERVADA]',
                 'errors' => ['in_list' => 'Tipo de permiso no válido.']
             ]
         ];
@@ -200,7 +200,13 @@ class PermisosController extends ResourceController
             }
 
             if (empty($numeroAutorizacion)) {
-                $prefix = $tipoPermiso === 'CARGA_DESCARGA' ? "AUT. CARGA N° " : ($tipoPermiso === 'USO_VIAS' ? "AUT. VIAS N° " : "RES-SUBTRANS-{$year}-");
+                $prefix = match($tipoPermiso) {
+                    'CARGA_DESCARGA'                        => "AUT. CARGA N° ",
+                    'USO_VIAS'                              => "AUT. VIAS N° ",
+                    'ZONAS_RESERVADAS', 'ZONA_RESERVADA'    => "AUT. ZONA RES N° ",
+                    'CONTROL_VEHICULAR', 'OPERACION'        => "AUT. CTRL N° ",
+                    default                                 => "AUT. MUN N° "
+                };
                 $count = $db->table('permisos_circulacion')->where('tipo_permiso', $tipoPermiso)->countAllResults() + 1;
                 do {
                     $numeroAutorizacion = $prefix . str_pad((string)$count, 3, '0', STR_PAD_LEFT) . "-{$year}-SGTTV";
@@ -218,7 +224,13 @@ class PermisosController extends ResourceController
                 'numero_autorizacion'    => $numeroAutorizacion,
                 'representante_legal'    => !empty($payload['representanteLegal']) ? strtoupper(trim($payload['representanteLegal'])) : null,
                 'tipo_permiso'           => $tipoPermiso,
-                'asunto'                 => !empty($payload['asunto']) ? trim($payload['asunto']) : ($tipoPermiso === 'CARGA_DESCARGA' ? 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA' : 'AUTORIZACION PROVISIONAL DE USO DE VIAS'),
+                'asunto'                 => !empty($payload['asunto']) ? trim($payload['asunto']) : match($tipoPermiso) {
+                    'CARGA_DESCARGA'                     => 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
+                    'USO_VIAS'                           => 'AUTORIZACION PROVISIONAL DE USO DE VIAS',
+                    'ZONAS_RESERVADAS', 'ZONA_RESERVADA' => 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA',
+                    'CONTROL_VEHICULAR', 'OPERACION'     => 'AUTORIZACIÓN MUNICIPAL DE CONTROL VEHICULAR Y CIRCULACIÓN',
+                    default                              => 'AUTORIZACIÓN MUNICIPAL OFICIAL'
+                },
                 'registro_numero'        => !empty($payload['registroNumero']) ? trim($payload['registroNumero']) : null,
                 'contenido'              => !empty($payload['contenido']) ? trim($payload['contenido']) : 'Autorización oficial emitida por la Subgerencia de Tránsito y Transporte.',
                 'zona_circulacion'       => !empty($payload['zonaCirculacion']) ? trim($payload['zonaCirculacion']) : 'Anillo Vial - Distrito de José Leonardo Ortiz',

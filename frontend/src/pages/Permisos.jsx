@@ -12,8 +12,10 @@ import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/F
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
+  { value: 'CONTROL_VEHICULAR', label: 'Control Vehicular' },
   { value: 'CARGA_DESCARGA', label: 'Carga y Descarga' },
   { value: 'USO_VIAS', label: 'Uso de Vías' },
+  { value: 'ZONAS_RESERVADAS', label: 'Zonas Reservadas' },
 ]
 
 const FILTER_ESTADO_OPTIONS = [
@@ -143,8 +145,10 @@ export function Permisos() {
   }, [])
 
   const totalPermisos = permisos.length
+  const totalControl = permisos.filter((p) => p.tipoPermiso === 'CONTROL_VEHICULAR' || p.tipoPermiso === 'OPERACION').length
   const totalCarga = permisos.filter((p) => p.tipoPermiso === 'CARGA_DESCARGA').length
   const totalVias = permisos.filter((p) => p.tipoPermiso === 'USO_VIAS').length
+  const totalZonas = permisos.filter((p) => p.tipoPermiso === 'ZONAS_RESERVADAS' || p.tipoPermiso === 'ZONA_RESERVADA').length
   const vigentes = permisos.filter((p) => p.estado === 'VIGENTE').length
   const vencidos = permisos.filter((p) => p.estado !== 'VIGENTE').length
 
@@ -161,7 +165,11 @@ export function Permisos() {
       p.reciboIngresoNumero?.toLowerCase().includes(s)
 
     const matchEstado = filterEstado === 'TODOS' || p.estado === filterEstado
-    const matchTipo = filterTipo === 'TODOS' || p.tipoPermiso === filterTipo
+    const matchTipo =
+      filterTipo === 'TODOS' ||
+      p.tipoPermiso === filterTipo ||
+      (filterTipo === 'CONTROL_VEHICULAR' && (p.tipoPermiso === 'OPERACION' || !p.tipoPermiso)) ||
+      (filterTipo === 'ZONAS_RESERVADAS' && p.tipoPermiso === 'ZONA_RESERVADA')
 
     return matchSearch && matchEstado && matchTipo
   })
@@ -275,46 +283,61 @@ export function Permisos() {
               </h1>
             </div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Directorio oficial de autorizaciones de Carga y Descarga, y Uso Provisional de Vías.
+              Directorio oficial de Control Vehicular, Carga y Descarga, Uso de Vías y Zonas Reservadas.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas separadas compactas - Exacto a Personas.jsx */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      {/* Tarjetas KPI con Bordes de Colores: 6 tarjetas separadas compactas */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {/* 1. Total Registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Total Registros</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Total</span>
             <span className="grid size-6 place-items-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
               <Icon name="routePermit" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(totalPermisos)}
             </p>
           </div>
         </div>
 
-        {/* 2. Carga y Descarga */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        {/* 2. Control Vehicular */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Carga y Descarga</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Ctrl Vehicular</span>
+            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+              <Icon name="truck" className="size-3.5" />
+            </span>
+          </div>
+          <div className="mt-1">
+            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(totalControl)}
+            </p>
+          </div>
+        </div>
+
+        {/* 3. Carga y Descarga */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Carga/Desc.</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
               <Icon name="motoTaxi" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(totalCarga)}
             </p>
           </div>
         </div>
 
-        {/* 3. Uso de Vías */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        {/* 4. Uso de Vías */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Uso de Vías</span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
@@ -322,14 +345,29 @@ export function Permisos() {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(totalVias)}
             </p>
           </div>
         </div>
 
-        {/* 4. Vigentes */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        {/* 5. Zonas Reservadas */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Zonas Reserv.</span>
+            <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
+              <Icon name="parking" className="size-3.5" />
+            </span>
+          </div>
+          <div className="mt-1">
+            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
+              {new Intl.NumberFormat('es-PE').format(totalZonas)}
+            </p>
+          </div>
+        </div>
+
+        {/* 6. Vigentes */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Vigentes</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
@@ -337,23 +375,8 @@ export function Permisos() {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(vigentes)}
-            </p>
-          </div>
-        </div>
-
-        {/* 5. Vencidos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Vencidos</span>
-            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
-              ✕
-            </span>
-          </div>
-          <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(vencidos)}
             </p>
           </div>
         </div>
@@ -506,6 +529,7 @@ export function Permisos() {
                     paginatedPermisos.map((p) => {
                       const isCarga = p.tipoPermiso === 'CARGA_DESCARGA'
                       const isVias = p.tipoPermiso === 'USO_VIAS'
+                      const isZonas = p.tipoPermiso === 'ZONAS_RESERVADAS' || p.tipoPermiso === 'ZONA_RESERVADA'
                       const solicitanteText = p.solicitanteNombre || p.solicitante || '—'
                       const initials = solicitanteText.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || 'AU'
 
@@ -536,10 +560,12 @@ export function Permisos() {
                                     ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
                                     : isVias
                                       ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                      : 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
+                                      : isZonas
+                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                        : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
                                 }`}
                               >
-                                {isCarga ? 'Carga y Descarga' : isVias ? 'Uso de Vías' : 'Operación TUPA'}
+                                {isCarga ? 'Carga y Descarga' : isVias ? 'Uso de Vías' : isZonas ? 'Zonas Reservadas' : 'Control Vehicular'}
                               </span>
                               <div className="text-[13px] font-bold text-slate-700 dark:text-slate-200 font-mono">
                                 {p.numeroAutorizacion}
@@ -768,7 +794,13 @@ export function Permisos() {
                       Formato Oficial A4
                     </h3>
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      {selectedPermiso.tipoPermiso === 'CARGA_DESCARGA' ? 'Carga y Descarga' : selectedPermiso.tipoPermiso === 'USO_VIAS' ? 'Uso Provisional de Vías' : 'Resolución'}
+                      {selectedPermiso.tipoPermiso === 'CARGA_DESCARGA'
+                        ? 'Carga y Descarga'
+                        : selectedPermiso.tipoPermiso === 'USO_VIAS'
+                          ? 'Uso Provisional de Vías'
+                          : selectedPermiso.tipoPermiso === 'ZONAS_RESERVADAS' || selectedPermiso.tipoPermiso === 'ZONA_RESERVADA'
+                            ? 'Zonas Reservadas'
+                            : 'Control Vehicular'}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">

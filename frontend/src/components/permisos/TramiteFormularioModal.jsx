@@ -133,24 +133,49 @@ export function TramiteFormularioModal({
   }
 
   const handleTipoChange = (newTipo) => {
+    let asunto = 'AUTORIZACIÓN MUNICIPAL OFICIAL'
+    let monto = '450.00'
+    let zona = 'Anillo Vial y Cuadrantes Autorizados - Distrito de José Leonardo Ortiz'
+    let horarioInicio = formData.horarioInicio || '06:00:00'
+    let horarioFin = formData.horarioFin || '22:00:00'
+
+    if (newTipo === 'CARGA_DESCARGA') {
+      asunto = 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA'
+      monto = '1030.00'
+      zona = 'Anillo Vial y Cuadrante Comercial - José Leonardo Ortiz'
+      horarioInicio = '16:00:00'
+      horarioFin = '05:00:00'
+    } else if (newTipo === 'USO_VIAS') {
+      asunto = 'AUTORIZACION PROVISIONAL DE USO DE VIAS'
+      monto = '850.00'
+      zona = 'Vía pública solicitada - Jurisdicción del Distrito de José Leonardo Ortiz'
+      horarioInicio = '08:00:00'
+      horarioFin = '18:00:00'
+    } else if (newTipo === 'ZONAS_RESERVADAS' || newTipo === 'ZONA_RESERVADA') {
+      asunto = 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
+      monto = '920.00'
+      zona = 'Frontis del establecimiento solicitante - José Leonardo Ortiz'
+      horarioInicio = '07:00:00'
+      horarioFin = '20:00:00'
+    } else {
+      // CONTROL_VEHICULAR / OPERACION
+      asunto = 'AUTORIZACIÓN MUNICIPAL DE CONTROL VEHICULAR Y CIRCULACIÓN'
+      monto = '450.00'
+      zona = 'Anillo Vial y Cuadrantes Autorizados - Distrito de José Leonardo Ortiz'
+      horarioInicio = '06:00:00'
+      horarioFin = '22:00:00'
+    }
+
     const updated = {
       ...formData,
       tipoPermiso: newTipo,
-      asunto:
-        newTipo === 'CARGA_DESCARGA'
-          ? 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA'
-          : newTipo === 'USO_VIAS'
-            ? 'AUTORIZACION PROVISIONAL DE USO DE VIAS'
-            : 'AUTORIZACIÓN GENERAL DE OPERACIÓN TUPA',
-      reciboIngresoMonto: newTipo === 'CARGA_DESCARGA' ? '1030.00' : newTipo === 'USO_VIAS' ? '850.00' : '450.00',
-      zonaCirculacion:
-        newTipo === 'CARGA_DESCARGA'
-          ? 'Anillo Vial - José Leonardo Ortiz'
-          : 'Jurisdicción del Distrito de José Leonardo Ortiz'
+      asunto,
+      reciboIngresoMonto: monto,
+      zonaCirculacion: zona,
+      horarioInicio,
+      horarioFin
     }
-    if (!formData.contenido || formData.contenido.includes('SUBGERENCIA DE TRÁNSITO')) {
-      updated.contenido = generarPlantillaCuerpo(updated)
-    }
+    updated.contenido = generarPlantillaCuerpo(updated)
     setFormData(updated)
   }
 
@@ -366,24 +391,44 @@ export function TramiteFormularioModal({
             <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
               Clasificación / Tipo de Permiso *
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              <button
+                type="button"
+                onClick={() => handleTipoChange('CONTROL_VEHICULAR')}
+                className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                  formData.tipoPermiso === 'CONTROL_VEHICULAR' || formData.tipoPermiso === 'OPERACION'
+                    ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-200 shadow-xs ring-1 ring-indigo-500/20'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black text-xs">Control Vehicular</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                    S/ 450
+                  </span>
+                </div>
+                <p className="text-[10px] opacity-80 leading-snug">
+                  Permiso municipal para verificación técnica y circulación autorizada de unidades.
+                </p>
+              </button>
+
               <button
                 type="button"
                 onClick={() => handleTipoChange('CARGA_DESCARGA')}
                 className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'CARGA_DESCARGA'
-                    ? 'border-sky-500 bg-sky-50/70 dark:bg-sky-950/30 text-sky-950 dark:text-sky-200 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
+                    ? 'border-sky-500 bg-sky-50/80 dark:bg-sky-950/40 text-sky-950 dark:text-sky-200 shadow-xs ring-1 ring-sky-500/20'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-black text-xs">Carga y Descarga</span>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200">
-                    TUPA S/ 1030
+                    S/ 1030
                   </span>
                 </div>
                 <p className="text-[10px] opacity-80 leading-snug">
-                  Horario nocturno / madrugada (16:00 a 05:00 hrs) para camiones y abastecimiento.
+                  Horario nocturno / madrugada (16:00 a 05:00 hrs) para abastecimiento comercial.
                 </p>
               </button>
 
@@ -392,38 +437,38 @@ export function TramiteFormularioModal({
                 onClick={() => handleTipoChange('USO_VIAS')}
                 className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'USO_VIAS'
-                    ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/30 text-indigo-950 dark:text-indigo-200 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
+                    ? 'border-amber-500 bg-amber-50/80 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 shadow-xs ring-1 ring-amber-500/20'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-black text-xs">Uso Provisional de Vías</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
-                    TUPA S/ 850
+                  <span className="font-black text-xs">Uso de Vías</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
+                    S/ 850
                   </span>
                 </div>
                 <p className="text-[10px] opacity-80 leading-snug">
-                  Ocupación autorizada de vía pública para eventos, mudanzas u obras programadas.
+                  Ocupación provisional de calzada/acera para mudanzas, eventos u obras civiles.
                 </p>
               </button>
 
               <button
                 type="button"
-                onClick={() => handleTipoChange('OPERACION')}
+                onClick={() => handleTipoChange('ZONAS_RESERVADAS')}
                 className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
-                  formData.tipoPermiso === 'OPERACION'
-                    ? 'border-violet-500 bg-violet-50/70 dark:bg-violet-950/30 text-violet-950 dark:text-violet-200 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
+                  formData.tipoPermiso === 'ZONAS_RESERVADAS' || formData.tipoPermiso === 'ZONA_RESERVADA'
+                    ? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200 shadow-xs ring-1 ring-emerald-500/20'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-black text-xs">Operación General TUPA</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200">
-                    TUPA S/ 450
+                  <span className="font-black text-xs">Zonas Reservadas</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
+                    S/ 920
                   </span>
                 </div>
                 <p className="text-[10px] opacity-80 leading-snug">
-                  Tarjeta de operatividad y autorizaciones de servicio especial en el distrito.
+                  Reserva exclusiva de estacionamiento en frontis para entidades y establecimientos.
                 </p>
               </button>
             </div>
