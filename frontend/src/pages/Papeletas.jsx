@@ -1008,6 +1008,10 @@ export function Papeletas({ user }) {
                       <p className="text-slate-400">Origen</p>
                       <div className="mt-1">{renderOrigen(selectedPapeleta)}</div>
                     </div>
+                    <div className="col-span-2">
+                      <p className="text-slate-400">Observaciones del Inspector</p>
+                      <p className="font-medium text-rose-600 dark:text-rose-400 italic">"{selectedPapeleta.observacionesAutoridad || 'Sin observaciones por parte de la autoridad.'}"</p>
+                    </div>
                   </div>
                 </div>
 
@@ -1039,15 +1043,6 @@ export function Papeletas({ user }) {
                       <p className="text-slate-400">Inspector</p>
                       <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.inspector} {selectedPapeleta.inspectorCIP ? `(CIP: ${selectedPapeleta.inspectorCIP})` : ''}</p>
                     </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Observaciones</h4>
-                  <div className="text-xs">
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      {selectedPapeleta.observacionesAutoridad || 'Sin observaciones por parte de la autoridad.'}
-                    </p>
                   </div>
                 </div>
 

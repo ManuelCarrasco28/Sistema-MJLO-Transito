@@ -892,7 +892,7 @@ DROP TABLE IF EXISTS `papeleta_fotos`;
 CREATE TABLE `papeleta_fotos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `id_papeleta` bigint(20) NOT NULL,
-  `foto` varchar(255) NOT NULL,
+  `foto` mediumtext NOT NULL,
   `fecha_created` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `fk_papeleta_fotos_papeleta` (`id_papeleta`),
