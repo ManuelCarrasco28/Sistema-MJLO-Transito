@@ -532,10 +532,11 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
 }
 
 /* ==========================================================================
-   ESTILOS DE IMPRESIÓN OFICIAL (TUC DIGITAL / CERTICAV / SOAT / CARNETS)
+/* ==========================================================================
+   ESTILOS DE IMPRESIÓN OFICIAL (DOCUMENTOS A4 / TICKETS / CARNETS VIALES)
    ========================================================================== */
 @media print {
-  /* Forzar impresión de colores exactos y fondos */
+  /* Forzar impresión de colores exactos y fondos gráficos en todos los navegadores */
   *, *::before, *::after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -546,8 +547,9 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     box-sizing: border-box !important;
   }
 
-  /* Ocultar TODO el árbol de React en #root SOLAMENTE cuando hay un documento oficial/carnet inyectado en el body vía portal */
-  body:has(> #seccion-impresion, > #seccion-impresion-tuc, > #seccion-impresion-ticket, > .seccion-impresion-portal) > #root {
+  /* 1. Cuando hay un documento oficial inyectado en document.body (Permisos, TUC, SOAT, Certicav, Boletas)
+     se oculta TODO el árbol de React en #root para aislar el documento */
+  body:has(> #seccion-impresion, > .seccion-impresion-portal) > #root {
     display: none !important;
   }
 
@@ -562,36 +564,51 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     overflow: visible !important;
   }
 
-  /* Ocultar elementos generales SOLO cuando imprimimos portals. Para el resto de la app, dejamos que Tailwind (print:hidden) haga su trabajo */
-  body:has(> #seccion-impresion, > #seccion-impresion-tuc, > #seccion-impresion-ticket, > .seccion-impresion-portal) * {
-    visibility: hidden !important;
-  }
-
-  /* Mostrar ÚNICAMENTE el contenedor del documento oficial / carnet a imprimir */
-  #seccion-impresion,
-  #seccion-impresion *,
-  #seccion-impresion-tuc,
-  #seccion-impresion-tuc *,
-  #seccion-impresion-ticket,
-  #seccion-impresion-ticket *,
+  /* 2. Visualización limpia y completa del portal inyectado en document.body */
   body > #seccion-impresion,
   body > .seccion-impresion-portal,
-  .seccion-impresion-portal,
+  .seccion-impresion-portal {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  body > #seccion-impresion *,
+  body > .seccion-impresion-portal *,
   .seccion-impresion-portal * {
     visibility: visible !important;
   }
 
-  /* Para tickets térmicos de altura dinámica, usamos relative para que defina la altura del documento */
+  /* 3. Tickets térmicos impresos dentro de #root (Papeletas, Pagos, Retenciones) */
   #seccion-impresion-ticket {
+    display: block !important;
+    visibility: visible !important;
     position: relative !important;
     width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 2mm 3mm !important;
     background: #ffffff !important;
+    color: #000000 !important;
     box-shadow: none !important;
+    border: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  /* Evitar saltos de página indeseados dentro del carnet u hoja oficial */
+  #seccion-impresion-ticket * {
+    visibility: visible !important;
+    color: #000000 !important;
+  }
+
+  /* 4. Evitar saltos de página indeseados dentro de documentos A4 y carnets */
   .ficha-certicav-a4,
   .constancia-soat-a4,
   .resolucion-permiso-a4,
@@ -605,11 +622,43 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     break-after: avoid !important;
     page-break-before: avoid !important;
     break-before: avoid !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
   }
 
+  /* En impresión A4 oficial: ocupar el ancho completo sin desbordar ni cortar márgenes */
+  .ficha-certicav-a4,
+  .constancia-soat-a4,
+  .resolucion-permiso-a4,
+  .autorizacion-carga-a4,
+  .autorizacion-vias-a4 {
+    width: 100% !important;
+    max-width: 194mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Carnets: anverso y reverso apilados limpiamente sin corte de bordes */
+  .carnet-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8mm !important;
+    align-items: center !important;
+    margin: 4mm auto !important;
+  }
+
+  .carnet-box {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-shadow: none !important;
+    border: 0.3pt solid #1e293b !important;
+  }
+
+  /* Configuración de página estándar: A4 con margen de seguridad de 5mm 6mm para evitar cortes en bordes */
   @page {
-    size: auto;
-    margin: 0mm;
+    size: A4 portrait;
+    margin: 5mm 6mm;
   }
 }
 

@@ -410,12 +410,12 @@
     box-sizing: border-box !important;
   }
 
-  /* 1. Ocultar TODO el árbol de React en #root para erradicar scrolls y páginas fantasmas */
-  body > #root {
+  /* 1. Ocultar TODO el árbol de React en #root SOLAMENTE si hay un portal de impresión inyectado en document.body */
+  body:has(> #seccion-impresion, > .seccion-impresion-portal) > #root {
     display: none !important;
   }
 
-  /* 2. Normalizar html y body a 1 sola página sin margen */
+  /* 2. Normalizar html y body */
   html, body {
     background: #ffffff !important;
     color: #000000 !important;
@@ -463,22 +463,24 @@
   .carnet-wrapper {
     display: flex !important;
     flex-direction: column !important;
-    gap: 12mm !important;
+    gap: 8mm !important;
     align-items: center !important;
-    margin: 8mm auto !important;
+    margin: 4mm auto !important;
   }
 
   .carnet-box {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     box-shadow: none !important;
-    border: 0.2pt solid #000 !important; /* Borde fino de corte guiado */
+    border: 0.3pt solid #1e293b !important;
   }
 
-  /* Hojas A4 Oficiales (CertiCAV, SOAT, Resoluciones) */
+  /* Hojas A4 Oficiales (CertiCAV, SOAT, Resoluciones, Carga, Vías) */
   .ficha-certicav-a4,
   .constancia-soat-a4,
-  .resolucion-permiso-a4 {
+  .resolucion-permiso-a4,
+  .autorizacion-carga-a4,
+  .autorizacion-vias-a4 {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     page-break-after: avoid !important;
@@ -489,12 +491,13 @@
     border: none !important;
     padding: 0 !important;
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 194mm !important;
     margin: 0 auto !important;
+    box-sizing: border-box !important;
   }
 
   @page {
     size: A4 portrait;
-    margin: 5mm;
+    margin: 5mm 6mm;
   }
 }
