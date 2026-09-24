@@ -529,6 +529,23 @@ class PapeletasController extends ResourceController
         }
     }
 
+    public function fotos($id)
+    {
+        try {
+            $db = \Config\Database::connect();
+            $fotos = $db->table('reporte_intervencion_fotos f')
+                ->select('f.id, f.foto')
+                ->join('reportes_intervencion ri', 'ri.id = f.id_reporte')
+                ->where('ri.id_papeleta', $id)
+                ->get()
+                ->getResultArray();
+
+            return $this->respond($fotos);
+        } catch (\Exception $e) {
+            return $this->failServerError('Error al obtener fotos: ' . $e->getMessage());
+        }
+    }
+
     private function uitActual($db): float
     {
         return (new \App\Services\Multas($db))->uit((int)date('Y'));

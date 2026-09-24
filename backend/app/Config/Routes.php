@@ -32,6 +32,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('operativos', ['controller' => 'OperativosController']);
         $routes->post('papeletas/(:num)/pagar', 'PapeletasController::pagar/$1');
         $routes->post('papeletas/(:num)/firma', 'PapeletasController::firma/$1');
+        $routes->get('papeletas/(:num)/fotos', 'PapeletasController::fotos/$1');
         $routes->get('tipos-infraccion', 'PapeletasController::tipos');
         $routes->get('pagos/origenes', 'PagosController::origenes');
         $routes->get('pagos/deudas', 'PagosController::deudasPorPersona');

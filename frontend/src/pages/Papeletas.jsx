@@ -67,6 +67,9 @@ export function Papeletas({ user }) {
   const [itemsPerPage, setItemsPerPage] = useState(8)
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [selectedPapeletaFotos, setSelectedPapeletaFotos] = useState([])
+  const [loadingPapeletaFotos, setLoadingPapeletaFotos] = useState(false)
+
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [isPagarModalOpen, setIsPagarModalOpen] = useState(false)
   const [selectedInfraccion, setSelectedInfraccion] = useState(null)
@@ -293,9 +296,19 @@ export function Papeletas({ user }) {
     loadData()
   }, [])
 
-  const handleOpenDetail = (papeleta) => {
+  const handleOpenDetail = async (papeleta) => {
     setSelectedPapeleta(papeleta)
     setIsDetailModalOpen(true)
+    setLoadingPapeletaFotos(true)
+    setSelectedPapeletaFotos([])
+    try {
+      const res = await api.get(`/papeletas/${papeleta.id}/fotos`)
+      setSelectedPapeletaFotos(res.data || [])
+    } catch (error) {
+      console.error('Error cargando fotos:', error)
+    } finally {
+      setLoadingPapeletaFotos(false)
+    }
   }
 
   const handleOpenPreview = (papeleta) => {
@@ -1048,6 +1061,35 @@ export function Papeletas({ user }) {
                       <p className="text-slate-400">Total</p>
                       <p className="font-mono font-black text-base text-rose-600 dark:text-rose-400">S/ {selectedPapeleta.montoTotal.toFixed(2)}</p>
                     </div>
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Evidencia fotográfica</h4>
+                  <div className="text-xs">
+                    {loadingPapeletaFotos ? (
+                      <div className="flex animate-pulse gap-4 overflow-x-auto pb-2">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className="h-28 w-40 shrink-0 rounded-xl bg-slate-200 dark:bg-slate-800" />
+                        ))}
+                      </div>
+                    ) : selectedPapeletaFotos.length > 0 ? (
+                      <div className="flex gap-4 overflow-x-auto pb-3 custom-scrollbar">
+                        {selectedPapeletaFotos.map((foto) => (
+                          <button type="button" key={foto.id} onClick={() => setSelectedImage(foto.foto)} className="shrink-0 relative group block overflow-hidden rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-black/5 cursor-pointer">
+                            <img src={foto.foto} alt="Evidencia" className="h-32 w-48 object-cover transition-transform duration-300 group-hover:scale-105" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center backdrop-blur-[0px] group-hover:backdrop-blur-[2px]">
+                              <Icon name="maximize" className="text-white opacity-0 group-hover:opacity-100 drop-shadow-lg size-8 transition-opacity duration-300" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-100/50 py-8 text-center dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                        <Icon name="image-off" className="mx-auto mb-2 size-8 text-slate-400 opacity-50" />
+                        <p className="font-bold text-slate-500">Sin evidencia fotográfica</p>
+                        <p className="mt-1 text-[10px] text-slate-400">Esta papeleta no tiene fotos adjuntas</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
