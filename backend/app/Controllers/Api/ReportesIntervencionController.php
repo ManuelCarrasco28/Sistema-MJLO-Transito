@@ -56,6 +56,7 @@ class ReportesIntervencionController extends ResourceController
             $query->where('r.id_inspector', $inspectorId);
         }
 
+        $query->groupBy('r.id');
         $rows = $query->orderBy('r.id', 'DESC')->limit(50)->get()->getResultArray();
 
         $reporteIds = array_column($rows, 'id');
@@ -69,6 +70,15 @@ class ReportesIntervencionController extends ResourceController
         }
 
         return $this->respond(['data' => $rows]);
+    }
+
+    public function fotos($id)
+    {
+        $db = \Config\Database::connect();
+        $fotos = $db->table('reporte_intervencion_fotos')
+            ->where('id_reporte', $id)
+            ->get()->getResultArray();
+        return $this->respond(['data' => $fotos]);
     }
 
     public function create()

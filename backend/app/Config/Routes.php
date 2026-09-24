@@ -61,6 +61,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->post('municipalidad/anios', 'MunicipalidadController::saveAnio');
         $routes->put('configuracion-sistema', 'MunicipalidadController::saveConfiguracion');
         $routes->get('reportes-intervencion', 'ReportesIntervencionController::index');
+        $routes->get('reportes-intervencion/(:num)/fotos', 'ReportesIntervencionController::fotos/$1');
         $routes->post('reportes-intervencion', 'ReportesIntervencionController::create');
         $routes->post('reportes-intervencion/(:num)/convertir', 'ReportesIntervencionController::convertir/$1');
         $routes->post('reportes-intervencion/(:num)/rechazar', 'ReportesIntervencionController::rechazar/$1');
