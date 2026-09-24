@@ -802,15 +802,15 @@ export function SuperAdminDashboard({ user }) {
       {editingUser && (
         <Modal title="Editar rol y estado" onClose={() => setEditingUser(null)}>
           <form onSubmit={saveRole} className="space-y-4">
-            <p className="font-bold">{editingUser.nombre_usuario}</p>
-            <select value={editingUser.cargo || ''} onChange={(e) => setEditingUser({ ...editingUser, cargo: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+            <p className="font-bold text-slate-800 dark:text-white">{editingUser.nombre_usuario}</p>
+            <select value={editingUser.cargo || ''} onChange={(e) => setEditingUser({ ...editingUser, cargo: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white outline-none">
               {CARGOS.map((cargo) => <option key={cargo} value={cargo}>{cargo}</option>)}
             </select>
-            <select value={editingUser.usuario_estado || 'ACTIVO'} onChange={(e) => setEditingUser({ ...editingUser, usuario_estado: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+            <select value={editingUser.usuario_estado || 'ACTIVO'} onChange={(e) => setEditingUser({ ...editingUser, usuario_estado: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white outline-none">
               <option value="ACTIVO">ACTIVO</option>
               <option value="INACTIVO">INACTIVO</option>
             </select>
-            <button className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white">Guardar cambios</button>
+            <button className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700 cursor-pointer">Guardar cambios</button>
           </form>
         </Modal>
       )}
@@ -897,9 +897,9 @@ export function SuperAdminDashboard({ user }) {
       {passwordUser && (
         <Modal title="Restablecer contraseña" onClose={() => setPasswordUser(null)}>
           <form onSubmit={resetPassword} className="space-y-4">
-            <p className="text-sm font-semibold text-slate-600">Usuario: <strong>{passwordUser.nombre_usuario}</strong></p>
-            <input minLength={6} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nueva contraseña" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <button className="w-full rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white">Actualizar contraseña</button>
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Usuario: <strong className="text-slate-900 dark:text-white">{passwordUser.nombre_usuario}</strong></p>
+            <input minLength={6} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nueva contraseña" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white outline-none" />
+            <button className="w-full rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white hover:bg-amber-600 cursor-pointer">Actualizar contraseña</button>
           </form>
         </Modal>
       )}
@@ -1711,7 +1711,7 @@ function Modal({ title, children, onClose, maxWidth = 'max-w-md' }) {
       <div className={`w-full ${maxWidth} overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]`}>
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-[var(--border)]">
           <h3 className="text-lg font-black text-slate-900 dark:text-white">{title}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><Icon name="close" /></button>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white cursor-pointer"><Icon name="close" /></button>
         </div>
         <div className="p-5">{children}</div>
       </div>

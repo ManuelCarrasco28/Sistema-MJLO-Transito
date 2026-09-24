@@ -182,6 +182,7 @@ html.dark body {
 button,
 input,
 select,
+textarea,
 option {
   font: inherit;
 }
@@ -194,6 +195,43 @@ option {
 html.dark option {
   background-color: #0f172a;
   color: #f1f5f9;
+}
+
+/* ==========================================================================
+   CORRECCIÓN GLOBAL DE FORMULARIOS E INPUTS EN MODO OSCURO
+   Evita que focus:bg-white o el autofill del navegador vuelvan los campos blancos
+   ========================================================================== */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  color-scheme: dark;
+}
+
+/* Neutralizar focus:bg-white exclusivamente en modo oscuro */
+html.dark input.focus\:bg-white:focus,
+html.dark select.focus\:bg-white:focus,
+html.dark textarea.focus\:bg-white:focus,
+html.dark .focus\:bg-white:focus {
+  background-color: var(--bg-subtle, #1e293b) !important;
+  color: #f8fafc !important;
+}
+
+/* Soporte de autofill en modo oscuro para evitar fondo amarillo/blanco del navegador */
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover,
+html.dark input:-webkit-autofill:focus,
+html.dark select:-webkit-autofill,
+html.dark textarea:-webkit-autofill {
+  -webkit-text-fill-color: #f8fafc !important;
+  -webkit-box-shadow: 0 0 0px 1000px #1e293b inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Atenuar resplandor neón en focus rings dentro del modo oscuro */
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  outline: none;
 }
 
 button {
