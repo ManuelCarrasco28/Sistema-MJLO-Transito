@@ -209,6 +209,7 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
         'observaciones': obs,
         'coordenadas': widget.reporteData['coordenadas'] ?? '',
         'fotos': fotosBase64,
+        'infraccionesIds': _selectedInfraccionesIds.where((id) => id != null).toList(),
         'dni_conductor': widget.reporteData['dni_conductor'] ?? '',
         'nombres_conductor': widget.reporteData['nombres_conductor'] ?? '',
         'apellidos_conductor': widget.reporteData['apellidos_conductor'] ?? '',

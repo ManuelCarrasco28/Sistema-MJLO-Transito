@@ -385,7 +385,7 @@ export function Papeletas({ user }) {
     const matchVehiculo = vehiculos.find((v) => String(v.placa || '').toUpperCase() === String(reporte.placa || reporte.placa_visual || '').toUpperCase())
     setReporteToConvert({ ...reporte, loadingFotos: true })
     setConvertForm({
-      infraccionesIds: [''],
+      infraccionesIds: reporte.infraccionesIds?.length ? reporte.infraccionesIds.map(String) : [''],
       vehiculoId: String(reporte.id_vehiculo || matchVehiculo?.id || ''),
       conductorDni: reporte.conductorDni && reporte.conductorDni !== 'S/D' ? reporte.conductorDni : '',
       observacionesAutoridad: reporte.observaciones || ''
@@ -628,15 +628,30 @@ export function Papeletas({ user }) {
 
       {activeView === 'REPORTES' && (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-[var(--border)]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 px-5 py-4 dark:border-[var(--border)]">
             <div>
               <h2 className="text-lg font-black text-slate-900 dark:text-white">Reportes Evidencias</h2>
               <p className="text-xs font-semibold text-slate-500">No son papeletas. Administración decide si procede o no.</p>
             </div>
-            <button onClick={loadData} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white">Actualizar</button>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar reporte..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-sm outline-none transition focus:border-rose-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button>
+                )}
+              </div>
+              <button onClick={loadData} className="w-full sm:w-auto rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white shrink-0">Actualizar</button>
+            </div>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-            {reportes.length ? reportes.map((reporte) => (
+            {reportes.filter(r => !searchTerm || [r.placa, r.placa_visual, r.lugar, r.observaciones, r.inspector_nombre, r.conductorDni].some(v => String(v || '').toLowerCase().includes(searchTerm.toLowerCase()))).length ? reportes.filter(r => !searchTerm || [r.placa, r.placa_visual, r.lugar, r.observaciones, r.inspector_nombre, r.conductorDni].some(v => String(v || '').toLowerCase().includes(searchTerm.toLowerCase()))).map((reporte) => (
               <div key={reporte.id} className="grid gap-4 p-5 lg:grid-cols-[1fr_220px] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 flex-1">
@@ -648,6 +663,9 @@ export function Papeletas({ user }) {
                     {reporte.placa_visual || 'SIN PLACA'} · {reporte.lugar}
                   </h3>
                   <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">{reporte.observaciones}</p>
+                  {reporte.infraccion_visual && (
+                    <p className="mt-1 text-xs font-black text-rose-600">INFRACCIÓN SUGERIDA: {reporte.infraccion_visual}</p>
+                  )}
                   <div className="mt-2 grid gap-1 text-xs font-semibold text-slate-500 sm:grid-cols-3">
                     <span>Inspector: {reporte.inspector_nombre}</span>
                     <span>Fecha: {new Date(reporte.fecha_hora).toLocaleString()}</span>

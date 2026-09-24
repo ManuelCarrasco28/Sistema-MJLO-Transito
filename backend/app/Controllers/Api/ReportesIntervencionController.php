@@ -67,6 +67,16 @@ class ReportesIntervencionController extends ResourceController
             $row['id_vehiculo'] = $row['id_vehiculo'] !== null ? (int)$row['id_vehiculo'] : null;
             $row['id_papeleta'] = $row['id_papeleta'] !== null ? (int)$row['id_papeleta'] : null;
             $row['fotos'] = []; // No cargamos fotos en el historial para evitar colapsar la memoria RAM del servidor
+            
+            $infrs = $db->table('reporte_intervencion_infracciones ri')
+                ->select('ti.id, ti.codigo, ti.descripcion')
+                ->join('tipos_infraccion ti', 'ti.id = ri.id_tipo_infraccion', 'left')
+                ->where('ri.id_reporte', $row['id'])
+                ->get()
+                ->getResultArray();
+            $row['infracciones'] = $infrs;
+            $row['infraccion_visual'] = !empty($infrs) ? implode(', ', array_column($infrs, 'codigo')) : 'Sin Infracción';
+            $row['infraccionesIds'] = array_map('intval', array_column($infrs, 'id'));
         }
 
         return $this->respond(['data' => $rows]);
@@ -211,6 +221,17 @@ class ReportesIntervencionController extends ResourceController
                             'foto' => $foto,
                         ]);
                     }
+                }
+            }
+            
+            $infraccionesIds = $input['infraccionesIds'] ?? [];
+            if (is_array($infraccionesIds)) {
+                $infraccionesIds = array_values(array_unique(array_filter(array_map('intval', $infraccionesIds), static fn ($v) => $v > 0)));
+                foreach ($infraccionesIds as $tipoId) {
+                    $db->table('reporte_intervencion_infracciones')->insert([
+                        'id_reporte' => $id,
+                        'id_tipo_infraccion' => $tipoId,
+                    ]);
                 }
             }
 

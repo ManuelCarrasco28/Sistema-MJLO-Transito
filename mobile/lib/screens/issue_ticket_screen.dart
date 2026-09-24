@@ -347,6 +347,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'observaciones': _observaciones,
         'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : '',
         'fotos': fotosBase64,
+        'infraccionesIds': _selectedInfraccionesIds.where((id) => id != null).toList(),
         'dni_conductor': conductorDni,
         'nombres_conductor': conductorNombres,
         'apellidos_conductor': conductorApellidos,
