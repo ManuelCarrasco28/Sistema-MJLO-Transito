@@ -564,7 +564,8 @@ class PapeletasController extends ResourceController
 
             $fotos = array_merge($fotosReporte, $fotosPapeleta);
 
-            return $this->respond(['data' => $fotos]);
+            $queryStr = (string)$db->getLastQuery();
+            return $this->respond(['data' => $fotos, 'debug_id' => $id, 'query' => $queryStr]);
         } catch (\Exception $e) {
             return $this->failServerError('Error al obtener fotos: ' . $e->getMessage());
         }

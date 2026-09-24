@@ -68,6 +68,7 @@ export function Papeletas({ user }) {
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedPapeletaFotos, setSelectedPapeletaFotos] = useState([])
+  const [rawFotosData, setRawFotosData] = useState(null)
   const [loadingPapeletaFotos, setLoadingPapeletaFotos] = useState(false)
 
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
@@ -304,6 +305,7 @@ export function Papeletas({ user }) {
     try {
       const res = await apiFetch(`/papeletas/${papeleta.id}/fotos?t=${Date.now()}`)
       const data = await res.json()
+      setRawFotosData(data)
       let fotosList = []
       if (Array.isArray(data)) {
         fotosList = data
@@ -1103,7 +1105,9 @@ export function Papeletas({ user }) {
                         <Icon name="image-off" className="mx-auto mb-2 size-8 text-slate-400 opacity-50" />
                         <p className="font-bold text-slate-500">Sin evidencia fotográfica</p>
                         <p className="mt-1 text-[10px] text-slate-400">Esta papeleta no tiene fotos adjuntas</p>
-                        <pre className="mt-2 text-[8px] text-left text-red-500 max-h-32 overflow-auto break-all">{JSON.stringify(selectedPapeletaFotos, null, 2)}</pre>
+                        <pre className="mt-2 text-[8px] text-left text-red-500 max-h-32 overflow-auto break-all">
+                          RAW: {JSON.stringify(rawFotosData, null, 2)}
+                        </pre>
                       </div>
                     )}
                   </div>

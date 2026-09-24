@@ -11,6 +11,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->get('municipalidad/config-mobile', 'MunicipalidadController::mobileConfig');
     $routes->get('mobile/dashboard', 'MunicipalidadController::mobileDashboard');
     $routes->get('mobile/vehiculos/buscar', 'VehiculosController::buscarMobile');
+    $routes->get('papeletas/(:num)/fotos', 'PapeletasController::fotos/$1');
 
     $routes->get('status', 'StatusController::index');
     $routes->group('', ['filter' => 'sessionauth'], static function ($routes): void {
@@ -32,7 +33,6 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('operativos', ['controller' => 'OperativosController']);
         $routes->post('papeletas/(:num)/pagar', 'PapeletasController::pagar/$1');
         $routes->post('papeletas/(:num)/firma', 'PapeletasController::firma/$1');
-        $routes->get('papeletas/(:num)/fotos', 'PapeletasController::fotos/$1');
         $routes->get('tipos-infraccion', 'PapeletasController::tipos');
         $routes->get('pagos/origenes', 'PagosController::origenes');
         $routes->get('pagos/deudas', 'PagosController::deudasPorPersona');
