@@ -304,7 +304,8 @@ export function Papeletas({ user }) {
     try {
       const res = await apiFetch(`/papeletas/${papeleta.id}/fotos`)
       const data = await res.json()
-      setSelectedPapeletaFotos(data || [])
+      const fotosList = Array.isArray(data) ? data : (data?.data || [])
+      setSelectedPapeletaFotos(fotosList)
     } catch (error) {
       console.error('Error cargando fotos:', error)
     } finally {
