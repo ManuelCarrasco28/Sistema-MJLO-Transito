@@ -68,8 +68,7 @@ class ReportesIntervencionController extends ResourceController
             $row['id_papeleta'] = $row['id_papeleta'] !== null ? (int)$row['id_papeleta'] : null;
             $row['fotos'] = []; // No cargamos fotos en el historial para evitar colapsar la memoria RAM del servidor
             
-            $infracciones = clone $db;
-            $infrs = $infracciones->table('reporte_intervencion_infracciones ri')
+            $infrs = $db->table('reporte_intervencion_infracciones ri')
                 ->select('ti.id, ti.codigo, ti.descripcion, ti.monto')
                 ->join('tipos_infraccion ti', 'ti.id = ri.id_tipo_infraccion', 'left')
                 ->where('ri.id_reporte', $row['id'])
