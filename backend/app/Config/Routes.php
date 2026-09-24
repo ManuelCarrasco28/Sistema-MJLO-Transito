@@ -66,6 +66,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->post('reportes-intervencion', 'ReportesIntervencionController::create');
         $routes->post('reportes-intervencion/(:num)/convertir', 'ReportesIntervencionController::convertir/$1');
         $routes->post('reportes-intervencion/(:num)/rechazar', 'ReportesIntervencionController::rechazar/$1');
+        $routes->get('notificaciones/resumen', 'NotificacionesController::resumen');
         $routes->get('auditoria', 'AuditoriaController::index');
         $routes->get('auditoria/estadisticas', 'AuditoriaController::estadisticas');
     });

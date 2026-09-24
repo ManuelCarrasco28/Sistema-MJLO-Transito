@@ -85,6 +85,31 @@ function Layout({ onLogout, user, onUserUpdate }) {
   }, [location.pathname])
 
   useEffect(() => {
+    let cancelled = false;
+    const fetchNotifications = async () => {
+      try {
+        const response = await apiFetch('/notificaciones/resumen')
+        if (response.ok) {
+          const payload = await response.json()
+          if (!cancelled && payload.data) {
+            setNotifications(payload.data)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching notificaciones:', error)
+      }
+    }
+    
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000); // Poll every minute
+    
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    }
+  }, [])
+
+  useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark')
       localStorage.setItem('theme', 'dark')

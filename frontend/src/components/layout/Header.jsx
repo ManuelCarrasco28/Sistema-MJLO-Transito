@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../ui/Icon'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../config/api'
 
 export function Header({
@@ -20,6 +20,7 @@ export function Header({
   onLogout,
   user,
 }) {
+  const navigate = useNavigate()
   const rawDate = new Intl.DateTimeFormat('es-PE', {
     weekday: 'long',
     day: 'numeric',
@@ -191,43 +192,55 @@ export function Header({
               </div>
 
               <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
-                {notifications.map((n) => {
-                  const tones = {
-                    rose: 'bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300',
-                    emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300',
-                    amber: 'bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300',
-                    blue: 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300',
-                  }
-                  return (
-                    <div
-                      key={n.id}
-                      onClick={() =>
-                        setNotifications((prev) =>
-                          prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item))
-                        )
-                      }
-                      className={`flex items-start gap-3.5 p-3.5 transition-colors cursor-pointer ${
-                        n.unread
-                          ? 'bg-blue-50/40 hover:bg-blue-50/70'
-                          : 'hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${tones[n.tone]}`}>
-                        <Icon name={n.icon} className="size-4.5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <p className="text-xs font-bold text-slate-800 truncate">{n.title}</p>
-                          {n.unread && <span className="size-2 shrink-0 rounded-full bg-blue-600" />}
-                        </div>
-                        <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2 leading-snug">
-                          {n.description}
-                        </p>
-                        <p className="mt-1 text-[10px] font-medium text-slate-400">{n.time}</p>
-                      </div>
+                {notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                    <div className="size-12 rounded-full bg-slate-50 dark:bg-white/5 flex items-center justify-center mb-3">
+                      <Icon name="document" className="size-6 text-slate-400 dark:text-slate-500" />
                     </div>
-                  )
-                })}
+                    <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No tienes notificaciones pendientes</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Te avisaremos cuando haya novedades importantes.</p>
+                  </div>
+                ) : (
+                  notifications.map((n) => {
+                    const tones = {
+                      rose: 'bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300',
+                      emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300',
+                      amber: 'bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300',
+                      blue: 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300',
+                    }
+                    return (
+                      <div
+                        key={n.id}
+                        onClick={() => {
+                          setNotifications((prev) =>
+                            prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item))
+                          )
+                          if (n.link) navigate(n.link)
+                          setNotifOpen(false)
+                        }}
+                        className={`flex items-start gap-3.5 p-3.5 transition-colors cursor-pointer ${
+                          n.unread
+                            ? 'bg-blue-50/40 hover:bg-blue-50/70'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${tones[n.tone]}`}>
+                          <Icon name={n.icon} className="size-4.5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{n.title}</p>
+                            {n.unread && <span className="size-2 shrink-0 rounded-full bg-blue-600" />}
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">
+                            {n.description}
+                          </p>
+                          <p className="mt-1 text-[10px] font-medium text-slate-400">{n.time}</p>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </div>
           )}
