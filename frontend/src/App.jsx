@@ -167,12 +167,12 @@ function Layout({ onLogout, user, onUserUpdate }) {
               <Route path="/asociaciones" element={onlyNormalUser(<Asociaciones />)} />
               <Route path="/documentos" element={onlyNormalUser(<Documentos />)} />
               <Route path="/inspecciones" element={onlyNormalUser(<Inspecciones />)} />
-              <Route path="/papeletas" element={onlyNormalUser(<Papeletas />)} />
+              <Route path="/papeletas" element={onlyNormalUser(<Papeletas user={user} />)} />
               <Route path="/operativos" element={onlyNormalUser(<Operativos user={user} />)} />
               <Route path="/cursos" element={onlyNormalUser(<CursosSeguridad />)} />
               <Route path="/cursos-seguridad" element={onlyNormalUser(<CursosSeguridad />)} />
               <Route path="/pagos" element={onlyNormalUser(<Pagos />)} />
-              <Route path="/internamientos" element={onlyNormalUser(<Retenciones />)} />
+              <Route path="/internamientos" element={onlyNormalUser(<Retenciones user={user} />)} />
               <Route path="/retenciones" element={onlyNormalUser(<Navigate to="/internamientos" replace />)} />
               <Route path="/permisos" element={onlyNormalUser(<Permisos />)} />
               <Route path="*" element={

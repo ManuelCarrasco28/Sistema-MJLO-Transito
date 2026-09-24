@@ -193,6 +193,9 @@ class AsociacionesController extends ResourceController
         }
 
         $flotaAutorizada = isset($input['flotaAutorizada']) ? max(1, (int)$input['flotaAutorizada']) : 50;
+        if ($flotaAutorizada > 500) {
+            return $this->failValidationErrors('La flota autorizada no puede superar las 500 unidades.');
+        }
 
         $idRepresentante = null;
         if (!empty($input['idRepresentanteLegal'])) {
@@ -340,7 +343,17 @@ class AsociacionesController extends ResourceController
         if (isset($input['tipoAmbiente'])) $record['tipo_ambiente'] = trim($input['tipoAmbiente']);
         if (isset($input['numeroLicencia'])) $record['numero_licencia'] = trim($input['numeroLicencia']);
         if (isset($input['resolucionAlcaldia'])) $record['resolucion_alcaldia'] = trim($input['resolucionAlcaldia']);
-        if (isset($input['flotaAutorizada'])) $record['flota_autorizada'] = max(1, (int)$input['flotaAutorizada']);
+        if (isset($input['flotaAutorizada'])) {
+            $flotaAutorizada = max(1, (int)$input['flotaAutorizada']);
+            $flotaActual = (int)$db->table('vehiculos')->where('id_asociacion', $id)->countAllResults();
+            if ($flotaAutorizada < $flotaActual) {
+                return $this->failValidationErrors("La flota autorizada no puede ser menor a {$flotaActual}, ya que actualmente hay {$flotaActual} vehículo(s) asociado(s).");
+            }
+            if ($flotaAutorizada > 500) {
+                return $this->failValidationErrors('La flota autorizada no puede superar las 500 unidades.');
+            }
+            $record['flota_autorizada'] = $flotaAutorizada;
+        }
         if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
 
         if (!empty($record)) {

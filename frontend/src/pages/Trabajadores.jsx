@@ -21,7 +21,7 @@ function FloatingInput({ id, label, type = "text", ...props }) {
       <input
         id={id}
         type={type}
-        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
         placeholder=" "
         autoComplete="off"
         {...props}
@@ -58,9 +58,9 @@ function FloatingSelect({ id, label, value, onChange, options = [], className = 
         type="button"
         id={id}
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-900 dark:text-white cursor-pointer ${isOpen
+        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-[var(--bg-surface)] dark:text-white cursor-pointer ${isOpen
             ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+            : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
           }`}
       >
         <span className="truncate">{selectedOption?.label || value}</span>
@@ -74,7 +74,7 @@ function FloatingSelect({ id, label, value, onChange, options = [], className = 
       </label>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
           <div className="space-y-0.5">
             {options.map((opt) => {
               const isSelected = String(opt.value) === String(value)
@@ -134,7 +134,7 @@ function SearchableSelect({ id, label, value, onChange, options = [], className 
         id={id}
         type="text"
         title={displayValue}
-        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white pl-3 pr-8 pt-4 pb-1 text-xs font-semibold text-slate-800 text-ellipsis overflow-hidden whitespace-nowrap outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white pl-3 pr-8 pt-4 pb-1 text-xs font-semibold text-slate-800 text-ellipsis overflow-hidden whitespace-nowrap outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
         placeholder=" "
         value={displayValue}
         onChange={(e) => {
@@ -155,7 +155,7 @@ function SearchableSelect({ id, label, value, onChange, options = [], className 
       </label>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
           <div className="space-y-0.5">
             {filteredOptions.length > 0 ? filteredOptions.map((opt) => {
               const isSelected = String(opt.value) === String(value)
@@ -207,7 +207,7 @@ function RoundedSelect({ value, onChange, options = [], className = '', buttonCl
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
-      <button type="button" onClick={() => setIsOpen(!isOpen)} className={`flex items-center justify-between gap-2 rounded-xl border bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 transition outline-none dark:bg-slate-800 dark:text-slate-200 cursor-pointer ${isOpen ? 'border-indigo-500 ring-2 ring-indigo-500/20 dark:border-indigo-400' : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'} ${buttonClassName}`}>
+      <button type="button" onClick={() => setIsOpen(!isOpen)} className={`flex items-center justify-between gap-2 rounded-xl border bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 transition outline-none dark:bg-[var(--bg-subtle)] dark:text-slate-200 cursor-pointer ${isOpen ? 'border-indigo-500 ring-2 ring-indigo-500/20 dark:border-indigo-400' : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'} ${buttonClassName}`}>
         <span className="whitespace-nowrap">{selectedOption?.label || placeholder}</span>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''}`}>
           <polyline points="6 9 12 15 18 9" />
@@ -215,7 +215,7 @@ function RoundedSelect({ value, onChange, options = [], className = '', buttonCl
       </button>
 
       {isOpen && (
-        <div className={`absolute right-0 top-full mt-1 z-40 min-w-full w-max rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100 ${dropdownClassName}`}>
+        <div className={`absolute right-0 top-full mt-1 z-40 min-w-full w-max rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100 ${dropdownClassName}`}>
           <div className="space-y-0.5">
             {options.map((opt) => {
               const isSelected = opt.value === value
@@ -409,7 +409,7 @@ export function Trabajadores() {
       {/* 2. Tarjetas KPI con Bordes de Colores: 3 tarjetas para Personal */}
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3">
         {/* Total Registrados */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registrados</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -424,7 +424,7 @@ export function Trabajadores() {
         </div>
 
         {/* Activos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Trabajadores Activos</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
@@ -439,7 +439,7 @@ export function Trabajadores() {
         </div>
 
         {/* Inactivos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Trabajadores Inactivos</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
@@ -457,10 +457,10 @@ export function Trabajadores() {
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
 
       {/* 3. Contenedor de la Tabla y Barra de Herramientas */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
         
         {/* Toolbar */}
-        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
@@ -468,7 +468,7 @@ export function Trabajadores() {
               placeholder="Buscar trabajador, DNI, cargo o unidad..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
             />
             {search && (
               <button
@@ -537,19 +537,19 @@ export function Trabajadores() {
         {/* Grid Clean */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 whitespace-nowrap">Trabajador</th>
                 <th className="px-4 py-3 whitespace-nowrap">Cargo & Unidad</th>
                 <th className="px-4 py-3 whitespace-nowrap">Asignación</th>
                 <th className="px-4 py-3 whitespace-nowrap">Cuenta</th>
                 <th className="px-4 py-3 whitespace-nowrap">Estado</th>
-                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-slate-800/40">Acciones</th>
+                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-[var(--bg-subtle)]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
               {visible.map((row) => (
-                <tr key={row.id} className="group transition-colors hover:bg-[var(--brand-soft)] dark:hover:bg-slate-800/40">
+                <tr key={row.id} className="group transition-colors hover:bg-[var(--brand-soft)] dark:hover:bg-[var(--bg-subtle)]">
                   {/* Trabajador */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <p className="text-[13.5px] font-bold text-slate-900 dark:text-white" style={{ color: 'var(--text)' }}>
@@ -581,7 +581,7 @@ export function Trabajadores() {
                   
                   {/* Cuenta */}
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${Number(row.tiene_cuenta) === 1 ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400' : 'bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${Number(row.tiene_cuenta) === 1 ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400' : 'bg-slate-50 text-slate-500 dark:bg-[var(--bg-subtle)] dark:text-slate-400'}`}>
                       {Number(row.tiene_cuenta) === 1 ? 'Sí' : 'No'}
                     </span>
                   </td>
@@ -654,7 +654,7 @@ export function Trabajadores() {
                 <tr>
                   <td colSpan={6} className="px-4 py-16 text-center">
                     <div className="mx-auto flex flex-col items-center justify-center space-y-3">
-                      <div className="size-8 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600 dark:border-slate-800 dark:border-t-indigo-500"></div>
+                      <div className="size-8 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600 dark:border-[var(--border)] dark:border-t-indigo-500"></div>
                       <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Cargando trabajadores...</p>
                       <p className="text-xs font-medium text-slate-400 dark:text-slate-500">Conectando con el servidor</p>
                     </div>
@@ -666,7 +666,7 @@ export function Trabajadores() {
                 <tr>
                   <td colSpan={6} className="px-4 py-16 text-center" style={{ color: 'var(--text-muted)' }}>
                     <div className="mx-auto max-w-xs space-y-2">
-                      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-slate-100 dark:bg-[var(--bg-subtle)]">
                         <Icon name="workerBadge" className="size-6 opacity-40" />
                       </div>
                       <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
@@ -690,12 +690,12 @@ export function Trabajadores() {
       {form && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter" onKeyDown={(e) => { if (e.key === 'Escape' && !saving) setForm(null) }}>
           <div className="flex min-h-full items-center justify-center p-4 sm:p-6 pb-24">
-            <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="relative flex w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+            <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="relative flex w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             
             {/* Header Modal - Estilo Personas.jsx */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="workerBadge" className="size-4" />
                 </span>
                 <h3 id="personal-title" className="text-base font-bold text-slate-900 dark:text-white">
@@ -716,7 +716,7 @@ export function Trabajadores() {
             <div className="p-4 sm:p-4.5 space-y-3">
               
               {!form.id && (
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-blue-600" />
                     Asignar Persona
@@ -726,7 +726,7 @@ export function Trabajadores() {
                     <input
                       id="buscarPersona"
                       required
-                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pb-1 pt-4 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pb-1 pt-4 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
                       placeholder=" "
                       value={personaSearch}
                       onFocus={() => setPersonaDropdownOpen(true)}
@@ -742,7 +742,7 @@ export function Trabajadores() {
                     </label>
 
                     {personaDropdownOpen && !selectedPersona && (
-                      <div className="absolute left-0 top-full z-20 mt-1 p-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                      <div className="absolute left-0 top-full z-20 mt-1 p-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
                         {personasDisponibles.map((p) => (
                           <button key={p.id} type="button" onMouseDown={(e) => {
                               e.preventDefault(); e.stopPropagation();
@@ -772,19 +772,19 @@ export function Trabajadores() {
               )}
 
               {form.id && (
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-blue-600" />
                     Persona Vinculada
                   </h4>
-                  <div className="rounded-xl border border-white bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800 shadow-2xs">
+                  <div className="rounded-xl border border-white bg-white px-4 py-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] shadow-2xs">
                     <p className="text-sm font-black text-slate-900 dark:text-white">{form.nombres} {form.apellidos}</p>
                     <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{form.tipo_documento}: {form.numero_documento}</p>
                   </div>
                 </div>
               )}
 
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-cyan-600" />
                   Datos Laborales
@@ -819,7 +819,7 @@ export function Trabajadores() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-emerald-600" />
                   Documentación y Estado
@@ -867,11 +867,11 @@ export function Trabajadores() {
               )}
 
               {form.historial?.length > 0 && (
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-slate-400">Historial Laboral</p>
                   <div className="space-y-2">
                     {form.historial.map((h, idx) => (
-                      <div key={idx} className="border-l-2 border-slate-200 pl-2 dark:border-slate-700">
+                      <div key={idx} className="border-l-2 border-slate-200 pl-2 dark:border-[var(--border-strong)]">
                         <p className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{h.cargo || 'Cargo no registrado'} · {h.unidad_organica || 'Sin unidad'}</p>
                         <p className="text-[10.5px] font-medium text-slate-500 mt-0.5">{h.documento || 'Sin doc.'} · {h.fecha_documento || 'Sin fecha'}</p>
                         <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">{h.tipo_funcion || 'Sin función'} {h.fecha_termino ? `(Terminó ${h.fecha_termino})` : '(Vigente)'}</p>
@@ -890,8 +890,8 @@ export function Trabajadores() {
             </div>
 
               {/* Footer Modal */}
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3 dark:border-slate-800 dark:bg-slate-900/80 rounded-b-3xl">
-                <button type="button" disabled={saving} onClick={() => setForm(null)} className="rounded-xl border border-slate-200/80 bg-white px-5 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 shadow-xs cursor-pointer">
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3 dark:border-[var(--border)] dark:bg-slate-900/80 rounded-b-3xl">
+                <button type="button" disabled={saving} onClick={() => setForm(null)} className="rounded-xl border border-slate-200/80 bg-white px-5 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-slate-700 shadow-xs cursor-pointer">
                   Cancelar
                 </button>
                 <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-6 py-2 text-xs font-extrabold text-white shadow-md shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white dark:shadow-slate-50/20">

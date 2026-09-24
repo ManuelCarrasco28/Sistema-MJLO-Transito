@@ -326,6 +326,44 @@ const iconPaths = {
       <line x1="15" y1="3" x2="15" y2="21" />
     </>
   ),
+  mapPin: (
+    <>
+      <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </>
+  ),
+  creditCard: (
+    <>
+      <rect x="2.5" y="5" width="19" height="14" rx="2" />
+      <line x1="2.5" y1="10" x2="21.5" y2="10" />
+      <line x1="6" y1="15" x2="10" y2="15" />
+    </>
+  ),
+  chartBar: (
+    <>
+      <line x1="4" y1="20" x2="20" y2="20" />
+      <rect x="6" y="12" width="3.5" height="8" />
+      <rect x="12" y="7" width="3.5" height="13" />
+      <rect x="18" y="15" width="0" height="5" />
+      <rect x="15.5" y="15" width="3.5" height="5" />
+    </>
+  ),
+  bolt: (
+    <>
+      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />
+    </>
+  ),
+  scale: (
+    <>
+      <path d="M12 3v18M6 8l-3.5 7a3.5 3.5 0 0 0 7 0L6 8ZM18 8l-3.5 7a3.5 3.5 0 0 0 7 0L18 8Z" />
+      <path d="M6 8h12M8 21h8" />
+    </>
+  ),
+  hand: (
+    <>
+      <path d="M9 12V6a1.5 1.5 0 0 1 3 0v5M12 11V4.5a1.5 1.5 0 0 1 3 0V11M15 11.5V6a1.5 1.5 0 0 1 3 0v9c0 3.5-2.5 6-6 6h-1c-2.5 0-3.8-.8-5-2.5L4 15.5c-.6-.9-.3-2 .6-2.5.7-.4 1.6-.2 2.1.4L9 16" />
+    </>
+  ),
 }
 
 export function Icon({ name, className = 'size-5' }) {

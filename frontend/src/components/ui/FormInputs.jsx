@@ -15,7 +15,12 @@ export function FloatingInput({
   ...props
 }) {
   const [isFocused, setIsFocused] = useState(false)
-  const isFloating = isFocused || (value !== undefined && value !== null && String(value).trim() !== '')
+  // Los inputs de fecha/hora siempre muestran su propio esqueleto (dd/mm/aaaa),
+  // nunca se ven realmente "vacíos", así que la etiqueta debe quedar arriba
+  // desde el inicio para no superponerse con ese texto nativo del navegador.
+  const isFloating = ['date', 'time', 'datetime-local', 'month', 'week'].includes(type)
+    || isFocused
+    || (value !== undefined && value !== null && String(value).trim() !== '')
 
   return (
     <div className={`relative ${className}`}>
@@ -30,7 +35,7 @@ export function FloatingInput({
         onBlur={() => setIsFocused(false)}
         autoComplete={autoComplete}
         placeholder=" "
-        className={`peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 ${inputClassName}`}
+        className={`peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400 ${inputClassName}`}
         {...props}
       />
       <label
@@ -79,10 +84,10 @@ export function FloatingSelect({
         type="button"
         id={id}
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-800 dark:text-white cursor-pointer ${
+        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-[var(--bg-subtle)] dark:text-white cursor-pointer ${
           isOpen
             ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+            : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
         }`}
       >
         <span className="truncate pr-1">{selectedOption?.label || value}</span>
@@ -112,7 +117,7 @@ export function FloatingSelect({
       </label>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 min-w-full w-max max-w-[280px] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute left-0 right-0 top-full mt-1 max-w-[calc(100vw-2rem)] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/15 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
           <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
             {options.map((opt) => {
               const isSelected = opt.value === value
@@ -183,10 +188,10 @@ export function RoundedSelect({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-between gap-2 rounded-xl border bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 transition outline-none dark:bg-slate-800 dark:text-slate-200 cursor-pointer ${
+        className={`flex items-center justify-between gap-2 rounded-xl border bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 transition outline-none dark:bg-[var(--bg-subtle)] dark:text-slate-200 cursor-pointer ${
           isOpen
             ? 'border-indigo-500 ring-2 ring-indigo-500/20 dark:border-indigo-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+            : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
         } ${buttonClassName}`}
       >
         <span className="whitespace-nowrap">{selectedOption?.label || placeholder}</span>
@@ -207,7 +212,7 @@ export function RoundedSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1.5 min-w-full w-max max-w-[320px] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute right-0 top-full mt-1.5 min-w-full w-max max-w-[320px] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
           <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
             {options.map((opt) => {
               const isSelected = opt.value === value

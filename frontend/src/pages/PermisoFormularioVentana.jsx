@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Editor } from '@tinymce/tinymce-react'
 import { Icon } from '../components/ui/Icon'
-import { apiFetch } from '../config/api'
+import { sanitizarMensaje, apiFetch } from '../config/api'
+import { showError } from '../utils/SwalUtil'
 import { BuscadorAdministrados } from '../components/permisos/BuscadorAdministrados'
 import { generarPlantillaCuerpo } from '../utils/permisosPlantilla'
 
@@ -105,7 +106,7 @@ export function PermisoFormularioVentana() {
           }
         }
       } catch (err) {
-        alert('Error al cargar la información del permiso: ' + err.message)
+        showError('Error al cargar', sanitizarMensaje(err.message, 'No se pudo cargar la información del permiso.'))
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -219,7 +220,7 @@ export function PermisoFormularioVentana() {
         }
       }, 1200)
     } catch (err) {
-      alert(err.message || 'Ocurrió un error al guardar la autorización.')
+      showError('Error', sanitizarMensaje(err.message, 'Ocurrió un error al guardar la autorización.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -247,7 +248,7 @@ export function PermisoFormularioVentana() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-[#070d1e] dark:text-slate-100 flex flex-col">
       {/* Barra Superior de la Ventana */}
-      <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#0B1437]/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3.5 shadow-sm flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-slate-200 dark:border-[var(--border)] px-4 sm:px-6 py-3.5 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/30">
             <Icon name="fileText" className="size-5" />
@@ -271,7 +272,7 @@ export function PermisoFormularioVentana() {
           <button
             type="button"
             onClick={handleCerrar}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
           >
             Cerrar ventana
           </button>
@@ -308,12 +309,12 @@ export function PermisoFormularioVentana() {
         )}
 
         {/* 1. BUSCADOR INTELIGENTE EN BASE DE DATOS (Auto-rellenado) */}
-        <div className="rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0B1437]">
+        <div className="rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <BuscadorAdministrados onSelect={handleSelectAdministrado} />
         </div>
 
         {/* 2. CLASIFICACIÓN / SELECTOR DE TIPO */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0B1437] space-y-3">
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
           <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
             Clasificación / Tipo de Permiso *
           </label>
@@ -324,7 +325,7 @@ export function PermisoFormularioVentana() {
               className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                 formData.tipoPermiso === 'CARGA_DESCARGA'
                   ? 'border-sky-500 bg-sky-50/70 dark:bg-sky-950/30 text-sky-950 dark:text-sky-200 shadow-sm'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
@@ -344,7 +345,7 @@ export function PermisoFormularioVentana() {
               className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                 formData.tipoPermiso === 'USO_VIAS'
                   ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/30 text-indigo-950 dark:text-indigo-200 shadow-sm'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
@@ -364,7 +365,7 @@ export function PermisoFormularioVentana() {
               className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                 formData.tipoPermiso === 'OPERACION'
                   ? 'border-violet-500 bg-violet-50/70 dark:bg-violet-950/30 text-violet-950 dark:text-violet-200 shadow-sm'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
@@ -381,8 +382,8 @@ export function PermisoFormularioVentana() {
         </div>
 
         {/* 3. CAMPOS DE DATOS GENERALES */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0B1437] space-y-4">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 pb-2">
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-4">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-[var(--border)] pb-2">
             Datos del Solicitante, Vehículo y Expediente
           </h2>
 
@@ -399,7 +400,7 @@ export function PermisoFormularioVentana() {
                 onChange={handleInputChange}
                 required
                 placeholder="Nombre completo o Empresa titular"
-                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 font-bold outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-bold outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
               />
             </div>
 
@@ -415,7 +416,7 @@ export function PermisoFormularioVentana() {
                 onChange={handleInputChange}
                 required
                 placeholder="20601234567 o 71234567"
-                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 font-mono font-bold outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
               />
             </div>
 
@@ -430,7 +431,7 @@ export function PermisoFormularioVentana() {
                 value={formData.representanteLegal}
                 onChange={handleInputChange}
                 placeholder="Nombre del apoderado legal"
-                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
               />
             </div>
 
@@ -445,7 +446,7 @@ export function PermisoFormularioVentana() {
                 value={formData.vehiculoPlaca}
                 onChange={handleInputChange}
                 placeholder="ABC-123"
-                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 font-mono font-bold uppercase outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold uppercase outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
               />
             </div>
 
@@ -460,7 +461,7 @@ export function PermisoFormularioVentana() {
                 value={formData.expediente}
                 onChange={handleInputChange}
                 placeholder="EXP-796383"
-                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 font-mono outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
               />
             </div>
 
@@ -475,7 +476,7 @@ export function PermisoFormularioVentana() {
                 value={formData.numeroAutorizacion}
                 onChange={handleInputChange}
                 placeholder="Generado automáticamente si se deja vacío"
-                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 font-mono outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
               />
             </div>
 
@@ -490,7 +491,7 @@ export function PermisoFormularioVentana() {
                 value={formData.zonaCirculacion}
                 onChange={handleInputChange}
                 placeholder="Anillo Vial - Distrito de José Leonardo Ortiz"
-                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
+                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800"
               />
             </div>
 
@@ -506,7 +507,7 @@ export function PermisoFormularioVentana() {
                   value={formData.horarioInicio}
                   onChange={handleInputChange}
                   placeholder="16:00:00"
-                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
                 />
                 <input
                   type="text"
@@ -514,7 +515,7 @@ export function PermisoFormularioVentana() {
                   value={formData.horarioFin}
                   onChange={handleInputChange}
                   placeholder="05:00:00"
-                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
@@ -531,7 +532,7 @@ export function PermisoFormularioVentana() {
                 value={formData.reciboIngresoNumero}
                 readOnly
                 placeholder="Se toma del trámite vinculado"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/60 px-3 py-2 font-mono text-slate-600 dark:text-slate-400 outline-none cursor-not-allowed"
+                className="w-full rounded-xl border border-slate-200 dark:border-[var(--border)] bg-slate-100 dark:bg-[var(--bg-subtle)] px-3 py-2 font-mono text-slate-600 dark:text-slate-400 outline-none cursor-not-allowed"
               />
             </div>
 
@@ -545,7 +546,7 @@ export function PermisoFormularioVentana() {
                 name="reciboIngresoMonto"
                 value={formData.reciboIngresoMonto}
                 readOnly
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/60 px-3 py-2 font-mono font-bold text-slate-600 dark:text-slate-400 outline-none cursor-not-allowed"
+                className="w-full rounded-xl border border-slate-200 dark:border-[var(--border)] bg-slate-100 dark:bg-[var(--bg-subtle)] px-3 py-2 font-mono font-bold text-slate-600 dark:text-slate-400 outline-none cursor-not-allowed"
               />
             </div>
 
@@ -559,15 +560,15 @@ export function PermisoFormularioVentana() {
                 name="fechaFinVigencia"
                 value={formData.fechaFinVigencia}
                 onChange={handleInputChange}
-                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 outline-none focus:border-indigo-500"
+                className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500"
               />
             </div>
           </div>
         </div>
 
         {/* 4. EDITOR ENRIQUECIDO TINYMCE */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0B1437] space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-[var(--border)] pb-3">
             <div>
               <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
                 <Icon name="fileText" className="size-4 text-indigo-600" />
@@ -581,13 +582,13 @@ export function PermisoFormularioVentana() {
             <button
               type="button"
               onClick={handleRecargarPlantilla}
-              className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs font-bold transition cursor-pointer"
+              className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 text-xs font-bold transition cursor-pointer"
             >
               <span>↺ Regenerar plantilla con datos</span>
             </button>
           </div>
 
-          <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
+          <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-[var(--border-strong)]">
             <Editor
               apiKey={TINYMCE_API_KEY}
               value={formData.contenido}
@@ -622,7 +623,7 @@ export function PermisoFormularioVentana() {
             <button
               type="button"
               onClick={handleCerrar}
-              className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
+              className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
             >
               Cancelar
             </button>

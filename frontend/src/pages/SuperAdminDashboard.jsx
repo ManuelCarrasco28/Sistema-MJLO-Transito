@@ -512,7 +512,7 @@ export function SuperAdminDashboard({ user }) {
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {dashboardStats.map((stat) => (
-              <div key={stat.label} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col justify-between">
+              <div key={stat.label} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-black uppercase tracking-wide text-slate-400">{stat.label}</p>
@@ -524,7 +524,7 @@ export function SuperAdminDashboard({ user }) {
                   </span>
                 </div>
                 {stat.isToggle && (
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[var(--border)] flex items-center justify-between">
                     <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300">
                       {savingConfigSistema ? 'Guardando...' : mobilePermitePapeleta ? 'Nueva Papeleta' : 'Registrar Evidencia'}
                     </span>
@@ -555,7 +555,7 @@ export function SuperAdminDashboard({ user }) {
             ))}
           </section>
 
-          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
             <div className="mb-5">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Administración del sistema</p>
               <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-white">Módulos administrativos</h2>
@@ -568,7 +568,7 @@ export function SuperAdminDashboard({ user }) {
                   key={module.id}
                   type="button"
                   onClick={() => navigate(`/superadmin/${module.id}`)}
-                  className="group rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-lg dark:border-slate-800 dark:bg-slate-800/40"
+                  className="group rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-lg dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]"
                 >
                   <div className="flex items-start gap-4">
                     <span className={`grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${module.tone} text-white shadow-lg`}>
@@ -577,7 +577,7 @@ export function SuperAdminDashboard({ user }) {
                     <div className="min-w-0">
                       <h2 className="text-base font-black text-slate-950 dark:text-white">{module.label}</h2>
                       <p className="mt-1 text-sm font-semibold leading-5 text-slate-500 dark:text-slate-400">{module.detail}</p>
-                      <span className="mt-4 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 shadow-sm group-hover:text-blue-700 dark:bg-slate-900 dark:text-slate-300">
+                      <span className="mt-4 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 shadow-sm group-hover:text-blue-700 dark:bg-[var(--bg-surface)] dark:text-slate-300">
                         Abrir módulo
                       </span>
                     </div>
@@ -593,7 +593,7 @@ export function SuperAdminDashboard({ user }) {
         activeModule === 'usuarios' ? (
           <Usuarios user={user} />
         ) : (
-          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Módulo administrativo</p>
@@ -648,8 +648,8 @@ export function SuperAdminDashboard({ user }) {
               ))}
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 dark:border-[var(--border)] lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="text-lg font-black text-slate-900 dark:text-white">Centro de auditoría institucional</h3>
                   <p className="text-xs font-semibold text-slate-500">
@@ -671,12 +671,12 @@ export function SuperAdminDashboard({ user }) {
                   value={auditSearch}
                   onChange={(event) => setAuditSearch(event.target.value)}
                   placeholder="Buscar por descripción, usuario, módulo o IP..."
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-[var(--border-strong)] dark:bg-slate-950 dark:text-white"
                 />
                 <select
                   value={auditType}
                   onChange={(event) => setAuditType(event.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-[var(--border-strong)] dark:bg-slate-950 dark:text-white"
                 >
                   <option value="TODOS">Todos los módulos</option>
                   <option value="SEGURIDAD">Seguridad (Login/Logout)</option>
@@ -690,7 +690,7 @@ export function SuperAdminDashboard({ user }) {
                 <select
                   value={auditSeverity}
                   onChange={(event) => setAuditSeverity(event.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-[var(--border-strong)] dark:bg-slate-950 dark:text-white"
                 >
                   <option value="TODOS">Todas las acciones</option>
                   <option value="CREAR">Creación</option>
@@ -703,7 +703,7 @@ export function SuperAdminDashboard({ user }) {
                 </select>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800">
+              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 dark:border-[var(--border)]">
                 <table className="w-full min-w-[900px] text-left text-sm">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 dark:bg-slate-950 dark:text-slate-400">
                     <tr>
@@ -716,7 +716,7 @@ export function SuperAdminDashboard({ user }) {
                       <th className="px-4 py-3">Dirección IP</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                     {loadingAudit ? (
                       <tr>
                         <td colSpan={7} className="px-4 py-8 text-center text-sm font-bold text-slate-500">
@@ -741,7 +741,7 @@ export function SuperAdminDashboard({ user }) {
                                 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-200'
                                 : event.accion === 'CREAR' || event.accion === 'CONFIRMAR'
                                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200'
-                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                  : 'bg-slate-100 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
                           }`}>
                             {event.accion}
                           </span>
@@ -785,7 +785,7 @@ export function SuperAdminDashboard({ user }) {
               { title: 'Archivos y evidencias', detail: 'Control de fotos, reportes móviles y documentos adjuntos.', status: 'En revisión' },
               { title: 'Restauración', detail: 'Proceso reservado para mantenimiento técnico autorizado.', status: 'Restringido' }
             ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <div key={item.title} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
                 <p className="font-black text-slate-900 dark:text-white">{item.title}</p>
                 <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{item.detail}</p>
                 <span className="mt-4 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 shadow-sm">
@@ -834,10 +834,10 @@ export function SuperAdminDashboard({ user }) {
                     setUserForm({ ...userForm, id_trabajador: '' })
                   }}
                   placeholder="Busca por DNI, nombre o cargo..."
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white"
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
                 {trabajadorDropdownOpen && !selectedTrabajador && (
-                  <div className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                  <div className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
                     {trabajadoresSinUsuario.map((trabajador) => (
                       <button
                         key={trabajador.id_persona || trabajador.id}
@@ -850,7 +850,7 @@ export function SuperAdminDashboard({ user }) {
                           setTrabajadorSearch(`${trabajador.numero_documento} — ${trabajador.nombres} ${trabajador.apellidos || ''}`.trim())
                           setTrabajadorDropdownOpen(false)
                         }}
-                        className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-blue-50 dark:border-slate-800 dark:hover:bg-slate-800"
+                        className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-blue-50 dark:border-[var(--border)] dark:hover:bg-[var(--bg-subtle)]"
                       >
                         <p className="font-bold text-slate-900 dark:text-white">{trabajador.nombres} {trabajador.apellidos}</p>
                         <p className="text-xs font-semibold text-blue-600">{trabajador.tipo_documento}: {trabajador.numero_documento} · {trabajador.cargo || 'Sin cargo'}</p>
@@ -876,14 +876,14 @@ export function SuperAdminDashboard({ user }) {
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <input required value={userForm.nombre_usuario} onChange={(e) => setUserForm({ ...userForm, nombre_usuario: e.target.value.toLowerCase().replace(/\s+/g, '') })} placeholder="Usuario" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white" />
-              <input required minLength={6} type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Contraseña" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white" />
-              <select value={userForm.cargo} onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white sm:col-span-2">
+              <input required value={userForm.nombre_usuario} onChange={(e) => setUserForm({ ...userForm, nombre_usuario: e.target.value.toLowerCase().replace(/\s+/g, '') })} placeholder="Usuario" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" />
+              <input required minLength={6} type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Contraseña" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" />
+              <select value={userForm.cargo} onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white sm:col-span-2">
                 {CARGOS.map((cargo) => <option key={cargo} value={cargo}>{cargo}</option>)}
               </select>
             </div>
-            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
-              <button type="button" onClick={() => setUserModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
+              <button type="button" onClick={() => setUserModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">
                 Cancelar
               </button>
               <button className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2 text-sm font-black text-white shadow-md shadow-blue-600/20 hover:shadow-lg">
@@ -909,15 +909,15 @@ export function SuperAdminDashboard({ user }) {
 
 function UsersTable({ usuarios, totalUsuarios, loading, searchTerm, setSearchTerm, onCreate, onEdit, onPassword, onDelete }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1">
           <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar usuario, nombre o rol..."
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-400"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400"
           />
           {searchTerm && (
             <button
@@ -940,7 +940,7 @@ function UsersTable({ usuarios, totalUsuarios, loading, searchTerm, setSearchTer
         </button>
       </div>
 
-      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/30 dark:text-slate-400">
         <span>
           Mostrando <strong className="text-slate-800 dark:text-white">{usuarios.length}</strong> de{' '}
           <strong className="text-slate-800 dark:text-white">{totalUsuarios}</strong> usuarios registrados
@@ -952,20 +952,20 @@ function UsersTable({ usuarios, totalUsuarios, loading, searchTerm, setSearchTer
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+          <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
             <tr>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Usuario</th>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Nombre completo</th>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Rol</th>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
-              <th className="sticky right-0 z-20 bg-slate-50/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:border-slate-800 dark:bg-slate-900/95 dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
+              <th className="sticky right-0 z-20 bg-slate-50/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:border-[var(--border)] dark:bg-slate-900/95 dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
             {loading ? (
               <tr><td colSpan="5" className="px-4 py-8 text-center font-bold text-slate-500">Cargando...</td></tr>
             ) : usuarios.length ? usuarios.map((item) => (
-              <tr key={item.id} className="group transition-colors hover:bg-blue-50/30 dark:hover:bg-slate-800/40">
+              <tr key={item.id} className="group transition-colors hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)]">
                 <td className="px-3.5 py-3.5">
                   <p className="font-black text-slate-800 dark:text-white">{item.nombre_usuario}</p>
                   <p className="text-xs font-semibold text-slate-400">ID trabajador: {item.id_trabajador}</p>
@@ -982,7 +982,7 @@ function UsersTable({ usuarios, totalUsuarios, loading, searchTerm, setSearchTer
                     {item.usuario_estado}
                   </span>
                 </td>
-                <td className="sticky right-0 z-10 bg-white px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] group-hover:bg-blue-50/40 dark:border-slate-800/80 dark:bg-[#0f172a] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] dark:group-hover:bg-slate-800/60">
+                <td className="sticky right-0 z-10 bg-white px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] group-hover:bg-blue-50/40 dark:border-slate-800/80 dark:bg-[var(--bg-surface)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] dark:group-hover:bg-slate-800/60">
                   <div className="flex justify-end gap-2">
                     <button onClick={() => onEdit(item)} className="rounded-xl bg-blue-50 p-2 text-blue-600 transition hover:bg-blue-500 hover:text-white dark:bg-blue-950/60 dark:text-blue-400" title="Editar"><Icon name="pencil" className="size-4" /></button>
                     <button onClick={() => onPassword(item)} className="rounded-xl bg-amber-50 p-2 text-amber-600 transition hover:bg-amber-500 hover:text-white dark:bg-amber-950/60 dark:text-amber-400" title="Contraseña"><Icon name="settings" className="size-4" /></button>
@@ -1021,15 +1021,15 @@ function RolesTable({ roles, loading, onEdit }) {
   }, [roles])
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1">
           <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar rol, cargo o usuario asignado..."
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-400"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400"
           />
           {searchTerm && (
             <button
@@ -1043,7 +1043,7 @@ function RolesTable({ roles, loading, onEdit }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/30 dark:text-slate-400">
         <span>
           Mostrando <strong className="text-slate-800 dark:text-white">{filteredRoles.length}</strong> de{' '}
           <strong className="text-slate-800 dark:text-white">{roles.length}</strong> roles registrados ({totalAsignaciones} usuarios vinculados)
@@ -1055,20 +1055,20 @@ function RolesTable({ roles, loading, onEdit }) {
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+          <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
             <tr>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Rol / Cargo</th>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Total Asignados</th>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Usuarios con este Rol</th>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
-              <th className="sticky right-0 z-20 bg-slate-50/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:border-slate-800 dark:bg-slate-900/95 dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
+              <th className="sticky right-0 z-20 bg-slate-50/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:border-[var(--border)] dark:bg-slate-900/95 dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
             {loading ? (
               <tr><td colSpan="5" className="px-4 py-8 text-center font-bold text-slate-500">Cargando roles...</td></tr>
             ) : filteredRoles.length ? filteredRoles.map((grupo) => (
-              <tr key={grupo.rol} className="group transition-colors hover:bg-blue-50/30 dark:hover:bg-slate-800/40">
+              <tr key={grupo.rol} className="group transition-colors hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)]">
                 <td className="px-3.5 py-3.5 align-top">
                   <p className="font-black text-slate-800 dark:text-white">{grupo.rol}</p>
                   <p className="text-xs font-semibold text-slate-400">Perfil del sistema</p>
@@ -1084,7 +1084,7 @@ function RolesTable({ roles, loading, onEdit }) {
                     {grupo.miembros.length ? grupo.miembros.map((m) => (
                       <span
                         key={m.id}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200/80 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200/80 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200"
                       >
                         <span className="font-bold text-slate-900 dark:text-white">{m.nombre_usuario}</span>
                         <span className="text-[11px] text-slate-400">({m.nombre_completo})</span>
@@ -1100,7 +1100,7 @@ function RolesTable({ roles, loading, onEdit }) {
                     ACTIVO
                   </span>
                 </td>
-                <td className="sticky right-0 z-10 bg-white px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] group-hover:bg-blue-50/40 dark:border-slate-800/80 dark:bg-[#0f172a] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] dark:group-hover:bg-slate-800/60 align-top">
+                <td className="sticky right-0 z-10 bg-white px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] group-hover:bg-blue-50/40 dark:border-slate-800/80 dark:bg-[var(--bg-surface)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] dark:group-hover:bg-slate-800/60 align-top">
                   <div className="flex justify-end gap-1.5">
                     {grupo.miembros.length > 0 ? (
                       <button
@@ -1181,7 +1181,7 @@ function ConfiguracionReadOnly({
   return (
     <div className="space-y-6">
       {/* TARJETA INTERACTIVA DE PERMISO GENERAL MÓVIL (Conexión App Móvil Inspectores) */}
-      <div className="rounded-3xl border border-violet-200/90 bg-gradient-to-r from-violet-50/90 via-purple-50/70 to-indigo-50/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="rounded-3xl border border-violet-200/90 bg-gradient-to-r from-violet-50/90 via-purple-50/70 to-indigo-50/80 p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className={`grid size-12 shrink-0 place-items-center rounded-2xl text-white shadow-md transition-all ${
@@ -1236,8 +1236,8 @@ function ConfiguracionReadOnly({
         }`}>
           <span>
             {mobilePermitePapeleta
-              ? '✓ ACTIVO: el móvil muestra “Nueva Papeleta” (infracción vehicular en tiempo real).'
-              : '⚡ INACTIVO: el móvil debe mostrar solo “Registrar reporte/evidencia” (revisión administrativa).'}
+              ? 'ACTIVO: el móvil muestra “Nueva Papeleta” (infracción vehicular en tiempo real).'
+              : 'INACTIVO: el móvil debe mostrar solo “Registrar reporte/evidencia” (revisión administrativa).'}
           </span>
           <span className="font-mono text-[10px] opacity-75">
             Sincroniza con /api/municipalidad/config-mobile
@@ -1246,7 +1246,7 @@ function ConfiguracionReadOnly({
       </div>
 
       {/* Banner de Aviso Solo Lectura */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 p-4 text-blue-900 shadow-xs dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 p-4 text-blue-900 shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-200">
         <div className="flex items-center gap-3">
           <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
             <Icon name="lock" className="size-5" />
@@ -1262,7 +1262,7 @@ function ConfiguracionReadOnly({
           type="button"
           onClick={onReload}
           disabled={loading}
-          className="inline-flex items-center justify-center gap-1.5 self-start sm:self-auto rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-xs font-black text-blue-700 shadow-xs transition hover:bg-blue-50 hover:shadow-md active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 cursor-pointer"
+          className="inline-flex items-center justify-center gap-1.5 self-start sm:self-auto rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-xs font-black text-blue-700 shadow-xs transition hover:bg-blue-50 hover:shadow-md active:scale-95 disabled:opacity-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-slate-200 cursor-pointer"
         >
           <span>{loading ? 'Cargando datos...' : 'Recargar información'}</span>
         </button>
@@ -1271,7 +1271,7 @@ function ConfiguracionReadOnly({
       {/* KPI Cards de Resumen */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+          <div key={kpi.label} className="flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
             <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${kpi.tone}`}>
               <Icon name={kpi.icon} className="size-5" />
             </div>
@@ -1285,7 +1285,7 @@ function ConfiguracionReadOnly({
       </div>
 
       {/* Selector de Pestañas */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-[var(--border)]">
         {[
           { id: 'todos', label: 'Ver Todo', icon: 'document' },
           { id: 'institucional', label: 'Datos Institucionales', icon: 'building' },
@@ -1299,7 +1299,7 @@ function ConfiguracionReadOnly({
             className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-black transition-all cursor-pointer ${
               activeTab === tab.id
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'
             }`}
           >
             <Icon name={tab.icon} className="size-4" />
@@ -1310,8 +1310,8 @@ function ConfiguracionReadOnly({
 
       {/* SECCIÓN 1: DATOS INSTITUCIONALES */}
       {(activeTab === 'todos' || activeTab === 'institucional') && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-900/40">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-[var(--border)] dark:bg-slate-900/40">
             <div className="flex items-center gap-2.5">
               <div className="flex size-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                 <Icon name="building" className="size-4" />
@@ -1329,7 +1329,7 @@ function ConfiguracionReadOnly({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
                 <tr>
                   <th className="px-5 py-3.5 w-1/4">Parámetro Institucional</th>
                   <th className="px-5 py-3.5 w-2/5">Valor Registrado</th>
@@ -1337,11 +1337,11 @@ function ConfiguracionReadOnly({
                   <th className="px-5 py-3.5 text-right">Estado</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">RUC</td>
                   <td className="px-5 py-3">
-                    <span className="inline-flex items-center font-mono font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/70 dark:bg-slate-800/80 dark:border-slate-700 dark:text-blue-300">
+                    <span className="inline-flex items-center font-mono font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/70 dark:bg-slate-800/80 dark:border-[var(--border-strong)] dark:text-blue-300">
                       {municipalidad?.ruc || '20148364975'}
                     </span>
                   </td>
@@ -1351,7 +1351,7 @@ function ConfiguracionReadOnly({
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Razón Social</td>
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-slate-200">{municipalidad?.razon_social || 'MUNICIPALIDAD DISTRITAL DE JOSÉ LEONARDO ORTIZ'}</td>
                   <td className="px-5 py-3 text-xs font-medium text-slate-500">Denominación legal de la entidad pública</td>
@@ -1360,25 +1360,25 @@ function ConfiguracionReadOnly({
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Nombre Abreviado</td>
                   <td className="px-5 py-3 font-semibold text-slate-700 dark:text-slate-300">{municipalidad?.nombre_abreviado || 'Municipalidad Distrital José Leonardo Ortiz'}</td>
                   <td className="px-5 py-3 text-xs font-medium text-slate-500">Nombre de uso común administrativo</td>
                   <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">ESTÁNDAR</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">ESTÁNDAR</span>
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Sigla Oficial</td>
                   <td className="px-5 py-3 font-black text-indigo-700 dark:text-indigo-400">{municipalidad?.sigla || 'MDJLO'}</td>
                   <td className="px-5 py-3 text-xs font-medium text-slate-500">Acrónimo institucional de la comuna</td>
                   <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">ESTÁNDAR</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">ESTÁNDAR</span>
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Dirección Fiscal</td>
                   <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{municipalidad?.direccion_fiscal || 'Av. Sáenz Peña 2151'}</td>
                   <td className="px-5 py-3 text-xs font-medium text-slate-500">Domicilio legal de la sede principal</td>
@@ -1387,18 +1387,18 @@ function ConfiguracionReadOnly({
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Jurisdicción Territorial</td>
                   <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">
                     {municipalidad?.departamento || 'Lambayeque'} · {municipalidad?.provincia || 'Chiclayo'} · {municipalidad?.distrito || 'José Leonardo Ortiz'}
                   </td>
                   <td className="px-5 py-3 text-xs font-medium text-slate-500">Departamento / Provincia / Distrito</td>
                   <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">UBIGEO</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">UBIGEO</span>
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Teléfono de Contacto</td>
                   <td className="px-5 py-3 font-semibold text-slate-700 dark:text-slate-300">{municipalidad?.telefono || '(074) 251911'}</td>
                   <td className="px-5 py-3 text-xs font-medium text-slate-500">Central telefónica oficial</td>
@@ -1407,7 +1407,7 @@ function ConfiguracionReadOnly({
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Correo Oficial</td>
                   <td className="px-5 py-3 font-medium text-blue-600 dark:text-blue-400">{municipalidad?.email || 'mesa.partes@munijlo.gob.pe'}</td>
                   <td className="px-5 py-3 text-xs font-medium text-slate-500">Buzón de notificaciones institucionales</td>
@@ -1416,7 +1416,7 @@ function ConfiguracionReadOnly({
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Mesa de Partes</td>
                   <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{municipalidad?.mesa_partes || 'Mesa de Partes Virtual / Presencial'}</td>
                   <td className="px-5 py-3 text-xs font-medium text-slate-500">Canal de recepción de trámites ciudadanos</td>
@@ -1425,7 +1425,7 @@ function ConfiguracionReadOnly({
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Logotipo Institucional</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2.5">
@@ -1439,7 +1439,7 @@ function ConfiguracionReadOnly({
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Estado General de la Entidad</td>
                   <td className="px-5 py-3 font-black text-slate-800 dark:text-white">{municipalidad?.estado || 'ACTIVO'}</td>
                   <td className="px-5 py-3 text-xs font-medium text-slate-500">Vigencia operativa de la entidad municipal</td>
@@ -1458,8 +1458,8 @@ function ConfiguracionReadOnly({
 
       {/* SECCIÓN 2: PARÁMETROS OPERATIVOS */}
       {(activeTab === 'todos' || activeTab === 'parametros') && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-900/40">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-[var(--border)] dark:bg-slate-900/40">
             <div className="flex items-center gap-2.5">
               <div className="flex size-8 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
                 <Icon name="settings" className="size-4" />
@@ -1476,7 +1476,7 @@ function ConfiguracionReadOnly({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
                 <tr>
                   <th className="px-5 py-3.5 w-1/4">Directiva / Parámetro</th>
                   <th className="px-5 py-3.5 w-1/4">Clave del Sistema</th>
@@ -1485,14 +1485,14 @@ function ConfiguracionReadOnly({
                   <th className="px-5 py-3.5 text-right">Condición</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-4">
                     <p className="font-black text-slate-800 dark:text-white">Permiso Papeleta Móvil</p>
                     <p className="text-xs font-medium text-slate-400">Emisión directa desde smartphone</p>
                   </td>
                   <td className="px-5 py-4">
-                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                       mobile_permite_aplicar_papeleta
                     </code>
                   </td>
@@ -1526,38 +1526,38 @@ function ConfiguracionReadOnly({
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-4">
                     <p className="font-black text-slate-800 dark:text-white">Entorno del Servidor</p>
                     <p className="text-xs font-medium text-slate-400">Modo de compilación y logs</p>
                   </td>
                   <td className="px-5 py-4">
-                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                      CI_ENVIRONMENT
+                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                      MODO_SISTEMA
                     </code>
                   </td>
                   <td className="px-5 py-4">
-                    <span className="inline-flex font-mono font-black text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200/70 dark:bg-slate-800/80 dark:border-slate-700 dark:text-blue-300">
-                      development
+                    <span className="inline-flex font-mono font-black text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200/70 dark:bg-slate-800/80 dark:border-[var(--border-strong)] dark:text-blue-300">
+                      Desarrollo
                     </span>
                   </td>
                   <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Ambiente activo en Apache / CodeIgniter 4 con registro detallado de eventos y rutas API.
+                    El sistema muestra registros internos detallados para facilitar la depuración durante el desarrollo.
                   </td>
                   <td className="px-5 py-4 text-right">
-                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                       SISTEMA
                     </span>
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-4">
                     <p className="font-black text-slate-800 dark:text-white">Tiempo Límite de Inactividad</p>
                     <p className="text-xs font-medium text-slate-400">Caducidad de sesión automática</p>
                   </td>
                   <td className="px-5 py-4">
-                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                       INACTIVITY_LIMIT_MS
                     </code>
                   </td>
@@ -1568,30 +1568,30 @@ function ConfiguracionReadOnly({
                     Desconexión por seguridad ante inactividad física del usuario en el navegador web.
                   </td>
                   <td className="px-5 py-4 text-right">
-                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                       SEGURIDAD
                     </span>
                   </td>
                 </tr>
 
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                   <td className="px-5 py-4">
-                    <p className="font-black text-slate-800 dark:text-white">Conexión MariaDB Docker</p>
+                    <p className="font-black text-slate-800 dark:text-white">Conexión con la Base de Datos</p>
                     <p className="text-xs font-medium text-slate-400">Base de datos municipal</p>
                   </td>
                   <td className="px-5 py-4">
-                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                      database.default.DBDriver
+                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                      ESTADO_BASE_DATOS
                     </code>
                   </td>
                   <td className="px-5 py-4">
                     <span className="inline-flex items-center gap-1.5 font-bold text-xs text-emerald-700 dark:text-emerald-400">
                       <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      MariaDB 10.6
+                      Operativa
                     </span>
                   </td>
                   <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Instancia Docker en contenedor <span className="font-mono font-bold">mjlo_db</span> (puerto 3306 interno / 3307 externo).
+                    Conexión activa y estable con el servidor de base de datos municipal.
                   </td>
                   <td className="px-5 py-4 text-right">
                     <span className="inline-flex rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
@@ -1607,8 +1607,8 @@ function ConfiguracionReadOnly({
 
       {/* SECCIÓN 3: VALORES DE LA UIT */}
       {(activeTab === 'todos' || activeTab === 'uit') && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-900/40">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-[var(--border)] dark:bg-slate-900/40">
             <div className="flex items-center gap-2.5">
               <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                 <Icon name="receiptCheck" className="size-4" />
@@ -1625,7 +1625,7 @@ function ConfiguracionReadOnly({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
                 <tr>
                   <th className="px-5 py-3.5 w-1/6">Año Fiscal</th>
                   <th className="px-5 py-3.5 w-1/4">Denominación Oficial</th>
@@ -1634,11 +1634,11 @@ function ConfiguracionReadOnly({
                   <th className="px-5 py-3.5 text-right">Condición</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                 {municipalidadAnios.length ? municipalidadAnios.map((item) => (
-                  <tr key={item.id} className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr key={item.id} className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
                     <td className="px-5 py-4">
-                      <span className="font-mono font-black text-sm text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                      <span className="font-mono font-black text-sm text-slate-900 dark:text-white bg-slate-100 dark:bg-[var(--bg-subtle)] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[var(--border-strong)]">
                         {item.anio}
                       </span>
                     </td>
@@ -1657,7 +1657,7 @@ function ConfiguracionReadOnly({
                       <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
                         String(item.anio) === String(new Date().getFullYear())
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                          : 'bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
                       }`}>
                         <span className={`size-1.5 rounded-full ${String(item.anio) === String(new Date().getFullYear()) ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                         {String(item.anio) === String(new Date().getFullYear()) ? 'VIGENTE' : 'HISTÓRICO'}
@@ -1675,7 +1675,7 @@ function ConfiguracionReadOnly({
             </table>
           </div>
 
-          <div className="border-t border-slate-100 bg-slate-50/40 p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 flex items-center justify-between">
+          <div className="border-t border-slate-100 bg-slate-50/40 p-4 text-xs text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/30 flex items-center justify-between">
             <span className="font-medium">
               Normativa: DS que fija la Unidad Impositiva Tributaria para el año fiscal en curso.
             </span>
@@ -1692,14 +1692,14 @@ function ConfiguracionReadOnly({
 function LabeledInput({ label, value, onChange, className = '', type = 'text', placeholder = '', required = false }) {
   return (
     <label className={`space-y-1 ${className}`}>
-      <span className="text-[11px] font-black uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="text-[11px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</span>
       <input
         required={required}
         type={type}
         value={value || ''}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder || label}
-        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:ring-blue-500/20"
       />
     </label>
   )
@@ -1708,8 +1708,8 @@ function LabeledInput({ label, value, onChange, className = '', type = 'text', p
 function Modal({ title, children, onClose, maxWidth = 'max-w-md' }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className={`w-full ${maxWidth} overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900`}>
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+      <div className={`w-full ${maxWidth} overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]`}>
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-[var(--border)]">
           <h3 className="text-lg font-black text-slate-900 dark:text-white">{title}</h3>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><Icon name="close" /></button>
         </div>

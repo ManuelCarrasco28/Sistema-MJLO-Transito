@@ -3,8 +3,9 @@ import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUti
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
-import { RoundedSelect } from '../components/ui/FormInputs'
-import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 
 const CARGOS = [
   'SUPERADMIN',
@@ -218,7 +219,7 @@ export function Usuarios({ user }) {
       setIsCreateModalOpen(false)
       loadData()
     } catch (err) {
-      showError('Error al crear usuario', err.message)
+      showError('Error al crear usuario', sanitizarMensaje(err.message, 'No se pudo crear el usuario.'))
     } finally {
       setSaving(false)
     }
@@ -253,7 +254,7 @@ export function Usuarios({ user }) {
       setIsEditModalOpen(false)
       loadData()
     } catch (err) {
-      showError('Error al editar', err.message)
+      showError('Error al editar', sanitizarMensaje(err.message, 'No se pudo editar el usuario.'))
     } finally {
       setSaving(false)
     }
@@ -286,7 +287,7 @@ export function Usuarios({ user }) {
       showSuccess('Contraseña Actualizada', `Se restableció la clave de acceso para @${selectedUser.nombre_usuario}.`)
       setIsPasswordModalOpen(false)
     } catch (err) {
-      showError('Error al cambiar contraseña', err.message)
+      showError('Error al cambiar contraseña', sanitizarMensaje(err.message, 'No se pudo cambiar la contraseña.'))
     } finally {
       setSaving(false)
     }
@@ -308,7 +309,7 @@ export function Usuarios({ user }) {
         showToast('Usuario eliminado correctamente')
         loadData()
       } catch (err) {
-        showError('Error al eliminar', err.message)
+        showError('Error al eliminar', sanitizarMensaje(err.message, 'No se pudo eliminar el usuario.'))
       }
     }
   }
@@ -502,18 +503,18 @@ export function Usuarios({ user }) {
   const getRoleBadge = (cargo) => {
     const c = (cargo || '').toUpperCase()
     if (c.includes('SUPERADMIN')) {
-      return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-slate-800'
+      return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-[var(--border)]'
     }
     if (c.includes('ADMINISTRADOR') || c.includes('SUBGERENTE')) {
-      return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-slate-800'
+      return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-[var(--border)]'
     }
     if (c.includes('INSPECTOR') || c.includes('FISCALIZADOR')) {
-      return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-slate-800'
+      return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-[var(--border)]'
     }
     if (c.includes('CAJERO')) {
-      return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-slate-800'
+      return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-[var(--border)]'
     }
-    return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+    return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:border-[var(--border-strong)]'
   }
 
   return (
@@ -542,7 +543,7 @@ export function Usuarios({ user }) {
       {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas idénticas al diseño de Personas.jsx */}
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {/* 1. Total usuarios */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Total usuarios
@@ -559,7 +560,7 @@ export function Usuarios({ user }) {
         </div>
 
         {/* 2. Administradores */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
               Administración
@@ -576,7 +577,7 @@ export function Usuarios({ user }) {
         </div>
 
         {/* 3. Inspectores */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
               Inspectores
@@ -593,7 +594,7 @@ export function Usuarios({ user }) {
         </div>
 
         {/* 4. Activos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Activos
@@ -610,7 +611,7 @@ export function Usuarios({ user }) {
         </div>
 
         {/* 5. Inactivos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
               Inactivos
@@ -628,9 +629,9 @@ export function Usuarios({ user }) {
       </div>
 
       {/* Contenedor de la Tabla con estilo exacto de Personas.jsx */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
         {/* Barra de Filtros y Acciones */}
-        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
@@ -638,7 +639,7 @@ export function Usuarios({ user }) {
               placeholder="Buscar por usuario, nombre completo, DNI o rol..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
             />
             {searchTerm && (
               <button
@@ -713,41 +714,41 @@ export function Usuarios({ user }) {
         {/* Tabla */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+            <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
                 <th className="px-4 py-3 whitespace-nowrap">Usuario</th>
                 <th className="px-4 py-3 whitespace-nowrap">Colaborador Asignado</th>
                 <th className="px-4 py-3 whitespace-nowrap">Rol / Permiso</th>
                 <th className="px-4 py-3 whitespace-nowrap">Estado</th>
-                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/95 dark:bg-slate-900/95 border-l border-slate-200/60 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/95 dark:bg-slate-900/95 border-l border-slate-200/60 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
               {isLoading && usuarios.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-full bg-slate-200 dark:bg-slate-800 shrink-0" />
+                        <div className="size-9 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)] shrink-0" />
                         <div className="space-y-1.5 flex-1">
-                          <div className="h-3.5 w-28 rounded bg-slate-200 dark:bg-slate-800" />
-                          <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-slate-800/60" />
+                          <div className="h-3.5 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                          <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="h-4 w-36 rounded bg-slate-200 dark:bg-slate-800" />
+                      <div className="h-4 w-36 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="h-5 w-28 rounded-full bg-slate-200 dark:bg-slate-800" />
+                      <div className="h-5 w-28 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" />
+                      <div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                     </td>
-                    <td className="sticky right-0 z-10 px-4 py-3.5 text-right bg-white dark:bg-[#0f172a]">
-                      <div className="h-8 w-28 ml-auto rounded bg-slate-100 dark:bg-slate-800" />
+                    <td className="sticky right-0 z-10 px-4 py-3.5 text-right bg-white dark:bg-[var(--bg-surface)]">
+                      <div className="h-8 w-28 ml-auto rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                     </td>
                   </tr>
                 ))
@@ -773,12 +774,12 @@ export function Usuarios({ user }) {
                   return (
                     <tr
                       key={u.id}
-                      className="group transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+                      className="group transition-colors hover:bg-slate-50/80 dark:hover:bg-[var(--bg-subtle)]"
                     >
                       {/* Usuario */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          <div className="size-9 shrink-0 rounded-full font-bold flex items-center justify-center text-xs select-none border border-indigo-200/80 bg-indigo-50 text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-300 shadow-2xs">
+                          <div className="size-9 shrink-0 rounded-full font-bold flex items-center justify-center text-xs select-none border border-indigo-200/80 bg-indigo-50 text-indigo-700 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-indigo-300 shadow-2xs">
                             {initial}
                           </div>
                           <div>
@@ -822,24 +823,11 @@ export function Usuarios({ user }) {
 
                       {/* Estado */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${
-                            u.usuario_estado === 'ACTIVO'
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                          }`}
-                        >
-                          <span
-                            className={`size-1.5 rounded-full ${
-                              u.usuario_estado === 'ACTIVO' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
-                            }`}
-                          />
-                          {u.usuario_estado || 'ACTIVO'}
-                        </span>
+                        <StatusBadge status={u.usuario_estado || 'ACTIVO'} />
                       </td>
 
                       {/* Acciones */}
-                      <td className="sticky right-0 z-10 px-4 py-3 text-right whitespace-nowrap bg-white dark:bg-[#0f172a] border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50">
+                      <td className="sticky right-0 z-10 px-4 py-3 text-right whitespace-nowrap bg-white dark:bg-[var(--bg-surface)] border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* OJO: Ver Ficha Detalle */}
                           <button
@@ -974,8 +962,8 @@ export function Usuarios({ user }) {
       {/* MODAL 1: NUEVO USUARIO */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
                   <Icon name="people" className="size-5" />
@@ -992,7 +980,7 @@ export function Usuarios({ user }) {
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
               >
                 ✕
               </button>
@@ -1017,12 +1005,12 @@ export function Usuarios({ user }) {
                       setTrabajadorDropdownOpen(true)
                     }}
                     placeholder="Escribe DNI o nombres para buscar en el padrón..."
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
                   />
                 </div>
 
                 {selectedTrabajador && (
-                  <div className="mt-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2 text-xs dark:border-slate-800 dark:bg-emerald-950/30">
+                  <div className="mt-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2 text-xs dark:border-[var(--border)] dark:bg-emerald-950/30">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-emerald-800 dark:text-emerald-300">
                         ✓ Seleccionado:
@@ -1041,7 +1029,7 @@ export function Usuarios({ user }) {
                 )}
 
                 {trabajadorDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
                     {trabajadoresDisponibles.length ? (
                       trabajadoresDisponibles.map((t) => (
                         <button
@@ -1083,11 +1071,9 @@ export function Usuarios({ user }) {
               {/* Formulario de Cuenta */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-1">
-                    2. Nombre de Usuario *
-                  </label>
-                  <input
-                    type="text"
+                  <FloatingInput
+                    id="nombre_usuario"
+                    label="2. Nombre de Usuario"
                     required
                     value={userForm.nombre_usuario}
                     onChange={(e) =>
@@ -1096,66 +1082,47 @@ export function Usuarios({ user }) {
                         nombre_usuario: e.target.value.toLowerCase().replace(/\s+/g, ''),
                       })
                     }
-                    placeholder="ej. mcorrea, jlopez"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                   />
                   <p className="mt-1 text-[10.5px] text-slate-400">
                     Solo minúsculas y sin espacios.
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-1">
-                    3. Contraseña Inicial *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={userForm.password}
-                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                    placeholder="Mínimo 6 caracteres"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                  />
-                </div>
+                <FloatingInput
+                  id="password_inicial"
+                  label="3. Contraseña Inicial"
+                  type="password"
+                  required
+                  minLength={6}
+                  value={userForm.password}
+                  onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                />
 
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-1">
-                    4. Rol / Permiso Asignado *
-                  </label>
-                  <select
-                    value={userForm.cargo}
-                    onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white cursor-pointer"
-                  >
-                    {CARGOS.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <FloatingSelect
+                  id="cargo_usuario"
+                  label="4. Rol / Permiso Asignado"
+                  value={userForm.cargo}
+                  onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })}
+                  options={CARGOS.map((c) => ({ value: c, label: c }))}
+                />
 
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-1">
-                    5. Estado de la Cuenta
-                  </label>
-                  <select
-                    value={userForm.estado}
-                    onChange={(e) => setUserForm({ ...userForm, estado: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white cursor-pointer"
-                  >
-                    <option value="ACTIVO">ACTIVO (Permite iniciar sesión)</option>
-                    <option value="INACTIVO">INACTIVO (Acceso bloqueado)</option>
-                  </select>
-                </div>
+                <FloatingSelect
+                  id="estado_cuenta"
+                  label="5. Estado de la Cuenta"
+                  value={userForm.estado}
+                  onChange={(e) => setUserForm({ ...userForm, estado: e.target.value })}
+                  options={[
+                    { value: 'ACTIVO', label: 'ACTIVO (Permite iniciar sesión)' },
+                    { value: 'INACTIVO', label: 'INACTIVO (Acceso bloqueado)' },
+                  ]}
+                />
               </div>
 
-              <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1176,8 +1143,8 @@ export function Usuarios({ user }) {
       {/* MODAL 2: EDITAR ROL Y ESTADO */}
       {isEditModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
                   <Icon name="pencil" className="size-4" />
@@ -1194,56 +1161,44 @@ export function Usuarios({ user }) {
               <button
                 type="button"
                 onClick={() => setIsEditModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleSaveEditUser} className="p-6 space-y-4">
-              <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
                 <p className="text-xs font-bold text-slate-500">Colaborador:</p>
                 <p className="text-sm font-black text-slate-800 dark:text-white">
                   {selectedUser.nombre_completo || 'Sin personal asignado'}
                 </p>
               </div>
 
-              <div>
-                <label className="block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-1">
-                  Rol / Cargo en Sistema
-                </label>
-                <select
-                  value={userForm.cargo}
-                  onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-white cursor-pointer"
-                >
-                  {CARGOS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FloatingSelect
+                id="cargo_edit"
+                label="Rol / Cargo en Sistema"
+                value={userForm.cargo}
+                onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })}
+                options={CARGOS.map((c) => ({ value: c, label: c }))}
+              />
 
-              <div>
-                <label className="block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-1">
-                  Estado
-                </label>
-                <select
-                  value={userForm.estado}
-                  onChange={(e) => setUserForm({ ...userForm, estado: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-white cursor-pointer"
-                >
-                  <option value="ACTIVO">ACTIVO (Permite acceso al sistema)</option>
-                  <option value="INACTIVO">INACTIVO (Bloquear acceso)</option>
-                </select>
-              </div>
+              <FloatingSelect
+                id="estado_edit"
+                label="Estado"
+                value={userForm.estado}
+                onChange={(e) => setUserForm({ ...userForm, estado: e.target.value })}
+                options={[
+                  { value: 'ACTIVO', label: 'ACTIVO (Permite acceso al sistema)' },
+                  { value: 'INACTIVO', label: 'INACTIVO (Bloquear acceso)' },
+                ]}
+              />
 
-              <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1264,8 +1219,8 @@ export function Usuarios({ user }) {
       {/* MODAL 3: RESTABLECER CONTRASEÑA */}
       {isPasswordModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
                   <Icon name="settings" className="size-4" />
@@ -1282,7 +1237,7 @@ export function Usuarios({ user }) {
               <button
                 type="button"
                 onClick={() => setIsPasswordModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
               >
                 ✕
               </button>
@@ -1293,35 +1248,31 @@ export function Usuarios({ user }) {
                 Ingresa una nueva contraseña para la cuenta del usuario. La clave anterior dejará de ser válida inmediatamente.
               </p>
 
-              <div>
-                <label className="block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-1">
-                  Nueva Contraseña *
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={6}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-3.5 pr-10 text-xs font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                  >
-                    {showPassword ? 'Ocultar' : 'Ver'}
-                  </button>
-                </div>
+              <div className="relative">
+                <FloatingInput
+                  id="nueva_password"
+                  label="Nueva Contraseña"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  inputClassName="pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  {showPassword ? 'Ocultar' : 'Ver'}
+                </button>
               </div>
 
-              <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsPasswordModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1342,8 +1293,8 @@ export function Usuarios({ user }) {
       {/* MODAL 4: FICHA DETALLE DEL USUARIO */}
       {isDetailModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
                   <Icon name="eye" className="size-4" />
@@ -1360,29 +1311,21 @@ export function Usuarios({ user }) {
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-                <div className="size-14 rounded-2xl font-black text-lg flex items-center justify-center border border-indigo-200 bg-indigo-100 text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-300">
+              <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                <div className="size-14 rounded-2xl font-black text-lg flex items-center justify-center border border-indigo-200 bg-indigo-100 text-indigo-700 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-indigo-300">
                   {(selectedUser.nombre_usuario || 'U').slice(0, 2).toUpperCase()}
                 </div>
                 <div>
                   <h4 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
                     @{selectedUser.nombre_usuario}
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                        selectedUser.usuario_estado === 'ACTIVO'
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                          : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                      }`}
-                    >
-                      {selectedUser.usuario_estado || 'ACTIVO'}
-                    </span>
+                    <StatusBadge status={selectedUser.usuario_estado || 'ACTIVO'} />
                   </h4>
                   <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mt-0.5">
                     {selectedUser.nombre_completo || 'Sin colaborador vinculado'}
@@ -1391,7 +1334,7 @@ export function Usuarios({ user }) {
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     Rol en Sistema
                   </span>
@@ -1400,7 +1343,7 @@ export function Usuarios({ user }) {
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     ID Trabajador
                   </span>
@@ -1410,7 +1353,7 @@ export function Usuarios({ user }) {
                 </div>
 
                 {selectedUser.numero_documento && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Documento de Identidad
                     </span>
@@ -1420,7 +1363,7 @@ export function Usuarios({ user }) {
                   </div>
                 )}
 
-                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     Acceso Municipal
                   </span>
@@ -1430,11 +1373,11 @@ export function Usuarios({ user }) {
                 </div>
               </div>
 
-              <div className="mt-5 flex items-center justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div className="mt-5 flex items-center justify-end gap-2 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
                 >
                   Cerrar
                 </button>

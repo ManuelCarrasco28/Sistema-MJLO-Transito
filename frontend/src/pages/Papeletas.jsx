@@ -2,15 +2,17 @@ import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { PageLoadError } from '../components/ui/PageLoadError'
-import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
+import { showError, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
-import { RoundedSelect } from '../components/ui/FormInputs'
+import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
+import { StatusBadge } from '../components/ui/StatusBadge'
 
 const FILTER_ORIGEN_OPTIONS = [
   { value: 'TODOS', label: 'Todos los orígenes' },
-  { value: 'OPERATIVO', label: '🚨 Solo Operativos' },
-  { value: 'RUTINA', label: '📋 Solo Rutina' }
+  { value: 'OPERATIVO', label: 'Solo Operativos' },
+  { value: 'RUTINA', label: 'Solo Rutina' }
 ];
 
 const FILTER_ESTADO_OPTIONS = [
@@ -33,7 +35,7 @@ const FILTER_FECHA_OPTIONS = [
   { value: 'MES', label: 'Este mes' }
 ];
 
-export function Papeletas() {
+export function Papeletas({ user }) {
   const cachedPapeletas = getCachedData('/papeletas')
   const cachedTipos = getCachedData('/tipos-infraccion')
   const cachedVeh = getCachedData('/vehiculos')
@@ -72,6 +74,13 @@ export function Papeletas() {
   const [reporteToConvert, setReporteToConvert] = useState(null)
   const [reporteToReject, setReporteToReject] = useState(null)
   const [convertForm, setConvertForm] = useState({ infraccionesIds: [''], vehiculoId: '', conductorDni: '', observacionesAutoridad: '' })
+  const [isNuevaModalOpen, setIsNuevaModalOpen] = useState(false)
+  const [nuevaForm, setNuevaForm] = useState({
+    vehiculoPlaca: '', claseVehiculo: '', marcaVehiculo: '', colorVehiculo: '', motorVehiculo: '',
+    conductorDni: '', conductorNombres: '', conductorApellidos: '', lugar: '',
+    infraccionesIds: [''], observacionesAutoridad: ''
+  })
+  const [creandoPapeleta, setCreandoPapeleta] = useState(false)
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [numeroRecibo, setNumeroRecibo] = useState('')
   const [fechaPago, setFechaPago] = useState('')
@@ -240,7 +249,7 @@ export function Papeletas() {
     return (
       <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wide uppercase leading-none ${isOperativo
           ? 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/70 dark:text-fuchsia-300'
-          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+          : 'bg-slate-100 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
         }`}>
         <span className="size-1 rounded-full bg-current" />
         {isOperativo ? 'OPERATIVO' : 'RUTINA'}
@@ -337,7 +346,7 @@ export function Papeletas() {
         setPapeletaToAction(null)
       } else {
         const error = await res.json()
-        alert(Object.values(error.messages || {}).join(' ') || 'Error al procesar el pago')
+        showError('Error', sanitizarMensaje(Object.values(error.messages || {}).join(' '), 'Error al procesar el pago.'))
       }
     } catch (err) {
       console.error(err)
@@ -387,9 +396,69 @@ export function Papeletas() {
       loadData()
       alert(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim())
     } catch (error) {
-      alert(error.message || 'Error al convertir reporte.')
+      showError('Error', sanitizarMensaje(error.message, 'Error al convertir reporte.'))
     } finally {
       setIsProcessingAction(false)
+    }
+  }
+
+  const handleOpenNuevaPapeleta = () => {
+    setNuevaForm({
+      vehiculoPlaca: '', claseVehiculo: '', marcaVehiculo: '', colorVehiculo: '', motorVehiculo: '',
+      conductorDni: '', conductorNombres: '', conductorApellidos: '', lugar: '',
+      infraccionesIds: [''], observacionesAutoridad: ''
+    })
+    setIsNuevaModalOpen(true)
+  }
+
+  const handleCrearPapeleta = async (event) => {
+    event.preventDefault()
+    const validInfracciones = nuevaForm.infraccionesIds.filter(id => id).map(Number)
+    if (!nuevaForm.vehiculoPlaca.trim()) {
+      showError('Atención', 'Ingresa la placa del vehículo.')
+      return
+    }
+    if (!nuevaForm.lugar.trim()) {
+      showError('Atención', 'Ingresa el lugar de la infracción.')
+      return
+    }
+    if (validInfracciones.length === 0) {
+      showError('Atención', 'Selecciona al menos una infracción.')
+      return
+    }
+    if (!user?.id_persona) {
+      showError('Sesión inválida', 'No se pudo identificar al inspector de la sesión actual. Vuelve a iniciar sesión.')
+      return
+    }
+    setCreandoPapeleta(true)
+    try {
+      const res = await apiFetch('/papeletas', {
+        method: 'POST',
+        body: {
+          vehiculoPlaca: nuevaForm.vehiculoPlaca.trim().toUpperCase(),
+          claseVehiculo: nuevaForm.claseVehiculo,
+          marcaVehiculo: nuevaForm.marcaVehiculo,
+          colorVehiculo: nuevaForm.colorVehiculo,
+          motorVehiculo: nuevaForm.motorVehiculo,
+          conductorDni: nuevaForm.conductorDni,
+          conductorNombres: nuevaForm.conductorNombres,
+          conductorApellidos: nuevaForm.conductorApellidos,
+          infractor: `${nuevaForm.conductorNombres} ${nuevaForm.conductorApellidos}`.trim(),
+          lugar: nuevaForm.lugar.trim(),
+          infraccionesIds: validInfracciones,
+          observacionesAutoridad: nuevaForm.observacionesAutoridad,
+          inspectorId: user.id_persona
+        }
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo registrar la papeleta.')
+      setIsNuevaModalOpen(false)
+      loadData()
+      showToast(`Papeleta ${data.data?.numeroPapeleta || ''} registrada correctamente`.trim())
+    } catch (error) {
+      showError('Error', sanitizarMensaje(error.message, 'No se pudo registrar la papeleta.'))
+    } finally {
+      setCreandoPapeleta(false)
     }
   }
 
@@ -412,7 +481,7 @@ export function Papeletas() {
       setMotivoRechazo('')
       loadData()
     } catch (error) {
-      alert(error.message || 'Error al rechazar reporte.')
+      showError('Error', sanitizarMensaje(error.message, 'Error al rechazar reporte.'))
     } finally {
       setIsProcessingAction(false)
     }
@@ -440,7 +509,7 @@ export function Papeletas() {
       </div>
 
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 print:hidden">
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Total Impuestas</span>
             <span className="grid size-6 place-items-center rounded-md bg-slate-50 text-slate-600 dark:bg-slate-950/60">
@@ -452,7 +521,7 @@ export function Papeletas() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pendientes</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 font-bold text-xs">
@@ -464,7 +533,7 @@ export function Papeletas() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Pagadas</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 font-bold text-xs">
@@ -476,7 +545,7 @@ export function Papeletas() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Anuladas</span>
             <span className="grid size-6 place-items-center rounded-md bg-slate-50 text-slate-600 dark:bg-slate-950/60 font-bold text-xs">
@@ -489,18 +558,18 @@ export function Papeletas() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xs dark:border-slate-800 dark:bg-[#0f172a] print:hidden">
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden">
         <button
           type="button"
           onClick={() => setActiveView('PAPELETAS')}
-          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'PAPELETAS' ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'PAPELETAS' ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'}`}
         >
           Papeletas registradas
         </button>
         <button
           type="button"
           onClick={() => setActiveView('REPORTES')}
-          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'REPORTES' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'REPORTES' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'}`}
         >
           Reportes Evidencias
           <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">{reportesPendientes}</span>
@@ -508,22 +577,20 @@ export function Papeletas() {
       </div>
 
       {activeView === 'REPORTES' && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] print:hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-[var(--border)]">
             <div>
               <h2 className="text-lg font-black text-slate-900 dark:text-white">Reportes Evidencias</h2>
               <p className="text-xs font-semibold text-slate-500">No son papeletas. Administración decide si procede o no.</p>
             </div>
             <button onClick={loadData} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white">Actualizar</button>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="divide-y divide-slate-100 dark:divide-[var(--border)]">
             {reportes.length ? reportes.map((reporte) => (
               <div key={reporte.id} className="grid gap-4 p-5 lg:grid-cols-[1fr_220px] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 flex-1">
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${reporte.estado === 'PENDIENTE' ? 'bg-amber-100 text-amber-800' : reporte.estado === 'CONVERTIDO_PAPELETA' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
-                      {reporte.estado}
-                    </span>
+                    <StatusBadge status={reporte.estado === 'CONVERTIDO_PAPELETA' ? 'FINALIZADO' : reporte.estado} />
                     <span className="font-mono text-xs font-black text-slate-500">#{reporte.id}</span>
                     {reporte.numero_papeleta && <span className="rounded-full bg-rose-100 px-2 py-1 text-[11px] font-black text-rose-700">{reporte.numero_papeleta}</span>}
                   </div>
@@ -566,7 +633,7 @@ export function Papeletas() {
               </div>
             )) : (
               <div className="px-5 py-12 text-center text-slate-400">
-                <p className="text-3xl">📷</p>
+                <Icon name="camera" className="size-8 mx-auto mb-1 text-slate-300 dark:text-slate-600" />
                 <p className="font-bold text-slate-600 dark:text-slate-300">Aún no hay Reportes Evidencias</p>
               </div>
             )}
@@ -574,8 +641,8 @@ export function Papeletas() {
         </div>
       )}
 
-      {activeView === 'PAPELETAS' && <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col print:hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 dark:border-slate-800">
+      {activeView === 'PAPELETAS' && <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col print:hidden">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 dark:border-[var(--border)]">
           {/* Top row: Search and Action Buttons */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:max-w-md">
@@ -585,7 +652,7 @@ export function Papeletas() {
                 placeholder="Buscar por código PAP, placa, infractor, DNI..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white focus:ring-2 focus:ring-rose-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-rose-400"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-rose-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-rose-400"
               />
               {searchTerm && (
                 <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
@@ -623,10 +690,10 @@ export function Papeletas() {
                 <span>PDF</span>
               </button>
 
-              <button 
+              <button
                 type="button"
-                onClick={() => alert("En desarrollo")} 
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:from-indigo-500 hover:to-violet-500 active:scale-95 cursor-pointer whitespace-nowrap"
+                onClick={handleOpenNuevaPapeleta}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:from-rose-500 hover:to-rose-600 active:scale-95 cursor-pointer whitespace-nowrap"
               >
                 <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
               </button>
@@ -669,22 +736,13 @@ export function Papeletas() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
-          <span>
-            Mostrando <strong className="text-slate-800 dark:text-white">{filteredPapeletas.length}</strong> de{' '}
-            <strong className="text-slate-800 dark:text-white">{papeletas.length}</strong> papeletas
-          </span>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500 select-none">
-              <span className="text-xs">✋</span> Arrastra para ver más columnas
+        {hasActiveFilters && (
+          <div className="flex items-center justify-end border-b border-slate-100 bg-slate-50/50 px-5 py-2 dark:border-[var(--border)] dark:bg-slate-900/30">
+            <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+              Filtros activos
             </span>
-            {hasActiveFilters && (
-              <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
-                Filtros activos
-              </span>
-            )}
           </div>
-        </div>
+        )}
 
         <div
           ref={tableContainerRef}
@@ -696,7 +754,7 @@ export function Papeletas() {
           tabIndex={0}
         >
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+            <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-400">
               <tr>
                 <th className="px-3.5 py-3.5 text-center">N° Papeleta</th>
                 <th className="px-3.5 py-3.5">Propietario</th>
@@ -710,26 +768,26 @@ export function Papeletas() {
                 <th className="px-3.5 py-3.5 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
               {isLoading && papeletas.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-5 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4 text-center"><div className="h-5 w-16 mx-auto rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4 text-right"><div className="h-4 w-16 ml-auto rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4 text-center"><div className="h-5 w-16 mx-auto rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-4 text-right"><div className="h-7 w-28 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-4"><div className="h-5 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-4 text-center"><div className="h-5 w-16 mx-auto rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-4 text-right"><div className="h-4 w-16 ml-auto rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-4 text-center"><div className="h-5 w-16 mx-auto rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-4 text-right"><div className="h-7 w-28 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : filteredPapeletas.length === 0 ? (
                 <tr>
                   <td colSpan="10" className="px-5 py-12 text-center text-slate-400">
-                    <p className="text-3xl">🎫</p>
+                    <Icon name="ticket" className="size-8 mx-auto mb-1 text-slate-300 dark:text-slate-600" />
                     <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron papeletas</p>
                   </td>
                 </tr>
@@ -737,8 +795,8 @@ export function Papeletas() {
                 paginatedPapeletas.map((p) => {
                   const tipoInf = tiposInfraccion.find((t) => t.id === p.detalles?.[0]?.tipoInfraccionId)
                   return (
-                    <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-slate-800/40">
-                      <td className="px-3.5 py-3.5 text-center">
+                    <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-[var(--bg-subtle)]">
+                      <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
                         <span className="font-mono font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
                         <div className="mt-0.5">{renderOrigen(p)}</div>
                       </td>
@@ -750,20 +808,15 @@ export function Papeletas() {
                         <p className="font-bold text-slate-800 dark:text-slate-100 text-xs">{p.conductorNombre || p.infractor || 'No Identificado'}</p>
                         <p className="font-mono text-xs text-slate-400">DNI: {p.conductorDni || 'S/D'}</p>
                       </td>
-                      <td className="px-3.5 py-3.5">
+                      <td className="px-3.5 py-3.5 whitespace-nowrap">
                         {p.vehiculoPlaca && p.vehiculoPlaca !== 'SIN PLACA' ? (
-                          <div>
-                            <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
-                              {p.vehiculoPlaca}
-                            </span>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                              {p.vehiculoCaracteristicas}
-                            </p>
-                          </div>
+                          <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
+                            {p.vehiculoPlaca}
+                          </span>
                         ) : (
                           <div>
                             <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-2 py-0.5 font-mono text-[11px] font-black text-rose-800 dark:bg-rose-950/80 dark:text-rose-300">
-                              ⚠️ SIN PLACA
+                              <Icon name="alert" className="size-3" /> SIN PLACA
                             </span>
                             <p className="text-xs font-bold text-rose-700 dark:text-rose-400 mt-0.5">
                               {p.vehiculoCaracteristicas || 'Características Obligatorias'}
@@ -811,14 +864,11 @@ export function Papeletas() {
                         <p className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-xs">{new Date(p.fechaHora).toLocaleDateString()}</p>
                         <p className="text-[11px] text-slate-400">{new Date(p.fechaHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </td>
-                      <td className="px-3.5 py-3.5 text-center">
+                      <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
                         <span className="font-mono font-black text-slate-800 dark:text-white text-sm">S/ {p.montoTotal.toFixed(2)}</span>
                       </td>
                       <td className="px-3 py-3.5 text-center">
-                        <span className={`mx-auto inline-flex min-w-[92px] items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ${p.estado === 'PAGADA' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : p.estado === 'PENDIENTE_PAGO' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
-                          <span className="size-2 rounded-full bg-current" />
-                          {p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado}
-                        </span>
+                        <StatusBadge status={p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado} />
                       </td>
                       <td className="px-3 py-3.5 text-center">
                         <div className="flex items-center justify-center gap-1">
@@ -826,7 +876,7 @@ export function Papeletas() {
                             <button
                               type="button"
                               disabled
-                              className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-400 shadow-xs cursor-not-allowed dark:bg-slate-800 dark:text-slate-500"
+                              className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-400 shadow-xs cursor-not-allowed dark:bg-[var(--bg-subtle)] dark:text-slate-500"
                               title="Papeleta anulada - No se puede pagar"
                             >
                               <Icon name="payment" className="size-4" />
@@ -837,7 +887,7 @@ export function Papeletas() {
                               onClick={() => handleOpenPagar(p)}
                               disabled={p.estado === 'PAGADA'}
                               className={`grid size-9 place-items-center rounded-full shadow-xs transition-all ${p.estado === 'PAGADA'
-                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-800 dark:text-slate-500'
+                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-[var(--bg-subtle)] dark:text-slate-500'
                                   : 'bg-emerald-600 text-white hover:bg-emerald-700 hover:scale-105 active:scale-95 cursor-pointer'
                                 }`}
                               title={p.estado === 'PAGADA' ? 'Papeleta ya pagada' : 'Pagar papeleta'}
@@ -848,7 +898,7 @@ export function Papeletas() {
                           <button onClick={() => handleOpenDetail(p)} className="grid size-9 place-items-center rounded-full bg-rose-50 text-rose-600 transition-all hover:bg-rose-500 hover:text-white hover:shadow-md dark:bg-rose-950/60 dark:text-rose-400 cursor-pointer" title="Ver Detalle">
                             <Icon name="eye" className="size-4" />
                           </button>
-                          <button onClick={() => handleOpenPreview(p)} className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition-all hover:bg-slate-800 hover:text-white hover:shadow-md dark:bg-slate-800 dark:text-slate-300 cursor-pointer" title="Imprimir Boleta">
+                          <button onClick={() => handleOpenPreview(p)} className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition-all hover:bg-slate-800 hover:text-white hover:shadow-md dark:bg-[var(--bg-subtle)] dark:text-slate-300 cursor-pointer" title="Imprimir Boleta">
                             <Icon name="print" className="size-4" />
                           </button>
                         </div>
@@ -876,7 +926,7 @@ export function Papeletas() {
 
       {isDetailModalOpen && selectedPapeleta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f172a]">
+          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
             <div className="flex items-center justify-between border-b border-rose-600/20 bg-rose-50 p-5 dark:bg-rose-950/30">
               <div>
                 <h3 className="text-xl font-black text-rose-700 dark:text-rose-400">{selectedPapeleta.numeroPapeleta}</h3>
@@ -886,7 +936,7 @@ export function Papeletas() {
             <div className="p-6 overflow-y-auto max-h-[80vh]">
 
               <div className="space-y-4">
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
                   <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Identificación de la Falta</h4>
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
@@ -904,7 +954,7 @@ export function Papeletas() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
                   <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Lugar y Fecha</h4>
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
@@ -922,7 +972,7 @@ export function Papeletas() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
                   <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Intervinientes y Vehículo</h4>
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
@@ -953,7 +1003,7 @@ export function Papeletas() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
                   <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Estado Económico</h4>
                   <div className="grid grid-cols-2 gap-3 text-xs mb-2">
                     <div>
@@ -966,9 +1016,7 @@ export function Papeletas() {
                     </div>
                     <div>
                       <p className="text-slate-400">Estado de Pago</p>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${selectedPapeleta.estado === 'PAGADA' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
-                        {selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado}
-                      </span>
+                      <StatusBadge status={selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado} />
                     </div>
                     <div>
                       <p className="text-slate-400">Total</p>
@@ -977,7 +1025,7 @@ export function Papeletas() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
                   <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Firma del conductor</h4>
                   <div className="grid gap-3 text-xs sm:grid-cols-2">
                     <div>
@@ -987,7 +1035,7 @@ export function Papeletas() {
                           : selectedPapeleta.firmaConductorEstado === 'SE_NEGO_A_FIRMAR'
                             ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
                             : selectedPapeleta.firmaConductorEstado === 'NO_PRESENTE'
-                              ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                              ? 'bg-slate-200 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
                               : 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
                         }`}>
                         <span className="size-2 rounded-full bg-current" />
@@ -1009,7 +1057,7 @@ export function Papeletas() {
                       </p>
                     </div>
                     {selectedPapeleta.firmaConductorImg && (
-                      <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                         <p className="mb-2 text-slate-400">Firma registrada</p>
                         <img
                           src={selectedPapeleta.firmaConductorImg}
@@ -1022,7 +1070,7 @@ export function Papeletas() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 mt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex justify-end gap-2 pt-4 mt-2 border-t border-slate-100 dark:border-[var(--border)]">
                 <button onClick={() => { setIsDetailModalOpen(false); handleOpenPreview(selectedPapeleta); }} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white cursor-pointer hover:bg-slate-800 transition">Imprimir Boleta</button>
                 <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-50 transition">Cerrar</button>
               </div>
@@ -1033,27 +1081,27 @@ export function Papeletas() {
 
       {reporteToConvert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <form onSubmit={handleConvertReporte} className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a]">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-emerald-50 px-6 py-4 dark:border-slate-800 dark:bg-emerald-950/30">
+          <form onSubmit={handleConvertReporte} className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-emerald-50 px-6 py-4 dark:border-[var(--border)] dark:bg-emerald-950/30">
               <div>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white">Generar papeleta desde reporte</h3>
                 <p className="text-xs font-bold text-slate-500">Si no ingresas DNI, quedará como CONDUCTOR NO PRESENTE.</p>
               </div>
-              <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-full p-1 text-slate-400 hover:bg-white">✕</button>
+              <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-full p-1 text-slate-400 hover:bg-white dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white">✕</button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600 border border-slate-200">
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600 border border-slate-200 dark:bg-[var(--bg-subtle)] dark:border-[var(--border)] dark:text-slate-300">
                 <p><strong>Reporte:</strong> #{reporteToConvert.id} · {reporteToConvert.placa_visual || 'SIN PLACA'}</p>
                 <p><strong>Lugar:</strong> {reporteToConvert.lugar}</p>
                 <p><strong>Observación:</strong> {reporteToConvert.observaciones}</p>
               </div>
 
-              <fieldset className="border border-slate-200 rounded-xl p-4">
-                <legend className="text-[11px] font-black uppercase tracking-wider text-emerald-600 px-2 ml-2 bg-white">Datos Generales</legend>
+              <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-[var(--border)]">
+                <legend className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-2 ml-2 bg-white dark:bg-[var(--bg-surface)]">Datos Generales</legend>
                 <div className="space-y-4">
                   <label className="block space-y-1.5">
-                    <span className="text-[11px] font-bold uppercase text-slate-500">Vehículo identificado</span>
-                    <select required value={convertForm.vehiculoId} onChange={(e) => setConvertForm({ ...convertForm, vehiculoId: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white">
+                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Vehículo identificado</span>
+                    <select required value={convertForm.vehiculoId} onChange={(e) => setConvertForm({ ...convertForm, vehiculoId: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)]">
                       <option value="">Selecciona vehículo</option>
                       {vehiculos.map((v) => (
                         <option key={v.id} value={v.id}>{v.placa} — {v.marca || ''} {v.modelo || ''}</option>
@@ -1062,24 +1110,24 @@ export function Papeletas() {
                   </label>
 
                   <label className="block space-y-1.5">
-                    <span className="text-[11px] font-bold uppercase text-slate-500">DNI del infractor/intervenido opcional</span>
-                    <input value={convertForm.conductorDni} onChange={(e) => setConvertForm({ ...convertForm, conductorDni: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="Vacío = CONDUCTOR NO PRESENTE" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white" />
+                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">DNI del infractor/intervenido opcional</span>
+                    <input value={convertForm.conductorDni} onChange={(e) => setConvertForm({ ...convertForm, conductorDni: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="Vacío = CONDUCTOR NO PRESENTE" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)] dark:placeholder-slate-500" />
                   </label>
                 </div>
               </fieldset>
 
-              <fieldset className="border border-slate-200 rounded-xl p-4">
-                <legend className="text-[11px] font-black uppercase tracking-wider text-rose-600 px-2 ml-2 bg-white">Infracciones y Observaciones</legend>
+              <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-[var(--border)]">
+                <legend className="text-[11px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 px-2 ml-2 bg-white dark:bg-[var(--bg-surface)]">Infracciones y Observaciones</legend>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <span className="text-[11px] font-bold uppercase text-slate-500">Infracciones a Aplicar</span>
+                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Infracciones a Aplicar</span>
                     {convertForm.infraccionesIds.map((infId, idx) => (
                       <div key={idx} className="flex gap-2">
                         <select required value={infId} onChange={(e) => {
                           const newIds = [...convertForm.infraccionesIds]
                           newIds[idx] = e.target.value
                           setConvertForm({ ...convertForm, infraccionesIds: newIds })
-                        }} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white">
+                        }} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)]">
                           <option value="">Selecciona infracción</option>
                           {tiposInfraccion.map((tipo) => (
                             <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
@@ -1090,26 +1138,26 @@ export function Papeletas() {
                             const newIds = [...convertForm.infraccionesIds]
                             newIds.splice(idx, 1)
                             setConvertForm({ ...convertForm, infraccionesIds: newIds })
-                          }} className="flex items-center justify-center rounded-xl bg-rose-100 px-3 py-2 text-rose-600 hover:bg-rose-200 font-bold transition">
+                          }} className="flex items-center justify-center rounded-xl bg-rose-100 px-3 py-2 text-rose-600 hover:bg-rose-200 font-bold transition dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60">
                             ✕
                           </button>
                         )}
                       </div>
                     ))}
-                    <button type="button" onClick={() => setConvertForm({ ...convertForm, infraccionesIds: [...convertForm.infraccionesIds, ''] })} className="text-xs font-black text-emerald-600 hover:text-emerald-700 mt-2 block">
+                    <button type="button" onClick={() => setConvertForm({ ...convertForm, infraccionesIds: [...convertForm.infraccionesIds, ''] })} className="text-xs font-black text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 mt-2 block">
                       + Añadir otra infracción
                     </button>
                   </div>
 
                   <label className="block space-y-1.5">
-                    <span className="text-[11px] font-bold uppercase text-slate-500">Observación de autoridad</span>
-                    <textarea value={convertForm.observacionesAutoridad} onChange={(e) => setConvertForm({ ...convertForm, observacionesAutoridad: e.target.value })} rows={3} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white" />
+                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Observación de autoridad</span>
+                    <textarea value={convertForm.observacionesAutoridad} onChange={(e) => setConvertForm({ ...convertForm, observacionesAutoridad: e.target.value })} rows={3} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)]" />
                   </label>
                 </div>
               </fieldset>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-              <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600">Cancelar</button>
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+              <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600 dark:border-[var(--border-strong)] dark:text-slate-300">Cancelar</button>
               <button disabled={isProcessingAction} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white disabled:opacity-60">Generar papeleta</button>
             </div>
           </form>
@@ -1118,20 +1166,140 @@ export function Papeletas() {
 
       {reporteToReject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <form onSubmit={handleRejectReporte} className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a]">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-rose-50 px-6 py-4 dark:border-slate-800 dark:bg-rose-950/30">
+          <form onSubmit={handleRejectReporte} className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-rose-50 px-6 py-4 dark:border-[var(--border)] dark:bg-rose-950/30">
               <h3 className="text-lg font-black text-slate-900 dark:text-white">Rechazar reporte #{reporteToReject.id}</h3>
-              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-full p-1 text-slate-400 hover:bg-white">✕</button>
+              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-full p-1 text-slate-400 hover:bg-white dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white">✕</button>
             </div>
             <div className="space-y-3 p-6">
               <label className="block space-y-1">
-                <span className="text-xs font-black uppercase text-slate-400">Motivo</span>
-                <textarea required value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} rows={4} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold" placeholder="Ej. Foto insuficiente, placa ilegible, no procede..." />
+                <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500">Motivo</span>
+                <textarea required value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} rows={4} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" placeholder="Ej. Foto insuficiente, placa ilegible, no procede..." />
               </label>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600">Cancelar</button>
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600 dark:border-[var(--border-strong)] dark:text-slate-300">Cancelar</button>
               <button disabled={isProcessingAction} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-black text-white disabled:opacity-60">Rechazar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isNuevaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <form onSubmit={handleCrearPapeleta} className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                  <Icon name="ticket" className="size-4" />
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Nueva Papeleta</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNuevaModalOpen(false)}
+                title="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+              >
+                <Icon name="close" className="size-5" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Vehículo</legend>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FloatingInput
+                    id="nueva_placa"
+                    label="Placa"
+                    required
+                    inputClassName="font-mono uppercase"
+                    value={nuevaForm.vehiculoPlaca}
+                    onChange={(e) => setNuevaForm({ ...nuevaForm, vehiculoPlaca: e.target.value.toUpperCase() })}
+                  />
+                  <FloatingInput id="nueva_clase" label="Clase" optional value={nuevaForm.claseVehiculo} onChange={(e) => setNuevaForm({ ...nuevaForm, claseVehiculo: e.target.value })} />
+                  <FloatingInput id="nueva_marca" label="Marca" optional value={nuevaForm.marcaVehiculo} onChange={(e) => setNuevaForm({ ...nuevaForm, marcaVehiculo: e.target.value })} />
+                  <FloatingInput id="nueva_color" label="Color" optional value={nuevaForm.colorVehiculo} onChange={(e) => setNuevaForm({ ...nuevaForm, colorVehiculo: e.target.value })} />
+                </div>
+                <p className="mt-2 text-[10.5px] text-slate-400">Si la placa no está registrada, se creará automáticamente con estos datos.</p>
+              </fieldset>
+
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Conductor / Infractor</legend>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <FloatingInput
+                    id="nueva_dni"
+                    label="DNI"
+                    optional
+                    maxLength={11}
+                    inputClassName="font-mono"
+                    value={nuevaForm.conductorDni}
+                    onChange={(e) => setNuevaForm({ ...nuevaForm, conductorDni: e.target.value.replace(/\D/g, '') })}
+                  />
+                  <FloatingInput id="nueva_nombres" label="Nombres" optional value={nuevaForm.conductorNombres} onChange={(e) => setNuevaForm({ ...nuevaForm, conductorNombres: e.target.value })} />
+                  <FloatingInput id="nueva_apellidos" label="Apellidos" optional value={nuevaForm.conductorApellidos} onChange={(e) => setNuevaForm({ ...nuevaForm, conductorApellidos: e.target.value })} />
+                </div>
+                <p className="mt-2 text-[10.5px] text-slate-400">Vacío = CONDUCTOR NO PRESENTE.</p>
+              </fieldset>
+
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Infracción</legend>
+                <div className="space-y-4">
+                  <FloatingInput id="nueva_lugar" label="Lugar de la infracción" required value={nuevaForm.lugar} onChange={(e) => setNuevaForm({ ...nuevaForm, lugar: e.target.value })} />
+
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Infracciones a aplicar</span>
+                    {nuevaForm.infraccionesIds.map((infId, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <select
+                          required
+                          value={infId}
+                          onChange={(e) => {
+                            const newIds = [...nuevaForm.infraccionesIds]
+                            newIds[idx] = e.target.value
+                            setNuevaForm({ ...nuevaForm, infraccionesIds: newIds })
+                          }}
+                          className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                        >
+                          <option value="">Selecciona infracción</option>
+                          {tiposInfraccion.map((tipo) => (
+                            <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
+                          ))}
+                        </select>
+                        {nuevaForm.infraccionesIds.length > 1 && (
+                          <button type="button" onClick={() => {
+                            const newIds = [...nuevaForm.infraccionesIds]
+                            newIds.splice(idx, 1)
+                            setNuevaForm({ ...nuevaForm, infraccionesIds: newIds })
+                          }} className="flex items-center justify-center rounded-xl bg-rose-100 px-3 py-2 text-rose-600 hover:bg-rose-200 font-bold transition dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60">
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setNuevaForm({ ...nuevaForm, infraccionesIds: [...nuevaForm.infraccionesIds, ''] })} className="text-xs font-black text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 mt-1 block">
+                      + Añadir otra infracción
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1.5">Observación de autoridad</label>
+                    <textarea
+                      value={nuevaForm.observacionesAutoridad}
+                      onChange={(e) => setNuevaForm({ ...nuevaForm, observacionesAutoridad: e.target.value })}
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                    />
+                  </div>
+                </div>
+              </fieldset>
+            </div>
+
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-[var(--border)]">
+              <button type="button" onClick={() => setIsNuevaModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">Cancelar</button>
+              <button disabled={creandoPapeleta} type="submit" className="rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-rose-600/25 hover:brightness-105 transition-all cursor-pointer disabled:opacity-60">
+                {creandoPapeleta ? 'Registrando...' : 'Registrar Papeleta'}
+              </button>
             </div>
           </form>
         </div>
@@ -1139,11 +1307,11 @@ export function Papeletas() {
 
       {isPagarModalOpen && papeletaToAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-emerald-500/30 dark:border-emerald-500/20">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-emerald-500/30 dark:border-emerald-500/20">
             <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50/80 px-6 py-4 dark:border-emerald-900/30 dark:bg-emerald-950/40">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-9 place-items-center rounded-xl bg-emerald-600 text-white font-black text-sm">
-                  💳
+                  <Icon name="creditCard" className="size-4.5" />
                 </span>
                 <div>
                   <h3 className="font-extrabold text-slate-800 dark:text-white text-base">Registro de Pago de Papeleta</h3>
@@ -1174,33 +1342,26 @@ export function Papeletas() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <label className="text-xs font-bold">Recibo real
-                  <input maxLength={50} value={numeroRecibo} onChange={e => setNumeroRecibo(e.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-slate-800" />
-                </label>
-                <label className="text-xs font-bold">Fecha de pago
-                  <input type="date" value={fechaPago} onChange={e => setFechaPago(e.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-slate-800" />
-                </label>
+                <FloatingInput id="recibo_real" label="Recibo real" maxLength={50} value={numeroRecibo} onChange={e => setNumeroRecibo(e.target.value)} />
+                <FloatingInput id="fecha_pago" label="Fecha de pago" type="date" value={fechaPago} onChange={e => setFechaPago(e.target.value)} />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Método de Pago:
-                </label>
-                <select
-                  value={metodoPago}
-                  onChange={(e) => setMetodoPago(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                >
-                  <option value="EFECTIVO">Efectivo en Caja Municipal</option>
-                  <option value="TRANSFERENCIA">Transferencia / Depósito Bancario</option>
-                  <option value="TARJETA">Tarjeta de Débito / Crédito</option>
-                </select>
-              </div>
+              <FloatingSelect
+                id="metodo_pago"
+                label="Método de Pago"
+                value={metodoPago}
+                onChange={(e) => setMetodoPago(e.target.value)}
+                options={[
+                  { value: 'EFECTIVO', label: 'Efectivo en Caja Municipal' },
+                  { value: 'TRANSFERENCIA', label: 'Transferencia / Depósito Bancario' },
+                  { value: 'TARJETA', label: 'Tarjeta de Débito / Crédito' },
+                ]}
+              />
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsPagarModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1355,14 +1516,14 @@ export function Papeletas() {
           onClick={() => setSelectedInfraccion(null)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]"
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-rose-100 bg-rose-50/80 px-5 py-4 dark:border-rose-950/60 dark:bg-rose-950/40">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-9 place-items-center rounded-xl bg-rose-600 text-white font-black text-sm shadow-sm shadow-rose-500/30">
-                  ⚖️
+                  <Icon name="scale" className="size-4" />
                 </span>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 dark:text-white">
@@ -1376,7 +1537,7 @@ export function Papeletas() {
               <button
                 type="button"
                 onClick={() => setSelectedInfraccion(null)}
-                className="rounded-full p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                className="rounded-full p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white transition-colors cursor-pointer"
               >
                 ✕
               </button>
@@ -1384,7 +1545,7 @@ export function Papeletas() {
 
             {/* Body */}
             <div className="p-5 space-y-4">
-              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 border border-slate-100 dark:bg-slate-900/50 dark:border-slate-800">
+              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 border border-slate-100 dark:bg-slate-900/50 dark:border-[var(--border)]">
                 <div>
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Código</span>
                   <p className="text-2xl font-black font-mono text-rose-700 dark:text-rose-400">
@@ -1410,14 +1571,14 @@ export function Papeletas() {
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                   Descripción
                 </h4>
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 text-xs font-medium leading-relaxed text-slate-800 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 text-xs font-medium leading-relaxed text-slate-800 dark:border-[var(--border)] dark:bg-slate-900/40 dark:text-slate-200">
                   {selectedInfraccion.descripcion}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-1">
                 {selectedInfraccion.monto > 0 && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Monto Multa</span>
                     <p className="text-base font-black font-mono text-slate-900 dark:text-white">
                       S/ {Number(selectedInfraccion.monto).toFixed(2)}
@@ -1425,7 +1586,7 @@ export function Papeletas() {
                   </div>
                 )}
                 {selectedInfraccion.porcentajeUit && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Sanción UIT</span>
                     <p className="text-base font-black font-mono text-slate-900 dark:text-white">
                       {selectedInfraccion.porcentajeUit}% UIT
@@ -1433,7 +1594,7 @@ export function Papeletas() {
                   </div>
                 )}
                 {selectedInfraccion.numeroPapeleta && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40 col-span-2">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40 col-span-2">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Papeleta Asociada</span>
                     <p className="text-xs font-bold font-mono text-rose-700 dark:text-rose-400">
                       {selectedInfraccion.numeroPapeleta}
@@ -1444,7 +1605,7 @@ export function Papeletas() {
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end border-t border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="flex justify-end border-t border-slate-100 bg-slate-50/50 p-4 dark:border-[var(--border)] dark:bg-slate-900/40">
               <button
                 type="button"
                 onClick={() => setSelectedInfraccion(null)}

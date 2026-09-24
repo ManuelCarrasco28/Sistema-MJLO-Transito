@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
-import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
+import { sanitizarMensaje, apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
+import { showError } from '../utils/SwalUtil'
 import { ResolucionPermisoPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
 import { TramiteFormularioModal } from '../components/permisos/TramiteFormularioModal'
@@ -51,7 +52,7 @@ export function Permisos() {
       setPermisos((prev) => prev.filter((p) => p.id !== id))
       invalidateCache('/permisos')
     } catch (err) {
-      alert(err.message || 'No se pudo eliminar la autorización.')
+      showError('Error', sanitizarMensaje(err.message, 'No se pudo eliminar la autorización.'))
     }
   }
 
@@ -243,7 +244,7 @@ export function Permisos() {
       {/* Cabecera Principal - Estilo Personas.jsx */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/25">
             <Icon name="routePermit" className="size-5.5" />
           </span>
           <div>
@@ -262,7 +263,7 @@ export function Permisos() {
       {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas separadas compactas - Exacto a Personas.jsx */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {/* 1. Total Registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Total Registros</span>
             <span className="grid size-6 place-items-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
@@ -277,7 +278,7 @@ export function Permisos() {
         </div>
 
         {/* 2. Carga y Descarga */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Carga y Descarga</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
@@ -292,7 +293,7 @@ export function Permisos() {
         </div>
 
         {/* 3. Uso de Vías */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Uso de Vías</span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
@@ -307,7 +308,7 @@ export function Permisos() {
         </div>
 
         {/* 4. Vigentes */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Vigentes</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
@@ -322,7 +323,7 @@ export function Permisos() {
         </div>
 
         {/* 5. Vencidos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Vencidos</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
@@ -338,7 +339,7 @@ export function Permisos() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800">
+      <div className="flex border-b border-slate-200 dark:border-[var(--border)]">
         <button
           type="button"
           onClick={() => setActiveTab('permisos')}
@@ -369,10 +370,10 @@ export function Permisos() {
       {activeTab === 'permisos' && (
         <div className="space-y-4">
           {/* Contenedor de la Tabla - Exacto a Personas.jsx */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
             
             {/* Barra de Filtros y Acciones */}
-            <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1">
                 <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
                 <input
@@ -380,7 +381,7 @@ export function Permisos() {
                   placeholder="Buscar por placa, solicitante, autorización o expediente..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
                 />
                 {searchTerm && (
                   <button
@@ -443,7 +444,7 @@ export function Permisos() {
                 <button
                   type="button"
                   onClick={handleOpenCreate}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-amber-500/30 active:scale-95 cursor-pointer whitespace-nowrap"
                 >
                   <span className="text-base leading-none font-black">+</span>
                   <span>Nueva autorización</span>
@@ -454,7 +455,7 @@ export function Permisos() {
             {/* Tabla de Autorizaciones */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <tr>
                     <th className="px-4 py-3 whitespace-nowrap">Solicitante</th>
                     <th className="px-4 py-3 whitespace-nowrap">N° Autorización</th>
@@ -462,12 +463,12 @@ export function Permisos() {
                     <th className="px-4 py-3 whitespace-nowrap">Zona / Horario</th>
                     <th className="px-4 py-3 whitespace-nowrap">Vigencia</th>
                     <th className="px-4 py-3 text-center whitespace-nowrap">Estado</th>
-                    <th className="sticky right-0 z-20 px-4 py-3 text-center whitespace-nowrap bg-slate-50/75 dark:bg-slate-800/40">
+                    <th className="sticky right-0 z-20 px-4 py-3 text-center whitespace-nowrap bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                       Acciones
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                   {isLoading ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
@@ -488,11 +489,11 @@ export function Permisos() {
                       const initials = solicitanteText.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || 'AU'
 
                       return (
-                          <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                          <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
                             {/* Solicitante / Titular con Avatar */}
                             <td className="px-4 py-3 align-top">
                               <div className="flex items-center gap-3">
-                                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 font-bold text-slate-700 text-xs shadow-2xs dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 font-bold text-slate-700 text-xs shadow-2xs dark:bg-[var(--bg-subtle)] dark:text-slate-300 border border-slate-200 dark:border-[var(--border-strong)]">
                                   {initials}
                                 </span>
                                 <div className="min-w-0 flex-1">
@@ -570,7 +571,7 @@ export function Permisos() {
                             </td>
 
                             {/* Acciones - Estilo Personas.jsx */}
-                            <td className="sticky right-0 z-20 px-4 py-3 text-center align-top bg-white/95 dark:bg-[#0f172a]/95">
+                            <td className="sticky right-0 z-20 px-4 py-3 text-center align-top bg-white/95 dark:bg-[var(--bg-surface)]/95">
                               <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   type="button"
@@ -682,7 +683,7 @@ export function Permisos() {
           {procedimientos.map((proc) => (
             <div
               key={proc.id}
-              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-horizon dark:shadow-none dark:border-slate-800 dark:bg-[#111C44]"
+              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-horizon dark:shadow-none dark:border-[var(--border)] dark:bg-[#111C44]"
             >
               <div>
                 <div className="flex items-center justify-between">
@@ -701,7 +702,7 @@ export function Permisos() {
                 </p>
               </div>
 
-              <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800 flex items-center justify-between">
+              <div className="mt-4 border-t border-slate-100 pt-3 dark:border-[var(--border)] flex items-center justify-between">
                 <span className="text-[11px] font-medium text-slate-400">Derecho de trámite</span>
                 <span className="text-sm font-black text-slate-900 dark:text-white">
                   S/ {Number(proc.costo || 0).toFixed(2)}
@@ -732,37 +733,40 @@ export function Permisos() {
       {/* MODAL DE PREVISUALIZACIÓN E IMPRESIÓN OFICIAL HOJA A4 */}
       {isDetailModalOpen && selectedPermiso && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xs animate-enter overflow-y-auto">
-          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0B1437] my-auto">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] my-auto">
             
-            {/* Header del visualizador */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-900 text-white dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-xl bg-violet-500/20 text-violet-400">
-                  <Icon name="print" className="size-5" />
+            {/* Header del visualizador estilo /personas */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                  <Icon name="print" className="size-4" />
                 </span>
                 <div>
-                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                    Formato Oficial A4 — Subgerencia de Tránsito y Transporte
-                    <span className="rounded-full bg-violet-500/20 text-violet-300 text-[10px] font-mono px-2 py-0.5 font-bold">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      Formato Oficial A4
+                    </h3>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                       {selectedPermiso.tipoPermiso === 'CARGA_DESCARGA' ? 'Carga y Descarga' : selectedPermiso.tipoPermiso === 'USO_VIAS' ? 'Uso Provisional de Vías' : 'Resolución'}
                     </span>
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {selectedPermiso.numeroAutorizacion || selectedPermiso.numeroResolucion}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {selectedPermiso.numeroAutorizacion || selectedPermiso.numeroResolucion} • Subgerencia de Tránsito y Transporte
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition cursor-pointer"
+                title="Cerrar previsualización"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                ✕
+                <Icon name="close" className="size-5" />
               </button>
             </div>
 
             {/* Vista Previa del Documento Oficial */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-center gap-4 bg-slate-100 dark:bg-slate-900/60">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-center gap-4 bg-slate-100 dark:bg-[var(--bg-subtle)]">
               <div className="text-center max-w-lg">
                 <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   Documento Oficial de Autorización Municipal — Hoja Formato A4
@@ -776,7 +780,7 @@ export function Permisos() {
             </div>
 
             {/* Footer de Acciones */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0B1437]">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-[var(--border)] bg-white dark:bg-[var(--bg-surface)]">
               <button
                 type="button"
                 onClick={handlePrint}
@@ -789,7 +793,7 @@ export function Permisos() {
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer"
+                className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 cursor-pointer"
               >
                 Cerrar
               </button>

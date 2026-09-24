@@ -47,26 +47,31 @@ export const navigationGroups = [
     ]
   },
   {
-    name: 'Documentación',
-    items: [
-      { id: 'documentos', label: 'Documentos del Vehículo', icon: 'folderShield', path: '/documentos' },
-      { id: 'certicav', label: 'Certicav', icon: 'certificate', path: '/inspecciones' },
-    ]
-  },
-  {
     name: 'Trámites',
     items: [
       { id: 'permisos', label: 'Permisos y Autorizaciones', icon: 'routePermit', path: '/permisos' },
       { id: 'cursos', label: 'Curso de Seguridad Vial', icon: 'course', path: '/cursos' },
+      { id: 'documentos', label: 'Documentos del Vehículo', icon: 'folderShield', path: '/documentos' },
+    ]
+  },
+  {
+    name: 'Inspecciones Técnicas',
+    items: [
+      { id: 'certicav', label: 'Certicav', icon: 'certificate', path: '/inspecciones' },
+      { id: 'operativos', label: 'Operativos', icon: 'operations', path: '/operativos' },
     ]
   },
   {
     name: 'Fiscalización',
     items: [
-      { id: 'operativos', label: 'Operativos', icon: 'operations', path: '/operativos' },
       { id: 'papeletas', label: 'Papeletas', icon: 'ticket', path: '/papeletas' },
-      { id: 'pagos', label: 'Pagos', icon: 'receiptCheck', path: '/pagos' },
       { id: 'internamientos', label: 'Internamientos', icon: 'garage', path: '/internamientos' },
+    ]
+  },
+  {
+    name: 'Pagos',
+    items: [
+      { id: 'pagos', label: 'Pagos', icon: 'receiptCheck', path: '/pagos' },
     ]
   }
 ];

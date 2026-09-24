@@ -48,7 +48,7 @@ class CursosController extends ResourceController
                 
                 try {
                     $participantes = $db->table('inscripciones_curso ic')
-                        ->select('c.nombres, c.apellido_paterno, c.apellido_materno, ic.estado, ic.asistio, p.numero AS dni, c.numero_licencia AS licencia, c.foto AS fotoUrl')
+                        ->select('c.nombres, c.apellido_paterno, c.apellido_materno, ic.estado, ic.estado_pago, ic.asistio, p.numero AS dni, c.numero_licencia AS licencia, c.foto AS fotoUrl')
                         ->join('personas p', 'p.id = ic.id_persona', 'left')
                         ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
                         ->where('ic.id_curso', $row['id'])
@@ -236,6 +236,33 @@ class CursosController extends ResourceController
         }
     }
 
+    /**
+     * Devuelve los IDs de personas que ya aprobaron o asistieron a un curso
+     * en los últimos 2 años (vigencia del certificado), para no ofrecerlas
+     * de nuevo al inscribir en un curso nuevo salvo que ya esté vencido.
+     */
+    public function personasConCursoVigente()
+    {
+        $db = \Config\Database::connect();
+        try {
+            $rows = $db->table('inscripciones_curso ic')
+                ->select('DISTINCT ic.id_persona')
+                ->join('cursos_seguridad_vial c', 'c.id = ic.id_curso')
+                ->groupStart()
+                    ->where('ic.estado', 'APROBADO')
+                    ->orWhere('ic.asistio', 1)
+                ->groupEnd()
+                ->where('c.fecha_inicio >=', date('Y-m-d', strtotime('-2 years')))
+                ->get()
+                ->getResultArray();
+
+            $ids = array_map(static fn($r) => (int)$r['id_persona'], $rows);
+            return $this->respond(['data' => $ids]);
+        } catch (\Throwable $t) {
+            return $this->respond(['data' => []]);
+        }
+    }
+
     public function inscribirParticipante($idCurso)
     {
         $db = \Config\Database::connect();
@@ -269,10 +296,24 @@ class CursosController extends ResourceController
             ->getRowArray();
 
         if (!$persona) {
-            return $this->failNotFound('No se encontró una persona con el DNI proporcionado en el sistema.');
+            return $this->failNotFound('No se encontró una persona con el DNI proporcionado en el sistema. Regístrala primero en el módulo Personas.');
         }
 
         $idPersona = $persona['id_persona'];
+
+        $curso = $db->table('cursos_seguridad_vial')
+            ->select('cupos, costo_inscripcion, estado')
+            ->where('id', $idCurso)
+            ->get()
+            ->getRowArray();
+
+        if (!$curso) {
+            return $this->failNotFound('No se encontró el curso indicado.');
+        }
+
+        if ($curso['estado'] === 'FINALIZADO') {
+            return $this->failValidationErrors('Este curso ya finalizó, no se pueden registrar más inscripciones.');
+        }
 
         // Verificar si ya está inscrito
         $existe = $db->table('inscripciones_curso')
@@ -284,12 +325,41 @@ class CursosController extends ResourceController
             return $this->failValidationErrors('Esta persona ya se encuentra inscrita en este curso.');
         }
 
+        // No permitir reinscribir a quien ya tiene un certificado vigente (últimos 2 años)
+        $vigente = $db->table('inscripciones_curso ic')
+            ->join('cursos_seguridad_vial c2', 'c2.id = ic.id_curso')
+            ->groupStart()
+                ->where('ic.estado', 'APROBADO')
+                ->orWhere('ic.asistio', 1)
+            ->groupEnd()
+            ->where('ic.id_persona', $idPersona)
+            ->where('c2.fecha_inicio >=', date('Y-m-d', strtotime('-2 years')))
+            ->countAllResults();
+
+        if ($vigente > 0) {
+            return $this->failValidationErrors('Esta persona ya cuenta con un certificado vigente de curso (menos de 2 años); no necesita volver a inscribirse.');
+        }
+
+        // Verificar cupo disponible
+        $cuposTotales = (int)($curso['cupos'] ?? 0);
+        $inscritosActuales = (int)$db->table('inscripciones_curso')
+            ->where('id_curso', $idCurso)
+            ->countAllResults();
+
+        if ($cuposTotales > 0 && $inscritosActuales >= $cuposTotales) {
+            return $this->failValidationErrors("El curso ya alcanzó su cupo máximo ({$cuposTotales} participantes).");
+        }
+
+        // El pago queda pendiente si el curso tiene costo; se cobra luego desde Pagos.
+        $costo = (float)($curso['costo_inscripcion'] ?? 0);
+        $estadoPago = $costo > 0 ? 'PENDIENTE' : 'PAGADO';
+
         // Inscribir
         $data = [
             'id_curso' => $idCurso,
             'id_persona' => $idPersona,
             'fecha_inscripcion' => date('Y-m-d H:i:s'),
-            'estado_pago' => 'PAGADO', // Por defecto para simplificar
+            'estado_pago' => $estadoPago,
             'asistio' => 0,
             'estado' => 'INSCRITO'
         ];
@@ -305,6 +375,7 @@ class CursosController extends ResourceController
                 'licencia' => $persona['numero_licencia'],
                 'fotoUrl' => $persona['foto'],
                 'estado' => 'INSCRITO',
+                'estado_pago' => $estadoPago,
                 'asistio' => 0
             ];
             

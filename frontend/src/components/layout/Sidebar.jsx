@@ -33,8 +33,8 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
     'Principal': true,
     'Super Admin': true,
     'Padrón municipal': true,
-    'Documentación': true,
     'Trámites': true,
+    'Inspecciones Técnicas': true,
     'Fiscalización': true
   })
 
@@ -57,12 +57,13 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const groupIconConfig = {
     'Super Admin': { icon: 'shieldCheck', color: 'text-cyan-500 dark:text-cyan-300', bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
     'Administración': { icon: 'settings', color: 'text-emerald-500 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
-    'Mantenimiento': { icon: 'lock', color: 'text-slate-500 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800/60' },
+    'Mantenimiento': { icon: 'lock', color: 'text-slate-500 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-[var(--bg-subtle)]' },
     'Principal': { icon: 'dashboard', color: 'text-[#4318FF]', bg: 'bg-[#EEF2FF] dark:bg-blue-950/40' },
     'Padrón municipal': { icon: 'people', color: 'text-[#4318FF] dark:text-indigo-400', bg: 'bg-[#EEF2FF] dark:bg-indigo-950/40' },
-    'Documentación': { icon: 'document', color: 'text-[#FFB547] dark:text-amber-400', bg: 'bg-[#FFF9EC] dark:bg-amber-950/40' },
-    'Trámites': { icon: 'document', color: 'text-[#7551FF] dark:text-purple-400', bg: 'bg-[#F4F0FF] dark:bg-purple-950/40' },
+    'Trámites': { icon: 'document', color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
+    'Inspecciones Técnicas': { icon: 'certificate', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/40' },
     'Fiscalización': { icon: 'ticket', color: 'text-[#EE5D50] dark:text-rose-400', bg: 'bg-[#FEEFEE] dark:bg-rose-950/40' },
+    'Pagos': { icon: 'receiptCheck', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
   }
 
   useEffect(() => {

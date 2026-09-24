@@ -4,13 +4,13 @@ export function StatusBadge({ status, className = '' }) {
   // Mapeo semántico según la skill rediseno-sobrio
   let tokenType = 'neutral' // default
 
-  if (['ACTIVO', 'VIGENTE', 'FORMAL', 'PAGADO', 'LIBERADO', 'FINALIZADO', 'APROBADO', 'COMPLETADO'].includes(norm)) {
+  if (['ACTIVO', 'VIGENTE', 'FORMAL', 'PAGADO', 'LIBERADO', 'FINALIZADO', 'APROBADO', 'COMPLETADO', 'EN_CURSO'].includes(norm)) {
     tokenType = 'ok'
   } else if (['EN_TRAMITE', 'EN TRÁMITE', 'EN TRAMITE', 'PENDIENTE', 'INFORMAL', 'POR_COBRAR', 'EN REVISIÓN', 'EN REVISION', 'INSCRITO', 'PROGRAMADO'].includes(norm)) {
     tokenType = 'warn'
-  } else if (['VENCIDO', 'EXPIRADO', 'OBSERVADO', 'EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'RETENIDO', 'BAJA', 'INACTIVO'].includes(norm)) {
+  } else if (['VENCIDO', 'EXPIRADO', 'OBSERVADO', 'EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'RETENIDO', 'BAJA', 'SUSPENDIDO', 'CANCELADO', 'DESAPROBADO', 'INACTIVO'].includes(norm)) {
     tokenType = 'danger'
-  } else if (['ANULADO', 'PRESCRITO', 'HISTORICO', 'EFECTIVO', 'TRANSFERENCIA', 'MULTIPLE'].includes(norm)) {
+  } else if (['ANULADO', 'ANULADA', 'PRESCRITO', 'HISTORICO', 'EFECTIVO', 'TRANSFERENCIA', 'MULTIPLE'].includes(norm)) {
     tokenType = 'neutral'
   }
 

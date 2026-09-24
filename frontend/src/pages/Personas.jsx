@@ -8,6 +8,7 @@ import { KpiStrip } from '../components/ui/KpiStrip'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
+import { useQuickCreate } from '../hooks/useQuickCreate'
 function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
   try {
@@ -157,8 +158,8 @@ export function Personas({ user, onUserUpdate }) {
       icon: 'people',
       accentColor: '#1d4f91',
       borderColor: '#93c5fd',
-      borderClass: 'border-2 border-blue-400 dark:border-slate-800 shadow-xs',
-      iconClass: 'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-slate-800',
+      borderClass: 'border-2 border-blue-400 dark:border-[var(--border)] shadow-xs',
+      iconClass: 'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-[var(--border)]',
     },
     {
       label: 'Con licencia',
@@ -167,8 +168,8 @@ export function Personas({ user, onUserUpdate }) {
       icon: 'permit',
       accentColor: '#0284c7',
       borderColor: '#7dd3fc',
-      borderClass: 'border-2 border-sky-400 dark:border-slate-800 shadow-xs',
-      iconClass: 'bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-950/80 dark:text-sky-300 dark:border-slate-800',
+      borderClass: 'border-2 border-sky-400 dark:border-[var(--border)] shadow-xs',
+      iconClass: 'bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-950/80 dark:text-sky-300 dark:border-[var(--border)]',
     },
     {
       label: 'Sin licencia',
@@ -177,8 +178,8 @@ export function Personas({ user, onUserUpdate }) {
       icon: 'vehicle',
       accentColor: '#6366f1',
       borderColor: '#a5b4fc',
-      borderClass: 'border-2 border-indigo-400 dark:border-slate-800 shadow-xs',
-      iconClass: 'bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-slate-800',
+      borderClass: 'border-2 border-indigo-400 dark:border-[var(--border)] shadow-xs',
+      iconClass: 'bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-[var(--border)]',
     },
     {
       label: 'Activos',
@@ -189,8 +190,8 @@ export function Personas({ user, onUserUpdate }) {
       accentColor: '#10b981',
       borderColor: '#6ee7b7',
       progressColor: '#10b981',
-      borderClass: 'border-2 border-emerald-400 dark:border-slate-800 shadow-xs',
-      iconClass: 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-slate-800',
+      borderClass: 'border-2 border-emerald-400 dark:border-[var(--border)] shadow-xs',
+      iconClass: 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-[var(--border)]',
     },
   ]
 
@@ -211,6 +212,8 @@ export function Personas({ user, onUserUpdate }) {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
+
+  useQuickCreate(() => handleOpenCreateModal(), !isLoading)
 
   const handleOpenCreateModal = () => {
     setFormData({
@@ -769,7 +772,7 @@ export function Personas({ user, onUserUpdate }) {
       {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas separadas compactas */}
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {/* 1. Total registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registros</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -784,7 +787,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 2. Con licencia */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Con Licencia</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
@@ -799,7 +802,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 3. Sin licencia */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Sin Licencia</span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
@@ -814,7 +817,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 4. Activos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Activos</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
@@ -829,7 +832,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 5. Inactivos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Inactivos</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
@@ -845,8 +848,8 @@ export function Personas({ user, onUserUpdate }) {
       </div>
 
       {/* Contenedor de la Tabla */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
-        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
@@ -854,7 +857,7 @@ export function Personas({ user, onUserUpdate }) {
               placeholder="Buscar por DNI, nombres, apellidos o licencia..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
             />
             {searchTerm && (
               <button
@@ -923,14 +926,14 @@ export function Personas({ user, onUserUpdate }) {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 whitespace-nowrap">Persona</th>
                 <th className="px-4 py-3 whitespace-nowrap">Documento</th>
                 <th className="px-4 py-3 whitespace-nowrap">Licencia</th>
                 <th className="px-4 py-3 whitespace-nowrap">Contacto</th>
                 <th className="px-4 py-3 whitespace-nowrap">Estado</th>
-                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-slate-800/40">
+                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                   Acciones
                 </th>
               </tr>
@@ -1220,11 +1223,11 @@ export function Personas({ user, onUserUpdate }) {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Header: Limpio, sin morado ni textos largos */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="people" className="size-4" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -1246,7 +1249,7 @@ export function Personas({ user, onUserUpdate }) {
                 {/* Bloque Superior: Foto a la izquierda + Identidad y Nombres a la derecha */}
                 <div className="flex flex-col sm:flex-row gap-3 items-stretch">
                   {/* Foto tipo carnet (ancho óptimo para no desperdiciar espacio horizontal) */}
-                  <div className="w-full sm:w-[102px] shrink-0 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-2.5 flex flex-col items-center justify-center gap-2 dark:border-slate-800 dark:bg-slate-900/60 shadow-xs">
+                  <div className="w-full sm:w-[102px] shrink-0 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-2.5 flex flex-col items-center justify-center gap-2 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-xs">
                     {formData.fotoImg ? (
                       <img
                         src={formData.fotoImg}
@@ -1255,7 +1258,7 @@ export function Personas({ user, onUserUpdate }) {
                           e.currentTarget.onerror = null
                           e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.nombres || 'P')}+${encodeURIComponent(formData.apellidoPaterno || 'P')}&background=f1f5f9&color=475569&bold=true`
                         }}
-                        className="w-[78px] h-[98px] rounded-xl object-cover border-2 border-slate-200 dark:border-slate-700 shadow-xs bg-slate-100 dark:bg-slate-800"
+                        className="w-[78px] h-[98px] rounded-xl object-cover border-2 border-slate-200 dark:border-[var(--border-strong)] shadow-xs bg-slate-100 dark:bg-[var(--bg-subtle)]"
                       />
                     ) : (
                       <div className="w-[78px] h-[98px] rounded-xl font-bold flex flex-col items-center justify-center text-lg uppercase select-none border border-slate-200 bg-slate-800 text-white shrink-0 shadow-xs">
@@ -1265,7 +1268,7 @@ export function Personas({ user, onUserUpdate }) {
                     )}
 
                     <div className="flex items-center gap-1.5 w-full justify-center">
-                      <label className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                      <label className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white dark:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
                         <Icon name="camera" className="size-3" />
                         <span>{formData.fotoImg ? 'Cambiar' : 'Subir'}</span>
                         <input
@@ -1289,7 +1292,7 @@ export function Personas({ user, onUserUpdate }) {
                   </div>
 
                   {/* Identidad y Nombres */}
-                  <div className="flex-1 min-w-0 space-y-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                  <div className="flex-1 min-w-0 space-y-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
                       <span className="size-2 rounded-full bg-blue-600" />
                       Datos Personales
@@ -1349,7 +1352,7 @@ export function Personas({ user, onUserUpdate }) {
                 </div>
 
                 {/* Bloque Inferior: Licencia y Contacto */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-emerald-600" />
                     Licencia y contacto
@@ -1428,11 +1431,11 @@ export function Personas({ user, onUserUpdate }) {
               </div>
 
               {/* Modal Footer */}
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-[var(--border)] dark:bg-slate-900/80">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 active:scale-95 cursor-pointer"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 active:scale-95 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1450,11 +1453,11 @@ export function Personas({ user, onUserUpdate }) {
 
       {isDetailModalOpen && selectedPersona && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Modal Header (Limpio, sin morado ni textos largos) */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="user" className="size-4" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -1474,7 +1477,7 @@ export function Personas({ user, onUserUpdate }) {
             {/* Modal Body: Compacto sin scroll */}
             <div className="p-5 pb-6 space-y-3">
               {/* Profile Hero Card */}
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 flex flex-col sm:flex-row items-center gap-4 dark:border-slate-800 dark:bg-slate-900/60 shadow-xs">
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 flex flex-col sm:flex-row items-center gap-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-xs">
                 {selectedPersona.fotoImg ? (
                   <img
                     src={selectedPersona.fotoImg}
@@ -1483,7 +1486,7 @@ export function Personas({ user, onUserUpdate }) {
                       e.currentTarget.onerror = null
                       e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPersona.nombres)}+${encodeURIComponent(selectedPersona.apellidoPaterno)}&background=f1f5f9&color=475569&bold=true`
                     }}
-                    className="w-[84px] h-[105px] rounded-xl object-cover border-2 border-slate-200 dark:border-slate-700 shrink-0 shadow-xs bg-slate-100 dark:bg-slate-800"
+                    className="w-[84px] h-[105px] rounded-xl object-cover border-2 border-slate-200 dark:border-[var(--border-strong)] shrink-0 shadow-xs bg-slate-100 dark:bg-[var(--bg-subtle)]"
                   />
                 ) : (
                   <div className="w-[84px] h-[105px] rounded-xl font-bold flex flex-col items-center justify-center text-xl uppercase select-none border border-slate-200 bg-slate-800 text-white shrink-0 shadow-xs">
@@ -1497,7 +1500,7 @@ export function Personas({ user, onUserUpdate }) {
                     {selectedPersona.apellidoPaterno && selectedPersona.nombres ? `, ${selectedPersona.nombres}` : ''}
                   </h4>
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-mono text-[11px] font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-xs">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-mono text-[11px] font-bold text-slate-700 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 shadow-xs">
                       <span className="text-slate-400 font-semibold">
                         {selectedPersona.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : selectedPersona.tipoDocumento}:
                       </span>
@@ -1512,7 +1515,7 @@ export function Personas({ user, onUserUpdate }) {
               {/* Secciones de Datos en Rejilla: Solo atributos reales con espacio completo */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {/* 1. Datos Personales y Licencia */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 space-y-1.5 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 space-y-1.5 shadow-xs">
                   <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                     Datos personales
                   </h5>
@@ -1575,7 +1578,7 @@ export function Personas({ user, onUserUpdate }) {
                 </div>
 
                 {/* 2. Contacto */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 space-y-1.5 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 space-y-1.5 shadow-xs">
                   <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                     Contacto
                   </h5>
@@ -1611,7 +1614,7 @@ export function Personas({ user, onUserUpdate }) {
               {/* Récord 360: Papeletas y Cursos */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-3.5">
                 {/* 3. Historial de Papeletas */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 flex flex-col shadow-xs max-h-60">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 flex flex-col shadow-xs max-h-60">
                   <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 shrink-0">
                     Historial de Papeletas ({selectedPersona.historialPapeletas?.length || 0})
                   </h5>
@@ -1620,10 +1623,10 @@ export function Personas({ user, onUserUpdate }) {
                       <p className="text-xs text-slate-400 italic text-center py-4">No registra papeletas.</p>
                     ) : (
                       selectedPersona.historialPapeletas.map((pap, i) => (
-                        <div key={i} className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                        <div key={i} className="bg-white dark:bg-[var(--bg-subtle)] p-2 rounded-xl border border-slate-200 dark:border-[var(--border-strong)] text-xs">
                           <div className="flex justify-between items-center mb-1">
                             <strong className="text-rose-600 dark:text-rose-400 font-mono">{pap.numero_papeleta}</strong>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400">{pap.estado}</span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[var(--bg-surface)] text-slate-600 dark:text-slate-400">{pap.estado}</span>
                           </div>
                           <p className="text-slate-600 dark:text-slate-300 font-semibold">Placa: {pap.placa}</p>
                           <p className="text-slate-500 dark:text-slate-400 text-[10px]">{formatFecha(pap.fecha_hora)} - {pap.lugar}</p>
@@ -1634,7 +1637,7 @@ export function Personas({ user, onUserUpdate }) {
                 </div>
 
                 {/* 4. Historial de Cursos */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 flex flex-col shadow-xs max-h-60">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 flex flex-col shadow-xs max-h-60">
                   <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 shrink-0">
                     Historial de Cursos ({selectedPersona.historialCursos?.length || 0})
                   </h5>
@@ -1643,13 +1646,13 @@ export function Personas({ user, onUserUpdate }) {
                       <p className="text-xs text-slate-400 italic text-center py-4">No registra cursos de seguridad vial.</p>
                     ) : (
                       selectedPersona.historialCursos.map((cur, i) => (
-                        <div key={i} className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                        <div key={i} className="bg-white dark:bg-[var(--bg-subtle)] p-2 rounded-xl border border-slate-200 dark:border-[var(--border-strong)] text-xs">
                           <div className="flex justify-between items-start mb-1">
                             <strong className="text-indigo-600 dark:text-indigo-400 leading-tight">{cur.curso_nombre}</strong>
                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ml-2 whitespace-nowrap ${
                               cur.estado === 'APROBADO' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400' :
                               cur.estado === 'DESAPROBADO' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400' :
-                              'bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400'
+                              'bg-slate-100 text-slate-600 dark:bg-[var(--bg-surface)] dark:text-slate-400'
                             }`}>{cur.estado}</span>
                           </div>
                           <p className="text-slate-500 dark:text-slate-400 text-[10px]">Inscrito: {formatFecha(cur.fecha_inscripcion)}</p>

@@ -99,13 +99,13 @@ function getDocTypeBadge(tipo) {
       )
     case 'TARJETA_PROPIEDAD':
       return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 border border-slate-200 dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:border-[var(--border-strong)]">
           Tarjeta Propiedad
         </span>
       )
     default:
       return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-[10.5px] font-bold text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300">
+        <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-[10.5px] font-bold text-slate-600 border border-slate-200 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
           {tipo || '—'}
         </span>
       )
@@ -568,7 +568,7 @@ export function Documentos() {
       {/* Cabecera Principal - Estilo Exacto Personas */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/25">
             <Icon name="document" className="size-5.5" />
           </span>
           <div>
@@ -587,7 +587,7 @@ export function Documentos() {
       {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas compactas (Estilo exacto Personas) */}
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {/* 1. Total documentos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Total registros
@@ -604,7 +604,7 @@ export function Documentos() {
         </div>
 
         {/* 2. Tarjetas Operatividad (TUC) */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
               Tarjetas TUC
@@ -621,7 +621,7 @@ export function Documentos() {
         </div>
 
         {/* 3. SOAT y CertiCAV */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
               SOAT / CertiCAV
@@ -638,7 +638,7 @@ export function Documentos() {
         </div>
 
         {/* 4. Vigentes */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Vigentes
@@ -655,7 +655,7 @@ export function Documentos() {
         </div>
 
         {/* 5. Vencidos / Otros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
               Vencidos / Trámite
@@ -673,8 +673,8 @@ export function Documentos() {
       </div>
 
       {/* Contenedor de la Tabla */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
-        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
@@ -682,7 +682,7 @@ export function Documentos() {
               placeholder="Buscar por código, placa, titular, DNI o asociación..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
             />
             {searchTerm && (
               <button
@@ -746,7 +746,7 @@ export function Documentos() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-amber-500/30 active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Emitir documento</span>
@@ -756,7 +756,7 @@ export function Documentos() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 whitespace-nowrap">Documento / Código</th>
                 <th className="px-4 py-3 whitespace-nowrap">Placa Vehicular</th>
@@ -764,12 +764,12 @@ export function Documentos() {
                 <th className="px-4 py-3 whitespace-nowrap">Expedición</th>
                 <th className="px-4 py-3 whitespace-nowrap">Vencimiento</th>
                 <th className="px-4 py-3 whitespace-nowrap">Estado</th>
-                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-slate-800/40">
+                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
               {isLoading && documentos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -817,7 +817,7 @@ export function Documentos() {
                 paginatedDocs.map((d) => (
                   <tr
                     key={d.id}
-                    className="group transition-colors hover:bg-[var(--brand-soft)] dark:hover:bg-slate-800/40"
+                    className="group transition-colors hover:bg-[var(--brand-soft)] dark:hover:bg-[var(--bg-subtle)]"
                   >
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="space-y-1">
@@ -832,7 +832,7 @@ export function Documentos() {
 
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="space-y-0.5">
-                        <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 shadow-2xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
+                        <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 shadow-2xs dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
                           {d.vehiculoPlaca}
                         </span>
                         {(d.vehiculoMarca || d.vehiculoModelo) && (
@@ -1016,11 +1016,11 @@ export function Documentos() {
       {/* Modal Emitir / Editar Documento */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="document" className="size-4" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -1040,7 +1040,7 @@ export function Documentos() {
             <form onSubmit={handleFormSubmit} autoComplete="off" className="flex flex-col">
               <div className="p-4 sm:p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
                 {/* 1. Sección: Vehículo y Titular */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-blue-600" />
                     Vehículo y Titular
@@ -1064,7 +1064,7 @@ export function Documentos() {
                       />
 
                       {isPlacaDropdownOpen && (
-                        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+                        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
                           {filteredPlacas.length === 0 ? (
                             <div className="px-3 py-2 text-center text-xs text-slate-400">
                               No hay vehículos con esa placa
@@ -1119,7 +1119,7 @@ export function Documentos() {
 
                   {/* Resumen del Propietario / Vehículo cargado desde la BD */}
                   {formData.vehiculoPlaca && (
-                    <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-800/80 flex items-center justify-between gap-3 text-xs">
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 dark:border-[var(--border-strong)] dark:bg-slate-800/80 flex items-center justify-between gap-3 text-xs">
                       <div className="min-w-0">
                         <span className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-wider block">
                           Propietario en Padrón
@@ -1145,7 +1145,7 @@ export function Documentos() {
                 </div>
 
                 {/* 2. Sección: Datos del Documento */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-indigo-600" />
                     Datos del Documento
@@ -1162,7 +1162,7 @@ export function Documentos() {
                 </div>
 
                 {/* 3. Sección: Vigencia y Estado */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-emerald-600" />
                     Vigencia y Estado
@@ -1199,11 +1199,11 @@ export function Documentos() {
               </div>
 
               {/* Modal Footer */}
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-[var(--border)] dark:bg-slate-900/80">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 active:scale-95 cursor-pointer"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 active:scale-95 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1222,11 +1222,11 @@ export function Documentos() {
       {/* Ficha de Detalle (Diccionario Visual - Estilo Exacto Personas) */}
       {isDetailModalOpen && selectedDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="document" className="size-4" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -1246,7 +1246,7 @@ export function Documentos() {
             {/* Modal Body */}
             <div className="p-5 pb-6 space-y-3.5 max-h-[80vh] overflow-y-auto">
               {/* Profile Hero Card */}
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 dark:border-slate-800 dark:bg-slate-900/60 shadow-xs">
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-xs">
                 <div className="flex items-center gap-3.5">
                   <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-800">
                     <Icon name="document" className="size-6" />
@@ -1285,7 +1285,7 @@ export function Documentos() {
               {/* Secciones de Datos en Rejilla: Solo atributos reales de la Base de Datos */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {/* 1. Datos del Vehículo y Titular */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 space-y-1.5 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 space-y-1.5 shadow-xs">
                   <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                     Datos del Vehículo y Titular
                   </h5>
@@ -1360,7 +1360,7 @@ export function Documentos() {
                 </div>
 
                 {/* 2. Datos de Emisión y Vigencia */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/50 space-y-1.5 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 space-y-1.5 shadow-xs">
                   <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                     Datos de Emisión y Vigencia
                   </h5>

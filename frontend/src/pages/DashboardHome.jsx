@@ -25,7 +25,7 @@ export function DashboardHome() {
         }
       })
       .catch(() => {
-        if (active && !cached) setError('No se pudo cargar información de la base de datos.')
+        if (active && !cached) setError('No se pudo cargar la información del panel principal.')
       })
 
     return () => {
@@ -63,7 +63,7 @@ export function DashboardHome() {
 
       {/* Alertas Preventivas de Vencimiento */}
       {dashboardData?.alertasVencimiento && dashboardData.alertasVencimiento.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="grid size-8 place-items-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
@@ -71,7 +71,7 @@ export function DashboardHome() {
               </span>
               <h2 className="text-sm font-bold text-slate-800 dark:text-white">Alertas de Vencimiento</h2>
             </div>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-400">
               Próximos 30 días
             </span>
           </div>

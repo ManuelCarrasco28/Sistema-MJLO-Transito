@@ -3,7 +3,8 @@ import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUti
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
-import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 
@@ -148,7 +149,6 @@ export function Asociaciones() {
   const particulares = asociaciones.filter((o) => o.tipo === 'PARTICULAR').length
   const asociacionesCount = asociaciones.filter((o) => o.tipo === 'ASOCIACION').length
   const flotaAcumulada = asociaciones.reduce((sum, o) => sum + Number(o.flotaTotal || 0), 0)
-  const flotaAutorizadaTotal = asociaciones.reduce((sum, o) => sum + Number(o.flotaAutorizada || 50), 0)
 
   const handleExportExcel = () => {
     const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
@@ -217,6 +217,18 @@ export function Asociaciones() {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, filterTipo, filterEstado])
+
+  // Bloquea el scroll de la página de fondo mientras hay un modal abierto,
+  // para que no arrastre visualmente la cabecera del modal al desplazarse.
+  useEffect(() => {
+    if (isModalOpen || isDetailModalOpen) {
+      const previousOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = previousOverflow
+      }
+    }
+  }, [isModalOpen, isDetailModalOpen])
 
   const paginatedOrgs = filteredOrgs.slice(
     (currentPage - 1) * itemsPerPage,
@@ -333,7 +345,7 @@ export function Asociaciones() {
       }
       setIsModalOpen(false)
     } catch (err) {
-      showError('Error al guardar', err.message || 'Error al guardar la asociación en el servidor.')
+      showError('Error al guardar', sanitizarMensaje(err.message, 'Error al guardar la asociación en el servidor.'))
     }
   }
 
@@ -376,7 +388,7 @@ export function Asociaciones() {
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
 
         {/* 1. Total registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registros</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -390,7 +402,7 @@ export function Asociaciones() {
         </div>
 
         {/* 2. Asociaciones */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Asociaciones</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
@@ -404,7 +416,7 @@ export function Asociaciones() {
         </div>
 
         {/* 3. Particulares */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Particulares</span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
@@ -418,7 +430,7 @@ export function Asociaciones() {
         </div>
 
         {/* 4. Flota Registrada */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Flota Registrada</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
@@ -435,8 +447,8 @@ export function Asociaciones() {
       </div>
 
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
-        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
@@ -444,7 +456,7 @@ export function Asociaciones() {
               placeholder="Buscar por nombre, RUC, partida, dirección o licencia..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
             />
             {searchTerm && (
               <button
@@ -521,7 +533,7 @@ export function Asociaciones() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+            <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[220px]">Asociación / Particular</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[125px]">RUC / Partida</th>
@@ -529,48 +541,48 @@ export function Asociaciones() {
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">Contacto</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[200px]">Ubicación</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[90px] text-center">Estado</th>
-                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-slate-800/40 px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
+                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
               {isLoading && asociaciones.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
                     <td className="px-3.5 py-3 min-w-[220px]">
                       <div className="flex items-center gap-2.5">
-                        <div className="size-8 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
+                        <div className="size-8 rounded-xl bg-slate-200 dark:bg-[var(--bg-subtle)] shrink-0" />
                         <div className="space-y-1.5 flex-1">
-                          <div className="h-3.5 w-40 rounded bg-slate-200 dark:bg-slate-800" />
-                          <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-slate-800/60" />
+                          <div className="h-3.5 w-40 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                          <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3 py-3 min-w-[170px]">
                       <div className="space-y-1.5">
-                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
-                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-slate-800/60" />
+                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                       </div>
                     </td>
                     <td className="px-3 py-3 min-w-[150px]">
                       <div className="space-y-1.5">
-                        <div className="h-3.5 w-24 rounded bg-slate-200 dark:bg-slate-800" />
-                        <div className="h-2.5 w-32 rounded bg-slate-100 dark:bg-slate-800/60" />
+                        <div className="h-3.5 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                        <div className="h-2.5 w-32 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                       </div>
                     </td>
                     <td className="px-3 py-3 min-w-[200px]">
                       <div className="space-y-1.5">
-                        <div className="h-3.5 w-48 rounded bg-slate-200 dark:bg-slate-800" />
-                        <div className="h-2.5 w-16 rounded bg-slate-100 dark:bg-slate-800/60" />
+                        <div className="h-3.5 w-48 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                        <div className="h-2.5 w-16 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                       </div>
                     </td>
                     <td className="px-3 py-3 min-w-[90px] text-center">
-                      <div className="mx-auto h-5 w-14 rounded-full bg-slate-200 dark:bg-slate-800" />
+                      <div className="mx-auto h-5 w-14 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                     </td>
-                    <td className="sticky right-0 bg-white/50 dark:bg-[#0f172a]/50 px-3.5 py-3 text-center">
+                    <td className="sticky right-0 bg-white/50 dark:bg-[var(--bg-surface)]/50 px-3.5 py-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
-                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-slate-800" />
-                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-slate-800" />
+                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                       </div>
                     </td>
                   </tr>
@@ -587,7 +599,7 @@ export function Asociaciones() {
                 </tr>
               ) : (
                 paginatedOrgs.map((o) => (
-                  <tr key={o.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
+                  <tr key={o.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]">
                     <td className="px-3.5 py-2.5 min-w-[220px]">
                       <div className="flex items-center gap-2.5">
                         <div className={`grid size-9 shrink-0 place-items-center rounded-xl font-bold shadow-xs ${o.tipo === 'ASOCIACION'
@@ -598,7 +610,7 @@ export function Asociaciones() {
                         </div>
                         <div className="flex-1">
                           <p className="font-normal text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-snug" title={o.razonSocial}>{o.razonSocial}</p>
-                          <span className="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300 mt-0.5">
+                          <span className="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300 mt-0.5">
                             {o.tipo}
                           </span>
                         </div>
@@ -638,17 +650,9 @@ export function Asociaciones() {
                       </button>
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-center">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-extrabold ${o.estado === 'ACTIVO'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                          }`}
-                      >
-                        <span className="size-1 rounded-full bg-current" />
-                        {o.estado}
-                      </span>
+                      <StatusBadge status={o.estado} />
                     </td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3.5 py-2.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3.5 py-2.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
@@ -697,12 +701,12 @@ export function Asociaciones() {
 
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter overflow-y-auto">
-          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800 my-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Cabecera del Modal */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900 rounded-t-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="building" className="size-4" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -719,13 +723,14 @@ export function Asociaciones() {
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} autoComplete="off" className="p-4 sm:p-5 space-y-4">
+            <form onSubmit={handleFormSubmit} autoComplete="off" className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
 
-              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+              <fieldset className="rounded-xl border border-slate-200 p-3.5 dark:border-[var(--border)]">
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Identificación Institucional
                 </legend>
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <FloatingSelect
                     id="org_tipo"
                     label="Tipo de Registro"
@@ -771,7 +776,7 @@ export function Asociaciones() {
                           if (!/^\d*$/.test(val)) return;
                           setFormData({ ...formData, ruc: val });
                         }}
-                        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                        inputClassName="font-mono"
                       />
                     </div>
                     <button
@@ -828,13 +833,13 @@ export function Asociaciones() {
                               setRepSearch(e.target.value)
                               setShowRepResults(true)
                             }}
-                            className="w-full h-[42px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                            className="w-full h-[42px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
                           />
                         </div>
 
                         {showRepResults && (
-                          <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                            <div className="flex items-center justify-between px-2.5 py-1 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 uppercase">
+                          <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                            <div className="flex items-center justify-between px-2.5 py-1 border-b border-slate-100 dark:border-[var(--border)] text-[10px] font-bold text-slate-400 uppercase">
                               <span>Personas registradas ({repResults.length})</span>
                               <button
                                 type="button"
@@ -887,7 +892,7 @@ export function Asociaciones() {
                         label="Partida Registral SUNARP"
                         value={formData.partidaRegistral}
                         onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
-                        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                        inputClassName="font-mono"
                       />
                       <FloatingInput
                         id="org_fecha_creacion"
@@ -902,11 +907,11 @@ export function Asociaciones() {
               </fieldset>
 
 
-              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+              <fieldset className="rounded-xl border border-slate-200 p-3.5 dark:border-[var(--border)]">
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Contacto, ubicación y autorización
                 </legend>
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <div className="sm:col-span-2">
                     <FloatingInput
                       id="org_dir"
@@ -922,7 +927,7 @@ export function Asociaciones() {
                       label="Coordenadas"
                       value={formData.coordenadas}
                       onChange={(e) => setFormData({ ...formData, coordenadas: e.target.value })}
-                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                      inputClassName="font-mono"
                     />
                   ) : (
                     <FloatingInput
@@ -944,7 +949,7 @@ export function Asociaciones() {
                       label="Resolución de alcaldía"
                       value={formData.resolucionAlcaldia}
                       onChange={(e) => setFormData({ ...formData, resolucionAlcaldia: e.target.value.toUpperCase() })}
-                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                      inputClassName="font-mono"
                     />
                   </div>
 
@@ -976,7 +981,7 @@ export function Asociaciones() {
 
                   {formData.tipo === 'PARTICULAR' && (
                     <>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 transition-all hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 transition-all hover:border-slate-300 dark:border-[var(--border-strong)] dark:bg-slate-800/80">
                         <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                           Tipo ambiente
                         </p>
@@ -1014,20 +1019,11 @@ export function Asociaciones() {
                 </div>
               </fieldset>
 
-              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Control y Estado
-                </legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FloatingInput
-                    id="org_flota"
-                    type="number"
-                    min={1}
-                    label={formData.tipo === 'PARTICULAR' ? 'Flota permitida' : 'Flota Autorizada (máx vehículos)'}
-                    value={formData.flotaAutorizada}
-                    onChange={(e) => setFormData({ ...formData, flotaAutorizada: Number(e.target.value) || 0 })}
-                  />
-
+              {isEditing && (
+                <fieldset className="rounded-xl border border-slate-200 p-3.5 dark:border-[var(--border)]">
+                  <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Control y Estado
+                  </legend>
                   <FloatingSelect
                     id="org_estado"
                     label="Estado de la Organización"
@@ -1039,13 +1035,14 @@ export function Asociaciones() {
                       { value: 'BAJA', label: 'DADO DE BAJA' }
                     ]}
                   />
-                </div>
-              </fieldset>
-              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+                </fieldset>
+              )}
+              </div>
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-4 py-3.5 sm:px-5 dark:border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1064,72 +1061,88 @@ export function Asociaciones() {
 
       {isDetailModalOpen && selectedOrg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800">
-            <div className="shrink-0 border-b border-slate-100 bg-[#071a2f] p-5 text-white relative">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200 dark:border-[var(--border)]">
+            {/* Header estilo /personas */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                  <Icon name="building" className="size-4" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
+                      {detailOrg.razonSocial}
+                    </h3>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                      {detailOrg.tipo}
+                    </span>
+                  </div>
+                  <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                    RUC: {detailOrg.ruc || 'Sin RUC'} • Registro Autorizado MDJLO
+                  </p>
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="absolute right-4 top-4 rounded-full p-1 text-slate-300 hover:bg-white/10 hover:text-white cursor-pointer"
+                title="Cerrar ficha"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                ✕
+                <Icon name="close" className="size-5" />
               </button>
-              <span className="inline-block rounded-full bg-indigo-500/20 px-3 py-0.5 text-[10px] font-black uppercase tracking-widest text-indigo-300 border border-indigo-500/30">
-                Registro Autorizado MDJLO
-              </span>
-              <h3 className="mt-2 text-xl font-black leading-tight">{detailOrg.razonSocial}</h3>
-              <p className="text-xs font-mono text-cyan-300">RUC: {detailOrg.ruc}</p>
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 text-xs">
               <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/60">
-                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-2.5 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                     <span className="font-bold text-slate-400">Representante Legal</span>
                     <span className="font-bold text-slate-800 dark:text-slate-100 text-right">
                       {detailOrg.representanteNombre || '—'}
                     </span>
                   </div>
                   {detailOrg.representanteDni && (
-                    <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                    <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                       <span className="font-bold text-slate-400">DNI Representante</span>
                       <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
                         {detailOrg.representanteDni}
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                     <span className="font-bold text-slate-400">Partida Registral SUNARP</span>
                     <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{detailOrg.partidaRegistral || '—'}</span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                     <span className="font-bold text-slate-400">Fecha creación</span>
                     <span className="font-semibold text-slate-700 dark:text-slate-200">{detailOrg.fechaCreacion || '—'}</span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                     <span className="font-bold text-slate-400">Flota Registrada</span>
                     <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{detailOrg.flotaTotal} Vehículos</span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                     <span className="font-bold text-slate-400">Teléfono de contacto</span>
                     <span className="font-semibold text-slate-700 dark:text-slate-200">{detailOrg.telefono || '—'}</span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                     <span className="font-bold text-slate-400">Resolución de alcaldía</span>
                     <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{detailOrg.resolucionAlcaldia || '—'}</span>
                   </div>
                   {detailOrg.tipo === 'PARTICULAR' && (
                     <>
-                      <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                      <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                         <span className="font-bold text-slate-400">Tipo ambiente</span>
                         <span className="font-semibold text-slate-700 dark:text-slate-200">{detailOrg.tipoAmbiente || '—'}</span>
                       </div>
-                      <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                      <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                         <span className="font-bold text-slate-400">Número licencia</span>
                         <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{detailOrg.numeroLicencia || '—'}</span>
                       </div>
                     </>
                   )}
-                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-slate-800">
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                     <span className="font-bold text-slate-400">Coordenadas</span>
                     <button
                       type="button"
@@ -1146,8 +1159,8 @@ export function Asociaciones() {
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-[var(--border)] dark:bg-slate-950">
                     <div>
                       <p className="text-sm font-black text-slate-900 dark:text-white">Ubicación</p>
                       <p className="mt-0.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">{detailOrg.coordenadas || 'Sin coordenadas'}</p>
@@ -1177,8 +1190,8 @@ export function Asociaciones() {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-[var(--border)] dark:bg-slate-950">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-[var(--border)]">
                   <div>
                     <p className="text-sm font-black text-slate-900 dark:text-white">Socios vinculados</p>
                     <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
@@ -1193,14 +1206,14 @@ export function Asociaciones() {
                 {isDetailLoading ? (
                   <div className="grid gap-2 p-4">
                     {Array.from({ length: 3 }).map((_, idx) => (
-                      <div key={idx} className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-900" />
+                      <div key={idx} className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-[var(--bg-surface)]" />
                     ))}
                   </div>
                 ) : detailOrg.socios?.length ? (
                   <div className="max-h-72 overflow-y-auto p-3">
                     <div className="grid gap-2 md:grid-cols-2">
                       {detailOrg.socios.map((socio) => (
-                        <div key={socio.idPersona} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                        <div key={socio.idPersona} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate text-sm font-black text-slate-900 dark:text-white" title={socio.nombre}>
@@ -1238,11 +1251,11 @@ export function Asociaciones() {
                 )}
               </div>
 
-              <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur dark:border-slate-800 dark:bg-[#0f172a]/95">
+              <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur dark:border-[var(--border)] dark:bg-[var(--bg-surface)]/95">
                 <button
                   type="button"
                   onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer"
+                  className="rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 cursor-pointer"
                 >
                   Cerrar Detalle
                 </button>
@@ -1254,22 +1267,38 @@ export function Asociaciones() {
 
       {mapPreview && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-[#123b6d] px-6 py-4 text-white dark:border-slate-800">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-blue-100/80">Mapa de ubicación</p>
-                <h3 className="mt-1 text-xl font-black">{mapPreview.title}</h3>
-                <p className="mt-0.5 font-mono text-xs text-cyan-200">{mapPreview.coordenadas}</p>
+          <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            {/* Header estilo /personas */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                  <Icon name="mapPin" className="size-4" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      {mapPreview.title}
+                    </h3>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                      Mapa de ubicación
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
+                    {mapPreview.coordenadas}
+                  </p>
+                </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => setMapPreview(null)}
-                className="grid size-10 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                title="Cerrar mapa"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
-                <Icon name="close" className="size-4" />
+                <Icon name="close" className="size-5" />
               </button>
             </div>
-            <div className="h-[65vh] bg-slate-100 dark:bg-slate-900">
+            <div className="h-[65vh] bg-slate-100 dark:bg-[var(--bg-surface)]">
               <iframe
                 title={`Mapa de ${mapPreview.title}`}
                 src={mapPreview.url}

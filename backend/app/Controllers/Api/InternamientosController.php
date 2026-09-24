@@ -115,6 +115,115 @@ class InternamientosController extends ResourceController
         }
     }
 
+    /**
+     * Registra un internamiento (orden de retención) a partir de una
+     * papeleta ya existente. Cada papeleta solo puede generar un
+     * internamiento (id_papeleta es único en ordenes_internamiento).
+     */
+    public function create()
+    {
+        $db = \Config\Database::connect();
+        $input = $this->request->getJSON(true);
+        if (!is_array($input)) {
+            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+        }
+
+        $rules = [
+            'idPapeleta' => [
+                'rules' => 'required|is_natural_no_zero',
+                'errors' => [
+                    'required' => 'Debe seleccionar la papeleta que origina el internamiento.',
+                    'is_natural_no_zero' => 'La papeleta seleccionada no es válida.'
+                ]
+            ],
+            'deposito' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El depósito municipal es obligatorio.']
+            ],
+        ];
+
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
+        }
+
+        try {
+            $idPapeleta = (int)$input['idPapeleta'];
+
+            $papeleta = $db->table('papeletas')->where('id', $idPapeleta)->get()->getRowArray();
+            if (!$papeleta) {
+                return $this->failNotFound('No se encontró la papeleta indicada.');
+            }
+            if (!$papeleta['id_vehiculo']) {
+                return $this->failValidationErrors('Esta papeleta no tiene un vehículo identificado; no se puede generar el internamiento.');
+            }
+
+            $existe = $db->table('ordenes_internamiento')->where('id_papeleta', $idPapeleta)->countAllResults();
+            if ($existe > 0) {
+                return $this->failValidationErrors('Esta papeleta ya tiene un internamiento registrado.');
+            }
+
+            $idInteresado = null;
+            $interesadoDni = trim($input['interesadoDni'] ?? '');
+            if ($interesadoDni !== '') {
+                $persona = $db->table('personas')->where('numero', $interesadoDni)->get()->getRowArray();
+                if (!$persona) {
+                    return $this->failNotFound('No se encontró una persona con el DNI del interesado proporcionado.');
+                }
+                $idInteresado = (int)$persona['id'];
+            }
+
+            $idRemisor = (int)($input['idRemisor'] ?? 0);
+            if ($idRemisor > 0) {
+                $remisor = $db->table('trabajadores')->where('id_persona', $idRemisor)->where('estado', 'ACTIVO')->get()->getRowArray();
+                if (!$remisor) {
+                    return $this->failValidationErrors('El inspector remisor no existe o está inactivo.');
+                }
+            } else {
+                $idRemisor = null;
+            }
+
+            $numeroOrden = 'INT-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+
+            $record = [
+                'id_papeleta' => $idPapeleta,
+                'id_vehiculo' => (int)$papeleta['id_vehiculo'],
+                'numero_orden' => $numeroOrden,
+                'id_remisor' => $idRemisor,
+                'id_interesado' => $idInteresado,
+                'fecha_ingreso' => date('Y-m-d H:i:s'),
+                'deposito' => trim($input['deposito']),
+                'motivo' => trim($input['motivo'] ?? ''),
+                'lugar_intervencion' => trim($input['lugarIntervencion'] ?? ''),
+                'grado_remisor' => trim($input['gradoRemisor'] ?? ''),
+                'carnet_remisor' => trim($input['carnetRemisor'] ?? ''),
+                'autoridad_que_dispone' => trim($input['autoridadQueDispone'] ?? ''),
+                'documento_referencia' => trim($input['documentoReferencia'] ?? ''),
+                'estado_carroceria' => trim($input['estadoCarroceria'] ?? ''),
+                'observaciones' => trim($input['observaciones'] ?? ''),
+                'estado' => 'RETENIDO',
+            ];
+
+            $db->table('ordenes_internamiento')->insert($record);
+            $insertId = $db->insertID();
+
+            if (class_exists('\App\Services\AuditoriaService')) {
+                \App\Services\AuditoriaService::registrar(
+                    'INTERNAMIENTOS',
+                    'REGISTRAR',
+                    "Se registró el internamiento {$numeroOrden} para el vehículo de la papeleta #{$idPapeleta}",
+                    ['id' => $insertId, 'numeroOrden' => $numeroOrden, 'idPapeleta' => $idPapeleta]
+                );
+            }
+
+            return $this->respondCreated(['status' => 201, 'message' => 'Internamiento registrado exitosamente.', 'data' => [
+                'id' => $insertId,
+                'numeroOrden' => $numeroOrden,
+            ]]);
+        } catch (\Throwable $e) {
+            return $this->failServerError('Error al registrar el internamiento: ' . $e->getMessage());
+        }
+    }
+
     public function criterios()
     {
         $db = \Config\Database::connect();

@@ -169,12 +169,12 @@ export function Header({
           </button>
           
           {notifOpen && (
-            <div className="absolute right-0 top-full mt-2.5 z-50 w-80 sm:w-96 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111C44] shadow-xl overflow-hidden animate-enter">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 px-4 py-3 bg-slate-50/70 dark:bg-[#0B1437]/50">
+            <div className="absolute right-0 top-full mt-2.5 z-50 w-80 sm:w-96 rounded-2xl border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[#111C44] shadow-xl overflow-hidden animate-enter">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[var(--border-strong)] px-4 py-3 bg-slate-50/70 dark:bg-[var(--bg-subtle)]/50">
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-bold text-slate-800 dark:text-white">Notificaciones</h4>
                   {unreadCount > 0 && (
-                    <span className="rounded-full bg-blue-50 dark:bg-blue-500/20 border border-blue-200/60 dark:border-slate-700 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                    <span className="rounded-full bg-blue-50 dark:bg-blue-500/20 border border-blue-200/60 dark:border-[var(--border-strong)] px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
                       {unreadCount} nuevas
                     </span>
                   )}
@@ -275,8 +275,8 @@ export function Header({
           </div>
 
           {userMenuOpen && (
-            <div className="absolute right-0 top-full mt-3 z-50 w-56 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111C44] p-2 shadow-[0_20px_45px_rgba(112,144,176,0.20)] dark:shadow-none animate-enter">
-              <div className="border-b border-slate-100 dark:border-slate-700 px-3 py-2.5">
+            <div className="absolute right-0 top-full mt-3 z-50 w-56 rounded-2xl border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[#111C44] p-2 shadow-[0_20px_45px_rgba(112,144,176,0.20)] dark:shadow-none animate-enter">
+              <div className="border-b border-slate-100 dark:border-[var(--border-strong)] px-3 py-2.5">
                 <p className="text-sm font-bold text-slate-800 dark:text-white">{userFullName}</p>
                 <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{userEmail}</p>
                 <span className="mt-1.5 inline-block rounded-md bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-[#4318FF] dark:text-blue-300">
@@ -320,9 +320,9 @@ export function Header({
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
           <form
             onSubmit={handleProfileSubmit}
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[#111C44]"
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#111C44]"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-700">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-[var(--border-strong)]">
               <div>
                 <h3 className="text-lg font-black text-[#2B3674] dark:text-white">Editar perfil</h3>
                 <p className="text-xs font-semibold text-slate-400">Tu foto viene del registro de ciudadano. Aquí solo puedes cambiar tu contraseña.</p>
@@ -337,7 +337,7 @@ export function Header({
             </div>
 
             <div className="space-y-4 p-5">
-              <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-[#0B1437]">
+              <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
                 {avatarImage ? (
                   <img src={avatarImage} alt="Foto de perfil" className="h-16 w-16 rounded-2xl object-cover shadow-sm" />
                 ) : (
@@ -350,7 +350,7 @@ export function Header({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+              <div className="rounded-2xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
                 <p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-300">Cambiar contraseña</p>
                 <div className="space-y-3">
                   <input
@@ -358,21 +358,21 @@ export function Header({
                     value={profileForm.password_actual}
                     onChange={(event) => setProfileForm((prev) => ({ ...prev, password_actual: event.target.value }))}
                     placeholder="Contraseña actual"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#4318FF] focus:ring-2 focus:ring-[#4318FF]/10 dark:border-slate-700 dark:bg-[#0B1437] dark:text-white"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#4318FF] focus:ring-2 focus:ring-[#4318FF]/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
                   />
                   <input
                     type="password"
                     value={profileForm.password_nuevo}
                     onChange={(event) => setProfileForm((prev) => ({ ...prev, password_nuevo: event.target.value }))}
                     placeholder="Nueva contraseña"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#4318FF] focus:ring-2 focus:ring-[#4318FF]/10 dark:border-slate-700 dark:bg-[#0B1437] dark:text-white"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#4318FF] focus:ring-2 focus:ring-[#4318FF]/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
                   />
                   <input
                     type="password"
                     value={profileForm.password_confirmacion}
                     onChange={(event) => setProfileForm((prev) => ({ ...prev, password_confirmacion: event.target.value }))}
                     placeholder="Confirmar nueva contraseña"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#4318FF] focus:ring-2 focus:ring-[#4318FF]/10 dark:border-slate-700 dark:bg-[#0B1437] dark:text-white"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#4318FF] focus:ring-2 focus:ring-[#4318FF]/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
                   />
                 </div>
               </div>
@@ -390,7 +390,7 @@ export function Header({
               )}
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-700">
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 dark:border-[var(--border-strong)]">
               <button
                 type="button"
                 onClick={() => setProfileModalOpen(false)}

@@ -39,8 +39,17 @@ class PagosController extends ResourceController
             ];
         }
 
+        // El medio de pago se arma listando qué conceptos incluye la orden
+        // (guardianía, papeleta y/o remolque), ya que el sistema no registra
+        // un único método por cada recibo combinado.
         $pagados = $db->table('ordenes_libertad ol')
-            ->select("ol.id, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_papeleta, ol.numero_recibo_remolque, 'VARIOS') as numero_recibo, NULL as numero_voucher, 'MULTIPLE' as medio_pago, CONCAT('Orden #', ol.numero_orden) as referencia_pago, ol.monto_total as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado")
+            ->select("ol.id, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_papeleta, ol.numero_recibo_remolque, 'VARIOS') as numero_recibo, NULL as numero_voucher,
+                COALESCE(NULLIF(CONCAT_WS(' + ',
+                    IF(ol.numero_recibo_guardiania IS NOT NULL, 'GUARDIANÍA', NULL),
+                    IF(ol.numero_recibo_papeleta IS NOT NULL, 'PAPELETA', NULL),
+                    IF(ol.numero_recibo_remolque IS NOT NULL, 'REMOLQUE', NULL)
+                ), ''), 'VARIOS CONCEPTOS') as medio_pago,
+                CONCAT('Orden #', ol.numero_orden) as referencia_pago, ol.monto_total as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado", false)
             ->get()->getResultArray();
 
         foreach ($pagados as $p) {
@@ -79,7 +88,64 @@ class PagosController extends ResourceController
             'metodo' => $row['medio_pago'], 'metodoPago' => $row['medio_pago'],
             'referenciaPago' => $row['referencia_pago'], 'montoTotal' => (float)$row['total'],
             'fecha' => $row['fecha_pago'], 'fechaHora' => $row['fecha_pago'], 'estado' => $row['estado'],
+            'pagadoPor' => $this->resolverPagador($row),
         ];
+    }
+
+    /**
+     * Resuelve el nombre de quien realizó el pago según el origen del
+     * comprobante: el infractor de la papeleta, el solicitante del trámite
+     * (persona o asociación), o el inscrito al curso.
+     */
+    private function resolverPagador(array $row): ?string
+    {
+        $db = \Config\Database::connect();
+        $tipo = $row['tipo_pago'] ?? '';
+
+        try {
+            if ($tipo === 'PAPELETA' && !empty($row['id_papeleta'])) {
+                $r = $db->table('papeletas p')
+                    ->select("TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', c.apellido_materno)) as nombre", false)
+                    ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
+                    ->join('ciudadanos c', 'c.id_persona = per.id', 'left')
+                    ->where('p.id', $row['id_papeleta'])
+                    ->get()->getRowArray();
+                return $r['nombre'] ?: null;
+            }
+
+            if ($tipo === 'TRAMITE' && !empty($row['id_tramite'])) {
+                $t = $db->table('tramites_documentarios')->select('id_persona, id_asociacion')->where('id', $row['id_tramite'])->get()->getRowArray();
+                if ($t) {
+                    if (!empty($t['id_persona'])) {
+                        $r = $db->table('personas p')
+                            ->select("TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', c.apellido_materno)) as nombre", false)
+                            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                            ->where('p.id', $t['id_persona'])
+                            ->get()->getRowArray();
+                        if (!empty($r['nombre'])) return $r['nombre'];
+                    }
+                    if (!empty($t['id_asociacion'])) {
+                        $r = $db->table('asociaciones')->select('razon_social')->where('id', $t['id_asociacion'])->get()->getRowArray();
+                        return $r['razon_social'] ?? null;
+                    }
+                }
+                return null;
+            }
+
+            if ($tipo === 'CURSO' && !empty($row['id_inscripcion'])) {
+                $r = $db->table('inscripciones_curso i')
+                    ->select("TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', c.apellido_materno)) as nombre", false)
+                    ->join('personas p', 'p.id = i.id_persona', 'left')
+                    ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                    ->where('i.id', $row['id_inscripcion'])
+                    ->get()->getRowArray();
+                return $r['nombre'] ?: null;
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return null;
     }
 
     public function create()

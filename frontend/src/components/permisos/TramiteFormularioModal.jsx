@@ -193,10 +193,10 @@ export function TramiteFormularioModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xs animate-enter overflow-y-auto">
-      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0B1437] my-auto">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] my-auto">
         
         {/* Cabecera del Modal */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-[var(--border)] bg-slate-50/50 dark:bg-slate-900/40">
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-600/30">
               <Icon name="routePermit" className="size-5" />
@@ -213,7 +213,7 @@ export function TramiteFormularioModal({
           <button
             type="button"
             onClick={onClose}
-            className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
           >
             <Icon name="close" className="size-5" />
           </button>
@@ -228,7 +228,7 @@ export function TramiteFormularioModal({
                 Vincular con Trámite / Mesa de Partes Existente (Opcional)
               </label>
               <select
-                className="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 dark:border-indigo-700 dark:bg-slate-800 dark:text-white"
+                className="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 dark:border-indigo-700 dark:bg-[var(--bg-subtle)] dark:text-white"
                 onChange={(e) => {
                   const tId = Number(e.target.value)
                   if (!tId) return
@@ -277,11 +277,11 @@ export function TramiteFormularioModal({
                 className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'CARGA_DESCARGA'
                     ? 'border-sky-500 bg-sky-50/70 dark:bg-sky-950/30 text-sky-950 dark:text-sky-200'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
                 }`}
               >
                 <div>
-                  <span className="font-black block text-xs">🚛 Carga y Descarga</span>
+                  <span className="font-black flex items-center gap-1.5 text-xs"><Icon name="vehicle" className="size-3.5" /> Carga y Descarga</span>
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
                     Horario Anillo Vial 4:00 PM a 5:00 AM.
                   </span>
@@ -294,11 +294,11 @@ export function TramiteFormularioModal({
                 className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'USO_VIAS'
                     ? 'border-amber-500 bg-amber-50/70 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
                 }`}
               >
                 <div>
-                  <span className="font-black block text-xs">🚧 Uso Provisional de Vías</span>
+                  <span className="font-black flex items-center gap-1.5 text-xs"><Icon name="routePermit" className="size-3.5" /> Uso Provisional de Vías</span>
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
                     Recorridos y flota vehicular autorizada.
                   </span>
@@ -311,11 +311,11 @@ export function TramiteFormularioModal({
                 className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'RENOVACION_OPERACION'
                     ? 'border-violet-500 bg-violet-50/70 dark:bg-violet-950/30 text-violet-950 dark:text-violet-200'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400'
                 }`}
               >
                 <div>
-                  <span className="font-black block text-xs">📋 Operación / TUPA</span>
+                  <span className="font-black flex items-center gap-1.5 text-xs"><Icon name="document" className="size-3.5" /> Operación / TUPA</span>
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
                     Resolución subgerencial de servicio.
                   </span>
@@ -325,8 +325,8 @@ export function TramiteFormularioModal({
           </div>
 
           {/* BLOQUE 1: Administrado y Expediente */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
-            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-800">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-[var(--border)] dark:bg-slate-900/40 space-y-3">
+            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
               <span className="grid size-5 place-items-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-400 text-[10px]">1</span>
               Datos del Administrado y Expediente
             </span>
@@ -343,7 +343,7 @@ export function TramiteFormularioModal({
                   placeholder="Ej. EMPRESA DE TRANSPORTE DOÑA PEPE"
                   value={formData.solicitanteNombre}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none focus:border-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none focus:border-violet-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -358,7 +358,7 @@ export function TramiteFormularioModal({
                   placeholder="20601234567"
                   value={formData.solicitanteDocumento}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none focus:border-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none focus:border-violet-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -372,7 +372,7 @@ export function TramiteFormularioModal({
                   placeholder="796383"
                   value={formData.expediente}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none focus:border-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none focus:border-violet-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -386,7 +386,7 @@ export function TramiteFormularioModal({
                   placeholder="Ej. 610"
                   value={formData.registroNumero}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -400,7 +400,7 @@ export function TramiteFormularioModal({
                   placeholder="Ej. DENISS ALTAMIRANO"
                   value={formData.representanteLegal}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -415,15 +415,15 @@ export function TramiteFormularioModal({
                   placeholder="SE APRUEBA USO DE VÍA O CARGA Y DESCARGA..."
                   value={formData.asunto}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold outline-none focus:border-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold outline-none focus:border-violet-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
             </div>
           </div>
 
           {/* BLOQUE 2: Parámetros del Vehículo / Flota y Zona */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
-            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-800">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-[var(--border)] dark:bg-slate-900/40 space-y-3">
+            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
               <span className="grid size-5 place-items-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-400 text-[10px]">2</span>
               Parámetros Operativos y Vehiculares
             </span>
@@ -439,7 +439,7 @@ export function TramiteFormularioModal({
                   placeholder="ABC-123"
                   value={formData.vehiculoPlaca}
                   onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })}
-                  className="w-full rounded-xl border-2 border-sky-400 bg-white px-3 py-2 font-mono font-black outline-none focus:border-sky-600 dark:border-sky-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border-2 border-sky-400 bg-white px-3 py-2 font-mono font-black outline-none focus:border-sky-600 dark:border-sky-700 dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -453,7 +453,7 @@ export function TramiteFormularioModal({
                   placeholder="202400028830"
                   value={formData.reciboIngresoNumero}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono font-bold outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono font-bold outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -467,7 +467,7 @@ export function TramiteFormularioModal({
                   name="reciboIngresoMonto"
                   value={formData.reciboIngresoMonto}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -480,7 +480,7 @@ export function TramiteFormularioModal({
                   name="zonaCirculacion"
                   value={formData.zonaCirculacion}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -494,7 +494,7 @@ export function TramiteFormularioModal({
                     name="horarioInicio"
                     value={formData.horarioInicio}
                     onChange={handleInputChange}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-2 py-1.5 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-2 py-1.5 outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                   />
                   <span className="text-slate-400 font-bold">-</span>
                   <input
@@ -502,7 +502,7 @@ export function TramiteFormularioModal({
                     name="horarioFin"
                     value={formData.horarioFin}
                     onChange={handleInputChange}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-2 py-1.5 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-2 py-1.5 outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                   />
                 </div>
               </div>
@@ -510,8 +510,8 @@ export function TramiteFormularioModal({
           </div>
 
           {/* BLOQUE 3: Vigencia y Estado Oficial */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
-            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-800">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-[var(--border)] dark:bg-slate-900/40 space-y-3">
+            <span className="font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
               <span className="grid size-5 place-items-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 text-[10px]">3</span>
               Vigencia Temporal y Estado Administrativo
             </span>
@@ -526,7 +526,7 @@ export function TramiteFormularioModal({
                   name="fechaEmision"
                   value={formData.fechaEmision}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -539,7 +539,7 @@ export function TramiteFormularioModal({
                   name="fechaInicioVigencia"
                   value={formData.fechaInicioVigencia}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -552,7 +552,7 @@ export function TramiteFormularioModal({
                   name="fechaFinVigencia"
                   value={formData.fechaFinVigencia}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
 
@@ -564,7 +564,7 @@ export function TramiteFormularioModal({
                   name="estado"
                   value={formData.estado}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold outline-none dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 >
                   <option value="VIGENTE">VIGENTE</option>
                   <option value="VENCIDO">VENCIDO</option>
@@ -576,8 +576,8 @@ export function TramiteFormularioModal({
           </div>
 
           {/* BLOQUE 4: Editor TinyMCE para la Referencia Textual / Cuerpo */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60 space-y-2.5 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] space-y-2.5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-[var(--border)]">
               <div>
                 <label className="font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-100 text-xs flex items-center gap-2">
                   <span className="grid size-5 place-items-center rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400 text-[10px]">4</span>
@@ -599,7 +599,7 @@ export function TramiteFormularioModal({
             </div>
 
             {/* Componente TinyMCE React Oficial */}
-            <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-[var(--border-strong)]">
               <Editor
                 apiKey={import.meta.env.VITE_TINYMCE_API_KEY || 'unmcqzdx4e88wfy3gqtlbelk1w21unqt3sl8hlcltd49u0o8'}
                 value={formData.contenido}
@@ -618,11 +618,11 @@ export function TramiteFormularioModal({
           </div>
 
           {/* Botones de Acción */}
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-[var(--border)]">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-300 px-5 py-2.5 font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
+              className="rounded-xl border border-slate-300 px-5 py-2.5 font-bold text-slate-600 hover:bg-slate-100 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
             >
               Cancelar
             </button>

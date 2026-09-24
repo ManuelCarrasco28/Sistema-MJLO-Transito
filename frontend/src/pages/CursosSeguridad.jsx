@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
-import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { CarnetCursoVialPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
-import { RoundedSelect } from '../components/ui/FormInputs'
+import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
+import { StatusBadge } from '../components/ui/StatusBadge'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -45,6 +46,11 @@ export function CursosSeguridad() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedCurso, setSelectedCurso] = useState(null)
   const [loadError, setLoadError] = useState('')
+  const [personas, setPersonas] = useState(getCachedData('/personas') || [])
+  const [participanteSearch, setParticipanteSearch] = useState('')
+  const [showParticipanteResults, setShowParticipanteResults] = useState(false)
+  const [inscribiendo, setInscribiendo] = useState(false)
+  const [personasVigentes, setPersonasVigentes] = useState([])
   const [formData, setFormData] = useState({
     codigo: '', titulo: '', descripcion: '', fecha: '', horario: '',
     instructor: '', lugar: '', capacidad: 50, estado: 'PROGRAMADO', tipo: 'SEGURIDAD_VIAL'
@@ -165,7 +171,7 @@ export function CursosSeguridad() {
       }
       setIsModalOpen(false)
     } catch (err) {
-      showError('Error', err.message || 'Error al guardar el curso')
+      showError('Error', sanitizarMensaje(err.message, 'Error al guardar el curso.'))
     }
   }
 
@@ -250,6 +256,17 @@ export function CursosSeguridad() {
     })
   }
 
+  // Bloquea el scroll de la página de fondo mientras hay un modal abierto.
+  useEffect(() => {
+    if (isModalOpen || isDetailModalOpen) {
+      const previousOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = previousOverflow
+      }
+    }
+  }, [isModalOpen, isDetailModalOpen])
+
   useEffect(() => {
     setLoadError('')
     apiFetch('/cursos')
@@ -266,7 +283,48 @@ export function CursosSeguridad() {
       })
       .catch(() => setLoadError('No se pudo cargar el registro de cursos viales.'))
       .finally(() => setIsLoading(false))
+
+    if (personas.length === 0) {
+      apiFetch('/personas')
+        .then(res => res.ok ? res.json() : Promise.reject(res))
+        .then(data => {
+          const pData = data.data || []
+          setPersonas(pData)
+          setCachedData('/personas', pData)
+        })
+        .catch(() => {})
+    }
+
+    apiFetch('/cursos/personas-vigentes')
+      .then(res => res.ok ? res.json() : Promise.reject(res))
+      .then(data => setPersonasVigentes(data.data || []))
+      .catch(() => {})
   }, [])
+
+  const getPersonaNombre = (p) => {
+    if (!p) return ''
+    if (p.nombreCompleto) return p.nombreCompleto
+    return `${p.nombres || ''} ${p.apellidoPaterno || p.apellido_paterno || ''} ${p.apellidoMaterno || p.apellido_materno || ''}`.trim() || 'Sin Nombre'
+  }
+
+  const participanteResults = participanteSearch.trim()
+    ? personas.filter((p) => {
+        // Oculta personas que ya cuentan con un certificado vigente (últimos 2
+        // años) de algún curso, salvo que ya estén inscritas en este mismo
+        // curso (para que sigan mostrándose como "ya inscrito").
+        const yaInscritoAqui = selectedCurso?.participantes?.some(
+          (part) => part.dni === (p.numeroDocumento || p.numero)
+        )
+        if (personasVigentes.includes(p.id) && !yaInscritoAqui) return false
+        // Filtra registros basura/placeholder (ej. "Sin Propietario Asignado").
+        if (getPersonaNombre(p).toUpperCase().includes('SIN PROPIETARIO')) return false
+
+        const q = participanteSearch.trim().toLowerCase()
+        const doc = String(p.numeroDocumento || p.numero || '').toLowerCase()
+        const nom = getPersonaNombre(p).toLowerCase()
+        return doc.includes(q) || nom.includes(q)
+      }).slice(0, 8)
+    : []
 
   const aprobados = cursos.flatMap(c => 
     (c.estado === 'FINALIZADO' && c.participantes) 
@@ -292,7 +350,7 @@ export function CursosSeguridad() {
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-md">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md">
             <Icon name="course" className="size-5.5" />
           </span>
           <div>
@@ -307,11 +365,11 @@ export function CursosSeguridad() {
       </div>
 
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">TOTAL CURSOS</span>
             <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60">
-              🎓
+              <Icon name="course" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1">
@@ -319,11 +377,11 @@ export function CursosSeguridad() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">CURSOS ACTIVOS</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60">
-              🏫
+              <Icon name="office" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1">
@@ -331,11 +389,11 @@ export function CursosSeguridad() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">TOTAL INSCRITOS</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60">
-              👥
+              <Icon name="people" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1">
@@ -343,7 +401,7 @@ export function CursosSeguridad() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">FINALIZADOS</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60">
@@ -356,26 +414,25 @@ export function CursosSeguridad() {
         </div>
       </div>
 
-      <div className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#0f172a]">
+      <div className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
         <button
           onClick={() => setActiveView('CURSOS')}
-          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'CURSOS' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'CURSOS' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'}`}
         >
           Cursos programados
         </button>
         <button
           onClick={() => setActiveView('APROBADOS')}
-          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'APROBADOS' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeView === 'APROBADOS' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'}`}
         >
           Registros de Carnet
-          <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">{aprobados.length}</span>
         </button>
       </div>
 
       {activeView === 'CURSOS' && (
-      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col">
 
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
           <div className="relative w-full sm:max-w-xs">
             <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -383,7 +440,7 @@ export function CursosSeguridad() {
               placeholder="Buscar por código, título, instructor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-purple-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-purple-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -405,7 +462,7 @@ export function CursosSeguridad() {
               <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" /><span>PDF</span>
             </button>
             
-            <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap">
+            <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap">
               <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
             </button>
           </div>
@@ -414,7 +471,7 @@ export function CursosSeguridad() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-3 py-3 whitespace-nowrap">CÓDIGO / TIPO</th>
                 <th className="px-3 py-3">TÍTULO DEL CURSO</th>
@@ -422,37 +479,37 @@ export function CursosSeguridad() {
                 <th className="px-3 py-3 whitespace-nowrap text-center">INSCRITOS / CAPACIDAD</th>
                 <th className="px-3 py-3">INSTRUCTOR / LUGAR</th>
                 <th className="px-3 py-3 whitespace-nowrap text-center">ESTADO</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-3 py-3 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[var(--bg-surface)] px-3 py-3 text-center whitespace-nowrap border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
               {isLoading && cursos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="px-3 py-3"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3 py-3">
                       <div className="space-y-1.5">
-                        <div className="h-3.5 w-44 rounded bg-slate-200 dark:bg-slate-800" />
-                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-slate-800/60" />
+                        <div className="h-3.5 w-44 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                       </div>
                     </td>
-                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3 py-3"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3 py-3"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3 py-3 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : filteredCursos.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-12 text-center">
-                    <p className="text-4xl mb-2">🎓</p>
+                    <Icon name="course" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
                     <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron cursos registrados</p>
                   </td>
                 </tr>
               ) : (
                 paginatedCursos.map((c) => (
-                  <tr key={c.id} className="group transition-colors hover:bg-purple-50/30 dark:hover:bg-slate-800/40">
+                  <tr key={c.id} className="group transition-colors hover:bg-purple-50/30 dark:hover:bg-[var(--bg-subtle)]">
 
                     <td className="px-3 py-3 whitespace-nowrap">
                       <p className="font-bold text-slate-900 dark:text-white">{c.codigo}</p>
@@ -499,26 +556,11 @@ export function CursosSeguridad() {
 
 
                     <td className="px-3 py-3 whitespace-nowrap text-center">
-                      {c.estado === 'ACTIVO' || c.estado === 'PROGRAMADO' || c.estado === 'ABIERTO' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
-                          <span className="size-1.5 rounded-full bg-emerald-600" />
-                          PROGRAMADO
-                        </span>
-                      ) : c.estado === 'EN_CURSO' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-extrabold text-sky-800 dark:bg-sky-950/60 dark:text-sky-400">
-                          <span className="size-1.5 rounded-full bg-sky-600" />
-                          EN CURSO
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-extrabold text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
-                          <span className="size-1.5 rounded-full bg-amber-600" />
-                          FINALIZADO
-                        </span>
-                      )}
+                      <StatusBadge status={c.estado === 'ACTIVO' || c.estado === 'ABIERTO' ? 'PROGRAMADO' : c.estado} />
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-center gap-1">
                         {c.estado === 'FINALIZADO' && (
                           <button onClick={() => handlePrintBatch(c)} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Descargar Carnets (Lote)">
@@ -557,9 +599,9 @@ export function CursosSeguridad() {
       )}
 
       {activeView === 'APROBADOS' && (
-        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col">
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col">
           {/* Controls Aprobados */}
-          <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
             <div className="relative w-full sm:max-w-xs">
               <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -567,13 +609,13 @@ export function CursosSeguridad() {
                 placeholder="Buscar por DNI o Nombres..."
                 value={searchAprobados}
                 onChange={(e) => setSearchAprobados(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-emerald-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
               />
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm">
-              <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-5 py-4">Conductor</th>
                   <th className="px-5 py-4">DNI / Licencia</th>
@@ -582,12 +624,12 @@ export function CursosSeguridad() {
                   <th className="px-5 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                 {paginatedAprobados.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-5 py-12 text-center text-slate-500 dark:text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-3">
-                        <div className="rounded-full bg-slate-100 p-4 dark:bg-slate-800">
+                        <div className="rounded-full bg-slate-100 p-4 dark:bg-[var(--bg-subtle)]">
                           <Icon name="file-check" className="size-8 text-slate-400 dark:text-slate-500" />
                         </div>
                         <p className="text-base font-semibold text-slate-700 dark:text-slate-300">No hay conductores aprobados</p>
@@ -601,7 +643,7 @@ export function CursosSeguridad() {
                     const fechaVencimiento = dt.toISOString().split('T')[0];
 
                     return (
-                      <tr key={i} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-slate-800/40">
+                      <tr key={i} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-[var(--bg-subtle)]">
                         <td className="px-5 py-4">
                           <p className="font-bold text-slate-800 dark:text-slate-200">{p.nombres} {p.apellido_paterno} {p.apellido_materno}</p>
                         </td>
@@ -617,7 +659,7 @@ export function CursosSeguridad() {
                           <p className="font-bold text-slate-800 dark:text-slate-200">{p.curso.fecha}</p>
                           <p className="text-[10px] font-semibold text-slate-500">Vence: {fechaVencimiento}</p>
                         </td>
-                        <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                        <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => handlePrintSingle(p)} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Descargar Carnet Individual">
                               <Icon name="print" className="size-4" />
@@ -645,80 +687,84 @@ export function CursosSeguridad() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="flex w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900 rounded-t-2xl">
-              <div>
-                <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                  <Icon name="course" className="size-4" />
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
                   {selectedCurso ? 'Editar Curso de Seguridad' : 'Programar Nuevo Curso'}
                 </h3>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 cursor-pointer">✕</button>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                title="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+              >
+                <Icon name="close" className="size-5" />
+              </button>
             </div>
-            <form onSubmit={handleFormSubmit} className="flex-1 space-y-6 p-6">
+            <form onSubmit={handleFormSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-7 overflow-y-auto p-7">
               
-              <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-slate-700">
+              <fieldset className="border border-slate-200 rounded-xl p-5 dark:border-[var(--border-strong)]">
                 <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DATOS GENERALES</legend>
-                <div className="grid gap-4 sm:grid-cols-2 mb-4">
-                  <div>
-                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Código</label>
-                    <input type="text" value={formData.codigo} disabled className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2 text-sm text-slate-500 outline-none dark:border-slate-700 dark:bg-slate-800" />
+                <div className="grid gap-5 sm:grid-cols-2 mb-5">
+                  <div className={selectedCurso ? '' : 'sm:col-span-2'}>
+                    <FloatingInput id="curso_codigo" label="Código" value={formData.codigo} disabled inputClassName="bg-slate-100 text-slate-500 dark:bg-[var(--bg-subtle)]" />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Estado</label>
-                    <RoundedSelect
+                  {selectedCurso && (
+                    <FloatingSelect
+                      id="curso_estado"
+                      label="Estado"
                       value={formData.estado}
-                      onChange={val => setFormData({ ...formData, estado: val })}
+                      onChange={e => setFormData({ ...formData, estado: e.target.value })}
                       options={FORM_ESTADO_OPTIONS}
                     />
-                  </div>
+                  )}
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Título del Curso *</label>
-                  <input type="text" required value={formData.titulo} onChange={e => setFormData({ ...formData, titulo: e.target.value })} placeholder="Ej. Seguridad Vial para Mototaxis" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                </div>
+                <FloatingInput id="curso_titulo" label="Título del Curso" required value={formData.titulo} onChange={e => setFormData({ ...formData, titulo: e.target.value })} />
               </fieldset>
 
-              <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-slate-700">
+              <fieldset className="border border-slate-200 rounded-xl p-5 dark:border-[var(--border-strong)]">
                 <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DETALLES DEL CURSO</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Fecha *</label>
-                    <input type="date" required value={formData.fecha} onChange={e => {
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <FloatingInput id="curso_fecha" label="Fecha" type="date" required value={formData.fecha} onChange={e => {
                       const newDate = e.target.value;
-                      
+
+                      // Al registrar, el curso siempre nace como PROGRAMADO; el
+                      // ajuste automático de estado según la fecha solo aplica
+                      // al editar un curso existente.
+                      if (!selectedCurso) {
+                        setFormData({ ...formData, fecha: newDate, estado: 'PROGRAMADO' });
+                        return;
+                      }
+
                       const localDate = new Date();
                       const year = localDate.getFullYear();
                       const month = String(localDate.getMonth() + 1).padStart(2, '0');
                       const day = String(localDate.getDate()).padStart(2, '0');
                       const today = `${year}-${month}-${day}`;
-                      
+
                       let autoEstado = formData.estado;
                       if (newDate > today) autoEstado = 'PROGRAMADO';
                       else if (newDate === today) autoEstado = 'EN_CURSO';
                       else if (newDate < today) autoEstado = 'FINALIZADO';
-                      
+
                       setFormData({ ...formData, fecha: newDate, estado: autoEstado });
-                    }} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Horario *</label>
-                    <input type="text" required value={formData.horario} onChange={e => setFormData({ ...formData, horario: e.target.value })} placeholder="Ej. 09:00 AM - 12:00 PM" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Instructor *</label>
-                    <input type="text" required value={formData.instructor} onChange={e => setFormData({ ...formData, instructor: e.target.value })} placeholder="Ej. Ing. Juan Pérez" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Lugar *</label>
-                    <input type="text" required value={formData.lugar} onChange={e => setFormData({ ...formData, lugar: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                  </div>
+                    }} />
+                  <FloatingInput id="curso_horario" label="Horario" required value={formData.horario} onChange={e => setFormData({ ...formData, horario: e.target.value })} />
+                  <FloatingInput id="curso_instructor" label="Instructor" required value={formData.instructor} onChange={e => setFormData({ ...formData, instructor: e.target.value })} />
+                  <FloatingInput id="curso_lugar" label="Lugar" required value={formData.lugar} onChange={e => setFormData({ ...formData, lugar: e.target.value })} />
                 </div>
               </fieldset>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancelar</button>
-                <button type="submit" className="rounded-xl bg-purple-600 px-5 py-2 text-xs font-extrabold text-white shadow-md hover:bg-purple-700 cursor-pointer">Guardar Curso</button>
+            </div>
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-7 py-4 dark:border-[var(--border)]">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">Cancelar</button>
+                <button type="submit" className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-amber-500/25 hover:brightness-105 transition-all cursor-pointer">Guardar Curso</button>
               </div>
             </form>
           </div>
@@ -726,82 +772,138 @@ export function CursosSeguridad() {
       )}
 
       {isDetailModalOpen && selectedCurso && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
-              <div>
-                <h3 className="text-xl font-black text-slate-800 dark:text-white">{selectedCurso.titulo}</h3>
-                <p className="text-xs text-slate-500">{selectedCurso.codigo}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-7 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                  <Icon name="course" className="size-4" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">{selectedCurso.titulo}</h3>
+                  <p className="text-xs font-mono text-slate-400">{selectedCurso.codigo}</p>
+                </div>
               </div>
-              <button onClick={() => setIsDetailModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 cursor-pointer">✕</button>
+              <button
+                type="button"
+                onClick={() => setIsDetailModalOpen(false)}
+                title="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+              >
+                <Icon name="close" className="size-5" />
+              </button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4 text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50">
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-7 space-y-7">
+              <div className="grid grid-cols-2 gap-4 text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-[var(--bg-subtle)] p-4 rounded-xl border border-slate-100 dark:border-slate-700/50">
                 <p><strong>Fecha:</strong> {selectedCurso.fecha}</p>
                 <p><strong>Horario:</strong> {selectedCurso.horario}</p>
                 <p><strong>Instructor:</strong> {selectedCurso.instructor}</p>
                 <p><strong>Lugar:</strong> {selectedCurso.lugar}</p>
                 <p><strong>Inscritos:</strong> {selectedCurso.inscritos || (selectedCurso.participantes?.length || 0)} / {selectedCurso.capacidad}</p>
-                <p><strong>Estado:</strong> <span className="font-bold text-purple-600 dark:text-purple-400">{selectedCurso.estado}</span></p>
+                <p className="flex items-center gap-1.5"><strong>Estado:</strong> <StatusBadge status={selectedCurso.estado} /></p>
               </div>
 
-              <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
-                <div className="flex items-center justify-between mb-4">
+              <div className="border-t border-slate-100 dark:border-[var(--border)] pt-6">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                   <strong className="text-base text-slate-800 dark:text-slate-200">Participantes</strong>
-                  
-                  {/* Formulario de inscripción rápida */}
-                  {selectedCurso.estado !== 'FINALIZADO' && (
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="text" 
-                      id="nuevoDniParticipante"
-                      placeholder="DNI del conductor..." 
-                      className="w-40 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-purple-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                      maxLength={8}
-                    />
-                    <button 
-                      type="button"
-                      onClick={async () => {
-                        const dniInput = document.getElementById('nuevoDniParticipante');
-                        const dni = dniInput.value.trim();
-                        if (!dni) {
-                          showError('Atención', 'Ingrese un DNI');
-                          return;
-                        }
-                        if (!/^\d{8}$/.test(dni)) {
-                          showError('Formato Inválido', 'El DNI debe tener 8 dígitos.');
-                          return;
-                        }
-                        
-                        try {
-                          const res = await apiFetch(`/cursos/${selectedCurso.id}/participantes`, {
-                            method: 'POST',
-                            body: { dni }
-                          });
-                          const result = await res.json();
-                          
-                          if (!res.ok) throw new Error(result.messages?.error || 'Error al inscribir');
-                          
-                          showToast('Participante inscrito correctamente');
-                          dniInput.value = '';
-                          
-                          // Actualizar estado local
-                          const updatedParticipantes = [...(selectedCurso.participantes || []), result.data];
-                          const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes, inscritos: updatedParticipantes.length };
-                          setSelectedCurso(updatedCurso);
-                          setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
-                        } catch (err) {
-                          showError('Error de inscripción', err.message);
-                        }
-                      }}
-                      className="rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-bold text-white shadow-md hover:bg-purple-700 cursor-pointer"
-                    >
-                      Inscribir
-                    </button>
-                  </div>
-                  )}
                 </div>
+
+                {/* Buscador de inscripción */}
+                {selectedCurso.estado !== 'FINALIZADO' && (() => {
+                  const cupoLleno = selectedCurso.capacidad > 0 && (selectedCurso.participantes?.length || 0) >= selectedCurso.capacidad
+                  return cupoLleno ? (
+                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+                      Este curso ya alcanzó su cupo máximo ({selectedCurso.capacidad} participantes).
+                    </div>
+                  ) : (
+                    <div className="relative mb-4">
+                      <div className="relative">
+                        <Icon name="search" className="absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Buscar participante por DNI o nombres..."
+                          value={participanteSearch}
+                          onFocus={() => setShowParticipanteResults(true)}
+                          onChange={(e) => {
+                            setParticipanteSearch(e.target.value)
+                            setShowParticipanteResults(true)
+                          }}
+                          className="w-full h-[38px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none transition focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
+                        />
+                      </div>
+
+                      {showParticipanteResults && participanteSearch.trim() && (
+                        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                          <div className="flex items-center justify-between px-2.5 py-1 border-b border-slate-100 dark:border-[var(--border)] text-[10px] font-bold text-slate-400 uppercase">
+                            <span>Personas registradas ({participanteResults.length})</span>
+                            <button type="button" onClick={() => setShowParticipanteResults(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕ Cerrar</button>
+                          </div>
+                          {participanteResults.length === 0 ? (
+                            <div className="p-3 text-center text-xs text-slate-400 font-medium space-y-2">
+                              <p>No se encontró ninguna persona con ese DNI o nombre.</p>
+                              <a
+                                href={`/personas?accion=registrar`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
+                              >
+                                <Icon name="idCard" className="size-3.5" /> Registrar persona nueva
+                              </a>
+                            </div>
+                          ) : (
+                            participanteResults.map((p) => {
+                              const dni = p.numeroDocumento || p.numero || ''
+                              const yaInscrito = selectedCurso.participantes?.some((part) => part.dni === dni)
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  disabled={inscribiendo || yaInscrito}
+                                  onClick={async () => {
+                                    setInscribiendo(true)
+                                    try {
+                                      const res = await apiFetch(`/cursos/${selectedCurso.id}/participantes`, {
+                                        method: 'POST',
+                                        body: { dni }
+                                      });
+                                      const result = await res.json();
+                                      if (!res.ok) throw new Error(result.messages?.error || 'Error al inscribir');
+
+                                      showToast('Participante inscrito correctamente');
+                                      setParticipanteSearch('')
+                                      setShowParticipanteResults(false)
+
+                                      const updatedParticipantes = [...(selectedCurso.participantes || []), result.data];
+                                      const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes, inscritos: updatedParticipantes.length };
+                                      setSelectedCurso(updatedCurso);
+                                      setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
+                                    } catch (err) {
+                                      showError('Error de inscripción', sanitizarMensaje(err.message, 'No se pudo registrar la inscripción.'));
+                                    } finally {
+                                      setInscribiendo(false)
+                                    }
+                                  }}
+                                  className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center justify-between gap-3 transition-colors cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-amber-600 dark:group-hover:text-amber-400">
+                                      {getPersonaNombre(p)}
+                                    </p>
+                                    <p className="font-mono text-[11px] text-slate-400">DNI: {dni}</p>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">
+                                    {yaInscrito ? 'Ya inscrito' : 'Inscribir →'}
+                                  </span>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {(!selectedCurso.participantes || selectedCurso.participantes.length === 0) ? (
                   <p className="text-sm text-slate-500 italic text-center py-4 bg-slate-50 dark:bg-slate-800/30 rounded-xl">No hay participantes inscritos en este curso.</p>
@@ -813,17 +915,20 @@ export function CursosSeguridad() {
                         : (p.estado || 'PENDIENTE');
                         
                       return (
-                      <li key={i} className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 gap-3">
+                      <li key={i} className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-slate-50 dark:bg-[var(--bg-subtle)] p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 gap-3">
                         <div>
                           <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
                             {p.nombres} {p.apellido_paterno} {p.apellido_materno}
                           </p>
-                          <p className="text-xs text-slate-500 font-semibold">DNI: {p.dni || p.numero}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-slate-500 font-semibold">DNI: {p.dni || p.numero}</p>
+                            {p.estado_pago && <StatusBadge status={p.estado_pago} />}
+                          </div>
                         </div>
                         
                         <div className="flex items-center gap-3">
                           {/* Controles de Asistencia y Estado */}
-                          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <div className="flex items-center gap-2 bg-white dark:bg-[var(--bg-surface)] px-2 py-1.5 rounded-lg border border-slate-200 dark:border-[var(--border-strong)]">
                             <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer">
                               <input 
                                 type="checkbox" 
@@ -847,7 +952,7 @@ export function CursosSeguridad() {
                                     setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
                                     showToast(asistio ? 'Marcado como asistente' : 'Desmarcado como asistente');
                                   } catch (err) {
-                                    showError('Error', err.message);
+                                    showError('Error', sanitizarMensaje(err.message, 'Ocurrió un error al procesar la solicitud.'));
                                   }
                                 }}
                                 className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
@@ -874,7 +979,7 @@ export function CursosSeguridad() {
                                   setSelectedCurso(updatedCurso);
                                   setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
                                 } catch (err) {
-                                  alert(err.message);
+                                  showError('Error', sanitizarMensaje(err.message, 'Ocurrió un error al procesar la solicitud.'));
                                 }
                               }}
                               className={`text-xs font-bold bg-transparent outline-none cursor-pointer ${
@@ -900,7 +1005,7 @@ export function CursosSeguridad() {
                             ) : estadoReal === 'INSCRITO' ? (
                               <span className="text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-1 rounded-md block">Inscrito</span>
                             ) : (
-                              <span className="text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md block">{estadoReal}</span>
+                              <span className="text-slate-500 bg-slate-100 dark:bg-[var(--bg-subtle)] px-2 py-1 rounded-md block">{estadoReal}</span>
                             )}
                           </span>
                         </div>
@@ -911,7 +1016,7 @@ export function CursosSeguridad() {
               </div>
             </div>
             
-            <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex justify-end dark:border-slate-800 dark:bg-slate-900">
+            <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex justify-end dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl bg-slate-900 px-6 py-2 text-sm font-extrabold text-white hover:bg-slate-800 cursor-pointer shadow-md">Cerrar</button>
             </div>
           </div>

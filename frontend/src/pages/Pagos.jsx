@@ -4,15 +4,15 @@ import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
-import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect } from '../components/ui/FormInputs'
 
 const FILTER_ESTADO_OPTIONS = [
-  { value: 'TODOS', label: 'Cualquier Estado' },
+  { value: 'TODOS', label: 'Todos los estados' },
   { value: 'PAGADO', label: 'Pagados' },
-  { value: 'PENDIENTE', label: 'Pendientes por pagar' },
+  { value: 'PENDIENTE', label: 'Pendientes' },
 ]
 
 const FILTER_TIPO_OPTIONS = [
@@ -61,7 +61,7 @@ export function Pagos() {
       const data = await res.json()
       if (!res.ok) throw new Error('No se pudieron cargar los registros de origen.')
       setOrigenes(data.data)
-    } catch (error) { showError('Error', error.message) }
+    } catch (error) { showError('Error', sanitizarMensaje(error.message, 'No se pudo registrar el pago.')) }
   }
 
   const handleConfirm = (pago) => {
@@ -124,7 +124,7 @@ export function Pagos() {
       setPagos(prev => [result.data, ...prev.filter(p => p.id !== result.data.id)])
       setIsModalOpen(false)
       showToast('Pago registrado exitosamente')
-    } catch (err) { showError('Error', err.message) }
+    } catch (err) { showError('Error', sanitizarMensaje(err.message, 'No se pudo anular el pago.')) }
     finally { setIsSaving(false) }
   }
 
@@ -136,7 +136,7 @@ export function Pagos() {
       if (!res.ok) throw new Error(json.message || 'Error al obtener el arqueo diario')
       setArqueoData(json.data)
     } catch (err) {
-      showError('Error', err.message || 'Error al cargar arqueo de caja')
+      showError('Error', sanitizarMensaje(err.message, 'Error al cargar arqueo de caja.'))
     } finally {
       setIsLoadingArqueo(false)
     }
@@ -161,6 +161,7 @@ export function Pagos() {
         { header: 'N° RECIBO', key: 'numeroRecibo' },
         { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente' },
         { header: 'TIPO PAGO', key: 'tipoPago' },
+        { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—' },
         { header: 'MÉTODO PAGO', key: 'metodo' },
         { header: 'MONTO', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}` },
         { header: 'ESTADO', key: 'estado' }
@@ -184,6 +185,7 @@ export function Pagos() {
         { header: 'N° RECIBO', key: 'numeroRecibo', isText: true, width: 140 },
         { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente', width: 110 },
         { header: 'TIPO PAGO', key: 'tipoPago', width: 130 },
+        { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—', width: 180 },
         { header: 'N° VOUCHER', key: 'numeroVoucher', isText: true, width: 140 },
         { header: 'REFERENCIA', key: 'referenciaPago', width: 160 },
         { header: 'MÉTODO PAGO', key: 'metodo', width: 120 },
@@ -274,7 +276,7 @@ export function Pagos() {
       
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-600 text-white shadow-md">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -291,18 +293,22 @@ export function Pagos() {
             </svg>
           </span>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">Pagos de Tránsito</h1>
-            <p className="text-xs font-medium text-slate-500">Control de ingresos por papeletas de infracción, licencias, cursos de seguridad vial y tasas municipales.</p>
+            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              Pagos de Tránsito
+            </h1>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Control de ingresos por papeletas de infracción, licencias, cursos de seguridad vial y tasas municipales.
+            </p>
           </div>
         </div>
       </div>
 
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 print:hidden">
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total Recaudado</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 text-xs">
-              💰
+              <Icon name="payment" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1">
@@ -310,11 +316,11 @@ export function Pagos() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-sky-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-sky-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Operaciones</span>
             <span className="grid size-6 place-items-center rounded-md bg-sky-50 text-sky-600 dark:bg-sky-950/60 text-xs">
-              🧾
+              <Icon name="receiptCheck" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1">
@@ -322,11 +328,11 @@ export function Pagos() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Pagos de Hoy</span>
             <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60 text-xs">
-              📅
+              <Icon name="calendar" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1">
@@ -335,19 +341,29 @@ export function Pagos() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a] flex flex-col print:hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
-          <div className="relative w-full sm:max-w-xs">
-            <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col print:hidden">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
+          <div className="relative w-full sm:w-56 md:w-64 lg:w-72 shrink-0">
+            <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Buscar por N° recibo, voucher..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200/80 bg-slate-50/50 py-2 pl-9 pr-4 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-800 dark:bg-slate-900/50 dark:text-white"
+              className="w-full rounded-xl border border-slate-200/80 bg-slate-50/70 py-1.5 pl-9 pr-8 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-emerald-500/20 dark:border-[var(--border)] dark:bg-slate-900/50 dark:text-white"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <RoundedSelect
               value={filterEstado}
               onChange={setFilterEstado}
@@ -359,10 +375,25 @@ export function Pagos() {
               options={FILTER_TIPO_OPTIONS}
             />
 
+            {(filterEstado !== 'TODOS' || filterTipoPago !== 'TODOS' || searchTerm !== '') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterEstado('TODOS')
+                  setFilterTipoPago('TODOS')
+                  setSearchTerm('')
+                }}
+                title="Limpiar filtros"
+                className="grid size-[32px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
+              >
+                <Icon name="filterX" className="size-3.5" />
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleOpenArqueo}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200/80 bg-purple-50/70 px-2.5 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-slate-800 dark:bg-slate-800/60 dark:text-purple-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200/80 bg-purple-50/70 px-2.5 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-purple-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer shadow-2xs whitespace-nowrap"
               title="Reporte de Arqueo y Cierre Diario de Caja"
             >
               <Icon name="chart" className="size-3.5 text-purple-600 dark:text-purple-400" />
@@ -372,7 +403,7 @@ export function Pagos() {
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-slate-800 dark:bg-slate-800/60 dark:text-emerald-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-emerald-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer shadow-2xs whitespace-nowrap"
               title="Descargar reporte de pagos en Excel"
             >
               <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -382,17 +413,20 @@ export function Pagos() {
             <button
               type="button"
               onClick={handleExportPdf}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-slate-800 dark:bg-slate-800/60 dark:text-rose-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-rose-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer shadow-2xs whitespace-nowrap"
+              title="Imprimir o exportar PDF"
             >
               <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
               <span>PDF</span>
             </button>
 
             <button
+              type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:scale-[1.02] hover:shadow-lg active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-md shadow-emerald-600/20 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              title="Registrar nuevo pago"
             >
-              <span className="text-base leading-none font-black">+</span>
+              <Icon name="plus" className="size-3.5" />
               <span>Registrar Pago</span>
             </button>
           </div>
@@ -400,44 +434,46 @@ export function Pagos() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3.5 whitespace-nowrap">N° RECIBO</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">FECHA / HORA</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">TIPO / VOUCHER</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">PAGADO POR</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">MÉTODO</th>
                 <th className="px-4 py-3.5 whitespace-nowrap text-center">MONTO TOTAL</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#0f172a] px-4 py-3.5 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[var(--bg-surface)] px-4 py-3.5 text-center whitespace-nowrap border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#0f172a]">
+            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[var(--bg-surface)]">
               {isLoading && pagos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="px-4 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-4 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-4 py-4"><div className="h-4 w-40 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-4 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-4 py-4"><div className="h-4 w-40 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-4 py-4">
                       <div className="space-y-1.5">
-                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
-                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-slate-800/60" />
+                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                       </div>
                     </td>
-                    <td className="px-4 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-4 py-4 text-right border-l border-slate-100 dark:border-slate-800"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-4 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-4 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-4 py-4 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : filteredPagos.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="p-12 text-center">
-                    <p className="text-4xl mb-2">💸</p>
+                  <td colSpan="7" className="p-12 text-center">
+                    <Icon name="payment" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
                     <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron pagos registrados</p>
                     <p className="text-xs text-slate-400">Intenta buscar con otros términos o filtros.</p>
                   </td>
                 </tr>
               ) : (
                 paginatedPagos.map((p) => (
-                  <tr key={p.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-slate-800/40">
+                  <tr key={p.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-[var(--bg-subtle)]">
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <p className="font-bold text-slate-900 dark:text-white">{p.numeroRecibo || 'Pendiente de recibo'}</p>
                       <span className="mt-0.5 inline-block rounded-md bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
@@ -454,9 +490,12 @@ export function Pagos() {
                       <p className="font-bold text-slate-900 dark:text-white">{p.tipoPago || 'TRAMITE'}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500">{p.numeroVoucher || 'Sin voucher'}</p>
                     </td>
+                    <td className="px-4 py-3.5">
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{p.pagadoPor || '—'}</p>
+                    </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider ${p.metodo === 'EFECTIVO'
-                        ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        ? 'bg-slate-100 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
                         : 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
                         }`}>
                         {p.metodo || 'Sin confirmar'}
@@ -466,7 +505,7 @@ export function Pagos() {
                       <p className="font-black text-slate-900 dark:text-white">S/ {p.montoTotal?.toFixed(2) || '0.00'}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">{p.estado}</p>
                     </td>
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#0f172a] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-center gap-1.5">
                         {p.estado === 'PENDIENTE' && p.tipoPago !== 'INTERNAMIENTO' && <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Confirmar recibo</button>}
                         <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="rounded-xl p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Ver Detalle">
@@ -503,26 +542,26 @@ export function Pagos() {
       
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div>
                 <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">{pagoToConfirm ? 'Confirmar recibo de pago' : 'Generar pago pendiente'}</h3>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 cursor-pointer">✕</button>
+              <button onClick={() => setIsModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-[var(--bg-subtle)] cursor-pointer">✕</button>
             </div>
             <form onSubmit={handleFormSubmit} className="flex-1 p-6">
               {pagoToConfirm ? (
-                <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-slate-700">
+                <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-[var(--border-strong)]">
                   <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DETALLES DEL RECIBO</legend>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2">
                       <p className="font-bold text-slate-800 dark:text-white text-lg">Monto: S/ {pagoToConfirm.montoTotal.toFixed(2)}</p>
                     </div>
                     <label className="block text-sm">Número real del recibo
-                      <input required maxLength={50} value={formData.numeroRecibo} onChange={e => setFormData({ ...formData, numeroRecibo: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
+                      <input required maxLength={50} value={formData.numeroRecibo} onChange={e => setFormData({ ...formData, numeroRecibo: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-[var(--bg-subtle)]" />
                     </label>
                     <label className="block text-sm">Fecha que figura en el recibo
-                      <input required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
+                      <input required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-[var(--bg-subtle)]" />
                     </label>
                     <label className="block text-sm">Método de pago
                       <RoundedSelect 
@@ -537,12 +576,12 @@ export function Pagos() {
                       />
                     </label>
                     <label className="block text-sm">Voucher o referencia (opcional)
-                      <input maxLength={100} value={formData.referenciaPago} onChange={e => setFormData({ ...formData, referenciaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800" />
+                      <input maxLength={100} value={formData.referenciaPago} onChange={e => setFormData({ ...formData, referenciaPago: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-[var(--bg-subtle)]" />
                     </label>
                   </div>
                 </fieldset>
               ) : (
-                <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-slate-700">
+                <fieldset className="border border-slate-200 rounded-xl p-4 dark:border-[var(--border-strong)]">
                   <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DATOS DE PAGO</legend>
                   <p className="text-sm text-slate-500 mb-4">El importe se obtiene del registro seleccionado. El recibo se ingresa después de realizar el pago.</p>
                   <div className="space-y-4">
@@ -559,7 +598,7 @@ export function Pagos() {
                       />
                     </label>
                     <label className="block text-sm">Registro asociado
-                      <select required value={formData.origenId || ''} onChange={e => setFormData({ ...formData, origenId: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-slate-800">
+                      <select required value={formData.origenId || ''} onChange={e => setFormData({ ...formData, origenId: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 dark:bg-[var(--bg-subtle)]">
                         <option value="">Seleccione un registro</option>
                         {(origenes[formData.tipoPago] || []).map(o => <option key={o.id} value={o.id}>{o.nombre || formData.tipoPago} — #{o.id}</option>)}
                       </select>
@@ -569,7 +608,7 @@ export function Pagos() {
                 </fieldset>
               )}
               <div className="flex justify-end gap-3 pt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancelar</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">Cancelar</button>
                 <button type="submit" disabled={isSaving} className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-extrabold text-white shadow-md hover:bg-emerald-700 cursor-pointer">{isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pendiente'}</button>
               </div>
             </form>
@@ -579,12 +618,13 @@ export function Pagos() {
 
       {isDetailModalOpen && selectedPago && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a] p-6">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] p-6">
             <h3 className="text-xl font-black mb-2 text-slate-800 dark:text-white">Detalle del Recibo</h3>
             <p className="text-xs text-slate-500 mb-6">{selectedPago.numeroRecibo}</p>
             <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
               <p><strong>Fecha:</strong> {selectedPago.fecha ? new Date(selectedPago.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente'}</p>
               <p><strong>Tipo de pago:</strong> {selectedPago.tipoPago || 'TRAMITE'}</p>
+              <p><strong>Pagado por:</strong> {selectedPago.pagadoPor || 'No identificado'}</p>
               <p><strong>Método de Pago:</strong> {selectedPago.metodo}</p>
               <p><strong>N° Voucher:</strong> {selectedPago.numeroVoucher || 'Sin voucher'}</p>
               <p><strong>Referencia:</strong> {selectedPago.referenciaPago || 'Sin referencia'}</p>
@@ -607,6 +647,7 @@ export function Pagos() {
             <p className="text-left"><strong>FECHA:</strong> {new Date(selectedPago.fecha).toLocaleString()}</p>
             <div className="my-4 border-y border-dashed border-slate-400 py-2 text-left">
               <p className="font-bold mb-1">TIPO: {selectedPago.tipoPago || 'TRAMITE'}</p>
+              <p>PAGADO POR: {selectedPago.pagadoPor || 'No identificado'}</p>
               <p>VOUCHER: {selectedPago.numeroVoucher || '---'}</p>
               <p>MÉTODO: {selectedPago.metodo}</p>
             </div>
@@ -624,9 +665,9 @@ export function Pagos() {
       {/* MODAL DE ARQUEO Y CIERRE DE CAJA DIARIO */}
       {isArqueoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-enter print:static print:block print:p-8 print:bg-transparent print:overflow-visible">
-          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a] print:max-h-none print:border-none print:shadow-none print:rounded-none">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:max-h-none print:border-none print:shadow-none print:rounded-none">
             {/* Cabecera del modal */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80 print:bg-transparent print:border-black print:pb-2 print:mb-4 print:px-0">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 dark:border-[var(--border)] dark:bg-slate-900/80 print:bg-transparent print:border-black print:pb-2 print:mb-4 print:px-0">
               <div className="flex items-center gap-3 print:w-full print:justify-center print:flex-col print:gap-1">
                 <span className="grid size-10 place-items-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 print:hidden">
                   <Icon name="chart" className="size-5" />
@@ -648,13 +689,13 @@ export function Pagos() {
                     setArqueoFecha(e.target.value)
                     fetchArqueo(e.target.value)
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none transition hover:border-purple-300 focus:border-purple-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none transition hover:border-purple-300 focus:border-purple-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200"
                 />
                 <button
                   type="button"
                   onClick={() => fetchArqueo(arqueoFecha)}
                   disabled={isLoadingArqueo}
-                  className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-100 hover:text-purple-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+                  className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-100 hover:text-purple-600 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                   title="Actualizar arqueo"
                 >
                   <Icon name="refresh" className={`size-4 ${isLoadingArqueo ? 'animate-spin' : ''}`} />
@@ -662,7 +703,7 @@ export function Pagos() {
                 <button
                   type="button"
                   onClick={() => setIsArqueoModalOpen(false)}
-                  className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer"
+                  className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-slate-200 cursor-pointer"
                 >
                   ✕
                 </button>
@@ -687,7 +728,7 @@ export function Pagos() {
                     <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/60 dark:bg-purple-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
                       <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 print:text-black">
                         <span>Total Recaudado</span>
-                        <span className="print:hidden">💰</span>
+                        <Icon name="payment" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
                         S/ {Number(arqueoData.totalRecaudado || 0).toFixed(2)}
@@ -700,7 +741,7 @@ export function Pagos() {
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
                       <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 print:text-black">
                         <span>Efectivo en Caja</span>
-                        <span className="print:hidden">💵</span>
+                        <Icon name="payment" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
                         S/ {Number(arqueoData.porMetodo?.efectivo || 0).toFixed(2)}
@@ -713,7 +754,7 @@ export function Pagos() {
                     <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-900/60 dark:bg-sky-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
                       <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 print:text-black">
                         <span>Tarjetas (POS)</span>
-                        <span className="print:hidden">💳</span>
+                        <Icon name="creditCard" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
                         S/ {Number(arqueoData.porMetodo?.tarjeta || 0).toFixed(2)}
@@ -726,7 +767,7 @@ export function Pagos() {
                     <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
                       <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 print:text-black">
                         <span>Transferencias</span>
-                        <span className="print:hidden">🏦</span>
+                        <Icon name="building" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
                         S/ {Number(arqueoData.porMetodo?.transferencia || 0).toFixed(2)}
@@ -740,20 +781,20 @@ export function Pagos() {
                   {/* Tablas de Desglose */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 print:grid-cols-1 print:gap-6">
                     {/* Desglose por concepto */}
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40 print:bg-transparent print:border-none print:p-0">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-[var(--border)] dark:bg-slate-900/40 print:bg-transparent print:border-none print:p-0">
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-black print:border-b print:border-black print:pb-1">
-                        <span className="print:hidden">📊 </span>Recaudación por Concepto
+                        <Icon name="chartBar" className="inline size-3.5 mr-1 -mt-0.5 print:hidden" />Recaudación por Concepto
                       </h4>
                       <div className="overflow-x-auto print:overflow-visible">
                         <table className="w-full text-left text-xs print:table-fixed">
-                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800 print:text-black print:border-black">
+                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-[var(--border)] print:text-black print:border-black">
                             <tr>
                               <th className="pb-2">Concepto</th>
                               <th className="pb-2 text-center">Cant.</th>
                               <th className="pb-2 text-right">Subtotal</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                          <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                             {arqueoData.porConcepto?.length === 0 ? (
                               <tr>
                                 <td colSpan="3" className="py-4 text-center text-slate-400">Sin ingresos en la fecha</td>
@@ -775,20 +816,20 @@ export function Pagos() {
                     </div>
 
                     {/* Desglose por cajero */}
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40 print:bg-transparent print:border-none print:p-0">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-[var(--border)] dark:bg-slate-900/40 print:bg-transparent print:border-none print:p-0">
                       <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-black print:border-b print:border-black print:pb-1">
-                        <span className="print:hidden">👤 </span>Rendición por Cajero / Operador
+                        <Icon name="user" className="inline size-3.5 mr-1 -mt-0.5 print:hidden" />Rendición por Cajero / Operador
                       </h4>
                       <div className="overflow-x-auto print:overflow-visible">
                         <table className="w-full text-left text-xs print:table-fixed">
-                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-slate-800 print:text-black print:border-black">
+                          <thead className="border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:border-[var(--border)] print:text-black print:border-black">
                             <tr>
                               <th className="pb-2">Cajero</th>
                               <th className="pb-2 text-center">Operaciones</th>
                               <th className="pb-2 text-right">Total Cobrado</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                          <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                             {arqueoData.porCajero?.length === 0 ? (
                               <tr>
                                 <td colSpan="3" className="py-4 text-center text-slate-400">Sin operaciones de cajero</td>
@@ -811,10 +852,10 @@ export function Pagos() {
                   </div>
 
                   {/* Detalle de Movimientos del Día */}
-                  <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800 print:bg-transparent print:border-none print:p-0 print:mt-6">
+                  <div className="rounded-2xl border border-slate-200 p-4 dark:border-[var(--border)] print:bg-transparent print:border-none print:p-0 print:mt-6">
                     <div className="mb-3 flex items-center justify-between print:border-b print:border-black print:pb-2">
                       <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-black print:text-sm">
-                        <span className="print:hidden">🧾 </span>Movimientos y Recibos Emitidos ({arqueoData.pagos?.length || 0})
+                        <Icon name="receiptCheck" className="inline size-3.5 mr-1 -mt-0.5 print:hidden" />Movimientos y Recibos Emitidos ({arqueoData.pagos?.length || 0})
                       </h4>
                       <span className="text-[11px] font-medium text-slate-400 print:text-black font-mono">
                         Fecha: {arqueoData.fecha}
@@ -823,7 +864,7 @@ export function Pagos() {
 
                     <div className="max-h-56 overflow-y-auto print:max-h-none print:overflow-visible">
                       <table className="w-full text-left text-xs print:table-fixed">
-                        <thead className="sticky top-0 bg-white border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:bg-[#0f172a] dark:border-slate-800 print:static print:bg-transparent print:text-black print:border-black">
+                        <thead className="sticky top-0 bg-white border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:bg-[var(--bg-surface)] dark:border-[var(--border)] print:static print:bg-transparent print:text-black print:border-black">
                           <tr>
                             <th className="py-2 print:py-1">N° Recibo</th>
                             <th className="py-2 print:py-1">Hora</th>
@@ -833,7 +874,7 @@ export function Pagos() {
                             <th className="py-2 print:py-1 text-right">Monto</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 print:divide-slate-300">
+                        <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)] print:divide-slate-300">
                           {arqueoData.pagos?.length === 0 ? (
                             <tr>
                               <td colSpan="6" className="py-6 text-center text-slate-400 print:text-black">
@@ -842,7 +883,7 @@ export function Pagos() {
                             </tr>
                           ) : (
                             arqueoData.pagos?.map((p) => (
-                              <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                              <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-[var(--bg-subtle)]">
                                 <td className="py-2 font-mono font-bold text-slate-900 dark:text-white print:text-black print:py-1">
                                   {p.numeroRecibo || `#${p.id}`}
                                 </td>
@@ -850,7 +891,7 @@ export function Pagos() {
                                   {p.fecha ? p.fecha.split(' ')[1] || p.fecha : '---'}
                                 </td>
                                 <td className="py-2 print:py-1">
-                                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300 print:bg-transparent print:p-0 print:text-black">
+                                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300 print:bg-transparent print:p-0 print:text-black">
                                     {p.tipoPago}
                                   </span>
                                 </td>
@@ -875,13 +916,13 @@ export function Pagos() {
             </div>
 
             {/* Footer de Acciones del Arqueo */}
-            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900 print:hidden">
+            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleExportArqueoExcel}
                   disabled={!arqueoData?.pagos?.length}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-slate-700 transition-all cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-extrabold text-emerald-700 shadow-2xs hover:bg-emerald-50 dark:border-emerald-800 dark:bg-[var(--bg-subtle)] dark:text-emerald-300 dark:hover:bg-slate-700 transition-all cursor-pointer disabled:opacity-50"
                 >
                   <Icon name="table" className="size-4" />
                   <span>Exportar Arqueo Excel</span>
@@ -899,7 +940,7 @@ export function Pagos() {
               <button
                 type="button"
                 onClick={() => setIsArqueoModalOpen(false)}
-                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer"
+                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 cursor-pointer"
               >
                 Cerrar
               </button>

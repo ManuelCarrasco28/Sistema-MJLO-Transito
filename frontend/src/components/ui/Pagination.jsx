@@ -19,7 +19,7 @@ function PaginationRowsSelect({ value, onChange }) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/70 py-1 px-2.5 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200 cursor-pointer"
+        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/70 py-1 px-2.5 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-[var(--border-strong)] dark:bg-slate-800/70 dark:text-slate-200 cursor-pointer"
       >
         <span>{value}</span>
         <svg
@@ -37,7 +37,7 @@ function PaginationRowsSelect({ value, onChange }) {
       </button>
 
       {isOpen && (
-        <div className="absolute bottom-full mb-1.5 left-0 z-50 min-w-[70px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute bottom-full mb-1.5 left-0 z-50 min-w-[70px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
           <div className="space-y-0.5">
             {[5, 8, 10, 20].map((num) => {
               const isSelected = num === value
@@ -107,7 +107,7 @@ export function Pagination({
   const hasNextBlock = endPage < totalPages
 
   return (
-    <div className="relative flex flex-col sm:flex-row items-center justify-center min-h-[52px] gap-3 border-t border-slate-100 bg-white px-4 py-2.5 text-xs text-slate-600 dark:border-slate-800 dark:bg-[#0f172a] dark:text-slate-400">
+    <div className="relative flex flex-col sm:flex-row items-center justify-center min-h-[52px] gap-3 border-t border-slate-100 bg-white px-4 py-2.5 text-xs text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400">
       {onItemsPerPageChange && (
         <div className="flex items-center gap-1.5 sm:absolute sm:left-4">
           <span className="text-[11px] text-slate-500 dark:text-slate-400">Por página:</span>
@@ -126,7 +126,7 @@ export function Pagination({
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+          className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
           title="Página Anterior"
           aria-label="Página anterior"
         >
@@ -142,7 +142,7 @@ export function Pagination({
               aria-label={`Ir al bloque anterior (página ${Math.max(1, startPage - BLOCK_SIZE)})`}
               title={`Páginas ${Math.max(1, startPage - BLOCK_SIZE)} - ${startPage - 1}`}
               onClick={() => onPageChange(Math.max(1, startPage - BLOCK_SIZE))}
-              className="flex size-8 items-center justify-center rounded-lg text-xs font-black tracking-widest text-slate-400 hover:border hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-all cursor-pointer"
+              className="flex size-8 items-center justify-center rounded-lg text-xs font-black tracking-widest text-slate-400 hover:border hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-slate-200 transition-all cursor-pointer"
             >
               ...
             </button>
@@ -158,7 +158,7 @@ export function Pagination({
               className={`flex size-8 items-center justify-center rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
                 p === currentPage
                   ? 'bg-[#0b3458] text-white shadow-xs dark:bg-cyan-600'
-                  : 'border border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800'
+                  : 'border border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-[var(--bg-subtle)]'
               }`}
             >
               {p}
@@ -171,7 +171,7 @@ export function Pagination({
               aria-label={`Ir al bloque siguiente (página ${endPage + 1})`}
               title={`Páginas ${endPage + 1} - ${Math.min(endPage + BLOCK_SIZE, totalPages)}`}
               onClick={() => onPageChange(endPage + 1)}
-              className="flex size-8 items-center justify-center rounded-lg text-xs font-black tracking-widest text-slate-400 hover:border hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-all cursor-pointer"
+              className="flex size-8 items-center justify-center rounded-lg text-xs font-black tracking-widest text-slate-400 hover:border hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-slate-200 transition-all cursor-pointer"
             >
               ...
             </button>
@@ -182,7 +182,7 @@ export function Pagination({
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+          className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
           title="Página Siguiente"
           aria-label="Página siguiente"
         >

@@ -239,7 +239,7 @@ export function ChartsSection({ data, loading = false }) {
         <div className="lg:col-span-2 space-y-7">
           
           {/* 1. Operaciones mensuales (Restaurado interactivo svg) */}
-          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '460ms' }}>
+          <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '460ms' }}>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
               <div>
                 <h3 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Operaciones mensuales</h3>
@@ -345,7 +345,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Multas y pagos registrados (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '610ms' }}>
+          <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '610ms' }}>
             <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
               <div>
                 <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Multas y pagos registrados</h2>
@@ -482,7 +482,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Modern Data Table */}
-          <div className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800" data-purpose="horizon-data-table">
+          <div className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)]" data-purpose="horizon-data-table">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
                 <h3 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Últimos Movimientos e Intervenciones</h3>
@@ -625,7 +625,7 @@ export function ChartsSection({ data, loading = false }) {
           </div>
 
           {/* Operatividad de permisos (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '830ms' }}>
+          <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '830ms' }}>
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#F4F7FE] pb-4 mb-5">
               <div>
                 <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Operatividad de permisos</h2>
@@ -690,7 +690,7 @@ export function ChartsSection({ data, loading = false }) {
         {/* RIGHT COLUMN (1/3 width on large screens) */}
         <div className="space-y-7">
           {/* Mini Calendar Widget con Operativos y Cursos de Seguridad Vial */}
-          <div className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800">
+          <div className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)]">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white">{monthNames[currentMonth]} {currentYear}</h4>
               <div className="flex items-center gap-1">
@@ -765,7 +765,7 @@ export function ChartsSection({ data, loading = false }) {
             </div>
 
             {/* Leyenda y contador mensual */}
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold">
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[var(--border)] flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
                   <span className="size-2 rounded-full bg-blue-600 dark:bg-blue-400" />
@@ -783,8 +783,8 @@ export function ChartsSection({ data, loading = false }) {
 
             {/* Detalle interactivo del día seleccionado */}
             {selectedCalendarDay ? (
-              <div className="mt-3.5 rounded-2xl border border-blue-200/80 bg-blue-50/40 p-3.5 dark:border-slate-800 dark:bg-slate-900/80 animate-in fade-in zoom-in-95 duration-150">
-                <div className="flex items-center justify-between pb-2 border-b border-blue-100 dark:border-slate-800">
+              <div className="mt-3.5 rounded-2xl border border-blue-200/80 bg-blue-50/40 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/80 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between pb-2 border-b border-blue-100 dark:border-[var(--border)]">
                   <div className="flex items-center gap-1.5">
                     <Icon name="calendar" className="size-4 text-blue-600 dark:text-blue-400" />
                     <span className="text-xs font-black text-slate-800 dark:text-white">
@@ -810,7 +810,7 @@ export function ChartsSection({ data, loading = false }) {
                     {selectedCalendarDay.operativos.map((op) => (
                       <div
                         key={`op-${op.id}`}
-                        className="rounded-xl border border-blue-200/60 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-950/80 shadow-2xs"
+                        className="rounded-xl border border-blue-200/60 bg-white p-2.5 dark:border-[var(--border)] dark:bg-slate-950/80 shadow-2xs"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
@@ -821,7 +821,7 @@ export function ChartsSection({ data, loading = false }) {
                               {op.nombre || 'Operativo Inopinado'}
                             </h5>
                             <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                              <span>📍</span> {op.lugar || 'Distrito J.L. Ortiz'}
+                              <Icon name="mapPin" className="size-3 inline shrink-0" /> {op.lugar || 'Distrito J.L. Ortiz'}
                             </p>
                             {op.hora_inicio && (
                               <p className="text-[10px] text-slate-400">
@@ -844,7 +844,7 @@ export function ChartsSection({ data, loading = false }) {
                     {selectedCalendarDay.cursos.map((c) => (
                       <div
                         key={`cur-${c.id}`}
-                        className="rounded-xl border border-emerald-200/60 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-950/80 shadow-2xs"
+                        className="rounded-xl border border-emerald-200/60 bg-white p-2.5 dark:border-[var(--border)] dark:bg-slate-950/80 shadow-2xs"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
@@ -855,7 +855,7 @@ export function ChartsSection({ data, loading = false }) {
                               {c.titulo || c.nombre || 'Capacitación Vial'}
                             </h5>
                             <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                              <span>📍</span> {c.lugar || 'Auditorio Municipal'}
+                              <Icon name="mapPin" className="size-3 inline shrink-0" /> {c.lugar || 'Auditorio Municipal'}
                             </p>
                             {c.horario && (
                               <p className="text-[10px] text-slate-400">
@@ -884,7 +884,7 @@ export function ChartsSection({ data, loading = false }) {
           </div>
 
           {/* Estado de expedientes (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '540ms' }}>
+          <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '540ms' }}>
             <div className="border-b border-[#F4F7FE] pb-4 mb-5">
               <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Estado de expedientes</h2>
               <p className="mt-0.5 text-xs text-[#A3AED0]">Distribución de documentos vigentes y observados</p>
@@ -932,7 +932,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Asociaciones registradas (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '760ms' }}>
+          <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '760ms' }}>
             <div className="border-b border-[#F4F7FE] pb-4 mb-5">
               <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Asociaciones</h2>
               <p className="mt-0.5 text-xs text-[#A3AED0]">Estado visual de empresas y comités</p>
@@ -959,7 +959,7 @@ export function ChartsSection({ data, loading = false }) {
           </article>
 
           {/* Vehículos en depósito (Restaurado interactivo) */}
-          <article className="bg-white dark:bg-[#0f172a] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-slate-800 animate-enter" style={{ animationDelay: '690ms' }}>
+          <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '690ms' }}>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white">Depósito Municipal</h4>
               <span className="text-[10px] font-bold text-[#EE5D50] bg-[#FEEFEE] dark:bg-rose-500/20 px-2 py-0.5 rounded-full">

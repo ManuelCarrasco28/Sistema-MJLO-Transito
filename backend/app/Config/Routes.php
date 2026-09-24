@@ -37,6 +37,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('pagos/arqueo-diario', 'PagosController::arqueoDiario');
         $routes->post('pagos/(:num)/confirmar', 'PagosController::confirmar/$1');
         $routes->resource('pagos', ['controller' => 'PagosController', 'only' => ['index', 'create', 'delete']]);
+        $routes->get('cursos/personas-vigentes', 'CursosController::personasConCursoVigente');
         $routes->post('cursos/(:num)/participantes', 'CursosController::inscribirParticipante/$1');
         $routes->put('cursos/(:num)/participantes/(:num)', 'CursosController::registrarNota/$1/$2');
         $routes->resource('cursos', ['controller' => 'CursosController']);

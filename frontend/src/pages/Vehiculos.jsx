@@ -4,7 +4,9 @@ import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
-import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
+import { showError } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect } from '../components/ui/FormInputs'
@@ -15,7 +17,7 @@ function FloatingInput({ id, label, type = "text", ...props }) {
       <input
         id={id}
         type={type}
-        className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+        className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
         placeholder=" "
         autoComplete="off"
         {...props}
@@ -52,9 +54,9 @@ function FloatingSelect({ id, label, value, onChange, options = [], className = 
         type="button"
         id={id}
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-10.5 w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-slate-900 dark:text-white cursor-pointer ${isOpen
+        className={`flex h-10.5 w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-[var(--bg-surface)] dark:text-white cursor-pointer ${isOpen
             ? 'border-indigo-500 ring-1 ring-indigo-500/20 dark:border-indigo-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+            : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
           }`}
       >
         <span className="truncate">{selectedOption?.label || value}</span>
@@ -68,7 +70,7 @@ function FloatingSelect({ id, label, value, onChange, options = [], className = 
       </label>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
           <div className="space-y-0.5">
             {options.map((opt) => {
               const isSelected = String(opt.value) === String(value)
@@ -491,7 +493,7 @@ export function Vehiculos() {
       }
       setIsModalOpen(false)
     } catch (err) {
-      alert(err.message || 'Error al guardar el vehículo en el servidor.')
+      showError('Error', sanitizarMensaje(err.message, 'Error al guardar el vehículo en el servidor.'))
     }
   }
 
@@ -523,7 +525,7 @@ export function Vehiculos() {
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
 
         {/* 1. Total Unidades */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total Unidades</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -537,7 +539,7 @@ export function Vehiculos() {
         </div>
 
         {/* 2. Formales */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Formales</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
@@ -549,10 +551,10 @@ export function Vehiculos() {
         </div>
 
         {/* 3. Informales */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Informales</span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs">⚠️</span>
+            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs"><Icon name="alert" className="size-3.5" /></span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(informales)}</p>
@@ -561,7 +563,7 @@ export function Vehiculos() {
         </div>
 
         {/* 4. Observados / Baja */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-slate-800 dark:bg-[#0f172a]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Inhabilitados</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">✕</span>
@@ -574,8 +576,8 @@ export function Vehiculos() {
       </div>
 
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-[#0f172a] overflow-hidden">
-        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
 
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
@@ -584,7 +586,7 @@ export function Vehiculos() {
               placeholder="Buscar por placa, marca, modelo, DNI o propietario..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-9 pr-8 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-9 pr-8 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400"
             />
             {searchTerm && (
               <button
@@ -682,7 +684,7 @@ export function Vehiculos() {
               <col className="w-[13%]" />
               <col className="w-[10%]" />
             </colgroup>
-            <thead className="bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+            <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Placa</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Vehículo & Modelo</th>
@@ -690,25 +692,25 @@ export function Vehiculos() {
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Propietario & Titular</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap text-center">Estado</th>
-                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-slate-800/40 px-3 py-3.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
+                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] px-3 py-3.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
               {isLoading && vehiculos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="px-3.5 py-2.5"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-2.5"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3.5 py-2.5">
                       <div className="space-y-1.5">
-                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
-                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-slate-800/60" />
+                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                       </div>
                     </td>
-                    <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-2.5"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="px-3.5 py-2.5 text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-4 shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-2.5"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-3.5 py-2.5 text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3 py-4 shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : filteredVehiculos.length === 0 ? (
@@ -729,11 +731,11 @@ export function Vehiculos() {
                 paginatedVehiculos.map((v) => (
                   <tr
                     key={v.id}
-                    className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40"
+                    className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]"
                   >
 
                     <td className="px-3.5 py-2.5 whitespace-nowrap">
-                      <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-slate-800 dark:bg-amber-400 dark:text-slate-950">
+                      <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
                         {v.placa}
                       </span>
                     </td>
@@ -744,7 +746,7 @@ export function Vehiculos() {
                         {v.marca} {v.modelo}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-400">
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                           {v.tipo}
                         </span>
                         <span>·</span>
@@ -792,26 +794,11 @@ export function Vehiculos() {
 
 
                     <td className="px-3.5 py-2.5 whitespace-nowrap text-center">
-                      {v.estado === 'SUSPENDIDO' || v.estado === 'BAJA' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300">
-                          <span className="size-2 rounded-full bg-current" />
-                          {v.estado}
-                        </span>
-                      ) : isVehiculoFormal(v) ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">
-                          <span className="size-2 rounded-full bg-current" />
-                          FORMAL
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300">
-                          <span className="size-2 rounded-full bg-current animate-pulse" />
-                          INFORMAL
-                        </span>
-                      )}
+                      <StatusBadge status={v.estado === 'SUSPENDIDO' || v.estado === 'BAJA' ? v.estado : (isVehiculoFormal(v) ? 'FORMAL' : 'INFORMAL')} />
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#0f172a] px-3 py-3.5 whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3 py-3.5 whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
@@ -861,11 +848,11 @@ export function Vehiculos() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter">
           <div className="flex min-h-full items-center justify-center p-3 sm:p-4">
-            <div className="relative w-full max-w-5xl rounded-3xl bg-white shadow-2xl dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800">
+            <div className="relative w-full max-w-5xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
               {/* Cabecera del Modal (Limpia, sin morado) */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="vehicle" className="size-4" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -894,7 +881,7 @@ export function Vehiculos() {
               className="space-y-2.5 p-4 sm:p-5"
             >
 
-              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                 <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-blue-600" />
                   Identificación de la Unidad
@@ -912,7 +899,7 @@ export function Vehiculos() {
                         if (/[^A-Z0-9-]/.test(val)) return;
                         setFormData({ ...formData, placa: val });
                       }}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-black uppercase"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white font-black uppercase"
                     />
 
                     <FloatingSelect
@@ -965,7 +952,7 @@ export function Vehiculos() {
                       label="Categoría SUNARP"
                       value={formData.categoria || ''}
                       onChange={(e) => setFormData({ ...formData, categoria: e.target.value.toUpperCase() })}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white uppercase"
                     />
 
                     <FloatingInput
@@ -973,7 +960,7 @@ export function Vehiculos() {
                       label="Carrocería"
                       value={formData.carroceria || ''}
                       onChange={(e) => setFormData({ ...formData, carroceria: e.target.value.toUpperCase() })}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white uppercase"
                     />
 
                     <FloatingInput
@@ -981,7 +968,7 @@ export function Vehiculos() {
                       label="Tipo Carrocería"
                       value={formData.tipoCarroceria || ''}
                       onChange={(e) => setFormData({ ...formData, tipoCarroceria: e.target.value.toUpperCase() })}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase font-mono"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white uppercase font-mono"
                     />
 
                     <FloatingInput
@@ -989,14 +976,14 @@ export function Vehiculos() {
                       label="Sede SUNARP"
                       value={formData.sedeRegistro || ''}
                       onChange={(e) => setFormData({ ...formData, sedeRegistro: e.target.value.toUpperCase() })}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white uppercase"
+                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white uppercase"
                     />
                   </div>
                 </div>
               </fieldset>
 
 
-              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                 <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-cyan-500" />
                   Datos Técnicos & SUNARP
@@ -1007,7 +994,7 @@ export function Vehiculos() {
                     label="Número de Serie (VIN)"
                     value={formData.numeroSerie}
                     onChange={(e) => setFormData({ ...formData, numeroSerie: e.target.value.toUpperCase() })}
-                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white font-mono"
                   />
 
                   <FloatingInput
@@ -1015,7 +1002,7 @@ export function Vehiculos() {
                     label="Serie del Motor"
                     value={formData.serieMotor}
                     onChange={(e) => setFormData({ ...formData, serieMotor: e.target.value.toUpperCase() })}
-                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white font-mono"
                   />
 
                   <FloatingInput
@@ -1023,13 +1010,13 @@ export function Vehiculos() {
                     label="Partida Registral SUNARP"
                     value={formData.partidaRegistral}
                     onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
-                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white font-mono"
+                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white font-mono"
                   />
                 </div>
               </fieldset>
 
 
-              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                 <legend className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-1 mb-2 flex items-center gap-2">
                   <span className="size-2 rounded-full bg-emerald-500" />
                   Titular & Asociación Autorizada
@@ -1054,7 +1041,7 @@ export function Vehiculos() {
                       }}
                     />
                     {showPropietarioResults && (
-                      <div className="absolute left-0 right-0 bottom-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                      <div className="absolute left-0 right-0 bottom-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
                         {propietarioResults.length ? (
                           propietarioResults.map((persona) => {
                             const documento = persona.numeroDocumento || ''
@@ -1068,7 +1055,7 @@ export function Vehiculos() {
                                   event.stopPropagation()
                                   selectPropietario(persona)
                                 }}
-                                className="flex w-full flex-col rounded-xl px-3 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer"
+                                className="flex w-full flex-col rounded-xl px-3 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
                               >
                                 <span className="font-mono text-xs font-black text-blue-700 dark:text-blue-300">{documento}</span>
                                 <span className="truncate text-xs font-bold text-slate-800 dark:text-white">{nombre || 'Sin nombre'}</span>
@@ -1112,7 +1099,7 @@ export function Vehiculos() {
                       }}
                     />
                     {showAsociacionResults && (
-                      <div className="absolute left-0 right-0 bottom-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                      <div className="absolute left-0 right-0 bottom-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
                         {asociacionResults.length ? (
                           asociacionResults.map((org) => (
                             <button
@@ -1123,7 +1110,7 @@ export function Vehiculos() {
                                 event.stopPropagation()
                                 selectAsociacion(org)
                               }}
-                              className="flex w-full flex-col rounded-xl px-3 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer"
+                              className="flex w-full flex-col rounded-xl px-3 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
                             >
                               <span className="truncate text-xs font-bold text-slate-800 dark:text-white">{org.razonSocial}</span>
                               <span className="font-mono text-[10px] font-black text-blue-700 dark:text-blue-300">RUC: {org.ruc || 'S/D'}</span>
@@ -1158,7 +1145,7 @@ export function Vehiculos() {
 
 
               {isEditing && (
-                <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/50 shadow-xs">
+                <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <legend className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 px-1 mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-amber-500" />
                     Estado de Operatividad Municipal
@@ -1181,11 +1168,11 @@ export function Vehiculos() {
               )}
 
 
-              <div className="mt-3 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-3 dark:border-slate-800">
+              <div className="mt-3 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-3 dark:border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1205,44 +1192,50 @@ export function Vehiculos() {
 
       {isDetailModalOpen && selectedVehiculo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-xs animate-enter sm:p-4">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f172a]">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
 
-            <div className="relative overflow-hidden border-b border-slate-800 bg-[#071a2f] px-5 py-4 text-white">
-              <div className="absolute right-0 top-0 translate-x-6 -translate-y-6 size-44 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-
-              <div className="flex items-center justify-between relative z-10">
+            {/* Header estilo /personas */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                  <Icon name="car" className="size-4" />
+                </span>
                 <div>
-                  <span className="inline-flex rounded-md border border-cyan-500/30 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-cyan-200">
-                    Ficha vehicular municipal
-                  </span>
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <h3 className="text-2xl font-black tracking-tight sm:text-3xl">{selectedVehiculo.placa}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white font-mono">
+                      {selectedVehiculo.placa}
+                    </h3>
                     <span
-                      className={`rounded-md px-2.5 py-1 text-xs font-black ${isVehiculoFormal(selectedVehiculo)
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                        }`}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                        isVehiculoFormal(selectedVehiculo)
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800'
+                          : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800'
+                      }`}
                     >
                       {isVehiculoFormal(selectedVehiculo) ? 'FORMAL' : 'INFORMAL'}
                     </span>
                   </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Ficha Vehicular Municipal • {selectedVehiculo.marca || ''} {selectedVehiculo.modelo || ''}
+                  </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-lg p-2 text-slate-300 transition-all hover:bg-white/10 hover:text-white cursor-pointer"
-                >
-                  ✕
-                </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setIsDetailModalOpen(false)}
+                title="Cerrar ficha"
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+              >
+                <Icon name="close" className="size-5" />
+              </button>
             </div>
 
 
             <div className="max-h-[calc(92vh-84px)] space-y-4 overflow-y-auto p-5">
 
               <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-                <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-slate-950">
                   <QRCodeSVG
                     value={buildVehiculoQrValue(selectedVehiculo)}
                     size={180}
@@ -1257,7 +1250,7 @@ export function Vehiculos() {
                   </span>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-[var(--border)] dark:bg-slate-900/50">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <span className="inline-flex rounded-md bg-blue-100 px-2.5 py-1 text-xs font-extrabold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
@@ -1267,44 +1260,44 @@ export function Vehiculos() {
                         {selectedVehiculo.marca} {selectedVehiculo.modelo}
                       </h4>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-right dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-right dark:border-[var(--border)] dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Código QR</p>
                       <p className="font-mono text-xs font-black text-slate-700 dark:text-slate-200">{selectedVehiculo.codigoQr || 'N/A'}</p>
                     </div>
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Placa</p>
                       <p className="font-mono text-lg font-black text-slate-900 dark:text-white">{selectedVehiculo.placa}</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Color</p>
                       <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.color || 'N/A'}</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Año fabricación</p>
                       <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.anio || 'N/A'}</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Categoría</p>
                       <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.categoria || 'N/A'}</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Carrocería</p>
                       <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.carroceria || 'N/A'}</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sede de registro</p>
                       <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.sedeRegistro || 'N/A'}</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tipo de carrocería</p>
                       <p className="font-mono text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.tipoCarroceria || 'N/A'}</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Condición Legal</p>
-                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{isVehiculoFormal(selectedVehiculo) ? 'FORMAL' : 'INFORMAL'}</p>
+                      <StatusBadge status={isVehiculoFormal(selectedVehiculo) ? 'FORMAL' : 'INFORMAL'} className="mt-1" />
                     </div>
                   </div>
                 </div>
@@ -1312,24 +1305,24 @@ export function Vehiculos() {
 
 
               <div className="grid gap-3 text-xs lg:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Propietario Registrado</p>
                   <p className="mt-1 text-sm font-extrabold text-slate-800 dark:text-white">{selectedVehiculo.propietario}</p>
                   <p className="text-slate-500 font-mono">DNI: {selectedVehiculo.propietarioTipoDocumento === 'DNI' ? selectedVehiculo.propietarioDni || 'N/A' : 'N/A'}</p>
                   <p className="text-slate-500 font-mono">RUC: {selectedVehiculo.asociacionRuc || 'N/A'}</p>
-                  <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <div className="mt-3 border-t border-slate-100 pt-3 dark:border-[var(--border)]">
                     <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Asociación del vehículo</p>
                     <p className="mt-1 font-bold text-slate-800 dark:text-cyan-300">{isVehiculoFormal(selectedVehiculo) ? selectedVehiculo.asociacion : 'Sin Asociación (Vehículo Informal)'}</p>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Documentos del Vehículo</p>
                   {[
                     ['Tarjeta de propiedad', getVehiculoDocumento(selectedVehiculo, 'TARJETA_PROPIEDAD')],
                     ['SOAT', getVehiculoDocumento(selectedVehiculo, 'SOAT')],
                   ].map(([label, documento]) => (
-                    <div key={label} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-900">
+                    <div key={label} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-[var(--bg-surface)]">
                       <span className="font-bold text-slate-600 dark:text-slate-300">{label}</span>
                       <span className="text-right font-mono font-black text-slate-800 dark:text-white">
                         {documento?.codigo || 'N/A'}
@@ -1348,17 +1341,17 @@ export function Vehiculos() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Número de Serie (Chasis)</p>
                   <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.numeroSerie || 'N/A'}</p>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Partida Registral SUNARP</p>
                   <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.partidaRegistral || 'N/A'}</p>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 lg:col-span-2">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950 lg:col-span-2">
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Historial de papeletas del vehículo</p>
                   {(() => {
                     const historial = selectedVehiculo.historialPapeletas || []
@@ -1370,7 +1363,7 @@ export function Vehiculos() {
 
                     if (historial.length === 0) {
                       return (
-                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[var(--bg-surface)] dark:text-slate-400">
                           Sin papeletas registradas.
                         </div>
                       )
@@ -1379,7 +1372,7 @@ export function Vehiculos() {
                     return (
                       <div className="mt-3 space-y-3">
                         <div className="grid gap-2 sm:grid-cols-4">
-                          <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-900">
+                          <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-[var(--bg-surface)]">
                             <p className="text-[10px] font-black uppercase text-slate-400">Total</p>
                             <p className="font-mono text-base font-black text-slate-900 dark:text-white">{historial.length}</p>
                           </div>
@@ -1391,18 +1384,18 @@ export function Vehiculos() {
                             <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-300">Pagado</p>
                             <p className="font-mono text-base font-black text-emerald-700 dark:text-emerald-300">S/ {pagado.toFixed(2)}</p>
                           </div>
-                          <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-900">
+                          <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-[var(--bg-surface)]">
                             <p className="text-[10px] font-black uppercase text-slate-400">Anuladas</p>
                             <p className="font-mono text-base font-black text-slate-700 dark:text-slate-300">{anuladas.length}</p>
                           </div>
                         </div>
 
-                        <div className="overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800">
+                        <div className="overflow-hidden rounded-lg border border-slate-100 dark:border-[var(--border)]">
                           {historial.map((papeleta) => {
                             const pagada = papeleta.estado === 'PAGADA'
                             const anulada = papeleta.estado === 'ANULADA'
                             return (
-                              <div key={papeleta.numeroPapeleta} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-slate-800 sm:grid-cols-[140px_1fr_110px_120px] sm:items-center">
+                              <div key={papeleta.numeroPapeleta} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-[var(--border)] sm:grid-cols-[140px_1fr_110px_120px] sm:items-center">
                                 <div>
                                   <p className="font-mono text-xs font-black text-rose-700 dark:text-rose-300">{papeleta.numeroPapeleta}</p>
                                   <p className="text-[10px] font-bold text-slate-400">{papeleta.fechaHora ? new Date(papeleta.fechaHora).toLocaleDateString() : 'Sin fecha'}</p>
@@ -1412,7 +1405,7 @@ export function Vehiculos() {
                                   <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400" title={papeleta.tipoInfraccion}>{papeleta.tipoInfraccion || papeleta.lugar || 'Infracción no especificada'}</p>
                                 </div>
                                 <p className="font-mono text-xs font-black text-slate-800 dark:text-slate-100">S/ {Number(papeleta.montoTotal || 0).toFixed(2)}</p>
-                                <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${pagada ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : anulada ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'}`}>
+                                <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${pagada ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : anulada ? 'bg-slate-200 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'}`}>
                                   <span className="size-1.5 rounded-full bg-current" />
                                   {pagada ? 'PAGADA' : anulada ? 'ANULADA' : 'DEBE'}
                                 </span>
@@ -1426,24 +1419,24 @@ export function Vehiculos() {
                 </div>
                 
                 {/* Historial de Internamientos */}
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 lg:col-span-2">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950 lg:col-span-2">
                   <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Historial de internamientos al depósito</p>
                   {(() => {
                     const internamientos = selectedVehiculo.historialInternamientos || []
                     
                     if (internamientos.length === 0) {
                       return (
-                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[var(--bg-surface)] dark:text-slate-400">
                           Sin internamientos registrados.
                         </div>
                       )
                     }
 
                     return (
-                      <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800">
+                      <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-[var(--border)]">
                         {internamientos.map((int) => {
                           return (
-                            <div key={int.numero_orden} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-slate-800 sm:grid-cols-[140px_1fr_120px] sm:items-center">
+                            <div key={int.numero_orden} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-[var(--border)] sm:grid-cols-[140px_1fr_120px] sm:items-center">
                               <div>
                                 <p className="font-mono text-xs font-black text-rose-700 dark:text-rose-300">{int.numero_orden}</p>
                                 <p className="text-[10px] font-bold text-slate-400">{int.fecha_ingreso ? new Date(int.fecha_ingreso).toLocaleDateString() : 'Sin fecha'}</p>
@@ -1471,11 +1464,11 @@ export function Vehiculos() {
               </div>
 
 
-              <div className="flex justify-end border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div className="flex justify-end border-t border-slate-100 pt-4 dark:border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-lg bg-slate-900 px-6 py-2.5 text-xs font-extrabold text-white transition-all hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer"
+                  className="rounded-lg bg-slate-900 px-6 py-2.5 text-xs font-extrabold text-white transition-all hover:bg-slate-800 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 cursor-pointer"
                 >
                   Cerrar Ficha
                 </button>

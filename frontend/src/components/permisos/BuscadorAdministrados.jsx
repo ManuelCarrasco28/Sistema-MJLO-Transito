@@ -96,7 +96,7 @@ export function BuscadorAdministrados({ onSelect }) {
           }}
           onFocus={() => setIsOpen(true)}
           placeholder="Escribir Razón Social, Administrado, RUC o DNI para rellenar campos..."
-          className="w-full rounded-2xl border-2 border-indigo-200/80 bg-indigo-50/30 pl-9 pr-10 py-2.5 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 dark:border-indigo-900/60 dark:bg-indigo-950/20 dark:text-white dark:focus:border-indigo-400"
+          className="w-full rounded-2xl border-2 border-indigo-200/80 bg-indigo-50/30 pl-9 pr-10 py-2.5 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-4 focus:ring-indigo-500/10 dark:border-indigo-900/60 dark:bg-indigo-950/20 dark:text-white dark:focus:border-indigo-400"
         />
 
         {query && (
@@ -113,7 +113,7 @@ export function BuscadorAdministrados({ onSelect }) {
 
       {/* Dropdown de Resultados */}
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-slate-800 dark:bg-[#0B1437]">
+        <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           {isLoading && results.length === 0 ? (
             <div className="p-4 text-center text-xs text-slate-500 font-medium">
               Buscando en la base de datos municipal...
@@ -124,7 +124,7 @@ export function BuscadorAdministrados({ onSelect }) {
             </div>
           ) : (
             <div className="space-y-1">
-              <div className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+              <div className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
                 Coincidencias encontradas ({results.length}) — Haz clic para auto-rellenar
               </div>
 
@@ -144,7 +144,7 @@ export function BuscadorAdministrados({ onSelect }) {
                           : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                     }`}
                   >
-                    {item.tipo === 'EMPRESA' ? '🏢' : item.tipo === 'PERSONA' ? '👤' : '📄'}
+                    <Icon name={item.tipo === 'EMPRESA' ? 'building' : item.tipo === 'PERSONA' ? 'user' : 'document'} className="size-4" />
                   </span>
 
                   <div className="flex-1 min-w-0">
@@ -152,7 +152,7 @@ export function BuscadorAdministrados({ onSelect }) {
                       <p className="text-xs font-black text-slate-800 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
                         {item.nombre || 'Sin nombre registrado'}
                       </p>
-                      <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 dark:bg-[var(--bg-subtle)] text-slate-600 dark:text-slate-300">
                         {item.tipoDocumento}: {item.documento || 'S/N'}
                       </span>
                     </div>
