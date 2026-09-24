@@ -149,6 +149,7 @@ class MunicipalidadController extends ResourceController
         $anio = trim((string)($input['anio'] ?? ''));
         $nombre = trim((string)($input['nombre'] ?? ''));
         $uit = (float)($input['uit'] ?? 0);
+        $token = trim((string)($input['token'] ?? ''));
 
         if ($idMunicipalidad <= 0 || !preg_match('/^\d{4}$/', $anio) || $uit <= 0) {
             return $this->failValidationErrors('Indique municipalidad, año válido y UIT mayor a cero.');
@@ -179,6 +180,7 @@ class MunicipalidadController extends ResourceController
             'nombre' => $nombre,
             'anio' => $anio,
             'uit' => $uit,
+            'token' => $token === '' ? null : $token,
         ];
 
         if ($existing) {

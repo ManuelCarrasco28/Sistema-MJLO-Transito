@@ -51,7 +51,7 @@ class PersonalController extends ResourceController
             ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
             ->join('unidades_organicas uo', 'uo.id = dof.id_unidad_organica', 'left')
             ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
-            ->join('usuarios ua', "ua.id_trabajador = pe.id_persona AND ua.estado = 'ACTIVO'", 'left');
+            ->join('usuarios ua', "ua.id_persona = pe.id_persona AND ua.estado = 'ACTIVO'", 'left');
             
         if ($rol !== 'SUPERADMIN') {
             $builder->where('p.numero !=', '00000001');

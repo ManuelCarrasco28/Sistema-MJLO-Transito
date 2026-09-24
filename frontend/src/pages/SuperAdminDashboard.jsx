@@ -2,15 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
-import { showConfirm } from '../utils/SwalUtil'
+import { showConfirm, showSuccess, showError } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
+import { exportToPdf } from '../utils/exportToPdf'
+import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { Usuarios } from './Usuarios'
 
 const DEFAULT_USER_FORM = {
   id_trabajador: '',
   nombre_usuario: '',
   password: '',
-  cargo: 'INSPECTOR DE TRÁNSITO MUNICIPAL',
+  id_rol: '',
   estado: 'ACTIVO'
 }
 
@@ -36,21 +38,12 @@ const DEFAULT_ANIO_FORM = {
   uit: ''
 }
 
-const CARGOS = [
-  'ADMINISTRADOR',
-  'SUBGERENTE DE TRÁNSITO Y TRANSPORTE',
-  'INSPECTOR DE TRÁNSITO MUNICIPAL',
-  'INSPECTOR TÉCNICO VEHICULAR',
-  'ADMINISTRADOR DE DEPÓSITO MUNICIPAL',
-  'ESPECIALISTA EN EDUCACIÓN VIAL',
-  'CAJERO DE RECAUDACIÓN'
-]
-
 export function SuperAdminDashboard({ user }) {
   const navigate = useNavigate()
   const { moduleId } = useParams()
   const [activeModule, setActiveModule] = useState(moduleId || null)
   const [usuarios, setUsuarios] = useState([])
+  const [roles, setRoles] = useState([])
   const [trabajadores, setTrabajadores] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [trabajadorSearch, setTrabajadorSearch] = useState('')
@@ -101,6 +94,32 @@ export function SuperAdminDashboard({ user }) {
     } finally {
       setLoadingAudit(false)
     }
+  }
+
+  
+  const handleExportAuditoriaPdf = () => {
+    exportToPdf({
+      filename: `Auditoria_Sistema_${new Date().getFullYear()}.pdf`,
+      title: 'Reporte de Auditoría del Sistema',
+      subtitle: 'Registro de acciones críticas',
+      metadata: [
+        { label: 'Generado por', value: user?.nombres + ' ' + user?.apellidoPaterno || 'Super Admin' },
+        { label: 'Fecha', value: new Date().toLocaleString('es-PE') }
+      ],
+      columns: [
+        { header: 'FECHA Y HORA', dataKey: 'fecha_hora' },
+        { header: 'MÓDULO', dataKey: 'modulo' },
+        { header: 'ACCIÓN', dataKey: 'accion' },
+        { header: 'DESCRIPCIÓN', dataKey: 'descripcion' },
+        { header: 'USUARIO', dataKey: 'nombre_usuario' },
+        { header: 'ROL', dataKey: 'rol_nombre' },
+        { header: 'IP', dataKey: 'direccion_ip' }
+      ],
+      data: realAuditLogs.map(log => ({
+        ...log,
+        fecha_hora: new Date(log.fecha_hora).toLocaleString('es-PE')
+      }))
+    })
   }
 
   const handleExportAuditoria = () => {
@@ -161,6 +180,16 @@ export function SuperAdminDashboard({ user }) {
     }
   }
 
+  const fetchRoles = async () => {
+    try {
+      const res = await apiFetch('/usuarios/roles')
+      const data = await res.json()
+      if (res.ok) setRoles(data.data || [])
+    } catch {
+      // silencioso: el select de roles simplemente quedará vacío
+    }
+  }
+
   const fetchTrabajadores = async () => {
     try {
       const res = await apiFetch('/personal')
@@ -199,6 +228,7 @@ export function SuperAdminDashboard({ user }) {
 
   useEffect(() => {
     fetchUsuarios()
+    fetchRoles()
     fetchTrabajadores()
     fetchMunicipalidadConfig()
     fetchAuditLogs()
@@ -402,7 +432,7 @@ export function SuperAdminDashboard({ user }) {
     try {
       const res = await apiFetch(`/usuarios/${editingUser.id}`, {
         method: 'PUT',
-        body: { cargo: editingUser.cargo, estado: editingUser.usuario_estado }
+        body: { id_rol: editingUser.id_rol, estado: editingUser.usuario_estado }
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo actualizar el usuario.')
@@ -451,13 +481,13 @@ export function SuperAdminDashboard({ user }) {
   const moduleStats = [
     { label: 'Usuarios activos', value: usuarios.filter((u) => u.usuario_estado === 'ACTIVO').length },
     { label: 'Usuarios inactivos', value: usuarios.filter((u) => u.usuario_estado !== 'ACTIVO').length },
-    { label: 'Roles registrados', value: new Set(usuarios.map((u) => u.cargo).filter(Boolean)).size },
+    { label: 'Roles registrados', value: new Set(usuarios.map((u) => u.rol).filter(Boolean)).size },
     { label: 'Módulos admin', value: adminModules.length }
   ]
 
   const rolesAgrupados = useMemo(() => {
     const grupos = usuarios.reduce((acc, usuario) => {
-      const rol = usuario.cargo || 'Sin rol asignado'
+      const rol = usuario.rol || 'Sin rol asignado'
       if (!acc[rol]) acc[rol] = []
       acc[rol].push(usuario)
       return acc
@@ -665,6 +695,16 @@ export function SuperAdminDashboard({ user }) {
                   <Icon name="table" className="size-4" />
                   <span>Exportar a Excel</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={handleExportAuditoriaPdf}
+                  disabled={loadingAudit || realAuditLogs.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-black text-rose-700 shadow-xs hover:bg-rose-50 active:scale-95 disabled:opacity-50 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-400 cursor-pointer"
+                >
+                  <Icon name="document" className="size-4" />
+                  <span>Exportar a PDF</span>
+                </button>
+
               </div>
 
               <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_200px_200px]">
@@ -674,43 +714,43 @@ export function SuperAdminDashboard({ user }) {
                   placeholder="Buscar por descripción, usuario, módulo o IP..."
                   className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-[var(--border-strong)] dark:bg-slate-950 dark:text-white"
                 />
-                <select
+                <RoundedSelect
                   value={auditType}
-                  onChange={(event) => setAuditType(event.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-[var(--border-strong)] dark:bg-slate-950 dark:text-white"
-                >
-                  <option value="TODOS">Todos los módulos</option>
-                  <option value="SEGURIDAD">Seguridad (Login/Logout)</option>
-                  <option value="USUARIOS">Usuarios</option>
-                  <option value="VEHICULOS">Vehículos</option>
-                  <option value="ASOCIACIONES">Asociaciones</option>
-                  <option value="PAGOS">Pagos y Recaudación</option>
-                  <option value="PAPELETAS">Papeletas</option>
-                  <option value="CONFIGURACION">Configuración</option>
-                </select>
-                <select
+                  onChange={setAuditType}
+                  options={[
+                    { value: 'TODOS', label: 'Todos los módulos' },
+                    { value: 'SEGURIDAD', label: 'Seguridad (Login/Logout)' },
+                    { value: 'USUARIOS', label: 'Usuarios' },
+                    { value: 'VEHICULOS', label: 'Vehículos' },
+                    { value: 'ASOCIACIONES', label: 'Asociaciones' },
+                    { value: 'PAGOS', label: 'Pagos y Recaudación' },
+                    { value: 'PAPELETAS', label: 'Papeletas' },
+                    { value: 'CONFIGURACION', label: 'Configuración' }
+                  ]}
+                />
+                <RoundedSelect
                   value={auditSeverity}
-                  onChange={(event) => setAuditSeverity(event.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-blue-500 dark:border-[var(--border-strong)] dark:bg-slate-950 dark:text-white"
-                >
-                  <option value="TODOS">Todas las acciones</option>
-                  <option value="CREAR">Creación</option>
-                  <option value="MODIFICAR">Modificación</option>
-                  <option value="ELIMINAR">Eliminación</option>
-                  <option value="LOGIN">Inicio de sesión</option>
-                  <option value="LOGOUT">Cierre de sesión</option>
-                  <option value="CONFIRMAR">Confirmación de pago</option>
-                  <option value="ANULAR">Anulación</option>
-                </select>
+                  onChange={setAuditSeverity}
+                  options={[
+                    { value: 'TODOS', label: 'Todas las acciones' },
+                    { value: 'CREAR', label: 'Creación' },
+                    { value: 'MODIFICAR', label: 'Modificación' },
+                    { value: 'ELIMINAR', label: 'Eliminación' },
+                    { value: 'LOGIN', label: 'Inicio de sesión' },
+                    { value: 'LOGOUT', label: 'Cierre de sesión' },
+                    { value: 'CONFIRMAR', label: 'Confirmación de pago' },
+                    { value: 'ANULAR', label: 'Anulación' }
+                  ]}
+                />
               </div>
 
               <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 dark:border-[var(--border)]">
-                <table className="w-full min-w-[900px] text-left text-sm">
+                <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 dark:bg-slate-950 dark:text-slate-400">
                     <tr>
-                      <th className="px-4 py-3">Fecha y Hora</th>
-                      <th className="px-4 py-3">Módulo</th>
-                      <th className="px-4 py-3">Acción</th>
+                      <th className="px-4 py-3 text-center">Fecha y Hora</th>
+                      <th className="px-4 py-3 text-center">Módulo</th>
+                      <th className="px-4 py-3 text-center">Acción</th>
                       <th className="px-4 py-3">Descripción del Evento</th>
                       <th className="px-4 py-3">Usuario</th>
                       <th className="px-4 py-3">Rol</th>
@@ -726,15 +766,15 @@ export function SuperAdminDashboard({ user }) {
                       </tr>
                     ) : realAuditLogs.length ? realAuditLogs.map((event) => (
                       <tr key={event.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">
+                        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap text-center">
                           {event.fecha_hora ? new Date(event.fecha_hora).toLocaleString('es-PE') : '—'}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
                           <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-200">
                             {event.modulo}
                           </span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
                           <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
                             event.accion === 'ELIMINAR' || event.accion === 'ANULAR'
                               ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-200'
@@ -747,10 +787,10 @@ export function SuperAdminDashboard({ user }) {
                             {event.accion}
                           </span>
                         </td>
-                        <td className="px-4 py-3 max-w-md">
+                        <td className="px-4 py-3 ">
                           <p className="font-semibold text-slate-800 dark:text-white leading-snug">{event.descripcion}</p>
                           {event.user_agent && (
-                            <p className="mt-0.5 text-[10px] text-slate-400 truncate max-w-sm" title={event.user_agent}>
+                            <p className="mt-0.5 text-[10px] text-slate-400  " title={event.user_agent}>
                               {event.user_agent}
                             </p>
                           )}
@@ -761,7 +801,7 @@ export function SuperAdminDashboard({ user }) {
                         <td className="px-4 py-3 text-xs font-semibold text-slate-500 whitespace-nowrap">
                           {event.rol || '—'}
                         </td>
-                        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">
+                        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap text-center">
                           {event.ip || '—'}
                         </td>
                       </tr>
@@ -804,13 +844,23 @@ export function SuperAdminDashboard({ user }) {
         <Modal title="Editar rol y estado" onClose={() => setEditingUser(null)}>
           <form onSubmit={saveRole} className="space-y-4">
             <p className="font-bold text-slate-800 dark:text-white">{editingUser.nombre_usuario}</p>
-            <select value={editingUser.cargo || ''} onChange={(e) => setEditingUser({ ...editingUser, cargo: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white outline-none">
-              {CARGOS.map((cargo) => <option key={cargo} value={cargo}>{cargo}</option>)}
-            </select>
-            <select value={editingUser.usuario_estado || 'ACTIVO'} onChange={(e) => setEditingUser({ ...editingUser, usuario_estado: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white outline-none">
-              <option value="ACTIVO">ACTIVO</option>
-              <option value="INACTIVO">INACTIVO</option>
-            </select>
+            <FloatingSelect
+              id="edit_rol"
+              label="Rol del sistema"
+              value={editingUser.id_rol || ''}
+              onChange={(e) => setEditingUser({ ...editingUser, id_rol: e.target.value })}
+              options={roles.map((r) => ({ value: r.id, label: r.nombre }))}
+            />
+            <FloatingSelect
+              id="edit_estado"
+              label="Estado del usuario"
+              value={editingUser.usuario_estado || 'ACTIVO'}
+              onChange={(e) => setEditingUser({ ...editingUser, usuario_estado: e.target.value })}
+              options={[
+                { value: 'ACTIVO', label: 'ACTIVO' },
+                { value: 'INACTIVO', label: 'INACTIVO' }
+              ]}
+            />
             <button className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700 cursor-pointer">Guardar cambios</button>
           </form>
         </Modal>
@@ -847,7 +897,7 @@ export function SuperAdminDashboard({ user }) {
                           event.preventDefault()
                           event.stopPropagation()
                           const idTrabajador = trabajador.id_persona || trabajador.id
-                          setUserForm((current) => ({ ...current, id_trabajador: idTrabajador, cargo: trabajador.cargo || current.cargo }))
+                          setUserForm((current) => ({ ...current, id_trabajador: idTrabajador }))
                           setTrabajadorSearch(`${trabajador.numero_documento} — ${trabajador.nombres} ${trabajador.apellidos || ''}`.trim())
                           setTrabajadorDropdownOpen(false)
                         }}
@@ -879,8 +929,9 @@ export function SuperAdminDashboard({ user }) {
             <div className="grid gap-3 sm:grid-cols-2">
               <input required value={userForm.nombre_usuario} onChange={(e) => setUserForm({ ...userForm, nombre_usuario: e.target.value.toLowerCase().replace(/\s+/g, '') })} placeholder="Usuario" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" />
               <input required minLength={6} type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Contraseña" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" />
-              <select value={userForm.cargo} onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white sm:col-span-2">
-                {CARGOS.map((cargo) => <option key={cargo} value={cargo}>{cargo}</option>)}
+              <select required value={userForm.id_rol} onChange={(e) => setUserForm({ ...userForm, id_rol: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white sm:col-span-2">
+                <option value="" disabled>Selecciona un rol...</option>
+                {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
               </select>
             </div>
             <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
@@ -952,13 +1003,13 @@ function UsersTable({ usuarios, totalUsuarios, loading, searchTerm, setSearchTer
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
+        <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
             <tr>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Usuario</th>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Nombre completo</th>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Rol</th>
-              <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
+              <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Estado</th>
               <th className="sticky right-0 z-20 bg-slate-50/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:border-[var(--border)] dark:bg-slate-900/95 dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
             </tr>
           </thead>
@@ -973,7 +1024,7 @@ function UsersTable({ usuarios, totalUsuarios, loading, searchTerm, setSearchTer
                 </td>
                 <td className="px-3.5 py-3.5 font-semibold text-slate-600 dark:text-slate-300">{item.nombre_completo}</td>
                 <td className="px-3.5 py-3.5">
-                  <span className="inline-flex max-w-[260px] rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-black uppercase leading-4 text-blue-700">
+                  <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-black uppercase leading-4 text-blue-700">
                     {item.cargo || 'Sin rol'}
                   </span>
                 </td>
@@ -1058,13 +1109,13 @@ function RolesTable({ roles, loading, onEdit }) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
+        <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
             <tr>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Rol / Cargo</th>
-              <th className="px-3.5 py-3.5 whitespace-nowrap">Total Asignados</th>
+              <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Total Asignados</th>
               <th className="px-3.5 py-3.5 whitespace-nowrap">Usuarios con este Rol</th>
-              <th className="px-3.5 py-3.5 whitespace-nowrap">Estado</th>
+              <th className="px-3.5 py-3.5 whitespace-nowrap text-center">Estado</th>
               <th className="sticky right-0 z-20 bg-slate-50/95 px-4 py-3.5 text-right whitespace-nowrap border-l border-slate-200/60 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:border-[var(--border)] dark:bg-slate-900/95 dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">Acciones</th>
             </tr>
           </thead>
@@ -1141,51 +1192,99 @@ function ConfiguracionReadOnly({
   loading,
   onReload
 }) {
-  const [activeTab, setActiveTab] = useState('todos')
-
-  const uitVigente = useMemo(() => {
-    const currentYear = String(new Date().getFullYear())
-    const match = (municipalidadAnios || []).find((a) => String(a.anio) === currentYear)
-    return match || (municipalidadAnios || [])[0] || null
-  }, [municipalidadAnios])
-
-  const kpis = [
-    {
-      label: 'Entidad Titular',
-      value: municipalidad?.sigla || 'MDJLO',
-      detail: `RUC ${municipalidad?.ruc || '20148364975'}`,
-      icon: 'building',
-      tone: 'text-blue-600 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-300'
-    },
-    {
-      label: 'UIT Periodo 2026',
-      value: uitVigente ? `S/ ${Number(uitVigente.uit).toFixed(2)}` : 'S/ 5,350.00',
-      detail: uitVigente ? uitVigente.nombre || 'Año Fiscal 2026' : 'Multas e Infracciones',
-      icon: 'receiptCheck',
-      tone: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300'
-    },
-    {
-      label: 'Permiso Móvil',
-      value: mobilePermitePapeleta ? 'HABILITADO' : 'SOLO REPORTES',
-      detail: mobilePermitePapeleta ? 'Aplica papeleta directa' : 'Reportes y evidencias',
-      icon: 'deviceMobile',
-      tone: mobilePermitePapeleta
-        ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300'
-        : 'text-amber-600 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300'
-    },
-    {
-      label: 'Motor de BD',
-      value: 'MariaDB 10.6',
-      detail: 'Instancia Docker :3306',
-      icon: 'folderShield',
-      tone: 'text-violet-600 bg-violet-50 dark:bg-violet-950/60 dark:text-violet-300'
+  const [formData, setFormData] = useState({
+    ruc: '',
+    razon_social: '',
+    nombre_abreviado: '',
+    sigla: '',
+    direccion_fiscal: '',
+    departamento: '',
+    provincia: '',
+    distrito: '',
+    telefono: '',
+    email: '',
+    mesa_partes: '',
+    logo: ''
+  })
+  
+  useEffect(() => {
+    if (municipalidad) {
+      setFormData({
+        ruc: municipalidad.ruc || '',
+        razon_social: municipalidad.razon_social || '',
+        nombre_abreviado: municipalidad.nombre_abreviado || '',
+        sigla: municipalidad.sigla || '',
+        direccion_fiscal: municipalidad.direccion_fiscal || '',
+        departamento: municipalidad.departamento || '',
+        provincia: municipalidad.provincia || '',
+        distrito: municipalidad.distrito || '',
+        telefono: municipalidad.telefono || '',
+        email: municipalidad.email || '',
+        mesa_partes: municipalidad.mesa_partes || '',
+        logo: municipalidad.logo || ''
+      })
     }
-  ]
+  }, [municipalidad])
+
+  const [saving, setSaving] = useState(false)
+  const [anioModalOpen, setAnioModalOpen] = useState(false)
+  const [anioForm, setAnioForm] = useState({ id: '', anio: '', nombre: '', uit: '', token: '' })
+  
+  const handleSave = async (e) => {
+    e.preventDefault()
+    if (!municipalidad?.id) return
+    setSaving(true)
+    try {
+      const res = await apiFetch(`/municipalidad/${municipalidad.id}`, {
+        method: 'PUT',
+        body: formData
+      })
+      if (res.ok) {
+        showSuccess('Datos de la municipalidad guardados correctamente')
+        onReload()
+      } else {
+        const error = await res.json()
+        showError(error.message || 'Error al guardar los datos')
+      }
+    } catch (err) {
+      showError('Error de red al guardar los datos')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveAnio = async (e) => {
+    e.preventDefault()
+    if (!municipalidad?.id) return
+    try {
+      const isEdit = !!anioForm.id
+      const url = '/municipalidad/anios'
+      const method = 'POST'
+      
+      const payload = { ...anioForm, id_municipalidad: municipalidad.id }
+      if (isEdit) delete payload.id
+      
+      const res = await apiFetch(url, {
+        method,
+        body: payload
+      })
+      if (res.ok) {
+        showSuccess(isEdit ? 'Año actualizado correctamente' : 'Año registrado correctamente')
+        setAnioModalOpen(false)
+        onReload()
+      } else {
+        const error = await res.json()
+        showError(error.message || 'Error al guardar año')
+      }
+    } catch (err) {
+      showError('Error de red al guardar año')
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      {/* TARJETA INTERACTIVA DE PERMISO GENERAL MÓVIL (Conexión App Móvil Inspectores) */}
-      <div className="rounded-3xl border border-violet-200/90 bg-gradient-to-r from-violet-50/90 via-purple-50/70 to-indigo-50/80 p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+      {/* TARJETA INTERACTIVA DE PERMISO GENERAL MÓVIL */}
+      <div className="rounded-3xl border border-violet-200/90 bg-gradient-to-r from-violet-50/90 via-purple-50/70 to-indigo-50/80 p-5 shadow-sm dark:border-[var(--border)] dark:bg-none dark:bg-[var(--bg-subtle)]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className={`grid size-12 shrink-0 place-items-center rounded-2xl text-white shadow-md transition-all ${
@@ -1200,17 +1299,9 @@ function ConfiguracionReadOnly({
                 <h3 className="text-base font-black text-slate-900 dark:text-white">
                   Permiso general móvil
                 </h3>
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-black tracking-wide ${
-                  mobilePermitePapeleta
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                }`}>
-                  <span className="size-1.5 rounded-full bg-current animate-pulse" />
-                  {mobilePermitePapeleta ? 'ACTIVO (NUEVA PAPELETA)' : 'INACTIVO (REGISTRAR EVIDENCIA)'}
-                </span>
               </div>
               <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-600 dark:text-slate-300">
-                Si está activo, todos los inspectores podrán aplicar papeletas desde el móvil. Si está inactivo, el móvil debe ocultar esa opción y trabajar solo con reportes/evidencias.
+                Control general para permitir a los inspectores aplicar papeletas en la app móvil.
               </p>
             </div>
           </div>
@@ -1232,462 +1323,146 @@ function ConfiguracionReadOnly({
             </label>
           </div>
         </div>
-
-        <div className={`mt-3.5 rounded-xl px-3.5 py-2 text-xs font-black flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 ${
-          mobilePermitePapeleta
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
-            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
-        }`}>
-          <span>
-            {mobilePermitePapeleta
-              ? 'ACTIVO: el móvil muestra “Nueva Papeleta” (infracción vehicular en tiempo real).'
-              : 'INACTIVO: el móvil debe mostrar solo “Registrar reporte/evidencia” (revisión administrativa).'}
-          </span>
-          <span className="font-mono text-[10px] opacity-75">
-            Sincroniza con /api/municipalidad/config-mobile
-          </span>
-        </div>
       </div>
 
-      {/* Banner de Aviso Solo Lectura */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 p-4 text-blue-900 shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-200">
-        <div className="flex items-center gap-3">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
-            <Icon name="lock" className="size-5" />
-          </div>
-          <div>
-            <h4 className="text-sm font-black text-slate-900 dark:text-white">Configuración y Parámetros del Sistema</h4>
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              Datos institucionales, técnicos y valores de cálculo tributario del distrito de José Leonardo Ortiz.
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onReload}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-1.5 self-start sm:self-auto rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-xs font-black text-blue-700 shadow-xs transition hover:bg-blue-50 hover:shadow-md active:scale-95 disabled:opacity-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-slate-200 cursor-pointer"
-        >
-          <span>{loading ? 'Cargando datos...' : 'Recargar información'}</span>
-        </button>
-      </div>
-
-      {/* KPI Cards de Resumen */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map((kpi) => (
-          <div key={kpi.label} className="flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-            <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${kpi.tone}`}>
-              <Icon name={kpi.icon} className="size-5" />
+      <form onSubmit={handleSave} className="space-y-6">
+        <fieldset className="border border-slate-200 rounded-xl p-4 sm:p-5 bg-white shadow-xs dark:bg-[var(--bg-surface)] dark:border-[var(--border)]">
+          <legend className="px-3 text-[11px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-white dark:bg-[var(--bg-surface)]">
+            Datos Institucionales
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+            <FloatingInput id="mun_ruc" label="RUC" value={formData.ruc} onChange={(e) => setFormData({...formData, ruc: e.target.value})} maxLength={11} required />
+            <div className="sm:col-span-2">
+              <FloatingInput id="mun_razon" label="Razón Social" value={formData.razon_social} onChange={(e) => setFormData({...formData, razon_social: e.target.value})} required />
             </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{kpi.label}</p>
-              <p className="text-base font-black text-slate-800 dark:text-white truncate">{kpi.value}</p>
-              <p className="text-xs font-medium text-slate-500 truncate">{kpi.detail}</p>
-            </div>
+            
+            <FloatingInput id="mun_abrev" label="Nombre Abreviado" value={formData.nombre_abreviado} onChange={(e) => setFormData({...formData, nombre_abreviado: e.target.value})} />
+            <FloatingInput id="mun_sigla" label="Sigla Oficial" value={formData.sigla} onChange={(e) => setFormData({...formData, sigla: e.target.value})} />
+            <FloatingInput id="mun_logo" label="Logo URL" value={formData.logo} onChange={(e) => setFormData({...formData, logo: e.target.value})} />
           </div>
-        ))}
-      </div>
+        </fieldset>
 
-      {/* Selector de Pestañas */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-[var(--border)]">
-        {[
-          { id: 'todos', label: 'Ver Todo', icon: 'document' },
-          { id: 'institucional', label: 'Datos Institucionales', icon: 'building' },
-          { id: 'parametros', label: 'Parámetros Operativos', icon: 'settings' },
-          { id: 'uit', label: 'Valores Oficiales UIT', icon: 'receiptCheck' }
-        ].map((tab) => (
+        <fieldset className="border border-slate-200 rounded-xl p-4 sm:p-5 bg-white shadow-xs dark:bg-[var(--bg-surface)] dark:border-[var(--border)]">
+          <legend className="px-3 text-[11px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-white dark:bg-[var(--bg-surface)]">
+            Contacto y Ubicación
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+            <div className="sm:col-span-3">
+              <FloatingInput id="mun_dir" label="Dirección Fiscal" value={formData.direccion_fiscal} onChange={(e) => setFormData({...formData, direccion_fiscal: e.target.value})} required />
+            </div>
+            <FloatingInput id="mun_dep" label="Departamento" value={formData.departamento} onChange={(e) => setFormData({...formData, departamento: e.target.value})} />
+            <FloatingInput id="mun_prov" label="Provincia" value={formData.provincia} onChange={(e) => setFormData({...formData, provincia: e.target.value})} />
+            <FloatingInput id="mun_dist" label="Distrito" value={formData.distrito} onChange={(e) => setFormData({...formData, distrito: e.target.value})} />
+            
+            <FloatingInput id="mun_tel" label="Teléfono de Contacto" value={formData.telefono} onChange={(e) => setFormData({...formData, telefono: e.target.value})} />
+            <FloatingInput id="mun_email" label="Correo Oficial" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+            <FloatingInput id="mun_mesa" label="Mesa de Partes" value={formData.mesa_partes} onChange={(e) => setFormData({...formData, mesa_partes: e.target.value})} />
+          </div>
+        </fieldset>
+
+        <div className="flex justify-end pt-2">
           <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-black transition-all cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]'
-            }`}
+            type="submit"
+            disabled={saving}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-black text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
           >
-            <Icon name={tab.icon} className="size-4" />
-            <span>{tab.label}</span>
+            <Icon name="save" className="size-4" />
+            {saving ? 'Guardando...' : 'Guardar Datos Institucionales'}
           </button>
-        ))}
+        </div>
+      </form>
+
+      {/* Configuración UIT */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:bg-[var(--bg-surface)] dark:border-[var(--border)] mt-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+          <div>
+            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Configuración UIT (Años Fiscales)</h3>
+            <p className="text-xs font-semibold text-slate-500">Valores de la Unidad Impositiva Tributaria para el cálculo de papeletas.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setAnioForm({ id: '', anio: String(new Date().getFullYear()), nombre: '', uit: '', token: '' })
+              setAnioModalOpen(true)
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-black text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
+          >
+            <Icon name="add" className="size-4" />
+            <span>Nuevo Año</span>
+          </button>
+        </div>
+        
+        <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-[var(--border)]">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+              <tr>
+                <th className="px-4 py-3 text-center">Año</th>
+                <th className="px-4 py-3">Nombre</th>
+                <th className="px-4 py-3 text-center">Valor UIT</th>
+                <th className="px-4 py-3 text-center">Token</th>
+                <th className="px-4 py-3 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+              {municipalidadAnios.length > 0 ? municipalidadAnios.map((item) => (
+                <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-[var(--bg-subtle)] transition-colors">
+                  <td className="px-4 py-3 text-center font-bold text-slate-700 dark:text-slate-300">{item.anio}</td>
+                  <td className="px-4 py-3 font-medium">{item.nombre}</td>
+                  <td className="px-4 py-3 text-center font-mono font-black text-blue-600 dark:text-blue-400">
+                    S/ {Number(item.uit || 0).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {item.token ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">✓ Configurado</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">✗ Falta token</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAnioForm({ id: item.id, anio: item.anio, nombre: item.nombre, uit: item.uit, token: item.token || '' })
+                        setAnioModalOpen(true)
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-300 transition-colors cursor-pointer"
+                    >
+                      <Icon name="edit" className="size-3.5" />
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="4" className="px-4 py-8 text-center text-sm font-semibold text-slate-400">
+                    No hay registros de UIT.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* SECCIÓN 1: DATOS INSTITUCIONALES */}
-      {(activeTab === 'todos' || activeTab === 'institucional') && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-[var(--border)] dark:bg-slate-900/40">
-            <div className="flex items-center gap-2.5">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-                <Icon name="building" className="size-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-white">Datos Institucionales de la Entidad</h3>
-                <p className="text-xs font-semibold text-slate-400">Identificación fiscal y administrativa de la Municipalidad Distrital José Leonardo Ortiz.</p>
-              </div>
+      {anioModalOpen && (
+        <Modal title={anioForm.id ? "Editar Año Fiscal" : "Nuevo Año Fiscal"} icon="receiptCheck" onClose={() => setAnioModalOpen(false)}>
+          <form onSubmit={handleSaveAnio} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 mt-2">
+              <FloatingInput id="anio_val" label="Año" required value={anioForm.anio} onChange={(e) => setAnioForm({...anioForm, anio: e.target.value})} />
+              <FloatingInput id="anio_nombre" label="Denominación (Opcional)" value={anioForm.nombre} onChange={(e) => setAnioForm({...anioForm, nombre: e.target.value})} />
+              <FloatingInput id="anio_uit" label="Valor UIT (S/)" required type="number" step="0.01" value={anioForm.uit} onChange={(e) => setAnioForm({...anioForm, uit: e.target.value})} inputClassName="font-mono font-bold text-blue-700 dark:text-blue-400" />
+              <FloatingInput id="anio_token" label="Token API (MTC / PIDE)" value={anioForm.token} onChange={(e) => setAnioForm({...anioForm, token: e.target.value})} />
             </div>
-            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 mt-2 sm:mt-0 self-start sm:self-auto">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
-              ENTIDAD VIGENTE
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
-                <tr>
-                  <th className="px-5 py-3.5 w-1/4">Parámetro Institucional</th>
-                  <th className="px-5 py-3.5 w-2/5">Valor Registrado</th>
-                  <th className="px-5 py-3.5">Detalle / Referencia</th>
-                  <th className="px-5 py-3.5 text-right">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">RUC</td>
-                  <td className="px-5 py-3">
-                    <span className="inline-flex items-center font-mono font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/70 dark:bg-slate-800/80 dark:border-[var(--border-strong)] dark:text-blue-300">
-                      {municipalidad?.ruc || '20148364975'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Registro Único de Contribuyente (SUNAT)</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">OFICIAL</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Razón Social</td>
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-slate-200">{municipalidad?.razon_social || 'MUNICIPALIDAD DISTRITAL DE JOSÉ LEONARDO ORTIZ'}</td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Denominación legal de la entidad pública</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">ACTIVO</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Nombre Abreviado</td>
-                  <td className="px-5 py-3 font-semibold text-slate-700 dark:text-slate-300">{municipalidad?.nombre_abreviado || 'Municipalidad Distrital José Leonardo Ortiz'}</td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Nombre de uso común administrativo</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">ESTÁNDAR</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Sigla Oficial</td>
-                  <td className="px-5 py-3 font-black text-indigo-700 dark:text-indigo-400">{municipalidad?.sigla || 'MDJLO'}</td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Acrónimo institucional de la comuna</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">ESTÁNDAR</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Dirección Fiscal</td>
-                  <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{municipalidad?.direccion_fiscal || 'Av. Sáenz Peña 2151'}</td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Domicilio legal de la sede principal</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">VÁLIDO</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Jurisdicción Territorial</td>
-                  <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">
-                    {municipalidad?.departamento || 'Lambayeque'} · {municipalidad?.provincia || 'Chiclayo'} · {municipalidad?.distrito || 'José Leonardo Ortiz'}
-                  </td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Departamento / Provincia / Distrito</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">UBIGEO</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Teléfono de Contacto</td>
-                  <td className="px-5 py-3 font-semibold text-slate-700 dark:text-slate-300">{municipalidad?.telefono || '(074) 251911'}</td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Central telefónica oficial</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">ACTIVO</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Correo Oficial</td>
-                  <td className="px-5 py-3 font-medium text-blue-600 dark:text-blue-400">{municipalidad?.email || 'mesa.partes@munijlo.gob.pe'}</td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Buzón de notificaciones institucionales</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">ACTIVO</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Mesa de Partes</td>
-                  <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{municipalidad?.mesa_partes || 'Mesa de Partes Virtual / Presencial'}</td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Canal de recepción de trámites ciudadanos</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">HABILITADO</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Logotipo Institucional</td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <img src={municipalidad?.logo || '/img/logo-mjlo.png'} alt="Logo" className="h-7 w-auto object-contain bg-white rounded p-0.5 shadow-xs border border-slate-200/60" />
-                      <span className="font-mono text-xs text-slate-500">{municipalidad?.logo || '/img/logo-mjlo.png'}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Recurso gráfico para carnets TUC y reportes</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">CARGADO</span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">Estado General de la Entidad</td>
-                  <td className="px-5 py-3 font-black text-slate-800 dark:text-white">{municipalidad?.estado || 'ACTIVO'}</td>
-                  <td className="px-5 py-3 text-xs font-medium text-slate-500">Vigencia operativa de la entidad municipal</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                      <span className="size-1.5 rounded-full bg-emerald-500" />
-                      {municipalidad?.estado || 'ACTIVO'}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* SECCIÓN 2: PARÁMETROS OPERATIVOS */}
-      {(activeTab === 'todos' || activeTab === 'parametros') && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-[var(--border)] dark:bg-slate-900/40">
-            <div className="flex items-center gap-2.5">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
-                <Icon name="settings" className="size-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-white">Parámetros Operativos del Sistema</h3>
-                <p className="text-xs font-semibold text-slate-400">Reglas de negocio, directivas móviles y configuración técnica de ejecución.</p>
-              </div>
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-black text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 active:scale-95 transition-all cursor-pointer"
+              >
+                Guardar Año Fiscal
+              </button>
             </div>
-            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-black text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 mt-2 sm:mt-0 self-start sm:self-auto">
-              4 DIRECTIVAS ACTIVAS
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
-                <tr>
-                  <th className="px-5 py-3.5 w-1/4">Directiva / Parámetro</th>
-                  <th className="px-5 py-3.5 w-1/4">Clave del Sistema</th>
-                  <th className="px-5 py-3.5 w-1/6">Valor Configurado</th>
-                  <th className="px-5 py-3.5">Regla de Negocio / Alcance</th>
-                  <th className="px-5 py-3.5 text-right">Condición</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-4">
-                    <p className="font-black text-slate-800 dark:text-white">Permiso Papeleta Móvil</p>
-                    <p className="text-xs font-medium text-slate-400">Emisión directa desde smartphone</p>
-                  </td>
-                  <td className="px-5 py-4">
-                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      mobile_permite_aplicar_papeleta
-                    </code>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
-                      mobilePermitePapeleta
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                    }`}>
-                      <span className="size-1.5 rounded-full bg-current" />
-                      {mobilePermitePapeleta ? 'HABILITADO' : 'SOLO REPORTES'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
-                    {mobilePermitePapeleta
-                      ? 'Los inspectores pueden imponer papeletas formalmente en calle desde el aplicativo móvil.'
-                      : 'El aplicativo móvil opera en modo recolección preventiva (reportes de intervención con evidencia fotográfica).'}
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <label className="relative inline-flex cursor-pointer items-center">
-                      <input
-                        type="checkbox"
-                        checked={mobilePermitePapeleta}
-                        disabled={savingConfigSistema}
-                        onChange={(e) => onToggleMobilePermitePapeleta && onToggleMobilePermitePapeleta(e.target.checked)}
-                        className="peer sr-only"
-                      />
-                      <span className="h-6 w-11 rounded-full bg-slate-300 transition-colors peer-checked:bg-violet-600 peer-disabled:opacity-60 dark:bg-slate-700"></span>
-                      <span className="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
-                    </label>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-4">
-                    <p className="font-black text-slate-800 dark:text-white">Entorno del Servidor</p>
-                    <p className="text-xs font-medium text-slate-400">Modo de compilación y logs</p>
-                  </td>
-                  <td className="px-5 py-4">
-                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      MODO_SISTEMA
-                    </code>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="inline-flex font-mono font-black text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200/70 dark:bg-slate-800/80 dark:border-[var(--border-strong)] dark:text-blue-300">
-                      Desarrollo
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
-                    El sistema muestra registros internos detallados para facilitar la depuración durante el desarrollo.
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      SISTEMA
-                    </span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-4">
-                    <p className="font-black text-slate-800 dark:text-white">Tiempo Límite de Inactividad</p>
-                    <p className="text-xs font-medium text-slate-400">Caducidad de sesión automática</p>
-                  </td>
-                  <td className="px-5 py-4">
-                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      INACTIVITY_LIMIT_MS
-                    </code>
-                  </td>
-                  <td className="px-5 py-4 font-black text-slate-800 dark:text-slate-200">
-                    15 Minutos
-                  </td>
-                  <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Desconexión por seguridad ante inactividad física del usuario en el navegador web.
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      SEGURIDAD
-                    </span>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                  <td className="px-5 py-4">
-                    <p className="font-black text-slate-800 dark:text-white">Conexión con la Base de Datos</p>
-                    <p className="text-xs font-medium text-slate-400">Base de datos municipal</p>
-                  </td>
-                  <td className="px-5 py-4">
-                    <code className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      ESTADO_BASE_DATOS
-                    </code>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="inline-flex items-center gap-1.5 font-bold text-xs text-emerald-700 dark:text-emerald-400">
-                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Operativa
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Conexión activa y estable con el servidor de base de datos municipal.
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <span className="inline-flex rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                      ONLINE
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* SECCIÓN 3: VALORES DE LA UIT */}
-      {(activeTab === 'todos' || activeTab === 'uit') && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 dark:border-[var(--border)] dark:bg-slate-900/40">
-            <div className="flex items-center gap-2.5">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                <Icon name="receiptCheck" className="size-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-white">Valores Oficiales de la Unidad Impositiva Tributaria (UIT)</h3>
-                <p className="text-xs font-semibold text-slate-400">Base oficial para el cálculo de sanciones de tránsito, retenciones y trámites TUPA.</p>
-              </div>
-            </div>
-            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 mt-2 sm:mt-0 self-start sm:self-auto">
-              UIT 2026: S/ 5,350.00
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/80 dark:text-slate-400">
-                <tr>
-                  <th className="px-5 py-3.5 w-1/6">Año Fiscal</th>
-                  <th className="px-5 py-3.5 w-1/4">Denominación Oficial</th>
-                  <th className="px-5 py-3.5 w-1/5">Valor UIT Vigente</th>
-                  <th className="px-5 py-3.5">Alcance Tributario y Aplicación</th>
-                  <th className="px-5 py-3.5 text-right">Condición</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-                {municipalidadAnios.length ? municipalidadAnios.map((item) => (
-                  <tr key={item.id} className="hover:bg-blue-50/30 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-                    <td className="px-5 py-4">
-                      <span className="font-mono font-black text-sm text-slate-900 dark:text-white bg-slate-100 dark:bg-[var(--bg-subtle)] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[var(--border-strong)]">
-                        {item.anio}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 font-black text-slate-800 dark:text-slate-200">
-                      {item.nombre || `Año Fiscal ${item.anio}`}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="font-mono font-black text-base text-blue-700 dark:text-blue-400">
-                        S/ {Number(item.uit || 0).toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
-                      Base imponible legal para la tasación porcentual de papeletas de tránsito (Muy Graves, Graves y Leves) y custodia en depósito.
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
-                        String(item.anio) === String(new Date().getFullYear())
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                          : 'bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
-                      }`}>
-                        <span className={`size-1.5 rounded-full ${String(item.anio) === String(new Date().getFullYear()) ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                        {String(item.anio) === String(new Date().getFullYear()) ? 'VIGENTE' : 'HISTÓRICO'}
-                      </span>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="5" className="px-5 py-8 text-center text-xs font-bold text-slate-400">
-                      No hay registros de UIT configurados en la base de datos.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="border-t border-slate-100 bg-slate-50/40 p-4 text-xs text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/30 flex items-center justify-between">
-            <span className="font-medium">
-              Normativa: DS que fija la Unidad Impositiva Tributaria para el año fiscal en curso.
-            </span>
-            <span className="font-mono font-semibold text-[11px] text-slate-400">
-              Tabla: municipalidad_anio
-            </span>
-          </div>
-        </div>
+          </form>
+        </Modal>
       )}
     </div>
   )
@@ -1709,7 +1484,7 @@ function LabeledInput({ label, value, onChange, className = '', type = 'text', p
   )
 }
 
-function Modal({ title, children, onClose, maxWidth = 'max-w-md' }) {
+function Modal({ title, children, onClose, maxWidth = '' }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
       <div className={`w-full ${maxWidth} overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]`}>

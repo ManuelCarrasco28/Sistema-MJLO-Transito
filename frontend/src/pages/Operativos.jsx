@@ -717,7 +717,7 @@ export function Operativos({ user }) {
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-auto">
-                <table className="w-full min-w-[1050px] text-left text-xs">
+                <table className="w-full text-left text-xs">
                   <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-[var(--bg-surface)] border-b border-slate-100 dark:border-[var(--border)]">
                     <tr>
                       <th className="px-4 py-2 whitespace-nowrap min-w-[125px]">Papeleta</th>

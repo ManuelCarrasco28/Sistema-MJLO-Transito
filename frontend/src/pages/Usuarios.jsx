@@ -7,39 +7,17 @@ import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/F
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 
-const CARGOS = [
-  'SUPERADMIN',
-  'ADMINISTRADOR',
-  'SUBGERENTE DE TRÁNSITO Y TRANSPORTE',
-  'INSPECTOR DE TRÁNSITO MUNICIPAL',
-  'INSPECTOR TÉCNICO VEHICULAR',
-  'ADMINISTRADOR DE DEPÓSITO MUNICIPAL',
-  'ESPECIALISTA EN EDUCACIÓN VIAL',
-  'CAJERO DE RECAUDACIÓN',
-  'MESA DE PARTES / ATENCIÓN',
-]
-
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
   { value: 'ACTIVO', label: 'Solo Activos' },
   { value: 'INACTIVO', label: 'Solo Inactivos' },
 ]
 
-const FILTER_CARGO_OPTIONS = [
-  { value: 'TODOS', label: 'Todos los roles' },
-  { value: 'SUPERADMIN', label: 'Superadmin' },
-  { value: 'ADMINISTRADOR', label: 'Administrador' },
-  { value: 'SUBGERENTE', label: 'Subgerente' },
-  { value: 'INSPECTOR', label: 'Inspectores' },
-  { value: 'CAJERO', label: 'Cajeros' },
-  { value: 'OTRO', label: 'Otros roles' },
-]
-
 const DEFAULT_USER_FORM = {
   id_trabajador: '',
   nombre_usuario: '',
   password: '',
-  cargo: 'INSPECTOR DE TRÁNSITO MUNICIPAL',
+  id_rol: '',
   estado: 'ACTIVO',
 }
 
@@ -57,13 +35,14 @@ export function Usuarios({ user }) {
   const cachedUsers = getCachedData('/usuarios')
   const [usuarios, setUsuarios] = useState(cachedUsers || [])
   const [trabajadores, setTrabajadores] = useState([])
+  const [roles, setRoles] = useState([])
   const [isLoading, setIsLoading] = useState(!cachedUsers)
   const [loadError, setLoadError] = useState('')
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState('TODOS')
-  const [filterCargo, setFilterCargo] = useState('TODOS')
+  const [filterRol, setFilterRol] = useState('TODOS')
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1)
@@ -89,9 +68,10 @@ export function Usuarios({ user }) {
     setIsLoading(true)
     setLoadError('')
     try {
-      const [usersRes, trabRes] = await Promise.all([
+      const [usersRes, trabRes, rolesRes] = await Promise.all([
         apiFetch('/usuarios'),
         apiFetch('/personal'),
+        apiFetch('/usuarios/roles'),
       ])
 
       if (!usersRes.ok) throw new Error('No se pudo cargar la lista de usuarios.')
@@ -103,6 +83,11 @@ export function Usuarios({ user }) {
       if (trabRes.ok) {
         const trabData = await trabRes.json()
         setTrabajadores(trabData.data || [])
+      }
+
+      if (rolesRes.ok) {
+        const rolesData = await rolesRes.json()
+        setRoles(rolesData.data || [])
       }
     } catch (err) {
       setLoadError(err.message || 'Error al conectar con la base de datos.')
@@ -120,12 +105,12 @@ export function Usuarios({ user }) {
   const activos = usuarios.filter((u) => u.usuario_estado === 'ACTIVO').length
   const inactivos = usuarios.filter((u) => u.usuario_estado !== 'ACTIVO').length
   const administradores = usuarios.filter((u) => {
-    const c = (u.cargo || '').toUpperCase()
-    return c.includes('ADMIN') || c.includes('SUPER') || c.includes('SUBGERENTE')
+    const r = (u.rol || '').toUpperCase()
+    return r === 'SUPERADMIN' || r === 'GERENTE' || r === 'SUBGERENTE'
   }).length
   const inspectores = usuarios.filter((u) => {
-    const c = (u.cargo || '').toUpperCase()
-    return c.includes('INSPECTOR') || c.includes('FISCALIZADOR')
+    const r = (u.rol || '').toUpperCase()
+    return r === 'TRABAJADOR' || r === 'SECRETARIA'
   }).length
 
   // Filtrado
@@ -134,33 +119,23 @@ export function Usuarios({ user }) {
     return usuarios.filter((item) => {
       const matchSearch =
         !q ||
-        [item.nombre_usuario, item.nombre_completo, item.cargo, item.numero_documento]
+        [item.nombre_usuario, item.nombre_completo, item.rol, item.cargo, item.numero_documento]
           .some((val) => String(val || '').toLowerCase().includes(q))
 
       const matchEstado =
         filterEstado === 'TODOS' || item.usuario_estado === filterEstado
 
-      let matchCargo = true
-      if (filterCargo !== 'TODOS') {
-        const c = (item.cargo || '').toUpperCase()
-        if (filterCargo === 'SUPERADMIN') matchCargo = c.includes('SUPERADMIN')
-        else if (filterCargo === 'ADMINISTRADOR') matchCargo = c.includes('ADMINISTRADOR')
-        else if (filterCargo === 'SUBGERENTE') matchCargo = c.includes('SUBGERENTE')
-        else if (filterCargo === 'INSPECTOR') matchCargo = c.includes('INSPECTOR')
-        else if (filterCargo === 'CAJERO') matchCargo = c.includes('CAJERO')
-        else if (filterCargo === 'OTRO') {
-          matchCargo = !c.includes('SUPER') && !c.includes('ADMIN') && !c.includes('INSPECTOR') && !c.includes('CAJERO')
-        }
-      }
+      const matchCargo =
+        filterRol === 'TODOS' || String(item.id_rol) === String(filterRol)
 
       return matchSearch && matchEstado && matchCargo
     })
-  }, [usuarios, searchTerm, filterEstado, filterCargo])
+  }, [usuarios, searchTerm, filterEstado, filterRol])
 
   // Paginación
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterEstado, filterCargo])
+  }, [searchTerm, filterEstado, filterRol])
 
   const paginatedUsuarios = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage
@@ -205,6 +180,10 @@ export function Usuarios({ user }) {
       showError('Validación', 'La contraseña inicial debe tener al menos 6 caracteres.')
       return
     }
+    if (!userForm.id_rol) {
+      showError('Falta información', 'Por favor selecciona el rol que tendrá este usuario.')
+      return
+    }
 
     setSaving(true)
     try {
@@ -229,7 +208,7 @@ export function Usuarios({ user }) {
   const handleOpenEditModal = (u) => {
     setSelectedUser(u)
     setUserForm({
-      cargo: u.cargo || CARGOS[0],
+      id_rol: u.id_rol || '',
       estado: u.usuario_estado || 'ACTIVO',
     })
     setIsEditModalOpen(true)
@@ -243,7 +222,7 @@ export function Usuarios({ user }) {
       const res = await apiFetch(`/usuarios/${selectedUser.id}`, {
         method: 'PUT',
         body: {
-          cargo: userForm.cargo,
+          id_rol: userForm.id_rol,
           estado: userForm.estado,
         },
       })
@@ -336,7 +315,7 @@ export function Usuarios({ user }) {
           <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">@${escapeXml(u.nombre_usuario)}</td>
           <td><strong>${escapeXml(u.nombre_completo || '—')}</strong></td>
           <td style="text-align: center; font-family: monospace;">${escapeXml(u.numero_documento || '—')}</td>
-          <td>${escapeXml(u.cargo || 'Sin cargo')}</td>
+          <td>${escapeXml(u.rol || 'Sin rol')}</td>
           <td style="text-align: center;">
             <span style="font-weight: bold; color: ${u.usuario_estado === 'ACTIVO' ? '#047857' : '#be123c'};">
               ${escapeXml(u.usuario_estado || 'ACTIVO')}
@@ -420,7 +399,7 @@ export function Usuarios({ user }) {
           <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">@${escapeXml(u.nombre_usuario)}</td>
           <td><strong>${escapeXml(u.nombre_completo || '—')}</strong></td>
           <td style="text-align: center; font-family: monospace;">${escapeXml(u.numero_documento || '—')}</td>
-          <td>${escapeXml(u.cargo || 'Sin cargo')}</td>
+          <td>${escapeXml(u.rol || 'Sin rol')}</td>
           <td style="text-align: center;">
             <span style="display:inline-block; padding:2px 7px; font-size:9.5px; font-weight:bold; border-radius:4px; ${
               u.usuario_estado === 'ACTIVO'
@@ -500,18 +479,18 @@ export function Usuarios({ user }) {
   }
 
   // Estilos y badges de roles
-  const getRoleBadge = (cargo) => {
-    const c = (cargo || '').toUpperCase()
-    if (c.includes('SUPERADMIN')) {
+  const getRoleBadge = (rol) => {
+    const r = (rol || '').toUpperCase()
+    if (r === 'SUPERADMIN') {
       return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-[var(--border)]'
     }
-    if (c.includes('ADMINISTRADOR') || c.includes('SUBGERENTE')) {
+    if (r === 'GERENTE' || r === 'SUBGERENTE') {
       return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-[var(--border)]'
     }
-    if (c.includes('INSPECTOR') || c.includes('FISCALIZADOR')) {
+    if (r === 'TRABAJADOR') {
       return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-[var(--border)]'
     }
-    if (c.includes('CAJERO')) {
+    if (r === 'SECRETARIA') {
       return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-[var(--border)]'
     }
     return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:border-[var(--border-strong)]'
@@ -660,17 +639,20 @@ export function Usuarios({ user }) {
             />
 
             <RoundedSelect
-              value={filterCargo}
-              onChange={setFilterCargo}
-              options={FILTER_CARGO_OPTIONS}
+              value={filterRol}
+              onChange={setFilterRol}
+              options={[
+                { value: 'TODOS', label: 'Todos los roles' },
+                ...roles.map((r) => ({ value: String(r.id), label: r.nombre })),
+              ]}
             />
 
-            {(filterEstado !== 'TODOS' || filterCargo !== 'TODOS' || searchTerm !== '') && (
+            {(filterEstado !== 'TODOS' || filterRol !== 'TODOS' || searchTerm !== '') && (
               <button
                 type="button"
                 onClick={() => {
                   setFilterEstado('TODOS')
-                  setFilterCargo('TODOS')
+                  setFilterRol('TODOS')
                   setSearchTerm('')
                 }}
                 title="Limpiar filtros"
@@ -769,7 +751,7 @@ export function Usuarios({ user }) {
               ) : (
                 paginatedUsuarios.map((u) => {
                   const initial = (u.nombre_usuario || 'U').slice(0, 2).toUpperCase()
-                  const isSuperadmin = (u.cargo || '').toUpperCase().includes('SUPERADMIN')
+                  const isSuperadmin = (u.rol || '').toUpperCase() === 'SUPERADMIN'
 
                   return (
                     <tr
@@ -814,11 +796,16 @@ export function Usuarios({ user }) {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-wide border ${getRoleBadge(
-                            u.cargo
+                            u.rol
                           )}`}
                         >
-                          {u.cargo || 'Sin cargo asignado'}
+                          {u.rol || 'Sin rol asignado'}
                         </span>
+                        {u.cargo && (
+                          <p className="mt-0.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+                            {u.cargo}
+                          </p>
+                        )}
                       </td>
 
                       {/* Estado */}
@@ -1039,7 +1026,6 @@ export function Usuarios({ user }) {
                             setUserForm((prev) => ({
                               ...prev,
                               id_trabajador: t.id_persona || t.id,
-                              cargo: t.cargo?.toUpperCase() || prev.cargo,
                             }))
                             setTrabajadorSearch(`${t.numero_documento} - ${t.nombres} ${t.apellidos}`)
                             setTrabajadorDropdownOpen(false)
@@ -1101,9 +1087,9 @@ export function Usuarios({ user }) {
                 <FloatingSelect
                   id="cargo_usuario"
                   label="4. Rol / Permiso Asignado"
-                  value={userForm.cargo}
-                  onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })}
-                  options={CARGOS.map((c) => ({ value: c, label: c }))}
+                  value={userForm.id_rol}
+                  onChange={(e) => setUserForm({ ...userForm, id_rol: e.target.value })}
+                  options={roles.map((r) => ({ value: String(r.id), label: r.nombre }))}
                 />
 
                 <FloatingSelect
@@ -1177,10 +1163,10 @@ export function Usuarios({ user }) {
 
               <FloatingSelect
                 id="cargo_edit"
-                label="Rol / Cargo en Sistema"
-                value={userForm.cargo}
-                onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })}
-                options={CARGOS.map((c) => ({ value: c, label: c }))}
+                label="Rol en el Sistema"
+                value={userForm.id_rol}
+                onChange={(e) => setUserForm({ ...userForm, id_rol: e.target.value })}
+                options={roles.map((r) => ({ value: String(r.id), label: r.nombre }))}
               />
 
               <FloatingSelect
@@ -1339,7 +1325,7 @@ export function Usuarios({ user }) {
                     Rol en Sistema
                   </span>
                   <p className="mt-1 font-black text-slate-800 dark:text-white">
-                    {selectedUser.cargo || 'Sin cargo'}
+                    {selectedUser.rol || 'Sin rol'}
                   </p>
                 </div>
 

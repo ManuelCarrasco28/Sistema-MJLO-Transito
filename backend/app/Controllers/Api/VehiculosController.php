@@ -59,6 +59,7 @@ class VehiculosController extends ResourceController
         $documentosPorVehiculo = [];
         $papeletasPorVehiculo = [];
         $certicavPorVehiculo = [];
+        $internamientosPorVehiculo = [];
 
         if (!empty($vehiculoIds)) {
             $documentos = $db->table('documentos_vehiculo')
@@ -132,7 +133,6 @@ class VehiculosController extends ResourceController
                 ->get()
                 ->getResultArray();
                 
-            $internamientosPorVehiculo = [];
             foreach ($internamientos as $int) {
                 $vehiculoId = (int)$int['id_vehiculo'];
                 unset($int['id_vehiculo']);

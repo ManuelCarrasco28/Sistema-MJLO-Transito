@@ -59,10 +59,11 @@ class AuthController extends ResourceController
     {
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()
-            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, COALESCE(ciudadanos.foto, "") as foto_img, cargos.nombre as cargo, trabajadores.id_persona as id_persona')
-            ->join('trabajadores', 'trabajadores.id_persona = usuarios.id_trabajador', 'inner')
-            ->join('ciudadanos', 'ciudadanos.id_persona = trabajadores.id_persona', 'inner')
-            ->join('desplazamiento_oficina', 'desplazamiento_oficina.id_trabajador = trabajadores.id_persona AND (desplazamiento_oficina.fecha_termino IS NULL OR desplazamiento_oficina.fecha_termino > CURDATE())', 'left')
+            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, COALESCE(ciudadanos.foto, "") as foto_img, roles.nombre as rol, cargos.nombre as cargo')
+            ->join('ciudadanos', 'ciudadanos.id_persona = usuarios.id_persona', 'inner')
+            ->join('roles', 'roles.id = usuarios.id_rol', 'inner')
+            ->join('trabajadores', 'trabajadores.id_persona = usuarios.id_persona', 'left')
+            ->join('desplazamiento_oficina', 'desplazamiento_oficina.id_trabajador = usuarios.id_persona AND (desplazamiento_oficina.fecha_termino IS NULL OR desplazamiento_oficina.fecha_termino > CURDATE())', 'left')
             ->join('cargos', 'cargos.id = desplazamiento_oficina.id_cargo', 'left')
             ->where('usuarios.id', $userId)
             ->first();
@@ -75,7 +76,9 @@ class AuthController extends ResourceController
             'id'          => $userRecord['id'],
             'nombres'     => $userRecord['nombres'],
             'apellidos'   => $userRecord['apellidos'],
-            'usuario'     => $userRecord['nombre_usuario'],
+            'usuario'     => $userRecord['usuario'],
+            'rol'         => $userRecord['rol'],
+            'id_rol'      => (int) $userRecord['id_rol'],
             'cargo'       => $userRecord['cargo'],
             'id_persona'  => (int) $userRecord['id_persona'],
             'foto_img'    => $userRecord['foto_img'] ?? '',
@@ -244,15 +247,10 @@ class AuthController extends ResourceController
 
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()
-            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, COALESCE(ciudadanos.foto, "") as foto_img, cargos.nombre as cargo, trabajadores.id_persona as id_persona')
-            ->join('trabajadores', 'trabajadores.id_persona = usuarios.id_trabajador', 'inner')
-            ->join('ciudadanos', 'ciudadanos.id_persona = trabajadores.id_persona', 'inner')
-            ->join('desplazamiento_oficina', 'desplazamiento_oficina.id_trabajador = trabajadores.id_persona AND (desplazamiento_oficina.fecha_termino IS NULL OR desplazamiento_oficina.fecha_termino > CURDATE())', 'left')
-            ->join('cargos', 'cargos.id = desplazamiento_oficina.id_cargo', 'left')
-            ->where('usuarios.nombre_usuario', $usuario)
+            ->where('usuarios.usuario', $usuario)
             ->first();
 
-        if (!$userRecord || !password_verify($password, $userRecord['password_hash'])) {
+        if (!$userRecord || !password_verify($password, $userRecord['clave'])) {
             $this->registerFailedLogin($usuario);
             \App\Services\AuditoriaService::registrar(
                 'SEGURIDAD',
@@ -276,6 +274,8 @@ class AuthController extends ResourceController
 
         $this->clearFailedLogins($usuario);
 
+        $usuarioModel->update((int) $userRecord['id'], ['fecha_logueo' => date('Y-m-d H:i:s')]);
+
         $cookieUserData = $userData;
         unset($cookieUserData['foto_img']);
         $cookieUserData['exp'] = time() + 7200;
@@ -294,9 +294,9 @@ class AuthController extends ResourceController
         \App\Services\AuditoriaService::registrar(
             'SEGURIDAD',
             'LOGIN',
-            "Inicio de sesión exitoso del usuario '{$userData['usuario']}' ({$userData['cargo']})",
-            ['usuario' => $userData['usuario'], 'cargo' => $userData['cargo']],
-            ['id' => $userData['id'], 'usuario' => $userData['usuario'], 'rol' => $userData['cargo']]
+            "Inicio de sesión exitoso del usuario '{$userData['usuario']}' ({$userData['rol']})",
+            ['usuario' => $userData['usuario'], 'rol' => $userData['rol']],
+            ['id' => $userData['id'], 'usuario' => $userData['usuario'], 'rol' => $userData['rol']]
         );
 
         return $this->respond([
@@ -335,7 +335,7 @@ class AuthController extends ResourceController
                 'LOGOUT',
                 "Cierre de sesión del usuario '{$cookieUser['usuario']}'",
                 null,
-                ['id' => $cookieUser['id'] ?? null, 'usuario' => $cookieUser['usuario'] ?? 'desconocido', 'rol' => $cookieUser['cargo'] ?? '']
+                ['id' => $cookieUser['id'] ?? null, 'usuario' => $cookieUser['usuario'] ?? 'desconocido', 'rol' => $cookieUser['rol'] ?? '']
             );
         }
 
@@ -367,12 +367,12 @@ class AuthController extends ResourceController
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()->find($userId);
 
-        if (!$userRecord || !password_verify($actual, $userRecord['password_hash'])) {
+        if (!$userRecord || !password_verify($actual, $userRecord['clave'])) {
             return $this->failUnauthorized('La contraseña actual es incorrecta.');
         }
 
         $usuarioModel->update($userId, [
-            'password_hash' => password_hash($nuevo, PASSWORD_DEFAULT),
+            'clave' => password_hash($nuevo, PASSWORD_DEFAULT),
         ]);
 
         return $this->respond([

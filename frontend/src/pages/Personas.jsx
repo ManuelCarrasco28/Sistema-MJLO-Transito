@@ -70,6 +70,15 @@ const FILTER_ESTADO_OPTIONS = [
   { value: 'INACTIVO', label: 'Inactivos' },
 ]
 
+const ESTADO_CIVIL_OPTIONS = [
+  { value: '', label: 'Seleccionar...' },
+  { value: 'SOLTERO', label: 'SOLTERO' },
+  { value: 'CASADO', label: 'CASADO' },
+  { value: 'CONVIVIENTE', label: 'CONVIVIENTE' },
+  { value: 'DIVORCIADO', label: 'DIVORCIADO' },
+  { value: 'VIUDO', label: 'VIUDO' },
+]
+
 export function Personas({ user, onUserUpdate }) {
   const cached = getCachedData('/personas')
   const [personas, setPersonas] = useState(cached || [])
@@ -108,6 +117,7 @@ export function Personas({ user, onUserUpdate }) {
     email: '',
     numeroLicencia: '',
     estado: 'ACTIVO',
+    estadoCivil: '',
     fotoImg: '',
   })
 
@@ -228,6 +238,7 @@ export function Personas({ user, onUserUpdate }) {
       email: '',
       numeroLicencia: '',
       estado: 'ACTIVO',
+      estadoCivil: '',
       fotoImg: '',
     })
     setIsEditing(false)
@@ -246,6 +257,37 @@ export function Personas({ user, onUserUpdate }) {
     })
     setIsEditing(true)
     setIsModalOpen(true)
+  }
+
+  const handleReniecSearch = async () => {
+    const dni = formData.numeroDocumento?.trim()
+    if (!dni || dni.length !== 8 || !/^\d{8}$/.test(dni)) {
+      showError('DNI Inválido', 'El número de DNI debe tener exactamente 8 dígitos.')
+      return
+    }
+
+    try {
+      const response = await apiFetch(`/pide/reniec/${dni}`)
+      if (!response.ok) {
+        throw new Error('No se pudo encontrar la información del DNI.')
+      }
+      const { data } = await response.json()
+      
+      if (data) {
+        setFormData(prev => ({
+          ...prev,
+          nombres: data.nombres || prev.nombres,
+          apellidoPaterno: data.apellidoPaterno || prev.apellidoPaterno,
+          apellidoMaterno: data.apellidoMaterno || prev.apellidoMaterno,
+          direccion: data.direccion || prev.direccion,
+          estadoCivil: data.estadoCivil || prev.estadoCivil,
+          fotoImg: data.foto_url || prev.fotoImg
+        }))
+        showToast('Datos obtenidos correctamente')
+      }
+    } catch (err) {
+      showError('Error', err.message || 'No se pudo consultar la información del DNI.')
+    }
   }
 
   const handlePhotoUpload = (e) => {
@@ -821,7 +863,7 @@ export function Personas({ user, onUserUpdate }) {
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Activos</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
-              ✓
+              ?
             </span>
           </div>
           <div className="mt-1">
@@ -836,7 +878,7 @@ export function Personas({ user, onUserUpdate }) {
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Inactivos</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
-              ✕
+              ?
             </span>
           </div>
           <div className="mt-1">
@@ -865,7 +907,7 @@ export function Personas({ user, onUserUpdate }) {
                 onClick={() => setSearchTerm('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
-                ✕
+                ?
               </button>
             )}
           </div>
@@ -1307,32 +1349,46 @@ export function Personas({ user, onUserUpdate }) {
                           options={tipoDocOptions}
                         />
                       </div>
-                      <div className="sm:col-span-7">
-                        <FloatingInput
-                          id="per_num_doc"
-                          label="Número de documento"
-                          required
-                          maxLength={(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') ? 8 : 15}
-                          value={formData.numeroDocumento}
-                          inputClassName="font-mono font-bold"
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const isDni = formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD';
-                            if (isDni && !/^\d*$/.test(val)) return;
-                            setFormData({ ...formData, numeroDocumento: val })
-                          }}
-                        />
+                      <div className="sm:col-span-7 flex gap-2 items-start">
+                        <div className="flex-1">
+                          <FloatingInput
+                            id="per_num_doc"
+                            label="Número de documento"
+                            required
+                            maxLength={(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') ? 8 : 15}
+                            value={formData.numeroDocumento}
+                            inputClassName="font-mono font-bold"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const isDni = formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD';
+                              if (isDni && !/^\d*$/.test(val)) return;
+                              setFormData({ ...formData, numeroDocumento: val })
+                            }}
+                          />
+                        </div>
+                        {(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') && (
+                          <button
+                            type="button"
+                            onClick={handleReniecSearch}
+                            title="Buscar DNI"
+                            className="shrink-0 h-[46px] w-[46px] rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-95 cursor-pointer mt-[2px]"
+                          >
+                            <Icon name="search" className="size-5" />
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      <FloatingInput
-                        id="per_nombres"
-                        label="Nombres"
-                        required
-                        value={formData.nombres}
-                        onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                      <div className="sm:col-span-2">
+                        <FloatingInput
+                          id="per_nombres"
+                          label="Nombres"
+                          required
+                          value={formData.nombres}
+                          onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
+                        />
+                      </div>
                       <FloatingInput
                         id="per_paterno"
                         label="Apellido paterno"
@@ -1347,6 +1403,17 @@ export function Personas({ user, onUserUpdate }) {
                         value={formData.apellidoMaterno}
                         onChange={(e) => setFormData({ ...formData, apellidoMaterno: e.target.value })}
                       />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="sm:col-span-1">
+                        <FloatingSelect
+                          id="per_estado_civil"
+                          label="Estado civil"
+                          value={formData.estadoCivil || ''}
+                          onChange={(e) => setFormData({ ...formData, estadoCivil: e.target.value })} options={ESTADO_CIVIL_OPTIONS}
+                          
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1669,3 +1736,6 @@ export function Personas({ user, onUserUpdate }) {
     </div>
   )
 }
+
+
+

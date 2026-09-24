@@ -21,14 +21,14 @@ class OperativosController extends ResourceController
                 o.*,
                 COALESCE(
                     NULLIF(TRIM(CONCAT(cu.nombres, ' ', cu.apellido_paterno, ' ', COALESCE(cu.apellido_materno, ''))), ''),
-                    u.nombre_usuario,
+                    u.usuario,
                     ''
                 ) AS usuario_registra,
                 COUNT(DISTINCT oi.id_inspector) AS total_inspectores,
                 COUNT(DISTINCT p.id) AS total_papeletas
             ", false)
             ->join('usuarios u', 'u.id = o.id_usuario_registra', 'left')
-            ->join('ciudadanos cu', 'cu.id_persona = u.id_trabajador', 'left')
+            ->join('ciudadanos cu', 'cu.id_persona = u.id_persona', 'left')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id AND oi.estado = "ASIGNADO"', 'left')
             ->join('papeletas p', 'p.id_operativo = o.id', 'left')
             ->where('o.id', $id)
@@ -131,14 +131,14 @@ class OperativosController extends ResourceController
                 o.*,
                 COALESCE(
                     NULLIF(TRIM(CONCAT(cu.nombres, ' ', cu.apellido_paterno, ' ', COALESCE(cu.apellido_materno, ''))), ''),
-                    u.nombre_usuario,
+                    u.usuario,
                     ''
                 ) AS usuario_registra,
                 COUNT(DISTINCT oi.id_inspector) AS total_inspectores,
                 COUNT(DISTINCT p.id) AS total_papeletas
             ", false)
             ->join('usuarios u', 'u.id = o.id_usuario_registra', 'left')
-            ->join('ciudadanos cu', 'cu.id_persona = u.id_trabajador', 'left')
+            ->join('ciudadanos cu', 'cu.id_persona = u.id_persona', 'left')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id AND oi.estado = "ASIGNADO"', 'left')
             ->join('papeletas p', 'p.id_operativo = o.id', 'left')
             ->groupBy('o.id')

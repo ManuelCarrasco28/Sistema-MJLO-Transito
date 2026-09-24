@@ -121,7 +121,7 @@ export function Header({
     .slice(0, 2)
     .toUpperCase() || 'US'
   const userEmail = user?.usuario ? `${user.usuario}@mdjlo.gob.pe` : 'usuario@mdjlo.gob.pe'
-  const userRole = user?.cargo || 'Trabajador municipal'
+  const userRole = user?.cargo || user?.rol || 'Trabajador municipal'
   const avatarImage = user?.foto_img || ''
 
   return (

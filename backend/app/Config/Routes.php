@@ -15,6 +15,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
 
     $routes->get('status', 'StatusController::index');
     $routes->group('', ['filter' => 'sessionauth'], static function ($routes): void {
+        $routes->get('pide/reniec/(:segment)', 'PideController::reniec/$1');
+        $routes->post('pide/sunarp', 'PideController::sunarp');
         $routes->get('me', 'AuthController::me');
         $routes->post('logout', 'AuthController::logout');
         $routes->post('perfil/password', 'AuthController::cambiarPassword');

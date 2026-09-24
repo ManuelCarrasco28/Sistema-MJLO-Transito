@@ -8,12 +8,9 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const navigate = useNavigate()
   const location = useLocation()
 
-  const isAdmin = Boolean(
-    user?.cargo?.toLowerCase()?.includes('admin') ||
-    user?.usuario?.toLowerCase()?.includes('admin') ||
-    user?.usuario === 'diegobarturen'
-  )
-  const isSuperAdmin = user?.usuario?.toLowerCase() === 'superadmin'
+  const rolNormalizado = (user?.rol || '').toUpperCase()
+  const isAdmin = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE'].includes(rolNormalizado)
+  const isSuperAdmin = rolNormalizado === 'SUPERADMIN'
 
   const visibleNavigationGroups = isSuperAdmin
     ? navigationGroups.filter((group) => group.superAdminOnly)

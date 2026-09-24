@@ -703,16 +703,7 @@ export function Vehiculos() {
 
 
         <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Listado de vehículos" tabIndex={0}>
-          <table className="w-full min-w-[1160px] table-fixed text-left text-sm">
-            <colgroup>
-              <col className="w-[11%]" />
-              <col className="w-[19%]" />
-              <col className="w-[16%]" />
-              <col className="w-[17%]" />
-              <col className="w-[14%]" />
-              <col className="w-[13%]" />
-              <col className="w-[10%]" />
-            </colgroup>
+          <table className="w-full text-left text-xs sm:text-sm">
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Placa</th>

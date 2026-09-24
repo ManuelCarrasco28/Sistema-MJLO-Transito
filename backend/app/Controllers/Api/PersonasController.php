@@ -8,6 +8,41 @@ class PersonasController extends ResourceController
 {
     protected $format = 'json';
 
+    public function reniec($dni = null)
+    {
+        $dni = trim((string)$dni);
+        if (strlen($dni) !== 8 || !ctype_digit($dni)) {
+            return $this->failValidationErrors('El DNI debe tener exactamente 8 dígitos numéricos.');
+        }
+
+        $baseUrl = trim((string) env('pide.baseUrl', ''));
+        $token = trim((string) env('pide.token', ''));
+
+        if ($baseUrl === '' || $token === '') {
+            return $this->failServerError('La consulta a RENIEC no está configurada en el servidor.');
+        }
+
+        try {
+            $client = \Config\Services::curlrequest();
+            $response = $client->get(rtrim($baseUrl, '/') . "/services/reniec/dni/{$dni}", [
+                'headers' => ['Authorization' => "Bearer {$token}"],
+                'http_errors' => false,
+                'timeout' => 10,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->failServerError('No se pudo conectar con el servicio de RENIEC.');
+        }
+
+        $statusCode = $response->getStatusCode();
+        $body = json_decode($response->getBody(), true);
+
+        if ($statusCode !== 200 || !is_array($body)) {
+            return $this->fail('No se encontró información para el DNI consultado.', $statusCode === 200 ? 404 : $statusCode);
+        }
+
+        return $this->respond(['status' => true, 'data' => $body]);
+    }
+
     public function tiposDocumento()
     {
         $db = \Config\Database::connect();
@@ -271,6 +306,7 @@ class PersonasController extends ResourceController
             'apellido_paterno' => trim($input['apellidoPaterno']),
             'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
             'numero_licencia'  => strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null,
+            'estado_civil'     => trim($input['estadoCivil'] ?? '') ?: null,
             'foto'             => trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '') ?: null,
         ];
         $db->table('ciudadanos')->insert($cData);
@@ -285,9 +321,10 @@ class PersonasController extends ResourceController
         }
 
         $newPersona = array_merge(['id' => (int)$insertId, 'tipoDocumento' => $tipoDocName, 'numeroDocumento' => $pData['numero'], 'numeroLicencia' => $cData['numero_licencia'] ?? ''], $cData, $pData);
-        unset($newPersona['id_persona'], $newPersona['id_tipo_documento'], $newPersona['numero'], $newPersona['foto']);
+        unset($newPersona['id_persona'], $newPersona['id_tipo_documento'], $newPersona['numero'], $newPersona['foto'], $newPersona['estado_civil']);
         $newPersona['apellidoPaterno'] = $cData['apellido_paterno'];
         $newPersona['apellidoMaterno'] = $cData['apellido_materno'];
+        $newPersona['estadoCivil'] = $cData['estado_civil'];
         $newPersona['fotoUrl'] = $cData['foto'];
         $newPersona['fotoImg'] = $cData['foto'];
 
@@ -402,6 +439,7 @@ class PersonasController extends ResourceController
         if (isset($input['apellidoPaterno'])) $cData['apellido_paterno'] = trim($input['apellidoPaterno']);
         if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = trim($input['apellidoMaterno']);
         if (array_key_exists('numeroLicencia', $input)) $cData['numero_licencia'] = strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null;
+        if (array_key_exists('estadoCivil', $input)) $cData['estado_civil'] = trim($input['estadoCivil'] ?? '') ?: null;
         if (array_key_exists('fotoUrl', $input) || array_key_exists('fotoImg', $input)) $cData['foto'] = trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '') ?: null;
 
         if (!empty($cData)) {

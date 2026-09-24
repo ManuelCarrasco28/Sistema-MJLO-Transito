@@ -25,7 +25,7 @@ const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard').the
 const Usuarios = lazy(() => import('./pages/Usuarios').then((module) => ({ default: module.Usuarios })))
 const Operativos = lazy(() => import('./pages/Operativos').then((module) => ({ default: module.Operativos })))
 
-const isSuperAdminUser = (user) => user?.usuario?.toLowerCase() === 'superadmin'
+const isSuperAdminUser = (user) => (user?.rol || '').toUpperCase() === 'SUPERADMIN'
 
 function ModuleFallback() {
   return (
