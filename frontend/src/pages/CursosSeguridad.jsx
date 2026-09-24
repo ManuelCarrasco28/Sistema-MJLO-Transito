@@ -4,7 +4,7 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
-import { CarnetCursoVialPrint } from '../components/documentos/TarjetaOperatividadPrint'
+import { CarnetCursoVialPrint, CarnetCursoVialLotePrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
@@ -75,19 +75,34 @@ export function CursosSeguridad() {
       showError('Error de Impresión', 'No hay participantes inscritos en este curso para imprimir.');
       return;
     }
+    const aprobados = curso.participantes.filter(p => curso.estado === 'FINALIZADO' ? (p.estado === 'APROBADO' || p.asistio) : true);
+    if (aprobados.length === 0) {
+      showError('Error de Impresión', 'No hay participantes con asistencia o aprobados para generar los carnets.');
+      return;
+    }
     setPrintCurso(curso);
     setTimeout(() => {
       window.print();
-      setTimeout(() => setPrintCurso(null), 500);
-    }, 300);
+      const cleanup = () => {
+        setPrintCurso(null);
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup, { once: true });
+      setTimeout(cleanup, 2500);
+    }, 350);
   }
 
   const handlePrintSingle = (aprobado) => {
     setPrintAprobado(aprobado);
     setTimeout(() => {
       window.print();
-      setTimeout(() => setPrintAprobado(null), 500);
-    }, 300);
+      const cleanup = () => {
+        setPrintAprobado(null);
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup, { once: true });
+      setTimeout(cleanup, 2500);
+    }, 350);
   }
 
   const handleOpenEditModal = (curso) => {
@@ -817,6 +832,17 @@ export function CursosSeguridad() {
               <div className="border-t border-slate-100 dark:border-[var(--border)] pt-6">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                   <strong className="text-base text-slate-800 dark:text-slate-200">Participantes</strong>
+                  {selectedCurso.participantes && selectedCurso.participantes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handlePrintBatch(selectedCurso)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700 transition shadow-xs cursor-pointer active:scale-95"
+                      title="Imprimir carnets oficiales (4 por hoja A4)"
+                    >
+                      <Icon name="print" className="size-3.5" />
+                      <span>Imprimir Carnets (Lote 4 por hoja)</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Buscador de inscripción */}
@@ -1032,67 +1058,56 @@ export function CursosSeguridad() {
           </div>
         </div>
       )}
-      {/* SECCIÓN OCULTA PARA IMPRESIÓN OFICIAL (LOTE) */}
-      {printCurso && (
-        <div id="batch-print-container" className="hidden print:flex absolute inset-0 bg-white z-50 flex-col gap-10 bg-transparent m-0 p-0">
-          <style>{`
-            @media print {
-              #batch-print-container #seccion-impresion {
-                position: relative !important;
-                page-break-after: always;
-                page-break-inside: avoid;
-              }
-            }
-          `}</style>
-          {printCurso.participantes
-            .filter(p => printCurso.estado === 'FINALIZADO' ? (p.estado === 'APROBADO' || p.asistio) : true)
-            .map((p, i) => {
-              const dt = new Date(printCurso.fecha);
-              dt.setFullYear(dt.getFullYear() + 1);
-              const fechaVencimiento = dt.toISOString().split('T')[0];
+      {/* SECCIÓN OFICIAL DE IMPRESIÓN EN LOTE (4 CARNETS POR HOJA A4) */}
+      {printCurso && (() => {
+        const dt = new Date(printCurso.fecha);
+        dt.setFullYear(dt.getFullYear() + 1);
+        const fechaVencimiento = dt.toISOString().split('T')[0];
 
-              return (
-                <div key={i}>
-                  <CarnetCursoVialPrint data={{
-                    codigo: printCurso.codigo,
-                    apellidos: `${p.apellido_paterno || ''} ${p.apellido_materno || ''}`.trim(),
-                    nombres: p.nombres || '',
-                    dni: p.dni || '',
-                    licencia: p.licencia || '',
-                    fotoUrl: p.fotoUrl || '',
-                    fechaExpedicion: printCurso.fecha,
-                    fechaExpiracion: fechaVencimiento
-                  }} />
-                </div>
-              );
-            })}
-        </div>
-      )}
-      {printAprobado && (
-        <div id="single-print-container" className="hidden print:flex absolute inset-0 bg-white z-50 flex-col bg-transparent m-0 p-0">
-          <style>{`
-            @media print {
-              #single-print-container #seccion-impresion {
-                position: relative !important;
-              }
-            }
-          `}</style>
-          <CarnetCursoVialPrint data={{
-            codigo: printAprobado.curso.codigo,
-            apellidos: `${printAprobado.apellido_paterno || ''} ${printAprobado.apellido_materno || ''}`.trim(),
-            nombres: printAprobado.nombres || '',
-            dni: printAprobado.dni || '',
-            licencia: printAprobado.licencia || '',
-            fotoUrl: printAprobado.fotoUrl || '',
-            fechaExpedicion: printAprobado.curso.fecha,
-            fechaExpiracion: (() => {
-              const dt = new Date(printAprobado.curso.fecha);
-              dt.setFullYear(dt.getFullYear() + 1);
-              return dt.toISOString().split('T')[0];
-            })()
-          }} />
-        </div>
-      )}
+        const aprobados = (printCurso.participantes || [])
+          .filter(p => printCurso.estado === 'FINALIZADO' ? (p.estado === 'APROBADO' || p.asistio) : true);
+
+        const items = aprobados.map(p => ({
+          codigo: printCurso.codigo,
+          tucNumero: printCurso.codigo,
+          apellidos: `${p.apellido_paterno || ''} ${p.apellido_materno || ''}`.trim(),
+          nombres: p.nombres || '',
+          dni: p.dni || p.numero || '',
+          licencia: p.licencia || '',
+          numeroLicencia: p.licencia || '',
+          fotoUrl: p.fotoUrl || '',
+          fechaExpedicion: printCurso.fecha,
+          fechaExpiracion: fechaVencimiento,
+          fechaVencimiento: fechaVencimiento,
+          asociacion: p.asociacion || 'INDEPENDIENTE'
+        }));
+
+        return <CarnetCursoVialLotePrint items={items} />;
+      })()}
+
+      {/* IMPRESIÓN INDIVIDUAL (DESDE VISTA APROBADOS) */}
+      {printAprobado && (() => {
+        const dt = new Date(printAprobado.curso.fecha);
+        dt.setFullYear(dt.getFullYear() + 1);
+        const fechaVencimiento = dt.toISOString().split('T')[0];
+
+        const item = {
+          codigo: printAprobado.curso.codigo,
+          tucNumero: printAprobado.curso.codigo,
+          apellidos: `${printAprobado.apellido_paterno || ''} ${printAprobado.apellido_materno || ''}`.trim(),
+          nombres: printAprobado.nombres || '',
+          dni: printAprobado.dni || printAprobado.numero || '',
+          licencia: printAprobado.licencia || '',
+          numeroLicencia: printAprobado.licencia || '',
+          fotoUrl: printAprobado.fotoUrl || '',
+          fechaExpedicion: printAprobado.curso.fecha,
+          fechaExpiracion: fechaVencimiento,
+          fechaVencimiento: fechaVencimiento,
+          asociacion: printAprobado.asociacion || 'INDEPENDIENTE'
+        };
+
+        return <CarnetCursoVialLotePrint items={[item]} />;
+      })()}
     </div>
   )
 }
