@@ -1451,6 +1451,7 @@ CREATE TABLE `vehiculos` (
   `serie_motor` varchar(80) DEFAULT NULL,
   `partida_registral` varchar(50) DEFAULT NULL,
   `codigo_qr` varchar(100) DEFAULT NULL,
+  `estado` varchar(20) NOT NULL DEFAULT 'ACTIVO',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_vehiculos_placa` (`placa`),
   UNIQUE KEY `uq_vehiculos_codigo_qr` (`codigo_qr`),
