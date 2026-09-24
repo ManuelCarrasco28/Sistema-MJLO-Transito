@@ -107,7 +107,7 @@ function FloatingSelect({ id, label, value, onChange, options = [], className = 
   )
 }
 
-function SearchableSelect({ id, label, value, onChange, options = [], className = '' }) {
+function SearchableSelect({ id, label, value, onChange, options = [], className = '', required = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const containerRef = useRef(null)
@@ -134,6 +134,7 @@ function SearchableSelect({ id, label, value, onChange, options = [], className 
         id={id}
         type="text"
         title={displayValue}
+        required={required}
         className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white pl-3 pr-8 pt-4 pb-1 text-xs font-semibold text-slate-800 text-ellipsis overflow-hidden whitespace-nowrap outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
         placeholder=" "
         value={displayValue}
@@ -145,6 +146,12 @@ function SearchableSelect({ id, label, value, onChange, options = [], className 
         onFocus={() => {
           setIsOpen(true)
           setQuery('')
+        }}
+        onClick={() => {
+          if (!isOpen) {
+            setIsOpen(true)
+            setQuery('')
+          }
         }}
       />
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`pointer-events-none absolute right-3 top-1/2 size-3 -translate-y-1/2 text-slate-400 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''}`}>
@@ -690,7 +697,7 @@ export function Trabajadores() {
       {form && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter" onKeyDown={(e) => { if (e.key === 'Escape' && !saving) setForm(null) }}>
           <div className="flex min-h-full items-center justify-center p-4 sm:p-6 pb-24">
-            <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="relative flex w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+            <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             
             {/* Header Modal - Estilo Personas.jsx */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
@@ -791,8 +798,14 @@ export function Trabajadores() {
                 </h4>
                 <div className="grid gap-2.5 sm:grid-cols-2">
                   <div className="relative sm:col-span-2">
-                    <FloatingInput id="cargo" label="Cargo" list="cargos-list" required value={form.cargo || ''} onChange={(e) => setForm({ ...form, cargo: e.target.value })} />
-                    <datalist id="cargos-list">{catalogos.cargos.map((c) => <option key={c.id} value={c.nombre} />)}</datalist>
+                    <SearchableSelect 
+                      id="cargo" 
+                      label="Cargo" 
+                      required
+                      value={form.cargo || ''} 
+                      onChange={(e) => setForm({ ...form, cargo: e.target.value })} 
+                      options={catalogos.cargos.map((c) => ({ value: c.nombre, label: c.nombre }))}
+                    />
                   </div>
                   
                   <div className="relative sm:col-span-2">
