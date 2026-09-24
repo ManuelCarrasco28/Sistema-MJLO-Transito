@@ -124,104 +124,162 @@ export function TarjetaOperatividadPrint({ data }) {
 }
 
 /**
- * Componente oficial de impresión: CARNET DE SEGURIDAD VIAL (CURSO VIAL)
- * Dimensiones: 85.6 mm x 53.98 mm a 2 caras (Anverso y Reverso)
+ * Cara Frontal (Anverso): CARNET DE SEGURIDAD VIAL
  */
-export function CarnetCursoVialPrint({ data }) {
+export function CarnetCursoVialAnverso({ data }) {
+  return (
+    <div className="carnet-box curso-vial-anverso">
+      <div className="header-carnet" style={{ borderBottomColor: '#34d399' }}>
+        <img src="/escudo-jlo.png" alt="MDJLO" className="escudo" />
+        <div className="header-text">
+          <h2>Municipalidad Distrital de José Leonardo Ortiz</h2>
+          <h1 style={{ fontSize: '7.5pt' }}>CARNET DE SEGURIDAD VIAL</h1>
+        </div>
+      </div>
+
+      <div className="banner-curso">
+        CURSO ANUAL DE EDUCACIÓN Y SEGURIDAD VIAL
+      </div>
+
+      <div className="body-carnet">
+        <div className="foto-container" style={{ borderColor: '#34d399' }}>
+          <img src={data.fotoUrl || data.fotoConductor || '/placeholder-user.png'} alt="Conductor" />
+        </div>
+        <div className="datos-container">
+          <div className="row-flex">
+            <div>
+              <span className="label" style={{ color: '#a7f3d0' }}>D.N.I.: </span>
+              <span className="val-yellow">{data.dni || data.conductorDni || '—'}</span>
+            </div>
+            <div>
+              <span className="label" style={{ color: '#a7f3d0' }}>N° Licencia: </span>
+              <span className="val-yellow">{data.licencia || data.numeroLicencia || 'B-IIc'}</span>
+            </div>
+          </div>
+          <div className="row-single">
+            <span className="label" style={{ color: '#a7f3d0' }}>Res. Gerencia: </span>
+            <span className="val-text">{data.resMunicipal || 'R.G. N° 018-2025-MDJLO/GSCyT'}</span>
+          </div>
+          <div className="row-single nombres-box" style={{ borderTopColor: 'rgba(255,255,255,0.2)' }}>
+            <span className="val-nombres">{data.apellidos || data.conductorNombres || 'CONDUCTOR AUTORIZADO'}</span>
+            {data.nombres && <span className="val-nombres">{data.nombres}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="footer-carnet-anverso">
+        <span className="tuc-numero" style={{ color: '#6ee7b7' }}>{data.tucNumero || data.codigo}</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Cara Trasera (Reverso): CARNET DE SEGURIDAD VIAL
+ */
+export function CarnetCursoVialReverso({ data }) {
   const qrRaw = data.qrUrl || `https://munijlo.gob.pe/transito/validar?tipo=CURSO_VIAL&carnet=${encodeURIComponent(data.tucNumero || data.codigo || '')}&dni=${encodeURIComponent(data.dni || '')}`
   const isImageQr = Boolean(data.qrUrl && (data.qrUrl.startsWith('data:image') || data.qrUrl.endsWith('.png') || data.qrUrl.endsWith('.jpg')))
 
   return (
-    <PrintWrapper className="carnet-preview-wrap">
-      <div className="carnet-wrapper">
-        {/* --- CARA ANVERSO --- */}
-        <div className="carnet-box curso-vial-anverso">
-          <div className="header-carnet" style={{ borderBottomColor: '#34d399' }}>
-            <img src="/escudo-jlo.png" alt="MDJLO" className="escudo" />
-            <div className="header-text">
-              <h2>Municipalidad Distrital de José Leonardo Ortiz</h2>
-              <h1 style={{ fontSize: '7.5pt' }}>CARNET DE SEGURIDAD VIAL</h1>
-            </div>
+    <div className="carnet-box reverso">
+      <div className="reverso-grid">
+        <div className="reverso-info">
+          <div className="field-block">
+            <label>MODALIDAD AUTORIZADA:</label>
+            <div className="box-val">SERVICIO ESPECIAL TRIMÓVIL</div>
           </div>
-
-          <div className="banner-curso">
-            CURSO ANUAL DE EDUCACIÓN Y SEGURIDAD VIAL
+          <div className="field-block">
+            <label>EMPRESA / ASOCIACIÓN:</label>
+            <div className="box-val-sm">{data.asociacion || 'INDEPENDIENTE'}</div>
           </div>
-
-          <div className="body-carnet">
-            <div className="foto-container" style={{ borderColor: '#34d399' }}>
-              <img src={data.fotoUrl || data.fotoConductor || '/placeholder-user.png'} alt="Conductor" />
-            </div>
-            <div className="datos-container">
-              <div className="row-flex">
-                <div>
-                  <span className="label" style={{ color: '#a7f3d0' }}>D.N.I.: </span>
-                  <span className="val-yellow">{data.dni || data.conductorDni || '—'}</span>
-                </div>
-                <div>
-                  <span className="label" style={{ color: '#a7f3d0' }}>N° Licencia: </span>
-                  <span className="val-yellow">{data.numeroLicencia || 'B-IIc'}</span>
-                </div>
-              </div>
-              <div className="row-single">
-                <span className="label" style={{ color: '#a7f3d0' }}>Res. Gerencia: </span>
-                <span className="val-text">{data.resMunicipal || 'R.G. N° 018-2025-MDJLO/GSCyT'}</span>
-              </div>
-              <div className="row-single nombres-box" style={{ borderTopColor: 'rgba(255,255,255,0.2)' }}>
-                <span className="val-nombres">{data.apellidos || data.conductorNombres || 'CONDUCTOR AUTORIZADO'}</span>
-                {data.nombres && <span className="val-nombres">{data.nombres}</span>}
-              </div>
-            </div>
+          <div className="field-block">
+            <label>FECHA DE EXPEDICIÓN:</label>
+            <div className="box-val">{data.fechaExpedicion || '—'}</div>
           </div>
-
-          <div className="footer-carnet-anverso">
-            <span className="tuc-numero" style={{ color: '#6ee7b7' }}>{data.tucNumero || data.codigo}</span>
+          <div className="field-block">
+            <label>FECHA DE VENCIMIENTO:</label>
+            <div className="box-val highlight-red">{data.fechaVencimiento || data.fechaExpiracion || '—'}</div>
+          </div>
+          <div className="field-block">
+            <label>CONDICIÓN:</label>
+            <div className="box-val-sm" style={{ color: '#047857', fontWeight: 800 }}>CAPACITADO Y APTO</div>
           </div>
         </div>
 
-        {/* --- CARA REVERSO --- */}
-        <div className="carnet-box reverso">
-          <div className="reverso-grid">
-            <div className="reverso-info">
-              <div className="field-block">
-                <label>MODALIDAD AUTORIZADA:</label>
-                <div className="box-val">SERVICIO ESPECIAL TRIMÓVIL</div>
-              </div>
-              <div className="field-block">
-                <label>EMPRESA / ASOCIACIÓN:</label>
-                <div className="box-val-sm">{data.asociacion || 'INDEPENDIENTE'}</div>
-              </div>
-              <div className="field-block">
-                <label>FECHA DE EXPEDICIÓN:</label>
-                <div className="box-val">{data.fechaExpedicion || '—'}</div>
-              </div>
-              <div className="field-block">
-                <label>FECHA DE VENCIMIENTO:</label>
-                <div className="box-val highlight-red">{data.fechaVencimiento || data.fechaExpiracion || '—'}</div>
-              </div>
-              <div className="field-block">
-                <label>CONDICIÓN:</label>
-                <div className="box-val-sm" style={{ color: '#047857', fontWeight: 800 }}>CAPACITADO Y APTO</div>
-              </div>
-            </div>
-
-            <div className="reverso-lateral">
-              <div className="qr-container">
-                {isImageQr ? (
-                  <img src={data.qrUrl} alt="QR Validación" />
-                ) : (
-                  <QRCodeSVG value={qrRaw} size={68} level="M" includeMargin={false} />
-                )}
-              </div>
-              <div className="firma-container">
-                <div className="linea-firma"></div>
-                <span>SUB GERENCIA DE TRÁNSITO</span>
-              </div>
-            </div>
+        <div className="reverso-lateral">
+          <div className="qr-container">
+            {isImageQr ? (
+              <img src={data.qrUrl} alt="QR Validación" />
+            ) : (
+              <QRCodeSVG value={qrRaw} size={68} level="M" includeMargin={false} />
+            )}
+          </div>
+          <div className="firma-container">
+            <div className="linea-firma"></div>
+            <span>SUB GERENCIA DE TRÁNSITO</span>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Par Anverso + Reverso de un carnet individual alineado verticalmente para corte y doblado
+ */
+export function CarnetCursoVialItem({ data }) {
+  return (
+    <div className="carnet-item-par">
+      <CarnetCursoVialAnverso data={data} />
+      <CarnetCursoVialReverso data={data} />
+    </div>
+  )
+}
+
+/**
+ * Componente individual de previsualización e impresión: CARNET DE SEGURIDAD VIAL
+ */
+export function CarnetCursoVialPrint({ data }) {
+  return (
+    <PrintWrapper className="carnet-preview-wrap">
+      <div className="carnet-wrapper">
+        <CarnetCursoVialAnverso data={data} />
+        <CarnetCursoVialReverso data={data} />
+      </div>
     </PrintWrapper>
+  )
+}
+
+/**
+ * Componente oficial de impresión en lote: CARNETS DE SEGURIDAD VIAL
+ * Distribución: 4 carnets completos por hoja A4 (2 columnas x 4 filas: Anversos y Reversos en pares)
+ * Garantiza exactamente el formato solicitado (frentes arriba y dorsos abajo) sin desbordamiento de página.
+ */
+export function CarnetCursoVialLotePrint({ items = [] }) {
+  if (!items || items.length === 0) return null
+
+  // Dividir en grupos de hasta 4 carnets por hoja A4
+  const chunks = []
+  for (let i = 0; i < items.length; i += 4) {
+    chunks.push(items.slice(i, i + 4))
+  }
+
+  return (
+    typeof document !== 'undefined' && createPortal(
+      <div id="seccion-impresion" className="seccion-impresion-portal seccion-lote-carnets">
+        {chunks.map((chunk, pageIndex) => (
+          <div key={pageIndex} className="hoja-carnets-lote-a4">
+            <div className="grid-carnets-4">
+              {chunk.map((item, itemIndex) => (
+                <CarnetCursoVialItem key={itemIndex} data={item} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>,
+      document.body
+    )
   )
 }
 
@@ -1233,129 +1291,169 @@ export function AutorizacionUsoViasPrint({ data }) {
 }
 
 /**
- * Componente despachador oficial de impresión: RESOLUCIÓN DE PERMISO Y AUTORIZACIÓN (Hoja A4 Oficial)
+ * Componente oficial de impresión: PERMISO DE CONTROL VEHICULAR (Hoja A4 Oficial MDJLO)
  */
-export function ResolucionPermisoPrint({ data }) {
-  if (!data) return null
+export function AutorizacionControlVehicularPrint({ data }) {
+  const qrRaw = `https://munijlo.gob.pe/transito/validar?tipo=PERM_CTRL&nro=${encodeURIComponent(data.numeroAutorizacion || '')}&placa=${encodeURIComponent(data.vehiculoPlaca || '')}`
 
-  // Despachar según tipo de autorización oficial
-  if (data.tipoPermiso === 'CARGA_DESCARGA') {
-    return <AutorizacionCargaDescargaPrint data={data} />
+  const formatShortDate = (dateStr) => {
+    if (!dateStr) return '—'
+    const parts = String(dateStr).slice(0, 10).split('-')
+    if (parts.length === 3) {
+      const months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SETIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
+      const mIdx = parseInt(parts[1], 10) - 1
+      return `${parts[2]} DE ${months[mIdx] || parts[1]} DEL ${parts[0]}`
+    }
+    return dateStr
   }
-
-  if (data.tipoPermiso === 'USO_VIAS') {
-    return <AutorizacionUsoViasPrint data={data} />
-  }
-
-  const qrRaw = `https://munijlo.gob.pe/transito/validar?tipo=RESOLUCION&exp=${encodeURIComponent(data.numeroExpediente || data.numeroResolucion || '')}`
 
   return (
     <PrintWrapper>
-      <div className="resolucion-permiso-a4" style={{ width: '100%', maxWidth: '190mm', margin: '0 auto', background: '#fff', padding: '6mm 8mm', color: '#000' }}>
-        {/* Cabecera institucional */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #0f172a', paddingBottom: '6px', marginBottom: '14px' }}>
+      <div
+        className="autorizacion-control-a4"
+        style={{
+          width: '100%',
+          maxWidth: '190mm',
+          margin: '0 auto',
+          background: '#ffffff',
+          color: '#000000',
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: '7.5pt',
+          lineHeight: 1.3,
+          padding: '6mm 8mm',
+          boxSizing: 'border-box'
+        }}
+      >
+        {/* CABECERA INSTITUCIONAL */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #4338ca', paddingBottom: '6px', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <img src="/escudo-jlo.png" alt="MDJLO" style={{ width: '48px', height: 'auto' }} />
             <div>
-              <h2 style={{ fontSize: '10pt', fontWeight: 900, margin: 0, textTransform: 'uppercase', color: '#0f172a' }}>
+              <h2 style={{ fontSize: '9.5pt', fontWeight: 900, margin: 0, textTransform: 'uppercase', color: '#0f172a' }}>
                 Municipalidad Distrital de José Leonardo Ortiz
               </h2>
-              <h3 style={{ fontSize: '8pt', fontWeight: 700, margin: '2px 0 0', color: '#475569', textTransform: 'uppercase' }}>
+              <h3 style={{ fontSize: '7.5pt', fontWeight: 800, margin: '2px 0 0', color: '#4338ca', textTransform: 'uppercase' }}>
                 Gerencia de Seguridad Ciudadana y Fiscalización · Subgerencia de Tránsito y Transporte
               </h3>
-              <p style={{ fontSize: '7.5pt', fontWeight: 800, color: '#6d28d9', margin: '2px 0 0' }}>
-                RESOLUCIÓN SUBGERENCIAL DE AUTORIZACIÓN Y PERMISO DE OPERACIÓN
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#475569', margin: '2px 0 0' }}>
+                PERMISO MUNICIPAL DE CONTROL VEHICULAR Y CIRCULACIÓN
               </p>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ border: '2px solid #6d28d9', padding: '4px 10px', borderRadius: '4px', background: '#faf5ff' }}>
-              <span style={{ fontSize: '7pt', fontWeight: 800, display: 'block', color: '#6d28d9' }}>RESOLUCIÓN N°</span>
-              <span style={{ fontSize: '10pt', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a' }}>
-                {data.numeroAutorizacion || data.numeroResolucion || 'R.S. N° 012-2026-MDJLO'}
+            <div style={{ border: '2px solid #4338ca', padding: '4px 10px', borderRadius: '4px', background: '#eef2ff' }}>
+              <span style={{ fontSize: '6.5pt', fontWeight: 800, display: 'block', color: '#4338ca' }}>PERMISO N°</span>
+              <span style={{ fontSize: '9.5pt', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a' }}>
+                {data.numeroAutorizacion || 'AUT. CTRL N° 001-2026-SGTTV'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Ficha del Solicitante y Trámite */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', padding: '10px', borderRadius: '6px', marginBottom: '12px', fontSize: '8pt' }}>
-          <div>
-            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>SOLICITANTE / TITULAR:</strong>
-            <span style={{ fontSize: '9.5pt', fontWeight: 800, color: '#0f172a' }}>{data.solicitanteNombre || data.solicitante || data.propietario || '—'}</span>
+        {/* FICHA TÉCNICA DE LA UNIDAD Y ADMINISTRADO */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', padding: '8px 10px', borderRadius: '6px', marginBottom: '10px', fontSize: '7.5pt' }}>
+          <div style={{ gridColumn: 'span 2' }}>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>ADMINISTRADO / TITULAR:</strong>
+            <span style={{ fontSize: '9pt', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase' }}>
+              {data.solicitanteNombre || data.solicitante || data.propietario || '—'}
+            </span>
           </div>
           <div>
             <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>DOCUMENTO DE IDENTIDAD:</strong>
-            <span style={{ fontFamily: 'monospace', fontWeight: 800 }}>{data.solicitanteRuc ? `RUC ${data.solicitanteRuc}` : `DNI ${data.solicitanteDocumento || data.solicitanteDni || '—'}`}</span>
+            <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '8.5pt' }}>
+              {data.solicitanteRuc ? `RUC ${data.solicitanteRuc}` : `DNI ${data.solicitanteDocumento || data.solicitanteDni || '—'}`}
+            </span>
+          </div>
+
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>PLACA DE RODAJE:</strong>
+            <span style={{ display: 'inline-block', background: '#fef08a', border: '1.5px solid #000', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 900, fontSize: '9pt', color: '#000' }}>
+              {data.vehiculoPlaca || '—'}
+            </span>
           </div>
           <div>
-            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>ASUNTO DE LA RESOLUCIÓN:</strong>
-            <span style={{ fontWeight: 700 }}>{data.asunto || 'Autorización de Operación y Tránsito Especial'}</span>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>EXPEDIENTE / SISGEDO:</strong>
+            <span style={{ fontWeight: 800 }}>{data.expediente || data.referenciaSisgedo || 'S/N'}</span>
           </div>
           <div>
-            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>ZONA AUTORIZADA DE CIRCULACIÓN:</strong>
-            <span style={{ fontWeight: 700, color: '#6d28d9' }}>{data.zonaCirculacion || 'Jurisdicción del Distrito de José Leonardo Ortiz'}</span>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>RECIBO DE DERECHO TUPA:</strong>
+            <span style={{ fontWeight: 800, color: '#16a34a' }}>
+              REC. {data.reciboIngresoNumero || 'S/N'} ({data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toFixed(2)}` : 'S/ 450.00'})
+            </span>
+          </div>
+
+          <div style={{ gridColumn: 'span 2' }}>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>ÁMBITO DE CIRCULACIÓN AUTORIZADO:</strong>
+            <span style={{ fontWeight: 700, color: '#4338ca' }}>
+              {data.zonaCirculacion || 'Anillo Vial y Cuadrantes Autorizados - Distrito de José Leonardo Ortiz'}
+            </span>
+          </div>
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>HORARIO DE CIRCULACIÓN:</strong>
+            <span style={{ fontWeight: 800 }}>
+              {data.horarioInicio && data.horarioFin ? `${data.horarioInicio} a ${data.horarioFin}` : '06:00:00 a 22:00:00'}
+            </span>
           </div>
         </div>
 
-        {/* Contenido Resolutivo */}
-        <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '12px', marginBottom: '14px', background: '#ffffff' }}>
+        {/* PARTE RESOLUTIVA Y CONDICIONES */}
+        <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '10px 12px', marginBottom: '10px', background: '#ffffff' }}>
           <h4 style={{ fontSize: '8pt', fontWeight: 900, color: '#0f172a', margin: '0 0 6px', textTransform: 'uppercase' }}>
-            Parte Resolutiva Oficial:
+            Cuerpo Oficial de la Resolución / Evaluación Técnica:
           </h4>
           {data.contenido && data.contenido.includes('<') ? (
             <div
-              style={{ fontSize: '7.5pt', lineHeight: 1.4, color: '#334155' }}
+              style={{ fontSize: '7.2pt', lineHeight: 1.35, color: '#334155' }}
               dangerouslySetInnerHTML={{ __html: data.contenido }}
             />
           ) : (
-            <p style={{ fontSize: '7.5pt', lineHeight: 1.4, color: '#334155', whiteSpace: 'pre-line' }}>
-              {data.contenido || 'Se autoriza la prestación de servicios de transporte especial en estricto cumplimiento del Reglamento Nacional de Tránsito y las Ordenanzas Municipales vigentes del distrito de José Leonardo Ortiz, quedando sujeto a la fiscalización continua de los inspectores municipales de transporte.'}
+            <p style={{ fontSize: '7.2pt', lineHeight: 1.35, color: '#334155', whiteSpace: 'pre-line', margin: 0 }}>
+              {data.contenido || 'Se autoriza la circulación y operatividad del vehículo especificado al haber acreditado el cumplimiento cabal de las exigencias técnicas y reglamentarias, manteniéndose sujeto a las normas vigentes de tránsito y transporte del Distrito de José Leonardo Ortiz.'}
             </p>
           )}
         </div>
 
-        {/* Vigencia y Fechas */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', border: '1px solid #cbd5e1', padding: '8px 10px', borderRadius: '6px', marginBottom: '16px', fontSize: '7.5pt', background: '#f8fafc' }}>
+        {/* VIGENCIA */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '6px', marginBottom: '12px', fontSize: '7.2pt', background: '#f8fafc' }}>
           <div>
-            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>INICIO DE VIGENCIA:</strong>
-            <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{data.fechaInicioVigencia ? new Date(data.fechaInicioVigencia).toLocaleDateString('es-PE') : 'Inmediato'}</span>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6pt' }}>FECHA DE EMISIÓN:</strong>
+            <span style={{ fontWeight: 800 }}>{formatShortDate(data.fechaEmision || new Date().toISOString())}</span>
           </div>
           <div>
-            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>TÉRMINO DE VIGENCIA:</strong>
-            <span style={{ fontFamily: 'monospace', fontWeight: 900, color: '#b91c1c' }}>{data.fechaFinVigencia ? new Date(data.fechaFinVigencia).toLocaleDateString('es-PE') : 'Indefinido'}</span>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6pt' }}>INICIO DE VIGENCIA:</strong>
+            <span style={{ fontWeight: 800 }}>{formatShortDate(data.fechaInicioVigencia)}</span>
           </div>
           <div>
-            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>HORARIO PERMITIDO:</strong>
-            <span style={{ fontWeight: 700 }}>{data.horarioInicio && data.horarioFin ? `${data.horarioInicio} a ${data.horarioFin}` : 'Todo el día'}</span>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6pt' }}>VENCIMIENTO:</strong>
+            <span style={{ fontWeight: 900, color: '#b91c1c' }}>{formatShortDate(data.fechaFinVigencia)}</span>
           </div>
         </div>
 
-        {/* Validación y Firmas */}
-        <div style={{ display: 'grid', gridTemplateColumns: '75% 25%', gap: '12px', border: '1px solid #cbd5e1', padding: '10px', borderRadius: '6px', marginBottom: '20px' }}>
+        {/* PIE Y FIRMAS */}
+        <div style={{ display: 'grid', gridTemplateColumns: '75% 25%', gap: '10px', border: '1px solid #cbd5e1', padding: '8px', borderRadius: '6px', marginBottom: '16px' }}>
           <div>
-            <p style={{ fontSize: '6.5pt', color: '#475569', margin: 0, lineHeight: 1.3 }}>
-              Dado en la sede de la Subgerencia de Tránsito y Transporte de la Municipalidad Distrital de José Leonardo Ortiz. Regístrese, comuníquese y archívese conforme a Ley N° 27181 y Ley Orgánica de Municipalidades N° 27972.
+            <p style={{ fontSize: '6.2pt', color: '#475569', margin: 0, lineHeight: 1.25 }}>
+              La presente credencial de Control Vehicular es personal e intransferible. Faculta la circulación dentro de los cuadrantes expresamente aprobados. Su portabilidad física o digital verificable mediante código QR es de carácter obligatorio frente a la Policía Nacional del Perú e Inspectores Municipales de Transporte.
             </p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <QRCodeSVG value={qrRaw} size={65} level="M" includeMargin={false} />
-            <span style={{ fontSize: '5.5pt', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>VERIFICACIÓN OFICIAL</span>
+            <QRCodeSVG value={qrRaw} size={58} level="M" includeMargin={false} />
+            <span style={{ fontSize: '5.2pt', fontWeight: 800, color: '#4338ca', marginTop: '2px' }}>CONTROL OFICIAL</span>
           </div>
         </div>
 
-        {/* Firmas */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '40px', textAlign: 'center', marginTop: '24px' }}>
+        {/* FIRMAS INSTITUCIONALES */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '40px', textAlign: 'center', marginTop: '18px' }}>
           <div>
             <div style={{ borderTop: '1px solid #0f172a', paddingTop: '4px', width: '80%', margin: '0 auto' }}>
-              <strong style={{ fontSize: '7.5pt', display: 'block', color: '#0f172a' }}>SUBGERENTE DE TRÁNSITO Y TRANSPORTE</strong>
-              <span style={{ fontSize: '6.5pt', color: '#64748b' }}>Municipalidad Distrital de José Leonardo Ortiz</span>
+              <strong style={{ fontSize: '7.2pt', display: 'block', color: '#0f172a' }}>SUBGERENTE DE TRÁNSITO Y TRANSPORTE</strong>
+              <span style={{ fontSize: '6pt', color: '#64748b' }}>Municipalidad Distrital de José Leonardo Ortiz</span>
             </div>
           </div>
           <div>
             <div style={{ borderTop: '1px solid #0f172a', paddingTop: '4px', width: '80%', margin: '0 auto' }}>
-              <strong style={{ fontSize: '7.5pt', display: 'block', color: '#0f172a' }}>GERENTE DE SEGURIDAD CIUDADANA Y FISCALIZACIÓN</strong>
-              <span style={{ fontSize: '6.5pt', color: '#64748b' }}>Municipalidad Distrital de José Leonardo Ortiz</span>
+              <strong style={{ fontSize: '7.2pt', display: 'block', color: '#0f172a' }}>GERENTE DE SEGURIDAD CIUDADANA Y FISCALIZACIÓN</strong>
+              <span style={{ fontSize: '6pt', color: '#64748b' }}>Municipalidad Distrital de José Leonardo Ortiz</span>
             </div>
           </div>
         </div>
@@ -1363,3 +1461,206 @@ export function ResolucionPermisoPrint({ data }) {
     </PrintWrapper>
   )
 }
+
+/**
+ * Componente oficial de impresión: AUTORIZACIÓN DE ZONAS RESERVADAS DE ESTACIONAMIENTO (Hoja A4 Oficial MDJLO)
+ */
+export function AutorizacionZonasReservadasPrint({ data }) {
+  const qrRaw = `https://munijlo.gob.pe/transito/validar?tipo=AUT_ZONA_RES&nro=${encodeURIComponent(data.numeroAutorizacion || '')}&titular=${encodeURIComponent(data.solicitanteNombre || data.solicitante || '')}`
+
+  const formatShortDate = (dateStr) => {
+    if (!dateStr) return '—'
+    const parts = String(dateStr).slice(0, 10).split('-')
+    if (parts.length === 3) {
+      const months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SETIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
+      const mIdx = parseInt(parts[1], 10) - 1
+      return `${parts[2]} DE ${months[mIdx] || parts[1]} DEL ${parts[0]}`
+    }
+    return dateStr
+  }
+
+  return (
+    <PrintWrapper>
+      <div
+        className="autorizacion-zonas-a4"
+        style={{
+          width: '100%',
+          maxWidth: '190mm',
+          margin: '0 auto',
+          background: '#ffffff',
+          color: '#000000',
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: '7.5pt',
+          lineHeight: 1.3,
+          padding: '6mm 8mm',
+          boxSizing: 'border-box'
+        }}
+      >
+        {/* CABECERA INSTITUCIONAL */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #047857', paddingBottom: '6px', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src="/escudo-jlo.png" alt="MDJLO" style={{ width: '48px', height: 'auto' }} />
+            <div>
+              <h2 style={{ fontSize: '9.5pt', fontWeight: 900, margin: 0, textTransform: 'uppercase', color: '#0f172a' }}>
+                Municipalidad Distrital de José Leonardo Ortiz
+              </h2>
+              <h3 style={{ fontSize: '7.5pt', fontWeight: 800, margin: '2px 0 0', color: '#047857', textTransform: 'uppercase' }}>
+                Gerencia de Seguridad Ciudadana y Fiscalización · Subgerencia de Tránsito y Transporte
+              </h3>
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#475569', margin: '2px 0 0' }}>
+                AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA
+              </p>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ border: '2px solid #047857', padding: '4px 10px', borderRadius: '4px', background: '#ecfdf5' }}>
+              <span style={{ fontSize: '6.5pt', fontWeight: 800, display: 'block', color: '#047857' }}>AUTORIZACIÓN N°</span>
+              <span style={{ fontSize: '9.5pt', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a' }}>
+                {data.numeroAutorizacion || 'AUT. ZONA RES N° 001-2026-SGTTV'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* FICHA DE LA ENTIDAD / ESTABLECIMIENTO Y UBICACIÓN */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', padding: '8px 10px', borderRadius: '6px', marginBottom: '10px', fontSize: '7.5pt' }}>
+          <div style={{ gridColumn: 'span 2' }}>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>ESTABLECIMIENTO / RAZÓN SOCIAL:</strong>
+            <span style={{ fontSize: '9pt', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase' }}>
+              {data.solicitanteNombre || data.solicitante || '—'}
+            </span>
+          </div>
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>DOCUMENTO DE IDENTIDAD / RUC:</strong>
+            <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '8.5pt' }}>
+              {data.solicitanteRuc ? `RUC ${data.solicitanteRuc}` : `DOC ${data.solicitanteDocumento || data.solicitanteDni || '—'}`}
+            </span>
+          </div>
+
+          <div style={{ gridColumn: 'span 2' }}>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>FRONTIS / UBICACIÓN AUTORIZADA:</strong>
+            <span style={{ fontWeight: 800, color: '#047857', fontSize: '8pt' }}>
+              {data.ubicacion || data.zonaCirculacion || 'Frontis del establecimiento solicitante - José Leonardo Ortiz'}
+            </span>
+          </div>
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>HORARIO DE RESERVA:</strong>
+            <span style={{ fontWeight: 800 }}>
+              {data.horarioInicio && data.horarioFin ? `${data.horarioInicio} a ${data.horarioFin}` : '07:00:00 a 20:00:00'}
+            </span>
+          </div>
+
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>EXPEDIENTE / SISGEDO:</strong>
+            <span style={{ fontWeight: 800 }}>{data.expediente || data.referenciaSisgedo || 'S/N'}</span>
+          </div>
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>REPRESENTANTE LEGAL:</strong>
+            <span style={{ fontWeight: 700 }}>{data.representanteLegal || '—'}</span>
+          </div>
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>DERECHO TUPA ANUAL:</strong>
+            <span style={{ fontWeight: 800, color: '#16a34a' }}>
+              REC. {data.reciboIngresoNumero || 'S/N'} ({data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toFixed(2)}` : 'S/ 920.00'})
+            </span>
+          </div>
+        </div>
+
+        {/* PARTE RESOLUTIVA OFICIAL */}
+        <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '10px 12px', marginBottom: '10px', background: '#ffffff' }}>
+          <h4 style={{ fontSize: '8pt', fontWeight: 900, color: '#0f172a', margin: '0 0 6px', textTransform: 'uppercase' }}>
+            Parte Resolutiva Oficial y Disposiciones Técnicas:
+          </h4>
+          {data.contenido && data.contenido.includes('<') ? (
+            <div
+              style={{ fontSize: '7.2pt', lineHeight: 1.35, color: '#334155' }}
+              dangerouslySetInnerHTML={{ __html: data.contenido }}
+            />
+          ) : (
+            <p style={{ fontSize: '7.2pt', lineHeight: 1.35, color: '#334155', whiteSpace: 'pre-line', margin: 0 }}>
+              {data.contenido || 'Se autoriza la reserva de estacionamiento temporal en la vía pública frente al inmueble señalado, quedando sujeto a la estricta demarcación reglamentaria y prohibición de obstaculización fuera del cajón asignado.'}
+            </p>
+          )}
+        </div>
+
+        {/* VIGENCIA */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '6px', marginBottom: '12px', fontSize: '7.2pt', background: '#f8fafc' }}>
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6pt' }}>FECHA DE EMISIÓN:</strong>
+            <span style={{ fontWeight: 800 }}>{formatShortDate(data.fechaEmision || new Date().toISOString())}</span>
+          </div>
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6pt' }}>INICIO DE VIGENCIA:</strong>
+            <span style={{ fontWeight: 800 }}>{formatShortDate(data.fechaInicioVigencia)}</span>
+          </div>
+          <div>
+            <strong style={{ color: '#64748b', display: 'block', fontSize: '6pt' }}>VENCIMIENTO:</strong>
+            <span style={{ fontWeight: 900, color: '#b91c1c' }}>{formatShortDate(data.fechaFinVigencia)}</span>
+          </div>
+        </div>
+
+        {/* PIE Y FIRMAS */}
+        <div style={{ display: 'grid', gridTemplateColumns: '75% 25%', gap: '10px', border: '1px solid #cbd5e1', padding: '8px', borderRadius: '6px', marginBottom: '16px' }}>
+          <div>
+            <p style={{ fontSize: '6.2pt', color: '#475569', margin: 0, lineHeight: 1.25 }}>
+              La presente autorización de Zona Reservada no otorga derecho posesorio ni propiedad sobre la vía pública. Exige la demarcación reglamentaria con pintura amarilla y blanca de tráfico y señal vertical R-36 informativa. Queda terminantemente prohibido lucrar o cobrar por el uso de este espacio. Es revocable por necesidad del tránsito distrital.
+            </p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <QRCodeSVG value={qrRaw} size={58} level="M" includeMargin={false} />
+            <span style={{ fontSize: '5.2pt', fontWeight: 800, color: '#047857', marginTop: '2px' }}>ZONA RESERVADA</span>
+          </div>
+        </div>
+
+        {/* FIRMAS INSTITUCIONALES */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '40px', textAlign: 'center', marginTop: '18px' }}>
+          <div>
+            <div style={{ borderTop: '1px solid #0f172a', paddingTop: '4px', width: '80%', margin: '0 auto' }}>
+              <strong style={{ fontSize: '7.2pt', display: 'block', color: '#0f172a' }}>SUBGERENTE DE TRÁNSITO Y TRANSPORTE</strong>
+              <span style={{ fontSize: '6pt', color: '#64748b' }}>Municipalidad Distrital de José Leonardo Ortiz</span>
+            </div>
+          </div>
+          <div>
+            <div style={{ borderTop: '1px solid #0f172a', paddingTop: '4px', width: '80%', margin: '0 auto' }}>
+              <strong style={{ fontSize: '7.2pt', display: 'block', color: '#0f172a' }}>GERENTE DE SEGURIDAD CIUDADANA Y FISCALIZACIÓN</strong>
+              <span style={{ fontSize: '6pt', color: '#64748b' }}>Municipalidad Distrital de José Leonardo Ortiz</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </PrintWrapper>
+  )
+}
+
+/**
+ * Componente despachador oficial de impresión: RESOLUCIÓN DE PERMISO Y AUTORIZACIÓN (Hoja A4 Oficial)
+ * Despacha entre los 4 trámites oficiales municipales:
+ * 1. Carga y Descarga (CARGA_DESCARGA)
+ * 2. Uso Provisional de Vías (USO_VIAS)
+ * 3. Zonas Reservadas de Estacionamiento (ZONAS_RESERVADAS)
+ * 4. Permiso de Control Vehicular (CONTROL_VEHICULAR / OPERACION)
+ */
+export function ResolucionPermisoPrint({ data }) {
+  if (!data) return null
+
+  const tipo = (data.tipoPermiso || '').toUpperCase()
+
+  // 1. Carga y Descarga
+  if (tipo === 'CARGA_DESCARGA') {
+    return <AutorizacionCargaDescargaPrint data={data} />
+  }
+
+  // 2. Uso Provisional de Vías
+  if (tipo === 'USO_VIAS') {
+    return <AutorizacionUsoViasPrint data={data} />
+  }
+
+  // 3. Zonas Reservadas
+  if (tipo === 'ZONAS_RESERVADAS' || tipo === 'ZONA_RESERVADA') {
+    return <AutorizacionZonasReservadasPrint data={data} />
+  }
+
+  // 4. Permiso de Control Vehicular (CONTROL_VEHICULAR o legado OPERACION)
+  return <AutorizacionControlVehicularPrint data={data} />
+}
+

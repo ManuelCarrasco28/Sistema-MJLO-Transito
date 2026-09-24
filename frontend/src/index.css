@@ -614,6 +614,8 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   .resolucion-permiso-a4,
   .autorizacion-carga-a4,
   .autorizacion-vias-a4,
+  .autorizacion-control-a4,
+  .autorizacion-zonas-a4,
   .carnet-wrapper,
   .print-card-container {
     page-break-inside: avoid !important;
@@ -631,7 +633,9 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   .constancia-soat-a4,
   .resolucion-permiso-a4,
   .autorizacion-carga-a4,
-  .autorizacion-vias-a4 {
+  .autorizacion-vias-a4,
+  .autorizacion-control-a4,
+  .autorizacion-zonas-a4 {
     width: 100% !important;
     max-width: 194mm !important;
     margin: 0 auto !important;
@@ -653,6 +657,60 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     break-inside: avoid !important;
     box-shadow: none !important;
     border: 0.3pt solid #1e293b !important;
+  }
+
+  /* Carnets en Lote (4 carnets por hoja A4) */
+  .seccion-lote-carnets {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }
+
+  .hoja-carnets-lote-a4 {
+    width: 100% !important;
+    max-width: 210mm !important;
+    min-height: 280mm !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-before: auto !important;
+    break-before: auto !important;
+    padding: 6mm 4mm !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+  }
+
+  .hoja-carnets-lote-a4:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  .grid-carnets-4 {
+    display: grid !important;
+    grid-template-columns: 85.6mm 85.6mm !important;
+    column-gap: 12mm !important;
+    row-gap: 7mm !important;
+    justify-content: center !important;
+    align-content: center !important;
+    margin: 0 auto !important;
+    width: fit-content !important;
+  }
+
+  .carnet-item-par {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3mm !important;
+    align-items: center !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    width: 85.6mm !important;
   }
 
   /* Configuración de página estándar: A4 con margen de seguridad de 5mm 6mm para evitar cortes en bordes */
