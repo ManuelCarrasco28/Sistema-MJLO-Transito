@@ -1043,6 +1043,15 @@ export function Papeletas({ user }) {
                 </div>
 
                 <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Observaciones</h4>
+                  <div className="text-xs">
+                    <p className="font-medium text-slate-700 dark:text-slate-300">
+                      {selectedPapeleta.observacionesAutoridad || 'Sin observaciones por parte de la autoridad.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
                   <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Estado Económico</h4>
                   <div className="grid grid-cols-2 gap-3 text-xs mb-2">
                     <div>

@@ -385,6 +385,22 @@ class PapeletasController extends ResourceController
 
             (new \App\Services\PagosTransito($db))->generar('PAPELETA', (int)$papeletaId);
 
+            $fotos = $input['fotos'] ?? [];
+            if (!empty($fotos) && is_array($fotos)) {
+                foreach ($fotos as $foto) {
+                    $fotoStr = trim((string)$foto);
+                    if ($fotoStr !== '') {
+                        if (!str_starts_with($fotoStr, 'data:image/')) {
+                            $fotoStr = 'data:image/jpeg;base64,' . $fotoStr;
+                        }
+                        $db->table('papeleta_fotos')->insert([
+                            'id_papeleta' => $papeletaId,
+                            'foto' => $fotoStr,
+                        ]);
+                    }
+                }
+            }
+
             $db->transCommit();
             $txStarted = false;
 
@@ -533,12 +549,20 @@ class PapeletasController extends ResourceController
     {
         try {
             $db = \Config\Database::connect();
-            $fotos = $db->table('reporte_intervencion_fotos f')
+            $fotosReporte = $db->table('reporte_intervencion_fotos f')
                 ->select('f.id, f.foto')
                 ->join('reportes_intervencion ri', 'ri.id = f.id_reporte')
                 ->where('ri.id_papeleta', $id)
                 ->get()
                 ->getResultArray();
+                
+            $fotosPapeleta = $db->table('papeleta_fotos')
+                ->select('id, foto')
+                ->where('id_papeleta', $id)
+                ->get()
+                ->getResultArray();
+
+            $fotos = array_merge($fotosReporte, $fotosPapeleta);
 
             return $this->respond($fotos);
         } catch (\Exception $e) {
