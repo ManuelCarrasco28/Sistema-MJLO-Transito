@@ -42,8 +42,12 @@ export function PagoPapeletaModal({
               <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.vehiculoPlaca}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-bold text-slate-500 dark:text-slate-400">Infracción:</span>
-              <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.tipoInfraccionCodigo || 'G01'}</span>
+              <span className="font-bold text-slate-500 dark:text-slate-400">Infracción{papeletaToAction.detalles?.length > 1 ? 'es' : ''}:</span>
+              <span className="font-bold text-slate-800 dark:text-white font-mono">
+                {papeletaToAction.detalles?.length > 0
+                  ? papeletaToAction.detalles.map(d => d.codigo).join(', ')
+                  : (papeletaToAction.tipoInfraccionCodigo || 'G01')}
+              </span>
             </div>
             <div className="border-t border-emerald-200 dark:border-emerald-800/60 pt-2 flex justify-between items-center">
               <span className="font-black text-slate-700 dark:text-slate-300 uppercase">Monto a Cancelar:</span>

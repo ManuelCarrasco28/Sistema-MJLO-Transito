@@ -912,27 +912,52 @@ export function Papeletas({ user }) {
                         )}
                       </td>
                       <td className="px-3.5 py-3.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const codigo = p.tipoInfraccionCodigo || tipoInf?.codigo || 'Infracción'
-                            const descripcion = p.tipoInfraccionDescripcion || tipoInf?.descripcion || 'Infracción según Reglamento Nacional de Tránsito y Transporte.'
-                            const gravedad = tipoInf?.gravedad || p.tipoInfraccionGravedad || (codigo.startsWith('M') ? 'MUY GRAVE' : codigo.startsWith('G') ? 'GRAVE' : 'LEVE')
-                            const porcentajeUit = tipoInf?.porcentajeUit ?? null
-                            setSelectedInfraccion({
-                              codigo,
-                              descripcion,
-                              gravedad,
-                              monto: p.montoTotal || tipoInf?.montoBase || 0,
-                              porcentajeUit,
-                              numeroPapeleta: p.numeroPapeleta,
-                            })
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 font-mono text-xs font-black text-rose-700 border border-rose-200/70 transition-all hover:scale-105 hover:bg-rose-100 hover:border-rose-300 hover:shadow-xs active:scale-95 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/60 dark:hover:bg-rose-900/60 cursor-pointer"
-                          title="Clic para ver detalle de la infracción"
-                        >
-                          <span>{p.tipoInfraccionCodigo || tipoInf?.codigo || 'G01'}</span>
-                        </button>
+                        <div className="flex flex-wrap items-center justify-center gap-1">
+                          {p.detalles?.length > 0 ? (
+                            p.detalles.map((det, dIdx) => (
+                              <button
+                                key={dIdx}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedInfraccion({
+                                    codigo: det.codigo || 'Infracción',
+                                    descripcion: det.descripcion || 'Infracción según Reglamento Nacional de Tránsito y Transporte.',
+                                    gravedad: det.gravedad || 'LEVE',
+                                    monto: det.monto || 0,
+                                    porcentajeUit: null,
+                                    numeroPapeleta: p.numeroPapeleta,
+                                  })
+                                }}
+                                className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 font-mono text-xs font-black text-rose-700 border border-rose-200/70 transition-all hover:scale-105 hover:bg-rose-100 hover:border-rose-300 hover:shadow-xs active:scale-95 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/60 dark:hover:bg-rose-900/60 cursor-pointer"
+                                title={`Clic para ver detalle de ${det.codigo}`}
+                              >
+                                <span>{det.codigo}</span>
+                              </button>
+                            ))
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const codigo = p.tipoInfraccionCodigo || tipoInf?.codigo || 'Infracción'
+                                const descripcion = p.tipoInfraccionDescripcion || tipoInf?.descripcion || 'Infracción según Reglamento Nacional de Tránsito y Transporte.'
+                                const gravedad = tipoInf?.gravedad || p.tipoInfraccionGravedad || (codigo.startsWith('M') ? 'MUY GRAVE' : codigo.startsWith('G') ? 'GRAVE' : 'LEVE')
+                                const porcentajeUit = tipoInf?.porcentajeUit ?? null
+                                setSelectedInfraccion({
+                                  codigo,
+                                  descripcion,
+                                  gravedad,
+                                  monto: p.montoTotal || tipoInf?.montoBase || 0,
+                                  porcentajeUit,
+                                  numeroPapeleta: p.numeroPapeleta,
+                                })
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 font-mono text-xs font-black text-rose-700 border border-rose-200/70 transition-all hover:scale-105 hover:bg-rose-100 hover:border-rose-300 hover:shadow-xs active:scale-95 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/60 dark:hover:bg-rose-900/60 cursor-pointer"
+                              title="Clic para ver detalle de la infracción"
+                            >
+                              <span>{p.tipoInfraccionCodigo || tipoInf?.codigo || 'G01'}</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3.5 py-3.5 text-center text-slate-600 dark:text-slate-400">
                         <p className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-xs">{new Date(p.fechaHora).toLocaleDateString()}</p>
