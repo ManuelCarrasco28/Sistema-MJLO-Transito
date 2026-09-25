@@ -230,7 +230,7 @@ class UsuariosController extends ResourceController
         );
 
         unset($usuario['clave']);
-        return $this->respond($this->formatResponse(true, 'Contraseña actualizada correctamente.', $usuario), 200);
+        return $this->respond(['message' => 'Contraseña actualizada correctamente.', 'data' => $usuario]);
     }
 
     public function delete($id = null)

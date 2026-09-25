@@ -64,6 +64,7 @@ export function FloatingSelect({
   className = '',
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [openUpwards, setOpenUpwards] = useState(false)
   const containerRef = useRef(null)
 
   useEffect(() => {
@@ -76,14 +77,28 @@ export function FloatingSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const handleToggle = () => {
+    if (!isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      // Si hay menos de 220px abajo y más espacio arriba, abrir hacia arriba
+      if (spaceBelow < 220 && rect.top > spaceBelow) {
+        setOpenUpwards(true)
+      } else {
+        setOpenUpwards(false)
+      }
+    }
+    setIsOpen((prev) => !prev)
+  }
+
   const selectedOption = options.find((opt) => opt.value === value) || options[0]
 
   return (
-    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : ''} ${className}`}>
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
       <button
         type="button"
         id={id}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-[var(--bg-subtle)] dark:text-white cursor-pointer ${
           isOpen
             ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
@@ -117,8 +132,12 @@ export function FloatingSelect({
       </label>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 max-w-[calc(100vw-2rem)] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/15 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
-          <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
+        <div
+          className={`absolute left-0 right-0 ${
+            openUpwards ? 'bottom-full mb-1' : 'top-full mt-1'
+          } max-w-[calc(100vw-2rem)] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-2xl shadow-slate-900/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100`}
+        >
+          <div className="space-y-0.5 max-h-56 overflow-y-auto custom-scrollbar">
             {options.map((opt) => {
               const isSelected = opt.value === value
               return (

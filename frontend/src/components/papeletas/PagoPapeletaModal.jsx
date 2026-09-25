@@ -17,8 +17,8 @@ export function PagoPapeletaModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-emerald-500/30 dark:border-emerald-500/20">
-        <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50/80 px-6 py-4 dark:border-emerald-900/30 dark:bg-emerald-950/40">
+      <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-emerald-500/30 dark:border-emerald-500/20">
+        <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50/80 px-6 py-4 rounded-t-3xl dark:border-emerald-900/30 dark:bg-emerald-950/40">
           <div className="flex items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-xl bg-emerald-600 text-white font-black text-sm">
               <Icon name="creditCard" className="size-4.5" />
@@ -42,8 +42,12 @@ export function PagoPapeletaModal({
               <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.vehiculoPlaca}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-bold text-slate-500 dark:text-slate-400">Infracción:</span>
-              <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.tipoInfraccionCodigo || 'G01'}</span>
+              <span className="font-bold text-slate-500 dark:text-slate-400">Infracción{papeletaToAction.detalles?.length > 1 ? 'es' : ''}:</span>
+              <span className="font-bold text-slate-800 dark:text-white font-mono">
+                {papeletaToAction.detalles?.length > 0
+                  ? papeletaToAction.detalles.map(d => d.codigo).join(', ')
+                  : (papeletaToAction.tipoInfraccionCodigo || 'G01')}
+              </span>
             </div>
             <div className="border-t border-emerald-200 dark:border-emerald-800/60 pt-2 flex justify-between items-center">
               <span className="font-black text-slate-700 dark:text-slate-300 uppercase">Monto a Cancelar:</span>

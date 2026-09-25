@@ -949,8 +949,8 @@ export function Usuarios({ user }) {
       {/* MODAL 1: NUEVO USUARIO */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-visible">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] rounded-t-3xl">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
                   <Icon name="people" className="size-5" />
@@ -1129,8 +1129,8 @@ export function Usuarios({ user }) {
       {/* MODAL 2: EDITAR ROL Y ESTADO */}
       {isEditModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-visible">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] rounded-t-3xl">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
                   <Icon name="pencil" className="size-4" />
@@ -1205,8 +1205,8 @@ export function Usuarios({ user }) {
       {/* MODAL 3: RESTABLECER CONTRASEÑA */}
       {isPasswordModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] rounded-t-3xl">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
                   <Icon name="settings" className="size-4" />
@@ -1279,8 +1279,8 @@ export function Usuarios({ user }) {
       {/* MODAL 4: FICHA DETALLE DEL USUARIO */}
       {isDetailModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
                   <Icon name="eye" className="size-4" />

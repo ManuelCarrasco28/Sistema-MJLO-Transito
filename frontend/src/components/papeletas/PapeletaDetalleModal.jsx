@@ -12,10 +12,30 @@ export function PapeletaDetalleModal({
 }) {
   if (!selectedPapeleta) return null
 
+  const detallesList = selectedPapeleta.detalles?.length > 0
+    ? selectedPapeleta.detalles
+    : [
+        {
+          codigo: selectedPapeleta.tipoInfraccionCodigo || 'G01',
+          gravedad: selectedPapeleta.tipoInfraccionGravedad || 'LEVE',
+          descripcion: selectedPapeleta.tipoInfraccionDescripcion || 'Infracción al Reglamento Nacional de Tránsito',
+          monto: selectedPapeleta.montoTotal,
+          descuento: 0,
+        },
+      ]
+
+  const montoBaseTotal = selectedPapeleta.detalles?.length > 0
+    ? selectedPapeleta.detalles.reduce((acc, d) => acc + (parseFloat(d.monto) || 0), 0)
+    : (parseFloat(selectedPapeleta.montoTotal) || 0)
+
+  const descuentoTotal = selectedPapeleta.detalles?.length > 0
+    ? selectedPapeleta.detalles.reduce((acc, d) => acc + (parseFloat(d.descuento) || 0), 0)
+    : 0
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-      <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-        <div className="flex items-center justify-between border-b border-rose-600/20 bg-rose-50 p-5 dark:bg-rose-950/30">
+      <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="flex items-center justify-between border-b border-rose-600/20 bg-rose-50 p-5 rounded-t-3xl dark:bg-rose-950/30">
           <div>
             <h3 className="text-xl font-black text-rose-700 dark:text-rose-400">{selectedPapeleta.numeroPapeleta}</h3>
           </div>
@@ -25,20 +45,51 @@ export function PapeletaDetalleModal({
 
           <div className="space-y-4">
             <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-              <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Identificación de la Falta</h4>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <p className="text-slate-400">Código</p>
-                  <p className="font-extrabold text-slate-800 dark:text-white text-sm">{selectedPapeleta.tipoInfraccionCodigo || selectedPapeleta.detalles?.[0]?.codigo || 'G01'}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400">Calificación</p>
-                  <p className="font-extrabold text-slate-800 dark:text-white">{selectedPapeleta.tipoInfraccionGravedad || selectedPapeleta.detalles?.[0]?.gravedad || 'LEVE'}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-slate-400">Descripción</p>
-                  <p className="font-medium text-slate-700 dark:text-slate-300">{selectedPapeleta.tipoInfraccionDescripcion || selectedPapeleta.detalles?.[0]?.descripcion || 'Infracción al Reglamento'}</p>
-                </div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-black uppercase tracking-wider text-rose-600">
+                  {detallesList.length > 1
+                    ? `Infracciones Imputadas (${detallesList.length})`
+                    : 'Identificación de la Falta'}
+                </h4>
+              </div>
+
+              <div className="space-y-2.5">
+                {detallesList.map((det, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-xl border border-slate-200/90 bg-white p-3 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-100 dark:border-[var(--border)]">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-black text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-lg border border-rose-200/60 dark:border-rose-900/50">
+                          {det.codigo || 'SIN CÓDIGO'}
+                        </span>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                          (det.gravedad || '').includes('MUY')
+                            ? 'bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300'
+                            : (det.gravedad || '').includes('GRAVE')
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
+                            : 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300'
+                        }`}>
+                          {det.gravedad || 'LEVE'}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block leading-tight">Monto</span>
+                        <span className="font-mono font-black text-xs text-slate-800 dark:text-white">
+                          S/ {parseFloat(det.monto || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Descripción</p>
+                      <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5 leading-relaxed">
+                        {det.descripcion || 'Sin descripción registrada'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -99,19 +150,19 @@ export function PapeletaDetalleModal({
               <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Estado Económico</h4>
               <div className="grid grid-cols-2 gap-3 text-xs mb-2">
                 <div>
-                  <p className="text-slate-400">Monto Base</p>
-                  <p className="font-bold text-slate-800 dark:text-white">S/ {parseFloat(selectedPapeleta.detalles?.[0]?.monto || selectedPapeleta.montoTotal).toFixed(2)}</p>
+                  <p className="text-slate-400">Monto Base Total</p>
+                  <p className="font-bold text-slate-800 dark:text-white">S/ {montoBaseTotal.toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Descuento</p>
-                  <p className="font-bold text-emerald-600">S/ {parseFloat(selectedPapeleta.detalles?.[0]?.descuento || 0).toFixed(2)}</p>
+                  <p className="text-slate-400">Descuento Total</p>
+                  <p className="font-bold text-emerald-600">S/ {descuentoTotal.toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-slate-400">Estado de Pago</p>
                   <StatusBadge status={selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado} />
                 </div>
                 <div>
-                  <p className="text-slate-400">Total</p>
+                  <p className="text-slate-400">Total a Pagar</p>
                   <p className="font-mono font-black text-base text-rose-600 dark:text-rose-400">S/ {selectedPapeleta.montoTotal.toFixed(2)}</p>
                 </div>
               </div>
