@@ -800,9 +800,9 @@ export function Pagos() {
       {/* MODAL DE ARQUEO Y CIERRE DE CAJA DIARIO */}
       {isArqueoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-enter print:static print:block print:p-8 print:bg-transparent print:overflow-visible">
-          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:max-h-none print:border-none print:shadow-none print:rounded-none">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:max-h-none print:border-none print:shadow-none print:rounded-none">
             {/* Cabecera del modal */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 dark:border-[var(--border)] dark:bg-slate-900/80 print:bg-transparent print:border-black print:pb-2 print:mb-4 print:px-0">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 rounded-t-3xl dark:border-[var(--border)] dark:bg-slate-900/80 print:bg-transparent print:border-black print:pb-2 print:mb-4 print:px-0">
               <div className="flex items-center gap-3 print:w-full print:justify-center print:flex-col print:gap-1">
                 <span className="grid size-10 place-items-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 print:hidden">
                   <Icon name="chart" className="size-5" />

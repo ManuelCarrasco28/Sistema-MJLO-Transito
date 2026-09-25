@@ -17,8 +17,8 @@ export function PagoPapeletaModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-emerald-500/30 dark:border-emerald-500/20">
-        <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50/80 px-6 py-4 dark:border-emerald-900/30 dark:bg-emerald-950/40">
+      <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-emerald-500/30 dark:border-emerald-500/20">
+        <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50/80 px-6 py-4 rounded-t-3xl dark:border-emerald-900/30 dark:bg-emerald-950/40">
           <div className="flex items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-xl bg-emerald-600 text-white font-black text-sm">
               <Icon name="creditCard" className="size-4.5" />
