@@ -9,10 +9,9 @@ import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../con
 import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
-import { RoundedSelect } from '../components/ui/FormInputs'
+import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { VehiculoFormModal } from '../components/vehiculos/VehiculoFormModal'
 import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleModal'
-import { PersonaRapidaModal } from '../components/vehiculos/PersonaRapidaModal'
 
 export function Vehiculos() {
   const cachedVeh = getCachedData('/vehiculos')
@@ -37,21 +36,16 @@ export function Vehiculos() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
   const [selectedVehiculo, setSelectedVehiculo] = useState(null)
-  const [isSearchingSunarp, setIsSearchingSunarp] = useState(false)
-  const [propietariosEncontrados, setPropietariosEncontrados] = useState([])
-  const [selectedOwnerIndex, setSelectedOwnerIndex] = useState(0)
-  const [isPersonaRapidaOpen, setIsPersonaRapidaOpen] = useState(false)
-  const [personaRapidaInitialNombre, setPersonaRapidaInitialNombre] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
 
   const [formData, setFormData] = useState({
     placa: '',
-    tipo: '',
+    tipo: 'Mototaxi (Trimovil)',
     marca: '',
     modelo: '',
     color: '',
-    anio: '',
+    anio: new Date().getFullYear(),
     categoria: '',
     carroceria: '',
     sedeRegistro: '',
@@ -305,11 +299,11 @@ export function Vehiculos() {
     setShowAsociacionResults(false)
     setFormData({
       placa: '',
-      tipo: '',
+      tipo: 'Mototaxi (Trimovil)',
       marca: '',
       modelo: '',
       color: '',
-      anio: '',
+      anio: new Date().getFullYear(),
       categoria: '',
       carroceria: '',
       sedeRegistro: '',
@@ -324,8 +318,6 @@ export function Vehiculos() {
       soatEstado: 'VIGENTE',
       tucNumero: `TUC-2026-${Math.floor(100 + Math.random() * 900)}`,
     })
-    setPropietariosEncontrados([])
-    setSelectedOwnerIndex(0)
     setIsEditing(false)
     setIsModalOpen(true)
   }
@@ -345,185 +337,8 @@ export function Vehiculos() {
       propietario: vehiculo.propietario || '',
       estado: vehiculo.estado === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'
     })
-    setPropietariosEncontrados([])
-    setSelectedOwnerIndex(0)
     setIsEditing(true)
     setIsModalOpen(true)
-  }
-
-  const handleSelectFoundOwner = (index) => {
-    setSelectedOwnerIndex(index)
-    const owner = propietariosEncontrados[index]
-    if (!owner) return
-
-    if (owner.matchedPersona) {
-      selectPropietario(owner.matchedPersona)
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        propietarioDni: '',
-        propietario: ''
-      }))
-      setPropietarioSearch(owner.nombre)
-      setShowPropietarioResults(false)
-    }
-  }
-
-  const handleOpenPersonaRapida = (nombre = '') => {
-    setPersonaRapidaInitialNombre(nombre || '')
-    setIsPersonaRapidaOpen(true)
-  }
-
-  const handlePersonaCreada = (newPersona) => {
-    const nextPersonas = [newPersona, ...personas]
-    setPersonas(nextPersonas)
-    setCachedData('/personas', nextPersonas)
-
-    // Actualizar propietariosEncontrados vinculando a la nueva persona creada
-    setPropietariosEncontrados((prev) =>
-      prev.map((prop, idx) => {
-        if (
-          idx === selectedOwnerIndex ||
-          (prop.nombre && newPersona.nombres && prop.nombre.toUpperCase().includes(newPersona.nombres.toUpperCase()))
-        ) {
-          return { ...prop, matchedPersona: newPersona }
-        }
-        return prop
-      })
-    )
-
-    // Seleccionar automáticamente como titular del vehículo
-    selectPropietario(newPersona)
-  }
-
-  const handleSunarpSearch = async () => {
-    const rawPlaca = formData.placa?.trim() || ''
-    const cleanPlaca = rawPlaca.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
-
-    if (!cleanPlaca || cleanPlaca.length < 5) {
-      showError('Placa requerida', 'Ingresa una placa válida (ej. M6Y544 o M6Y-544) para consultar.')
-      return
-    }
-
-    setIsSearchingSunarp(true)
-    try {
-      const response = await apiFetch('/pide/sunarp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          placa: cleanPlaca,
-          codeZona: '11',
-          codeOficina: '01'
-        })
-      })
-
-      if (!response.ok) {
-        let errorMsg = 'No se pudo consultar el servicio vehicular.'
-        try {
-          const errData = await response.json()
-          errorMsg = errData.messages?.error || errData.message || errorMsg
-        } catch (_) {}
-        throw new Error(errorMsg)
-      }
-
-      const res = await response.json()
-      const data = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
-
-      if (!data) {
-        throw new Error(res.message || 'No se encontraron registros para la placa ingresada.')
-      }
-
-      // Deducir tipo vehicular inteligentemente de categoria y carroceria
-      const cat = (data.categoria || '').toUpperCase().trim()
-      const carr = (data.carroceria || '').toUpperCase().trim()
-      let inferredTipo = formData.tipo || ''
-
-      if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) {
-        inferredTipo = 'Moto Lineal'
-      } else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) {
-        inferredTipo = 'Mototaxi'
-      } else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV') || carr.includes('COUPE') || carr.includes('STATION') || carr.includes('AUTOMOVIL')) {
-        inferredTipo = 'Automóvil'
-      } else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS') || carr.includes('MINIBUS')) {
-        inferredTipo = 'Camioneta Rural'
-      }
-
-      // Validar anio de fabricacion
-      const anioNum = parseInt(data.ano_fabricacion || data.anio_fabricacion || data.anio, 10)
-      const currentYear = new Date().getFullYear()
-      const validAnio = (anioNum && anioNum > 1950 && anioNum <= currentYear + 1) ? anioNum : formData.anio
-
-      // Extraer nombres de propietarios del registro oficial
-      const rawProps = Array.isArray(data.propietarios) ? data.propietarios : []
-      const propNames = rawProps
-        .map(p => typeof p === 'string' ? p.trim() : (p.nombre || p.razon_social || p.apellidos_nombres || ''))
-        .filter(Boolean)
-
-      // Intentar vincular automáticamente con personas ya registradas en el padrón
-      const normalize = (str) => (str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, ' ').trim()
-
-      const foundOwners = propNames.map((name, index) => {
-        const normPName = normalize(name)
-        const found = personas.find(p => {
-          const fullName = normalize(getPersonaNombre(p))
-          return fullName === normPName || (normPName.length > 6 && (fullName.includes(normPName) || normPName.includes(fullName)))
-        })
-        return {
-          nombre: name,
-          esPrimero: index === 0,
-          matchedPersona: found || null
-        }
-      })
-
-      setPropietariosEncontrados(foundOwners)
-      setSelectedOwnerIndex(0)
-
-      let matchedPersona = foundOwners.length > 0 ? foundOwners[0].matchedPersona : null
-
-      setFormData(prev => ({
-        ...prev,
-        placa: data.placa || prev.placa,
-        tipo: inferredTipo,
-        marca: data.marca ? data.marca.trim() : prev.marca,
-        modelo: data.modelo ? data.modelo.trim() : prev.modelo,
-        color: data.color ? data.color.trim() : prev.color,
-        anio: validAnio,
-        categoria: data.categoria ? data.categoria.trim().toUpperCase() : prev.categoria,
-        carroceria: data.carroceria ? data.carroceria.trim().toUpperCase() : prev.carroceria,
-        tipoCarroceria: data.tipo_carroceria ? data.tipo_carroceria.trim().toUpperCase() : prev.tipoCarroceria,
-        sedeRegistro: data.sede ? data.sede.trim().toUpperCase() : prev.sedeRegistro,
-        numeroSerie: (data.serie || data.vin || '').trim().toUpperCase() || prev.numeroSerie,
-        serieMotor: (data.nro_motor || '').trim().toUpperCase() || prev.serieMotor,
-        partidaRegistral: (data.partida || data.partida_registral || '').trim() || prev.partidaRegistral,
-        ...(matchedPersona ? {
-          propietarioDni: String(matchedPersona.numeroDocumento || ''),
-          propietario: getPersonaNombre(matchedPersona),
-        } : {
-          propietarioDni: '',
-          propietario: '',
-        })
-      }))
-
-      if (matchedPersona) {
-        const doc = String(matchedPersona.numeroDocumento || '')
-        const nom = getPersonaNombre(matchedPersona)
-        setPropietarioSearch(`${doc} — ${nom}`)
-        setShowPropietarioResults(false)
-      } else if (foundOwners.length > 0) {
-        setPropietarioSearch(foundOwners[0].nombre)
-        setShowPropietarioResults(false)
-      }
-
-      if (foundOwners.length > 1) {
-        showToast(`Datos cargados. Se encontraron ${foundOwners.length} titulares en el registro.`)
-      } else {
-        showToast('Datos cargados correctamente.')
-      }
-    } catch (err) {
-      showError('Consulta vehicular', err.message || 'No se pudo obtener información del vehículo.')
-    } finally {
-      setIsSearchingSunarp(false)
-    }
   }
 
   const handleOpenDetail = (vehiculo) => {
@@ -554,7 +369,7 @@ export function Vehiculos() {
     // Validaciones
     const placaClean = formData.placa.trim().toUpperCase()
     if (!placaClean || !formData.propietarioDni.trim()) {
-      alert('Por favor completa los campos requeridos (Placa y Propietario).')
+      alert('Por favor completa los campos requeridos (Placa y Propietario registrado).')
       return
     }
     if (placaClean.length < 6) {
@@ -730,9 +545,9 @@ export function Vehiculos() {
               onChange={setFilterTipo}
               options={[
                 { value: 'TODOS', label: 'Todos los tipos' },
-                { value: 'Mototaxi', label: 'Mototaxi' },
-                { value: 'Automóvil', label: 'Automóvil' },
-                { value: 'Camioneta Rural', label: 'Camioneta Rural' },
+                { value: 'Mototaxi (Trimovil)', label: 'Mototaxi (Trimovil)' },
+                { value: 'Automóvil (Sedán/Hatchback)', label: 'Automóvil (Sedán/Hatchback)' },
+                { value: 'Camioneta Rural (Combi)', label: 'Camioneta Rural (Combi)' },
                 { value: 'Moto Lineal', label: 'Moto Lineal' }
               ]}
             />
@@ -805,7 +620,7 @@ export function Vehiculos() {
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Vehículo & Modelo</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Asociación / Empresa</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Propietario & Titular</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Serie Chasis / Registro</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap text-center">Estado</th>
                 <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] px-3 py-3.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
@@ -975,23 +790,9 @@ export function Vehiculos() {
           asociacionResults={asociacionResults}
           selectAsociacion={selectAsociacion}
           clearAsociacion={clearAsociacion}
-          handleSunarpSearch={handleSunarpSearch}
-          isSearchingSunarp={isSearchingSunarp}
-          propietariosEncontrados={propietariosEncontrados}
-          selectedOwnerIndex={selectedOwnerIndex}
-          onSelectOwner={handleSelectFoundOwner}
-          onOpenPersonaRapida={handleOpenPersonaRapida}
         />
       )}
 
-      {isPersonaRapidaOpen && (
-        <PersonaRapidaModal
-          isOpen={isPersonaRapidaOpen}
-          onClose={() => setIsPersonaRapidaOpen(false)}
-          onPersonaCreada={handlePersonaCreada}
-          initialNombre={personaRapidaInitialNombre}
-        />
-      )}
 
       {isDetailModalOpen && (
         <VehiculoDetalleModal

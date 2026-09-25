@@ -168,7 +168,7 @@ export function VehiculoDetalleModal({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
-              <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Partida Registral</p>
+              <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Partida Registral SUNARP</p>
               <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.partidaRegistral || 'N/A'}</p>
             </div>
 

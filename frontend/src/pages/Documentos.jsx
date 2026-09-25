@@ -17,8 +17,8 @@ const TIPO_DOC_OPTIONS = [
 ]
 
 const TIPO_DOC_LABEL_EXTERNO = {
-  CITV: 'CITV (Inspección Técnica)',
-  TARJETA_PROPIEDAD: 'Tarjeta de Propiedad',
+  CITV: 'CITV (Inspección Técnica MTC)',
+  TARJETA_PROPIEDAD: 'Tarjeta de Propiedad (SUNARP)',
 }
 
 const ESTADO_OPTIONS = [
@@ -531,16 +531,16 @@ export function Documentos() {
       {toast && (
         <div
           key={toast.id}
-          className="fixed right-5 top-5 z-[80] flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold shadow-xl transition-all toast-in backdrop-blur-md"
+          className="fixed right-6 top-6 z-[80] flex items-center gap-2.5 rounded-[var(--radius)] border px-4 py-3 text-[13px] font-medium shadow-md transition-all animate-enter"
           style={{
             backgroundColor: 'var(--bg-surface)',
             borderColor: 'var(--border-ok)',
             color: 'var(--text)',
-            boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.12)',
+            boxShadow: 'var(--shadow-md)',
           }}
         >
           <span
-            className="grid size-5 place-items-center rounded-full text-[11px] font-bold shrink-0 border"
+            className="grid size-6 place-items-center rounded-full text-xs font-semibold shrink-0 border"
             style={{
               backgroundColor: 'var(--ok-bg)',
               color: 'var(--ok-fg)',

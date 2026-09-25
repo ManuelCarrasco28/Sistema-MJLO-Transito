@@ -77,6 +77,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->put('usuarios/(:num)/password', 'UsuariosController::updatePassword/$1');
         $routes->put('municipalidad/(:num)', 'MunicipalidadController::update/$1');
         $routes->post('municipalidad/anios', 'MunicipalidadController::saveAnio');
+        $routes->delete('municipalidad/anios/(:num)', 'MunicipalidadController::deleteAnio/$1');
         $routes->put('configuracion-sistema', 'MunicipalidadController::saveConfiguracion');
     });
 });

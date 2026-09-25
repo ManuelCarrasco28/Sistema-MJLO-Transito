@@ -25,13 +25,6 @@ export const navigationGroups = [
     ]
   },
   {
-    name: 'Mantenimiento',
-    superAdminOnly: true,
-    items: [
-      { id: 'superadmin-respaldo', label: 'Respaldo', icon: 'lock', path: '/superadmin/respaldo' }
-    ]
-  },
-  {
     name: 'Principal',
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/dashboard' }

@@ -720,112 +720,30 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   }
 }
 
-/* ========================================================
-   NOTIFICACIONES ("NUBES" / TOASTS) - COMPACTO Y ANIMACIÓN SUAVE
-   ======================================================== */
-@keyframes toast-fade-in {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, -10px, 0) scale(0.96);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
+/* Notificaciones (toasts): entrada deslizante, barra de tiempo y sacudida en errores */
+@keyframes toast-in {
+  0% { opacity: 0; transform: translateX(110%) scale(0.95); }
+  70% { opacity: 1; transform: translateX(-6px) scale(1); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
-
-@keyframes toast-fade-out {
-  0% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, -10px, 0) scale(0.96);
-  }
-}
-
 @keyframes toast-progress {
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
 }
-
+@keyframes toast-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
 @keyframes toast-icon-pop {
-  0% { transform: scale(0.3); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% { transform: scale(0); }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); }
 }
-
+.toast-in { animation: toast-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.toast-shake { animation: toast-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both, toast-shake 0.4s ease-in-out 0.45s; }
+.toast-icon { animation: toast-icon-pop 0.4s ease-out 0.15s both; }
 .toast-progress { transform-origin: left; animation: toast-progress linear forwards; }
-
-/* SweetAlert2 Toasts Globales: tamaño mini, elegante y animación suave */
-.swal2-container.swal2-top-end,
-.swal2-container.swal2-top-right {
-  top: 1rem !important;
-  right: 1.25rem !important;
-  padding: 0 !important;
-  z-index: 9999 !important;
-}
-
-.swal2-popup.swal2-toast {
-  padding: 0.35rem 0.65rem !important;
-  min-width: 0 !important;
-  max-width: 18rem !important;
-  width: auto !important;
-  border-radius: 0.75rem !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 0 2px 5px rgba(0, 0, 0, 0.04) !important;
-  border: 1px solid rgba(226, 232, 240, 0.95) !important;
-  background: rgba(255, 255, 255, 0.98) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.35rem !important;
-  overflow: hidden !important;
-}
-
-.dark .swal2-popup.swal2-toast {
-  border-color: rgba(51, 65, 85, 0.6) !important;
-  background: rgba(15, 23, 42, 0.95) !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
-}
-
-.swal2-popup.swal2-toast .swal2-icon {
-  margin: 0 !important;
-  transform: scale(0.55) !important;
-  transform-origin: center center !important;
-  margin-right: -0.4rem !important;
-  margin-left: -0.4rem !important;
-}
-
-.swal2-popup.swal2-toast .swal2-title {
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  letter-spacing: 0em !important;
-  line-height: 1.2 !important;
-  margin: 0 !important;
-  padding: 0.1rem 0.2rem 0.1rem 0.05rem !important;
-  color: #1e293b !important;
-  display: inline-block !important;
-}
-
-.dark .swal2-popup.swal2-toast .swal2-title {
-  color: #f1f5f9 !important;
-}
-
-.swal2-popup.swal2-toast .swal2-timer-progress-bar {
-  height: 2px !important;
-  opacity: 0.7 !important;
-  background: linear-gradient(90deg, #38bdf8, #818cf8) !important;
-}
-
-.swal2-toast-in {
-  animation: toast-fade-in 0.3s ease-out forwards !important;
-}
-
-.swal2-toast-out {
-  animation: toast-fade-out 0.2s ease-in forwards !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .toast-progress, .swal2-toast-in, .swal2-toast-out { animation: none !important; }
+  .toast-in, .toast-shake, .toast-icon, .toast-progress { animation: none; }
 }

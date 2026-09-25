@@ -49,25 +49,26 @@ export function ActionToast({ toast, onClose }) {
     <div
       key={toast.id}
       role={toast.type === 'error' ? 'alert' : 'status'}
-      className={`fixed right-5 top-5 z-[80] w-auto max-w-[21rem] overflow-hidden rounded-xl border shadow-xl backdrop-blur-md ${estilo.caja} ${toast.type === 'error' ? 'toast-shake' : 'toast-in'}`}
+      className={`fixed right-6 top-6 z-[80] w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border shadow-lg ${estilo.caja} ${toast.type === 'error' ? 'toast-shake' : 'toast-in'}`}
     >
-      <div className="flex items-center gap-2.5 px-3 py-2">
-        <span className={`toast-icon grid size-5.5 shrink-0 place-items-center rounded-full text-xs font-bold ${estilo.icono}`}>
-          {estilo.simbolo === 'trash' ? <Icon name="trash" className="size-3" /> : estilo.simbolo}
+      <div className="flex items-start gap-3 px-4 py-3">
+        <span className={`toast-icon grid size-7 shrink-0 place-items-center rounded-full text-sm font-bold ${estilo.icono}`}>
+          {estilo.simbolo === 'trash' ? <Icon name="trash" className="size-3.5" /> : estilo.simbolo}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-bold text-slate-800 dark:text-slate-100 leading-snug">{toast.message}</p>
+          <p className={`text-[11px] font-bold uppercase tracking-wide ${estilo.titulo}`}>{estilo.etiqueta}</p>
+          <p className="text-[13px] font-medium text-slate-700 dark:text-slate-200">{toast.message}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Cerrar notificación"
-          className="shrink-0 rounded-md p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+          className="shrink-0 rounded-md px-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
         >
           ✕
         </button>
       </div>
-      <div className={`toast-progress h-[2px] ${estilo.barra}`} style={{ animationDuration: `${TOAST_DURACION_MS}ms` }} />
+      <div className={`toast-progress h-1 ${estilo.barra}`} style={{ animationDuration: `${TOAST_DURACION_MS}ms` }} />
     </div>
   )
 }
