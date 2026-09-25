@@ -6,6 +6,7 @@ import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 
 const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 
@@ -15,100 +16,9 @@ const FILTER_ESTADO_OPTIONS = [
   { value: 'INACTIVO', label: 'Inactivos' },
 ]
 
-function FloatingInput({ id, label, type = "text", ...props }) {
-  return (
-    <div className="relative">
-      <input
-        id={id}
-        type={type}
-        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
-        placeholder=" "
-        autoComplete="off"
-        {...props}
-      />
-      <label
-        htmlFor={id}
-        className="pointer-events-none absolute left-3 right-3 truncate whitespace-nowrap top-1/2 -translate-y-1/2 select-none text-xs font-medium text-slate-400 transition-all duration-150 peer-focus:top-1 peer-focus:-translate-y-0 peer-focus:text-[9.5px] peer-focus:font-bold peer-focus:text-blue-600 peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:-translate-y-0 peer-[:not(:placeholder-shown)]:text-[9.5px] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:text-slate-500 dark:peer-[:not(:placeholder-shown)]:text-slate-400"
-      >
-        {label}
-      </label>
-    </div>
-  )
-}
-
-function FloatingSelect({ id, label, value, onChange, options = [], className = '' }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef(null)
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const selectedOption = options.find((opt) => String(opt.value) === String(value)) || options[0]
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        id={id}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-[var(--bg-surface)] dark:text-white cursor-pointer ${isOpen
-            ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
-          }`}
-      >
-        <span className="truncate">{selectedOption?.label || value}</span>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''}`}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      <label htmlFor={id} className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? '!text-blue-600 dark:!text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
-        {label}
-      </label>
-
-      {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
-          <div className="space-y-0.5">
-            {options.map((opt) => {
-              const isSelected = String(opt.value) === String(value)
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange({ target: { value: opt.value } })
-                    setIsOpen(false)
-                  }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold'
-                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
-                    }`}
-                >
-                  <span className="whitespace-nowrap">{opt.label}</span>
-                  {isSelected && (
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3 text-blue-600 dark:text-blue-400 shrink-0">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function SearchableSelect({ id, label, value, onChange, options = [], className = '', required = false }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [openUpwards, setOpenUpwards] = useState(false)
   const [query, setQuery] = useState('')
   const containerRef = useRef(null)
 
@@ -123,13 +33,27 @@ function SearchableSelect({ id, label, value, onChange, options = [], className 
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const handleOpen = () => {
+    if (!isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      if (spaceBelow < 220 && rect.top > spaceBelow) {
+        setOpenUpwards(true)
+      } else {
+        setOpenUpwards(false)
+      }
+    }
+    setIsOpen(true)
+    setQuery('')
+  }
+
   const selectedOption = options.find((opt) => String(opt.value) === String(value))
   const displayValue = isOpen ? query : (selectedOption ? selectedOption.label : '')
 
   const filteredOptions = options.filter(opt => opt.label.toLowerCase().includes(query.toLowerCase()))
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
       <input
         id={id}
         type="text"
@@ -143,16 +67,8 @@ function SearchableSelect({ id, label, value, onChange, options = [], className 
           setIsOpen(true)
           if (!e.target.value) onChange({ target: { value: '' } })
         }}
-        onFocus={() => {
-          setIsOpen(true)
-          setQuery('')
-        }}
-        onClick={() => {
-          if (!isOpen) {
-            setIsOpen(true)
-            setQuery('')
-          }
-        }}
+        onFocus={handleOpen}
+        onClick={handleOpen}
       />
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`pointer-events-none absolute right-3 top-1/2 size-3 -translate-y-1/2 text-slate-400 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''}`}>
         <polyline points="6 9 12 15 18 9" />
@@ -162,7 +78,7 @@ function SearchableSelect({ id, label, value, onChange, options = [], className 
       </label>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
+        <div className={`absolute left-0 right-0 ${openUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl shadow-slate-900/15 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100`}>
           <div className="space-y-0.5">
             {filteredOptions.length > 0 ? filteredOptions.map((opt) => {
               const isSelected = String(opt.value) === String(value)
@@ -688,10 +604,10 @@ export function Trabajadores() {
       {form && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter" onKeyDown={(e) => { if (e.key === 'Escape' && !saving) setForm(null) }}>
           <div className="flex min-h-full items-center justify-center p-4 sm:p-6 pb-24">
-            <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+            <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="relative flex w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             
             {/* Header Modal - Estilo Personas.jsx */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="workerBadge" className="size-4" />
