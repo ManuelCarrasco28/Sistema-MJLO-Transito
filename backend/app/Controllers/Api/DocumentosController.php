@@ -107,7 +107,7 @@ class DocumentosController extends ResourceController
         $rawTipo = strtoupper(trim($input['tipoDocumento'] ?? 'TARJETA_OPERATIVIDAD'));
 
         if ($rawTipo === 'TARJETA_PROPIEDAD') {
-            return $this->failValidationErrors('La Tarjeta de Propiedad es un documento registral externo y no constituye un documento emitible por la Municipalidad.');
+            return $this->failValidationErrors('La Tarjeta de Propiedad es expedida exclusivamente por la SUNARP (Partida Registral) y no constituye un documento emitible por la Municipalidad.');
         }
 
         if ($rawTipo === 'CITV' || $rawTipo === 'INSPECCION_TECNICA') {
@@ -244,7 +244,7 @@ class DocumentosController extends ResourceController
         // registrado debe poder editarse (p. ej. marcarlo VENCIDO).
         if ($tipoDocumento !== null && $tipoDocumento !== $actual['tipo_documento']) {
             if ($tipoDocumento === 'TARJETA_PROPIEDAD') {
-                return $this->failValidationErrors('La Tarjeta de Propiedad es un documento registral externo y no es emitible por la Municipalidad.');
+                return $this->failValidationErrors('La Tarjeta de Propiedad es de SUNARP y no es un documento emitible por la Municipalidad.');
             }
             if ($tipoDocumento === 'CITV' || $tipoDocumento === 'INSPECCION_TECNICA') {
                 return $this->failValidationErrors('Las inspecciones técnicas (CITV) no son gestionadas en este módulo de emisión de documentos.');

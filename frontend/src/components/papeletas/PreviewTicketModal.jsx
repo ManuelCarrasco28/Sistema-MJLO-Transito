@@ -1,7 +1,36 @@
+import { useEffect } from 'react'
 import { Icon } from '../ui/Icon'
 
 export function PreviewTicketModal({ selectedPapeleta, onClose }) {
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      document.body.setAttribute('data-print-orientation', 'ticket')
+      document.body.classList.add('is-printing-ticket')
+    }
+    const handleAfterPrint = () => {
+      document.body.removeAttribute('data-print-orientation')
+      document.body.classList.remove('is-printing-ticket')
+    }
+
+    window.addEventListener('beforeprint', handleBeforePrint)
+    window.addEventListener('afterprint', handleAfterPrint)
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint)
+      window.removeEventListener('afterprint', handleAfterPrint)
+      document.body.removeAttribute('data-print-orientation')
+      document.body.classList.remove('is-printing-ticket')
+    }
+  }, [])
+
   if (!selectedPapeleta) return null
+
+  const montoBaseTotal = selectedPapeleta.detalles?.length > 0
+    ? selectedPapeleta.detalles.reduce((acc, d) => acc + (parseFloat(d.monto) || 0), 0)
+    : (parseFloat(selectedPapeleta.montoTotal) || 0)
+
+  const descuentoTotal = selectedPapeleta.detalles?.length > 0
+    ? selectedPapeleta.detalles.reduce((acc, d) => acc + (parseFloat(d.descuento) || 0), 0)
+    : 0
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-enter print:static print:block print:p-0 print:bg-transparent">
@@ -14,8 +43,8 @@ export function PreviewTicketModal({ selectedPapeleta, onClose }) {
         </button>
       </div>
 
-      <div id="seccion-impresion-ticket" className="w-full max-w-[320px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl print:shadow-none print:max-w-full">
-        <div className="p-4 border border-slate-200 print:border-none print:p-0">
+      <div id="seccion-impresion-ticket" className="w-full max-w-[330px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:max-w-full">
+        <div className="p-5 border border-slate-200 rounded-2xl print:rounded-none print:border-none print:p-1.5">
           <div className="text-center mb-3">
             <h2 className="text-sm font-black uppercase mb-1">MUNICIPALIDAD DISTRITAL</h2>
             <h3 className="text-xs font-bold uppercase mb-1">José Leonardo Ortiz</h3>
@@ -45,19 +74,33 @@ export function PreviewTicketModal({ selectedPapeleta, onClose }) {
 
           <div className="border-t-2 border-dashed border-black my-2"></div>
 
-          <div className="space-y-1 mb-2">
+          <div className="space-y-2 mb-2">
             <span className="font-bold">INFRACCIONES:</span>
             {selectedPapeleta.detalles?.length > 0 ? (
               selectedPapeleta.detalles.map((d, i) => (
-                <div key={i} className="flex justify-between pl-2">
-                  <span>{d.codigo} ({d.gravedad || 'LEVE'})</span>
-                  <span>S/ {parseFloat(d.monto || selectedPapeleta.montoTotal).toFixed(2)}</span>
+                <div key={i} className="pl-1 border-b border-dotted border-slate-300 pb-1.5 last:border-b-0 last:pb-0">
+                  <div className="flex justify-between font-bold">
+                    <span>{d.codigo} ({d.gravedad || 'LEVE'})</span>
+                    <span>S/ {parseFloat(d.monto || 0).toFixed(2)}</span>
+                  </div>
+                  {d.descripcion && (
+                    <p className="text-[10px] text-slate-700 leading-tight mt-0.5 break-words">
+                      {d.descripcion}
+                    </p>
+                  )}
                 </div>
               ))
             ) : (
-              <div className="flex justify-between pl-2">
-                <span>{selectedPapeleta.tipoInfraccionCodigo || 'N/A'}</span>
-                <span>S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
+              <div className="pl-1">
+                <div className="flex justify-between font-bold">
+                  <span>{selectedPapeleta.tipoInfraccionCodigo || 'N/A'} ({selectedPapeleta.tipoInfraccionGravedad || 'LEVE'})</span>
+                  <span>S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
+                </div>
+                {selectedPapeleta.tipoInfraccionDescripcion && (
+                  <p className="text-[10px] text-slate-700 leading-tight mt-0.5 break-words">
+                    {selectedPapeleta.tipoInfraccionDescripcion}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -86,11 +129,11 @@ export function PreviewTicketModal({ selectedPapeleta, onClose }) {
           <div className="space-y-1 mb-2">
             <div className="flex justify-between">
               <span>Monto Base:</span>
-              <span>S/ {parseFloat(selectedPapeleta.detalles?.[0]?.monto || selectedPapeleta.montoTotal).toFixed(2)}</span>
+              <span>S/ {montoBaseTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span>Descuento:</span>
-              <span>- S/ {parseFloat(selectedPapeleta.detalles?.[0]?.descuento || 0).toFixed(2)}</span>
+              <span>- S/ {descuentoTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span>Gastos/Int:</span>

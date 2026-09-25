@@ -31,7 +31,8 @@ export function exportToPdf({
   subtitle = 'Subgerencia de Tránsito y Transporte',
   summaryItems = [],
   columns = [],
-  data = []
+  data = [],
+  orientation = 'landscape'
 }) {
   if (!data || data.length === 0) {
     alert('No hay registros para exportar a PDF.')
@@ -94,8 +95,8 @@ export function exportToPdf({
         <title>${escapeXml(filename)}</title>
         <style>
           @page {
-            size: A4 landscape;
-            margin: 8mm 10mm 8mm 10mm;
+            size: A4 ${orientation};
+            margin: ${orientation === 'portrait' ? '12mm 14mm 12mm 14mm' : '10mm 12mm 10mm 12mm'};
           }
           * { box-sizing: border-box; }
           body {
@@ -152,6 +153,13 @@ export function exportToPdf({
             width: 100%;
             border-collapse: collapse;
             margin-top: 4px;
+          }
+          thead {
+            display: table-header-group;
+          }
+          tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
           th {
             background-color: #0f172a;

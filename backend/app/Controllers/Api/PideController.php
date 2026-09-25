@@ -41,7 +41,7 @@ class PideController extends ResourceController
         if ($this->rateLimited()) {
             return service('response')->setStatusCode(429)->setJSON([
                 'status' => 429,
-                'messages' => ['error' => 'Demasiadas consultas de documento en poco tiempo. Intenta de nuevo en unos minutos.'],
+                'messages' => ['error' => 'Demasiadas consultas RENIEC en poco tiempo. Intenta de nuevo en unos minutos.'],
             ]);
         }
 
@@ -84,9 +84,9 @@ class PideController extends ResourceController
     public function sunarp()
     {
         $input = $this->request->getJSON(true) ?: [];
-        $placa = strtoupper(str_replace([' ', '-'], '', trim($input["placa"] ?? "")));
-        $codeZona = trim($input["codeZona"] ?? "") !== "" ? trim($input["codeZona"]) : "11";
-        $codeOficina = trim($input["codeOficina"] ?? "") !== "" ? trim($input["codeOficina"]) : "01";
+        $placa = strtoupper(trim($input["placa"] ?? ""));
+        $codeZona = trim($input["codeZona"] ?? "");
+        $codeOficina = trim($input["codeOficina"] ?? "");
 
         if (empty($placa)) {
             return $this->failValidationErrors("La placa es requerida.");
@@ -95,7 +95,7 @@ class PideController extends ResourceController
         if ($this->rateLimited()) {
             return service('response')->setStatusCode(429)->setJSON([
                 'status' => 429,
-                'messages' => ['error' => 'Demasiadas consultas de placa en poco tiempo. Intenta de nuevo en unos minutos.'],
+                'messages' => ['error' => 'Demasiadas consultas SUNARP en poco tiempo. Intenta de nuevo en unos minutos.'],
             ]);
         }
 

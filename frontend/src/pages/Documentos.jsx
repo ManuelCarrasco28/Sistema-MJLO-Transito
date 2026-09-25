@@ -17,8 +17,8 @@ const TIPO_DOC_OPTIONS = [
 ]
 
 const TIPO_DOC_LABEL_EXTERNO = {
-  CITV: 'CITV (Inspección Técnica)',
-  TARJETA_PROPIEDAD: 'Tarjeta de Propiedad',
+  CITV: 'CITV (Inspección Técnica MTC)',
+  TARJETA_PROPIEDAD: 'Tarjeta de Propiedad (SUNARP)',
 }
 
 const ESTADO_OPTIONS = [
@@ -437,7 +437,7 @@ export function Documentos() {
           <meta charset="utf-8"/>
           <title>Padron_Documentos_MJLO_${new Date().toISOString().slice(0, 10)}</title>
           <style>
-            @page { size: A4 landscape; margin: 8mm 10mm 8mm 10mm; }
+            @page { size: A4 landscape; margin: 10mm 12mm 10mm 12mm; }
             * { box-sizing: border-box; }
             body {
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -460,6 +460,8 @@ export function Documentos() {
             }
             .summary-item strong { color: #0f172a; }
             table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; break-inside: avoid; }
             th {
               background-color: #0f172a; color: #ffffff; text-transform: uppercase; font-size: 9px;
               font-weight: 800; letter-spacing: 0.4px; padding: 6px 7px; border: 1px solid #0f172a; text-align: left;
@@ -531,16 +533,16 @@ export function Documentos() {
       {toast && (
         <div
           key={toast.id}
-          className="fixed right-5 top-5 z-[80] flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold shadow-xl transition-all toast-in backdrop-blur-md"
+          className="fixed right-6 top-6 z-[80] flex items-center gap-2.5 rounded-[var(--radius)] border px-4 py-3 text-[13px] font-medium shadow-md transition-all animate-enter"
           style={{
             backgroundColor: 'var(--bg-surface)',
             borderColor: 'var(--border-ok)',
             color: 'var(--text)',
-            boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.12)',
+            boxShadow: 'var(--shadow-md)',
           }}
         >
           <span
-            className="grid size-5 place-items-center rounded-full text-[11px] font-bold shrink-0 border"
+            className="grid size-6 place-items-center rounded-full text-xs font-semibold shrink-0 border"
             style={{
               backgroundColor: 'var(--ok-bg)',
               color: 'var(--ok-fg)',

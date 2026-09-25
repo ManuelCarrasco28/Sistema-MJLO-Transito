@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
@@ -62,15 +62,18 @@ export function SuperAdminDashboard({ user }) {
   const [municipalidadForm, setMunicipalidadForm] = useState(DEFAULT_MUNICIPALIDAD_FORM)
   const [municipalidadAnios, setMunicipalidadAnios] = useState([])
   const [anioForm, setAnioForm] = useState(DEFAULT_ANIO_FORM)
-  const [mobilePermitePapeleta, setMobilePermitePapeleta] = useState(true)
+  // Empieza en null (no en true/false) para no mostrar un valor adivinado
+  // mientras se carga la configuración real desde el servidor.
+  const [mobilePermitePapeleta, setMobilePermitePapeleta] = useState(null)
   const [savingConfigSistema, setSavingConfigSistema] = useState(false)
-  const [loadingMunicipalidad, setLoadingMunicipalidad] = useState(false)
+  const [loadingMunicipalidad, setLoadingMunicipalidad] = useState(true)
   const [auditSearch, setAuditSearch] = useState('')
   const [auditType, setAuditType] = useState('TODOS')
   const [auditSeverity, setAuditSeverity] = useState('TODOS')
   const [realAuditLogs, setRealAuditLogs] = useState([])
   const [loadingAudit, setLoadingAudit] = useState(false)
   const [auditStats, setAuditStats] = useState({ total: 0, hoy: 0, porModulo: [] })
+  const municipalidadRequestRef = useRef(0)
 
   const fetchAuditLogs = async () => {
     setLoadingAudit(true)
@@ -157,8 +160,7 @@ export function SuperAdminDashboard({ user }) {
     { id: 'usuarios', label: 'Gestión de usuarios', detail: 'Crear cuentas, activar usuarios y asignar responsables.', icon: 'people', tone: 'from-blue-600 to-indigo-500' },
     { id: 'roles', label: 'Roles y permisos', detail: 'Definir accesos por perfil y estado de cuenta.', icon: 'shieldCheck', tone: 'from-emerald-600 to-teal-500' },
     { id: 'configuracion', label: 'Configuración del sistema', detail: 'Parámetros globales, seguridad y sesiones.', icon: 'settings', tone: 'from-violet-600 to-purple-500' },
-    { id: 'auditoria', label: 'Auditoría y logs', detail: 'Revisar acciones críticas realizadas por usuarios.', icon: 'document', tone: 'from-amber-500 to-orange-500' },
-    { id: 'respaldo', label: 'Respaldo y mantenimiento', detail: 'Control de copias, restauración y estado.', icon: 'lock', tone: 'from-slate-700 to-slate-500' }
+    { id: 'auditoria', label: 'Auditoría y logs', detail: 'Revisar acciones críticas realizadas por usuarios.', icon: 'document', tone: 'from-amber-500 to-orange-500' }
   ]
 
   useEffect(() => {
@@ -205,11 +207,20 @@ export function SuperAdminDashboard({ user }) {
   }
 
   const fetchMunicipalidadConfig = async () => {
+    const requestId = ++municipalidadRequestRef.current
     setLoadingMunicipalidad(true)
     try {
       const res = await apiFetch('/municipalidad/config')
       const data = await res.json()
       if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo cargar la municipalidad.')
+
+      // Si mientras esta petición estaba en vuelo se lanzó otra más nueva
+      // (p. ej. el doble efecto de montaje de StrictMode, o un toggle del
+      // usuario que ya disparó su propio refetch), esta respuesta llegó
+      // tarde: aplicarla pisaría un cambio más reciente (como el toggle de
+      // "permiso móvil") con datos desactualizados.
+      if (requestId !== municipalidadRequestRef.current) return
+
       const payload = data.data || {}
       const muni = payload.municipalidad || null
       setMunicipalidad(muni)
@@ -223,9 +234,13 @@ export function SuperAdminDashboard({ user }) {
         : DEFAULT_ANIO_FORM
       )
     } catch (error) {
-      setMessage(error.message || 'Error al cargar configuración municipal.')
+      if (requestId === municipalidadRequestRef.current) {
+        setMessage(error.message || 'Error al cargar configuración municipal.')
+      }
     } finally {
-      setLoadingMunicipalidad(false)
+      if (requestId === municipalidadRequestRef.current) {
+        setLoadingMunicipalidad(false)
+      }
     }
   }
 
@@ -325,89 +340,6 @@ export function SuperAdminDashboard({ user }) {
 
   const selectedTrabajador = trabajadores.find((trabajador) => String(trabajador.id_persona || trabajador.id) === String(userForm.id_trabajador))
 
-  const auditEvents = useMemo(() => {
-    const now = new Date()
-    const toDateLabel = (value, fallbackMinutes = 0) => {
-      const date = value ? new Date(value) : new Date(now.getTime() - fallbackMinutes * 60000)
-      return Number.isNaN(date.getTime()) ? 'Sin fecha' : date.toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })
-    }
-
-    const userEvents = usuarios.slice(0, 30).map((item, index) => ({
-      id: `usuario-${item.id || index}`,
-      fecha: toDateLabel(item.fecha_updated || item.fecha_created, 15 + index * 7),
-      tipo: 'USUARIOS',
-      severidad: item.usuario_estado === 'INACTIVO' ? 'MEDIA' : 'BAJA',
-      evento: item.usuario_estado === 'INACTIVO' ? 'Cuenta de usuario inactiva' : 'Cuenta de usuario habilitada',
-      detalle: `${item.nombre_usuario || 'Usuario'} · ${item.cargo || 'Sin rol asignado'}`,
-      usuario: user?.usuario || 'superadmin',
-      origen: 'Panel web',
-      estado: item.usuario_estado || 'ACTIVO'
-    }))
-
-    const baseEvents = [
-      {
-        id: 'login-superadmin',
-        fecha: toDateLabel(null, 2),
-        tipo: 'SEGURIDAD',
-        severidad: 'BAJA',
-        evento: 'Inicio de sesión administrativo',
-        detalle: 'Acceso al panel de Super Admin',
-        usuario: user?.usuario || 'superadmin',
-        origen: 'Web · navegador',
-        estado: 'OK'
-      },
-      {
-        id: 'mobile-permission',
-        fecha: toDateLabel(null, 5),
-        tipo: 'CONFIGURACIÓN',
-        severidad: mobilePermitePapeleta ? 'ALTA' : 'MEDIA',
-        evento: 'Permiso general móvil',
-        detalle: mobilePermitePapeleta
-          ? 'Inspectores pueden aplicar papeletas desde el móvil'
-          : 'Inspectores registran solo evidencias para revisión administrativa',
-        usuario: user?.usuario || 'superadmin',
-        origen: 'Configuración global',
-        estado: mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO'
-      },
-      {
-        id: 'uit-config',
-        fecha: toDateLabel(null, 12),
-        tipo: 'CONFIGURACIÓN',
-        severidad: municipalidadAnios.length ? 'BAJA' : 'ALTA',
-        evento: 'UIT fiscal configurada',
-        detalle: municipalidadAnios.length
-          ? `${municipalidadAnios.length} año(s) fiscal(es) registrado(s)`
-          : 'Falta configurar la UIT para calcular papeletas',
-        usuario: user?.usuario || 'superadmin',
-        origen: 'Municipalidad',
-        estado: municipalidadAnios.length ? 'OK' : 'PENDIENTE'
-      },
-      {
-        id: 'municipalidad-config',
-        fecha: toDateLabel(municipalidad?.fecha_updated || municipalidad?.fecha_created, 20),
-        tipo: 'CONFIGURACIÓN',
-        severidad: municipalidad?.estado === 'ACTIVO' ? 'BAJA' : 'ALTA',
-        evento: 'Datos institucionales',
-        detalle: municipalidad?.razon_social || 'Municipalidad pendiente de configurar',
-        usuario: user?.usuario || 'superadmin',
-        origen: 'Panel web',
-        estado: municipalidad?.estado || 'PENDIENTE'
-      }
-    ]
-
-    return [...baseEvents, ...userEvents]
-  }, [usuarios, user, mobilePermitePapeleta, municipalidadAnios, municipalidad])
-
-  const filteredAuditEvents = useMemo(() => {
-    const q = auditSearch.trim().toLowerCase()
-    return auditEvents.filter((event) => {
-      const matchesSearch = !q || [event.evento, event.detalle, event.usuario, event.origen, event.estado]
-        .some((value) => String(value || '').toLowerCase().includes(q))
-      const matchesType = auditType === 'TODOS' || event.tipo === auditType
-      const matchesSeverity = auditSeverity === 'TODOS' || event.severidad === auditSeverity
-      return matchesSearch && matchesType && matchesSeverity
-    })
-  }, [auditEvents, auditSearch, auditType, auditSeverity])
 
   const saveUser = async (event) => {
     event.preventDefault()
@@ -501,33 +433,43 @@ export function SuperAdminDashboard({ user }) {
   }, [usuarios])
 
   const dashboardStats = [
-    { label: 'Usuarios activos', value: moduleStats[0].value, detail: 'Cuentas habilitadas', icon: 'people', tone: 'text-emerald-600 bg-emerald-50' },
-    { label: 'Usuarios inactivos', value: moduleStats[1].value, detail: 'Cuentas bloqueadas', icon: 'lock', tone: 'text-rose-600 bg-rose-50' },
-    { label: 'Roles registrados', value: moduleStats[2].value, detail: 'Perfiles administrativos', icon: 'shieldCheck', tone: 'text-blue-600 bg-blue-50' },
+    {
+      label: 'Usuarios activos', value: moduleStats[0].value, detail: 'Cuentas habilitadas', icon: 'people',
+      borderColor: 'border-emerald-400', textColor: 'text-emerald-600 dark:text-emerald-400', tone: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+    },
+    {
+      label: 'Usuarios inactivos', value: moduleStats[1].value, detail: 'Cuentas bloqueadas', icon: 'lock',
+      borderColor: 'border-rose-400', textColor: 'text-rose-600 dark:text-rose-400', tone: 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+    },
+    {
+      label: 'Roles registrados', value: moduleStats[2].value, detail: 'Perfiles administrativos', icon: 'shieldCheck',
+      borderColor: 'border-indigo-400', textColor: 'text-indigo-600 dark:text-indigo-400', tone: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400',
+    },
     {
       label: 'Permiso móvil',
-      value: mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO',
-      detail: mobilePermitePapeleta ? 'Móvil aplica papeletas' : 'Solo reportes/evidencias',
+      value: mobilePermitePapeleta === null ? '...' : mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO',
+      detail: mobilePermitePapeleta === null ? 'Cargando configuración...' : mobilePermitePapeleta ? 'Móvil aplica papeletas' : 'Solo reportes/evidencias',
       icon: 'deviceMobile',
-      tone: mobilePermitePapeleta ? 'text-violet-600 bg-violet-50 dark:bg-violet-950/60 dark:text-violet-300' : 'text-amber-600 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300',
+      borderColor: 'border-violet-400', textColor: 'text-violet-600 dark:text-violet-400', tone: 'bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400',
       isToggle: true
     }
   ]
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3.5">
-          <span className={`grid size-12 shrink-0 place-items-center rounded-2xl text-white shadow-lg ${
-            isDashboard ? 'bg-gradient-to-br from-slate-950 to-indigo-700 shadow-indigo-500/20' : `bg-gradient-to-br ${activeModuleInfo.tone}`
+    <div className="space-y-4">
+      {/* Cabecera Principal */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className={`grid size-11 shrink-0 place-items-center rounded-2xl text-white shadow-md ${
+            isDashboard ? 'bg-gradient-to-br from-indigo-600 to-violet-600 shadow-indigo-500/25' : `bg-gradient-to-br ${activeModuleInfo.tone} shadow-indigo-500/25`
           }`}>
-            <Icon name={isDashboard ? 'shieldCheck' : activeModuleInfo.icon} className="size-6" />
+            <Icon name={isDashboard ? 'shieldCheck' : activeModuleInfo.icon} className="size-5.5" />
           </span>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
               {isDashboard ? 'Panel Super Admin' : activeModuleInfo.label}
             </h1>
-            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
               {isDashboard
                 ? `Bienvenido, ${user?.nombres || 'Super Admin'}. Gestión administrativa, seguridad y configuración global.`
                 : activeModuleInfo.detail}
@@ -544,29 +486,32 @@ export function SuperAdminDashboard({ user }) {
 
       {isDashboard && (
         <>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/* Tarjetas KPI con Bordes de Colores */}
+          <div className="grid gap-2.5 grid-cols-2 xl:grid-cols-4">
             {dashboardStats.map((stat) => (
-              <div key={stat.label} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col justify-between">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-400">{stat.label}</p>
-                    <p className="mt-3 text-2xl font-black text-slate-950 dark:text-white">{stat.value}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{stat.detail}</p>
-                  </div>
-                  <span className={`grid size-11 shrink-0 place-items-center rounded-2xl ${stat.tone}`}>
-                    <Icon name={stat.icon} className="size-5" />
+              <div key={stat.label} className={`relative overflow-hidden rounded-xl border-[1.5px] ${stat.borderColor} bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${stat.textColor}`}>{stat.label}</span>
+                  <span className={`grid size-6 place-items-center rounded-md ${stat.tone}`}>
+                    <Icon name={stat.icon} className="size-3.5" />
                   </span>
                 </div>
+                <div className="mt-1">
+                  <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+                    {stat.value}
+                  </p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{stat.detail}</p>
+                </div>
                 {stat.isToggle && (
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[var(--border)] flex items-center justify-between">
-                    <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300">
-                      {savingConfigSistema ? 'Guardando...' : mobilePermitePapeleta ? 'Nueva Papeleta' : 'Registrar Evidencia'}
+                  <div className="mt-2 pt-2 border-t border-slate-100 dark:border-[var(--border)] flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold text-slate-600 dark:text-slate-300">
+                      {mobilePermitePapeleta === null ? 'Cargando...' : savingConfigSistema ? 'Guardando...' : mobilePermitePapeleta ? 'Nueva Papeleta' : 'Registrar Evidencia'}
                     </span>
                     <label className="relative inline-flex cursor-pointer items-center">
                       <input
                         type="checkbox"
-                        checked={mobilePermitePapeleta}
-                        disabled={savingConfigSistema}
+                        checked={mobilePermitePapeleta === true}
+                        disabled={savingConfigSistema || mobilePermitePapeleta === null}
                         onChange={(e) => {
                           const next = e.target.checked
                           setMobilePermitePapeleta(next)
@@ -580,14 +525,14 @@ export function SuperAdminDashboard({ user }) {
                         }}
                         className="peer sr-only"
                       />
-                      <span className="h-6 w-11 rounded-full bg-slate-300 transition-colors peer-checked:bg-violet-600 peer-disabled:opacity-60 dark:bg-slate-700"></span>
-                      <span className="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
+                      <span className="h-5 w-9 rounded-full bg-slate-300 transition-colors peer-checked:bg-violet-600 peer-disabled:opacity-60 dark:bg-slate-700"></span>
+                      <span className="absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4"></span>
                     </label>
                   </div>
                 )}
               </div>
             ))}
-          </section>
+          </div>
 
           <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
             <div className="mb-5">
@@ -823,23 +768,6 @@ export function SuperAdminDashboard({ user }) {
           </div>
         )}
 
-        {activeModule === 'respaldo' && (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {[
-              { title: 'Base de datos', detail: 'Preparado para exportar copia de seguridad del sistema.', status: 'Pendiente de integrar' },
-              { title: 'Archivos y evidencias', detail: 'Control de fotos, reportes móviles y documentos adjuntos.', status: 'En revisión' },
-              { title: 'Restauración', detail: 'Proceso reservado para mantenimiento técnico autorizado.', status: 'Restringido' }
-            ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-                <p className="font-black text-slate-900 dark:text-white">{item.title}</p>
-                <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{item.detail}</p>
-                <span className="mt-4 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 shadow-sm">
-                  {item.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
         )
       )}

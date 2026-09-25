@@ -34,7 +34,7 @@ class VehiculosController extends ResourceController
             ->select("
                 v.id,
                 v.placa,
-                COALESCE(tv.nombre, 'Mototaxi') AS tipo,
+                COALESCE(tv.nombre, 'Mototaxi (Trimovil)') AS tipo,
                 COALESCE(v.marca, '') AS marca,
                 COALESCE(v.modelo, '') AS modelo,
                 COALESCE(v.color, '') AS color,
@@ -275,7 +275,7 @@ class VehiculosController extends ResourceController
         }
 
         
-        $tipoNombre = !empty($input['tipo']) ? trim($input['tipo']) : 'Mototaxi';
+        $tipoNombre = !empty($input['tipo']) ? trim($input['tipo']) : 'Mototaxi (Trimovil)';
         $tipoRow = $db->table('tipos_vehiculo')->where('nombre', $tipoNombre)->get()->getRowArray();
         if (!$tipoRow) {
             $db->table('tipos_vehiculo')->insert(['nombre' => $tipoNombre]);

@@ -50,7 +50,7 @@ export function imprimirInspeccionesPdf({ listToExport, vehiculos, totales, apro
         <meta charset="utf-8"/>
         <title>Padron_Inspecciones_CERTICAV_${new Date().toISOString().slice(0, 10)}</title>
         <style>
-          @page { size: A4 landscape; margin: 8mm 10mm 8mm 10mm; }
+          @page { size: A4 landscape; margin: 10mm 12mm 10mm 12mm; }
           * { box-sizing: border-box; }
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -73,6 +73,8 @@ export function imprimirInspeccionesPdf({ listToExport, vehiculos, totales, apro
           }
           .summary-item strong { color: #0f172a; }
           table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+          thead { display: table-header-group; }
+          tr { page-break-inside: avoid; break-inside: avoid; }
           th {
             background-color: #0f172a; color: #ffffff; text-transform: uppercase; font-size: 9px;
             font-weight: 800; letter-spacing: 0.4px; padding: 6px 7px; border: 1px solid #0f172a; text-align: left;

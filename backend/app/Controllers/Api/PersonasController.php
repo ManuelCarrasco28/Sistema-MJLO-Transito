@@ -80,26 +80,31 @@ class PersonasController extends ResourceController
                 'errors' => ['required' => 'El apellido paterno es requerido.']
             ],
             'apellidoMaterno' => [
-                'rules' => 'permit_empty',
+                'rules' => 'required',
+                'errors' => ['required' => 'El apellido materno es requerido.']
             ],
             'numeroLicencia' => [
-                'rules' => 'permit_empty|max_length[9]',
+                'rules' => 'required|max_length[9]',
                 'errors' => [
+                    'required' => 'El número de licencia es requerido.',
                     'max_length' => 'El número de licencia no puede exceder los 9 caracteres.'
                 ]
             ],
             'direccion' => [
-                'rules' => 'permit_empty',
+                'rules' => 'required',
+                'errors' => ['required' => 'La dirección es requerida.']
             ],
             'email' => [
-                'rules' => 'permit_empty|valid_email',
+                'rules' => 'required|valid_email',
                 'errors' => [
+                    'required' => 'El correo electrónico es requerido.',
                     'valid_email' => 'Por favor ingresa un correo electrónico válido.'
                 ]
             ],
             'celular' => [
-                'rules' => 'permit_empty|numeric|exact_length[9]',
+                'rules' => 'required|numeric|exact_length[9]',
                 'errors' => [
+                    'required' => 'El número de celular es requerido.',
                     'numeric' => 'El número de celular debe contener solo números.',
                     'exact_length' => 'El número de celular debe tener exactamente 9 dígitos.'
                 ]

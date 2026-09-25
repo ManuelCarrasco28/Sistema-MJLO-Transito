@@ -532,6 +532,41 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
 }
 
 /* ==========================================================================
+   CONFIGURACIÓN GLOBAL DE PÁGINAS IMPRESAS (@PAGE) - MÁRGENES PROFESIONALES OFICIALES
+   ========================================================================== */
+/* 1. Estándar Vertical Oficial (A4 Portrait): Margen institucional de 12mm superior/inferior y 14mm laterales */
+@page {
+  size: A4 portrait;
+  margin: 12mm 14mm 12mm 14mm;
+}
+
+/* 2. Estándar Horizontal Oficial (A4 Landscape): Margen de 10mm superior/inferior y 12mm laterales para reportes y padrones */
+@page landscape-sheet {
+  size: A4 landscape;
+  margin: 10mm 12mm 10mm 12mm;
+}
+
+/* 3. Estándar Rollos Térmicos Continuos (Tickets de Infracción y Pagos 80mm POS) */
+@page ticket-roll {
+  size: 80mm auto;
+  margin: 2mm 3mm 2mm 3mm;
+}
+
+.print-landscape,
+.page-landscape,
+.hoja-documento-landscape,
+body.is-printing-landscape,
+[data-print-orientation="landscape"] {
+  page: landscape-sheet;
+}
+
+#seccion-impresion-ticket,
+.print-ticket,
+body.is-printing-ticket,
+[data-print-orientation="ticket"] {
+  page: ticket-roll;
+}
+
 /* ==========================================================================
    ESTILOS DE IMPRESIÓN OFICIAL (DOCUMENTOS A4 / TICKETS / CARNETS VIALES)
    ========================================================================== */
@@ -586,13 +621,13 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     visibility: visible !important;
   }
 
-  /* 3. Tickets térmicos impresos dentro de #root (Papeletas, Pagos, Retenciones) */
+  /* 3. Tickets térmicos impresos (Papeletas, Pagos, Retenciones) */
   #seccion-impresion-ticket {
     display: block !important;
     visibility: visible !important;
     position: relative !important;
     width: 100% !important;
-    max-width: 80mm !important;
+    max-width: 78mm !important;
     margin: 0 auto !important;
     padding: 2mm 3mm !important;
     background: #ffffff !important;
@@ -616,6 +651,10 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   .autorizacion-vias-a4,
   .autorizacion-control-a4,
   .autorizacion-zonas-a4,
+  .boleta-internamiento-a4,
+  .orden-libertad-a4,
+  .hoja-documento-a4,
+  .hoja-documento-landscape,
   .carnet-wrapper,
   .print-card-container {
     page-break-inside: avoid !important;
@@ -628,19 +667,26 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     box-sizing: border-box !important;
   }
 
-  /* En impresión A4 oficial: ocupar el ancho completo sin desbordar ni cortar márgenes */
+  /* En impresión A4 oficial: ocupar el ancho completo imprimible gobernado por los márgenes de @page */
   .ficha-certicav-a4,
   .constancia-soat-a4,
   .resolucion-permiso-a4,
   .autorizacion-carga-a4,
   .autorizacion-vias-a4,
   .autorizacion-control-a4,
-  .autorizacion-zonas-a4 {
+  .autorizacion-zonas-a4,
+  .boleta-internamiento-a4,
+  .orden-libertad-a4,
+  .hoja-documento-a4,
+  .hoja-documento-landscape {
     width: 100% !important;
-    max-width: 194mm !important;
-    margin: 0 auto !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
     padding: 0 !important;
     border: none !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
   }
 
   /* Carnets: anverso y reverso apilados limpiamente sin corte de bordes */
@@ -669,8 +715,8 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
 
   .hoja-carnets-lote-a4 {
     width: 100% !important;
-    max-width: 210mm !important;
-    min-height: 280mm !important;
+    max-width: 100% !important;
+    min-height: auto !important;
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
@@ -682,7 +728,7 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     break-after: page !important;
     page-break-before: auto !important;
     break-before: auto !important;
-    padding: 6mm 4mm !important;
+    padding: 4mm 0 !important;
     margin: 0 auto !important;
     background: #ffffff !important;
   }
@@ -695,8 +741,8 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   .grid-carnets-4 {
     display: grid !important;
     grid-template-columns: 85.6mm 85.6mm !important;
-    column-gap: 12mm !important;
-    row-gap: 7mm !important;
+    column-gap: 10mm !important;
+    row-gap: 6mm !important;
     justify-content: center !important;
     align-content: center !important;
     margin: 0 auto !important;
@@ -712,120 +758,32 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     break-inside: avoid !important;
     width: 85.6mm !important;
   }
-
-  /* Configuración de página estándar: A4 con margen de seguridad de 5mm 6mm para evitar cortes en bordes */
-  @page {
-    size: A4 portrait;
-    margin: 5mm 6mm;
-  }
 }
 
-/* ========================================================
-   NOTIFICACIONES ("NUBES" / TOASTS) - COMPACTO Y ANIMACIÓN SUAVE
-   ======================================================== */
-@keyframes toast-fade-in {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, -10px, 0) scale(0.96);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
+/* Notificaciones (toasts): entrada deslizante, barra de tiempo y sacudida en errores */
+@keyframes toast-in {
+  0% { opacity: 0; transform: translateX(110%) scale(0.95); }
+  70% { opacity: 1; transform: translateX(-6px) scale(1); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
-
-@keyframes toast-fade-out {
-  0% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, -10px, 0) scale(0.96);
-  }
-}
-
 @keyframes toast-progress {
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
 }
-
+@keyframes toast-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
 @keyframes toast-icon-pop {
-  0% { transform: scale(0.3); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% { transform: scale(0); }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); }
 }
-
+.toast-in { animation: toast-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.toast-shake { animation: toast-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both, toast-shake 0.4s ease-in-out 0.45s; }
+.toast-icon { animation: toast-icon-pop 0.4s ease-out 0.15s both; }
 .toast-progress { transform-origin: left; animation: toast-progress linear forwards; }
-
-/* SweetAlert2 Toasts Globales: tamaño mini, elegante y animación suave */
-.swal2-container.swal2-top-end,
-.swal2-container.swal2-top-right {
-  top: 1rem !important;
-  right: 1.25rem !important;
-  padding: 0 !important;
-  z-index: 9999 !important;
-}
-
-.swal2-popup.swal2-toast {
-  padding: 0.35rem 0.65rem !important;
-  min-width: 0 !important;
-  max-width: 18rem !important;
-  width: auto !important;
-  border-radius: 0.75rem !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 0 2px 5px rgba(0, 0, 0, 0.04) !important;
-  border: 1px solid rgba(226, 232, 240, 0.95) !important;
-  background: rgba(255, 255, 255, 0.98) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.35rem !important;
-  overflow: hidden !important;
-}
-
-.dark .swal2-popup.swal2-toast {
-  border-color: rgba(51, 65, 85, 0.6) !important;
-  background: rgba(15, 23, 42, 0.95) !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
-}
-
-.swal2-popup.swal2-toast .swal2-icon {
-  margin: 0 !important;
-  transform: scale(0.55) !important;
-  transform-origin: center center !important;
-  margin-right: -0.4rem !important;
-  margin-left: -0.4rem !important;
-}
-
-.swal2-popup.swal2-toast .swal2-title {
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  letter-spacing: 0em !important;
-  line-height: 1.2 !important;
-  margin: 0 !important;
-  padding: 0.1rem 0.2rem 0.1rem 0.05rem !important;
-  color: #1e293b !important;
-  display: inline-block !important;
-}
-
-.dark .swal2-popup.swal2-toast .swal2-title {
-  color: #f1f5f9 !important;
-}
-
-.swal2-popup.swal2-toast .swal2-timer-progress-bar {
-  height: 2px !important;
-  opacity: 0.7 !important;
-  background: linear-gradient(90deg, #38bdf8, #818cf8) !important;
-}
-
-.swal2-toast-in {
-  animation: toast-fade-in 0.3s ease-out forwards !important;
-}
-
-.swal2-toast-out {
-  animation: toast-fade-out 0.2s ease-in forwards !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .toast-progress, .swal2-toast-in, .swal2-toast-out { animation: none !important; }
+  .toast-in, .toast-shake, .toast-icon, .toast-progress { animation: none; }
 }

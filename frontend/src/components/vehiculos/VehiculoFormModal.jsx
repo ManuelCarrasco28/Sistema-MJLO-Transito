@@ -22,12 +22,6 @@ export function VehiculoFormModal({
   asociacionResults,
   selectAsociacion,
   clearAsociacion,
-  handleSunarpSearch,
-  isSearchingSunarp,
-  propietariosEncontrados = [],
-  selectedOwnerIndex = 0,
-  onSelectOwner,
-  onOpenPersonaRapida,
 }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter">
@@ -71,42 +65,19 @@ export function VehiculoFormModal({
               </legend>
               <div className="space-y-2.5">
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="flex gap-2 items-start">
-                    <div className="flex-1 min-w-0">
-                      <FloatingInput
-                        id="veh_placa"
-                        label="Placa de Rodaje"
-                        required
-                        maxLength={15}
-                        value={formData.placa}
-                        onChange={(e) => {
-                          const val = e.target.value.toUpperCase();
-                          if (/[^A-Z0-9-]/.test(val)) return;
-                          setFormData({ ...formData, placa: val });
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleSunarpSearch?.();
-                          }
-                        }}
-                        inputClassName="font-black uppercase tracking-wider"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleSunarpSearch}
-                      disabled={isSearchingSunarp}
-                      title="Consultar datos de la placa"
-                      className="shrink-0 h-[46px] w-[46px] rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-95 cursor-pointer mt-[2px] disabled:opacity-60 disabled:cursor-not-allowed shadow-xs"
-                    >
-                      {isSearchingSunarp ? (
-                        <span className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Icon name="search" className="size-5" />
-                      )}
-                    </button>
-                  </div>
+                  <FloatingInput
+                    id="veh_placa"
+                    label="Placa de Rodaje"
+                    required
+                    maxLength={15}
+                    value={formData.placa}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      if (/[^A-Z0-9-]/.test(val)) return;
+                      setFormData({ ...formData, placa: val });
+                    }}
+                    inputClassName="font-black uppercase"
+                  />
 
                   <FloatingSelect
                     id="veh_tipo"
@@ -114,10 +85,9 @@ export function VehiculoFormModal({
                     value={formData.tipo}
                     onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                     options={[
-                      { value: '', label: 'Seleccionar...' },
-                      { value: 'Mototaxi', label: 'Mototaxi' },
-                      { value: 'Automóvil', label: 'Automóvil' },
-                      { value: 'Camioneta Rural', label: 'Camioneta Rural' },
+                      { value: 'Mototaxi (Trimovil)', label: 'Mototaxi (Trimovil)' },
+                      { value: 'Automóvil (Sedán/Hatchback)', label: 'Automóvil (Sedán/Hatchback)' },
+                      { value: 'Camioneta Rural (Combi)', label: 'Camioneta Rural (Combi)' },
                       { value: 'Moto Lineal', label: 'Moto Lineal' },
                     ]}
                   />
@@ -157,7 +127,7 @@ export function VehiculoFormModal({
                 <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
                   <FloatingInput
                     id="veh_categoria"
-                    label="Categoría"
+                    label="Categoría SUNARP"
                     value={formData.categoria || ''}
                     onChange={(e) => setFormData({ ...formData, categoria: e.target.value.toUpperCase() })}
                     inputClassName="uppercase"
@@ -181,7 +151,7 @@ export function VehiculoFormModal({
 
                   <FloatingInput
                     id="veh_sede"
-                    label="Sede de Registro"
+                    label="Sede SUNARP"
                     value={formData.sedeRegistro || ''}
                     onChange={(e) => setFormData({ ...formData, sedeRegistro: e.target.value.toUpperCase() })}
                     inputClassName="uppercase"
@@ -194,7 +164,7 @@ export function VehiculoFormModal({
             <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
               <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
                 <span className="size-2 rounded-full bg-cyan-500" />
-                Datos Técnicos y Registro
+                Datos Técnicos & SUNARP
               </legend>
               <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                 <FloatingInput
@@ -215,7 +185,7 @@ export function VehiculoFormModal({
 
                 <FloatingInput
                   id="veh_partida"
-                  label="Partida Registral"
+                  label="Partida Registral SUNARP"
                   value={formData.partidaRegistral}
                   onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
                   inputClassName="font-mono"
@@ -229,121 +199,11 @@ export function VehiculoFormModal({
                 <span className="size-2 rounded-full bg-emerald-500" />
                 Titular & Asociación Autorizada
               </legend>
-
-              {/* Selector de Titulares encontrados en el registro oficial */}
-              {propietariosEncontrados && propietariosEncontrados.length > 0 && (
-                <div className="mb-3 rounded-2xl border border-blue-200/90 bg-gradient-to-br from-blue-50/80 via-indigo-50/40 to-slate-50/70 p-3 dark:border-blue-900/40 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-slate-900/40 shadow-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="grid size-5.5 place-items-center rounded-lg bg-blue-600 text-white">
-                        <Icon name="people" className="size-3.5" />
-                      </span>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                        Titulares detectados en el registro vehicular ({propietariosEncontrados.length})
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Selecciona quién figurará como titular ante la municipalidad:
-                    </span>
-                  </div>
-
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {propietariosEncontrados.map((prop, idx) => {
-                      const isSelected = selectedOwnerIndex === idx
-                      const isRegistrado = Boolean(prop.matchedPersona)
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => onSelectOwner?.(idx)}
-                          className={`group relative flex items-start gap-2.5 rounded-xl p-2.5 text-left border transition-all cursor-pointer text-xs ${
-                            isSelected
-                              ? 'border-blue-500 bg-white shadow-sm ring-2 ring-blue-500/20 dark:border-blue-400 dark:bg-slate-800'
-                              : 'border-slate-200/80 bg-white/70 hover:bg-white hover:border-slate-300 dark:border-slate-700/80 dark:bg-slate-900/60 dark:hover:bg-slate-800'
-                          }`}
-                        >
-                          <span
-                            className={`mt-1 size-2.5 rounded-full shrink-0 ${
-                              isRegistrado ? 'bg-emerald-500 shadow-xs' : 'bg-amber-400'
-                            }`}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-extrabold text-slate-900 dark:text-white uppercase tracking-tight text-[11.5px] truncate">
-                                {prop.nombre}
-                              </span>
-                              {prop.esPrimero ? (
-                                <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                  Titular actual
-                                </span>
-                              ) : (
-                                <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                                  Cónyuge / Copropietario
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                              {isRegistrado ? (
-                                <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
-                                  ✓ Registrado en padrón (DNI: {prop.matchedPersona.numeroDocumento})
-                                </span>
-                              ) : (
-                                <span className="text-amber-700 dark:text-amber-400 font-semibold">
-                                  ⚠ No figura en el padrón local
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                          {isSelected && (
-                            <span className="text-blue-600 dark:text-blue-400 shrink-0">
-                              <Icon name="check" className="size-4" />
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {propietariosEncontrados[selectedOwnerIndex] && !propietariosEncontrados[selectedOwnerIndex].matchedPersona && (
-                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
-                      <div className="flex items-center gap-2">
-                        <Icon name="alert" className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                        <span>
-                          <strong>{propietariosEncontrados[selectedOwnerIndex].nombre}</strong> no está en Personas.
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => onOpenPersonaRapida?.(propietariosEncontrados[selectedOwnerIndex].nombre)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-xs font-black text-white hover:from-blue-700 hover:to-indigo-700 shadow-xs cursor-pointer active:scale-95 transition-all"
-                      >
-                        <Icon name="people" className="size-3.5" />
-                        <span>+ Registrar Persona</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
               <div className="grid gap-2.5 lg:grid-cols-2 items-start">
                 <div className="relative" data-combobox="vehiculo">
-                  <div className="flex items-center justify-between pb-1 px-0.5">
-                    <label htmlFor="veh_propietario" className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                      Propietario en Padrón <span className="text-rose-500">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => onOpenPersonaRapida?.('')}
-                      className="inline-flex items-center gap-1 text-[10.5px] font-extrabold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer"
-                    >
-                      <Icon name="people" className="size-3.5" />
-                      <span>+ Registrar Persona</span>
-                    </button>
-                  </div>
-
                   <FloatingInput
                     id="veh_propietario"
-                    label="Buscar por DNI o Nombre"
+                    label="Propietario registrado en Personas"
                     required
                     value={propietarioSearch}
                     onFocus={() => setShowPropietarioResults(true)}
@@ -381,18 +241,8 @@ export function VehiculoFormModal({
                           )
                         })
                       ) : (
-                        <div className="px-3 py-2 text-xs font-semibold text-amber-600 flex items-center justify-between gap-2">
-                          <span>No se encontró a esa persona en el padrón.</span>
-                          <button
-                            type="button"
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              onOpenPersonaRapida?.(propietarioSearch)
-                            }}
-                            className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10.5px] cursor-pointer shrink-0"
-                          >
-                            + Registrarla
-                          </button>
+                        <div className="px-3 py-2.5 text-xs font-semibold text-amber-600">
+                          No se encontró una persona con ese DNI o nombre. Regístrala primero en Personas.
                         </div>
                       )}
                     </div>
@@ -404,7 +254,7 @@ export function VehiculoFormModal({
                   )}
                   {!personas.length && (
                     <p className="px-3 pt-1 text-xs font-semibold text-amber-600">
-                      No hay personas cargadas. Registra primero al propietario en el padrón.
+                      No hay personas cargadas. Registra primero al propietario en el módulo Personas.
                     </p>
                   )}
                 </div>
@@ -412,7 +262,7 @@ export function VehiculoFormModal({
                 <div className="relative" data-combobox="vehiculo">
                   <FloatingInput
                     id="veh_org"
-                    label="Empresa o Asociación"
+                    label="Empresa o Asociación (Define Formal / Informal)"
                     value={asociacionSearch}
                     onFocus={() => setShowAsociacionResults(true)}
                     onChange={(e) => {

@@ -119,7 +119,7 @@ class AsociacionesController extends ResourceController
             ->select("
                 v.id,
                 v.placa,
-                COALESCE(tv.nombre, 'Mototaxi') AS tipo,
+                COALESCE(tv.nombre, 'Mototaxi (Trimovil)') AS tipo,
                 COALESCE(v.marca, '') AS marca,
                 COALESCE(v.modelo, '') AS modelo,
                 COALESCE(v.color, '') AS color,

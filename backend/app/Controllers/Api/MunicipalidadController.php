@@ -32,12 +32,19 @@ class MunicipalidadController extends ResourceController
         if ($municipalidad) {
             // No seleccionar 'token': es un secreto (bearer de PIDE) y este
             // endpoint lo consulta cualquier usuario autenticado, no solo superadmin.
+            // Se agrega 'tokenConfigurado' (booleano) para que la UI pueda
+            // mostrar si ya hay uno guardado sin revelar su valor.
             $anios = $db->table('municipalidad_anio')
-                ->select('id, id_municipalidad, fecha_created, fecha_updated, nombre, anio, uit')
+                ->select("id, id_municipalidad, fecha_created, fecha_updated, nombre, anio, uit, (token IS NOT NULL AND token != '') as tokenConfigurado", false)
                 ->where('id_municipalidad', $municipalidad['id'])
                 ->orderBy('anio', 'DESC')
                 ->get()
                 ->getResultArray();
+
+            foreach ($anios as &$anioRow) {
+                $anioRow['tokenConfigurado'] = (bool) $anioRow['tokenConfigurado'];
+            }
+            unset($anioRow);
         }
 
         return $this->respond([
@@ -183,24 +190,58 @@ class MunicipalidadController extends ResourceController
             'nombre' => $nombre,
             'anio' => $anio,
             'uit' => $uit,
-            'token' => $token === '' ? null : $token,
         ];
+
+        // El modal de edición nunca puede pre-cargar el token real (es un
+        // secreto que el endpoint de lectura no expone), así que llega vacío
+        // salvo que el usuario lo haya vuelto a escribir. Si viene vacío en
+        // una edición, se conserva el token que ya estaba guardado en vez de
+        // borrarlo sin querer.
+        if ($token !== '' || !$existing) {
+            $data['token'] = $token === '' ? null : $token;
+        }
 
         if ($existing) {
             $db->table('municipalidad_anio')->where('id', $existing['id'])->update($data);
             $id = (int)$existing['id'];
+            $tokenConfigurado = $token !== '' ? true : !empty($existing['token']);
         } else {
             $db->table('municipalidad_anio')->insert($data);
             $id = (int)$db->insertID();
+            $tokenConfigurado = $token !== '';
         }
-
-        $responseData = $data;
-        unset($responseData['token']);
 
         return $this->respond([
             'message' => 'UIT del año guardada correctamente.',
-            'data' => array_merge($responseData, ['id' => $id, 'tokenConfigurado' => $token !== '']),
+            'data' => array_merge($data, ['id' => $id, 'tokenConfigurado' => $tokenConfigurado]),
         ]);
+    }
+
+    public function deleteAnio($id = null)
+    {
+        $db = \Config\Database::connect();
+        if (!$id) {
+            return $this->failNotFound('ID de año fiscal no especificado.');
+        }
+        if (!$db->tableExists('municipalidad_anio')) {
+            return $this->failServerError('Falta crear la tabla municipalidad_anio.');
+        }
+
+        $anio = $db->table('municipalidad_anio')->where('id', $id)->get()->getRowArray();
+        if (!$anio) {
+            return $this->failNotFound('Año fiscal no encontrado.');
+        }
+
+        $db->table('municipalidad_anio')->where('id', $id)->delete();
+
+        \App\Services\AuditoriaService::registrar(
+            'CONFIGURACION',
+            'ELIMINAR',
+            "Se eliminó el año fiscal {$anio['anio']} ({$anio['nombre']}).",
+            ['id' => (int)$id, 'anio' => $anio['anio']]
+        );
+
+        return $this->respondDeleted(['message' => 'Año fiscal eliminado correctamente.']);
     }
 
     public function saveConfiguracion()

@@ -888,7 +888,7 @@ export function Asociaciones() {
                     <>
                       <FloatingInput
                         id="org_partida"
-                        label="Partida Registral"
+                        label="Partida Registral SUNARP"
                         value={formData.partidaRegistral}
                         onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
                         inputClassName="font-mono"
@@ -1130,7 +1130,7 @@ export function Asociaciones() {
                     </div>
                   )}
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
-                    <span className="font-bold text-slate-400">Partida Registral</span>
+                    <span className="font-bold text-slate-400">Partida Registral SUNARP</span>
                     <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{detailOrg.partidaRegistral || '—'}</span>
                   </div>
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
