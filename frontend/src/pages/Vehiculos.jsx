@@ -12,6 +12,33 @@ import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { VehiculoFormModal } from '../components/vehiculos/VehiculoFormModal'
 import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleModal'
+import { PersonaFormModal } from '../components/personas/PersonaFormModal'
+
+function formatTipoDocLabel(t) {
+  const code = (t.codigo || '').toUpperCase().trim()
+  if (code === 'DNI') return 'DNI (Doc. Nacional)'
+  if (code === 'CE') return 'Carnet de Extranjería'
+  if (code === 'PAS' || code === 'PASAPORTE') return 'Pasaporte'
+  if (t.nombre) {
+    const clean = t.nombre.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+    return t.codigo ? `${t.codigo} - ${clean}` : clean
+  }
+  return t.codigo || t.nombre || 'Documento'
+}
+
+const ESTADO_CIVIL_OPTIONS = [
+  { value: '', label: 'Seleccionar...' },
+  { value: 'SOLTERO', label: 'SOLTERO' },
+  { value: 'CASADO', label: 'CASADO' },
+  { value: 'CONVIVIENTE', label: 'CONVIVIENTE' },
+  { value: 'DIVORCIADO', label: 'DIVORCIADO' },
+  { value: 'VIUDO', label: 'VIUDO' },
+]
+
+const ESTADO_OPTIONS = [
+  { value: 'ACTIVO', label: 'ACTIVO' },
+  { value: 'INACTIVO', label: 'INACTIVO' },
+]
 
 export function Vehiculos({ user }) {
   const rolNormalizado = (user?.rol || '').toUpperCase()
@@ -41,6 +68,250 @@ export function Vehiculos({ user }) {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedVehiculo, setSelectedVehiculo] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [titularDetectado, setTitularDetectado] = useState(null)
+
+  const cachedTipos = getCachedData('/tipo-documentos')
+  const [tipoDocOptions, setTipoDocOptions] = useState(() => {
+    if (cachedTipos && Array.isArray(cachedTipos) && cachedTipos.length > 0) {
+      return cachedTipos.map((t) => ({
+        value: t.codigo || t.nombre,
+        label: formatTipoDocLabel(t),
+      }))
+    }
+    return [
+      { value: 'DNI', label: 'DNI (Doc. Nacional)' },
+      { value: 'CE', label: 'Carnet de Extranjería' },
+      { value: 'PAS', label: 'Pasaporte' },
+      { value: 'RUC', label: 'RUC' },
+    ]
+  })
+
+  const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false)
+  const initialPersonaForm = {
+    tipoDocumento: 'DNI',
+    numeroDocumento: '',
+    nombres: '',
+    apellidoPaterno: '',
+    apellidoMaterno: '',
+    direccion: '',
+    telefono: '',
+    celular: '',
+    email: '',
+    numeroLicencia: '',
+    estado: 'ACTIVO',
+    estadoCivil: '',
+    fotoImg: '',
+    fotoUrl: '',
+  }
+  const [personaFormData, setPersonaFormData] = useState(initialPersonaForm)
+
+  const handleOpenPersonaRapida = (titular) => {
+    let dni = ''
+    let nombres = ''
+    let paterno = ''
+    let materno = ''
+
+    if (typeof titular === 'object' && titular !== null) {
+      dni = titular.documento || ''
+      const rawName = (titular.nombre || '').trim()
+      const parts = rawName.split(/\s+/)
+      if (parts.length >= 3) {
+        paterno = parts[0]
+        materno = parts[1]
+        nombres = parts.slice(2).join(' ')
+      } else if (parts.length === 2) {
+        paterno = parts[0]
+        nombres = parts[1]
+      } else if (parts.length === 1) {
+        nombres = parts[0]
+      }
+    } else if (typeof titular === 'string') {
+      const trimmed = titular.trim()
+      if (/^\d{8}$/.test(trimmed)) {
+        dni = trimmed
+      } else {
+        const parts = trimmed.split(/\s+/)
+        if (parts.length >= 3) {
+          paterno = parts[0]
+          materno = parts[1]
+          nombres = parts.slice(2).join(' ')
+        } else {
+          nombres = trimmed
+        }
+      }
+    }
+
+    setPersonaFormData({
+      ...initialPersonaForm,
+      numeroDocumento: dni,
+      nombres,
+      apellidoPaterno: paterno,
+      apellidoMaterno: materno,
+    })
+    setIsPersonaModalOpen(true)
+
+    if (dni && dni.length === 8 && /^\d{8}$/.test(dni)) {
+      handleReniecSearchPersona(dni)
+    }
+  }
+
+  const handleReniecSearchPersona = async (explicitDni) => {
+    const dni = typeof explicitDni === 'string' ? explicitDni : personaFormData.numeroDocumento?.trim()
+    if (!dni || dni.length !== 8 || !/^\d{8}$/.test(dni)) {
+      showError('DNI Inválido', 'El número de DNI debe tener exactamente 8 dígitos.')
+      return
+    }
+
+    try {
+      const response = await apiFetch(`/pide/reniec/${dni}`)
+      if (!response.ok) throw new Error('No se pudo encontrar la información del DNI en RENIEC.')
+      const { data } = await response.json()
+      if (data) {
+        setPersonaFormData((prev) => ({
+          ...prev,
+          numeroDocumento: dni,
+          nombres: data.nombres || prev.nombres,
+          apellidoPaterno: data.apellidoPaterno || prev.apellidoPaterno,
+          apellidoMaterno: data.apellidoMaterno || prev.apellidoMaterno,
+          direccion: data.direccion || prev.direccion,
+          estadoCivil: data.estadoCivil || prev.estadoCivil,
+          fotoImg: data.foto_url || prev.fotoImg,
+          fotoUrl: data.foto_url || prev.fotoUrl,
+        }))
+      }
+    } catch (err) {
+      showError('Error', err.message || 'No se pudo consultar RENIEC.')
+    }
+  }
+
+  const handlePhotoUploadPersona = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      showError('Formato Inválido', 'Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP).')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const rawData = ev.target?.result
+      if (!rawData) return
+      const img = new Image()
+      img.onload = () => {
+        const maxDim = 400
+        let width = img.width
+        let height = img.height
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width)
+            width = maxDim
+          } else {
+            width = Math.round((width * maxDim) / height)
+            height = maxDim
+          }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        const compressed = canvas.toDataURL('image/jpeg', 0.85)
+        setPersonaFormData((prev) => ({ ...prev, fotoImg: compressed, fotoUrl: compressed }))
+      }
+      img.onerror = () => {
+        setPersonaFormData((prev) => ({ ...prev, fotoImg: rawData, fotoUrl: rawData }))
+      }
+      img.src = rawData
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleClearPhotoPersona = () => {
+    setPersonaFormData((prev) => ({ ...prev, fotoImg: '', fotoUrl: '' }))
+  }
+
+  const handlePersonaFormSubmit = async (e) => {
+    e.preventDefault()
+    const docLen = (personaFormData.numeroDocumento || '').trim().length
+    if (
+      !personaFormData.numeroDocumento.trim() ||
+      !personaFormData.nombres.trim() ||
+      !personaFormData.apellidoPaterno.trim() ||
+      !personaFormData.apellidoMaterno.trim() ||
+      !personaFormData.numeroLicencia.trim() ||
+      !personaFormData.celular.trim() ||
+      !personaFormData.direccion.trim() ||
+      !personaFormData.email.trim()
+    ) {
+      showError('Validación Fallida', 'Por favor completa todos los campos requeridos (Documento, Nombres, Apellidos, Licencia, Celular, Dirección y Email).')
+      return
+    }
+    const isDni = personaFormData.tipoDocumento === 'DNI' || personaFormData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD'
+    if (isDni && (docLen !== 8 || !/^\d{8}$/.test(personaFormData.numeroDocumento.trim()))) {
+      showError('DNI Inválido', 'El DNI debe tener exactamente 8 dígitos numéricos.')
+      return
+    }
+    if (!isDni && (docLen < 8 || docLen > 15)) {
+      showError('Documento Inválido', 'El número de documento debe tener entre 8 y 15 caracteres.')
+      return
+    }
+    if (personaFormData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personaFormData.email)) {
+      showError('Validación Fallida', 'Por favor ingresa un correo electrónico válido.')
+      return
+    }
+    if (personaFormData.celular && !/^\d{9}$/.test(personaFormData.celular)) {
+      showError('Validación Fallida', 'El número de celular debe tener exactamente 9 dígitos numéricos.')
+      return
+    }
+
+    try {
+      const res = await apiFetch('/personas', {
+        method: 'POST',
+        body: personaFormData,
+      })
+      const resData = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(resData.messages?.error || resData.message || 'Error al registrar la persona.')
+      }
+      const newPersona = resData.data || { ...personaFormData, id: Date.now() }
+      const standardizedPersona = {
+        ...newPersona,
+        id: Number(newPersona.id || Date.now()),
+        numeroDocumento: String(newPersona.numeroDocumento || newPersona.numero || personaFormData.numeroDocumento || '').trim(),
+        nombres: (newPersona.nombres || personaFormData.nombres || '').trim(),
+        apellidoPaterno: (newPersona.apellidoPaterno || newPersona.apellido_paterno || personaFormData.apellidoPaterno || '').trim(),
+        apellidoMaterno: (newPersona.apellidoMaterno || newPersona.apellido_materno || personaFormData.apellidoMaterno || '').trim(),
+      }
+
+      const nextPersonas = [
+        standardizedPersona,
+        ...personas.filter((p) => String(p.numeroDocumento || p.numero || '').trim() !== standardizedPersona.numeroDocumento)
+      ]
+      setPersonas(nextPersonas)
+      setCachedData('/personas', nextPersonas)
+
+      // Sincronizar en segundo plano con el backend
+      apiFetch('/personas')
+        .then((r) => r.ok ? r.json() : null)
+        .then((payload) => {
+          if (payload?.data && Array.isArray(payload.data)) {
+            setPersonas(payload.data)
+            setCachedData('/personas', payload.data)
+          }
+        })
+        .catch(() => {})
+
+      selectPropietario(standardizedPersona)
+      setTitularDetectado({
+        nombre: `${standardizedPersona.nombres} ${standardizedPersona.apellidoPaterno} ${standardizedPersona.apellidoMaterno}`.trim(),
+        documento: standardizedPersona.numeroDocumento,
+        matchedPersona: standardizedPersona,
+      })
+      setIsPersonaModalOpen(false)
+      showToast('Persona registrada y asignada como propietario.')
+    } catch (err) {
+      showError('Error', sanitizarMensaje(err.message, 'No se pudo guardar la persona.'))
+    }
+  }
 
   const [consultaPlaca, setConsultaPlaca] = useState('')
   const [consultaResult, setConsultaResult] = useState(null)
@@ -51,7 +322,7 @@ export function Vehiculos({ user }) {
     e.preventDefault()
     if (!consultaPlaca.trim()) return
     const plate = consultaPlaca.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
-    
+
     if (plate.length < 5) {
       setConsultaError('Ingrese una placa válida (ej. M6Y544 o M6Y-544).')
       return
@@ -73,7 +344,7 @@ export function Vehiculos({ user }) {
         try {
           const errData = await response.json()
           errorMsg = errData.messages?.error || errData.message || errorMsg
-        } catch (_) {}
+        } catch (_) { }
         throw new Error(errorMsg)
       }
 
@@ -100,6 +371,27 @@ export function Vehiculos({ user }) {
       else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV')) inferredTipo = 'Automóvil'
       else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS')) inferredTipo = 'Camioneta Rural'
 
+      let rawAnio = sunarpData.ano_fabricacion ?? sunarpData.anio_fabricacion ?? sunarpData.anio ?? ''
+      let detectedAnio = parseInt(String(rawAnio).trim(), 10)
+      if (!detectedAnio || detectedAnio < 1900 || detectedAnio > 2100) {
+        const vin = (sunarpData.serie || sunarpData.vin || sunarpData.numero_serie || '').toUpperCase().trim()
+        if (vin.length >= 10) {
+          const vinCode = vin.charAt(9)
+          const vinYears = {
+            '1': 2001, '2': 2002, '3': 2003, '4': 2004, '5': 2005, '6': 2006, '7': 2007, '8': 2008, '9': 2009,
+            'A': 2010, 'B': 2011, 'C': 2012, 'D': 2013, 'E': 2014, 'F': 2015, 'G': 2016, 'H': 2017,
+            'J': 2018, 'K': 2019, 'L': 2020, 'M': 2021, 'N': 2022, 'P': 2023, 'R': 2024, 'S': 2025,
+            'T': 2026, 'V': 2027, 'W': 2028, 'X': 2029, 'Y': 2030
+          }
+          if (vinYears[vinCode]) {
+            detectedAnio = vinYears[vinCode]
+          }
+        }
+      }
+      if (!detectedAnio || detectedAnio < 1900 || detectedAnio > 2100) {
+        detectedAnio = foundInPadron?.anio || new Date().getFullYear()
+      }
+
       const combined = {
         placa: plate,
         marca: foundInPadron?.marca || sunarpData.marca || 'N/A',
@@ -114,7 +406,7 @@ export function Vehiculos({ user }) {
         asociacion: foundInPadron?.asociacion || null,
         estado: foundInPadron?.estado || 'INACTIVO',
         esDelPadron: !!foundInPadron,
-        anio: foundInPadron?.anio || sunarpData.ano_fabricacion || sunarpData.anio_fabricacion || sunarpData.anio || 'N/A',
+        anio: detectedAnio,
         categoria: foundInPadron?.categoria || sunarpData.categoria || 'N/A',
         carroceria: foundInPadron?.carroceria || sunarpData.carroceria || 'N/A',
         sedeRegistro: foundInPadron?.sedeRegistro || sunarpData.sede || sunarpData.oficina_registral || sunarpData.oficina || 'N/A',
@@ -182,23 +474,29 @@ export function Vehiculos({ user }) {
 
   const propietarioResults = personas
     .filter((persona) => {
-      const query = propietarioSearch.trim().toLowerCase()
-      if (!query) return true
-      const documento = String(persona.numeroDocumento || '').toLowerCase()
+      const rawQuery = (propietarioSearch || '').trim().toLowerCase()
+      if (!rawQuery) return true
+      const documento = String(persona.numeroDocumento || persona.numero || persona.dni || '').toLowerCase().trim()
       const nombre = getPersonaNombre(persona).toLowerCase()
-      return documento.includes(query) || nombre.includes(query)
+      
+      // Si la búsqueda contiene "73129239 — Jose Manuel" o guión, probar las partes individuales
+      const parts = rawQuery.split(/[—\-]/).map((s) => s.trim()).filter(Boolean)
+      if (parts.length > 1) {
+        return parts.some((p) => documento.includes(p) || nombre.includes(p))
+      }
+      return documento.includes(rawQuery) || nombre.includes(rawQuery)
     })
-    .slice(0, 8)
+    .slice(0, 12)
 
   const selectPropietario = (persona) => {
-    const documento = String(persona.numeroDocumento || '')
+    const documento = String(persona.numeroDocumento || persona.numero || persona.dni || '').trim()
     const nombre = getPersonaNombre(persona)
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       propietarioDni: documento,
-      propietario: nombre
-    })
-    setPropietarioSearch(`${documento} — ${nombre}`)
+      propietario: nombre,
+    }))
+    setPropietarioSearch(documento ? `${documento} — ${nombre}` : nombre)
     setShowPropietarioResults(false)
   }
 
@@ -212,21 +510,141 @@ export function Vehiculos({ user }) {
 
   const selectAsociacion = (org) => {
     const nombre = org?.razonSocial || ''
-    setFormData({
-      ...formData,
-      asociacion: nombre
-    })
+    setFormData((prev) => ({
+      ...prev,
+      asociacion: nombre,
+    }))
     setAsociacionSearch(nombre)
     setShowAsociacionResults(false)
   }
 
   const clearAsociacion = () => {
-    setFormData({
-      ...formData,
-      asociacion: ''
-    })
+    setFormData((prev) => ({
+      ...prev,
+      asociacion: '',
+    }))
     setAsociacionSearch('')
     setShowAsociacionResults(false)
+  }
+
+  const [isBuscandoSunarpModal, setIsBuscandoSunarpModal] = useState(false)
+
+  const handleBuscarSunarpModal = async () => {
+    const plate = (formData.placa || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+    if (plate.length < 5) {
+      showError('Placa inválida', 'Ingrese una placa válida antes de buscar')
+      return
+    }
+
+    setIsBuscandoSunarpModal(true)
+    try {
+      const response = await apiFetch('/pide/sunarp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ placa: plate, codeZona: '11', codeOficina: '01' })
+      })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.messages?.error || errData.message || 'No se pudo consultar el servicio vehicular SUNARP.')
+      }
+
+      const res = await response.json()
+      const sunarpData = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
+      if (!sunarpData) {
+        throw new Error(res.message || 'No se encontraron registros en SUNARP para la placa ingresada.')
+      }
+
+      const cat = (sunarpData.categoria || '').toUpperCase().trim()
+      const carr = (sunarpData.carroceria || '').toUpperCase().trim()
+      let inferredTipo = formData.tipo
+      if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) inferredTipo = 'Moto Lineal'
+      else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredTipo = 'Mototaxi (Trimovil)'
+      else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV')) inferredTipo = 'Automóvil (Sedán/Hatchback)'
+      else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS')) inferredTipo = 'Camioneta Rural (Combi)'
+
+      const rawProps = Array.isArray(sunarpData.propietarios) ? sunarpData.propietarios : []
+      const mappedProps = rawProps.map((p, idx) => {
+        const nombreStr = typeof p === 'string' ? p.trim() : (p.nombre || p.razon_social || p.apellidos_nombres || '')
+        const docStr = typeof p === 'object' ? (p.numero_documento || p.dni || p.ruc || '') : ''
+        return {
+          nombre: nombreStr,
+          documento: docStr,
+          esPrincipal: idx === 0,
+        }
+      }).filter(p => p.nombre)
+
+      const legalOwner = mappedProps[0] || (rawProps[0] ? { nombre: String(rawProps[0]), documento: '', esPrincipal: true } : null)
+
+      if (legalOwner) {
+        let matched = null
+        if (legalOwner.documento) {
+          matched = personas.find(p => (p.numeroDocumento || '').trim() === legalOwner.documento.trim())
+        }
+        if (!matched && legalOwner.nombre) {
+          const cleanOwnerName = legalOwner.nombre.toUpperCase().trim()
+          matched = personas.find(p => {
+            const fullPName = `${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.toUpperCase().trim()
+            return fullPName && (cleanOwnerName.includes(fullPName) || fullPName.includes(cleanOwnerName))
+          })
+        }
+
+        if (matched) {
+          selectPropietario(matched)
+          setTitularDetectado({ ...legalOwner, matchedPersona: matched })
+        } else {
+          setTitularDetectado({ ...legalOwner, matchedPersona: null })
+          setPropietarioSearch(legalOwner.nombre)
+          setFormData((prev) => ({
+            ...prev,
+            propietarioDni: legalOwner.documento || '',
+            propietario: legalOwner.nombre || '',
+          }))
+        }
+      }
+
+      let rawModalAnio = sunarpData.ano_fabricacion ?? sunarpData.anio_fabricacion ?? sunarpData.anio ?? ''
+      let detectedModalAnio = parseInt(String(rawModalAnio).trim(), 10)
+      if (!detectedModalAnio || detectedModalAnio < 1900 || detectedModalAnio > 2100) {
+        const vin = (sunarpData.serie || sunarpData.vin || sunarpData.numero_serie || '').toUpperCase().trim()
+        if (vin.length >= 10) {
+          const vinCode = vin.charAt(9)
+          const vinYears = {
+            '1': 2001, '2': 2002, '3': 2003, '4': 2004, '5': 2005, '6': 2006, '7': 2007, '8': 2008, '9': 2009,
+            'A': 2010, 'B': 2011, 'C': 2012, 'D': 2013, 'E': 2014, 'F': 2015, 'G': 2016, 'H': 2017,
+            'J': 2018, 'K': 2019, 'L': 2020, 'M': 2021, 'N': 2022, 'P': 2023, 'R': 2024, 'S': 2025,
+            'T': 2026, 'V': 2027, 'W': 2028, 'X': 2029, 'Y': 2030
+          }
+          if (vinYears[vinCode]) {
+            detectedModalAnio = vinYears[vinCode]
+          }
+        }
+      }
+      if (!detectedModalAnio || detectedModalAnio < 1900 || detectedModalAnio > 2100) {
+        detectedModalAnio = formData.anio || new Date().getFullYear()
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        placa: plate,
+        tipo: inferredTipo,
+        marca: sunarpData.marca || prev.marca,
+        modelo: sunarpData.modelo || prev.modelo,
+        color: sunarpData.color || prev.color,
+        anio: detectedModalAnio,
+        categoria: sunarpData.categoria || prev.categoria,
+        carroceria: sunarpData.carroceria || prev.carroceria,
+        tipoCarroceria: sunarpData.tipo_carroceria || sunarpData.carroceria || prev.tipoCarroceria,
+        sedeRegistro: sunarpData.sede || sunarpData.oficina_registral || sunarpData.oficina || prev.sedeRegistro,
+        numeroSerie: sunarpData.serie || sunarpData.vin || sunarpData.numero_serie || sunarpData.nro_serie || prev.numeroSerie,
+        serieMotor: sunarpData.numero_motor || sunarpData.nro_motor || prev.serieMotor,
+        partidaRegistral: sunarpData.partida || sunarpData.partida_registral || prev.partidaRegistral,
+      }))
+    } catch (err) {
+      showError('Error de consulta', sanitizarMensaje(err.message, 'No se pudo consultar SUNARP.'))
+    } finally {
+      setIsBuscandoSunarpModal(false)
+    }
   }
 
   const isVehiculoFormal = (v) => Boolean(
@@ -389,6 +807,7 @@ export function Vehiculos({ user }) {
     setShowPropietarioResults(false)
     setAsociacionSearch('')
     setShowAsociacionResults(false)
+    setTitularDetectado(null)
     setFormData({
       placa: '',
       tipo: 'Mototaxi (Trimovil)',
@@ -422,6 +841,12 @@ export function Vehiculos({ user }) {
     setShowPropietarioResults(false)
     setAsociacionSearch(isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '')
     setShowAsociacionResults(false)
+    const matchedOwner = vehiculo.propietarioDni ? personas.find(p => p.numeroDocumento === vehiculo.propietarioDni) : null
+    setTitularDetectado(vehiculo.propietario ? {
+      nombre: vehiculo.propietario,
+      documento: vehiculo.propietarioDni || '',
+      matchedPersona: matchedOwner,
+    } : null)
     setFormData({
       ...vehiculo,
       asociacion: isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '',
@@ -513,7 +938,7 @@ export function Vehiculos({ user }) {
               Búsqueda rápida en el padrón municipal por número de placa
             </p>
           </div>
-          
+
           <form onSubmit={handleConsulta} className="relative flex flex-col gap-4 sm:flex-row">
             <div className="relative flex-1">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-5">
@@ -549,71 +974,71 @@ export function Vehiculos({ user }) {
         </div>
 
         {consultaResult && (
-           <div className="animate-enter rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-             <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center dark:border-[var(--border)]">
-               <div className="flex items-center gap-4">
-                 <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 dark:bg-[var(--bg-subtle)]">
-                   <Icon name="motoTaxi" className="size-8 text-slate-600 dark:text-slate-300" />
-                 </div>
-                 <div>
-                   <h2 className="text-3xl font-black tracking-widest text-slate-900 dark:text-white">
-                     {consultaResult.placa}
-                   </h2>
-                   <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-                     {consultaResult.marca} {consultaResult.modelo}
-                   </span>
-                 </div>
-               </div>
-               <button 
-                 onClick={() => handleOpenDetail(consultaResult)} 
-                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-50 px-5 py-3 text-sm font-bold text-indigo-600 hover:bg-indigo-100 sm:w-auto dark:bg-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/30 transition active:scale-95 cursor-pointer"
-               >
-                 <Icon name="eye" className="size-4" />
-                 Ficha Técnica
-               </button>
-             </div>
-             
-             <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Asociación / Empresa</p>
-                  <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200 line-clamp-2">
-                    {isVehiculoFormal(consultaResult) ? (consultaResult.asociacion || 'NO ASIGNADA') : 'PARTICULAR'}
-                  </p>
+          <div className="animate-enter rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center dark:border-[var(--border)]">
+              <div className="flex items-center gap-4">
+                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 dark:bg-[var(--bg-subtle)]">
+                  <Icon name="motoTaxi" className="size-8 text-slate-600 dark:text-slate-300" />
                 </div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Propietario / Titular</p>
-                  <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200 line-clamp-2">
-                    {consultaResult.propietario || 'NO REGISTRADO'}
-                  </p>
+                <div>
+                  <h2 className="text-3xl font-black tracking-widest text-slate-900 dark:text-white">
+                    {consultaResult.placa}
+                  </h2>
+                  <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                    {consultaResult.marca} {consultaResult.modelo}
+                  </span>
                 </div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Estado Formal</p>
-                  <div className="mt-2">
-                    {isVehiculoFormal(consultaResult) ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-bold text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
-                        <Icon name="checkCircle" className="size-4 shrink-0" /> FORMAL
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-bold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
-                        <Icon name="alertTriangle" className="size-4 shrink-0" /> INFORMAL
-                      </span>
-                    )}
-                  </div>
+              </div>
+              <button
+                onClick={() => handleOpenDetail(consultaResult)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-50 px-5 py-3 text-sm font-bold text-indigo-600 hover:bg-indigo-100 sm:w-auto dark:bg-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/30 transition active:scale-95 cursor-pointer"
+              >
+                <Icon name="eye" className="size-4" />
+                Ficha Técnica
+              </button>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Asociación / Empresa</p>
+                <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200 line-clamp-2">
+                  {isVehiculoFormal(consultaResult) ? (consultaResult.asociacion || 'NO ASIGNADA') : 'PARTICULAR'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Propietario / Titular</p>
+                <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200 line-clamp-2">
+                  {consultaResult.propietario || 'NO REGISTRADO'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Estado Formal</p>
+                <div className="mt-2">
+                  {isVehiculoFormal(consultaResult) ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-bold text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                      <Icon name="checkCircle" className="size-4 shrink-0" /> FORMAL
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-bold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                      <Icon name="alertTriangle" className="size-4 shrink-0" /> INFORMAL
+                    </span>
+                  )}
                 </div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Estado Padrón</p>
-                  <div className="mt-2">
-                    {consultaResult.esDelPadron ? (
-                      <StatusBadge status={consultaResult.estado || 'ACTIVO'} />
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                        <Icon name="x" className="size-4 shrink-0" /> NO REGISTRADO
-                      </span>
-                    )}
-                  </div>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Estado Padrón</p>
+                <div className="mt-2">
+                  {consultaResult.esDelPadron ? (
+                    <StatusBadge status={consultaResult.estado || 'ACTIVO'} />
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                      <Icon name="x" className="size-4 shrink-0" /> NO REGISTRADO
+                    </span>
+                  )}
                 </div>
-             </div>
-           </div>
+              </div>
+            </div>
+          </div>
         )}
 
         <VehiculoDetalleModal
@@ -710,11 +1135,10 @@ export function Vehiculos({ user }) {
         <button
           type="button"
           onClick={() => setFilterEstado(filterEstado === 'FORMAL' ? 'TODOS' : 'FORMAL')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
-            filterEstado === 'FORMAL'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${filterEstado === 'FORMAL'
               ? 'border-emerald-600 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <Icon name="shieldCheck" className="size-4" />
           <span>Vehículos Formal ({formales})</span>
@@ -723,11 +1147,10 @@ export function Vehiculos({ user }) {
         <button
           type="button"
           onClick={() => setFilterEstado(filterEstado === 'INFORMAL' ? 'TODOS' : 'INFORMAL')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
-            filterEstado === 'INFORMAL'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${filterEstado === 'INFORMAL'
               ? 'border-amber-500 text-amber-600 dark:border-amber-400 dark:text-amber-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <Icon name="alert" className="size-4" />
           <span>Vehículos Informal ({informales})</span>
@@ -1017,9 +1440,28 @@ export function Vehiculos({ user }) {
           asociacionResults={asociacionResults}
           selectAsociacion={selectAsociacion}
           clearAsociacion={clearAsociacion}
+          onBuscarSunarp={handleBuscarSunarpModal}
+          isBuscandoSunarp={isBuscandoSunarpModal}
+          titularDetectado={titularDetectado}
+          onOpenPersonaRapida={handleOpenPersonaRapida}
         />
       )}
 
+      {isPersonaModalOpen && (
+        <PersonaFormModal
+          isEditing={false}
+          formData={personaFormData}
+          setFormData={setPersonaFormData}
+          handlePhotoUpload={handlePhotoUploadPersona}
+          handleClearPhoto={handleClearPhotoPersona}
+          tipoDocOptions={tipoDocOptions}
+          handleReniecSearch={handleReniecSearchPersona}
+          estadoCivilOptions={ESTADO_CIVIL_OPTIONS}
+          estadoOptions={ESTADO_OPTIONS}
+          onSubmit={handlePersonaFormSubmit}
+          onClose={() => setIsPersonaModalOpen(false)}
+        />
+      )}
 
       {isDetailModalOpen && (
         <VehiculoDetalleModal

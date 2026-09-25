@@ -22,6 +22,10 @@ export function VehiculoFormModal({
   asociacionResults,
   selectAsociacion,
   clearAsociacion,
+  onBuscarSunarp,
+  isBuscandoSunarp,
+  titularDetectado,
+  onOpenPersonaRapida,
 }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter">
@@ -65,19 +69,44 @@ export function VehiculoFormModal({
               </legend>
               <div className="space-y-2.5">
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                  <FloatingInput
-                    id="veh_placa"
-                    label="Placa de Rodaje"
-                    required
-                    maxLength={15}
-                    value={formData.placa}
-                    onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
-                      if (/[^A-Z0-9-]/.test(val)) return;
-                      setFormData({ ...formData, placa: val });
-                    }}
-                    inputClassName="font-black uppercase"
-                  />
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1">
+                      <FloatingInput
+                        id="veh_placa"
+                        label="Placa de Rodaje"
+                        required
+                        maxLength={15}
+                        value={formData.placa}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase();
+                          if (/[^A-Z0-9-]/.test(val)) return;
+                          setFormData({ ...formData, placa: val });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            onBuscarSunarp?.();
+                          }
+                        }}
+                        inputClassName="font-black uppercase tracking-wider"
+                      />
+                    </div>
+                    {onBuscarSunarp && (
+                      <button
+                        type="button"
+                        onClick={onBuscarSunarp}
+                        disabled={isBuscandoSunarp}
+                        title="Buscar en SUNARP"
+                        className="shrink-0 h-[46px] w-[46px] rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-95 cursor-pointer mt-[2px] disabled:opacity-60 shadow-xs"
+                      >
+                        {isBuscandoSunarp ? (
+                          <span className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Icon name="search" className="size-5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
 
                   <FloatingSelect
                     id="veh_tipo"
@@ -194,11 +223,62 @@ export function VehiculoFormModal({
             </fieldset>
 
 
-            <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
+            <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
               <legend className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-1 mb-2 flex items-center gap-2">
                 <span className="size-2 rounded-full bg-emerald-500" />
                 Titular & Asociación Autorizada
               </legend>
+
+              {titularDetectado && titularDetectado.nombre && (
+                <div className={`mb-3 rounded-2xl border p-3 shadow-xs transition-all ${
+                  titularDetectado.matchedPersona
+                    ? 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/50 dark:bg-emerald-950/30'
+                    : 'border-amber-300 bg-amber-50/90 dark:border-amber-900/60 dark:bg-amber-950/40'
+                }`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <span className={`grid size-7 shrink-0 place-items-center rounded-xl text-white ${
+                        titularDetectado.matchedPersona ? 'bg-emerald-600' : 'bg-amber-500'
+                      }`}>
+                        <Icon name={titularDetectado.matchedPersona ? 'check' : 'alert'} className="size-4" />
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/80 dark:bg-slate-900 text-slate-700 dark:text-slate-200">
+                            Titular Detectado
+                          </span>
+                          <span className="font-extrabold text-slate-900 dark:text-white uppercase text-xs">
+                            {titularDetectado.nombre}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-medium mt-0.5">
+                          {titularDetectado.matchedPersona ? (
+                            <span className="text-emerald-700 dark:text-emerald-300 font-semibold">
+                              ✓ Enlazado al padrón municipal (DNI: {titularDetectado.matchedPersona.numeroDocumento})
+                            </span>
+                          ) : (
+                            <span className="text-amber-800 dark:text-amber-300 font-semibold">
+                              ⚠ No registrado en el padrón de Personas.
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {!titularDetectado.matchedPersona && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenPersonaRapida?.(titularDetectado)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-2 text-xs font-black text-white hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-600/20 cursor-pointer active:scale-95 transition-all shrink-0"
+                      >
+                        <Icon name="people" className="size-4" />
+                        <span>+ Registrar Persona</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="grid gap-2.5 lg:grid-cols-2 items-start">
                 <div className="relative" data-combobox="vehiculo">
                   <FloatingInput
@@ -210,19 +290,19 @@ export function VehiculoFormModal({
                     onChange={(e) => {
                       const value = e.target.value
                       setPropietarioSearch(value)
-                      setFormData({
-                        ...formData,
+                      setFormData((prev) => ({
+                        ...prev,
                         propietarioDni: '',
                         propietario: ''
-                      })
+                      }))
                       setShowPropietarioResults(true)
                     }}
                   />
                   {showPropietarioResults && (
-                    <div className="absolute left-0 right-0 bottom-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                    <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
                       {propietarioResults.length ? (
                         propietarioResults.map((persona) => {
-                          const documento = persona.numeroDocumento || ''
+                          const documento = persona.numeroDocumento || persona.numero || persona.dni || ''
                           const nombre = getPersonaNombre(persona)
                           return (
                             <button
@@ -233,7 +313,7 @@ export function VehiculoFormModal({
                                 event.stopPropagation()
                                 selectPropietario(persona)
                               }}
-                              className="flex w-full flex-col rounded-xl px-3 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
+                              className="flex w-full flex-col rounded-xl px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-[var(--bg-subtle)] cursor-pointer transition-colors"
                             >
                               <span className="font-mono text-xs font-black text-blue-700 dark:text-blue-300">{documento}</span>
                               <span className="truncate text-xs font-bold text-slate-800 dark:text-white">{nombre || 'Sin nombre'}</span>
@@ -242,7 +322,7 @@ export function VehiculoFormModal({
                         })
                       ) : (
                         <div className="px-3 py-2.5 text-xs font-semibold text-amber-600">
-                          No se encontró una persona con ese DNI o nombre. Regístrala primero en Personas.
+                          No se encontró una persona con ese DNI o nombre.
                         </div>
                       )}
                     </div>
@@ -268,15 +348,15 @@ export function VehiculoFormModal({
                     onChange={(e) => {
                       const value = e.target.value
                       setAsociacionSearch(value)
-                      setFormData({
-                        ...formData,
+                      setFormData((prev) => ({
+                        ...prev,
                         asociacion: ''
-                      })
+                      }))
                       setShowAsociacionResults(true)
                     }}
                   />
                   {showAsociacionResults && (
-                    <div className="absolute left-0 right-0 bottom-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                    <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
                       {asociacionResults.length ? (
                         asociacionResults.map((org) => (
                           <button

@@ -63,6 +63,9 @@ Vagrantfile
 /writable/debugbar/*
 !/writable/debugbar/index.html
 
+/writable/login_rate_limits/*
+!/writable/login_rate_limits/index.html
+
 php_errors.log
 
 #-------------------------
