@@ -45,6 +45,7 @@ export function Vehiculos({ user }) {
   const [consultaPlaca, setConsultaPlaca] = useState('')
   const [consultaResult, setConsultaResult] = useState(null)
   const [consultaError, setConsultaError] = useState('')
+  const [isSearchingSunarp, setIsSearchingSunarp] = useState(false)
 
   const handleConsulta = async (e) => {
     e.preventDefault()
