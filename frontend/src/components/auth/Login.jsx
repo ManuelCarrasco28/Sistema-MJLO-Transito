@@ -109,6 +109,14 @@ export function Login({ onLogin }) {
         return
       }
 
+      if (data.data?.rol?.toUpperCase() === 'TRABAJADOR') {
+        setError('El acceso al sistema web está restringido para este rol. Por favor, utilice la aplicación móvil.')
+        setIsShaking(true)
+        resetCaptcha()
+        setIsLoading(false)
+        return
+      }
+
       if (rememberMe) {
         localStorage.setItem('remember_username', username.trim())
       } else {
