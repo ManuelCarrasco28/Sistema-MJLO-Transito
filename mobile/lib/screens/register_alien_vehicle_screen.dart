@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
 import '../theme.dart';
@@ -150,7 +151,7 @@ class _RegisterAlienVehicleScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Vehículo no registrado en la municipalidad JLO ni en Chiclayo. Ingrese características manualmente.',
+                'Vehículo no registrado en la municipalidad JLO ni en Chiclayo.',
               ),
               duration: Duration(seconds: 4),
             ),
@@ -166,7 +167,7 @@ class _RegisterAlienVehicleScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Error o vehículo no registrado en la municipalidad JLO ni en Chiclayo. Ingrese datos manualmente.',
+              'Error o vehículo no registrado en la municipalidad JLO ni en Chiclayo.',
             ),
             duration: Duration(seconds: 4),
           ),
@@ -437,6 +438,7 @@ class _RegisterAlienVehicleScreenState
                 TextInputType.text,
                 hasSearch: true,
                 onSearch: _searchVehiculo,
+                maxLength: 8,
               ),
               const SizedBox(height: 16),
             ],
@@ -507,6 +509,7 @@ class _RegisterAlienVehicleScreenState
                   _duenioNombresController,
                   _duenioApellidosController,
                 ),
+                maxLength: 15,
               ),
               const SizedBox(height: 12),
               _buildTextField(
@@ -830,12 +833,16 @@ class _RegisterAlienVehicleScreenState
     bool hasSearch = false,
     VoidCallback? onSearch,
     bool readOnly = false,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
       keyboardType: type,
       textCapitalization: TextCapitalization.characters,
       readOnly: readOnly,
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey.shade600),

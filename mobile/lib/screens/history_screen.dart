@@ -137,13 +137,17 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
 
   Widget _buildListOperativos() {
     if (_listaOperativos.isEmpty) {
+      final String mensaje = (widget.filterDni != null || widget.filterPlaca != null)
+          ? 'No registra intervenciones en operativos'
+          : 'No participaste en ningún operativo';
+
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.local_police, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
-            Text('No participaste en ningún operativo', style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
+            Text(mensaje, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
           ],
         ),
       );
@@ -181,13 +185,17 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
 
   Widget _buildListActividades(List<dynamic> list) {
     if (list.isEmpty) {
+      final String mensaje = (widget.filterDni != null || widget.filterPlaca != null)
+          ? 'No registra papeletas ni reportes'
+          : 'No tienes actividades registradas';
+
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.list_alt, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
-            Text('No hay actividades registradas', style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
+            Text(mensaje, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
           ],
         ),
       );

@@ -534,7 +534,7 @@ export function Inspecciones() {
   const handleFormSubmit = async (e) => {
     e.preventDefault()
     if (!formData.vehiculoPlaca.trim()) {
-      showToast('Por favor ingrese la placa del vehículo.', 'error')
+      showToast('Por favor  la placa del vehículo.', 'error')
       return
     }
 

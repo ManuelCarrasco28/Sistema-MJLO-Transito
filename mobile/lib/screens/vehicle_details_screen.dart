@@ -88,10 +88,19 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
               ? _buildErrorState()
               : FadeTransition(
                   opacity: _fadeAnimation,
-                  child: _buildDetails(),
+                  child: Stack(
+                    children: [
+                      _buildDetails(),
+                      if (_vehicleData != null)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: MediaQuery.of(context).padding.bottom + 16,
+                          child: _buildActionButton(),
+                        ),
+                    ],
+                  ),
                 ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _vehicleData != null ? _buildActionButton() : null,
     );
   }
 

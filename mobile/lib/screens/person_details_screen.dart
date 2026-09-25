@@ -78,7 +78,9 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
         backgroundColor: AppTheme.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: SingleChildScrollView(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
         padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 200.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,14 +134,16 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
           ],
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        width: double.infinity,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: MediaQuery.of(context).padding.bottom + 16,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton.icon(
@@ -188,7 +192,10 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
                 ),
               ),
             ],
+          ),
         ),
+      ),
+      ],
       ),
     );
   }
