@@ -18,6 +18,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
       if (group.superAdminOnly && !isSuperAdmin) return null
       if (group.adminOnly && !isAdmin) return null
       if (group.officeOnly && !isOffice) return null
+      if (isSuperAdmin && !group.superAdminOnly) return null
 
       const filteredItems = group.items.filter((item) => {
         if (item.superAdminOnly && !isSuperAdmin) return false
