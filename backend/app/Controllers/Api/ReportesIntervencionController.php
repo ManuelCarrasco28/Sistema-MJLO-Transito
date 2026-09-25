@@ -45,14 +45,29 @@ class ReportesIntervencionController extends ResourceController
             ->join('ciudadanos c_cond', 'c_cond.id_persona = cond_per.id', 'left')
             ->join('operativos op', 'op.id = r.id_operativo', 'left');
 
-        // Filtrar por inspector si se pasa el parámetro (optimización de rendimiento móvil)
         $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
+        $dni = $this->request->getGet('dni');
+        $placa = $this->request->getGet('placa');
+
         if ($inspectorId > 0) {
             $query->where('r.id_inspector', $inspectorId);
         }
+        if (!empty($dni)) {
+            $query->groupStart()
+                  ->where('cond_per.numero', $dni)
+                  ->orWhere('prop_per.numero', $dni)
+                  ->groupEnd();
+        }
+        if (!empty($placa)) {
+            $query->where('v.placa', $placa);
+        }
+
+        if (empty($dni) && empty($placa)) {
+            $query->limit(100);
+        }
 
         $query->groupBy('r.id');
-        $rows = $query->orderBy('r.id', 'DESC')->limit(50)->get()->getResultArray();
+        $rows = $query->orderBy('r.id', 'DESC')->get()->getResultArray();
 
         $reporteIds = array_column($rows, 'id');
 

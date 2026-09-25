@@ -58,7 +58,16 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
     if (_persona == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Detalles de Persona', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), backgroundColor: AppTheme.primaryBlue, iconTheme: const IconThemeData(color: Colors.white)),
-        body: const Center(child: Text('No se encontró a la persona')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Text(
+              'Persona no registrada en la municipalidad JLO\n\n(Solo los DNIs son consultados automáticamente en RENIEC).', 
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey)
+            ),
+          )
+        ),
       );
     }
 
@@ -70,7 +79,7 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 80.0),
+        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 200.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -123,13 +132,14 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        width: double.infinity,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton.icon(
@@ -178,7 +188,6 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
                 ),
               ),
             ],
-          ),
         ),
       ),
     );
@@ -209,7 +218,7 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Fotografía del Administrado / Conductor', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                const Text('Fotografía de la Persona Consultada', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text('${_persona!['nombres']} ${_persona!['apellidoPaterno']}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
               ],

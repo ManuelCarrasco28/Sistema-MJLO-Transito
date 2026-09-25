@@ -1,9 +1,11 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+
 import '../services/api_service.dart';
 import '../theme.dart';
 import '../utils/location_helper.dart';
@@ -15,12 +17,14 @@ class RegisterAlienVehicleScreen extends StatefulWidget {
   const RegisterAlienVehicleScreen({super.key, required this.conductor});
 
   @override
-  State<RegisterAlienVehicleScreen> createState() => _RegisterAlienVehicleScreenState();
+  State<RegisterAlienVehicleScreen> createState() =>
+      _RegisterAlienVehicleScreenState();
 }
 
-class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen> {
+class _RegisterAlienVehicleScreenState
+    extends State<RegisterAlienVehicleScreen> {
   // Dueño eliminado para no vincular automáticamente
-  
+
   // Vehículo
   String _estadoPlaca = 'CON_PLACA'; // 'CON_PLACA', 'SIN_PLACA'
   final _placaController = TextEditingController();
@@ -41,7 +45,7 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
   final _lugarController = TextEditingController();
   final _coordenadasController = TextEditingController();
   final _observacionesController = TextEditingController();
-  
+
   final _duenioDniController = TextEditingController();
   final _duenioNombresController = TextEditingController();
   final _duenioApellidosController = TextEditingController();
@@ -49,13 +53,13 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
   bool _isSearching = false;
   bool _vehiculoEncontrado = false;
   bool? _permitePapeleta;
-  
+
   @override
   void initState() {
     super.initState();
     _loadPermiso();
   }
-  
+
   Future<void> _loadPermiso() async {
     final permite = await ApiService.permiteAplicarPapeletaMovil();
     if (mounted) {
@@ -65,7 +69,11 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
     }
   }
 
-  Future<void> _searchPersona(TextEditingController dniCtrl, TextEditingController nomCtrl, TextEditingController apeCtrl) async {
+  Future<void> _searchPersona(
+    TextEditingController dniCtrl,
+    TextEditingController nomCtrl,
+    TextEditingController apeCtrl,
+  ) async {
     final dni = dniCtrl.text.trim();
     if (dni.isEmpty) {
       _showError('Ingrese un DNI para buscar');
@@ -77,7 +85,9 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
       if (persona != null) {
         setState(() {
           nomCtrl.text = persona['nombres'] ?? '';
-          apeCtrl.text = '${persona['apellidoPaterno'] ?? ''} ${persona['apellidoMaterno'] ?? ''}'.trim();
+          apeCtrl.text =
+              '${persona['apellidoPaterno'] ?? ''} ${persona['apellidoMaterno'] ?? ''}'
+                  .trim();
         });
       } else {
         _showError('DNI no encontrado');
@@ -111,16 +121,18 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
           _marcaController.text = vehiculo['marca'] ?? '';
           _colorController.text = vehiculo['color'] ?? '';
           _claseController.text = vehiculo['modelo'] ?? '';
-          _chasisController.text = vehiculo['numeroSerie'] ?? vehiculo['chasis'] ?? '';
-          
-          if (vehiculo['propietario'] != null && vehiculo['propietario'] != 'Sin Propietario Asignado') {
-             _duenioDniController.text = vehiculo['propietarioDni'] ?? '';
-             _duenioNombresController.text = vehiculo['propietario'] ?? '';
-             _duenioApellidosController.text = '';
+          _chasisController.text =
+              vehiculo['numeroSerie'] ?? vehiculo['chasis'] ?? '';
+
+          if (vehiculo['propietario'] != null &&
+              vehiculo['propietario'] != 'Sin Propietario Asignado') {
+            _duenioDniController.text = vehiculo['propietarioDni'] ?? '';
+            _duenioNombresController.text = vehiculo['propietario'] ?? '';
+            _duenioApellidosController.text = '';
           } else {
-             _duenioDniController.text = '';
-             _duenioNombresController.text = '';
-             _duenioApellidosController.text = '';
+            _duenioDniController.text = '';
+            _duenioNombresController.text = '';
+            _duenioApellidosController.text = '';
           }
         });
       } else {
@@ -135,17 +147,31 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
           _duenioApellidosController.text = '';
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vehículo no encontrado. Ingrese características manualmente.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Vehículo no registrado en la municipalidad JLO ni en Chiclayo. Ingrese características manualmente.',
+              ),
+              duration: Duration(seconds: 4),
+            ),
+          );
         }
       }
     } catch (e) {
-        setState(() {
-          _vehiculoEncontrado = false;
-          _vehiculoData = null;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error o vehículo no encontrado. Ingrese datos manualmente.')));
-        }
+      setState(() {
+        _vehiculoEncontrado = false;
+        _vehiculoData = null;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Error o vehículo no registrado en la municipalidad JLO ni en Chiclayo. Ingrese datos manualmente.',
+            ),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSearching = false);
     }
@@ -180,11 +206,15 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
       setState(() {
         _currentPosition = position;
         _lugarController.text = address;
-        _coordenadasController.text = '${position.latitude}, ${position.longitude}';
+        _coordenadasController.text =
+            '${position.latitude}, ${position.longitude}';
       });
 
       if (!wasNull) {
-        _mapController.move(LatLng(position.latitude, position.longitude), 16.0);
+        _mapController.move(
+          LatLng(position.latitude, position.longitude),
+          16.0,
+        );
       }
 
       if (mounted) {
@@ -193,7 +223,11 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
         );
       }
     } catch (e) {
-      _showError(e is Exception ? e.toString().replaceFirst('Exception: ', '') : 'Error al obtener la ubicación: $e');
+      _showError(
+        e is Exception
+            ? e.toString().replaceFirst('Exception: ', '')
+            : 'Error al obtener la ubicación: $e',
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -208,7 +242,7 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
       _showError('Ingresa la placa del vehículo');
       return;
     }
-    
+
     final bool permite = _permitePapeleta ?? true;
     if (!permite) {
       if (_lugarController.text.trim().isEmpty) {
@@ -216,7 +250,9 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
         return;
       }
       if (_observacionesController.text.trim().isEmpty) {
-        _showError('Falta ingresar las observaciones obligatorias para el reporte');
+        _showError(
+          'Falta ingresar las observaciones obligatorias para el reporte',
+        );
         return;
       }
     }
@@ -224,26 +260,32 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
     final Map<String, dynamic> reporteData = {
       'dni_conductor': widget.conductor['numeroDocumento'] ?? '',
       'nombres_conductor': widget.conductor['nombres'] ?? '',
-      'apellidos_conductor': '${widget.conductor['apellidoPaterno'] ?? ''} ${widget.conductor['apellidoMaterno'] ?? ''}'.trim(),
-      
+      'apellidos_conductor':
+          '${widget.conductor['apellidoPaterno'] ?? ''} ${widget.conductor['apellidoMaterno'] ?? ''}'
+              .trim(),
+
       'dueño_es_conductor': false,
       'dni_dueño': _duenioDniController.text,
       'nombres_dueño': _duenioNombresController.text,
       'apellidos_dueño': _duenioApellidosController.text,
-      
+
       'estado_placa': _estadoPlaca,
-      'placa': _estadoPlaca == 'CON_PLACA' ? _placaController.text.trim().toUpperCase() : null,
+      'placa': _estadoPlaca == 'CON_PLACA'
+          ? _placaController.text.trim().toUpperCase()
+          : null,
       'chasis': _chasisController.text.trim().toUpperCase(),
-      
+
       'clase_vehiculo': _claseController.text.trim().toUpperCase(),
       'marca_vehiculo': _marcaController.text.trim().toUpperCase(),
       'color_vehiculo': _colorController.text.trim().toUpperCase(),
       'motor_vehiculo': '',
-      
+
       'lugar': _lugarController.text.trim(),
       'observaciones': _observacionesController.text.trim(),
       'fotos': _fotos,
-      'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : null,
+      'coordenadas': _currentPosition != null
+          ? '${_currentPosition!.latitude},${_currentPosition!.longitude}'
+          : null,
     };
 
     Navigator.push(
@@ -257,7 +299,9 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
   void _showError(String msg) {
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
     }
   }
 
@@ -279,7 +323,14 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Registrar Vehículo Ajeno', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text(
+          'Registrar Vehículo Ajeno',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
         backgroundColor: AppTheme.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -288,28 +339,51 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('1. Datos del Conductor', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+            const Text(
+              '1. Datos del Conductor',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E3A8A),
+              ),
+            ),
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('DNI: ${widget.conductor['numeroDocumento']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    'DNI: ${widget.conductor['numeroDocumento']}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
                   Text('Nombres: ${widget.conductor['nombres']}'),
                   const SizedBox(height: 4),
-                  Text('Apellidos: ${widget.conductor['apellidoPaterno']} ${widget.conductor['apellidoMaterno'] ?? ''}'.trim()),
+                  Text(
+                    'Apellidos: ${widget.conductor['apellidoPaterno']} ${widget.conductor['apellidoMaterno'] ?? ''}'
+                        .trim(),
+                  ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            const Text('2. Datos del Vehículo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+            const Text(
+              '2. Datos del Vehículo',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E3A8A),
+              ),
+            ),
             const SizedBox(height: 12),
-            
+
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -319,7 +393,10 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
               child: Column(
                 children: [
                   RadioListTile<String>(
-                    title: const Text('Tiene Placa', style: TextStyle(fontWeight: FontWeight.w600)),
+                    title: const Text(
+                      'Tiene Placa',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     value: 'CON_PLACA',
                     groupValue: _estadoPlaca,
                     onChanged: (val) {
@@ -334,7 +411,10 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                   ),
                   const Divider(height: 1),
                   RadioListTile<String>(
-                    title: const Text('Sin Placa', style: TextStyle(fontWeight: FontWeight.w600)),
+                    title: const Text(
+                      'Sin Placa',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     value: 'SIN_PLACA',
                     groupValue: _estadoPlaca,
                     onChanged: (val) {
@@ -347,56 +427,122 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 16),
             if (_estadoPlaca == 'CON_PLACA') ...[
-              _buildTextField(_placaController, 'Número de Placa (Ej: M1-5678)', Icons.directions_car, TextInputType.text, hasSearch: true, onSearch: _searchVehiculo),
+              _buildTextField(
+                _placaController,
+                'Número de Placa',
+                Icons.directions_car,
+                TextInputType.text,
+                hasSearch: true,
+                onSearch: _searchVehiculo,
+              ),
               const SizedBox(height: 16),
             ],
-            
+
             if (_estadoPlaca == 'CON_PLACA' && _vehiculoEncontrado) ...[
               _buildVehicleSummaryCard(),
             ],
-            
+
             if (_estadoPlaca == 'SIN_PLACA') ...[
               const Padding(
                 padding: EdgeInsets.only(bottom: 8.0),
-                child: Text('Características del Vehículo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+                child: Text(
+                  'Características del Vehículo',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
               ),
-              _buildTextField(_claseController, 'Clase (Ej: Mototaxi)', Icons.category, TextInputType.text),
+              _buildTextField(
+                _claseController,
+                'Clase (Ej: Mototaxi)',
+                Icons.category,
+                TextInputType.text,
+              ),
               const SizedBox(height: 12),
-              _buildTextField(_marcaController, 'Marca', Icons.branding_watermark, TextInputType.text),
+              _buildTextField(
+                _marcaController,
+                'Marca',
+                Icons.branding_watermark,
+                TextInputType.text,
+              ),
               const SizedBox(height: 12),
-              _buildTextField(_colorController, 'Color', Icons.color_lens, TextInputType.text),
+              _buildTextField(
+                _colorController,
+                'Color',
+                Icons.color_lens,
+                TextInputType.text,
+              ),
               const SizedBox(height: 12),
-              _buildTextField(_chasisController, 'Número de Serie (Chasis)', Icons.settings, TextInputType.text),
+              _buildTextField(
+                _chasisController,
+                'Número de Serie (Chasis)',
+                Icons.settings,
+                TextInputType.text,
+              ),
             ],
 
             if (_estadoPlaca == 'SIN_PLACA') ...[
               const SizedBox(height: 24),
-              const Text('3. Datos del Supuesto Propietario', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+              const Text(
+                '3. Datos del Supuesto Propietario',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E3A8A),
+                ),
+              ),
               const SizedBox(height: 12),
-              _buildTextField(_duenioDniController, 'DNI del Propietario', Icons.badge, TextInputType.number, 
-                hasSearch: true, 
-                onSearch: () => _searchPersona(_duenioDniController, _duenioNombresController, _duenioApellidosController)),
+              _buildTextField(
+                _duenioDniController,
+                'DNI del Propietario',
+                Icons.badge,
+                TextInputType.number,
+                hasSearch: true,
+                onSearch: () => _searchPersona(
+                  _duenioDniController,
+                  _duenioNombresController,
+                  _duenioApellidosController,
+                ),
+              ),
               const SizedBox(height: 12),
-              _buildTextField(_duenioNombresController, 'Nombres del Propietario', Icons.person, TextInputType.text),
+              _buildTextField(
+                _duenioNombresController,
+                'Nombres del Propietario',
+                Icons.person,
+                TextInputType.text,
+              ),
               const SizedBox(height: 12),
-              _buildTextField(_duenioApellidosController, 'Apellidos del Propietario', Icons.person_outline, TextInputType.text),
+              _buildTextField(
+                _duenioApellidosController,
+                'Apellidos del Propietario',
+                Icons.person_outline,
+                TextInputType.text,
+              ),
             ],
 
-            
             const SizedBox(height: 16),
             const Padding(
               padding: EdgeInsets.only(bottom: 8.0),
-              child: Text('Lugar y Evidencia', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+              child: Text(
+                'Lugar y Evidencia',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal,
+                ),
+              ),
             ),
-            
+
             TextFormField(
               controller: _lugarController,
               decoration: InputDecoration(
                 labelText: 'Lugar de Intervención (Calle/Nombre)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 filled: true,
                 fillColor: Colors.white,
                 prefixIcon: const Icon(Icons.location_on, color: Colors.grey),
@@ -407,12 +553,25 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                       color: AppTheme.primaryBlue,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: _isLoadingLocation 
-                      ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)))
-                      : IconButton(
-                          icon: const Icon(Icons.my_location, color: Colors.white),
-                          onPressed: _getCurrentLocation,
-                        ),
+                    child: _isLoadingLocation
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          )
+                        : IconButton(
+                            icon: const Icon(
+                              Icons.my_location,
+                              color: Colors.white,
+                            ),
+                            onPressed: _getCurrentLocation,
+                          ),
                   ),
                 ),
               ),
@@ -423,16 +582,21 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
               readOnly: true,
               decoration: InputDecoration(
                 labelText: 'Coordenadas exactas',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 filled: true,
                 fillColor: Colors.grey.shade100,
                 prefixIcon: const Icon(Icons.gps_fixed, color: Colors.grey),
               ),
             ),
-            
+
             if (_currentPosition != null) ...[
               const SizedBox(height: 12),
-              const Text('Ajuste manual (toca el mapa para cambiar la ubicación exacta)', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const Text(
+                'Ajuste manual (toca el mapa para cambiar la ubicación exacta)',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
               const SizedBox(height: 4),
               Container(
                 height: 200,
@@ -444,7 +608,10 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                 child: FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    initialCenter: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                    initialCenter: LatLng(
+                      _currentPosition!.latitude,
+                      _currentPosition!.longitude,
+                    ),
                     initialZoom: 16.0,
                     onTap: (tapPosition, point) {
                       setState(() {
@@ -460,22 +627,31 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                           altitudeAccuracy: 0.0,
                           headingAccuracy: 0.0,
                         );
-                        _coordenadasController.text = '${point.latitude}, ${point.longitude}';
+                        _coordenadasController.text =
+                            '${point.latitude}, ${point.longitude}';
                       });
                     },
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.mjlo.transito',
                     ),
                     MarkerLayer(
                       markers: [
                         Marker(
-                          point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                          point: LatLng(
+                            _currentPosition!.latitude,
+                            _currentPosition!.longitude,
+                          ),
                           width: 40,
                           height: 40,
-                          child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                          child: const Icon(
+                            Icons.location_on,
+                            color: Colors.red,
+                            size: 40,
+                          ),
                         ),
                       ],
                     ),
@@ -483,13 +659,15 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                 ),
               ),
             ],
-            
+
             const SizedBox(height: 12),
             TextField(
               controller: _observacionesController,
               decoration: InputDecoration(
                 labelText: 'Observaciones',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 filled: true,
                 fillColor: Colors.white,
                 alignLabelWithHint: true,
@@ -497,7 +675,7 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
               maxLines: 3,
             ),
             const SizedBox(height: 16),
-            
+
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -512,7 +690,13 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: const Text('Evidencia Fotográfica', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                        child: const Text(
+                          'Evidencia Fotográfica',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
@@ -520,11 +704,19 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange.shade600,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                         icon: const Icon(Icons.camera_alt, size: 20),
-                        label: const Text('Tomar Foto', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: const Text(
+                          'Tomar Foto',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
@@ -539,7 +731,10 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                           return Stack(
                             children: [
                               Container(
-                                margin: const EdgeInsets.only(right: 12, top: 8),
+                                margin: const EdgeInsets.only(
+                                  right: 12,
+                                  top: 8,
+                                ),
                                 width: 100,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(8),
@@ -547,7 +742,12 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                                     image: FileImage(File(_fotos[index].path)),
                                     fit: BoxFit.cover,
                                   ),
-                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)],
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
                                 ),
                               ),
                               Positioned(
@@ -565,7 +765,11 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                                       shape: BoxShape.circle,
                                     ),
                                     padding: const EdgeInsets.all(4),
-                                    child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -578,7 +782,7 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
           ],
         ),
@@ -594,15 +798,22 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryBlue,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 elevation: 5,
               ),
               icon: const Icon(Icons.arrow_forward),
               label: Text(
-                _permitePapeleta == null 
-                  ? 'Cargando...' 
-                  : (_permitePapeleta! ? 'Siguiente: Generar Papeleta' : 'Siguiente: Enviar Reporte'),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                _permitePapeleta == null
+                    ? 'Cargando...'
+                    : (_permitePapeleta!
+                          ? 'Siguiente: Generar Papeleta'
+                          : 'Siguiente: Enviar Reporte'),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -611,7 +822,15 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, TextInputType type, {bool hasSearch = false, VoidCallback? onSearch, bool readOnly = false}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon,
+    TextInputType type, {
+    bool hasSearch = false,
+    VoidCallback? onSearch,
+    bool readOnly = false,
+  }) {
     return TextField(
       controller: controller,
       keyboardType: type,
@@ -628,12 +847,24 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryBlue,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
-                  child: _isSearching 
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                      : const Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: _isSearching
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Buscar',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                 ),
               )
             : null,
@@ -663,50 +894,124 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.greenAccent, size: 20),
+                    Icon(
+                      Icons.check_circle,
+                      color: Colors.greenAccent,
+                      size: 20,
+                    ),
                     SizedBox(width: 8),
-                    Text('VEHÍCULO ENCONTRADO', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(
+                      'VEHÍCULO ENCONTRADO',
+                      style: TextStyle(
+                        color: Colors.greenAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: estadoColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: estadoColor),
                   ),
-                  child: Text(estadoTexto, style: TextStyle(color: estadoColor, fontWeight: FontWeight.bold, fontSize: 11)),
+                  child: Text(
+                    estadoTexto,
+                    style: TextStyle(
+                      color: estadoColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            _buildSummaryRow('MARCA', _marcaController.text, 'CLASE', _claseController.text),
+            _buildSummaryRow(
+              'MARCA',
+              _marcaController.text,
+              'CLASE',
+              _claseController.text,
+            ),
             const SizedBox(height: 12),
-            _buildSummaryRow('COLOR', _colorController.text, 'CHASIS', _chasisController.text),
+            _buildSummaryRow(
+              'COLOR',
+              _colorController.text,
+              'CHASIS',
+              _chasisController.text,
+            ),
             const Divider(color: Colors.white24, height: 24),
-            const Text('PROPIETARIO REGISTRADO', style: TextStyle(color: Colors.white54, fontSize: 11)),
+            const Text(
+              'PROPIETARIO REGISTRADO',
+              style: TextStyle(color: Colors.white54, fontSize: 11),
+            ),
             const SizedBox(height: 4),
-            Text(_duenioNombresController.text.isNotEmpty ? _duenioNombresController.text : 'Sin Propietario Asignado', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+            Text(
+              _duenioNombresController.text.isNotEmpty
+                  ? _duenioNombresController.text
+                  : 'Sin Propietario Asignado',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text('DNI/RUC: ${_duenioDniController.text.isNotEmpty ? _duenioDniController.text : "N/A"}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-            
+            Text(
+              'DNI/RUC: ${_duenioDniController.text.isNotEmpty ? _duenioDniController.text : "N/A"}',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+
             if (documentos.isNotEmpty) ...[
               const Divider(color: Colors.white24, height: 24),
-              const Text('DOCUMENTOS REGISTRADOS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+              const Text(
+                'DOCUMENTOS REGISTRADOS',
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 8),
               ...documentos.map((doc) {
                 final bool isVigente = doc['estado'] == 'VIGENTE';
-                final docColor = isVigente ? Colors.greenAccent : Colors.redAccent;
+                final docColor = isVigente
+                    ? Colors.greenAccent
+                    : Colors.redAccent;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6.0),
                   child: Row(
                     children: [
-                      Icon(isVigente ? Icons.verified : Icons.warning_amber_rounded, color: docColor, size: 16),
+                      Icon(
+                        isVigente
+                            ? Icons.verified
+                            : Icons.warning_amber_rounded,
+                        color: docColor,
+                        size: 16,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text('${doc['tipoDocumento']}${doc['numero'] != null && doc['numero'] != 'null' ? ' - ${doc['numero']}' : ''}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        child: Text(
+                          '${doc['tipoDocumento']}${doc['numero'] != null && doc['numero'] != 'null' ? ' - ${doc['numero']}' : ''}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
-                      Text(doc['estado'] ?? '', style: TextStyle(color: docColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                      Text(
+                        doc['estado'] ?? '',
+                        style: TextStyle(
+                          color: docColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -718,19 +1023,52 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
     );
   }
 
-  Widget _buildSummaryRow(String label1, String val1, String label2, String val2) {
+  Widget _buildSummaryRow(
+    String label1,
+    String val1,
+    String label2,
+    String val2,
+  ) {
     return Row(
       children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label1, style: const TextStyle(color: Colors.white54, fontSize: 11)),
-          const SizedBox(height: 2),
-          Text(val1.isNotEmpty ? val1 : '-', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ])),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label2, style: const TextStyle(color: Colors.white54, fontSize: 11)),
-          const SizedBox(height: 2),
-          Text(val2.isNotEmpty ? val2 : '-', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ])),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label1,
+                style: const TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                val1.isNotEmpty ? val1 : '-',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label2,
+                style: const TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                val2.isNotEmpty ? val2 : '-',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

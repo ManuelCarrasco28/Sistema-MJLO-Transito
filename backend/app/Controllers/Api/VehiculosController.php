@@ -222,6 +222,50 @@ class VehiculosController extends ResourceController
             ->getResultArray();
 
         if (empty($rows)) {
+            if ($tipo === 'PLACA') {
+                $sunarpData = \App\Services\PideService::sunarp($normalizado);
+                if ($sunarpData && !isset($sunarpData['error'])) {
+                    $rawProps = $sunarpData['propietarios'] ?? [];
+                    $propNames = array_filter(array_map(function($p) {
+                        return is_string($p) ? trim($p) : trim($p['nombre'] ?? $p['razon_social'] ?? $p['apellidos_nombres'] ?? '');
+                    }, is_array($rawProps) ? $rawProps : []));
+                    
+                    $propietario = empty($propNames) ? 'Sin Propietario Asignado' : implode(', ', $propNames);
+
+                    return $this->respond(['data' => [
+                        'id' => 0,
+                        'placa' => $sunarpData['placa'] ?? $normalizado,
+                        'tipo' => 'Vehículo',
+                        'marca' => $sunarpData['marca'] ?? '',
+                        'modelo' => $sunarpData['modelo'] ?? '',
+                        'color' => $sunarpData['color'] ?? '',
+                        'anio' => $sunarpData['ano_fabricacion'] ?? $sunarpData['anio_fabricacion'] ?? $sunarpData['anio'] ?? '',
+                        'categoria' => $sunarpData['categoria'] ?? '',
+                        'carroceria' => $sunarpData['carroceria'] ?? '',
+                        'sedeRegistro' => $sunarpData['sede'] ?? '',
+                        'tipoCarroceria' => $sunarpData['tipo_carroceria'] ?? '',
+                        'numeroSerie' => $sunarpData['serie'] ?? $sunarpData['vin'] ?? '',
+                        'serieMotor' => $sunarpData['nro_motor'] ?? '',
+                        'partidaRegistral' => $sunarpData['partida'] ?? $sunarpData['partida_registral'] ?? '',
+                        'codigoQr' => '',
+                        'asociacionId' => null,
+                        'asociacion' => null,
+                        'asociacionRuc' => '',
+                        'propietarioTipoDocumento' => '',
+                        'propietarioDni' => '',
+                        'estado' => 'ACTIVO',
+                        'formalidad' => 'INFORMAL',
+                        'propietario' => $propietario,
+                        'documentosVehiculo' => [],
+                        'certicav' => null,
+                        'historialPapeletas' => [],
+                        'historialInternamientos' => [],
+                        'soatEstado' => 'SIN_REGISTRO',
+                        'tucNumero' => 'TUC-2026-000',
+                    ]]);
+                }
+            }
+
             return $this->failNotFound('No se encontró vehículo con el dato ingresado.');
         }
 

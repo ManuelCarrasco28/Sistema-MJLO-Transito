@@ -15,7 +15,7 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://192.168.101.18:8080/api'; // Cambiado a IP actual
+  static const String _defaultUrl = 'http://192.168.101.47:8080/api'; // Cambiado a IP actual
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb
@@ -91,12 +91,22 @@ class ApiService {
     await _secureStorage.delete(key: _sessionCookieKey);
   }
 
-  static Future<List<dynamic>> getPapeletas() async {
+  static Future<List<dynamic>> getPapeletas({String? dni, String? placa}) async {
     final int? idPersona = await getPersonalId();
     if (idPersona == null) return [];
+    
+    final Map<String, dynamic> params = {};
+    if (dni == null && placa == null) {
+      params['inspector_id'] = idPersona.toString();
+    }
+    if (dni != null) params['dni'] = dni;
+    if (placa != null) params['placa'] = placa;
+    
+    final uri = Uri.parse('$baseUrl/papeletas').replace(queryParameters: params);
+    
     final response = await http
         .get(
-          Uri.parse('$baseUrl/papeletas?inspector_id=$idPersona'),
+          uri,
           headers: await _getHeaders(isJson: false),
         )
         .timeout(_requestTimeout);
@@ -107,12 +117,22 @@ class ApiService {
     throw Exception('Error al cargar historial de papeletas');
   }
 
-  static Future<List<dynamic>> getReportes() async {
+  static Future<List<dynamic>> getReportes({String? dni, String? placa}) async {
     final int? idPersona = await getPersonalId();
     if (idPersona == null) return [];
+    
+    final Map<String, dynamic> params = {};
+    if (dni == null && placa == null) {
+      params['inspector_id'] = idPersona.toString();
+    }
+    if (dni != null) params['dni'] = dni;
+    if (placa != null) params['placa'] = placa;
+    
+    final uri = Uri.parse('$baseUrl/reportes-intervencion').replace(queryParameters: params);
+    
     final response = await http
         .get(
-          Uri.parse('$baseUrl/reportes-intervencion?inspector_id=$idPersona'),
+          uri,
           headers: await _getHeaders(isJson: false),
         )
         .timeout(_requestTimeout);

@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/api_service.dart';
 import '../theme.dart';
 import 'qr_scanner_screen.dart';
@@ -52,7 +54,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _loadDashboardData();
       _startMobileConfigAutoRefresh();
-    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       _mobileConfigTimer?.cancel();
       _mobileConfigTimer = null;
     }
@@ -78,7 +81,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _registradasHoy = dashData['papeletas_hoy'] as int? ?? 0;
           _reportesHoy = dashData['reportes_hoy'] as int? ?? 0;
           if (dashData.containsKey('permite_aplicar_papeleta')) {
-            _permitePapeletaMovil = dashData['permite_aplicar_papeleta'] as bool? ?? false;
+            _permitePapeletaMovil =
+                dashData['permite_aplicar_papeleta'] as bool? ?? false;
           }
         });
       }
@@ -98,8 +102,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-
-
   void _handlePrimaryControlAction() {
     _showSearchTypeSelectionDialog(context);
   }
@@ -116,7 +118,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Tipo de Búsqueda', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+        title: const Text(
+          'Tipo de Búsqueda',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.primaryBlue,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -130,10 +138,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       backgroundColor: AppTheme.primaryBlue,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     icon: const Icon(Icons.pin),
-                    label: const Text('Placa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'Placa',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     onPressed: () {
                       Navigator.pop(context);
                       _showSearchDialog(context, 'PLACA');
@@ -147,10 +163,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       backgroundColor: AppTheme.primaryBlue,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     icon: const Icon(Icons.badge),
-                    label: const Text('DNI', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'Documento',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     onPressed: () {
                       Navigator.pop(context);
                       _showSearchDialog(context, 'DNI');
@@ -167,34 +191,71 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _showSearchDialog(BuildContext context, String searchType) {
     final controller = TextEditingController();
-    String title = searchType == 'PLACA' ? 'Buscar Placa' : 'Buscar DNI';
-    String label = searchType == 'PLACA' ? 'Número de Placa' : 'Número de Documento';
+    String title = searchType == 'PLACA' ? 'Buscar Placa' : 'Buscar Documento';
+    String label = searchType == 'PLACA'
+        ? 'Número de Placa'
+        : 'Número de Documento';
+    String hint = searchType == 'PLACA' ? '' : '';
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            labelText: label,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            filled: true,
-            fillColor: Colors.grey.shade50,
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.primaryBlue,
           ),
-          textCapitalization: TextCapitalization.characters,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (searchType != 'PLACA')
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12.0),
+                child: Text(
+                  'Ingrese el número de DNI, Carnet de Extranjería o Pasaporte.',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ),
+            TextField(
+              controller: controller,
+              keyboardType: searchType == 'PLACA'
+                  ? TextInputType.text
+                  : TextInputType.number,
+              inputFormatters: searchType == 'PLACA'
+                  ? []
+                  : [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: label,
+                hintText: hint,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+              textCapitalization: TextCapitalization.characters,
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar', style: TextStyle(color: Colors.grey.shade600)),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryBlue,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: () {
               final value = controller.text.trim().toUpperCase();
@@ -223,14 +284,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 });
               }
             },
-            child: const Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Buscar',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
     );
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -286,7 +348,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 _buildBottomNavItem(Icons.home_rounded, 'Inicio', 0, () {}),
                 _buildOperativoNavItem(),
-                _buildBottomNavItem(Icons.logout_rounded, 'Salir', 2, () => _logout(context)),
+                _buildBottomNavItem(
+                  Icons.logout_rounded,
+                  'Salir',
+                  2,
+                  () => _logout(context),
+                ),
               ],
             ),
           ),
@@ -304,7 +371,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         } else {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No pertenece a ningún operativo activo en este momento.')),
+            const SnackBar(
+              content: Text(
+                'No pertenece a ningún operativo activo en este momento.',
+              ),
+            ),
           );
         }
       },
@@ -317,7 +388,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           children: [
             Icon(
               Icons.shield,
-              color: hasOperativo ? AppTheme.accentYellow : Colors.grey.shade500,
+              color: hasOperativo
+                  ? AppTheme.accentYellow
+                  : Colors.grey.shade500,
               size: 24,
             ),
             const SizedBox(height: 2),
@@ -325,7 +398,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               'Operativo',
               style: TextStyle(
                 fontSize: 12,
-                color: hasOperativo ? AppTheme.accentYellow : Colors.grey.shade600,
+                color: hasOperativo
+                    ? AppTheme.accentYellow
+                    : Colors.grey.shade600,
                 fontWeight: hasOperativo ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -341,7 +416,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Operativo Actual', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+        title: const Text(
+          'Operativo Actual',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.primaryBlue,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,17 +431,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             const SizedBox(height: 12),
             _buildDialogRow(Icons.location_on, 'Lugar', op['lugar'] ?? '-'),
             const SizedBox(height: 12),
-            _buildDialogRow(Icons.event, 'Fecha y Hora', '${op['fecha']}\nInicio: ${op['hora_inicio'] ?? '-'} | Fin: ${op['hora_fin'] ?? '--:--'}'),
+            _buildDialogRow(
+              Icons.event,
+              'Fecha y Hora',
+              '${op['fecha']}\nInicio: ${op['hora_inicio'] ?? '-'} | Fin: ${op['hora_fin'] ?? '--:--'}',
+            ),
             const SizedBox(height: 12),
-            _buildDialogRow(Icons.assignment_ind, 'Su cargo', op['cargo_inspector'] ?? 'Inspector'),
+            _buildDialogRow(
+              Icons.assignment_ind,
+              'Su cargo',
+              op['cargo_inspector'] ?? 'Inspector',
+            ),
             const SizedBox(height: 12),
-            _buildDialogRow(Icons.info_outline, 'Estado', (op['estado'] ?? '-').toString().replaceAll('_', ' ')),
+            _buildDialogRow(
+              Icons.info_outline,
+              'Estado',
+              (op['estado'] ?? '-').toString().replaceAll('_', ' '),
+            ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Cerrar',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -377,8 +473,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
             ],
           ),
         ),
@@ -386,7 +492,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildBottomNavItem(IconData icon, String label, int index, VoidCallback onTap) {
+  Widget _buildBottomNavItem(
+    IconData icon,
+    String label,
+    int index,
+    VoidCallback onTap,
+  ) {
     final isSelected = _selectedIndex == index;
     return InkWell(
       onTap: onTap,
@@ -429,7 +540,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               color: AppTheme.accentYellow,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.person_outline, color: AppTheme.primaryBlue, size: 28),
+            child: const Icon(
+              Icons.person_outline,
+              color: AppTheme.primaryBlue,
+              size: 28,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -437,9 +552,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               future: SharedPreferences.getInstance(),
               builder: (context, snapshot) {
                 final prefs = snapshot.data;
-                final nombre = prefs?.getString('nombres')?.split(' ').first ?? 'Inspector';
-                final apellido = prefs?.getString('apellidos')?.split(' ').first ?? '';
-                
+                final nombre =
+                    prefs?.getString('nombres')?.split(' ').first ??
+                    'Inspector';
+                final apellido =
+                    prefs?.getString('apellidos')?.split(' ').first ?? '';
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -453,7 +571,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _operativoActivo != null ? 'Operativo: ${_operativoActivo!['nombre']}' : 'Sin operativo asignado',
+                      _operativoActivo != null
+                          ? 'Operativo: ${_operativoActivo!['nombre']}'
+                          : 'Sin operativo asignado',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.8),
                         fontSize: 12,
@@ -483,15 +603,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Registradas hoy', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                Text(
+                  'Registradas hoy',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text('$_registradasHoy', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primaryBlue)),
+                    Text(
+                      '$_registradasHoy',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.primaryBlue,
+                      ),
+                    ),
                     const SizedBox(width: 4),
-                    Text('papeletas', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+                    Text(
+                      'papeletas',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryBlue,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -510,15 +647,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Registrados hoy', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                Text(
+                  'Registrados hoy',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text('$_reportesHoy', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.orange)),
+                    Text(
+                      '$_reportesHoy',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.orange,
+                      ),
+                    ),
                     const SizedBox(width: 4),
-                    Text('reportes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange)),
+                    Text(
+                      'reportes',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -612,7 +766,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }) {
     final bgColor = isPrimary ? AppTheme.primaryBlue : Colors.white;
     final textColor = isPrimary ? Colors.white : AppTheme.primaryBlue;
-    final iconBgColor = isPrimary ? AppTheme.accentYellow : AppTheme.backgroundLight;
+    final iconBgColor = isPrimary
+        ? AppTheme.accentYellow
+        : AppTheme.backgroundLight;
     final iconColor = AppTheme.primaryBlue;
 
     return InkWell(
@@ -629,7 +785,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 color: AppTheme.primaryBlue.withOpacity(0.3),
                 blurRadius: 10,
                 offset: const Offset(0, 5),
-              )
+              ),
           ],
         ),
         padding: const EdgeInsets.all(16),
@@ -649,7 +805,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
                 if (badge != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: badgeColor ?? Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),

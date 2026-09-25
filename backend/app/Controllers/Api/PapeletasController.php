@@ -40,7 +40,7 @@ class PapeletasController extends ResourceController
         $db = \Config\Database::connect();
         
         try {
-            $rows = $db->table('papeletas p')
+            $builder = $db->table('papeletas p')
                 ->select("
                     p.id,
                     p.numero_papeleta as numeroPapeleta,
@@ -113,8 +113,30 @@ class PapeletasController extends ResourceController
                 )
                 ->join('personas prop_per', 'prop_per.id = COALESCE(vp.id_persona, vpa.id_persona)', 'left', false)
                 ->join('ciudadanos c_prop', 'c_prop.id_persona = prop_per.id', 'left')
-                ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left')
-                ->groupBy('p.id')
+                ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left');
+
+            $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
+            $dni = $this->request->getGet('dni');
+            $placa = $this->request->getGet('placa');
+
+            if ($inspectorId > 0) {
+                $builder->where('p.id_inspector', $inspectorId);
+            }
+            if (!empty($dni)) {
+                $builder->groupStart()
+                        ->where('per.numero', $dni)
+                        ->orWhere('prop_per.numero', $dni)
+                        ->groupEnd();
+            }
+            if (!empty($placa)) {
+                $builder->where('v.placa', $placa);
+            }
+
+            if (empty($dni) && empty($placa)) {
+                $builder->limit(100);
+            }
+
+            $rows = $builder->groupBy('p.id')
                 ->orderBy('p.id', 'DESC')
                 ->get()
                 ->getResultArray();

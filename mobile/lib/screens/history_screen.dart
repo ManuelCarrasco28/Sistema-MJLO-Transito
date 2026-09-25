@@ -39,8 +39,8 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
 
   Future<void> _loadHistory() async {
     try {
-      final papeletas = await ApiService.getPapeletas();
-      final reportes = await ApiService.getReportes();
+      final papeletas = await ApiService.getPapeletas(dni: widget.filterDni, placa: widget.filterPlaca);
+      final reportes = await ApiService.getReportes(dni: widget.filterDni, placa: widget.filterPlaca);
 
       List<dynamic> todas = [];
       Map<String, Map<String, dynamic>> opsMap = {};
@@ -74,21 +74,7 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
         return dateB.compareTo(dateA);
       });
 
-      // Aplicar filtros si existen
-      if (widget.filterPlaca != null || widget.filterDni != null) {
-        todas = todas.where((act) {
-          if (widget.filterPlaca != null && widget.filterPlaca!.trim().isNotEmpty) {
-            final placa = act['vehiculoPlaca'] ?? act['placa'] ?? '';
-            if (placa != widget.filterPlaca) return false;
-          }
-          if (widget.filterDni != null && widget.filterDni!.trim().isNotEmpty) {
-            final conductorDni = act['conductorDni'] ?? '';
-            final propDni = act['propietarioDni'] ?? '';
-            if (conductorDni != widget.filterDni && propDni != widget.filterDni) return false;
-          }
-          return true;
-        }).toList();
-      }
+      // Filtros ahora se aplican en el backend
 
       setState(() {
         _todasActividades = todas;

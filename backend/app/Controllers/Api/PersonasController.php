@@ -158,7 +158,38 @@ class PersonasController extends ResourceController
 
         $rows = $builder->orderBy('p.id', 'DESC')->get()->getResultArray();
 
-        $personaIds = array_map(function($r) { return $r['id']; }, $rows);
+        if (empty($rows) && $numero && strlen(trim($numero)) === 8 && ctype_digit(trim($numero))) {
+            $pideData = \App\Services\PideService::reniec(trim($numero));
+            if ($pideData && !isset($pideData['error'])) {
+                $rows[] = [
+                    'id' => 0,
+                    'idTipoDocumento' => 1,
+                    'tipoDocumento' => 'DNI',
+                    'tipoDocumentoNombre' => 'DOCUMENTO NACIONAL DE IDENTIDAD',
+                    'numeroDocumento' => trim($numero),
+                    'nombres' => $pideData['nombres'] ?? '',
+                    'apellidoPaterno' => $pideData['apellidoPaterno'] ?? '',
+                    'apellidoMaterno' => $pideData['apellidoMaterno'] ?? '',
+                    'sexo' => '',
+                    'fechaNacimiento' => null,
+                    'estadoCivil' => $pideData['estadoCivil'] ?? '',
+                    'profesion' => '',
+                    'ubigeo' => '',
+                    'fechaCreated' => date('Y-m-d H:i:s'),
+                    'fechaUpdated' => date('Y-m-d H:i:s'),
+                    'direccion' => $pideData['direccion'] ?? '',
+                    'telefono' => '',
+                    'celular' => '',
+                    'email' => '',
+                    'numeroLicencia' => '',
+                    'fotoUrl' => $pideData['foto_url'] ?? '',
+                    'fotoImg' => $pideData['foto_url'] ?? '',
+                    'estado' => 'ACTIVO',
+                ];
+            }
+        }
+
+        $personaIds = array_values(array_filter(array_map(function($r) { return $r['id'] ?? 0; }, $rows), function($id) { return $id > 0; }));
         
         $historialPapeletas = [];
         $historialCursos = [];
