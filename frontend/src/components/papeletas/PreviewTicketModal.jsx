@@ -1,6 +1,27 @@
+import { useEffect } from 'react'
 import { Icon } from '../ui/Icon'
 
 export function PreviewTicketModal({ selectedPapeleta, onClose }) {
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      document.body.setAttribute('data-print-orientation', 'ticket')
+      document.body.classList.add('is-printing-ticket')
+    }
+    const handleAfterPrint = () => {
+      document.body.removeAttribute('data-print-orientation')
+      document.body.classList.remove('is-printing-ticket')
+    }
+
+    window.addEventListener('beforeprint', handleBeforePrint)
+    window.addEventListener('afterprint', handleAfterPrint)
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint)
+      window.removeEventListener('afterprint', handleAfterPrint)
+      document.body.removeAttribute('data-print-orientation')
+      document.body.classList.remove('is-printing-ticket')
+    }
+  }, [])
+
   if (!selectedPapeleta) return null
 
   const montoBaseTotal = selectedPapeleta.detalles?.length > 0
@@ -22,8 +43,8 @@ export function PreviewTicketModal({ selectedPapeleta, onClose }) {
         </button>
       </div>
 
-      <div id="seccion-impresion-ticket" className="w-full max-w-[320px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl print:shadow-none print:max-w-full">
-        <div className="p-4 border border-slate-200 print:border-none print:p-0">
+      <div id="seccion-impresion-ticket" className="w-full max-w-[330px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:max-w-full">
+        <div className="p-5 border border-slate-200 rounded-2xl print:rounded-none print:border-none print:p-1.5">
           <div className="text-center mb-3">
             <h2 className="text-sm font-black uppercase mb-1">MUNICIPALIDAD DISTRITAL</h2>
             <h3 className="text-xs font-bold uppercase mb-1">José Leonardo Ortiz</h3>

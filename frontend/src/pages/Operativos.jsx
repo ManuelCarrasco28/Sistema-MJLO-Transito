@@ -421,18 +421,21 @@ export function Operativos({ user }) {
           <meta charset="UTF-8" />
           <title>${safeText(reportFileName(op, 'pdf'))}</title>
           <style>
-            @page { size: A4 landscape; margin: 12mm; }
-            body { font-family: Arial, sans-serif; color: #0f172a; }
-            h1 { margin: 0 0 4px; font-size: 22px; }
-            p { margin: 4px 0; font-size: 12px; color: #334155; }
-            .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
-            .card { border: 1px solid #dbe3ef; border-radius: 10px; padding: 10px; }
-            .label { color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 700; }
-            .value { font-size: 18px; font-weight: 800; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; font-size: 10px; }
-            th { background: #f1f5f9; color: #475569; text-transform: uppercase; font-size: 9px; }
+            @page { size: A4 landscape; margin: 10mm 12mm 10mm 12mm; }
+            * { box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; }
+            h1 { margin: 0 0 4px; font-size: 20px; }
+            p { margin: 4px 0; font-size: 11px; color: #334155; }
+            .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+            .card { border: 1px solid #dbe3ef; border-radius: 8px; padding: 8px; }
+            .label { color: #64748b; font-size: 9.5px; text-transform: uppercase; font-weight: 700; }
+            .value { font-size: 16px; font-weight: 800; margin-top: 3px; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 6px; }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; break-inside: avoid; }
+            th { background: #f1f5f9; color: #475569; text-transform: uppercase; font-size: 9px; font-weight: 800; }
             th, td { border: 1px solid #e2e8f0; padding: 6px; vertical-align: top; }
-            .footer { margin-top: 10px; font-size: 10px; color: #64748b; }
+            .footer { margin-top: 10px; font-size: 9px; color: #64748b; }
           </style>
         </head>
         <body>

@@ -532,6 +532,41 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
 }
 
 /* ==========================================================================
+   CONFIGURACIÓN GLOBAL DE PÁGINAS IMPRESAS (@PAGE) - MÁRGENES PROFESIONALES OFICIALES
+   ========================================================================== */
+/* 1. Estándar Vertical Oficial (A4 Portrait): Margen institucional de 12mm superior/inferior y 14mm laterales */
+@page {
+  size: A4 portrait;
+  margin: 12mm 14mm 12mm 14mm;
+}
+
+/* 2. Estándar Horizontal Oficial (A4 Landscape): Margen de 10mm superior/inferior y 12mm laterales para reportes y padrones */
+@page landscape-sheet {
+  size: A4 landscape;
+  margin: 10mm 12mm 10mm 12mm;
+}
+
+/* 3. Estándar Rollos Térmicos Continuos (Tickets de Infracción y Pagos 80mm POS) */
+@page ticket-roll {
+  size: 80mm auto;
+  margin: 2mm 3mm 2mm 3mm;
+}
+
+.print-landscape,
+.page-landscape,
+.hoja-documento-landscape,
+body.is-printing-landscape,
+[data-print-orientation="landscape"] {
+  page: landscape-sheet;
+}
+
+#seccion-impresion-ticket,
+.print-ticket,
+body.is-printing-ticket,
+[data-print-orientation="ticket"] {
+  page: ticket-roll;
+}
+
 /* ==========================================================================
    ESTILOS DE IMPRESIÓN OFICIAL (DOCUMENTOS A4 / TICKETS / CARNETS VIALES)
    ========================================================================== */
@@ -586,13 +621,13 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     visibility: visible !important;
   }
 
-  /* 3. Tickets térmicos impresos dentro de #root (Papeletas, Pagos, Retenciones) */
+  /* 3. Tickets térmicos impresos (Papeletas, Pagos, Retenciones) */
   #seccion-impresion-ticket {
     display: block !important;
     visibility: visible !important;
     position: relative !important;
     width: 100% !important;
-    max-width: 80mm !important;
+    max-width: 78mm !important;
     margin: 0 auto !important;
     padding: 2mm 3mm !important;
     background: #ffffff !important;
@@ -616,6 +651,10 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   .autorizacion-vias-a4,
   .autorizacion-control-a4,
   .autorizacion-zonas-a4,
+  .boleta-internamiento-a4,
+  .orden-libertad-a4,
+  .hoja-documento-a4,
+  .hoja-documento-landscape,
   .carnet-wrapper,
   .print-card-container {
     page-break-inside: avoid !important;
@@ -628,19 +667,26 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     box-sizing: border-box !important;
   }
 
-  /* En impresión A4 oficial: ocupar el ancho completo sin desbordar ni cortar márgenes */
+  /* En impresión A4 oficial: ocupar el ancho completo imprimible gobernado por los márgenes de @page */
   .ficha-certicav-a4,
   .constancia-soat-a4,
   .resolucion-permiso-a4,
   .autorizacion-carga-a4,
   .autorizacion-vias-a4,
   .autorizacion-control-a4,
-  .autorizacion-zonas-a4 {
+  .autorizacion-zonas-a4,
+  .boleta-internamiento-a4,
+  .orden-libertad-a4,
+  .hoja-documento-a4,
+  .hoja-documento-landscape {
     width: 100% !important;
-    max-width: 194mm !important;
-    margin: 0 auto !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
     padding: 0 !important;
     border: none !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
   }
 
   /* Carnets: anverso y reverso apilados limpiamente sin corte de bordes */
@@ -669,8 +715,8 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
 
   .hoja-carnets-lote-a4 {
     width: 100% !important;
-    max-width: 210mm !important;
-    min-height: 280mm !important;
+    max-width: 100% !important;
+    min-height: auto !important;
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
@@ -682,7 +728,7 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     break-after: page !important;
     page-break-before: auto !important;
     break-before: auto !important;
-    padding: 6mm 4mm !important;
+    padding: 4mm 0 !important;
     margin: 0 auto !important;
     background: #ffffff !important;
   }
@@ -695,8 +741,8 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   .grid-carnets-4 {
     display: grid !important;
     grid-template-columns: 85.6mm 85.6mm !important;
-    column-gap: 12mm !important;
-    row-gap: 7mm !important;
+    column-gap: 10mm !important;
+    row-gap: 6mm !important;
     justify-content: center !important;
     align-content: center !important;
     margin: 0 auto !important;
@@ -711,12 +757,6 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     width: 85.6mm !important;
-  }
-
-  /* Configuración de página estándar: A4 con margen de seguridad de 5mm 6mm para evitar cortes en bordes */
-  @page {
-    size: A4 portrait;
-    margin: 5mm 6mm;
   }
 }
 

@@ -9,7 +9,7 @@ export const OrdenLibertadPrint = ({ item }) => {
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div id="seccion-impresion" className="print:block hidden bg-white text-black font-sans w-[210mm] mx-auto pt-0 pb-2 px-6 box-border text-xs print:absolute print:top-0 print:left-0 print:m-0 print:w-full">
+    <div id="seccion-impresion" className="seccion-impresion-portal orden-libertad-a4 font-sans text-xs box-border">
       
       {/* Header */}
       <div className="text-center relative mb-1 pt-2">

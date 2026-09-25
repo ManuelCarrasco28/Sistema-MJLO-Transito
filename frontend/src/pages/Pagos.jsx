@@ -276,6 +276,31 @@ export function Pagos() {
   const totalMonto = pagos.filter(p => p.estado === 'PAGADO').reduce((acc, curr) => acc + (curr.montoTotal || 0), 0)
   const pagosHoy = pagos.filter(p => p.estado === 'PAGADO' && p.fecha && new Date(p.fecha).toDateString() === new Date().toDateString()).length
 
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      document.body.removeAttribute('data-print-orientation')
+      document.body.classList.remove('is-printing-ticket', 'is-printing-landscape', 'is-printing-portrait')
+    }
+    window.addEventListener('afterprint', handleAfterPrint)
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint)
+      document.body.removeAttribute('data-print-orientation')
+      document.body.classList.remove('is-printing-ticket', 'is-printing-landscape', 'is-printing-portrait')
+    }
+  }, [])
+
+  const handlePrintTicket = () => {
+    document.body.setAttribute('data-print-orientation', 'ticket')
+    document.body.classList.add('is-printing-ticket')
+    window.print()
+  }
+
+  const handlePrintArqueo = () => {
+    document.body.setAttribute('data-print-orientation', 'landscape')
+    document.body.classList.add('is-printing-landscape')
+    window.print()
+  }
+
   const [filterEstado, setFilterEstado] = useState('TODOS')
 
   const filteredPagos = pagos.filter((p) => {
@@ -775,7 +800,7 @@ export function Pagos() {
 
       {isPreviewModalOpen && selectedPago && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter print:static print:block print:p-0 print:bg-transparent">
-          <div id="seccion-impresion-ticket" className="w-full max-w-sm overflow-hidden rounded-md bg-white shadow-2xl dark:bg-slate-100 p-8 text-center text-slate-900 font-mono text-xs">
+          <div id="seccion-impresion-ticket" className="w-full max-w-[330px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-100 p-5 text-center text-slate-900 font-mono text-xs print:rounded-none print:shadow-none print:p-1.5 print:max-w-full">
             <h4 className="font-bold text-sm mb-1">MUNICIPALIDAD DISTRITAL JLO</h4>
             <p className="mb-4">TICKET DE PAGO MUNICIPAL</p>
             <p className="text-left"><strong>N° RECIBO:</strong> {selectedPago.numeroRecibo}</p>
@@ -790,8 +815,8 @@ export function Pagos() {
               <p><strong>TOTAL: S/ {selectedPago.montoTotal?.toFixed(2)}</strong></p>
             </div>
             <div className="mt-8 pt-4 border-t border-slate-300 flex justify-between print:hidden">
-              <button onClick={() => window.print()} className="bg-emerald-600 text-white px-4 py-2 rounded font-sans font-bold hover:bg-emerald-700">Imprimir</button>
-              <button onClick={() => setIsPreviewModalOpen(false)} className="bg-slate-800 text-white px-4 py-2 rounded font-sans font-bold hover:bg-slate-700">Cerrar</button>
+              <button onClick={handlePrintTicket} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-sans font-bold hover:bg-emerald-700 cursor-pointer">Imprimir Ticket</button>
+              <button onClick={() => setIsPreviewModalOpen(false)} className="bg-slate-800 text-white px-4 py-2 rounded-xl font-sans font-bold hover:bg-slate-700 cursor-pointer">Cerrar</button>
             </div>
           </div>
         </div>
@@ -1064,7 +1089,7 @@ export function Pagos() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={handlePrintArqueo}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-3.5 py-2 text-xs font-extrabold text-purple-700 shadow-2xs hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-300 transition-all cursor-pointer"
                 >
                   <Icon name="print" className="size-4" />

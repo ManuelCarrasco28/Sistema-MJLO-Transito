@@ -366,32 +366,46 @@
 }
 
 /* ===================================================
-   HOJA A4 OFICIAL: FICHA CERTICAV (INSPECCIÓN TÉCNICA)
+   HOJAS A4 OFICIALES INSTITUCIONALES (VISTA PREVIA EN PANTALLA)
+   Dimensiones estándar: 210mm × 297mm con margen interno profesional (12mm sup/inf, 14mm lat)
    =================================================== */
-.ficha-certicav-a4 {
+.ficha-certicav-a4,
+.constancia-soat-a4,
+.resolucion-permiso-a4,
+.autorizacion-carga-a4,
+.autorizacion-vias-a4,
+.autorizacion-control-a4,
+.autorizacion-zonas-a4,
+.boleta-internamiento-a4,
+.orden-libertad-a4,
+.hoja-documento-a4 {
   width: 100%;
-  max-width: 190mm;
+  max-width: 210mm;
+  min-height: 297mm;
   background: #ffffff;
   color: #0f172a;
-  padding: 6mm 8mm;
+  padding: 12mm 14mm;
+  margin: 0 auto;
   border: 1px solid #cbd5e1;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-radius: 2px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   font-family: Arial, Helvetica, sans-serif;
   box-sizing: border-box;
 }
 
-/* ===================================================
-   HOJA A4 OFICIAL: CONSTANCIA SOAT Y RESOLUCIÓN PERMISOS
-   =================================================== */
-.constancia-soat-a4,
-.resolucion-permiso-a4 {
+/* Hojas A4 Horizontal Oficiales (Vista Previa): 297mm × 210mm */
+.hoja-documento-landscape,
+.preview-landscape .hoja-documento-a4 {
   width: 100%;
-  max-width: 190mm;
+  max-width: 297mm;
+  min-height: 210mm;
   background: #ffffff;
   color: #0f172a;
-  padding: 8mm 10mm;
+  padding: 10mm 12mm;
+  margin: 0 auto;
   border: 1px solid #cbd5e1;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-radius: 2px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   font-family: Arial, Helvetica, sans-serif;
   box-sizing: border-box;
 }
@@ -489,8 +503,8 @@
 
   .hoja-carnets-lote-a4 {
     width: 100% !important;
-    max-width: 210mm !important;
-    min-height: 280mm !important;
+    max-width: 100% !important;
+    min-height: auto !important;
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
@@ -502,7 +516,7 @@
     break-after: page !important;
     page-break-before: auto !important;
     break-before: auto !important;
-    padding: 6mm 4mm !important;
+    padding: 4mm 0 !important;
     margin: 0 auto !important;
     background: #ffffff !important;
   }
@@ -515,8 +529,8 @@
   .grid-carnets-4 {
     display: grid !important;
     grid-template-columns: 85.6mm 85.6mm !important;
-    column-gap: 12mm !important;
-    row-gap: 7mm !important;
+    column-gap: 10mm !important;
+    row-gap: 6mm !important;
     justify-content: center !important;
     align-content: center !important;
     margin: 0 auto !important;
@@ -533,14 +547,19 @@
     width: 85.6mm !important;
   }
 
-  /* Hojas A4 Oficiales (CertiCAV, SOAT, Resoluciones, Carga, Vías, Control, Zonas Reservadas) */
+  /* Hojas A4 Oficiales (CertiCAV, SOAT, Resoluciones, Carga, Vías, Control, Zonas Reservadas, Boletas):
+     En papel, el margen físico lo rige @page (12mm sup/inf, 14mm lat), ocupando el 100% de la zona imprimible sin cortes */
   .ficha-certicav-a4,
   .constancia-soat-a4,
   .resolucion-permiso-a4,
   .autorizacion-carga-a4,
   .autorizacion-vias-a4,
   .autorizacion-control-a4,
-  .autorizacion-zonas-a4 {
+  .autorizacion-zonas-a4,
+  .boleta-internamiento-a4,
+  .orden-libertad-a4,
+  .hoja-documento-a4,
+  .hoja-documento-landscape {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     page-break-after: avoid !important;
@@ -551,13 +570,9 @@
     border: none !important;
     padding: 0 !important;
     width: 100% !important;
-    max-width: 194mm !important;
-    margin: 0 auto !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
     box-sizing: border-box !important;
-  }
-
-  @page {
-    size: A4 portrait;
-    margin: 5mm 6mm;
   }
 }

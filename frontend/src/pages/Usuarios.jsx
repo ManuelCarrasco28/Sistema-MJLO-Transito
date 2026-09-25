@@ -421,7 +421,7 @@ export function Usuarios({ user }) {
           <meta charset="utf-8"/>
           <title>Padron_Usuarios_MJLO_${new Date().toISOString().slice(0, 10)}</title>
           <style>
-            @page { size: A4 landscape; margin: 10mm; }
+            @page { size: A4 landscape; margin: 10mm 12mm 10mm 12mm; }
             * { box-sizing: border-box; }
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; font-size: 11px; }
             .header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
@@ -429,6 +429,8 @@ export function Usuarios({ user }) {
             .subtitle { font-size: 11px; color: #475569; margin-top: 2px; }
             .meta { font-size: 9.5px; color: #64748b; text-align: right; }
             table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; break-inside: avoid; }
             th { background-color: #0f172a; color: #ffffff; text-transform: uppercase; font-size: 9.5px; font-weight: 800; padding: 6px 8px; border: 1px solid #0f172a; text-align: left; }
             td { border: 1px solid #e2e8f0; padding: 6px 8px; vertical-align: middle; font-size: 10px; }
             .footer { margin-top: 14px; font-size: 9px; color: #94a3b8; display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 6px; }

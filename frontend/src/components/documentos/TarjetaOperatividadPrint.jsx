@@ -3,14 +3,40 @@ import { createPortal } from 'react-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import './TarjetasImpresion.css'
 
-export function PrintWrapper({ children, className = '' }) {
+export function PrintWrapper({ children, className = '', orientation = 'portrait' }) {
+  React.useEffect(() => {
+    const handleBeforePrint = () => {
+      document.body.setAttribute('data-print-orientation', orientation)
+      if (orientation === 'landscape') {
+        document.body.classList.add('is-printing-landscape')
+      } else if (orientation === 'ticket') {
+        document.body.classList.add('is-printing-ticket')
+      } else {
+        document.body.classList.add('is-printing-portrait')
+      }
+    }
+    const handleAfterPrint = () => {
+      document.body.removeAttribute('data-print-orientation')
+      document.body.classList.remove('is-printing-landscape', 'is-printing-ticket', 'is-printing-portrait')
+    }
+
+    window.addEventListener('beforeprint', handleBeforePrint)
+    window.addEventListener('afterprint', handleAfterPrint)
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint)
+      window.removeEventListener('afterprint', handleAfterPrint)
+      document.body.removeAttribute('data-print-orientation')
+      document.body.classList.remove('is-printing-landscape', 'is-printing-ticket', 'is-printing-portrait')
+    }
+  }, [orientation])
+
   return (
     <>
-      <div className={`preview-doc-screen ${className}`}>
+      <div className={`preview-doc-screen preview-${orientation} ${className}`}>
         {children}
       </div>
       {typeof document !== 'undefined' && createPortal(
-        <div id="seccion-impresion" className="seccion-impresion-portal">
+        <div id="seccion-impresion" className={`seccion-impresion-portal print-${orientation}`} data-orientation={orientation}>
           <div className="impresion-documento-hoja">
             {children}
           </div>
@@ -473,7 +499,7 @@ export function CerticavFichaPrint({ data }) {
 
   return (
     <PrintWrapper>
-      <div className="ficha-certicav-a4" style={{ width: '100%', maxWidth: '190mm', margin: '0 auto', background: '#fff', color: '#000', fontFamily: 'Arial, sans-serif', boxSizing: 'border-box', padding: '4mm 6mm' }}>
+      <div className="ficha-certicav-a4">
         
         {/* CABECERA INSTITUCIONAL */}
         <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 130px', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
@@ -915,21 +941,7 @@ export function AutorizacionCargaDescargaPrint({ data }) {
 
   return (
     <PrintWrapper>
-      <div
-        className="autorizacion-carga-a4"
-        style={{
-          width: '100%',
-          maxWidth: '190mm',
-          margin: '0 auto',
-          background: '#ffffff',
-          color: '#000000',
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '7.2pt',
-          lineHeight: 1.22,
-          padding: '6mm 8mm',
-          boxSizing: 'border-box'
-        }}
-      >
+      <div className="autorizacion-carga-a4" style={{ fontSize: '7.2pt', lineHeight: 1.22 }}>
         {/* CABECERA OFICIAL CON ESCUDO NACIONAL Y MDJLO */}
         <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 140px', alignItems: 'center', gap: '8px', borderBottom: '1px solid #000', paddingBottom: '4px', marginBottom: '4px' }}>
           <div style={{ textAlign: 'center' }}>
@@ -1137,21 +1149,7 @@ export function AutorizacionUsoViasPrint({ data }) {
 
   return (
     <PrintWrapper>
-      <div
-        className="autorizacion-vias-a4"
-        style={{
-          width: '100%',
-          maxWidth: '190mm',
-          margin: '0 auto',
-          background: '#ffffff',
-          color: '#000000',
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '7.5pt',
-          lineHeight: 1.3,
-          padding: '8mm 10mm',
-          boxSizing: 'border-box'
-        }}
-      >
+      <div className="autorizacion-vias-a4" style={{ fontSize: '7.5pt', lineHeight: 1.3 }}>
         {/* CABECERA NORMATIVA TUPA */}
         <div style={{ fontSize: '6.2pt', textAlign: 'justify', lineHeight: 1.2, marginBottom: '8px', color: '#1e293b' }}>
           DE LA MUNICIPALIDAD DISTRITAL DE JOSE LEONARDO ORTIZ, DE CONFORMIDAD AL TEXTO UNICO DE PROCEDIMIENTOS ADMINISTRATIVOS – TUPA 2020, APROBADO CON ORDENANZA MUNICIPAL N° 014-2019-MDJLO DE FECHA 31/12/19, PUBLICADA EL 06 DE NOVIEMBRE DEL 2020, CONVENIOS Y DEMAS NORMAS COMPLEMENTARIAS VIGENTES, EXPIDE LA PRESENTE:
@@ -1309,21 +1307,7 @@ export function AutorizacionControlVehicularPrint({ data }) {
 
   return (
     <PrintWrapper>
-      <div
-        className="autorizacion-control-a4"
-        style={{
-          width: '100%',
-          maxWidth: '190mm',
-          margin: '0 auto',
-          background: '#ffffff',
-          color: '#000000',
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '7.5pt',
-          lineHeight: 1.3,
-          padding: '6mm 8mm',
-          boxSizing: 'border-box'
-        }}
-      >
+      <div className="autorizacion-control-a4" style={{ fontSize: '7.5pt', lineHeight: 1.3 }}>
         {/* CABECERA INSTITUCIONAL */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #4338ca', paddingBottom: '6px', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1481,21 +1465,7 @@ export function AutorizacionZonasReservadasPrint({ data }) {
 
   return (
     <PrintWrapper>
-      <div
-        className="autorizacion-zonas-a4"
-        style={{
-          width: '100%',
-          maxWidth: '190mm',
-          margin: '0 auto',
-          background: '#ffffff',
-          color: '#000000',
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '7.5pt',
-          lineHeight: 1.3,
-          padding: '6mm 8mm',
-          boxSizing: 'border-box'
-        }}
-      >
+      <div className="autorizacion-zonas-a4" style={{ fontSize: '7.5pt', lineHeight: 1.3 }}>
         {/* CABECERA INSTITUCIONAL */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #047857', paddingBottom: '6px', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
