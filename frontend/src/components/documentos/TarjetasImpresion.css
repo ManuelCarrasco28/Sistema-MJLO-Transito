@@ -12,7 +12,7 @@
 .preview-doc-screen {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   width: 100%;
 }
@@ -21,6 +21,7 @@
   padding: 16px;
   background-color: #f0f2f5;
   border-radius: 16px;
+  justify-content: center;
 }
 
 #seccion-impresion {

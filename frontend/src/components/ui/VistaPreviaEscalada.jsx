@@ -26,6 +26,12 @@ export function VistaPreviaEscalada({ ajustar, children, orientacion = 'portrait
     return () => ro.disconnect()
   }, [ajustar, orientacion])
 
+  useEffect(() => {
+    if (contenedorRef.current) {
+      contenedorRef.current.scrollTop = 0
+    }
+  }, [children, ajustar])
+
   return (
     <div ref={contenedorRef} className={`flex-1 min-h-0 w-full flex justify-center ${ajustar ? 'overflow-hidden' : 'overflow-auto'}`}>
       <div style={{ height: alto || undefined }}>

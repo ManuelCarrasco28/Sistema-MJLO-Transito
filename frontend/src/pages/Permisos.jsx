@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
@@ -42,6 +42,13 @@ export function Permisos() {
   const [editingPermiso, setEditingPermiso] = useState(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const previewScrollRef = useRef(null)
+
+  useEffect(() => {
+    if (isDetailModalOpen && previewScrollRef.current) {
+      previewScrollRef.current.scrollTop = 0
+    }
+  }, [isDetailModalOpen, selectedPermiso])
   const handleDeletePermiso = async (id) => {
     const result = await showConfirm(
       '¿Eliminar autorización?',
@@ -820,7 +827,7 @@ export function Permisos() {
             </div>
 
             {/* Vista Previa del Documento Oficial */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-center gap-4 bg-slate-100 dark:bg-[var(--bg-subtle)]">
+            <div ref={previewScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-start gap-4 bg-slate-100 dark:bg-[var(--bg-subtle)]">
               <div className="text-center max-w-lg">
                 <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   Documento Oficial de Autorización Municipal — Hoja Formato A4

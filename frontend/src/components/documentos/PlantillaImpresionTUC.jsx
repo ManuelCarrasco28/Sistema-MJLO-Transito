@@ -59,6 +59,14 @@ export function PlantillaImpresionTUC({ documento, onClose }) {
     qrUrl: `https://munijlo.gob.pe/transito/validar?doc=${encodeURIComponent(documento.codigo || '')}&placa=${encodeURIComponent(documento.vehiculoPlaca || '')}`
   }
 
+  const previewContainerRef = React.useRef(null)
+
+  React.useEffect(() => {
+    if (previewContainerRef.current) {
+      previewContainerRef.current.scrollTop = 0
+    }
+  }, [documento])
+
   const handlePrint = () => {
     window.scrollTo(0, 0)
     const scrollContainers = document.querySelectorAll('.overflow-y-auto')
@@ -120,7 +128,7 @@ export function PlantillaImpresionTUC({ documento, onClose }) {
         </div>
 
         {/* Contenido con Scroll de previsualización en pantalla */}
-        <div className="p-6 max-h-[75vh] overflow-y-auto bg-slate-100 dark:bg-[var(--bg-subtle)] flex flex-col items-center justify-center gap-4">
+        <div ref={previewContainerRef} className="p-6 max-h-[75vh] overflow-y-auto bg-slate-100 dark:bg-[var(--bg-subtle)] flex flex-col items-center justify-start gap-4">
           <div className="text-center max-w-lg">
             <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
               {isTuc && 'Formato Carnet Oficial a 2 Caras (8.5 cm × 5.5 cm) — Anverso y Reverso'}
