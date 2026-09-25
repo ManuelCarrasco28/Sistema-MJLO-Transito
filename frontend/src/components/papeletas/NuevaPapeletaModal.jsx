@@ -1,7 +1,114 @@
+import { useState } from 'react'
 import { Icon } from '../ui/Icon'
 import { FloatingInput } from '../ui/FormInputs'
+import { apiFetch } from '../../config/api'
+import { showError, showToast } from '../../utils/SwalUtil'
 
 export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, creandoPapeleta, onSubmit, onClose }) {
+  const [isSearchingSunarp, setIsSearchingSunarp] = useState(false)
+  const [isSearchingReniec, setIsSearchingReniec] = useState(false)
+
+  const handleSunarpSearch = async () => {
+    const rawPlaca = nuevaForm.vehiculoPlaca?.trim() || ''
+    const cleanPlaca = rawPlaca.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+
+    if (!cleanPlaca || cleanPlaca.length < 5) {
+      showError('Placa requerida', 'Ingresa una placa válida para consultar.')
+      return
+    }
+
+    setIsSearchingSunarp(true)
+    try {
+      const response = await apiFetch('/pide/sunarp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          placa: cleanPlaca,
+          codeZona: '11',
+          codeOficina: '01'
+        })
+      })
+
+      if (!response.ok) {
+        let errorMsg = 'No se pudo consultar el servicio vehicular.'
+        try {
+          const errData = await response.json()
+          errorMsg = errData.messages?.error || errData.message || errorMsg
+        } catch (_) {}
+        throw new Error(errorMsg)
+      }
+
+      const res = await response.json()
+      const data = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
+
+      if (!data) {
+        throw new Error(res.message || 'No se encontraron registros en SUNARP para la placa.')
+      }
+
+      const cat = (data.categoria || '').toUpperCase().trim()
+      const carr = (data.carroceria || '').toUpperCase().trim()
+      let inferredClase = nuevaForm.claseVehiculo || ''
+
+      if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) inferredClase = 'Moto Lineal'
+      else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredClase = 'Mototaxi'
+      else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV') || carr.includes('COUPE') || carr.includes('STATION') || carr.includes('AUTOMOVIL')) inferredClase = 'Automóvil'
+      else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS') || carr.includes('MINIBUS')) inferredClase = 'Camioneta Rural'
+
+      setNuevaForm(prev => ({
+        ...prev,
+        vehiculoPlaca: cleanPlaca,
+        marcaVehiculo: data.marca || prev.marcaVehiculo,
+        colorVehiculo: data.color || prev.colorVehiculo,
+        claseVehiculo: inferredClase,
+        motorVehiculo: data.numero_motor || data.nro_motor || prev.motorVehiculo || ''
+      }))
+
+      showToast('Datos vehiculares obtenidos', 'success')
+    } catch (err) {
+      showError('Consulta fallida', err.message || 'Ocurrió un error en la consulta a SUNARP.')
+    } finally {
+      setIsSearchingSunarp(false)
+    }
+  }
+
+  const handleReniecSearch = async () => {
+    const rawDni = nuevaForm.conductorDni?.trim() || ''
+    if (rawDni.length !== 8) {
+      showError('DNI requerido', 'Ingresa un DNI válido de 8 dígitos para consultar.')
+      return
+    }
+
+    setIsSearchingReniec(true)
+    try {
+      const response = await apiFetch(`/pide/reniec/${rawDni}`)
+      
+      if (!response.ok) {
+        throw new Error('No se pudo encontrar la información del DNI.')
+      }
+
+      const { data } = await response.json()
+
+      if (!data) {
+        throw new Error('No se encontró a la persona con el DNI ingresado.')
+      }
+
+      const nombres = data.nombres || ''
+      const apellidos = `${data.apellidoPaterno || ''} ${data.apellidoMaterno || ''}`.trim()
+
+      setNuevaForm(prev => ({
+        ...prev,
+        conductorNombres: nombres || prev.conductorNombres,
+        conductorApellidos: apellidos || prev.conductorApellidos
+      }))
+
+      showToast('Datos de conductor obtenidos', 'success')
+    } catch (err) {
+      showError('Consulta fallida', err.message || 'Ocurrió un error en la consulta a RENIEC.')
+    } finally {
+      setIsSearchingReniec(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
       <form onSubmit={onSubmit} className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
@@ -26,14 +133,27 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
           <fieldset className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
             <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Vehículo</legend>
             <div className="grid gap-4 sm:grid-cols-2">
-              <FloatingInput
-                id="nueva_placa"
-                label="Placa"
-                required
-                inputClassName="font-mono uppercase"
-                value={nuevaForm.vehiculoPlaca}
-                onChange={(e) => setNuevaForm({ ...nuevaForm, vehiculoPlaca: e.target.value.toUpperCase() })}
-              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <FloatingInput
+                    id="nueva_placa"
+                    label="Placa"
+                    required
+                    inputClassName="font-mono uppercase"
+                    value={nuevaForm.vehiculoPlaca}
+                    onChange={(e) => setNuevaForm({ ...nuevaForm, vehiculoPlaca: e.target.value.toUpperCase() })}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSunarpSearch}
+                  disabled={isSearchingSunarp || !nuevaForm.vehiculoPlaca?.trim()}
+                  className={`flex shrink-0 items-center justify-center rounded-xl bg-indigo-50 px-4 text-indigo-600 transition-colors hover:bg-indigo-100 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-100 dark:border-indigo-500/20 shadow-xs h-[52px]`}
+                  title="Consultar SUNARP"
+                >
+                  <Icon name={isSearchingSunarp ? 'loader' : 'search'} className={`size-5 ${isSearchingSunarp ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
               <FloatingInput id="nueva_clase" label="Clase" optional value={nuevaForm.claseVehiculo} onChange={(e) => setNuevaForm({ ...nuevaForm, claseVehiculo: e.target.value })} />
               <FloatingInput id="nueva_marca" label="Marca" optional value={nuevaForm.marcaVehiculo} onChange={(e) => setNuevaForm({ ...nuevaForm, marcaVehiculo: e.target.value })} />
               <FloatingInput id="nueva_color" label="Color" optional value={nuevaForm.colorVehiculo} onChange={(e) => setNuevaForm({ ...nuevaForm, colorVehiculo: e.target.value })} />
@@ -44,15 +164,28 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
           <fieldset className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
             <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Conductor / Infractor</legend>
             <div className="grid gap-4 sm:grid-cols-3">
-              <FloatingInput
-                id="nueva_dni"
-                label="DNI"
-                optional
-                maxLength={11}
-                inputClassName="font-mono"
-                value={nuevaForm.conductorDni}
-                onChange={(e) => setNuevaForm({ ...nuevaForm, conductorDni: e.target.value.replace(/\D/g, '') })}
-              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <FloatingInput
+                    id="nueva_dni"
+                    label="DNI"
+                    optional
+                    maxLength={8}
+                    inputClassName="font-mono"
+                    value={nuevaForm.conductorDni}
+                    onChange={(e) => setNuevaForm({ ...nuevaForm, conductorDni: e.target.value.replace(/\D/g, '') })}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleReniecSearch}
+                  disabled={isSearchingReniec || (nuevaForm.conductorDni || '').length !== 8}
+                  className={`flex shrink-0 items-center justify-center rounded-xl bg-indigo-50 px-4 text-indigo-600 transition-colors hover:bg-indigo-100 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-100 dark:border-indigo-500/20 shadow-xs h-[52px]`}
+                  title="Consultar RENIEC"
+                >
+                  <Icon name={isSearchingReniec ? 'loader' : 'search'} className={`size-5 ${isSearchingReniec ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
               <FloatingInput id="nueva_nombres" label="Nombres" optional value={nuevaForm.conductorNombres} onChange={(e) => setNuevaForm({ ...nuevaForm, conductorNombres: e.target.value })} />
               <FloatingInput id="nueva_apellidos" label="Apellidos" optional value={nuevaForm.conductorApellidos} onChange={(e) => setNuevaForm({ ...nuevaForm, conductorApellidos: e.target.value })} />
             </div>

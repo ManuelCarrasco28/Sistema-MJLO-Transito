@@ -1,6 +1,8 @@
 import { Icon } from '../ui/Icon'
 
-export function MetricCards({ cards = [], loading = false }) {
+export function MetricCards({ cards = [], loading = false, user }) {
+  const rolNormalizado = (user?.rol || '').toUpperCase()
+  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA', 'ADMINISTRATIVO'].includes(rolNormalizado)
   const horizonStyles = [
     { bg: 'bg-[#F4F7FE] dark:bg-[#4318FF]/20', text: 'text-[#4318FF] dark:text-[#E0E7FF]', icon: 'vehicle' },
     { bg: 'bg-[#E6F9F0] dark:bg-[#01B574]/20', text: 'text-[#01B574] dark:text-[#E6F9F0]', icon: 'document' },
@@ -19,9 +21,26 @@ export function MetricCards({ cards = [], loading = false }) {
       ]
     : cards
 
+  // Filtrar y adaptar tarjetas según el rol
+  const filteredCards = displayCards.filter(card => {
+    if (!isOffice) {
+      if (card.label === 'Documentos vigentes' || card.label === 'Trámites documentarios') {
+        return false
+      }
+    }
+    return true
+  }).map(card => {
+    if (!isOffice && card.label === 'Papeletas pendientes') {
+      return { ...card, detail: 'Pendientes de pago o atención' } // Ocultamos el monto en soles
+    }
+    return card
+  })
+
+  const finalCards = loading ? displayCards : filteredCards
+
   return (
     <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 mb-8" data-purpose="kpi-metric-cards">
-      {displayCards.map((card, index) => {
+      {finalCards.map((card, index) => {
         const style = horizonStyles[index % horizonStyles.length]
         
         return (

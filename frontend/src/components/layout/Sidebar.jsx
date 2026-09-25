@@ -9,12 +9,27 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const location = useLocation()
 
   const rolNormalizado = (user?.rol || '').toUpperCase()
-  const isAdmin = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE'].includes(rolNormalizado)
   const isSuperAdmin = rolNormalizado === 'SUPERADMIN'
+  const isAdmin = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE'].includes(rolNormalizado)
+  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNormalizado)
 
-  const visibleNavigationGroups = isSuperAdmin
-    ? navigationGroups.filter((group) => group.superAdminOnly)
-    : navigationGroups.filter((group) => !group.superAdminOnly && (!group.adminOnly || isAdmin))
+  const visibleNavigationGroups = navigationGroups
+    .map((group) => {
+      if (group.superAdminOnly && !isSuperAdmin) return null
+      if (group.adminOnly && !isAdmin) return null
+      if (group.officeOnly && !isOffice) return null
+
+      const filteredItems = group.items.filter((item) => {
+        if (item.superAdminOnly && !isSuperAdmin) return false
+        if (item.adminOnly && !isAdmin) return false
+        if (item.officeOnly && !isOffice) return false
+        return true
+      })
+
+      if (filteredItems.length === 0) return null
+      return { ...group, items: filteredItems }
+    })
+    .filter(Boolean)
 
   const isItemSelected = (item) => {
     if (!item) return false

@@ -14,7 +14,10 @@ import { VehiculoFormModal } from '../components/vehiculos/VehiculoFormModal'
 import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleModal'
 import { PersonaRapidaModal } from '../components/vehiculos/PersonaRapidaModal'
 
-export function Vehiculos() {
+export function Vehiculos({ user }) {
+  const rolNormalizado = (user?.rol || '').toUpperCase()
+  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNormalizado)
+
   const cachedVeh = getCachedData('/vehiculos')
   const cachedOrg = getCachedData('/asociaciones')
   const cachedPersonas = getCachedData('/personas')
@@ -44,6 +47,94 @@ export function Vehiculos() {
   const [selectedOwnerIndex, setSelectedOwnerIndex] = useState(0)
   const [isPersonaRapidaOpen, setIsPersonaRapidaOpen] = useState(false)
   const [personaRapidaInitialNombre, setPersonaRapidaInitialNombre] = useState('')
+
+  const [consultaPlaca, setConsultaPlaca] = useState('')
+  const [consultaResult, setConsultaResult] = useState(null)
+  const [consultaError, setConsultaError] = useState('')
+
+  const handleConsulta = async (e) => {
+    e.preventDefault()
+    if (!consultaPlaca.trim()) return
+    const plate = consultaPlaca.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+    
+    if (plate.length < 5) {
+      setConsultaError('Ingrese una placa válida (ej. M6Y544 o M6Y-544).')
+      return
+    }
+
+    setConsultaResult(null)
+    setConsultaError('')
+    setIsSearchingSunarp(true)
+
+    try {
+      const response = await apiFetch('/pide/sunarp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ placa: plate, codeZona: '11', codeOficina: '01' })
+      })
+
+      if (!response.ok) {
+        let errorMsg = 'No se pudo consultar el servicio vehicular SUNARP.'
+        try {
+          const errData = await response.json()
+          errorMsg = errData.messages?.error || errData.message || errorMsg
+        } catch (_) {}
+        throw new Error(errorMsg)
+      }
+
+      const res = await response.json()
+      const sunarpData = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
+
+      if (!sunarpData) {
+        throw new Error(res.message || 'No se encontraron registros en SUNARP para la placa ingresada.')
+      }
+
+      const foundInPadron = vehiculos.find(v => (v.placa || '').toUpperCase() === plate)
+
+      const rawProps = Array.isArray(sunarpData.propietarios) ? sunarpData.propietarios : []
+      const propNames = rawProps
+        .map(p => typeof p === 'string' ? p.trim() : (p.nombre || p.razon_social || p.apellidos_nombres || ''))
+        .filter(Boolean)
+        .join(' - ')
+
+      const cat = (sunarpData.categoria || '').toUpperCase().trim()
+      const carr = (sunarpData.carroceria || '').toUpperCase().trim()
+      let inferredTipo = 'Vehículo'
+      if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) inferredTipo = 'Moto Lineal'
+      else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredTipo = 'Mototaxi'
+      else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV')) inferredTipo = 'Automóvil'
+      else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS')) inferredTipo = 'Camioneta Rural'
+
+      const combined = {
+        placa: plate,
+        marca: foundInPadron?.marca || sunarpData.marca || 'N/A',
+        modelo: foundInPadron?.modelo || sunarpData.modelo || 'N/A',
+        color: foundInPadron?.color || sunarpData.color || 'N/A',
+        serieMotor: foundInPadron?.serieMotor || sunarpData.numero_motor || sunarpData.nro_motor || 'N/A',
+        numeroSerie: foundInPadron?.numeroSerie || sunarpData.serie || sunarpData.vin || sunarpData.numero_serie || sunarpData.nro_serie || 'N/A',
+        partidaRegistral: foundInPadron?.partidaRegistral || sunarpData.partida || sunarpData.partida_registral || 'N/A',
+        propietario: foundInPadron?.propietario || propNames || 'NO REGISTRADO',
+        propietarioTipoDocumento: foundInPadron ? 'DNI' : (rawProps[0]?.numero_documento ? 'DNI' : null),
+        propietarioDni: foundInPadron?.propietarioDni || rawProps[0]?.numero_documento || rawProps[0]?.dni || null,
+        asociacion: foundInPadron?.asociacion || null,
+        estado: foundInPadron?.estado || 'INACTIVO',
+        esDelPadron: !!foundInPadron,
+        anio: foundInPadron?.anio || sunarpData.ano_fabricacion || sunarpData.anio_fabricacion || sunarpData.anio || 'N/A',
+        categoria: foundInPadron?.categoria || sunarpData.categoria || 'N/A',
+        carroceria: foundInPadron?.carroceria || sunarpData.carroceria || 'N/A',
+        sedeRegistro: foundInPadron?.sedeRegistro || sunarpData.sede || sunarpData.oficina_registral || sunarpData.oficina || 'N/A',
+        tipoCarroceria: foundInPadron?.tipoCarroceria || sunarpData.tipo_carroceria || sunarpData.carroceria || 'N/A',
+        tipo: foundInPadron?.tipo || inferredTipo,
+        ...(foundInPadron || {})
+      }
+
+      setConsultaResult(combined)
+    } catch (err) {
+      setConsultaError(err.message || 'Error al realizar la consulta.')
+    } finally {
+      setIsSearchingSunarp(false)
+    }
+  }
 
   const [formData, setFormData] = useState({
     placa: '',
@@ -593,6 +684,133 @@ export function Vehiculos() {
     }
   }
 
+  if (!isOffice) {
+    return (
+      <div className="mx-auto w-full max-w-3xl animate-enter py-6">
+        <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="mb-8 flex flex-col items-center justify-center text-center">
+            <div className="mb-4 flex size-20 items-center justify-center rounded-3xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+              <Icon name="search" className="size-10" />
+            </div>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Consulta Vehicular</h1>
+            <p className="mt-2 text-base font-medium text-slate-500">
+              Búsqueda rápida en el padrón municipal por número de placa
+            </p>
+          </div>
+          
+          <form onSubmit={handleConsulta} className="relative flex flex-col gap-4 sm:flex-row">
+            <div className="relative flex-1">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-5">
+                <Icon name="motoTaxi" className="size-6 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Ej. 1234-AB"
+                value={consultaPlaca}
+                onChange={(e) => setConsultaPlaca(e.target.value.toUpperCase())}
+                className="block w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-4 pl-14 pr-4 text-2xl font-black uppercase tracking-widest text-slate-900 transition focus:border-indigo-500 focus:bg-white focus:outline-hidden focus:ring-4 focus:ring-indigo-500/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400 placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                autoFocus
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isSearchingSunarp}
+              className={`flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-10 py-4 text-lg font-bold text-white shadow-xl shadow-indigo-600/30 transition hover:bg-indigo-700 active:scale-95 cursor-pointer ${isSearchingSunarp ? 'opacity-75 cursor-wait' : ''}`}
+            >
+              <Icon name={isSearchingSunarp ? 'loader' : 'search'} className={`size-6 ${isSearchingSunarp ? 'animate-spin' : ''}`} />
+              <span>{isSearchingSunarp ? 'Consultando...' : 'Consultar'}</span>
+            </button>
+          </form>
+
+          {consultaError && (
+            <div className="mt-6 animate-enter rounded-2xl bg-rose-50 p-4 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20">
+              <div className="flex items-center gap-3">
+                <Icon name="alertCircle" className="size-5 shrink-0" />
+                <p className="font-bold">{consultaError}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {consultaResult && (
+           <div className="animate-enter rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+             <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center dark:border-[var(--border)]">
+               <div className="flex items-center gap-4">
+                 <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 dark:bg-[var(--bg-subtle)]">
+                   <Icon name="motoTaxi" className="size-8 text-slate-600 dark:text-slate-300" />
+                 </div>
+                 <div>
+                   <h2 className="text-3xl font-black tracking-widest text-slate-900 dark:text-white">
+                     {consultaResult.placa}
+                   </h2>
+                   <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                     {consultaResult.marca} {consultaResult.modelo}
+                   </span>
+                 </div>
+               </div>
+               <button 
+                 onClick={() => handleOpenDetail(consultaResult)} 
+                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-50 px-5 py-3 text-sm font-bold text-indigo-600 hover:bg-indigo-100 sm:w-auto dark:bg-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/30 transition active:scale-95 cursor-pointer"
+               >
+                 <Icon name="eye" className="size-4" />
+                 Ficha Técnica
+               </button>
+             </div>
+             
+             <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Asociación / Empresa</p>
+                  <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200 line-clamp-2">
+                    {isVehiculoFormal(consultaResult) ? (consultaResult.asociacion || 'NO ASIGNADA') : 'PARTICULAR'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Propietario / Titular</p>
+                  <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200 line-clamp-2">
+                    {consultaResult.propietario || 'NO REGISTRADO'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Estado Formal</p>
+                  <div className="mt-2">
+                    {isVehiculoFormal(consultaResult) ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-bold text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                        <Icon name="checkCircle" className="size-4 shrink-0" /> FORMAL
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-bold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                        <Icon name="alertTriangle" className="size-4 shrink-0" /> INFORMAL
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Estado Padrón</p>
+                  <div className="mt-2">
+                    {consultaResult.esDelPadron ? (
+                      <StatusBadge status={consultaResult.estado || 'ACTIVO'} />
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                        <Icon name="x" className="size-4 shrink-0" /> NO REGISTRADO
+                      </span>
+                    )}
+                  </div>
+                </div>
+             </div>
+           </div>
+        )}
+
+        <VehiculoDetalleModal
+          selectedVehiculo={isDetailModalOpen ? selectedVehiculo : null}
+          onClose={() => setIsDetailModalOpen(false)}
+          isVehiculoFormal={isVehiculoFormal}
+          buildVehiculoQrValue={buildVehiculoQrValue}
+          getVehiculoDocumento={getVehiculoDocumento}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {loadError && <PageLoadError message={loadError} />}
@@ -762,34 +980,38 @@ export function Vehiculos() {
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              title="Descargar padrón en Excel (.xls)"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Excel</span>
-            </button>
+            {isOffice && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  title="Descargar padrón en Excel (.xls)"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+                >
+                  <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Excel</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              title="Descargar o imprimir padrón en PDF"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
-              <span>PDF</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  title="Descargar o imprimir padrón en PDF"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+                >
+                  <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
+                  <span>PDF</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
-            >
-              <span className="text-base leading-none font-black">+</span>
-              <span>Nuevo Vehículo</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={handleOpenCreateModal}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+                >
+                  <span className="text-base leading-none font-black">+</span>
+                  <span>Nuevo Vehículo</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -916,22 +1138,26 @@ export function Vehiculos() {
                         >
                           <Icon name="eye" className="size-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(v)}
-                          title="Editar Vehículo"
-                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white"
-                        >
-                          <Icon name="pencil" className="size-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(v.id)}
-                          title="Eliminar Vehículo"
-                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white"
-                        >
-                          <Icon name="trash" className="size-4" />
-                        </button>
+                        {isOffice && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(v)}
+                              title="Editar Vehículo"
+                              className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white"
+                            >
+                              <Icon name="pencil" className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(v.id)}
+                              title="Eliminar Vehículo"
+                              className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white"
+                            >
+                              <Icon name="trash" className="size-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

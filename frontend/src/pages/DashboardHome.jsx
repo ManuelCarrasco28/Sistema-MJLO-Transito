@@ -5,7 +5,7 @@ import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { Icon } from '../components/ui/Icon'
 import { QuickActions } from '../components/dashboard/QuickActions'
 
-export function DashboardHome() {
+export function DashboardHome({ user }) {
   const cached = getCachedData('/dashboard')
   const [dashboardData, setDashboardData] = useState(cached || null)
   const [error, setError] = useState('')
@@ -59,7 +59,7 @@ export function DashboardHome() {
       )}
 
       {/* Quick Actions (Accesos rápidos) */}
-      <QuickActions />
+      <QuickActions user={user} />
 
       {/* Alertas Preventivas de Vencimiento */}
       {dashboardData?.alertasVencimiento && dashboardData.alertasVencimiento.length > 0 && (
@@ -111,10 +111,11 @@ export function DashboardHome() {
       )}
 
       {/* KPI Metric Cards */}
-      <MetricCards cards={dashboardData?.summaryCards} loading={!dashboardData && !error} />
+      <MetricCards cards={dashboardData?.summaryCards} loading={!dashboardData && !error} user={user} />
       
       {/* Main Dashboard Grid */}
-      <ChartsSection data={dashboardData} loading={!dashboardData && !error} />
+      <ChartsSection data={dashboardData} loading={!dashboardData && !error} user={user} />
     </div>
   )
 }
+

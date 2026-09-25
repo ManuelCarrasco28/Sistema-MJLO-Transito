@@ -40,14 +40,15 @@ export const navigationGroups = [
   {
     name: 'Padrón municipal',
     items: [
-      { id: 'personas', label: 'Personas', icon: 'idCard', path: '/personas' },
-      { id: 'trabajadores', label: 'Trabajadores', icon: 'workerBadge', path: '/trabajadores' },
-      { id: 'asociaciones', label: 'Asociaciones', icon: 'office', path: '/asociaciones' },
+      { id: 'personas', label: 'Personas', icon: 'idCard', path: '/personas', officeOnly: true },
+      { id: 'trabajadores', label: 'Trabajadores', icon: 'workerBadge', path: '/trabajadores', officeOnly: true },
+      { id: 'asociaciones', label: 'Asociaciones', icon: 'office', path: '/asociaciones', officeOnly: true },
       { id: 'vehiculos', label: 'Vehículos', icon: 'motoTaxi', path: '/vehiculos' },
     ]
   },
   {
     name: 'Trámites',
+    officeOnly: true,
     items: [
       { id: 'permisos', label: 'Permisos y Autorizaciones', icon: 'routePermit', path: '/permisos' },
       { id: 'cursos', label: 'Curso de Seguridad Vial', icon: 'course', path: '/cursos' },
@@ -70,6 +71,7 @@ export const navigationGroups = [
   },
   {
     name: 'Pagos',
+    officeOnly: true,
     items: [
       { id: 'pagos', label: 'Pagos', icon: 'receiptCheck', path: '/pagos' },
     ]

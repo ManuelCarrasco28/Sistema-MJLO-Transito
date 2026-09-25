@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Icon } from '../ui/Icon'
 import { apiFetch, getCachedData, setCachedData } from '../../config/api'
 
-export function ChartsSection({ data, loading = false }) {
+export function ChartsSection({ data, loading = false, user }) {
+  const rolNormalizado = (user?.rol || '').toUpperCase()
+  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA', 'ADMINISTRATIVO'].includes(rolNormalizado)
   const navigate = useNavigate()
   const [expandedChart, setExpandedChart] = useState(null)
   const [expandedMultasPagos, setExpandedMultasPagos] = useState(null)
@@ -239,6 +241,7 @@ export function ChartsSection({ data, loading = false }) {
         <div className="lg:col-span-2 space-y-7">
           
           {/* 1. Operaciones mensuales (Restaurado interactivo svg) */}
+          {isOffice && (
           <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '460ms' }}>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
               <div>
@@ -343,8 +346,10 @@ export function ChartsSection({ data, loading = false }) {
               </div>
             </div>
           </article>
+          )}
 
           {/* Multas y pagos registrados (Restaurado interactivo) */}
+          {isOffice && (
           <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '610ms' }}>
             <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
               <div>
@@ -480,6 +485,7 @@ export function ChartsSection({ data, loading = false }) {
               </div>
             )}
           </article>
+          )}
 
           {/* Modern Data Table */}
           <div className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)]" data-purpose="horizon-data-table">
@@ -489,6 +495,7 @@ export function ChartsSection({ data, loading = false }) {
                 <p className="text-xs font-semibold text-[#A3AED0]">Registros procesados por el equipo de fiscalizadores en tiempo real</p>
               </div>
               <div className="flex items-center gap-2">
+                {isOffice && (
                 <button
                   onClick={() => {
                     const htmlContent = `
@@ -550,6 +557,7 @@ export function ChartsSection({ data, loading = false }) {
                 >
                   Exportar Excel
                 </button>
+                )}
                 <button
                   onClick={() => setShowPreviewModal(true)}
                   className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#4318FF] text-white shadow-horizon dark:shadow-none-btn hover:bg-[#3311DB] transition-all cursor-pointer"
@@ -567,7 +575,7 @@ export function ChartsSection({ data, loading = false }) {
                     <th className="pb-3 px-3">Trámite / Infracción</th>
                     <th className="pb-3 px-3">Fecha & Hora</th>
                     <th className="pb-3 px-3 text-center">Estado</th>
-                    <th className="pb-3 px-3 text-right">Monto</th>
+                    {isOffice && <th className="pb-3 px-3 text-right">Monto</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F4F7FE] font-medium">
@@ -593,7 +601,7 @@ export function ChartsSection({ data, loading = false }) {
                     <td className="py-3.5 px-3 text-center">
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#FFF5E6] dark:bg-amber-500/20 text-[#FFB547]">En Proceso</span>
                     </td>
-                    <td className="py-3.5 px-3 text-right font-black text-[#2B3674] dark:text-white">S/ 412.00</td>
+                    {isOffice && <td className="py-3.5 px-3 text-right font-black text-[#2B3674] dark:text-white">S/ 412.00</td>}
                   </tr>
                   <tr className="hover:bg-[#F4F7FE] dark:bg-white/10 transition-colors">
                     <td className="py-3.5 px-3">
@@ -617,7 +625,7 @@ export function ChartsSection({ data, loading = false }) {
                     <td className="py-3.5 px-3 text-center">
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#E6F9F0] dark:bg-emerald-500/20 text-[#01B574]">Aprobado</span>
                     </td>
-                    <td className="py-3.5 px-3 text-right font-black text-[#2B3674] dark:text-white">S/ 35.00</td>
+                    {isOffice && <td className="py-3.5 px-3 text-right font-black text-[#2B3674] dark:text-white">S/ 35.00</td>}
                   </tr>
                 </tbody>
               </table>
@@ -625,6 +633,7 @@ export function ChartsSection({ data, loading = false }) {
           </div>
 
           {/* Operatividad de permisos (Restaurado interactivo) */}
+          {isOffice && (
           <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '830ms' }}>
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#F4F7FE] pb-4 mb-5">
               <div>
@@ -685,6 +694,7 @@ export function ChartsSection({ data, loading = false }) {
               </div>
             </div>
           </article>
+          )}
         </div>
 
         {/* RIGHT COLUMN (1/3 width on large screens) */}
@@ -884,6 +894,7 @@ export function ChartsSection({ data, loading = false }) {
           </div>
 
           {/* Estado de expedientes (Restaurado interactivo) */}
+          {isOffice && (
           <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '540ms' }}>
             <div className="border-b border-[#F4F7FE] pb-4 mb-5">
               <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Estado de expedientes</h2>
@@ -930,8 +941,10 @@ export function ChartsSection({ data, loading = false }) {
               </div>
             </div>
           </article>
+          )}
 
           {/* Asociaciones registradas (Restaurado interactivo) */}
+          {isOffice && (
           <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '760ms' }}>
             <div className="border-b border-[#F4F7FE] pb-4 mb-5">
               <h2 className="text-lg font-extrabold text-[#2B3674] dark:text-white">Asociaciones</h2>
@@ -957,6 +970,7 @@ export function ChartsSection({ data, loading = false }) {
               ))}
             </div>
           </article>
+          )}
 
           {/* Vehículos en depósito (Restaurado interactivo) */}
           <article className="bg-white dark:bg-[var(--bg-surface)] rounded-[20px] p-6 shadow-horizon dark:shadow-none border border-slate-200/80 dark:border-[var(--border)] animate-enter" style={{ animationDelay: '690ms' }}>

@@ -166,7 +166,10 @@ function Layout({ onLogout, user, onUserUpdate }) {
   }, [])
 
   const isSuperAdmin = isSuperAdminUser(user)
+  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes((user?.rol || '').toUpperCase())
+
   const onlyNormalUser = (element) => isSuperAdmin ? <Navigate to="/superadmin" replace /> : element
+  const onlyOfficeUser = (element) => isSuperAdmin ? <Navigate to="/superadmin" replace /> : (!isOffice ? <Navigate to="/dashboard" replace /> : element)
 
   return (
     <main
@@ -216,21 +219,21 @@ function Layout({ onLogout, user, onUserUpdate }) {
               <Route path="/superadmin/usuarios" element={isSuperAdmin ? <Usuarios user={user} /> : <Navigate to="/dashboard" replace />} />
               <Route path="/superadmin/:moduleId" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
               <Route path="/admin" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
-              <Route path="/dashboard" element={onlyNormalUser(<DashboardHome />)} />
-              <Route path="/vehiculos" element={onlyNormalUser(<Vehiculos />)} />
-              <Route path="/personas" element={onlyNormalUser(<Personas user={user} onUserUpdate={onUserUpdate} />)} />
-              <Route path="/trabajadores" element={onlyNormalUser(<Trabajadores />)} />
-              <Route path="/asociaciones" element={onlyNormalUser(<Asociaciones />)} />
-              <Route path="/documentos" element={onlyNormalUser(<Documentos />)} />
+              <Route path="/dashboard" element={onlyNormalUser(<DashboardHome user={user} />)} />
+              <Route path="/vehiculos" element={onlyNormalUser(<Vehiculos user={user} />)} />
+              <Route path="/personas" element={onlyOfficeUser(<Personas user={user} onUserUpdate={onUserUpdate} />)} />
+              <Route path="/trabajadores" element={onlyOfficeUser(<Trabajadores />)} />
+              <Route path="/asociaciones" element={onlyOfficeUser(<Asociaciones />)} />
+              <Route path="/documentos" element={onlyOfficeUser(<Documentos />)} />
               <Route path="/inspecciones" element={onlyNormalUser(<Inspecciones />)} />
               <Route path="/papeletas" element={onlyNormalUser(<Papeletas user={user} />)} />
               <Route path="/operativos" element={onlyNormalUser(<Operativos user={user} />)} />
-              <Route path="/cursos" element={onlyNormalUser(<CursosSeguridad />)} />
-              <Route path="/cursos-seguridad" element={onlyNormalUser(<CursosSeguridad />)} />
-              <Route path="/pagos" element={onlyNormalUser(<Pagos />)} />
+              <Route path="/cursos" element={onlyOfficeUser(<CursosSeguridad />)} />
+              <Route path="/cursos-seguridad" element={onlyOfficeUser(<CursosSeguridad />)} />
+              <Route path="/pagos" element={onlyOfficeUser(<Pagos />)} />
               <Route path="/internamientos" element={onlyNormalUser(<Retenciones user={user} />)} />
               <Route path="/retenciones" element={onlyNormalUser(<Navigate to="/internamientos" replace />)} />
-              <Route path="/permisos" element={onlyNormalUser(<Permisos />)} />
+              <Route path="/permisos" element={onlyOfficeUser(<Permisos />)} />
               <Route path="*" element={
                 <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">
                   <h2 className="text-xl font-bold">Módulo en desarrollo</h2>

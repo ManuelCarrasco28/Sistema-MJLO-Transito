@@ -114,7 +114,7 @@ const AVAILABLE_SHORTCUTS = [
 
 const DEFAULT_SHORTCUTS = ['vehiculo', 'inspeccion', 'papeleta', 'pago'];
 
-export function QuickActions() {
+export function QuickActions({ user }) {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -138,7 +138,19 @@ export function QuickActions() {
     setIsModalOpen(false);
   };
 
-  const activeShortcuts = AVAILABLE_SHORTCUTS.filter(s => selectedIds.includes(s.id));
+  const rolNormalizado = (user?.rol || '').toUpperCase();
+  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNormalizado);
+
+  // Filtramos los atajos disponibles basados en el rol
+  const allowedShortcuts = AVAILABLE_SHORTCUTS.filter(s => {
+    if (!isOffice) {
+      // Si no es oficina (ej. Inspector/Trabajador), solo puede ver papeleta, inspeccion, operativo
+      return ['papeleta', 'inspeccion', 'operativo'].includes(s.id);
+    }
+    return true; // Oficina/Admin puede ver todos
+  });
+
+  const activeShortcuts = allowedShortcuts.filter(s => selectedIds.includes(s.id));
 
   return (
     <div>
@@ -210,7 +222,7 @@ export function QuickActions() {
 
       {isModalOpen && (
         <CustomizeModal 
-          availableShortcuts={AVAILABLE_SHORTCUTS}
+          availableShortcuts={allowedShortcuts}
           initialSelection={selectedIds}
           onSave={handleSave}
           onClose={() => setIsModalOpen(false)}
