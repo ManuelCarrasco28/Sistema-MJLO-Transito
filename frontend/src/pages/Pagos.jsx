@@ -513,7 +513,6 @@ export function Pagos() {
                   <td colSpan="7" className="p-12 text-center">
                     <Icon name="payment" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
                     <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron pagos registrados</p>
-                    <p className="text-xs text-slate-400">Intenta buscar con otros términos o filtros.</p>
                   </td>
                 </tr>
               ) : (

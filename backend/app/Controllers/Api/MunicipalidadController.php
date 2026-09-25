@@ -30,7 +30,10 @@ class MunicipalidadController extends ResourceController
 
         $anios = [];
         if ($municipalidad) {
+            // No seleccionar 'token': es un secreto (bearer de PIDE) y este
+            // endpoint lo consulta cualquier usuario autenticado, no solo superadmin.
             $anios = $db->table('municipalidad_anio')
+                ->select('id, id_municipalidad, fecha_created, fecha_updated, nombre, anio, uit')
                 ->where('id_municipalidad', $municipalidad['id'])
                 ->orderBy('anio', 'DESC')
                 ->get()
@@ -191,9 +194,12 @@ class MunicipalidadController extends ResourceController
             $id = (int)$db->insertID();
         }
 
+        $responseData = $data;
+        unset($responseData['token']);
+
         return $this->respond([
             'message' => 'UIT del año guardada correctamente.',
-            'data' => array_merge($data, ['id' => $id]),
+            'data' => array_merge($responseData, ['id' => $id, 'tokenConfigurado' => $token !== '']),
         ]);
     }
 

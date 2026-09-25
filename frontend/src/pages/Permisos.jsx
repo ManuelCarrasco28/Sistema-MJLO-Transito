@@ -521,8 +521,9 @@ export function Permisos() {
                     </tr>
                   ) : paginatedPermisos.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                        No se encontraron autorizaciones con los filtros seleccionados.
+                      <td colSpan={7} className="p-12 text-center">
+                        <Icon name="permit" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
+                        <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron autorizaciones</p>
                       </td>
                     </tr>
                   ) : (

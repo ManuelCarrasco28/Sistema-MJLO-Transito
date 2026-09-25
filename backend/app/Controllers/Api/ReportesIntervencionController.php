@@ -16,12 +16,7 @@ class ReportesIntervencionController extends ResourceController
             return $this->respond(['data' => []]);
         }
 
-        if (!$db->fieldExists('id_operativo', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_operativo INT NULL AFTER id_papeleta');
-        }
-        if (!$db->fieldExists('id_conductor', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_conductor INT NULL AFTER id_vehiculo');
-        }
+        $this->ensureColumnasExtra($db);
 
         $query = $db->table('reportes_intervencion r')
             ->select("
@@ -140,12 +135,7 @@ class ReportesIntervencionController extends ResourceController
             $fechaHora = (new \DateTime('now', new \DateTimeZone('America/Lima')))->format('Y-m-d H:i:s');
         }
 
-        if (!$db->fieldExists('id_operativo', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_operativo INT NULL AFTER id_papeleta');
-        }
-        if (!$db->fieldExists('id_conductor', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_conductor INT NULL AFTER id_vehiculo');
-        }
+        $this->ensureColumnasExtra($db);
 
         $db->transException(true)->transBegin();
         try {
@@ -213,13 +203,18 @@ class ReportesIntervencionController extends ResourceController
             $id = (int)$db->insertID();
 
             if (is_array($fotos)) {
+                // Máximo 5 fotos por reporte y límite de tamaño (~7MB base64 ~= 5MB binario)
+                $fotos = array_slice($fotos, 0, 5);
                 foreach ($fotos as $foto) {
-                    $foto = $this->normalizarFoto(trim((string)$foto));
-                    if ($foto !== '') {
-                        $db->table('reporte_intervencion_fotos')->insert([
-                            'id_reporte' => $id,
-                            'foto' => $foto,
-                        ]);
+                    $fotoStr = trim((string)$foto);
+                    if ($fotoStr !== '' && strlen($fotoStr) <= 7 * 1024 * 1024) {
+                        $fotoNormalizada = $this->normalizarFoto($fotoStr);
+                        if ($fotoNormalizada !== '') {
+                            $db->table('reporte_intervencion_fotos')->insert([
+                                'id_reporte' => $id,
+                                'foto' => $fotoNormalizada,
+                            ]);
+                        }
                     }
                 }
             }
@@ -395,6 +390,20 @@ class ReportesIntervencionController extends ResourceController
         ]);
 
         return $this->respond(['message' => 'Reporte rechazado correctamente.']);
+    }
+
+    /**
+     * Migración perezosa: agrega id_operativo/id_conductor si la tabla aún
+     * no las tiene (instalaciones creadas antes de que existieran).
+     */
+    private function ensureColumnasExtra($db): void
+    {
+        if (!$db->fieldExists('id_operativo', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_operativo INT NULL AFTER id_papeleta');
+        }
+        if (!$db->fieldExists('id_conductor', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_conductor INT NULL AFTER id_vehiculo');
+        }
     }
 
     private function normalizarFoto(string $foto): string

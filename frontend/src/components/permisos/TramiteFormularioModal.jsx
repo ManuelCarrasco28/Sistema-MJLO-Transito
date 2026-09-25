@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Icon } from '../ui/Icon'
+import { FloatingInput } from '../ui/FormInputs'
 import { sanitizarMensaje, apiFetch } from '../../config/api'
 import { showError, showToast } from '../../utils/SwalUtil'
 import { BuscadorAdministrados } from './BuscadorAdministrados'
@@ -24,20 +25,20 @@ export function TramiteFormularioModal({
     registroNumero: '',
     referenciaSisgedo: '',
     asunto: 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
-    zonaCirculacion: 'Anillo Vial - José Leonardo Ortiz',
-    ubicacion: 'Paradero Central y Anexos',
-    horarioInicio: '16:00:00',
-    horarioFin: '05:00:00',
+    zonaCirculacion: '',
+    ubicacion: '',
+    horarioInicio: '',
+    horarioFin: '',
     fechaEmision: new Date().toISOString().slice(0, 10),
     fechaInicioVigencia: new Date().toISOString().slice(0, 10),
     fechaFinVigencia: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     reciboIngresoNumero: '',
-    reciboIngresoMonto: '1030.00',
+    reciboIngresoMonto: '',
     reciboIngresoFecha: new Date().toISOString().slice(0, 10),
-    tonelaje: '03 A 07-TM',
+    tonelaje: '',
     numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000)),
-    recorridoIngreso: 'Av. Balta, Av. Chiclayo, Calle Kennedy',
-    recorridoSalida: 'Calle Leguía, Av. México, Av. Sáenz Peña',
+    recorridoIngreso: '',
+    recorridoSalida: '',
     flotaPlacas: '',
     observaciones: '',
     contenido: '',
@@ -68,18 +69,18 @@ export function TramiteFormularioModal({
         expediente: initialData.expediente || initialData.expedienteNumero || '',
         registroNumero: initialData.registroNumero || '',
         referenciaSisgedo: initialData.referenciaSisgedo || '',
-        asunto: initialData.asunto || 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
-        zonaCirculacion: initialData.zonaCirculacion || 'Anillo Vial - José Leonardo Ortiz',
+        asunto: initialData.asunto || '',
+        zonaCirculacion: initialData.zonaCirculacion || '',
         ubicacion: initialData.ubicacion || '',
-        horarioInicio: initialData.horarioInicio || '16:00:00',
-        horarioFin: initialData.horarioFin || '05:00:00',
+        horarioInicio: initialData.horarioInicio || '',
+        horarioFin: initialData.horarioFin || '',
         fechaEmision: initialData.fechaEmision || new Date().toISOString().slice(0, 10),
         fechaInicioVigencia: initialData.fechaInicioVigencia || new Date().toISOString().slice(0, 10),
         fechaFinVigencia: initialData.fechaFinVigencia || '',
         reciboIngresoNumero: initialData.reciboIngresoNumero || '',
-        reciboIngresoMonto: initialData.reciboIngresoMonto ? String(initialData.reciboIngresoMonto) : '1030.00',
+        reciboIngresoMonto: initialData.reciboIngresoMonto ? String(initialData.reciboIngresoMonto) : '',
         reciboIngresoFecha: initialData.reciboIngresoFecha || '',
-        tonelaje: initialData.tonelaje || '03 A 07-TM',
+        tonelaje: initialData.tonelaje || '',
         numeroSeguridad: initialData.numeroSeguridad || String(Math.floor(10000 + Math.random() * 90000)),
         recorridoIngreso: initialData.recorridoIngreso || '',
         recorridoSalida: initialData.recorridoSalida || '',
@@ -135,45 +136,27 @@ export function TramiteFormularioModal({
   const handleTipoChange = (newTipo) => {
     let asunto = 'AUTORIZACIÓN MUNICIPAL OFICIAL'
     let monto = '450.00'
-    let zona = 'Anillo Vial y Cuadrantes Autorizados - Distrito de José Leonardo Ortiz'
-    let horarioInicio = formData.horarioInicio || '06:00:00'
-    let horarioFin = formData.horarioFin || '22:00:00'
 
     if (newTipo === 'CARGA_DESCARGA') {
       asunto = 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA'
       monto = '1030.00'
-      zona = 'Anillo Vial y Cuadrante Comercial - José Leonardo Ortiz'
-      horarioInicio = '16:00:00'
-      horarioFin = '05:00:00'
     } else if (newTipo === 'USO_VIAS') {
       asunto = 'AUTORIZACION PROVISIONAL DE USO DE VIAS'
       monto = '850.00'
-      zona = 'Vía pública solicitada - Jurisdicción del Distrito de José Leonardo Ortiz'
-      horarioInicio = '08:00:00'
-      horarioFin = '18:00:00'
     } else if (newTipo === 'ZONAS_RESERVADAS' || newTipo === 'ZONA_RESERVADA') {
       asunto = 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
       monto = '920.00'
-      zona = 'Frontis del establecimiento solicitante - José Leonardo Ortiz'
-      horarioInicio = '07:00:00'
-      horarioFin = '20:00:00'
     } else {
       // CONTROL_VEHICULAR / OPERACION
       asunto = 'AUTORIZACIÓN MUNICIPAL DE CONTROL VEHICULAR Y CIRCULACIÓN'
       monto = '450.00'
-      zona = 'Anillo Vial y Cuadrantes Autorizados - Distrito de José Leonardo Ortiz'
-      horarioInicio = '06:00:00'
-      horarioFin = '22:00:00'
     }
 
     const updated = {
       ...formData,
       tipoPermiso: newTipo,
       asunto,
-      reciboIngresoMonto: monto,
-      zonaCirculacion: zona,
-      horarioInicio,
-      horarioFin
+      reciboIngresoMonto: formData.reciboIngresoMonto || monto
     }
     updated.contenido = generarPlantillaCuerpo(updated)
     setFormData(updated)
@@ -475,190 +458,146 @@ export function TramiteFormularioModal({
           </div>
 
           {/* 3. CAMPOS DE DATOS GENERALES */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
-            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-[var(--border)] pb-1.5 flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-indigo-600"></span>
-              <span>Datos del Solicitante, Vehículo y Expediente</span>
-            </h4>
+          <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs space-y-3">
+            <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
+              <span className="size-2 rounded-full bg-blue-600" />
+              Datos del Solicitante, Vehículo y Expediente
+            </legend>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {/* Administrado / Razón Social */}
-              <div className="lg:col-span-2">
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Razón Social o Administrado *
-                </label>
-                <input
-                  type="text"
-                  name="solicitanteNombre"
-                  value={formData.solicitanteNombre}
-                  onChange={handleInputChange}
+              <div className="sm:col-span-2 lg:col-span-2">
+                <FloatingInput
+                  id="perm_solicitante_nombre"
+                  label="Razón Social o Administrado"
                   required
-                  placeholder="Ej. ASOCIACIÓN DE TRANSPORTISTAS..."
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-bold outline-none focus:border-indigo-500"
+                  value={formData.solicitanteNombre}
+                  onChange={(e) => setFormData({ ...formData, solicitanteNombre: e.target.value })}
+                  inputClassName="font-bold"
                 />
               </div>
 
               {/* Documento RUC / DNI */}
               <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  RUC / DNI *
-                </label>
-                <input
-                  type="text"
-                  name="solicitanteDocumento"
-                  value={formData.solicitanteDocumento}
-                  onChange={handleInputChange}
+                <FloatingInput
+                  id="perm_solicitante_documento"
+                  label="RUC / DNI"
                   required
-                  placeholder="20601234561 o 47589632"
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold outline-none focus:border-indigo-500"
+                  maxLength={15}
+                  value={formData.solicitanteDocumento}
+                  onChange={(e) => setFormData({ ...formData, solicitanteDocumento: e.target.value })}
+                  inputClassName="font-mono font-bold"
                 />
               </div>
 
               {/* Representante Legal */}
               <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Representante Legal
-                </label>
-                <input
-                  type="text"
-                  name="representanteLegal"
+                <FloatingInput
+                  id="perm_representante_legal"
+                  label="Representante Legal"
                   value={formData.representanteLegal}
-                  onChange={handleInputChange}
-                  placeholder="Nombres del titular o apoderado"
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500"
+                  onChange={(e) => setFormData({ ...formData, representanteLegal: e.target.value })}
                 />
               </div>
 
               {/* Vehículo / Placa */}
               <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Vehículo / Placa
-                </label>
-                <input
-                  type="text"
-                  name="vehiculoPlaca"
+                <FloatingInput
+                  id="perm_vehiculo_placa"
+                  label="Vehículo / Placa"
                   value={formData.vehiculoPlaca}
                   onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })}
-                  placeholder="ABC-123 O FLOTA"
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono uppercase font-bold outline-none focus:border-indigo-500"
+                  inputClassName="font-mono font-bold uppercase"
                 />
               </div>
 
               {/* Expediente UTD */}
               <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Expediente UTD / SISGEDO
-                </label>
-                <input
-                  type="text"
-                  name="expediente"
+                <FloatingInput
+                  id="perm_expediente"
+                  label="Expediente UTD / SISGEDO"
                   value={formData.expediente}
-                  onChange={handleInputChange}
-                  placeholder="EXP-2026-00451"
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500"
+                  onChange={(e) => setFormData({ ...formData, expediente: e.target.value })}
+                  inputClassName="font-mono"
                 />
               </div>
 
               {/* N° Autorización / Resolución */}
               <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  N° Autorización / Resolución
-                </label>
-                <input
-                  type="text"
-                  name="numeroAutorizacion"
+                <FloatingInput
+                  id="perm_numero_autorizacion"
+                  label="N° Autorización / Resolución"
+                  optional
                   value={formData.numeroAutorizacion}
-                  onChange={handleInputChange}
-                  placeholder="Generado automáticamente si se deja vacío"
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500"
+                  onChange={(e) => setFormData({ ...formData, numeroAutorizacion: e.target.value })}
+                  inputClassName="font-mono font-bold"
                 />
               </div>
 
               {/* Zona de Circulación */}
               <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Zona de Circulación / Cuadrante
-                </label>
-                <input
-                  type="text"
-                  name="zonaCirculacion"
+                <FloatingInput
+                  id="perm_zona_circulacion"
+                  label="Zona de Circulación / Cuadrante"
                   value={formData.zonaCirculacion}
-                  onChange={handleInputChange}
-                  placeholder="Anillo Vial - Distrito de José Leonardo Ortiz"
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500"
+                  onChange={(e) => setFormData({ ...formData, zonaCirculacion: e.target.value })}
                 />
               </div>
 
               {/* Horario */}
-              <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Horario Autorizado
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    name="horarioInicio"
-                    value={formData.horarioInicio}
-                    onChange={handleInputChange}
-                    placeholder="16:00:00"
-                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
-                  />
-                  <input
-                    type="text"
-                    name="horarioFin"
-                    value={formData.horarioFin}
-                    onChange={handleInputChange}
-                    placeholder="05:00:00"
-                    className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-2.5 py-2 font-mono text-center outline-none focus:border-indigo-500"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-2">
+                <FloatingInput
+                  id="perm_horario_inicio"
+                  label="Horario Inicio"
+                  value={formData.horarioInicio}
+                  onChange={(e) => setFormData({ ...formData, horarioInicio: e.target.value })}
+                  inputClassName="font-mono text-center"
+                />
+                <FloatingInput
+                  id="perm_horario_fin"
+                  label="Horario Fin"
+                  value={formData.horarioFin}
+                  onChange={(e) => setFormData({ ...formData, horarioFin: e.target.value })}
+                  inputClassName="font-mono text-center"
+                />
               </div>
 
               {/* Recibo TUPA */}
               <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  N° Recibo de Pago
-                </label>
-                <input
-                  type="text"
-                  name="reciboIngresoNumero"
+                <FloatingInput
+                  id="perm_recibo_numero"
+                  label="N° Recibo de Pago"
                   value={formData.reciboIngresoNumero}
-                  onChange={handleInputChange}
-                  placeholder="REC-2026-00006"
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono outline-none focus:border-indigo-500"
+                  onChange={(e) => setFormData({ ...formData, reciboIngresoNumero: e.target.value })}
+                  inputClassName="font-mono font-bold"
                 />
               </div>
 
               {/* Monto TUPA */}
               <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Monto Pagado (S/)
-                </label>
-                <input
+                <FloatingInput
+                  id="perm_recibo_monto"
+                  label="Monto Pagado (S/)"
                   type="number"
                   step="0.01"
-                  name="reciboIngresoMonto"
                   value={formData.reciboIngresoMonto}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 font-mono font-bold outline-none focus:border-indigo-500"
+                  onChange={(e) => setFormData({ ...formData, reciboIngresoMonto: e.target.value })}
+                  inputClassName="font-mono font-bold"
                 />
               </div>
 
               {/* Vigencia Hasta */}
               <div>
-                <label className="mb-1 block font-bold text-slate-700 dark:text-slate-300">
-                  Vigencia Hasta
-                </label>
-                <input
+                <FloatingInput
+                  id="perm_vigencia_hasta"
+                  label="Vigencia Hasta"
                   type="date"
-                  name="fechaFinVigencia"
                   value={formData.fechaFinVigencia}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-surface)] px-3 py-2 outline-none focus:border-indigo-500"
+                  onChange={(e) => setFormData({ ...formData, fechaFinVigencia: e.target.value })}
                 />
               </div>
             </div>
-          </div>
+          </fieldset>
 
           {/* Barra de Navegación Inferior */}
           <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-[var(--border)]">

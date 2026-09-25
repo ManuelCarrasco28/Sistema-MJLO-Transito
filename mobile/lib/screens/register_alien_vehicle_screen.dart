@@ -2,11 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
+import '../utils/location_helper.dart';
 import 'issue_ticket_informal_screen.dart';
 
 class RegisterAlienVehicleScreen extends StatefulWidget {
@@ -168,75 +168,32 @@ class _RegisterAlienVehicleScreenState extends State<RegisterAlienVehicleScreen>
   }
 
   Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
     setState(() {
       _isLoadingLocation = true;
     });
 
     try {
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showError('Los servicios de ubicación están desactivados.');
-        return;
-      }
+      final position = await obtenerPosicionActual();
+      final address = await obtenerDireccionDesdePosicion(position);
 
-      permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _showError('Los permisos de ubicación fueron denegados.');
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        _showError('Los permisos de ubicación están denegados permanentemente.');
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition();
-      
-      String address = '${position.latitude}, ${position.longitude}';
-      try {
-        List<geocoding.Placemark> placemarks = await geocoding.Geocoding().placemarkFromCoordinates(position.latitude, position.longitude);
-        if (placemarks.isNotEmpty) {
-          final place = placemarks.first;
-          address = '${place.thoroughfare ?? ''} ${place.subThoroughfare ?? ''}'.trim();
-          if (address.isEmpty) {
-            address = place.street ?? '';
-          }
-          final locality = place.locality ?? place.subAdministrativeArea ?? '';
-          if (locality.isNotEmpty) {
-            address = address.isEmpty ? locality : '$address, $locality';
-          }
-          if (address.trim().isEmpty) {
-            address = '${position.latitude}, ${position.longitude}';
-          }
-        }
-      } catch (e) {
-        // Fallback a coordenadas si falla
-      }
-
-      bool wasNull = _currentPosition == null;
+      final bool wasNull = _currentPosition == null;
       setState(() {
         _currentPosition = position;
         _lugarController.text = address;
         _coordenadasController.text = '${position.latitude}, ${position.longitude}';
       });
-      
+
       if (!wasNull) {
         _mapController.move(LatLng(position.latitude, position.longitude), 16.0);
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ubicación obtenida correctamente')),
         );
       }
     } catch (e) {
-      _showError('Error al obtener la ubicación: $e');
+      _showError(e is Exception ? e.toString().replaceFirst('Exception: ', '') : 'Error al obtener la ubicación: $e');
     } finally {
       if (mounted) {
         setState(() {

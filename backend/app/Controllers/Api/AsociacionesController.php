@@ -9,11 +9,13 @@ class AsociacionesController extends ResourceController
 {
     protected $format = 'json';
 
-    public function index()
+    /**
+     * Consulta base de asociaciones con datos del representante legal y
+     * conteo de flota, compartida por index() y show().
+     */
+    private function asociacionSelectQuery($db)
     {
-        $db = \Config\Database::connect();
-
-        $rows = $db->table('asociaciones o')
+        return $db->table('asociaciones o')
             ->select("
                 o.id,
                 CASE WHEN o.tipo = 'EMPRESA' THEN 'PARTICULAR' ELSE o.tipo END AS tipo,
@@ -38,23 +40,37 @@ class AsociacionesController extends ResourceController
             ", false)
             ->join('personas p_rep', 'p_rep.id = o.id_representante_legal', 'left')
             ->join('ciudadanos c_rep', 'c_rep.id_persona = p_rep.id', 'left')
-            ->join('vehiculos v', 'v.id_asociacion = o.id', 'left')
+            ->join('vehiculos v', 'v.id_asociacion = o.id', 'left');
+    }
+
+    /**
+     * Normaliza tipos y calcula los indicadores de cupo (disponibles,
+     * porcentaje de ocupación, estado) a partir de flotaTotal/flotaAutorizada.
+     */
+    private function calcularCupo(array $r): array
+    {
+        $r['id'] = (int)$r['id'];
+        $flotaTotal = (int)$r['flotaTotal'];
+        $flotaAutorizada = max(1, (int)$r['flotaAutorizada']);
+        $r['flotaTotal'] = $flotaTotal;
+        $r['flotaAutorizada'] = $flotaAutorizada;
+        $r['cuposDisponibles'] = max(0, $flotaAutorizada - $flotaTotal);
+        $r['porcentajeOcupacion'] = round(($flotaTotal / $flotaAutorizada) * 100);
+        $r['estadoCupo'] = $flotaTotal > $flotaAutorizada ? 'SOBRECUPO' : ($flotaTotal === $flotaAutorizada ? 'COMPLETO' : 'DISPONIBLE');
+        return $r;
+    }
+
+    public function index()
+    {
+        $db = \Config\Database::connect();
+
+        $rows = $this->asociacionSelectQuery($db)
             ->groupBy('o.id')
             ->orderBy('o.id', 'DESC')
             ->get()
             ->getResultArray();
 
-        $data = array_map(static function (array $r) {
-            $r['id'] = (int)$r['id'];
-            $flotaTotal = (int)$r['flotaTotal'];
-            $flotaAutorizada = max(1, (int)$r['flotaAutorizada']);
-            $r['flotaTotal'] = $flotaTotal;
-            $r['flotaAutorizada'] = $flotaAutorizada;
-            $r['cuposDisponibles'] = max(0, $flotaAutorizada - $flotaTotal);
-            $r['porcentajeOcupacion'] = round(($flotaTotal / $flotaAutorizada) * 100);
-            $r['estadoCupo'] = $flotaTotal > $flotaAutorizada ? 'SOBRECUPO' : ($flotaTotal === $flotaAutorizada ? 'COMPLETO' : 'DISPONIBLE');
-            return $r;
-        }, $rows);
+        $data = array_map([$this, 'calcularCupo'], $rows);
 
         return $this->respond(['data' => $data]);
     }
@@ -67,32 +83,7 @@ class AsociacionesController extends ResourceController
             return $this->failNotFound('ID de asociación no especificado.');
         }
 
-        $asociacion = $db->table('asociaciones o')
-            ->select("
-                o.id,
-                CASE WHEN o.tipo = 'EMPRESA' THEN 'PARTICULAR' ELSE o.tipo END AS tipo,
-                o.razon_social AS razonSocial,
-                COALESCE(o.ruc, '') AS ruc,
-                COALESCE(o.partida_registral, '') AS partidaRegistral,
-                COALESCE(o.fecha_creacion, '') AS fechaCreacion,
-                COALESCE(o.direccion, '') AS direccion,
-                COALESCE(o.coordenadas, '') AS coordenadas,
-                COALESCE(o.telefono_contacto, '') AS telefono,
-                COALESCE(o.email_contacto, '') AS email,
-                COALESCE(o.tipo_ambiente, '') AS tipoAmbiente,
-                COALESCE(o.numero_licencia, '') AS numeroLicencia,
-                COALESCE(o.resolucion_alcaldia, '') AS resolucionAlcaldia,
-                COALESCE(o.flota_autorizada, 50) AS flotaAutorizada,
-                o.id_representante_legal AS idRepresentanteLegal,
-                COALESCE(p_rep.numero, '') AS representanteDni,
-                TRIM(CONCAT(COALESCE(c_rep.nombres, ''), ' ', COALESCE(c_rep.apellido_paterno, ''), ' ', COALESCE(c_rep.apellido_materno, ''))) AS representanteNombre,
-                COALESCE(NULLIF(p_rep.telefono, ''), NULLIF(p_rep.celular, ''), '') AS representanteTelefono,
-                o.estado,
-                COUNT(v.id) AS flotaTotal
-            ", false)
-            ->join('personas p_rep', 'p_rep.id = o.id_representante_legal', 'left')
-            ->join('ciudadanos c_rep', 'c_rep.id_persona = p_rep.id', 'left')
-            ->join('vehiculos v', 'v.id_asociacion = o.id', 'left')
+        $asociacion = $this->asociacionSelectQuery($db)
             ->where('o.id', $id)
             ->groupBy('o.id')
             ->get()
@@ -102,14 +93,7 @@ class AsociacionesController extends ResourceController
             return $this->failNotFound('Asociación no encontrada.');
         }
 
-        $asociacion['id'] = (int)$asociacion['id'];
-        $flotaTotal = (int)$asociacion['flotaTotal'];
-        $flotaAutorizada = max(1, (int)$asociacion['flotaAutorizada']);
-        $asociacion['flotaTotal'] = $flotaTotal;
-        $asociacion['flotaAutorizada'] = $flotaAutorizada;
-        $asociacion['cuposDisponibles'] = max(0, $flotaAutorizada - $flotaTotal);
-        $asociacion['porcentajeOcupacion'] = round(($flotaTotal / $flotaAutorizada) * 100);
-        $asociacion['estadoCupo'] = $flotaTotal > $flotaAutorizada ? 'SOBRECUPO' : ($flotaTotal === $flotaAutorizada ? 'COMPLETO' : 'DISPONIBLE');
+        $asociacion = $this->calcularCupo($asociacion);
 
         $socios = $db->table('vehiculo_propietarios vp')
             ->select("
@@ -135,7 +119,7 @@ class AsociacionesController extends ResourceController
             ->select("
                 v.id,
                 v.placa,
-                COALESCE(tv.nombre, 'Mototaxi (Trimovil)') AS tipo,
+                COALESCE(tv.nombre, 'Mototaxi') AS tipo,
                 COALESCE(v.marca, '') AS marca,
                 COALESCE(v.modelo, '') AS modelo,
                 COALESCE(v.color, '') AS color,

@@ -51,44 +51,7 @@ class InspeccionesController extends ResourceController
     {
         $db = \Config\Database::connect();
         try {
-            $builder = $db->table('certicav i')
-                ->select("
-                    i.id,
-                    i.id_tecnico as tecnicoId,
-                    i.id_conductor as conductorId,
-                    i.numero_registro as numeroInspeccion,
-                    i.numero_registro as numeroRegistro,
-                    i.numero_serie_certicav as numeroSerieCerticav,
-                    COALESCE(i.primera_evaluacion, 'APROBADO') as primeraEvaluacion,
-                    COALESCE(i.segunda_evaluacion, '') as segundaEvaluacion,
-                    COALESCE(CONCAT(cc.nombres, ' ', cc.apellido_paterno, ' ', COALESCE(cc.apellido_materno, '')), '') as conductorNombre,
-                    COALESCE(pc.numero, '') as conductorDni,
-                    COALESCE(cc.numero_licencia, '') as conductorLicencia,
-                    v.placa as vehiculoPlaca,
-                    COALESCE(v.marca, '') as vehiculoMarca,
-                    COALESCE(v.modelo, '') as vehiculoModelo,
-                    COALESCE(v.color, '') as vehiculoColor,
-                    COALESCE(v.serie_motor, '') as vehiculoMotor,
-                    COALESCE(v.anio_fabricacion, '') as vehiculoAnio,
-                    COALESCE(a.razon_social, '') as transportador,
-                    COALESCE(CONCAT(cp.nombres, ' ', cp.apellido_paterno, ' ', COALESCE(cp.apellido_materno, '')), '') as propietario,
-                    COALESCE(pp.numero, '') as propietarioDni,
-                    COALESCE(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')), 'Inspector Técnico Municipal') as inspector,
-                    i.fecha as fecha,
-                    i.fecha_segunda_evaluacion as fechaSegundaEvaluacion,
-                    i.resultado,
-                    i.observaciones,
-                    i.estado
-                ")
-                ->join('vehiculos v', 'v.id = i.id_vehiculo', 'left')
-                ->join('asociaciones a', 'a.id = v.id_asociacion', 'left')
-                ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
-                ->join('personas pp', 'pp.id = vp.id_persona', 'left')
-                ->join('ciudadanos cp', 'cp.id_persona = pp.id', 'left')
-                ->join('ciudadanos c', 'c.id_persona = i.id_tecnico', 'left')
-                ->join('personas pc', 'pc.id = i.id_conductor', 'left')
-                ->join('ciudadanos cc', 'cc.id_persona = pc.id', 'left')
-                ->groupBy('i.id');
+            $builder = $this->consultaInspeccion($db)->groupBy('i.id');
 
             if (is_numeric($id)) {
                 $builder->where('i.id', (int)$id);
@@ -127,43 +90,7 @@ class InspeccionesController extends ResourceController
         $db = \Config\Database::connect();
         
         try {
-            $rows = $db->table('certicav i')
-                ->select("
-                    i.id,
-                    i.id_tecnico as tecnicoId,
-                    i.id_conductor as conductorId,
-                    i.numero_registro as numeroInspeccion,
-                    i.numero_registro as numeroRegistro,
-                    i.numero_serie_certicav as numeroSerieCerticav,
-                    COALESCE(i.primera_evaluacion, 'APROBADO') as primeraEvaluacion,
-                    COALESCE(i.segunda_evaluacion, '') as segundaEvaluacion,
-                    COALESCE(CONCAT(cc.nombres, ' ', cc.apellido_paterno, ' ', COALESCE(cc.apellido_materno, '')), '') as conductorNombre,
-                    COALESCE(pc.numero, '') as conductorDni,
-                    COALESCE(cc.numero_licencia, '') as conductorLicencia,
-                    v.placa as vehiculoPlaca,
-                    COALESCE(v.marca, '') as vehiculoMarca,
-                    COALESCE(v.modelo, '') as vehiculoModelo,
-                    COALESCE(v.color, '') as vehiculoColor,
-                    COALESCE(v.serie_motor, '') as vehiculoMotor,
-                    COALESCE(v.anio_fabricacion, '') as vehiculoAnio,
-                    COALESCE(a.razon_social, '') as transportador,
-                    COALESCE(CONCAT(cp.nombres, ' ', cp.apellido_paterno, ' ', COALESCE(cp.apellido_materno, '')), '') as propietario,
-                    COALESCE(pp.numero, '') as propietarioDni,
-                    COALESCE(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')), 'Inspector Técnico Municipal') as inspector,
-                    i.fecha as fecha,
-                    i.fecha_segunda_evaluacion as fechaSegundaEvaluacion,
-                    i.resultado,
-                    i.observaciones,
-                    i.estado
-                ")
-                ->join('vehiculos v', 'v.id = i.id_vehiculo', 'left')
-                ->join('asociaciones a', 'a.id = v.id_asociacion', 'left')
-                ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
-                ->join('personas pp', 'pp.id = vp.id_persona', 'left')
-                ->join('ciudadanos cp', 'cp.id_persona = pp.id', 'left')
-                ->join('ciudadanos c', 'c.id_persona = i.id_tecnico', 'left')
-                ->join('personas pc', 'pc.id = i.id_conductor', 'left')
-                ->join('ciudadanos cc', 'cc.id_persona = pc.id', 'left')
+            $rows = $this->consultaInspeccion($db)
                 ->where('i.estado !=', 'ANULADA')
                 ->groupBy('i.id')
                 ->orderBy('i.id', 'DESC')
@@ -572,6 +499,51 @@ class InspeccionesController extends ResourceController
         ]);
 
         return $conductorId;
+    }
+
+    /**
+     * Consulta base de CERTICAV con los datos de vehículo, conductor, propietario
+     * y técnico. Compartida por index() y show() para evitar duplicar el SELECT/JOIN.
+     */
+    private function consultaInspeccion($db)
+    {
+        return $db->table('certicav i')
+            ->select("
+                i.id,
+                i.id_tecnico as tecnicoId,
+                i.id_conductor as conductorId,
+                i.numero_registro as numeroInspeccion,
+                i.numero_registro as numeroRegistro,
+                i.numero_serie_certicav as numeroSerieCerticav,
+                COALESCE(i.primera_evaluacion, 'APROBADO') as primeraEvaluacion,
+                COALESCE(i.segunda_evaluacion, '') as segundaEvaluacion,
+                COALESCE(CONCAT(cc.nombres, ' ', cc.apellido_paterno, ' ', COALESCE(cc.apellido_materno, '')), '') as conductorNombre,
+                COALESCE(pc.numero, '') as conductorDni,
+                COALESCE(cc.numero_licencia, '') as conductorLicencia,
+                v.placa as vehiculoPlaca,
+                COALESCE(v.marca, '') as vehiculoMarca,
+                COALESCE(v.modelo, '') as vehiculoModelo,
+                COALESCE(v.color, '') as vehiculoColor,
+                COALESCE(v.serie_motor, '') as vehiculoMotor,
+                COALESCE(v.anio_fabricacion, '') as vehiculoAnio,
+                COALESCE(a.razon_social, '') as transportador,
+                COALESCE(CONCAT(cp.nombres, ' ', cp.apellido_paterno, ' ', COALESCE(cp.apellido_materno, '')), '') as propietario,
+                COALESCE(pp.numero, '') as propietarioDni,
+                COALESCE(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')), 'Inspector Técnico Municipal') as inspector,
+                i.fecha as fecha,
+                i.fecha_segunda_evaluacion as fechaSegundaEvaluacion,
+                i.resultado,
+                i.observaciones,
+                i.estado
+            ")
+            ->join('vehiculos v', 'v.id = i.id_vehiculo', 'left')
+            ->join('asociaciones a', 'a.id = v.id_asociacion', 'left')
+            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
+            ->join('personas pp', 'pp.id = vp.id_persona', 'left')
+            ->join('ciudadanos cp', 'cp.id_persona = pp.id', 'left')
+            ->join('ciudadanos c', 'c.id_persona = i.id_tecnico', 'left')
+            ->join('personas pc', 'pc.id = i.id_conductor', 'left')
+            ->join('ciudadanos cc', 'cc.id_persona = pc.id', 'left');
     }
 
     /**

@@ -67,17 +67,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadDashboardData() async {
+    // Un solo endpoint liviano en lugar de 3 peticiones pesadas.
+    // Cada llamada se maneja por separado para que una falla en una
+    // (p. ej. sin operativo asignado o wifi inestable) no bloquee
+    // la actualización del permiso móvil ni de los contadores del día.
     try {
-      // Un solo endpoint liviano en lugar de 3 peticiones pesadas
       final dashData = await ApiService.getMobileDashboard();
-      final op = await ApiService.getOperativoActivo();
-
       if (mounted) {
         setState(() {
           _registradasHoy = dashData['papeletas_hoy'] as int? ?? 0;
           _reportesHoy = dashData['reportes_hoy'] as int? ?? 0;
-          _operativoActivo = op;
-          // Actualizar permiso de papeleta si viene en el dashboard
           if (dashData.containsKey('permite_aplicar_papeleta')) {
             _permitePapeletaMovil = dashData['permite_aplicar_papeleta'] as bool? ?? false;
           }
@@ -85,6 +84,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     } catch (e) {
       // Ignorar errores silenciosamente para el dashboard
+    }
+
+    try {
+      final op = await ApiService.getOperativoActivo();
+      if (mounted) {
+        setState(() {
+          _operativoActivo = op;
+        });
+      }
+    } catch (e) {
+      // Ignorar errores silenciosamente para el operativo activo
     }
   }
 

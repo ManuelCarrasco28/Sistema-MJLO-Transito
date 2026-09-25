@@ -23,16 +23,34 @@ class PideController extends ResourceController
         return $anio["token"];
     }
 
+    private function rateLimited(): bool
+    {
+        $cookie = $this->request->getCookie('session_user');
+        $user = \App\Services\AuthSession::resolveActiveUser($cookie);
+        $key = ($user['id'] ?? 'anon') . '|' . $this->request->getIPAddress();
+        $blocked = \App\Services\AuthSession::checkRateLimit('pide', $key, 20, 60, 300);
+        return $blocked !== null;
+    }
+
     public function reniec($dni)
     {
         if (!preg_match("/^\d{8}$/", $dni)) {
             return $this->failValidationErrors("El DNI debe tener exactamente 8 digitos.");
         }
 
+        if ($this->rateLimited()) {
+            return service('response')->setStatusCode(429)->setJSON([
+                'status' => 429,
+                'messages' => ['error' => 'Demasiadas consultas de documento en poco tiempo. Intenta de nuevo en unos minutos.'],
+            ]);
+        }
+
         $token = $this->getToken();
         if (!$token) {
             return $this->failServerError("El token de la API PIDE no esta configurado para el anio actual.");
         }
+
+        $sslVerify = filter_var(env('app.pideSslVerify', true), FILTER_VALIDATE_BOOLEAN);
 
         $curl = curl_init();
         curl_setopt_array($curl, [
@@ -43,8 +61,8 @@ class PideController extends ResourceController
             CURLOPT_TIMEOUT => 30,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => "GET",
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_SSL_VERIFYPEER => $sslVerify,
+            CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0,
             CURLOPT_HTTPHEADER => [
                 "Authorization: Bearer " . $token,
                 "Accept: application/json"
@@ -66,12 +84,19 @@ class PideController extends ResourceController
     public function sunarp()
     {
         $input = $this->request->getJSON(true) ?: [];
-        $placa = strtoupper(trim($input["placa"] ?? ""));
-        $codeZona = trim($input["codeZona"] ?? "");
-        $codeOficina = trim($input["codeOficina"] ?? "");
+        $placa = strtoupper(str_replace([' ', '-'], '', trim($input["placa"] ?? "")));
+        $codeZona = trim($input["codeZona"] ?? "") !== "" ? trim($input["codeZona"]) : "11";
+        $codeOficina = trim($input["codeOficina"] ?? "") !== "" ? trim($input["codeOficina"]) : "01";
 
         if (empty($placa)) {
             return $this->failValidationErrors("La placa es requerida.");
+        }
+
+        if ($this->rateLimited()) {
+            return service('response')->setStatusCode(429)->setJSON([
+                'status' => 429,
+                'messages' => ['error' => 'Demasiadas consultas de placa en poco tiempo. Intenta de nuevo en unos minutos.'],
+            ]);
         }
 
         $token = $this->getToken();
@@ -85,6 +110,8 @@ class PideController extends ResourceController
             "codeOficina" => $codeOficina
         ];
 
+        $sslVerify = filter_var(env('app.pideSslVerify', true), FILTER_VALIDATE_BOOLEAN);
+
         $curl = curl_init();
         curl_setopt_array($curl, [
             CURLOPT_URL => "https://pide.munijlo.gob.pe/api/v1/services/sunarp/placa",
@@ -95,8 +122,8 @@ class PideController extends ResourceController
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => "POST",
             CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_SSL_VERIFYPEER => $sslVerify,
+            CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0,
             CURLOPT_HTTPHEADER => [
                 "Authorization: Bearer " . $token,
                 "Content-Type: application/json",

@@ -23,36 +23,7 @@ class AuthController extends ResourceController
 
     private function decodeSessionCookie(?string $cookie): ?array
     {
-        if (!$cookie || !str_contains($cookie, '.')) {
-            return null;
-        }
-
-        [$payload, $signature] = explode('.', $cookie, 2);
-        $secret = (string) env('app.sessionSecret', '');
-
-        if ($secret === '') {
-            return null;
-        }
-
-        $expectedSignature = hash_hmac('sha256', $payload, $secret);
-        if (!hash_equals($expectedSignature, $signature)) {
-            return null;
-        }
-
-        $base64 = strtr($payload, '-_', '+/');
-        $base64 .= str_repeat('=', (4 - strlen($base64) % 4) % 4);
-        $json = base64_decode($base64, true);
-        $user = $json ? json_decode($json, true) : null;
-
-        if (!is_array($user)) {
-            return null;
-        }
-
-        if (empty($user['exp']) || (int) $user['exp'] < time()) {
-            return null;
-        }
-
-        return $user;
+        return \App\Services\AuthSession::resolveActiveUser($cookie);
     }
 
     private function getUserDataById(int $userId): ?array
@@ -82,6 +53,7 @@ class AuthController extends ResourceController
             'cargo'       => $userRecord['cargo'],
             'id_persona'  => (int) $userRecord['id_persona'],
             'foto_img'    => $userRecord['foto_img'] ?? '',
+            'sv'          => (int) $userRecord['session_version'],
         ];
     }
 
@@ -103,43 +75,51 @@ class AuthController extends ResourceController
         return hash('sha256', strtolower(trim($usuario)) . '|' . $ip);
     }
 
-    private function rateLimitPath(string $usuario): string
+    private function rateLimitIpKey(): string
     {
-        return $this->rateLimitDirectory() . $this->rateLimitKey($usuario) . '.json';
+        $ip = $this->request->getIPAddress() ?: 'unknown';
+
+        return hash('sha256', 'global_ip|' . $ip);
     }
 
-    private function readRateLimit(string $usuario): array
+    private function rateLimitPath(string $key): string
     {
-        $path = $this->rateLimitPath($usuario);
-        if (!is_file($path)) {
-            return [
-                'attempts' => 0,
-                'first_attempt_at' => time(),
-                'blocked_until' => 0,
-            ];
-        }
+        return $this->rateLimitDirectory() . $key . '.json';
+    }
 
-        $data = json_decode((string) file_get_contents($path), true);
-
-        return is_array($data) ? $data : [
+    private function freshRateLimitData(): array
+    {
+        return [
             'attempts' => 0,
             'first_attempt_at' => time(),
             'blocked_until' => 0,
         ];
     }
 
-    private function writeRateLimit(string $usuario, array $data): void
+    private function readRateLimitByKey(string $key): array
+    {
+        $path = $this->rateLimitPath($key);
+        if (!is_file($path)) {
+            return $this->freshRateLimitData();
+        }
+
+        $data = json_decode((string) file_get_contents($path), true);
+
+        return is_array($data) ? $data : $this->freshRateLimitData();
+    }
+
+    private function writeRateLimitByKey(string $key, array $data): void
     {
         try {
-            @file_put_contents($this->rateLimitPath($usuario), json_encode($data), LOCK_EX);
+            @file_put_contents($this->rateLimitPath($key), json_encode($data), LOCK_EX);
         } catch (\Throwable $e) {
             log_message('warning', 'No se pudo escribir rate-limit de login: ' . $e->getMessage());
         }
     }
 
-    private function ensureLoginIsNotRateLimited(string $usuario)
+    private function checkRateLimitByKey(string $key, string $errorMessagePrefix = 'Demasiados intentos fallidos.')
     {
-        $data = $this->readRateLimit($usuario);
+        $data = $this->readRateLimitByKey($key);
         $blockedUntil = (int) ($data['blocked_until'] ?? 0);
 
         if ($blockedUntil > time()) {
@@ -151,7 +131,7 @@ class AuthController extends ResourceController
                     'status' => 429,
                     'error' => 429,
                     'messages' => [
-                        'error' => "Demasiados intentos fallidos. Intenta nuevamente en {$minutes} min.",
+                        'error' => "{$errorMessagePrefix} Intenta nuevamente en {$minutes} min.",
                     ],
                 ]);
         }
@@ -159,20 +139,26 @@ class AuthController extends ResourceController
         return null;
     }
 
-    private function registerFailedLogin(string $usuario): void
+    private function ensureLoginIsNotRateLimited(string $usuario)
+    {
+        // 1. Protección contra password spraying / fuerza bruta: límite por IP (20 fallos globales)
+        $ipCheck = $this->checkRateLimitByKey($this->rateLimitIpKey(), 'Demasiados intentos fallidos desde esta conexión.');
+        if ($ipCheck) {
+            return $ipCheck;
+        }
+
+        // 2. Límite específico por cuenta + IP (5 fallos)
+        return $this->checkRateLimitByKey($this->rateLimitKey($usuario), 'Demasiados intentos fallidos.');
+    }
+
+    private function recordFailedAttempt(string $key, int $maxAttempts, int $windowSeconds, int $blockSeconds): void
     {
         $now = time();
-        $windowSeconds = 300;
-        $maxAttempts = 5;
-        $blockSeconds = 900;
-        $data = $this->readRateLimit($usuario);
+        $data = $this->readRateLimitByKey($key);
 
         if (($now - (int) ($data['first_attempt_at'] ?? $now)) > $windowSeconds) {
-            $data = [
-                'attempts' => 0,
-                'first_attempt_at' => $now,
-                'blocked_until' => 0,
-            ];
+            $data = $this->freshRateLimitData();
+            $data['first_attempt_at'] = $now;
         }
 
         $data['attempts'] = ((int) ($data['attempts'] ?? 0)) + 1;
@@ -181,12 +167,21 @@ class AuthController extends ResourceController
             $data['blocked_until'] = $now + $blockSeconds;
         }
 
-        $this->writeRateLimit($usuario, $data);
+        $this->writeRateLimitByKey($key, $data);
+    }
+
+    private function registerFailedLogin(string $usuario): void
+    {
+        // 5 intentos por usuario e IP dentro de 5 minutos bloquean la cuenta para esa IP por 15 minutos
+        $this->recordFailedAttempt($this->rateLimitKey($usuario), 5, 300, 900);
+
+        // 20 intentos globales por IP dentro de 5 minutos bloquean la IP por 15 minutos (mitiga password spraying)
+        $this->recordFailedAttempt($this->rateLimitIpKey(), 20, 300, 900);
     }
 
     private function clearFailedLogins(string $usuario): void
     {
-        $path = $this->rateLimitPath($usuario);
+        $path = $this->rateLimitPath($this->rateLimitKey($usuario));
         if (is_file($path)) {
             unlink($path);
         }
@@ -250,7 +245,13 @@ class AuthController extends ResourceController
             ->where('usuarios.usuario', $usuario)
             ->first();
 
-        if (!$userRecord || !password_verify($password, $userRecord['clave'])) {
+        // Mitigación de timing attack: si el usuario no existe, se calcula bcrypt contra un hash válido
+        // para que el tiempo de respuesta sea indistinguible entre usuarios existentes e inexistentes.
+        $dummyHash = '$2y$10$uC6yLnBuSCPOiqRse39Ifupcrvx6zZJ5e/.sK.Pa340hQGwjbQFJG';
+        $hashToCheck = $userRecord ? ($userRecord['clave'] ?? $dummyHash) : $dummyHash;
+        $passwordMatches = password_verify($password, $hashToCheck);
+
+        if (!$userRecord || !$passwordMatches) {
             $this->registerFailedLogin($usuario);
             \App\Services\AuditoriaService::registrar(
                 'SEGURIDAD',
@@ -337,6 +338,10 @@ class AuthController extends ResourceController
                 null,
                 ['id' => $cookieUser['id'] ?? null, 'usuario' => $cookieUser['usuario'] ?? 'desconocido', 'rol' => $cookieUser['rol'] ?? '']
             );
+
+            if (!empty($cookieUser['id'])) {
+                \App\Services\AuthSession::invalidateSessions((int) $cookieUser['id']);
+            }
         }
 
         helper('cookie');
@@ -350,18 +355,35 @@ class AuthController extends ResourceController
 
     public function cambiarPassword()
     {
-        $json = $this->request->getJSON();
+        // Solo se permite cambiar la propia contraseña: el id de sesión manda,
+        // nunca un id_usuario arbitrario enviado por el cliente.
+        $cookieUser = $this->decodeSessionCookie($this->request->getCookie('session_user'));
+        if (!$cookieUser || empty($cookieUser['id'])) {
+            return $this->failUnauthorized('Sesión no válida o expirada.');
+        }
+        $userId = (int) $cookieUser['id'];
 
-        $userId = (int) ($json->id_usuario ?? 0);
+        $rateLimitKey = 'user-' . $userId . '|' . $this->request->getIPAddress();
+        $blocked = \App\Services\AuthSession::checkRateLimit('cambiar-password', $rateLimitKey, 6, 300, 900);
+        if ($blocked) {
+            return service('response')
+                ->setStatusCode(429)
+                ->setJSON([
+                    'status' => 429,
+                    'messages' => ['error' => "Demasiados intentos. Intenta nuevamente en {$blocked['retryAfterMinutes']} min."],
+                ]);
+        }
+
+        $json = $this->request->getJSON();
         $actual = $json->password_actual ?? '';
         $nuevo = $json->password_nuevo ?? '';
 
-        if ($userId <= 0 || $actual === '' || $nuevo === '') {
-            return $this->failValidationErrors('Debe proporcionar usuario, contraseña actual y nueva contraseña.');
+        if ($actual === '' || $nuevo === '') {
+            return $this->failValidationErrors('Debe proporcionar la contraseña actual y la nueva contraseña.');
         }
 
-        if (strlen($nuevo) < 6) {
-            return $this->failValidationErrors('La nueva contraseña debe tener al menos 6 caracteres.');
+        if (strlen($nuevo) < 8) {
+            return $this->failValidationErrors('La nueva contraseña debe tener al menos 8 caracteres.');
         }
 
         $usuarioModel = new UsuarioModel();
@@ -374,6 +396,7 @@ class AuthController extends ResourceController
         $usuarioModel->update($userId, [
             'clave' => password_hash($nuevo, PASSWORD_DEFAULT),
         ]);
+        \App\Services\AuthSession::invalidateSessions($userId);
 
         return $this->respond([
             'status'  => true,

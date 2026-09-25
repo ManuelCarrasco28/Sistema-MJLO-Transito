@@ -68,9 +68,12 @@ class CursosController extends ResourceController
         }
     }
 
-    public function create()
+    /**
+     * Decodifica el body JSON de la petición; si CodeIgniter no pudo
+     * parsearlo (o vino vacío), reintenta manualmente y cae al POST clásico.
+     */
+    private function parseInput(): array
     {
-        $db = \Config\Database::connect();
         try {
             $input = $this->request->getJSON(true);
         } catch (\Throwable $e) {
@@ -79,6 +82,38 @@ class CursosController extends ResourceController
         if (!is_array($input)) {
             $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
         }
+        return is_array($input) ? $input : [];
+    }
+
+    /**
+     * True si la persona ya aprobó o asistió a un curso vigente (últimos 2
+     * años), condición que aplica tanto para listar personas ya cubiertas
+     * como para bloquear una reinscripción individual.
+     */
+    private function tieneCursoVigente($db, ?int $idPersona = null, ?string $select = null)
+    {
+        $query = $db->table('inscripciones_curso ic');
+        if ($select !== null) {
+            $query->select($select, false);
+        }
+        $query->join('cursos_seguridad_vial c', 'c.id = ic.id_curso')
+            ->groupStart()
+                ->where('ic.estado', 'APROBADO')
+                ->orWhere('ic.asistio', 1)
+            ->groupEnd()
+            ->where('c.fecha_inicio >=', date('Y-m-d', strtotime('-2 years')));
+
+        if ($idPersona !== null) {
+            $query->where('ic.id_persona', $idPersona);
+        }
+
+        return $query;
+    }
+
+    public function create()
+    {
+        $db = \Config\Database::connect();
+        $input = $this->parseInput();
 
         $rules = [
             'titulo' => [
@@ -158,14 +193,7 @@ class CursosController extends ResourceController
     public function update($id = null)
     {
         $db = \Config\Database::connect();
-        try {
-            $input = $this->request->getJSON(true);
-        } catch (\Throwable $e) {
-            $input = null;
-        }
-        if (!is_array($input)) {
-            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
-        }
+        $input = $this->parseInput();
 
         $rules = [
             'titulo' => [
@@ -245,14 +273,7 @@ class CursosController extends ResourceController
     {
         $db = \Config\Database::connect();
         try {
-            $rows = $db->table('inscripciones_curso ic')
-                ->select('DISTINCT ic.id_persona')
-                ->join('cursos_seguridad_vial c', 'c.id = ic.id_curso')
-                ->groupStart()
-                    ->where('ic.estado', 'APROBADO')
-                    ->orWhere('ic.asistio', 1)
-                ->groupEnd()
-                ->where('c.fecha_inicio >=', date('Y-m-d', strtotime('-2 years')))
+            $rows = $this->tieneCursoVigente($db, null, 'DISTINCT ic.id_persona')
                 ->get()
                 ->getResultArray();
 
@@ -266,10 +287,7 @@ class CursosController extends ResourceController
     public function inscribirParticipante($idCurso)
     {
         $db = \Config\Database::connect();
-        $input = $this->request->getJSON(true);
-        if (!is_array($input)) {
-            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
-        }
+        $input = $this->parseInput();
 
         $rules = [
             'dni' => [
@@ -326,15 +344,7 @@ class CursosController extends ResourceController
         }
 
         // No permitir reinscribir a quien ya tiene un certificado vigente (últimos 2 años)
-        $vigente = $db->table('inscripciones_curso ic')
-            ->join('cursos_seguridad_vial c2', 'c2.id = ic.id_curso')
-            ->groupStart()
-                ->where('ic.estado', 'APROBADO')
-                ->orWhere('ic.asistio', 1)
-            ->groupEnd()
-            ->where('ic.id_persona', $idPersona)
-            ->where('c2.fecha_inicio >=', date('Y-m-d', strtotime('-2 years')))
-            ->countAllResults();
+        $vigente = $this->tieneCursoVigente($db, $idPersona)->countAllResults();
 
         if ($vigente > 0) {
             return $this->failValidationErrors('Esta persona ya cuenta con un certificado vigente de curso (menos de 2 años); no necesita volver a inscribirse.');
@@ -388,10 +398,7 @@ class CursosController extends ResourceController
     public function registrarNota($idCurso, $dni)
     {
         $db = \Config\Database::connect();
-        $input = $this->request->getJSON(true);
-        if (!is_array($input)) {
-            $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
-        }
+        $input = $this->parseInput();
 
         $estado = trim($input['estado'] ?? '');
         $asistio = isset($input['asistio']) ? (int)$input['asistio'] : null;

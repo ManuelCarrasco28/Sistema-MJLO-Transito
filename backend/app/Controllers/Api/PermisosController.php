@@ -445,21 +445,13 @@ class PermisosController extends ResourceController
             }
             $asocs = $builderAsoc->limit(10)->get()->getResultArray();
             foreach ($asocs as $a) {
-                $results[] = [
-                    'tipo'               => 'EMPRESA',
-                    'nombre'             => $a['nombre'],
-                    'documento'          => $a['documento'],
-                    'tipoDocumento'      => 'RUC',
-                    'representanteLegal' => '',
-                    'direccion'          => $a['direccion'],
-                    'telefono'           => $a['telefono'],
-                    'placa'              => '',
-                    'expediente'         => '',
-                    'reciboNumero'       => '',
-                    'reciboMonto'        => null,
-                    'reciboFecha'        => '',
-                    'tramiteId'          => null,
-                ];
+                $results[] = $this->formatearResultadoAdministrado('EMPRESA', [
+                    'nombre'        => $a['nombre'],
+                    'documento'     => $a['documento'],
+                    'tipoDocumento' => 'RUC',
+                    'direccion'     => $a['direccion'],
+                    'telefono'      => $a['telefono'],
+                ]);
             }
 
             // 2. Buscar en Personas / Ciudadanos
@@ -487,21 +479,13 @@ class PermisosController extends ResourceController
             $pers = $builderPers->limit(10)->get()->getResultArray();
             foreach ($pers as $p) {
                 if (empty($p['nombre']) && empty($p['documento'])) continue;
-                $results[] = [
-                    'tipo'               => 'PERSONA',
-                    'nombre'             => $p['nombre'],
-                    'documento'          => $p['documento'],
-                    'tipoDocumento'      => $p['tipoDocumento'],
-                    'representanteLegal' => '',
-                    'direccion'          => $p['direccion'],
-                    'telefono'           => $p['telefono'],
-                    'placa'              => '',
-                    'expediente'         => '',
-                    'reciboNumero'       => '',
-                    'reciboMonto'        => null,
-                    'reciboFecha'        => '',
-                    'tramiteId'          => null,
-                ];
+                $results[] = $this->formatearResultadoAdministrado('PERSONA', [
+                    'nombre'        => $p['nombre'],
+                    'documento'     => $p['documento'],
+                    'tipoDocumento' => $p['tipoDocumento'],
+                    'direccion'     => $p['direccion'],
+                    'telefono'      => $p['telefono'],
+                ]);
             }
 
             // 3. Buscar en Trámites Documentarios (para auto-rellenar expediente, placa, recibo y solicitante)
@@ -539,21 +523,18 @@ class PermisosController extends ResourceController
             $trams = $builderTram->limit(10)->get()->getResultArray();
             foreach ($trams as $t) {
                 if (empty($t['nombre']) && empty($t['documento']) && empty($t['expediente'])) continue;
-                $results[] = [
-                    'tipo'               => 'TRAMITE',
+                $results[] = $this->formatearResultadoAdministrado('TRAMITE', [
                     'nombre'             => $t['nombre'],
                     'documento'          => $t['documento'],
                     'tipoDocumento'      => $t['tipoDocumento'],
                     'representanteLegal' => $t['representanteLegal'] ?? '',
-                    'direccion'          => '',
-                    'telefono'           => '',
                     'placa'              => $t['placa'],
                     'expediente'         => $t['expediente'],
                     'reciboNumero'       => $t['reciboNumero'],
                     'reciboMonto'        => $t['reciboMonto'] ? (float)$t['reciboMonto'] : null,
                     'reciboFecha'        => $t['reciboFecha'],
                     'tramiteId'          => (int)$t['tramiteId'],
-                ];
+                ]);
             }
 
             // Deduplicar resultados por documento + nombre + expediente
@@ -571,6 +552,29 @@ class PermisosController extends ResourceController
         } catch (\Throwable $e) {
             return $this->failServerError('Error buscando administrados: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Completa un resultado de búsqueda de administrados con los campos por
+     * defecto que no aplican a cada origen (empresa, persona o trámite).
+     */
+    private function formatearResultadoAdministrado(string $tipo, array $item): array
+    {
+        return array_merge([
+            'tipo'               => $tipo,
+            'nombre'             => '',
+            'documento'          => '',
+            'tipoDocumento'      => '',
+            'representanteLegal' => '',
+            'direccion'          => '',
+            'telefono'           => '',
+            'placa'              => '',
+            'expediente'         => '',
+            'reciboNumero'       => '',
+            'reciboMonto'        => null,
+            'reciboFecha'        => '',
+            'tramiteId'          => null,
+        ], $item);
     }
 
     private function normalizarFila(array $r): array

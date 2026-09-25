@@ -671,18 +671,9 @@ export function Trabajadores() {
               
               {!loading && !visible.length && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-16 text-center" style={{ color: 'var(--text-muted)' }}>
-                    <div className="mx-auto max-w-xs space-y-2">
-                      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-slate-100 dark:bg-[var(--bg-subtle)]">
-                        <Icon name="workerBadge" className="size-6 opacity-40" />
-                      </div>
-                      <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                        No se encontraron trabajadores
-                      </p>
-                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                        Intenta con otro término de búsqueda o modifica los filtros.
-                      </p>
-                    </div>
+                  <td colSpan={6} className="p-12 text-center">
+                    <Icon name="workerBadge" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
+                    <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron trabajadores</p>
                   </td>
                 </tr>
               )}

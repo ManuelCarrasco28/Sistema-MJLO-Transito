@@ -29,8 +29,39 @@ const isSuperAdminUser = (user) => (user?.rol || '').toUpperCase() === 'SUPERADM
 
 function ModuleFallback() {
   return (
-    <div className="grid min-h-[45vh] place-items-center rounded-2xl bg-white text-sm font-black text-slate-500 shadow-sm dark:bg-slate-900 dark:text-slate-300">
-      Cargando módulo...
+    <div className="animate-pulse space-y-6">
+      <div className="flex items-center gap-3.5">
+        <div className="size-12 shrink-0 rounded-2xl bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+        <div className="space-y-2">
+          <div className="h-5 w-48 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+          <div className="h-3 w-72 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="h-3 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+            <div className="mt-3 h-6 w-12 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="flex items-center gap-3 border-b border-slate-100 p-4 dark:border-[var(--border)]">
+          <div className="h-10 flex-1 rounded-xl bg-slate-100 dark:bg-[var(--bg-subtle)]" />
+          <div className="h-10 w-28 rounded-xl bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+        </div>
+        <div className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3.5">
+              <div className="h-3.5 flex-1 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
+              <div className="h-3.5 w-24 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
+              <div className="h-3.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

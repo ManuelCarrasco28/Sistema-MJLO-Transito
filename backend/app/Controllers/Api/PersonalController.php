@@ -11,14 +11,8 @@ class PersonalController extends ResourceController
     public function index()
     {
         $db = \Config\Database::connect();
-        $cookie = $this->request->getCookie('session_user');
-        $rol = '';
-        if ($cookie && str_contains($cookie, '.')) {
-            [$payload] = explode('.', $cookie, 2);
-            $json = base64_decode(strtr($payload, '-_', '+/'));
-            $user = $json ? json_decode($json, true) : null;
-            $rol = strtoupper($user['rol'] ?? '');
-        }
+        $user = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
+        $rol = strtoupper($user['rol'] ?? '');
 
         $builder = $db->table('trabajadores pe')
             ->select("

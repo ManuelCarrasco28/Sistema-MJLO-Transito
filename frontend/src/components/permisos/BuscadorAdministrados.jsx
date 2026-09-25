@@ -95,7 +95,7 @@ export function BuscadorAdministrados({ onSelect }) {
             setIsOpen(true)
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder="Escribir Razón Social, Administrado, RUC o DNI para rellenar campos..."
+          placeholder="Buscar por Razón Social, Administrado, RUC o DNI..."
           className="w-full rounded-2xl border-2 border-indigo-200/80 bg-indigo-50/30 pl-9 pr-10 py-2.5 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-4 focus:ring-indigo-500/10 dark:border-indigo-900/60 dark:bg-indigo-950/20 dark:text-white dark:focus:border-indigo-400"
         />
 

@@ -8,41 +8,6 @@ class PersonasController extends ResourceController
 {
     protected $format = 'json';
 
-    public function reniec($dni = null)
-    {
-        $dni = trim((string)$dni);
-        if (strlen($dni) !== 8 || !ctype_digit($dni)) {
-            return $this->failValidationErrors('El DNI debe tener exactamente 8 dígitos numéricos.');
-        }
-
-        $baseUrl = trim((string) env('pide.baseUrl', ''));
-        $token = trim((string) env('pide.token', ''));
-
-        if ($baseUrl === '' || $token === '') {
-            return $this->failServerError('La consulta a RENIEC no está configurada en el servidor.');
-        }
-
-        try {
-            $client = \Config\Services::curlrequest();
-            $response = $client->get(rtrim($baseUrl, '/') . "/services/reniec/dni/{$dni}", [
-                'headers' => ['Authorization' => "Bearer {$token}"],
-                'http_errors' => false,
-                'timeout' => 10,
-            ]);
-        } catch (\Throwable $e) {
-            return $this->failServerError('No se pudo conectar con el servicio de RENIEC.');
-        }
-
-        $statusCode = $response->getStatusCode();
-        $body = json_decode($response->getBody(), true);
-
-        if ($statusCode !== 200 || !is_array($body)) {
-            return $this->fail('No se encontró información para el DNI consultado.', $statusCode === 200 ? 404 : $statusCode);
-        }
-
-        return $this->respond(['status' => true, 'data' => $body]);
-    }
-
     public function tiposDocumento()
     {
         $db = \Config\Database::connect();
@@ -56,10 +21,12 @@ class PersonasController extends ResourceController
         return $this->respond(['data' => $rows]);
     }
 
-    private function findPersona($id)
+    /**
+     * Consulta base de personas + datos de ciudadano, compartida por
+     * findPersona() e index() para evitar duplicar el SELECT/JOIN.
+     */
+    private function personaSelectQuery($db)
     {
-        $db = \Config\Database::connect();
-
         return $db->table('personas p')
             ->select("
                 p.id,
@@ -87,53 +54,93 @@ class PersonasController extends ResourceController
                 p.estado
             ", false)
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
-            ->where('p.id', $id)
-            ->get()
-            ->getRowArray();
+            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left');
+    }
+
+    private function findPersona($id)
+    {
+        $db = \Config\Database::connect();
+
+        return $this->personaSelectQuery($db)->where('p.id', $id)->get()->getRowArray();
+    }
+
+    /**
+     * Reglas de validación compartidas por create() y update(); en creación
+     * además se exige el número de documento.
+     */
+    private function personaValidationRules(bool $esCreacion): array
+    {
+        $rules = [
+            'nombres' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'Los nombres son requeridos.']
+            ],
+            'apellidoPaterno' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El apellido paterno es requerido.']
+            ],
+            'apellidoMaterno' => [
+                'rules' => 'permit_empty',
+            ],
+            'numeroLicencia' => [
+                'rules' => 'permit_empty|max_length[9]',
+                'errors' => [
+                    'max_length' => 'El número de licencia no puede exceder los 9 caracteres.'
+                ]
+            ],
+            'direccion' => [
+                'rules' => 'permit_empty',
+            ],
+            'email' => [
+                'rules' => 'permit_empty|valid_email',
+                'errors' => [
+                    'valid_email' => 'Por favor ingresa un correo electrónico válido.'
+                ]
+            ],
+            'celular' => [
+                'rules' => 'permit_empty|numeric|exact_length[9]',
+                'errors' => [
+                    'numeric' => 'El número de celular debe contener solo números.',
+                    'exact_length' => 'El número de celular debe tener exactamente 9 dígitos.'
+                ]
+            ]
+        ];
+
+        if ($esCreacion) {
+            $rules['numeroDocumento'] = [
+                'rules' => 'required',
+                'errors' => ['required' => 'El número de documento es requerido.']
+            ];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Resuelve el id de tipo_documentos_identidad a partir del código,
+     * nombre o id escrito en el formulario; por defecto DNI (id 1).
+     */
+    private function resolverTipoDocumentoId($db, string $tipoDocNombre): int
+    {
+        $tipoDocRow = $db->table('tipo_documentos_identidad')
+            ->groupStart()
+                ->where('codigo', $tipoDocNombre)
+                ->orWhere('nombre', $tipoDocNombre)
+                ->orWhere('id', is_numeric($tipoDocNombre) ? (int)$tipoDocNombre : 0)
+            ->groupEnd()
+            ->get()->getRowArray();
+
+        return $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
     }
 
     public function index()
     {
         $db = \Config\Database::connect();
 
-        $cookie = $this->request->getCookie('session_user');
-        $rol = '';
-        if ($cookie && str_contains($cookie, '.')) {
-            [$payload] = explode('.', $cookie, 2);
-            $json = base64_decode(strtr($payload, '-_', '+/'));
-            $user = $json ? json_decode($json, true) : null;
-            $rol = strtoupper($user['rol'] ?? '');
-        }
+        $user = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
+        $rol = strtoupper($user['rol'] ?? '');
 
-        $builder = $db->table('personas p')
-            ->select("
-                p.id,
-                p.id_tipo_documento AS idTipoDocumento,
-                COALESCE(td.codigo, td.nombre, 'DNI') AS tipoDocumento,
-                COALESCE(td.nombre, 'DOCUMENTO NACIONAL DE IDENTIDAD') AS tipoDocumentoNombre,
-                p.numero AS numeroDocumento,
-                c.nombres,
-                c.apellido_paterno AS apellidoPaterno,
-                COALESCE(c.apellido_materno, '') AS apellidoMaterno,
-                COALESCE(c.sexo, '') AS sexo,
-                c.fecha_nacimiento AS fechaNacimiento,
-                COALESCE(c.estado_civil, '') AS estadoCivil,
-                COALESCE(c.profesion, '') AS profesion,
-                COALESCE(p.id_ubigeo, '') AS ubigeo,
-                p.fecha_created AS fechaCreated,
-                p.fecha_updated AS fechaUpdated,
-                COALESCE(p.direccion, '') AS direccion,
-                COALESCE(p.telefono, '') AS telefono,
-                COALESCE(p.celular, '') AS celular,
-                COALESCE(p.email, '') AS email,
-                COALESCE(c.numero_licencia, '') AS numeroLicencia,
-                COALESCE(c.foto, '') AS fotoUrl,
-                COALESCE(c.foto, '') AS fotoImg,
-                p.estado
-            ", false)
-            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left');
+        $builder = $this->personaSelectQuery($db);
 
         $numero = $this->request->getGet('numeroDocumento');
         if ($numero) {
@@ -211,52 +218,7 @@ class PersonasController extends ResourceController
         $db = \Config\Database::connect();
         $input = $this->request->getJSON(true) ?: $this->request->getPost();
 
-        $rules = [
-            'numeroDocumento' => [
-                'rules' => 'required',
-                'errors' => ['required' => 'El número de documento es requerido.']
-            ],
-            'nombres' => [
-                'rules' => 'required',
-                'errors' => ['required' => 'Los nombres son requeridos.']
-            ],
-            'apellidoPaterno' => [
-                'rules' => 'required',
-                'errors' => ['required' => 'El apellido paterno es requerido.']
-            ],
-            'apellidoMaterno' => [
-                'rules' => 'required',
-                'errors' => ['required' => 'El apellido materno es requerido.']
-            ],
-            'numeroLicencia' => [
-                'rules' => 'required|max_length[9]',
-                'errors' => [
-                    'required' => 'El número de licencia es requerido.',
-                    'max_length' => 'El número de licencia no puede exceder los 9 caracteres.'
-                ]
-            ],
-            'direccion' => [
-                'rules' => 'required',
-                'errors' => ['required' => 'La dirección es requerida.']
-            ],
-            'email' => [
-                'rules' => 'required|valid_email',
-                'errors' => [
-                    'required' => 'El correo electrónico es requerido.',
-                    'valid_email' => 'Por favor ingresa un correo electrónico válido.'
-                ]
-            ],
-            'celular' => [
-                'rules' => 'required|numeric|exact_length[9]',
-                'errors' => [
-                    'required' => 'El número de celular es requerido.',
-                    'numeric' => 'El número de celular debe contener solo números.',
-                    'exact_length' => 'El número de celular debe tener exactamente 9 dígitos.'
-                ]
-            ]
-        ];
-
-        if (!$this->validateData($input, $rules)) {
+        if (!$this->validateData($input, $this->personaValidationRules(true))) {
             return $this->failValidationErrors($this->validator->getErrors());
         }
 
@@ -279,14 +241,7 @@ class PersonasController extends ResourceController
 
         $db->transStart();
 
-        $tipoDocRow = $db->table('tipo_documentos_identidad')
-            ->groupStart()
-                ->where('codigo', $tipoDocName)
-                ->orWhere('nombre', $tipoDocName)
-                ->orWhere('id', is_numeric($tipoDocName) ? (int)$tipoDocName : 0)
-            ->groupEnd()
-            ->get()->getRowArray();
-        $tipoDocId = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
+        $tipoDocId = $this->resolverTipoDocumentoId($db, $tipoDocName);
 
         $pData = [
             'id_tipo_documento' => $tipoDocId,
@@ -364,48 +319,7 @@ class PersonasController extends ResourceController
             }
         }
 
-        $rules = [
-            'nombres' => [
-                'rules' => 'required',
-                'errors' => ['required' => 'Los nombres son requeridos.']
-            ],
-            'apellidoPaterno' => [
-                'rules' => 'required',
-                'errors' => ['required' => 'El apellido paterno es requerido.']
-            ],
-            'apellidoMaterno' => [
-                'rules' => 'required',
-                'errors' => ['required' => 'El apellido materno es requerido.']
-            ],
-            'numeroLicencia' => [
-                'rules' => 'required|max_length[9]',
-                'errors' => [
-                    'required' => 'El número de licencia es requerido.',
-                    'max_length' => 'El número de licencia no puede exceder los 9 caracteres.'
-                ]
-            ],
-            'direccion' => [
-                'rules' => 'required',
-                'errors' => ['required' => 'La dirección es requerida.']
-            ],
-            'email' => [
-                'rules' => 'required|valid_email',
-                'errors' => [
-                    'required' => 'El correo electrónico es requerido.',
-                    'valid_email' => 'Por favor ingresa un correo electrónico válido.'
-                ]
-            ],
-            'celular' => [
-                'rules' => 'required|numeric|exact_length[9]',
-                'errors' => [
-                    'required' => 'El número de celular es requerido.',
-                    'numeric' => 'El número de celular debe contener solo números.',
-                    'exact_length' => 'El número de celular debe tener exactamente 9 dígitos.'
-                ]
-            ]
-        ];
-
-        if (!$this->validateData($input, $rules)) {
+        if (!$this->validateData($input, $this->personaValidationRules(false))) {
             return $this->failValidationErrors($this->validator->getErrors());
         }
 
@@ -413,15 +327,7 @@ class PersonasController extends ResourceController
 
         $pData = [];
         if (isset($input['tipoDocumento'])) {
-            $tipoDocInput = trim($input['tipoDocumento']);
-            $tipoDocRow = $db->table('tipo_documentos_identidad')
-                ->groupStart()
-                    ->where('codigo', $tipoDocInput)
-                    ->orWhere('nombre', $tipoDocInput)
-                    ->orWhere('id', is_numeric($tipoDocInput) ? (int)$tipoDocInput : 0)
-                ->groupEnd()
-                ->get()->getRowArray();
-            $pData['id_tipo_documento'] = $tipoDocRow ? (int)$tipoDocRow['id'] : 1;
+            $pData['id_tipo_documento'] = $this->resolverTipoDocumentoId($db, trim($input['tipoDocumento']));
         }
         if (isset($input['numeroDocumento'])) $pData['numero'] = trim($input['numeroDocumento']);
         if (isset($input['direccion'])) $pData['direccion'] = trim($input['direccion']);

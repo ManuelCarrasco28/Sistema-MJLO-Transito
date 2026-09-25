@@ -9,6 +9,7 @@ import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
+import { MapaCoordenadasPicker } from '../components/ui/MapaCoordenadasPicker'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -36,6 +37,7 @@ export function Asociaciones() {
   const [itemsPerPage, setItemsPerPage] = useState(8)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedOrg, setSelectedOrg] = useState(null)
   const [detailData, setDetailData] = useState(null)
@@ -589,12 +591,9 @@ export function Asociaciones() {
                 ))
               ) : filteredOrgs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-16 text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <Icon name="building" className="size-12 text-slate-300 dark:text-slate-600 mb-4" />
-                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200">No se encontraron asociaciones</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Modifica los términos de búsqueda o los filtros seleccionados.</p>
-                    </div>
+                  <td colSpan="7" className="p-12 text-center">
+                    <Icon name="building" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
+                    <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron asociaciones</p>
                   </td>
                 </tr>
               ) : (
@@ -889,7 +888,7 @@ export function Asociaciones() {
                     <>
                       <FloatingInput
                         id="org_partida"
-                        label="Partida Registral SUNARP"
+                        label="Partida Registral"
                         value={formData.partidaRegistral}
                         onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
                         inputClassName="font-mono"
@@ -922,13 +921,23 @@ export function Asociaciones() {
                   </div>
 
                   {formData.tipo === 'ASOCIACION' ? (
-                    <FloatingInput
-                      id="org_coordenadas"
-                      label="Coordenadas"
-                      value={formData.coordenadas}
-                      onChange={(e) => setFormData({ ...formData, coordenadas: e.target.value })}
-                      inputClassName="font-mono"
-                    />
+                    <div className="relative">
+                      <FloatingInput
+                        id="org_coordenadas"
+                        label="Coordenadas"
+                        value={formData.coordenadas}
+                        onChange={(e) => setFormData({ ...formData, coordenadas: e.target.value })}
+                        inputClassName="font-mono pr-9"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsMapPickerOpen(true)}
+                        title="Ubicar en el mapa"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 grid size-6 place-items-center rounded-lg text-indigo-500 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 cursor-pointer"
+                      >
+                        <Icon name="mapPin" className="size-4" />
+                      </button>
+                    </div>
                   ) : (
                     <FloatingInput
                       id="org_tel"
@@ -1058,6 +1067,16 @@ export function Asociaciones() {
         </div>
       )}
 
+      <MapaCoordenadasPicker
+        isOpen={isMapPickerOpen}
+        onClose={() => setIsMapPickerOpen(false)}
+        onConfirm={(coords) => {
+          setFormData({ ...formData, coordenadas: coords })
+          setIsMapPickerOpen(false)
+        }}
+        initialValue={formData.coordenadas}
+        direccionSugerida={formData.direccion}
+      />
 
       {isDetailModalOpen && selectedOrg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
@@ -1111,7 +1130,7 @@ export function Asociaciones() {
                     </div>
                   )}
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
-                    <span className="font-bold text-slate-400">Partida Registral SUNARP</span>
+                    <span className="font-bold text-slate-400">Partida Registral</span>
                     <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{detailOrg.partidaRegistral || '—'}</span>
                   </div>
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">

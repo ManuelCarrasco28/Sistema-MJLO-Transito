@@ -23,20 +23,7 @@ class PagosController extends ResourceController
             ->get()->getResultArray();
 
         foreach ($pendientes as $p) {
-            $pagos[] = [
-                'id' => 'int_p_' . $p['id'],
-                'tipoPago' => $p['tipo_pago'],
-                'papeletaId' => null, 'tramiteId' => null, 'inscripcionId' => null,
-                'numeroRecibo' => $p['numero_recibo'],
-                'numeroVoucher' => $p['numero_voucher'],
-                'metodo' => $p['medio_pago'],
-                'metodoPago' => $p['medio_pago'],
-                'referenciaPago' => $p['referencia_pago'],
-                'montoTotal' => (float)$p['total'],
-                'fecha' => $p['fecha_pago'],
-                'fechaHora' => $p['fecha_pago'],
-                'estado' => $p['estado'],
-            ];
+            $pagos[] = $this->formatearPagoInternamiento($p, 'int_p_');
         }
 
         // El medio de pago se arma listando qué conceptos incluye la orden
@@ -53,27 +40,13 @@ class PagosController extends ResourceController
             ->get()->getResultArray();
 
         foreach ($pagados as $p) {
-            $pagos[] = [
-                'id' => 'int_l_' . $p['id'],
-                'tipoPago' => $p['tipo_pago'],
-                'papeletaId' => null, 'tramiteId' => null, 'inscripcionId' => null,
-                'numeroRecibo' => $p['numero_recibo'],
-                'numeroVoucher' => $p['numero_voucher'],
-                'metodo' => $p['medio_pago'],
-                'metodoPago' => $p['medio_pago'],
-                'referenciaPago' => $p['referencia_pago'],
-                'montoTotal' => (float)$p['total'],
-                'fecha' => $p['fecha_pago'],
-                'fechaHora' => $p['fecha_pago'],
-                'estado' => $p['estado'],
-            ];
+            $pagos[] = $this->formatearPagoInternamiento($p, 'int_l_');
         }
 
         // Papeletas pendientes de pago que aún no tienen un recibo generado
         // en pagos_transito, para que se vean en Pagos sin esperar a que
         // alguien las seleccione manualmente en "Registrar Pago".
-        $idsPapeletasConRecibo = $db->table('pagos_transito')->select('id_papeleta')->where('id_papeleta IS NOT NULL', null, false)->get()->getResultArray();
-        $idsPapeletasConRecibo = array_map(static fn($r) => (int)$r['id_papeleta'], $idsPapeletasConRecibo);
+        $idsPapeletasConRecibo = $this->idsConRecibo($db, 'id_papeleta');
 
         $papeletasPendientes = $db->table('papeletas p')
             ->select("p.id, p.numero_papeleta, p.monto_total, p.fecha_hora, v.placa", false)
@@ -103,8 +76,7 @@ class PagosController extends ResourceController
 
         // Inscripciones a cursos con costo, pendientes de pago, que aún no
         // tienen un recibo generado.
-        $idsInscripcionesConRecibo = $db->table('pagos_transito')->select('id_inscripcion')->where('id_inscripcion IS NOT NULL', null, false)->get()->getResultArray();
-        $idsInscripcionesConRecibo = array_map(static fn($r) => (int)$r['id_inscripcion'], $idsInscripcionesConRecibo);
+        $idsInscripcionesConRecibo = $this->idsConRecibo($db, 'id_inscripcion');
 
         $cursosPendientes = $db->table('inscripciones_curso i')
             ->select("i.id, i.fecha_inscripcion, c.nombre as curso_nombre, c.costo_inscripcion, CONCAT(ci.nombres, ' ', ci.apellido_paterno) as persona_nombre", false)
@@ -144,6 +116,40 @@ class PagosController extends ResourceController
         });
 
         return $this->respond(['data' => $pagos]);
+    }
+
+    /**
+     * IDs de una columna de referencia (papeleta/trámite/inscripción) que ya
+     * tienen un recibo generado en pagos_transito, para excluirlos de las
+     * listas de "pendientes sin recibo".
+     */
+    private function idsConRecibo($db, string $columna): array
+    {
+        $rows = $db->table('pagos_transito')->select($columna)->where("$columna IS NOT NULL", null, false)->get()->getResultArray();
+        return array_map(static fn($r) => (int)$r[$columna], $rows);
+    }
+
+    /**
+     * Da forma de fila de pago a una orden de internamiento (retenida o
+     * liberada), que no vive en pagos_transito pero debe listarse junto a los
+     * demás comprobantes.
+     */
+    private function formatearPagoInternamiento(array $row, string $idPrefix): array
+    {
+        return [
+            'id' => $idPrefix . $row['id'],
+            'tipoPago' => $row['tipo_pago'],
+            'papeletaId' => null, 'tramiteId' => null, 'inscripcionId' => null,
+            'numeroRecibo' => $row['numero_recibo'],
+            'numeroVoucher' => $row['numero_voucher'],
+            'metodo' => $row['medio_pago'],
+            'metodoPago' => $row['medio_pago'],
+            'referenciaPago' => $row['referencia_pago'],
+            'montoTotal' => (float)$row['total'],
+            'fecha' => $row['fecha_pago'],
+            'fechaHora' => $row['fecha_pago'],
+            'estado' => $row['estado'],
+        ];
     }
 
     public function present(array $row): array
@@ -368,9 +374,9 @@ class PagosController extends ResourceController
             ->whereNotIn('i.estado', ['ANULADO', 'CANCELADO'])
             ->get()->getResultArray();
 
-        $idsPapeletasConRecibo = array_map(static fn($r) => (int)$r['id_papeleta'], $db->table('pagos_transito')->select('id_papeleta')->where('id_papeleta IS NOT NULL', null, false)->get()->getResultArray());
-        $idsTramitesConRecibo = array_map(static fn($r) => (int)$r['id_tramite'], $db->table('pagos_transito')->select('id_tramite')->where('id_tramite IS NOT NULL', null, false)->get()->getResultArray());
-        $idsInscripcionesConRecibo = array_map(static fn($r) => (int)$r['id_inscripcion'], $db->table('pagos_transito')->select('id_inscripcion')->where('id_inscripcion IS NOT NULL', null, false)->get()->getResultArray());
+        $idsPapeletasConRecibo = $this->idsConRecibo($db, 'id_papeleta');
+        $idsTramitesConRecibo = $this->idsConRecibo($db, 'id_tramite');
+        $idsInscripcionesConRecibo = $this->idsConRecibo($db, 'id_inscripcion');
 
         $deudas = [];
         foreach ($papeletas as $p) {

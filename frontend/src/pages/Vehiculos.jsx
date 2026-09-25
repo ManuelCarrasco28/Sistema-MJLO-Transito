@@ -10,98 +10,9 @@ import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect } from '../components/ui/FormInputs'
-
-function FloatingInput({ id, label, type = "text", ...props }) {
-  return (
-    <div className="relative">
-      <input
-        id={id}
-        type={type}
-        className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
-        placeholder=" "
-        autoComplete="off"
-        {...props}
-      />
-      <label
-        htmlFor={id}
-        className="pointer-events-none absolute left-3 right-3 truncate whitespace-nowrap top-1/2 -translate-y-1/2 select-none text-xs font-medium text-slate-400 transition-all duration-150 peer-focus:top-1 peer-focus:translate-y-0 peer-focus:text-[9.5px] peer-focus:font-bold peer-focus:text-indigo-600 peer-not-placeholder-shown:top-1 peer-not-placeholder-shown:translate-y-0 peer-not-placeholder-shown:text-[9.5px] peer-not-placeholder-shown:font-bold peer-not-placeholder-shown:text-slate-500 dark:peer-not-placeholder-shown:text-slate-400"
-      >
-        {label}
-      </label>
-    </div>
-  )
-}
-
-function FloatingSelect({ id, label, value, onChange, options = [], className = '' }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef(null)
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const selectedOption = options.find((opt) => String(opt.value) === String(value)) || options[0]
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        id={id}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-10.5 w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-[var(--bg-surface)] dark:text-white cursor-pointer ${isOpen
-            ? 'border-indigo-500 ring-1 ring-indigo-500/20 dark:border-indigo-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
-          }`}
-      >
-        <span className="truncate">{selectedOption?.label || value}</span>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''}`}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      <label htmlFor={id} className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${isOpen ? 'text-indigo-600! dark:text-indigo-400!' : 'text-slate-500 dark:text-slate-400'}`}>
-        {label}
-      </label>
-
-      {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
-          <div className="space-y-0.5">
-            {options.map((opt) => {
-              const isSelected = String(opt.value) === String(value)
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange({ target: { value: opt.value } })
-                    setIsOpen(false)
-                  }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${isSelected
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
-                      : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
-                    }`}
-                >
-                  <span className="whitespace-nowrap">{opt.label}</span>
-                  {isSelected && (
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3 text-indigo-600 dark:text-indigo-400 shrink-0">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+import { VehiculoFormModal } from '../components/vehiculos/VehiculoFormModal'
+import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleModal'
+import { PersonaRapidaModal } from '../components/vehiculos/PersonaRapidaModal'
 
 export function Vehiculos() {
   const cachedVeh = getCachedData('/vehiculos')
@@ -126,16 +37,21 @@ export function Vehiculos() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [selectedVehiculo, setSelectedVehiculo] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [selectedVehiculo, setSelectedVehiculo] = useState(null)
+  const [isSearchingSunarp, setIsSearchingSunarp] = useState(false)
+  const [propietariosEncontrados, setPropietariosEncontrados] = useState([])
+  const [selectedOwnerIndex, setSelectedOwnerIndex] = useState(0)
+  const [isPersonaRapidaOpen, setIsPersonaRapidaOpen] = useState(false)
+  const [personaRapidaInitialNombre, setPersonaRapidaInitialNombre] = useState('')
 
   const [formData, setFormData] = useState({
     placa: '',
-    tipo: 'Mototaxi (Trimovil)',
+    tipo: '',
     marca: '',
     modelo: '',
     color: '',
-    anio: new Date().getFullYear(),
+    anio: '',
     categoria: '',
     carroceria: '',
     sedeRegistro: '',
@@ -389,11 +305,11 @@ export function Vehiculos() {
     setShowAsociacionResults(false)
     setFormData({
       placa: '',
-      tipo: 'Mototaxi (Trimovil)',
+      tipo: '',
       marca: '',
       modelo: '',
       color: '',
-      anio: new Date().getFullYear(),
+      anio: '',
       categoria: '',
       carroceria: '',
       sedeRegistro: '',
@@ -408,6 +324,8 @@ export function Vehiculos() {
       soatEstado: 'VIGENTE',
       tucNumero: `TUC-2026-${Math.floor(100 + Math.random() * 900)}`,
     })
+    setPropietariosEncontrados([])
+    setSelectedOwnerIndex(0)
     setIsEditing(false)
     setIsModalOpen(true)
   }
@@ -427,8 +345,185 @@ export function Vehiculos() {
       propietario: vehiculo.propietario || '',
       estado: vehiculo.estado === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'
     })
+    setPropietariosEncontrados([])
+    setSelectedOwnerIndex(0)
     setIsEditing(true)
     setIsModalOpen(true)
+  }
+
+  const handleSelectFoundOwner = (index) => {
+    setSelectedOwnerIndex(index)
+    const owner = propietariosEncontrados[index]
+    if (!owner) return
+
+    if (owner.matchedPersona) {
+      selectPropietario(owner.matchedPersona)
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        propietarioDni: '',
+        propietario: ''
+      }))
+      setPropietarioSearch(owner.nombre)
+      setShowPropietarioResults(false)
+    }
+  }
+
+  const handleOpenPersonaRapida = (nombre = '') => {
+    setPersonaRapidaInitialNombre(nombre || '')
+    setIsPersonaRapidaOpen(true)
+  }
+
+  const handlePersonaCreada = (newPersona) => {
+    const nextPersonas = [newPersona, ...personas]
+    setPersonas(nextPersonas)
+    setCachedData('/personas', nextPersonas)
+
+    // Actualizar propietariosEncontrados vinculando a la nueva persona creada
+    setPropietariosEncontrados((prev) =>
+      prev.map((prop, idx) => {
+        if (
+          idx === selectedOwnerIndex ||
+          (prop.nombre && newPersona.nombres && prop.nombre.toUpperCase().includes(newPersona.nombres.toUpperCase()))
+        ) {
+          return { ...prop, matchedPersona: newPersona }
+        }
+        return prop
+      })
+    )
+
+    // Seleccionar automáticamente como titular del vehículo
+    selectPropietario(newPersona)
+  }
+
+  const handleSunarpSearch = async () => {
+    const rawPlaca = formData.placa?.trim() || ''
+    const cleanPlaca = rawPlaca.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+
+    if (!cleanPlaca || cleanPlaca.length < 5) {
+      showError('Placa requerida', 'Ingresa una placa válida (ej. M6Y544 o M6Y-544) para consultar.')
+      return
+    }
+
+    setIsSearchingSunarp(true)
+    try {
+      const response = await apiFetch('/pide/sunarp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          placa: cleanPlaca,
+          codeZona: '11',
+          codeOficina: '01'
+        })
+      })
+
+      if (!response.ok) {
+        let errorMsg = 'No se pudo consultar el servicio vehicular.'
+        try {
+          const errData = await response.json()
+          errorMsg = errData.messages?.error || errData.message || errorMsg
+        } catch (_) {}
+        throw new Error(errorMsg)
+      }
+
+      const res = await response.json()
+      const data = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
+
+      if (!data) {
+        throw new Error(res.message || 'No se encontraron registros para la placa ingresada.')
+      }
+
+      // Deducir tipo vehicular inteligentemente de categoria y carroceria
+      const cat = (data.categoria || '').toUpperCase().trim()
+      const carr = (data.carroceria || '').toUpperCase().trim()
+      let inferredTipo = formData.tipo || ''
+
+      if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) {
+        inferredTipo = 'Moto Lineal'
+      } else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) {
+        inferredTipo = 'Mototaxi'
+      } else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV') || carr.includes('COUPE') || carr.includes('STATION') || carr.includes('AUTOMOVIL')) {
+        inferredTipo = 'Automóvil'
+      } else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS') || carr.includes('MINIBUS')) {
+        inferredTipo = 'Camioneta Rural'
+      }
+
+      // Validar anio de fabricacion
+      const anioNum = parseInt(data.ano_fabricacion || data.anio_fabricacion || data.anio, 10)
+      const currentYear = new Date().getFullYear()
+      const validAnio = (anioNum && anioNum > 1950 && anioNum <= currentYear + 1) ? anioNum : formData.anio
+
+      // Extraer nombres de propietarios del registro oficial
+      const rawProps = Array.isArray(data.propietarios) ? data.propietarios : []
+      const propNames = rawProps
+        .map(p => typeof p === 'string' ? p.trim() : (p.nombre || p.razon_social || p.apellidos_nombres || ''))
+        .filter(Boolean)
+
+      // Intentar vincular automáticamente con personas ya registradas en el padrón
+      const normalize = (str) => (str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, ' ').trim()
+
+      const foundOwners = propNames.map((name, index) => {
+        const normPName = normalize(name)
+        const found = personas.find(p => {
+          const fullName = normalize(getPersonaNombre(p))
+          return fullName === normPName || (normPName.length > 6 && (fullName.includes(normPName) || normPName.includes(fullName)))
+        })
+        return {
+          nombre: name,
+          esPrimero: index === 0,
+          matchedPersona: found || null
+        }
+      })
+
+      setPropietariosEncontrados(foundOwners)
+      setSelectedOwnerIndex(0)
+
+      let matchedPersona = foundOwners.length > 0 ? foundOwners[0].matchedPersona : null
+
+      setFormData(prev => ({
+        ...prev,
+        placa: data.placa || prev.placa,
+        tipo: inferredTipo,
+        marca: data.marca ? data.marca.trim() : prev.marca,
+        modelo: data.modelo ? data.modelo.trim() : prev.modelo,
+        color: data.color ? data.color.trim() : prev.color,
+        anio: validAnio,
+        categoria: data.categoria ? data.categoria.trim().toUpperCase() : prev.categoria,
+        carroceria: data.carroceria ? data.carroceria.trim().toUpperCase() : prev.carroceria,
+        tipoCarroceria: data.tipo_carroceria ? data.tipo_carroceria.trim().toUpperCase() : prev.tipoCarroceria,
+        sedeRegistro: data.sede ? data.sede.trim().toUpperCase() : prev.sedeRegistro,
+        numeroSerie: (data.serie || data.vin || '').trim().toUpperCase() || prev.numeroSerie,
+        serieMotor: (data.nro_motor || '').trim().toUpperCase() || prev.serieMotor,
+        partidaRegistral: (data.partida || data.partida_registral || '').trim() || prev.partidaRegistral,
+        ...(matchedPersona ? {
+          propietarioDni: String(matchedPersona.numeroDocumento || ''),
+          propietario: getPersonaNombre(matchedPersona),
+        } : {
+          propietarioDni: '',
+          propietario: '',
+        })
+      }))
+
+      if (matchedPersona) {
+        const doc = String(matchedPersona.numeroDocumento || '')
+        const nom = getPersonaNombre(matchedPersona)
+        setPropietarioSearch(`${doc} — ${nom}`)
+        setShowPropietarioResults(false)
+      } else if (foundOwners.length > 0) {
+        setPropietarioSearch(foundOwners[0].nombre)
+        setShowPropietarioResults(false)
+      }
+
+      if (foundOwners.length > 1) {
+        showToast(`Datos cargados. Se encontraron ${foundOwners.length} titulares en el registro.`)
+      } else {
+        showToast('Datos cargados correctamente.')
+      }
+    } catch (err) {
+      showError('Consulta vehicular', err.message || 'No se pudo obtener información del vehículo.')
+    } finally {
+      setIsSearchingSunarp(false)
+    }
   }
 
   const handleOpenDetail = (vehiculo) => {
@@ -459,7 +554,7 @@ export function Vehiculos() {
     // Validaciones
     const placaClean = formData.placa.trim().toUpperCase()
     if (!placaClean || !formData.propietarioDni.trim()) {
-      alert('Por favor completa los campos requeridos (Placa y Propietario registrado).')
+      alert('Por favor completa los campos requeridos (Placa y Propietario).')
       return
     }
     if (placaClean.length < 6) {
@@ -635,9 +730,9 @@ export function Vehiculos() {
               onChange={setFilterTipo}
               options={[
                 { value: 'TODOS', label: 'Todos los tipos' },
-                { value: 'Mototaxi (Trimovil)', label: 'Mototaxi (Trimovil)' },
-                { value: 'Automóvil (Sedán/Hatchback)', label: 'Automóvil (Sedán/Hatchback)' },
-                { value: 'Camioneta Rural (Combi)', label: 'Camioneta Rural (Combi)' },
+                { value: 'Mototaxi', label: 'Mototaxi' },
+                { value: 'Automóvil', label: 'Automóvil' },
+                { value: 'Camioneta Rural', label: 'Camioneta Rural' },
                 { value: 'Moto Lineal', label: 'Moto Lineal' }
               ]}
             />
@@ -710,7 +805,7 @@ export function Vehiculos() {
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Vehículo & Modelo</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Asociación / Empresa</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Propietario & Titular</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Serie Chasis / Registro</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap text-center">Estado</th>
                 <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] px-3 py-3.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
@@ -735,16 +830,9 @@ export function Vehiculos() {
                 ))
               ) : filteredVehiculos.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
-                    <div className="mx-auto max-w-xs space-y-2">
-                      <Icon name="vehicle" className="size-10" />
-                      <p className="font-bold text-slate-600 dark:text-slate-300">
-                        No se encontraron vehículos
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        Intenta cambiando los términos de búsqueda o los filtros seleccionados.
-                      </p>
-                    </div>
+                  <td colSpan="7" className="p-12 text-center">
+                    <Icon name="vehicle" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
+                    <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron vehículos</p>
                   </td>
                 </tr>
               ) : (
@@ -866,633 +954,53 @@ export function Vehiculos() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="flex min-h-full items-center justify-center p-3 sm:p-4">
-            <div className="relative w-full max-w-5xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
-              {/* Cabecera del Modal (Limpia, sin morado) */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                  <Icon name="vehicle" className="size-4" />
-                </span>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  {isEditing ? 'Editar Vehículo' : 'Registrar Vehículo'}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                title="Cerrar"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleFormSubmit}
-              autoComplete="off"
-              onMouseDown={(event) => {
-                if (!event.target.closest('[data-combobox="vehiculo"]')) {
-                  setShowPropietarioResults(false)
-                  setShowAsociacionResults(false)
-                }
-              }}
-              className="space-y-2.5 p-4 sm:p-5"
-            >
-
-              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-blue-600" />
-                  Identificación de la Unidad
-                </legend>
-                <div className="space-y-2.5">
-                  <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                    <FloatingInput
-                      id="veh_placa"
-                      label="Placa de Rodaje"
-                      required
-                      maxLength={15}
-                      value={formData.placa}
-                      onChange={(e) => {
-                        const val = e.target.value.toUpperCase();
-                        if (/[^A-Z0-9-]/.test(val)) return;
-                        setFormData({ ...formData, placa: val });
-                      }}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white font-black uppercase"
-                    />
-
-                    <FloatingSelect
-                      id="veh_tipo"
-                      label="Tipo de Vehículo"
-                      value={formData.tipo}
-                      onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-                      options={[
-                        { value: 'Mototaxi (Trimovil)', label: 'Mototaxi (Trimovil)' },
-                        { value: 'Automóvil (Sedán/Hatchback)', label: 'Automóvil (Sedán/Hatchback)' },
-                        { value: 'Camioneta Rural (Combi)', label: 'Camioneta Rural (Combi)' },
-                        { value: 'Moto Lineal', label: 'Moto Lineal' },
-                      ]}
-                    />
-
-                    <FloatingInput
-                      id="veh_marca"
-                      label="Marca"
-                      value={formData.marca}
-                      onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                    <FloatingInput
-                      id="veh_modelo"
-                      label="Modelo"
-                      value={formData.modelo}
-                      onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
-                    />
-
-                    <FloatingInput
-                      id="veh_color"
-                      label="Color"
-                      value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    />
-
-                    <FloatingInput
-                      id="veh_anio"
-                      type="number"
-                      label="Año de Fabricación"
-                      value={formData.anio}
-                      onChange={(e) => setFormData({ ...formData, anio: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
-                    <FloatingInput
-                      id="veh_categoria"
-                      label="Categoría SUNARP"
-                      value={formData.categoria || ''}
-                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value.toUpperCase() })}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white uppercase"
-                    />
-
-                    <FloatingInput
-                      id="veh_carroceria"
-                      label="Carrocería"
-                      value={formData.carroceria || ''}
-                      onChange={(e) => setFormData({ ...formData, carroceria: e.target.value.toUpperCase() })}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white uppercase"
-                    />
-
-                    <FloatingInput
-                      id="veh_tipo_carroceria"
-                      label="Tipo Carrocería"
-                      value={formData.tipoCarroceria || ''}
-                      onChange={(e) => setFormData({ ...formData, tipoCarroceria: e.target.value.toUpperCase() })}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white uppercase font-mono"
-                    />
-
-                    <FloatingInput
-                      id="veh_sede"
-                      label="Sede SUNARP"
-                      value={formData.sedeRegistro || ''}
-                      onChange={(e) => setFormData({ ...formData, sedeRegistro: e.target.value.toUpperCase() })}
-                      className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white uppercase"
-                    />
-                  </div>
-                </div>
-              </fieldset>
-
-
-              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-cyan-500" />
-                  Datos Técnicos & SUNARP
-                </legend>
-                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                  <FloatingInput
-                    id="veh_serie"
-                    label="Número de Serie (VIN)"
-                    value={formData.numeroSerie}
-                    onChange={(e) => setFormData({ ...formData, numeroSerie: e.target.value.toUpperCase() })}
-                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white font-mono"
-                  />
-
-                  <FloatingInput
-                    id="veh_motor"
-                    label="Serie del Motor"
-                    value={formData.serieMotor}
-                    onChange={(e) => setFormData({ ...formData, serieMotor: e.target.value.toUpperCase() })}
-                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white font-mono"
-                  />
-
-                  <FloatingInput
-                    id="veh_partida"
-                    label="Partida Registral SUNARP"
-                    value={formData.partidaRegistral}
-                    onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
-                    className="peer flex h-10.5 w-full rounded-xl border border-slate-200 bg-white px-3 pt-4 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white font-mono"
-                  />
-                </div>
-              </fieldset>
-
-
-              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                <legend className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-1 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-emerald-500" />
-                  Titular & Asociación Autorizada
-                </legend>
-                <div className="grid gap-2.5 lg:grid-cols-2 items-start">
-                  <div className="relative" data-combobox="vehiculo">
-                    <FloatingInput
-                      id="veh_propietario"
-                      label="Propietario registrado en Personas"
-                      required
-                      value={propietarioSearch}
-                      onFocus={() => setShowPropietarioResults(true)}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        setPropietarioSearch(value)
-                        setFormData({
-                          ...formData,
-                          propietarioDni: '',
-                          propietario: ''
-                        })
-                        setShowPropietarioResults(true)
-                      }}
-                    />
-                    {showPropietarioResults && (
-                      <div className="absolute left-0 right-0 bottom-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
-                        {propietarioResults.length ? (
-                          propietarioResults.map((persona) => {
-                            const documento = persona.numeroDocumento || ''
-                            const nombre = getPersonaNombre(persona)
-                            return (
-                              <button
-                                key={persona.id || documento}
-                                type="button"
-                                onMouseDown={(event) => {
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  selectPropietario(persona)
-                                }}
-                                className="flex w-full flex-col rounded-xl px-3 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
-                              >
-                                <span className="font-mono text-xs font-black text-blue-700 dark:text-blue-300">{documento}</span>
-                                <span className="truncate text-xs font-bold text-slate-800 dark:text-white">{nombre || 'Sin nombre'}</span>
-                              </button>
-                            )
-                          })
-                        ) : (
-                          <div className="px-3 py-2.5 text-xs font-semibold text-amber-600">
-                            No se encontró una persona con ese DNI o nombre. Regístrala primero en Personas.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {formData.propietarioDni && (
-                      <p className="px-3 pt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                        Seleccionado: {formData.propietarioDni} — {formData.propietario}
-                      </p>
-                    )}
-                    {!personas.length && (
-                      <p className="px-3 pt-1 text-xs font-semibold text-amber-600">
-                        No hay personas cargadas. Registra primero al propietario en el módulo Personas.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="relative" data-combobox="vehiculo">
-                    <FloatingInput
-                      id="veh_org"
-                      label="Empresa o Asociación (Define Formal / Informal)"
-                      value={asociacionSearch}
-                      onFocus={() => setShowAsociacionResults(true)}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        setAsociacionSearch(value)
-                        setFormData({
-                          ...formData,
-                          asociacion: ''
-                        })
-                        setShowAsociacionResults(true)
-                      }}
-                    />
-                    {showAsociacionResults && (
-                      <div className="absolute left-0 right-0 bottom-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
-                        {asociacionResults.length ? (
-                          asociacionResults.map((org) => (
-                            <button
-                              key={org.id || org.ruc || org.razonSocial}
-                              type="button"
-                              onMouseDown={(event) => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                selectAsociacion(org)
-                              }}
-                              className="flex w-full flex-col rounded-xl px-3 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
-                            >
-                              <span className="truncate text-xs font-bold text-slate-800 dark:text-white">{org.razonSocial}</span>
-                              <span className="font-mono text-[10px] font-black text-blue-700 dark:text-blue-300">RUC: {org.ruc || 'S/D'}</span>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-3 py-2.5 text-xs font-semibold text-amber-600">
-                            No se encontró asociación. Si el vehículo no pertenece a una asociación, déjalo vacío.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between gap-2 px-3 pt-1 text-xs">
-                      {formData.asociacion ? (
-                        <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                          Formal: {formData.asociacion}
-                        </span>
-                      ) : (
-                        <span className="font-semibold text-amber-600">
-                          Sin asociación: vehículo informal
-                        </span>
-                      )}
-                      {formData.asociacion && (
-                        <button type="button" onClick={clearAsociacion} className="font-bold text-rose-500 hover:text-rose-700 cursor-pointer">
-                          Quitar asociación
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </fieldset>
-
-
-              <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                <legend className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 px-1 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-amber-500" />
-                  Estado del Vehículo
-                </legend>
-                <div className="grid gap-2.5 sm:grid-cols-1">
-                  <FloatingSelect
-                    id="veh_estado"
-                    label="Estado"
-                    value={formData.estado}
-                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                    options={[
-                      { value: 'ACTIVO', label: 'ACTIVO' },
-                      { value: 'INACTIVO', label: 'INACTIVO' }
-                    ]}
-                  />
-                </div>
-              </fieldset>
-
-
-              <div className="mt-3 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-3 dark:border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-linear-to-r from-blue-600 to-cyan-600 px-6 py-2 text-xs font-black text-white hover:from-blue-700 hover:to-cyan-700 shadow-md shadow-blue-600/25 transition-all cursor-pointer"
-                >
-                  {isEditing ? 'Guardar Cambios' : 'Registrar Vehículo'}
-                </button>
-              </div>
-            </form>
-            </div>
-          </div>
-        </div>
+        <VehiculoFormModal
+          isEditing={isEditing}
+          formData={formData}
+          setFormData={setFormData}
+          onSubmit={handleFormSubmit}
+          onClose={() => setIsModalOpen(false)}
+          propietarioSearch={propietarioSearch}
+          setPropietarioSearch={setPropietarioSearch}
+          showPropietarioResults={showPropietarioResults}
+          setShowPropietarioResults={setShowPropietarioResults}
+          propietarioResults={propietarioResults}
+          getPersonaNombre={getPersonaNombre}
+          selectPropietario={selectPropietario}
+          personas={personas}
+          asociacionSearch={asociacionSearch}
+          setAsociacionSearch={setAsociacionSearch}
+          showAsociacionResults={showAsociacionResults}
+          setShowAsociacionResults={setShowAsociacionResults}
+          asociacionResults={asociacionResults}
+          selectAsociacion={selectAsociacion}
+          clearAsociacion={clearAsociacion}
+          handleSunarpSearch={handleSunarpSearch}
+          isSearchingSunarp={isSearchingSunarp}
+          propietariosEncontrados={propietariosEncontrados}
+          selectedOwnerIndex={selectedOwnerIndex}
+          onSelectOwner={handleSelectFoundOwner}
+          onOpenPersonaRapida={handleOpenPersonaRapida}
+        />
       )}
 
+      {isPersonaRapidaOpen && (
+        <PersonaRapidaModal
+          isOpen={isPersonaRapidaOpen}
+          onClose={() => setIsPersonaRapidaOpen(false)}
+          onPersonaCreada={handlePersonaCreada}
+          initialNombre={personaRapidaInitialNombre}
+        />
+      )}
 
-      {isDetailModalOpen && selectedVehiculo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-xs animate-enter sm:p-4">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-
-            {/* Header estilo /personas */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                  <Icon name="car" className="size-4" />
-                </span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white font-mono">
-                      {selectedVehiculo.placa}
-                    </h3>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                        isVehiculoFormal(selectedVehiculo)
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800'
-                          : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800'
-                      }`}
-                    >
-                      {isVehiculoFormal(selectedVehiculo) ? 'FORMAL' : 'INFORMAL'}
-                    </span>
-                    <StatusBadge status={selectedVehiculo.estado || 'ACTIVO'} />
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Ficha Vehicular Municipal • {selectedVehiculo.marca || ''} {selectedVehiculo.modelo || ''}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                title="Cerrar ficha"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
-            </div>
-
-
-            <div className="max-h-[calc(92vh-84px)] space-y-4 overflow-y-auto p-5">
-
-              <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-                <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-slate-950">
-                  <QRCodeSVG
-                    value={buildVehiculoQrValue(selectedVehiculo)}
-                    size={180}
-                    level="Q"
-                    marginSize={4}
-                    bgColor="#ffffff"
-                    fgColor="#000000"
-                    title={`Código QR del vehículo ${selectedVehiculo.placa}`}
-                  />
-                  <span className="mt-2 font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                    Escanea para identificar el vehículo
-                  </span>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-[var(--border)] dark:bg-slate-900/50">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <span className="inline-flex rounded-md bg-blue-100 px-2.5 py-1 text-xs font-extrabold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                        {selectedVehiculo.tipo}
-                      </span>
-                      <h4 className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
-                        {selectedVehiculo.marca} {selectedVehiculo.modelo}
-                      </h4>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-right dark:border-[var(--border)] dark:bg-slate-950">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Código QR</p>
-                      <p className="font-mono text-xs font-black text-slate-700 dark:text-slate-200">{selectedVehiculo.codigoQr || 'N/A'}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Placa</p>
-                      <p className="font-mono text-lg font-black text-slate-900 dark:text-white">{selectedVehiculo.placa}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Color</p>
-                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.color || 'N/A'}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Año fabricación</p>
-                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.anio || 'N/A'}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Categoría</p>
-                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.categoria || 'N/A'}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Carrocería</p>
-                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.carroceria || 'N/A'}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sede de registro</p>
-                      <p className="text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.sedeRegistro || 'N/A'}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tipo de carrocería</p>
-                      <p className="font-mono text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.tipoCarroceria || 'N/A'}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Condición Legal</p>
-                      <StatusBadge status={isVehiculoFormal(selectedVehiculo) ? 'FORMAL' : 'INFORMAL'} className="mt-1" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-
-              <div className="grid gap-3 text-xs lg:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
-                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Propietario Registrado</p>
-                  <p className="mt-1 text-sm font-extrabold text-slate-800 dark:text-white">{selectedVehiculo.propietario}</p>
-                  <p className="text-slate-500 font-mono">DNI: {selectedVehiculo.propietarioTipoDocumento === 'DNI' ? selectedVehiculo.propietarioDni || 'N/A' : 'N/A'}</p>
-                  <p className="text-slate-500 font-mono">RUC: {selectedVehiculo.asociacionRuc || 'N/A'}</p>
-                  <div className="mt-3 border-t border-slate-100 pt-3 dark:border-[var(--border)]">
-                    <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Asociación del vehículo</p>
-                    <p className="mt-1 font-bold text-slate-800 dark:text-cyan-300">{isVehiculoFormal(selectedVehiculo) ? selectedVehiculo.asociacion : 'Sin Asociación (Vehículo Informal)'}</p>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
-                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Documentos del Vehículo</p>
-                  {[
-                    ['Tarjeta de propiedad', getVehiculoDocumento(selectedVehiculo, 'TARJETA_PROPIEDAD')],
-                    ['SOAT', getVehiculoDocumento(selectedVehiculo, 'SOAT')],
-                  ].map(([label, documento]) => (
-                    <div key={label} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-[var(--bg-surface)]">
-                      <span className="font-bold text-slate-600 dark:text-slate-300">{label}</span>
-                      <span className="text-right font-mono font-black text-slate-800 dark:text-white">
-                        {documento?.codigo || 'N/A'}
-                        <span className="ml-2 text-[10px] font-bold text-slate-400">{documento?.estado || 'SIN_REGISTRO'}</span>
-                      </span>
-                    </div>
-                  ))}
-                  <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-cyan-50 px-3 py-2 dark:bg-cyan-950/30">
-                    <span className="font-bold text-slate-600 dark:text-slate-300">CERTICAV / Inspección técnica</span>
-                    <span className="text-right font-mono font-black text-slate-800 dark:text-white">
-                      {selectedVehiculo.certicav?.numeroSerieCerticav || selectedVehiculo.certicav?.numeroRegistro || 'N/A'}
-                      <span className="ml-2 text-[10px] font-bold text-slate-400">
-                        {selectedVehiculo.certicav?.resultado || selectedVehiculo.certicav?.estado || 'SIN_REGISTRO'}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
-                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Número de Serie (Chasis)</p>
-                  <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.numeroSerie || 'N/A'}</p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
-                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Partida Registral SUNARP</p>
-                  <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.partidaRegistral || 'N/A'}</p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950 lg:col-span-2">
-                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Historial de papeletas del vehículo</p>
-                  {(() => {
-                    const historial = selectedVehiculo.historialPapeletas || []
-                    const pendientes = historial.filter((p) => p.estado === 'PENDIENTE_PAGO')
-                    const pagadas = historial.filter((p) => p.estado === 'PAGADA')
-                    const anuladas = historial.filter((p) => p.estado === 'ANULADA')
-                    const deuda = pendientes.reduce((sum, p) => sum + Number(p.montoTotal || 0), 0)
-                    const pagado = pagadas.reduce((sum, p) => sum + Number(p.montoTotal || 0), 0)
-
-                    if (historial.length === 0) {
-                      return (
-                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[var(--bg-surface)] dark:text-slate-400">
-                          Sin papeletas registradas.
-                        </div>
-                      )
-                    }
-
-                    return (
-                      <div className="mt-3 space-y-3">
-                        <div className="grid gap-2 sm:grid-cols-4">
-                          <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-[var(--bg-surface)]">
-                            <p className="text-[10px] font-black uppercase text-slate-400">Total</p>
-                            <p className="font-mono text-base font-black text-slate-900 dark:text-white">{historial.length}</p>
-                          </div>
-                          <div className="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-950/40">
-                            <p className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-300">Debe</p>
-                            <p className="font-mono text-base font-black text-amber-700 dark:text-amber-300">S/ {deuda.toFixed(2)}</p>
-                          </div>
-                          <div className="rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/40">
-                            <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-300">Pagado</p>
-                            <p className="font-mono text-base font-black text-emerald-700 dark:text-emerald-300">S/ {pagado.toFixed(2)}</p>
-                          </div>
-                          <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-[var(--bg-surface)]">
-                            <p className="text-[10px] font-black uppercase text-slate-400">Anuladas</p>
-                            <p className="font-mono text-base font-black text-slate-700 dark:text-slate-300">{anuladas.length}</p>
-                          </div>
-                        </div>
-
-                        <div className="overflow-hidden rounded-lg border border-slate-100 dark:border-[var(--border)]">
-                          {historial.map((papeleta) => {
-                            const pagada = papeleta.estado === 'PAGADA'
-                            const anulada = papeleta.estado === 'ANULADA'
-                            return (
-                              <div key={papeleta.numeroPapeleta} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-[var(--border)] sm:grid-cols-[140px_1fr_110px_120px] sm:items-center">
-                                <div>
-                                  <p className="font-mono text-xs font-black text-rose-700 dark:text-rose-300">{papeleta.numeroPapeleta}</p>
-                                  <p className="text-[10px] font-bold text-slate-400">{papeleta.fechaHora ? new Date(papeleta.fechaHora).toLocaleDateString() : 'Sin fecha'}</p>
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-black text-slate-800 dark:text-slate-100">{papeleta.codigoInfraccion || 'SIN CODIGO'} · {papeleta.gravedad || 'SIN GRAVEDAD'}</p>
-                                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400" title={papeleta.tipoInfraccion}>{papeleta.tipoInfraccion || papeleta.lugar || 'Infracción no especificada'}</p>
-                                </div>
-                                <p className="font-mono text-xs font-black text-slate-800 dark:text-slate-100">S/ {Number(papeleta.montoTotal || 0).toFixed(2)}</p>
-                                <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${pagada ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : anulada ? 'bg-slate-200 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'}`}>
-                                  <span className="size-1.5 rounded-full bg-current" />
-                                  {pagada ? 'PAGADA' : anulada ? 'ANULADA' : 'DEBE'}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })()}
-                </div>
-                
-                {/* Historial de Internamientos */}
-                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950 lg:col-span-2">
-                  <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Historial de internamientos al depósito</p>
-                  {(() => {
-                    const internamientos = selectedVehiculo.historialInternamientos || []
-                    
-                    if (internamientos.length === 0) {
-                      return (
-                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[var(--bg-surface)] dark:text-slate-400">
-                          Sin internamientos registrados.
-                        </div>
-                      )
-                    }
-
-                    return (
-                      <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-[var(--border)]">
-                        {internamientos.map((int) => {
-                          return (
-                            <div key={int.numero_orden} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-[var(--border)] sm:grid-cols-[140px_1fr_120px] sm:items-center">
-                              <div>
-                                <p className="font-mono text-xs font-black text-rose-700 dark:text-rose-300">{int.numero_orden}</p>
-                                <p className="text-[10px] font-bold text-slate-400">{int.fecha_ingreso ? new Date(int.fecha_ingreso).toLocaleDateString() : 'Sin fecha'}</p>
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-xs font-black text-slate-800 dark:text-slate-100">{int.motivo || 'Sin motivo'}</p>
-                                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{int.lugar_intervencion || 'Sin lugar'}</p>
-                              </div>
-                              <div className="text-right">
-                                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${
-                                  int.estado === 'LIBERADO' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' :
-                                  'bg-orange-100 text-orange-800 dark:bg-orange-950/70 dark:text-orange-300'
-                                }`}>
-                                  <span className="size-1.5 rounded-full bg-current" />
-                                  {int.estado}
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
-                </div>
-              </div>
-
-
-              <div className="flex justify-end border-t border-slate-100 pt-4 dark:border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-lg bg-slate-900 px-6 py-2.5 text-xs font-extrabold text-white transition-all hover:bg-slate-800 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 cursor-pointer"
-                >
-                  Cerrar Ficha
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {isDetailModalOpen && (
+        <VehiculoDetalleModal
+          selectedVehiculo={selectedVehiculo}
+          onClose={() => setIsDetailModalOpen(false)}
+          isVehiculoFormal={isVehiculoFormal}
+          buildVehiculoQrValue={buildVehiculoQrValue}
+          getVehiculoDocumento={getVehiculoDocumento}
+        />
       )}
     </div>
   )

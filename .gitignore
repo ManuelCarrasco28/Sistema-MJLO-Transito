@@ -24,6 +24,7 @@ backend/writable/session/*
 backend/writable/uploads/*
 backend/writable/debugbar/*
 backend/writable/login_rate_limits/*
+backend/writable/rate_limits_*/*
 !backend/writable/**/index.html
 !backend/writable/**/.gitkeep
 *.log

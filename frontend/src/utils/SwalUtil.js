@@ -1,6 +1,6 @@
 import Swal from 'sweetalert2';
 
-export const showToast = (title, icon = 'success', timer = 3500) => {
+export const showToast = (title, icon = 'success', timer = 2800) => {
     return Swal.fire({
         toast: true,
         position: 'top-end',
@@ -9,13 +9,11 @@ export const showToast = (title, icon = 'success', timer = 3500) => {
         showConfirmButton: false,
         timer: timer,
         timerProgressBar: true,
-        background: 'var(--bg-surface, #ffffff)',
-        color: 'var(--text, #1e293b)',
-        customClass: {
-            popup: 'rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 p-4 flex items-center min-w-[340px]',
-            title: 'text-base font-extrabold tracking-tight ml-2',
-            icon: 'scale-110 shadow-sm rounded-full',
-            timerProgressBar: 'bg-indigo-500 h-1.5 rounded-full',
+        showClass: {
+            popup: 'swal2-toast-in'
+        },
+        hideClass: {
+            popup: 'swal2-toast-out'
         },
         didOpen: (toast) => {
             toast.addEventListener('mouseenter', Swal.stopTimer)

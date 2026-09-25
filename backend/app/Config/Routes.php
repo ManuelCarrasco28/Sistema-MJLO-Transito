@@ -7,21 +7,22 @@ $routes->get('/', 'Home::index');
 $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($routes): void {
     $routes->options('(:any)', 'AuthController::options');
     $routes->post('login', 'AuthController::login');
-    $routes->get('mobile/config', 'MunicipalidadController::mobileConfig');
-    $routes->get('municipalidad/config-mobile', 'MunicipalidadController::mobileConfig');
-    $routes->get('mobile/dashboard', 'MunicipalidadController::mobileDashboard');
-    $routes->get('mobile/vehiculos/buscar', 'VehiculosController::buscarMobile');
-    $routes->get('papeletas/(:num)/fotos', 'PapeletasController::fotos/$1');
-
     $routes->get('status', 'StatusController::index');
+
     $routes->group('', ['filter' => 'sessionauth'], static function ($routes): void {
+        $routes->get('mobile/config', 'MunicipalidadController::mobileConfig');
+        $routes->get('municipalidad/config-mobile', 'MunicipalidadController::mobileConfig');
+        $routes->get('mobile/dashboard', 'MunicipalidadController::mobileDashboard');
+        $routes->get('mobile/vehiculos/buscar', 'VehiculosController::buscarMobile');
+        $routes->get('papeletas/(:num)/fotos', 'PapeletasController::fotos/$1');
+
         $routes->get('pide/reniec/(:segment)', 'PideController::reniec/$1');
         $routes->post('pide/sunarp', 'PideController::sunarp');
         $routes->get('me', 'AuthController::me');
         $routes->post('logout', 'AuthController::logout');
         $routes->post('perfil/password', 'AuthController::cambiarPassword');
         $routes->get('dashboard', 'DashboardController::index');
-        
+
         $routes->get('vehiculos/persona/dni', 'VehiculosController::getVehiculosByPersonaDni');
         $routes->resource('vehiculos', ['controller' => 'VehiculosController']);
         $routes->get('tipo-documentos', 'PersonasController::tiposDocumento');
@@ -54,22 +55,28 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('permisos/buscar-administrados', 'PermisosController::buscarAdministrados');
         $routes->resource('permisos', ['controller' => 'PermisosController']);
         $routes->get('procedimientos-admin', 'PermisosController::procedimientos');
-        $routes->get('usuarios', 'UsuariosController::index');
-        $routes->post('usuarios', 'UsuariosController::create');
-        $routes->put('usuarios/(:num)', 'UsuariosController::update/$1');
-        $routes->delete('usuarios/(:num)', 'UsuariosController::delete/$1');
-        $routes->put('usuarios/(:num)/password', 'UsuariosController::updatePassword/$1');
         $routes->get('municipalidad/config', 'MunicipalidadController::config');
-        $routes->put('municipalidad/(:num)', 'MunicipalidadController::update/$1');
-        $routes->post('municipalidad/anios', 'MunicipalidadController::saveAnio');
-        $routes->put('configuracion-sistema', 'MunicipalidadController::saveConfiguracion');
         $routes->get('reportes-intervencion', 'ReportesIntervencionController::index');
         $routes->get('reportes-intervencion/(:num)/fotos', 'ReportesIntervencionController::fotos/$1');
         $routes->post('reportes-intervencion', 'ReportesIntervencionController::create');
         $routes->post('reportes-intervencion/(:num)/convertir', 'ReportesIntervencionController::convertir/$1');
         $routes->post('reportes-intervencion/(:num)/rechazar', 'ReportesIntervencionController::rechazar/$1');
         $routes->get('notificaciones/resumen', 'NotificacionesController::resumen');
+    });
+
+    // Rutas administrativas: solo roles con privilegios de gestión institucional.
+    // (gestión de cuentas/roles de usuarios, datos de la municipalidad, token PIDE y auditoría del sistema).
+    $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE'], static function ($routes): void {
         $routes->get('auditoria', 'AuditoriaController::index');
         $routes->get('auditoria/estadisticas', 'AuditoriaController::estadisticas');
+        $routes->get('usuarios', 'UsuariosController::index');
+        $routes->get('usuarios/roles', 'UsuariosController::roles');
+        $routes->post('usuarios', 'UsuariosController::create');
+        $routes->put('usuarios/(:num)', 'UsuariosController::update/$1');
+        $routes->delete('usuarios/(:num)', 'UsuariosController::delete/$1');
+        $routes->put('usuarios/(:num)/password', 'UsuariosController::updatePassword/$1');
+        $routes->put('municipalidad/(:num)', 'MunicipalidadController::update/$1');
+        $routes->post('municipalidad/anios', 'MunicipalidadController::saveAnio');
+        $routes->put('configuracion-sistema', 'MunicipalidadController::saveConfiguracion');
     });
 });

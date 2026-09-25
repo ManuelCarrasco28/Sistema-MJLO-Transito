@@ -32,16 +32,11 @@ class AuditoriaService
             $rol = $usuarioManual['rol'] ?? null;
 
             if (!$nombreUsuario && $request) {
-                $cookie = $request->getCookie('session_user');
-                if ($cookie && str_contains($cookie, '.')) {
-                    [$payload] = explode('.', $cookie, 2);
-                    $json = base64_decode(strtr($payload, '-_', '+/'));
-                    $user = $json ? json_decode($json, true) : null;
-                    if ($user) {
-                        $idUsuario = $user['id'] ?? null;
-                        $nombreUsuario = $user['usuario'] ?? null;
-                        $rol = $user['rol'] ?? null;
-                    }
+                $user = AuthSession::decodeCookie($request->getCookie('session_user'));
+                if ($user) {
+                    $idUsuario = $user['id'] ?? null;
+                    $nombreUsuario = $user['usuario'] ?? null;
+                    $rol = $user['rol'] ?? null;
                 }
             }
 

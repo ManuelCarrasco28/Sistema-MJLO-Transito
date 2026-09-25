@@ -20,7 +20,7 @@ class CorsFilter implements FilterInterface
         $envOrigins = env('app.corsAllowedOrigins');
         $allowed = $envOrigins ? array_map('trim', explode(',', $envOrigins)) : $this->allowedOrigins;
 
-        if ($origin && (in_array($origin, $allowed, true) || (defined('ENVIRONMENT') && ENVIRONMENT === 'development'))) {
+        if ($origin && in_array($origin, $allowed, true)) {
             $response->setHeader('Access-Control-Allow-Origin', $origin);
         }
 
@@ -43,7 +43,7 @@ class CorsFilter implements FilterInterface
         $envOrigins = env('app.corsAllowedOrigins');
         $allowed = $envOrigins ? array_map('trim', explode(',', $envOrigins)) : $this->allowedOrigins;
 
-        if ($origin && (in_array($origin, $allowed, true) || (defined('ENVIRONMENT') && ENVIRONMENT === 'development'))) {
+        if ($origin && in_array($origin, $allowed, true)) {
             $response->setHeader('Access-Control-Allow-Origin', $origin);
         }
 

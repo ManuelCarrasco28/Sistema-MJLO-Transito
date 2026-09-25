@@ -2,14 +2,20 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
+  // La cookie de sesión es una credencial: se guarda en almacenamiento
+  // cifrado (Keystore en Android / Keychain en iOS), no en SharedPreferences
+  // en texto plano.
+  static const _secureStorage = FlutterSecureStorage();
+  static const _sessionCookieKey = 'session_cookie';
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://192.168.101.47:8080/api'; // Cambiado a IP actual
+  static const String _defaultUrl = 'http://192.168.101.18:8080/api'; // Cambiado a IP actual
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb
@@ -19,8 +25,7 @@ class ApiService {
   static const Duration _requestTimeout = Duration(seconds: 20);
 
   static Future<Map<String, String>> _getHeaders({bool isJson = true}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final cookie = prefs.getString('session_cookie');
+    final cookie = await _secureStorage.read(key: _sessionCookieKey);
     final headers = <String, String>{
       'X-Mobile-App': 'MJLO-TRANSITO',
       if (isJson) 'Content-Type': 'application/json',
@@ -51,7 +56,7 @@ class ApiService {
         if (rawCookie != null) {
           final match = RegExp(r'session_user=[^;]+').firstMatch(rawCookie);
           if (match != null) {
-            await prefs.setString('session_cookie', match.group(0)!);
+            await _secureStorage.write(key: _sessionCookieKey, value: match.group(0)!);
           }
         }
 
@@ -83,6 +88,7 @@ class ApiService {
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    await _secureStorage.delete(key: _sessionCookieKey);
   }
 
   static Future<List<dynamic>> getPapeletas() async {

@@ -571,7 +571,20 @@ export function Operativos({ user }) {
                   </td>
                 </tr>
               ))}
-              {!visible.length && <tr><td colSpan="6" className="p-8 text-center text-xs text-slate-500">{loading ? 'Cargando operativos...' : 'No se encontraron operativos.'}</td></tr>}
+              {!visible.length && (
+                <tr>
+                  <td colSpan="6" className="p-12 text-center">
+                    {loading ? (
+                      <p className="text-xs text-slate-500">Cargando operativos...</p>
+                    ) : (
+                      <>
+                        <Icon name="operations" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
+                        <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron operativos</p>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

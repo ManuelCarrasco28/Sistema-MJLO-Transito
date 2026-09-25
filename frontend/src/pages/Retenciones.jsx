@@ -344,8 +344,9 @@ export function Retenciones({ user }) {
                 </tr>
               ) : paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                    No se encontraron registros de internamiento con los filtros seleccionados.
+                  <td colSpan={7} className="p-12 text-center">
+                    <Icon name="retention" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
+                    <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron registros de internamiento</p>
                   </td>
                 </tr>
               ) : (

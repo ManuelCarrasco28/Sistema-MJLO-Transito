@@ -253,109 +253,17 @@ class PapeletasController extends ResourceController
                 }
             }
 
-            $multas = new \App\Services\Multas($db);
-            $anio = (int)date('Y', strtotime($fechaHora));
-            $montoTotal = 0;
-            $detallesToInsert = [];
-
-            foreach ($infraccionesIds as $tipoId) {
-                $infraccion = $db->table('tipos_infraccion')->where('id', $tipoId)->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
-                if (!$infraccion) {
-                    throw new \DomainException('Una infracción seleccionada no existe o está inactiva.');
-                }
-                $monto = $multas->monto($infraccion, $anio);
-                $montoTotal += $monto;
-                $detallesToInsert[] = [
-                    'id_tipo_infraccion' => $tipoId,
-                    'monto' => $monto,
-                    'descuento' => 0.00,
-                    'monto_final' => $monto,
-                ];
-            }
+            ['montoTotal' => $montoTotal, 'detalles' => $detallesToInsert] = $this->calcularInfracciones($db, $infraccionesIds, $fechaHora);
 
             $db->transException(true)->transBegin();
             $txStarted = true;
 
-            $vehiculoId = null;
-            if ($placa !== '' && $placa !== 'SIN_PLACA') {
-                $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
-                if ($vehiculo) {
-                    $vehiculoId = (int)$vehiculo['id'];
-                }
-            }
+            ['vehiculoId' => $vehiculoId, 'placa' => $placa, 'duenoId' => $duenoId] = $this->resolverVehiculo(
+                $db, $placa, $marcaVehiculo, $colorVehiculo, $claseVehiculo, $motorVehiculo, $input
+            );
 
-            if (!$vehiculoId) {
-                $placaRegistro = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . random_int(1000, 9999);
-                $db->table('vehiculos')->insert([
-                    'placa' => $placaRegistro,
-                    'id_tipo_vehiculo' => null,
-                    'marca' => $marcaVehiculo ?: null,
-                    'color' => $colorVehiculo ?: null,
-                    'modelo' => $claseVehiculo ?: null,
-                    'serie_motor' => $motorVehiculo ?: null,
-                ]);
-                $vehiculoId = (int)$db->insertID();
-                $placa = $placaRegistro;
-
-                // Si se proporcionaron datos del dueño, vincularlo al vehículo
-                $duenoDni = trim($input['duenoDni'] ?? '');
-                if ($duenoDni !== '') {
-                    $duenoPersona = $db->table('personas')->where('numero', $duenoDni)->limit(1)->get()->getRowArray();
-                    $duenoId = null;
-                    if ($duenoPersona) {
-                        $duenoId = (int)$duenoPersona['id'];
-                    } else {
-                        $duenoApellidos = preg_split('/\s+/', trim($input['duenoApellidos'] ?? '')) ?: [];
-                        $db->table('personas')->insert([
-                            'id_tipo_documento' => 1,
-                            'numero' => $duenoDni,
-                            'estado' => 'ACTIVO',
-                        ]);
-                        $duenoId = (int)$db->insertID();
-                        $db->table('ciudadanos')->insert([
-                            'id_persona' => $duenoId,
-                            'nombres' => trim($input['duenoNombres'] ?? 'NO REGISTRADO'),
-                            'apellido_paterno' => $duenoApellidos[0] ?? 'NO REGISTRADO',
-                            'apellido_materno' => isset($duenoApellidos[1]) ? implode(' ', array_slice($duenoApellidos, 1)) : null,
-                        ]);
-                        $db->table('administrados')->ignore(true)->insert(['id_persona' => $duenoId]);
-                    }
-                    $db->table('vehiculo_propietarios')->insert([
-                        'id_vehiculo'  => $vehiculoId,
-                        'id_persona'   => $duenoId,
-                        'fecha_inicio' => date('Y-m-d'),
-                        'estado'       => 'ACTIVO',
-                    ]);
-                }
-            }
-
-            $personaId = null;
             $fuga = $input['fuga'] ?? false;
-            
-            if ($fuga) {
-                // Si hubo fuga, el infractor pasa a ser el dueño (si se registró)
-                $personaId = $duenoId ?? null;
-            } else if ($conductorDni !== '') {
-                $persona = $db->table('personas')->where('numero', $conductorDni)->limit(1)->get()->getRowArray();
-                if ($persona) {
-                    $personaId = (int)$persona['id'];
-                } else {
-                    $apellidos = preg_split('/\s+/', trim($conductorApellidos)) ?: [];
-                    $db->table('personas')->insert([
-                        'id_tipo_documento' => 1,
-                        'numero' => $conductorDni,
-                        'estado' => 'ACTIVO',
-                    ]);
-                    $personaId = (int)$db->insertID();
-                    $db->table('ciudadanos')->insert([
-                        'id_persona' => $personaId,
-                        'nombres' => $conductorNombres ?: ($infractor ?: 'INFRACTOR'),
-                        'apellido_paterno' => $apellidos[0] ?? 'NO REGISTRADO',
-                        'apellido_materno' => isset($apellidos[1]) ? implode(' ', array_slice($apellidos, 1)) : null,
-                    ]);
-                    $db->table('administrados')->ignore(true)->insert(['id_persona' => $personaId]);
-                }
-            }
+            $personaId = $this->resolverInfractor($db, $fuga, $duenoId, $conductorDni, $conductorNombres, $conductorApellidos, $infractor);
 
             $numeroPapeleta = 'PAP-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
             $inspectorNombre = trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? ''));
@@ -387,9 +295,11 @@ class PapeletasController extends ResourceController
 
             $fotos = $input['fotos'] ?? [];
             if (!empty($fotos) && is_array($fotos)) {
+                // Máximo 5 fotos por papeleta y límite de tamaño (~7MB base64 ~= 5MB binario)
+                $fotos = array_slice($fotos, 0, 5);
                 foreach ($fotos as $foto) {
                     $fotoStr = trim((string)$foto);
-                    if ($fotoStr !== '') {
+                    if ($fotoStr !== '' && strlen($fotoStr) <= 7 * 1024 * 1024) {
                         if (!str_starts_with($fotoStr, 'data:image/')) {
                             $fotoStr = 'data:image/jpeg;base64,' . $fotoStr;
                         }
@@ -573,5 +483,134 @@ class PapeletasController extends ResourceController
     private function uitActual($db): float
     {
         return (new \App\Services\Multas($db))->uit((int)date('Y'));
+    }
+
+    /**
+     * Calcula el monto de cada infracción seleccionada y arma las filas listas
+     * para papeleta_detalles.
+     */
+    private function calcularInfracciones($db, array $infraccionesIds, string $fechaHora): array
+    {
+        $multas = new \App\Services\Multas($db);
+        $anio = (int)date('Y', strtotime($fechaHora));
+        $montoTotal = 0;
+        $detalles = [];
+
+        foreach ($infraccionesIds as $tipoId) {
+            $infraccion = $db->table('tipos_infraccion')->where('id', $tipoId)->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
+            if (!$infraccion) {
+                throw new \DomainException('Una infracción seleccionada no existe o está inactiva.');
+            }
+            $monto = $multas->monto($infraccion, $anio);
+            $montoTotal += $monto;
+            $detalles[] = [
+                'id_tipo_infraccion' => $tipoId,
+                'monto' => $monto,
+                'descuento' => 0.00,
+                'monto_final' => $monto,
+            ];
+        }
+
+        return ['montoTotal' => $montoTotal, 'detalles' => $detalles];
+    }
+
+    /**
+     * Busca el vehículo por placa; si no existe lo registra con los datos
+     * capturados en campo y, de venir datos del dueño, lo vincula como propietario.
+     */
+    private function resolverVehiculo($db, string $placa, string $marca, string $color, string $clase, string $motor, array $input): array
+    {
+        $vehiculoId = null;
+        if ($placa !== '' && $placa !== 'SIN_PLACA') {
+            $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
+            if ($vehiculo) {
+                $vehiculoId = (int)$vehiculo['id'];
+            }
+        }
+
+        $duenoId = null;
+        if (!$vehiculoId) {
+            $placaRegistro = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . random_int(1000, 9999);
+            $db->table('vehiculos')->insert([
+                'placa' => $placaRegistro,
+                'id_tipo_vehiculo' => null,
+                'marca' => $marca ?: null,
+                'color' => $color ?: null,
+                'modelo' => $clase ?: null,
+                'serie_motor' => $motor ?: null,
+            ]);
+            $vehiculoId = (int)$db->insertID();
+            $placa = $placaRegistro;
+
+            // Si se proporcionaron datos del dueño, vincularlo al vehículo
+            $duenoDni = trim($input['duenoDni'] ?? '');
+            if ($duenoDni !== '') {
+                $duenoPersona = $db->table('personas')->where('numero', $duenoDni)->limit(1)->get()->getRowArray();
+                if ($duenoPersona) {
+                    $duenoId = (int)$duenoPersona['id'];
+                } else {
+                    $duenoApellidos = preg_split('/\s+/', trim($input['duenoApellidos'] ?? '')) ?: [];
+                    $db->table('personas')->insert([
+                        'id_tipo_documento' => 1,
+                        'numero' => $duenoDni,
+                        'estado' => 'ACTIVO',
+                    ]);
+                    $duenoId = (int)$db->insertID();
+                    $db->table('ciudadanos')->insert([
+                        'id_persona' => $duenoId,
+                        'nombres' => trim($input['duenoNombres'] ?? 'NO REGISTRADO'),
+                        'apellido_paterno' => $duenoApellidos[0] ?? 'NO REGISTRADO',
+                        'apellido_materno' => isset($duenoApellidos[1]) ? implode(' ', array_slice($duenoApellidos, 1)) : null,
+                    ]);
+                    $db->table('administrados')->ignore(true)->insert(['id_persona' => $duenoId]);
+                }
+                $db->table('vehiculo_propietarios')->insert([
+                    'id_vehiculo'  => $vehiculoId,
+                    'id_persona'   => $duenoId,
+                    'fecha_inicio' => date('Y-m-d'),
+                    'estado'       => 'ACTIVO',
+                ]);
+            }
+        }
+
+        return ['vehiculoId' => $vehiculoId, 'placa' => $placa, 'duenoId' => $duenoId];
+    }
+
+    /**
+     * Resuelve la persona infractora: si hubo fuga, el dueño registrado del
+     * vehículo; si no, busca/crea al conductor por DNI.
+     */
+    private function resolverInfractor($db, $fuga, ?int $duenoId, string $conductorDni, string $conductorNombres, string $conductorApellidos, string $infractor): ?int
+    {
+        if ($fuga) {
+            // Si hubo fuga, el infractor pasa a ser el dueño (si se registró)
+            return $duenoId;
+        }
+
+        if ($conductorDni === '') {
+            return null;
+        }
+
+        $persona = $db->table('personas')->where('numero', $conductorDni)->limit(1)->get()->getRowArray();
+        if ($persona) {
+            return (int)$persona['id'];
+        }
+
+        $apellidos = preg_split('/\s+/', trim($conductorApellidos)) ?: [];
+        $db->table('personas')->insert([
+            'id_tipo_documento' => 1,
+            'numero' => $conductorDni,
+            'estado' => 'ACTIVO',
+        ]);
+        $personaId = (int)$db->insertID();
+        $db->table('ciudadanos')->insert([
+            'id_persona' => $personaId,
+            'nombres' => $conductorNombres ?: ($infractor ?: 'INFRACTOR'),
+            'apellido_paterno' => $apellidos[0] ?? 'NO REGISTRADO',
+            'apellido_materno' => isset($apellidos[1]) ? implode(' ', array_slice($apellidos, 1)) : null,
+        ]);
+        $db->table('administrados')->ignore(true)->insert(['id_persona' => $personaId]);
+
+        return $personaId;
     }
 }

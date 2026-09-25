@@ -58,8 +58,8 @@ class UsuariosController extends ResourceController
             return $this->failValidationErrors('Seleccione un colaborador, un rol y complete Usuario y Contraseña.');
         }
 
-        if (strlen($password) < 6) {
-            return $this->failValidationErrors('La contraseña debe tener al menos 6 caracteres.');
+        if (strlen($password) < 8) {
+            return $this->failValidationErrors('La contraseña debe tener al menos 8 caracteres.');
         }
 
         $db = \Config\Database::connect();
@@ -154,6 +154,12 @@ class UsuariosController extends ResourceController
             return $this->failNotFound('Usuario no encontrado.');
         }
 
+        $actor = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
+        $actorRol = strtoupper((string)($actor['rol'] ?? ''));
+        if ($usuario['usuario'] === 'superadmin' && $actorRol !== 'SUPERADMIN') {
+            return $this->fail('Solo un SuperAdmin puede modificar la cuenta superadmin principal.', 403);
+        }
+
         $rolRow = $db->table('roles')->where('id', $idRol)->where('estado', 'ACTIVO')->get()->getRowArray();
         if (!$rolRow) {
             return $this->failValidationErrors('El rol seleccionado no es válido.');
@@ -175,6 +181,10 @@ class UsuariosController extends ResourceController
             return $this->failServerError('Error al actualizar el usuario.');
         }
 
+        // El rol o estado cambió: cualquier sesión activa de ese usuario con
+        // permisos anteriores queda invalidada de inmediato.
+        \App\Services\AuthSession::invalidateSessions((int)$id);
+
         \App\Services\AuditoriaService::registrar(
             'USUARIOS',
             'MODIFICAR',
@@ -189,8 +199,8 @@ class UsuariosController extends ResourceController
     {
         $input = $this->request->getJSON(true) ?: [];
 
-        if (!isset($input['password']) || empty(trim($input['password']))) {
-            return $this->failValidationErrors('La contraseña es requerida.');
+        if (!isset($input['password']) || strlen(trim($input['password'])) < 8) {
+            return $this->failValidationErrors('La contraseña debe tener al menos 8 caracteres.');
         }
 
         $db = \Config\Database::connect();
@@ -200,9 +210,17 @@ class UsuariosController extends ResourceController
             return $this->failNotFound('Usuario no encontrado.');
         }
 
+        $actor = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
+        $actorRol = strtoupper((string)($actor['rol'] ?? ''));
+        if ($usuario['usuario'] === 'superadmin' && $actorRol !== 'SUPERADMIN') {
+            return $this->fail('Solo un SuperAdmin puede restablecer la contraseña de la cuenta superadmin principal.', 403);
+        }
+
         $db->table('usuarios')->where('id', $id)->update([
             'clave' => password_hash($input['password'], PASSWORD_BCRYPT)
         ]);
+        // Fuerza el cierre de cualquier sesión activa con la contraseña anterior.
+        \App\Services\AuthSession::invalidateSessions((int)$id);
 
         \App\Services\AuditoriaService::registrar(
             'USUARIOS',
@@ -211,6 +229,7 @@ class UsuariosController extends ResourceController
             ['id_usuario' => $id, 'usuario' => $usuario['usuario']]
         );
 
+        unset($usuario['clave']);
         return $this->respond($this->formatResponse(true, 'Contraseña actualizada correctamente.', $usuario), 200);
     }
 

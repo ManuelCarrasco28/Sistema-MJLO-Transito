@@ -13,13 +13,28 @@ class VehiculosController extends ResourceController
         return strtoupper(preg_replace('/[^A-Z0-9]/', '', trim($value)) ?? '');
     }
 
+    /**
+     * Resuelve el id de asociaciones a partir del nombre escrito en el
+     * formulario, descartando las etiquetas de "sin asociación / particular".
+     */
+    private function resolverAsociacionId($db, string $orgName): ?int
+    {
+        $sinAsociacion = ['Sin Asociación (Informal)', 'Sin Asociación', 'Independiente', 'Independiente / Particular'];
+        if (empty($orgName) || in_array($orgName, $sinAsociacion, true)) {
+            return null;
+        }
+
+        $orgRow = $db->table('asociaciones')->like('razon_social', $orgName)->get()->getRowArray();
+        return $orgRow ? (int)$orgRow['id'] : null;
+    }
+
     private function vehiculosBaseQuery($db)
     {
         return $db->table('vehiculos v')
             ->select("
                 v.id,
                 v.placa,
-                COALESCE(tv.nombre, 'Mototaxi (Trimovil)') AS tipo,
+                COALESCE(tv.nombre, 'Mototaxi') AS tipo,
                 COALESCE(v.marca, '') AS marca,
                 COALESCE(v.modelo, '') AS modelo,
                 COALESCE(v.color, '') AS color,
@@ -260,7 +275,7 @@ class VehiculosController extends ResourceController
         }
 
         
-        $tipoNombre = !empty($input['tipo']) ? trim($input['tipo']) : 'Mototaxi (Trimovil)';
+        $tipoNombre = !empty($input['tipo']) ? trim($input['tipo']) : 'Mototaxi';
         $tipoRow = $db->table('tipos_vehiculo')->where('nombre', $tipoNombre)->get()->getRowArray();
         if (!$tipoRow) {
             $db->table('tipos_vehiculo')->insert(['nombre' => $tipoNombre]);
@@ -269,18 +284,9 @@ class VehiculosController extends ResourceController
             $tipoVehiculoId = $tipoRow['id'];
         }
 
-        
-        $asociacionId = null;
+
         $orgName = trim($input['asociacion'] ?? '');
-        if (!empty($orgName) && !in_array($orgName, ['Sin Asociación (Informal)', 'Sin Asociación', 'Sin Asociación (Informal)', 'Sin Asociación', 'Independiente', 'Independiente / Particular'])) {
-            $orgRow = $db->table('asociaciones')
-                ->like('razon_social', $orgName)
-                ->get()
-                ->getRowArray();
-            if ($orgRow) {
-                $asociacionId = $orgRow['id'];
-            }
-        }
+        $asociacionId = $this->resolverAsociacionId($db, $orgName);
 
         $qrCode = $input['codigoQr'] ?? ('QR-VEH-' . date('Y') . '-' . str_pad(random_int(100, 999), 3, '0', STR_PAD_LEFT));
 
@@ -401,18 +407,7 @@ class VehiculosController extends ResourceController
         }
 
         if (array_key_exists('asociacion', $input)) {
-            $asociacionId = null;
-            $orgName = trim((string)$input['asociacion']);
-            if (!empty($orgName) && !in_array($orgName, ['Sin Asociación (Informal)', 'Sin Asociación', 'Sin Asociación (Informal)', 'Sin Asociación', 'Independiente', 'Independiente / Particular'])) {
-                $orgRow = $db->table('asociaciones')
-                    ->like('razon_social', $orgName)
-                    ->get()
-                    ->getRowArray();
-                if ($orgRow) {
-                    $asociacionId = $orgRow['id'];
-                }
-            }
-            $record['id_asociacion'] = $asociacionId;
+            $record['id_asociacion'] = $this->resolverAsociacionId($db, trim((string)$input['asociacion']));
         }
 
         if (!empty($input['tipo'])) {
@@ -423,15 +418,6 @@ class VehiculosController extends ResourceController
                 $record['id_tipo_vehiculo'] = $db->insertID();
             } else {
                 $record['id_tipo_vehiculo'] = $tipoRow['id'];
-            }
-        }
-        if (isset($input['asociacion'])) {
-            $orgNombre = trim($input['asociacion']);
-            if ($orgNombre !== '') {
-                $orgRow = $db->table('asociaciones')->like('razon_social', $orgNombre)->get()->getRowArray();
-                $record['id_asociacion'] = $orgRow ? $orgRow['id'] : null;
-            } else {
-                $record['id_asociacion'] = null;
             }
         }
 

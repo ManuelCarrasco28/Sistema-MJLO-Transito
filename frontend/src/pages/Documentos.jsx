@@ -8,23 +8,7 @@ import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../conf
 import { PlantillaImpresionTUC } from '../components/documentos/PlantillaImpresionTUC'
 import { exportToExcel } from '../utils/exportToExcel'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
-
-function formatFecha(fechaStr) {
-  if (!fechaStr) return '—'
-  try {
-    const parts = fechaStr.split(/[- :T]/)
-    if (parts.length >= 3) {
-      const year = parseInt(parts[0], 10)
-      const month = parseInt(parts[1], 10) - 1
-      const day = parseInt(parts[2], 10)
-      const d = new Date(year, month, day)
-      return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    }
-    return fechaStr
-  } catch {
-    return fechaStr
-  }
-}
+import { formatFecha } from '../utils/formatters'
 
 const TIPO_DOC_OPTIONS = [
   { value: 'TARJETA_OPERATIVIDAD', label: 'Tarjeta de Operatividad (TUC)' },
@@ -33,8 +17,8 @@ const TIPO_DOC_OPTIONS = [
 ]
 
 const TIPO_DOC_LABEL_EXTERNO = {
-  CITV: 'CITV (Inspección Técnica MTC)',
-  TARJETA_PROPIEDAD: 'Tarjeta de Propiedad (SUNARP)',
+  CITV: 'CITV (Inspección Técnica)',
+  TARJETA_PROPIEDAD: 'Tarjeta de Propiedad',
 }
 
 const ESTADO_OPTIONS = [
@@ -547,16 +531,16 @@ export function Documentos() {
       {toast && (
         <div
           key={toast.id}
-          className="fixed right-6 top-6 z-[80] flex items-center gap-2.5 rounded-[var(--radius)] border px-4 py-3 text-[13px] font-medium shadow-md transition-all animate-enter"
+          className="fixed right-5 top-5 z-[80] flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold shadow-xl transition-all toast-in backdrop-blur-md"
           style={{
             backgroundColor: 'var(--bg-surface)',
             borderColor: 'var(--border-ok)',
             color: 'var(--text)',
-            boxShadow: 'var(--shadow-md)',
+            boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.12)',
           }}
         >
           <span
-            className="grid size-6 place-items-center rounded-full text-xs font-semibold shrink-0 border"
+            className="grid size-5 place-items-center rounded-full text-[11px] font-bold shrink-0 border"
             style={{
               backgroundColor: 'var(--ok-bg)',
               color: 'var(--ok-fg)',
@@ -807,16 +791,9 @@ export function Documentos() {
                 ))
               ) : filteredDocs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-12 text-center" style={{ color: 'var(--text-muted)' }}>
-                    <div className="mx-auto max-w-xs space-y-1.5">
-                      <Icon name="document" className="size-8 mx-auto opacity-40" />
-                      <p className="font-semibold" style={{ color: 'var(--text)' }}>
-                        No se encontraron documentos
-                      </p>
-                      <p className="text-[12.5px]">
-                        Intenta con otro término de búsqueda o modifica los filtros.
-                      </p>
-                    </div>
+                  <td colSpan="7" className="p-12 text-center">
+                    <Icon name="document" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
+                    <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron documentos</p>
                   </td>
                 </tr>
               ) : (

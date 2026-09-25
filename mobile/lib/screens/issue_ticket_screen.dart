@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart' as geocoding;
 import '../services/api_service.dart';
 import '../theme.dart';
+import '../utils/location_helper.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -128,50 +128,13 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
     setState(() {
       _isLoadingLocation = true;
     });
 
     try {
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showError('Los servicios de ubicación están desactivados.');
-        return;
-      }
-
-      permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _showError('Los permisos de ubicación fueron denegados.');
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        _showError('Los permisos de ubicación están denegados permanentemente.');
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition();
-      
-      String address = '${position.latitude}, ${position.longitude}';
-      try {
-        List<geocoding.Placemark> placemarks = await geocoding.Geocoding().placemarkFromCoordinates(position.latitude, position.longitude);
-        if (placemarks.isNotEmpty) {
-          final place = placemarks.first;
-          address = '${place.thoroughfare ?? ''} ${place.subThoroughfare ?? ''}'.trim();
-          if (address.isEmpty) address = place.street ?? '';
-          final locality = place.locality ?? place.subAdministrativeArea ?? '';
-          if (locality.isNotEmpty) address = address.isEmpty ? locality : '$address, $locality';
-          if (address.trim().isEmpty) address = '${position.latitude}, ${position.longitude}';
-        }
-      } catch (e) {
-        debugPrint('Error obteniendo dirección: $e');
-      }
+      final position = await obtenerPosicionActual();
+      final address = await obtenerDireccionDesdePosicion(position);
 
       setState(() {
         _currentPosition = position;
@@ -185,7 +148,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         );
       }
     } catch (e) {
-      _showError('Error al obtener la ubicación: $e');
+      _showError(e is Exception ? e.toString().replaceFirst('Exception: ', '') : 'Error al obtener la ubicación: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -193,6 +156,39 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         });
       }
     }
+  }
+
+  /// Datos del conductor a reportar: si el dueño está conduciendo, se toman
+  /// del vehículo; si no, de los campos capturados en el formulario.
+  Map<String, String> _resolverDatosConductor() {
+    final String nombre = _conductorEsDueno
+        ? (widget.vehicleData['propietario'] ?? 'Dueño')
+        : '${_nombresConductor.text.trim()} ${_apellidosConductor.text.trim()}';
+    final String dni = _conductorEsDueno
+        ? (widget.vehicleData['propietarioDni'] ?? '').toString()
+        : _dniConductor.text.trim();
+    final String nombres = _conductorEsDueno
+        ? (widget.vehicleData['propietarioNombres'] ?? nombre).toString()
+        : _nombresConductor.text.trim();
+    final String apellidos = _conductorEsDueno
+        ? '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim()
+        : _apellidosConductor.text.trim();
+
+    return {
+      'nombre': nombre,
+      'dni': dni,
+      'nombres': nombres,
+      'apellidos': apellidos,
+    };
+  }
+
+  Future<List<String>> _fotosToBase64() async {
+    final List<String> fotosBase64 = [];
+    for (var foto in _fotos) {
+      final bytes = await foto.readAsBytes();
+      fotosBase64.add(base64Encode(bytes));
+    }
+    return fotosBase64;
   }
 
   double get _montoTotal {
@@ -241,31 +237,15 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
 
       final List<int> infraccionesInts = validInfracciones.map((e) => int.parse(e!)).toList();
 
-      String conductorNombre = _conductorEsDueno 
-          ? (widget.vehicleData['propietario'] ?? 'Dueño')
-          : '${_nombresConductor.text.trim()} ${_apellidosConductor.text.trim()}';
-      String conductorDni = _conductorEsDueno
-          ? (widget.vehicleData['propietarioDni'] ?? '').toString()
-          : _dniConductor.text.trim();
-      String conductorNombres = _conductorEsDueno
-          ? (widget.vehicleData['propietarioNombres'] ?? conductorNombre).toString()
-          : _nombresConductor.text.trim();
-      String conductorApellidos = _conductorEsDueno
-          ? '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim()
-          : _apellidosConductor.text.trim();
-
-      List<String> fotosBase64 = [];
-      for (var foto in _fotos) {
-        final bytes = await foto.readAsBytes();
-        fotosBase64.add(base64Encode(bytes));
-      }
+      final conductor = _resolverDatosConductor();
+      final fotosBase64 = await _fotosToBase64();
 
       final requestData = {
         'vehiculoPlaca': widget.vehicleData['placa'] ?? widget.vehicleData['chasis'],
-        'infractor': conductorNombre,
-        'conductorDni': conductorDni,
-        'conductorNombres': conductorNombres,
-        'conductorApellidos': conductorApellidos,
+        'infractor': conductor['nombre'],
+        'conductorDni': conductor['dni'],
+        'conductorNombres': conductor['nombres'],
+        'conductorApellidos': conductor['apellidos'],
         'lugar': _lugar,
         'infraccionesIds': infraccionesInts,
         'observacionesAutoridad': _observaciones,
@@ -321,24 +301,8 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
           ? widget.vehicleData['placa'].toString().trim().toUpperCase()
           : '';
 
-      List<String> fotosBase64 = [];
-      for (var foto in _fotos) {
-        final bytes = await foto.readAsBytes();
-        fotosBase64.add(base64Encode(bytes));
-      }
-
-      String conductorNombre = _conductorEsDueno 
-          ? (widget.vehicleData['propietario'] ?? 'Dueño')
-          : '${_nombresConductor.text.trim()} ${_apellidosConductor.text.trim()}';
-      String conductorDni = _conductorEsDueno
-          ? (widget.vehicleData['propietarioDni'] ?? '').toString()
-          : _dniConductor.text.trim();
-      String conductorNombres = _conductorEsDueno
-          ? (widget.vehicleData['propietarioNombres'] ?? conductorNombre).toString()
-          : _nombresConductor.text.trim();
-      String conductorApellidos = _conductorEsDueno
-          ? '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim()
-          : _apellidosConductor.text.trim();
+      final fotosBase64 = await _fotosToBase64();
+      final conductor = _resolverDatosConductor();
 
       await ApiService.createReporteIntervencion({
         'inspectorId': inspectorId,
@@ -348,9 +312,9 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : '',
         'fotos': fotosBase64,
         'infraccionesIds': _selectedInfraccionesIds.where((id) => id != null).toList(),
-        'dni_conductor': conductorDni,
-        'nombres_conductor': conductorNombres,
-        'apellidos_conductor': conductorApellidos,
+        'dni_conductor': conductor['dni'],
+        'nombres_conductor': conductor['nombres'],
+        'apellidos_conductor': conductor['apellidos'],
         'dni_dueño': widget.vehicleData['propietarioDni'] ?? '',
         'nombres_dueño': widget.vehicleData['propietarioNombres'] ?? '',
         'apellidos_dueño': '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim(),

@@ -8,6 +8,12 @@ import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { PagoPapeletaModal } from '../components/papeletas/PagoPapeletaModal'
+import { NuevaPapeletaModal } from '../components/papeletas/NuevaPapeletaModal'
+import { PapeletaDetalleModal } from '../components/papeletas/PapeletaDetalleModal'
+import { ConvertirReporteModal } from '../components/papeletas/ConvertirReporteModal'
+import { PreviewTicketModal } from '../components/papeletas/PreviewTicketModal'
+import { InfraccionDetalleModal } from '../components/papeletas/InfraccionDetalleModal'
 
 const FILTER_ORIGEN_OPTIONS = [
   { value: 'TODOS', label: 'Todos los orígenes' },
@@ -992,331 +998,30 @@ export function Papeletas({ user }) {
       </div>
       }
 
-      {isDetailModalOpen && selectedPapeleta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-            <div className="flex items-center justify-between border-b border-rose-600/20 bg-rose-50 p-5 dark:bg-rose-950/30">
-              <div>
-                <h3 className="text-xl font-black text-rose-700 dark:text-rose-400">{selectedPapeleta.numeroPapeleta}</h3>
-              </div>
-              <button onClick={() => setIsDetailModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-white cursor-pointer">✕</button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[80vh]">
-
-              <div className="space-y-4">
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Identificación de la Falta</h4>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <p className="text-slate-400">Código</p>
-                      <p className="font-extrabold text-slate-800 dark:text-white text-sm">{selectedPapeleta.tipoInfraccionCodigo || selectedPapeleta.detalles?.[0]?.codigo || 'G01'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Calificación</p>
-                      <p className="font-extrabold text-slate-800 dark:text-white">{selectedPapeleta.tipoInfraccionGravedad || selectedPapeleta.detalles?.[0]?.gravedad || 'LEVE'}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-slate-400">Descripción</p>
-                      <p className="font-medium text-slate-700 dark:text-slate-300">{selectedPapeleta.tipoInfraccionDescripcion || selectedPapeleta.detalles?.[0]?.descripcion || 'Infracción al Reglamento'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Lugar y Fecha</h4>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <p className="text-slate-400">Fecha y Hora</p>
-                      <p className="font-bold text-slate-800 dark:text-white">{new Date(selectedPapeleta.fechaHora).toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Ubicación</p>
-                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.lugar}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-slate-400">Origen</p>
-                      <div className="mt-1">{renderOrigen(selectedPapeleta)}</div>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-slate-400">Observaciones del Inspector</p>
-                      <p className="font-medium text-rose-600 dark:text-rose-400 italic">"{selectedPapeleta.observacionesAutoridad || 'Sin observaciones por parte de la autoridad.'}"</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Intervinientes y Vehículo</h4>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <p className="text-slate-400">Propietario</p>
-                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.propietarioNombre || 'No Registrado'}</p>
-                      <p className="font-mono text-[11px] text-slate-400">DNI/RUC: {selectedPapeleta.propietarioDni || 'S/D'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Infractor</p>
-                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.conductorNombre || selectedPapeleta.infractor}</p>
-                      <p className="font-mono text-[11px] text-slate-400">DNI: {selectedPapeleta.conductorDni || 'S/D'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Vehículo</p>
-                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.vehiculoPlaca}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">{selectedPapeleta.vehiculoCaracteristicas}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Tipo Infractor</p>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ${selectedPapeleta.tipoInfractor === 'FORMAL' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'}`}>
-                        {selectedPapeleta.tipoInfractor || 'INFORMAL'}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Inspector</p>
-                      <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.inspector} {selectedPapeleta.inspectorCIP ? `(CIP: ${selectedPapeleta.inspectorCIP})` : ''}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Estado Económico</h4>
-                  <div className="grid grid-cols-2 gap-3 text-xs mb-2">
-                    <div>
-                      <p className="text-slate-400">Monto Base</p>
-                      <p className="font-bold text-slate-800 dark:text-white">S/ {parseFloat(selectedPapeleta.detalles?.[0]?.monto || selectedPapeleta.montoTotal).toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Descuento</p>
-                      <p className="font-bold text-emerald-600">S/ {parseFloat(selectedPapeleta.detalles?.[0]?.descuento || 0).toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Estado de Pago</p>
-                      <StatusBadge status={selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado} />
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Total</p>
-                      <p className="font-mono font-black text-base text-rose-600 dark:text-rose-400">S/ {selectedPapeleta.montoTotal.toFixed(2)}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Evidencia fotográfica</h4>
-                  <div className="text-xs">
-                    {loadingPapeletaFotos ? (
-                      <div className="flex animate-pulse gap-4 overflow-x-auto pb-2">
-                        {[1, 2, 3].map(i => (
-                          <div key={i} className="h-28 w-40 shrink-0 rounded-xl bg-slate-200 dark:bg-slate-800" />
-                        ))}
-                      </div>
-                    ) : selectedPapeletaFotos.length > 0 ? (
-                      <div className="flex gap-4 overflow-x-auto pb-3 custom-scrollbar">
-                        {selectedPapeletaFotos.map((foto) => (
-                          <button type="button" key={foto.id} onClick={() => setSelectedImage(foto.foto)} className="shrink-0 relative group block overflow-hidden rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-black/5 cursor-pointer">
-                            <img src={foto.foto} alt="Evidencia" className="h-32 w-48 object-cover transition-transform duration-300 group-hover:scale-105" />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center backdrop-blur-[0px] group-hover:backdrop-blur-[2px]">
-                              <Icon name="maximize" className="text-white opacity-0 group-hover:opacity-100 drop-shadow-lg size-8 transition-opacity duration-300" />
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-100/50 py-8 text-center dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-                        <Icon name="image-off" className="mx-auto mb-2 size-8 text-slate-400 opacity-50" />
-                        <p className="font-bold text-slate-500">Sin evidencia fotográfica</p>
-                        <p className="mt-1 text-[10px] text-slate-400">Esta papeleta no tiene fotos adjuntas</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Firma del conductor</h4>
-                  <div className="grid gap-3 text-xs sm:grid-cols-2">
-                    <div>
-                      <p className="text-slate-400">Estado</p>
-                      <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${selectedPapeleta.firmaConductorEstado === 'FIRMADO'
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
-                          : selectedPapeleta.firmaConductorEstado === 'SE_NEGO_A_FIRMAR'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
-                            : selectedPapeleta.firmaConductorEstado === 'NO_PRESENTE'
-                              ? 'bg-slate-200 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
-                              : 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
-                        }`}>
-                        <span className="size-2 rounded-full bg-current" />
-                        {selectedPapeleta.firmaConductorEstado || 'PENDIENTE'}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Fecha y hora de firma</p>
-                      <p className="font-bold text-slate-800 dark:text-white">
-                        {selectedPapeleta.firmaConductorFecha
-                          ? new Date(selectedPapeleta.firmaConductorFecha).toLocaleString()
-                          : 'Sin fecha registrada'}
-                      </p>
-                    </div>
-                    {selectedPapeleta.firmaConductorImg && (
-                      <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                        <p className="mb-2 text-slate-400">Firma registrada</p>
-                        <img
-                          src={selectedPapeleta.firmaConductorImg}
-                          alt="Firma del conductor"
-                          className="max-h-24 rounded-lg object-contain"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 mt-2 border-t border-slate-100 dark:border-[var(--border)]">
-                <button onClick={() => { setIsDetailModalOpen(false); handleOpenPreview(selectedPapeleta); }} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white cursor-pointer hover:bg-slate-800 transition">Imprimir Boleta</button>
-                <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-50 transition">Cerrar</button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {isDetailModalOpen && (
+        <PapeletaDetalleModal
+          selectedPapeleta={selectedPapeleta}
+          onClose={() => setIsDetailModalOpen(false)}
+          onImprimir={() => { setIsDetailModalOpen(false); handleOpenPreview(selectedPapeleta); }}
+          renderOrigen={renderOrigen}
+          loadingPapeletaFotos={loadingPapeletaFotos}
+          selectedPapeletaFotos={selectedPapeletaFotos}
+          onVerImagen={setSelectedImage}
+        />
       )}
 
       {reporteToConvert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <form onSubmit={handleConvertReporte} className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
-            <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-emerald-50 px-6 py-4 dark:border-[var(--border)] dark:bg-emerald-950/30">
-              <div>
-                <h3 className="text-lg font-black text-slate-900 dark:text-white">Generar papeleta desde reporte</h3>
-                <p className="text-xs font-bold text-slate-500">Revisa la evidencia y completa la infracción.</p>
-              </div>
-              <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-full p-2 text-slate-400 hover:bg-slate-200/50 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white transition-colors">✕</button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="rounded-2xl bg-slate-50 p-5 text-sm border border-slate-200 dark:bg-[var(--bg-subtle)] dark:border-[var(--border)] shadow-sm transition hover:shadow-md">
-                  <div className="mb-3 flex items-center gap-2 text-emerald-700 dark:text-emerald-400 border-b border-slate-200/50 pb-2 dark:border-slate-700/50">
-                    <Icon name="file-text" className="size-5" />
-                    <h4 className="font-black text-sm uppercase tracking-wider">Reporte #{reporteToConvert.id}</h4>
-                  </div>
-                  <div className="space-y-3">
-                    <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Placa Detectada</span><strong className="text-slate-800 dark:text-white text-base bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 shadow-sm">{reporteToConvert.placa_visual || 'SIN PLACA'}</strong></p>
-                    <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Lugar</span><span className="font-semibold text-slate-700 dark:text-slate-300 leading-snug">{reporteToConvert.lugar}</span></p>
-                    <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Observación del Inspector</span><span className="font-semibold text-rose-600 dark:text-rose-400 italic leading-snug">"{reporteToConvert.observaciones}"</span></p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-slate-50 p-5 text-sm border border-slate-200 dark:bg-[var(--bg-subtle)] dark:border-[var(--border)] shadow-sm transition hover:shadow-md">
-                  <div className="mb-3 flex items-center gap-2 text-sky-600 dark:text-sky-400 border-b border-slate-200/50 pb-2 dark:border-slate-700/50">
-                    <Icon name="info" className="size-5" />
-                    <h4 className="font-black text-sm uppercase tracking-wider">Base de Datos</h4>
-                  </div>
-                  <div className="space-y-3">
-                    <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Estado en Padrón</span><span className={`font-black text-[11px] px-2 py-1 rounded tracking-wide ${reporteToConvert.tipoInfractor === 'FORMAL' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50' : 'bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/50'}`}>{reporteToConvert.tipoInfractor}</span></p>
-                    {(reporteToConvert.vehiculo_marca || reporteToConvert.vehiculo_modelo || reporteToConvert.vehiculo_color) && (
-                      <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Características</span><span className="font-semibold text-slate-700 dark:text-slate-300">{[reporteToConvert.vehiculo_marca, reporteToConvert.vehiculo_modelo, reporteToConvert.vehiculo_color].filter(Boolean).join(' / ')}</span></p>
-                    )}
-                    {reporteToConvert.propietarioNombre && reporteToConvert.propietarioNombre !== 'No Registrado' && (
-                      <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Titular / Asociación</span><span className="font-semibold text-slate-700 dark:text-slate-300 leading-snug">{reporteToConvert.propietarioNombre} <br/><span className="text-xs text-slate-500 font-medium">({reporteToConvert.propietarioDni})</span></span></p>
-                    )}
-                    {reporteToConvert.conductorNombre && reporteToConvert.conductorNombre !== 'No identificado' && (
-                      <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Conductor Reportado</span><span className="font-semibold text-slate-700 dark:text-slate-300 leading-snug">{reporteToConvert.conductorNombre} <br/><span className="text-xs text-slate-500 font-medium">({reporteToConvert.conductorDni})</span></span></p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-slate-50 p-5 border border-slate-200 dark:bg-[var(--bg-subtle)] dark:border-[var(--border)] shadow-sm">
-                {reporteToConvert.loadingFotos ? (
-                  <div className="flex items-center gap-3 text-slate-400 py-2">
-                    <div className="size-5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600 dark:border-slate-700 dark:border-t-emerald-500"></div>
-                    <p className="text-xs font-black uppercase tracking-wider">Cargando evidencias fotográficas...</p>
-                  </div>
-                ) : reporteToConvert.fotos && reporteToConvert.fotos.length > 0 ? (
-                  <div>
-                    <div className="mb-3 flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                      <Icon name="camera" className="size-4" />
-                      <h4 className="font-black text-xs uppercase tracking-wider">Evidencias Fotográficas ({reporteToConvert.fotos.length})</h4>
-                    </div>
-                    <div className="flex gap-4 overflow-x-auto pb-3 custom-scrollbar">
-                      {reporteToConvert.fotos.map((foto) => (
-                        <button type="button" key={foto.id} onClick={() => setSelectedImage(foto.foto)} className="shrink-0 relative group block overflow-hidden rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-black/5 cursor-pointer">
-                          <img src={foto.foto} alt="Evidencia" className="h-32 w-48 object-cover transition-transform duration-300 group-hover:scale-105" />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center backdrop-blur-[0px] group-hover:backdrop-blur-[2px]">
-                            <Icon name="maximize" className="text-white opacity-0 group-hover:opacity-100 drop-shadow-lg size-8 transition-opacity duration-300" />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-slate-400 py-2">
-                    <Icon name="image-off" className="size-5" /> 
-                    <p className="text-xs font-black uppercase tracking-wider">No se adjuntaron fotos en la app móvil.</p>
-                  </div>
-                )}
-              </div>
-
-              <fieldset className="min-w-0 border border-slate-200 rounded-xl p-4 dark:border-[var(--border)]">
-                <legend className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-2 ml-2 bg-white dark:bg-[var(--bg-surface)]">Datos Generales</legend>
-                <div className="space-y-4">
-                  <label className="block space-y-1.5">
-                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Vehículo identificado</span>
-                    <select required value={convertForm.vehiculoId} onChange={(e) => setConvertForm({ ...convertForm, vehiculoId: e.target.value })} className="w-full min-w-0 overflow-hidden text-ellipsis rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)]">
-                      <option value="">Selecciona vehículo</option>
-                      {vehiculos.map((v) => (
-                        <option key={v.id} value={v.id}>{v.placa} — {v.marca || ''} {v.modelo || ''}</option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block space-y-1.5">
-                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">DNI del infractor/intervenido opcional</span>
-                    <input value={convertForm.conductorDni} onChange={(e) => setConvertForm({ ...convertForm, conductorDni: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="Vacío = CONDUCTOR NO PRESENTE" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)] dark:placeholder-slate-500" />
-                  </label>
-                </div>
-              </fieldset>
-
-              <fieldset className="min-w-0 border border-slate-200 rounded-xl p-4 dark:border-[var(--border)]">
-                <legend className="text-[11px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 px-2 ml-2 bg-white dark:bg-[var(--bg-surface)]">Infracciones y Observaciones</legend>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Infracciones a Aplicar</span>
-                    {convertForm.infraccionesIds.map((infId, idx) => (
-                      <div key={idx} className="flex gap-2">
-                        <select required value={infId} onChange={(e) => {
-                          const newIds = [...convertForm.infraccionesIds]
-                          newIds[idx] = e.target.value
-                          setConvertForm({ ...convertForm, infraccionesIds: newIds })
-                        }} className="flex-1 min-w-0 overflow-hidden text-ellipsis rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)]">
-                          <option value="">Selecciona infracción</option>
-                          {tiposInfraccion.map((tipo) => (
-                            <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion.length > 85 ? tipo.descripcion.substring(0, 85) + '...' : tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
-                          ))}
-                        </select>
-                        {convertForm.infraccionesIds.length > 1 && (
-                          <button type="button" onClick={() => {
-                            const newIds = [...convertForm.infraccionesIds]
-                            newIds.splice(idx, 1)
-                            setConvertForm({ ...convertForm, infraccionesIds: newIds })
-                          }} className="flex items-center justify-center rounded-xl bg-rose-100 px-3 py-2 text-rose-600 hover:bg-rose-200 font-bold transition dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60">
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => setConvertForm({ ...convertForm, infraccionesIds: [...convertForm.infraccionesIds, ''] })} className="text-xs font-black text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 mt-2 block">
-                      + Añadir otra infracción
-                    </button>
-                  </div>
-
-                  <label className="block space-y-1.5">
-                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Observación de autoridad</span>
-                    <textarea value={convertForm.observacionesAutoridad} onChange={(e) => setConvertForm({ ...convertForm, observacionesAutoridad: e.target.value })} rows={3} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)]" />
-                  </label>
-                </div>
-              </fieldset>
-            </div>
-            <div className="shrink-0 flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-5 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-              <button type="button" onClick={() => setReporteToConvert(null)} className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-[var(--bg-surface)] dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">Cancelar</button>
-              <button disabled={isProcessingAction} className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed">Generar papeleta legal</button>
-            </div>
-          </form>
-        </div>
+        <ConvertirReporteModal
+          reporteToConvert={reporteToConvert}
+          onClose={() => setReporteToConvert(null)}
+          onSubmit={handleConvertReporte}
+          vehiculos={vehiculos}
+          convertForm={convertForm}
+          setConvertForm={setConvertForm}
+          tiposInfraccion={tiposInfraccion}
+          isProcessingAction={isProcessingAction}
+          onVerImagen={setSelectedImage}
+        />
       )}
 
       {reporteToReject && (
@@ -1341,436 +1046,38 @@ export function Papeletas({ user }) {
       )}
 
       {isNuevaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
-          <form onSubmit={handleCrearPapeleta} className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                  <Icon name="ticket" className="size-4" />
-                </span>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Nueva Papeleta</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsNuevaModalOpen(false)}
-                title="Cerrar"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
-              <fieldset className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Vehículo</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FloatingInput
-                    id="nueva_placa"
-                    label="Placa"
-                    required
-                    inputClassName="font-mono uppercase"
-                    value={nuevaForm.vehiculoPlaca}
-                    onChange={(e) => setNuevaForm({ ...nuevaForm, vehiculoPlaca: e.target.value.toUpperCase() })}
-                  />
-                  <FloatingInput id="nueva_clase" label="Clase" optional value={nuevaForm.claseVehiculo} onChange={(e) => setNuevaForm({ ...nuevaForm, claseVehiculo: e.target.value })} />
-                  <FloatingInput id="nueva_marca" label="Marca" optional value={nuevaForm.marcaVehiculo} onChange={(e) => setNuevaForm({ ...nuevaForm, marcaVehiculo: e.target.value })} />
-                  <FloatingInput id="nueva_color" label="Color" optional value={nuevaForm.colorVehiculo} onChange={(e) => setNuevaForm({ ...nuevaForm, colorVehiculo: e.target.value })} />
-                </div>
-                <p className="mt-2 text-[10.5px] text-slate-400">Si la placa no está registrada, se creará automáticamente con estos datos.</p>
-              </fieldset>
-
-              <fieldset className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Conductor / Infractor</legend>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <FloatingInput
-                    id="nueva_dni"
-                    label="DNI"
-                    optional
-                    maxLength={11}
-                    inputClassName="font-mono"
-                    value={nuevaForm.conductorDni}
-                    onChange={(e) => setNuevaForm({ ...nuevaForm, conductorDni: e.target.value.replace(/\D/g, '') })}
-                  />
-                  <FloatingInput id="nueva_nombres" label="Nombres" optional value={nuevaForm.conductorNombres} onChange={(e) => setNuevaForm({ ...nuevaForm, conductorNombres: e.target.value })} />
-                  <FloatingInput id="nueva_apellidos" label="Apellidos" optional value={nuevaForm.conductorApellidos} onChange={(e) => setNuevaForm({ ...nuevaForm, conductorApellidos: e.target.value })} />
-                </div>
-                <p className="mt-2 text-[10.5px] text-slate-400">Vacío = CONDUCTOR NO PRESENTE.</p>
-              </fieldset>
-
-              <fieldset className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Infracción</legend>
-                <div className="space-y-4">
-                  <FloatingInput id="nueva_lugar" label="Lugar de la infracción" required value={nuevaForm.lugar} onChange={(e) => setNuevaForm({ ...nuevaForm, lugar: e.target.value })} />
-
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Infracciones a aplicar</span>
-                    {nuevaForm.infraccionesIds.map((infId, idx) => (
-                      <div key={idx} className="flex gap-2">
-                        <select
-                          required
-                          value={infId}
-                          onChange={(e) => {
-                            const newIds = [...nuevaForm.infraccionesIds]
-                            newIds[idx] = e.target.value
-                            setNuevaForm({ ...nuevaForm, infraccionesIds: newIds })
-                          }}
-                          className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                        >
-                          <option value="">Selecciona infracción</option>
-                          {tiposInfraccion.map((tipo) => (
-                            <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion.length > 85 ? tipo.descripcion.substring(0, 85) + '...' : tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
-                          ))}
-                        </select>
-                        {nuevaForm.infraccionesIds.length > 1 && (
-                          <button type="button" onClick={() => {
-                            const newIds = [...nuevaForm.infraccionesIds]
-                            newIds.splice(idx, 1)
-                            setNuevaForm({ ...nuevaForm, infraccionesIds: newIds })
-                          }} className="flex items-center justify-center rounded-xl bg-rose-100 px-3 py-2 text-rose-600 hover:bg-rose-200 font-bold transition dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60">
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => setNuevaForm({ ...nuevaForm, infraccionesIds: [...nuevaForm.infraccionesIds, ''] })} className="text-xs font-black text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 mt-1 block">
-                      + Añadir otra infracción
-                    </button>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1.5">Observación de autoridad</label>
-                    <textarea
-                      value={nuevaForm.observacionesAutoridad}
-                      onChange={(e) => setNuevaForm({ ...nuevaForm, observacionesAutoridad: e.target.value })}
-                      rows={3}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-                    />
-                  </div>
-                </div>
-              </fieldset>
-            </div>
-
-            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-[var(--border)]">
-              <button type="button" onClick={() => setIsNuevaModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">Cancelar</button>
-              <button disabled={creandoPapeleta} type="submit" className="rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-rose-600/25 hover:brightness-105 transition-all cursor-pointer disabled:opacity-60">
-                {creandoPapeleta ? 'Registrando...' : 'Registrar Papeleta'}
-              </button>
-            </div>
-          </form>
-        </div>
+        <NuevaPapeletaModal
+          nuevaForm={nuevaForm}
+          setNuevaForm={setNuevaForm}
+          tiposInfraccion={tiposInfraccion}
+          creandoPapeleta={creandoPapeleta}
+          onSubmit={handleCrearPapeleta}
+          onClose={() => setIsNuevaModalOpen(false)}
+        />
       )}
 
-      {isPagarModalOpen && papeletaToAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-emerald-500/30 dark:border-emerald-500/20">
-            <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50/80 px-6 py-4 dark:border-emerald-900/30 dark:bg-emerald-950/40">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-9 place-items-center rounded-xl bg-emerald-600 text-white font-black text-sm">
-                  <Icon name="creditCard" className="size-4.5" />
-                </span>
-                <div>
-                  <h3 className="font-extrabold text-slate-800 dark:text-white text-base">Registro de Pago de Papeleta</h3>
-                  <p className="text-xs font-mono text-emerald-700 dark:text-emerald-400">Papeleta: {papeletaToAction.numeroPapeleta}</p>
-                </div>
-              </div>
-              <button onClick={() => setIsPagarModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer">✕</button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="rounded-2xl bg-emerald-50/50 p-4 border border-emerald-200/60 dark:bg-emerald-950/20 dark:border-emerald-900/40 text-xs space-y-2">
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-500 dark:text-slate-400">Infractor:</span>
-                  <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.conductorNombre || papeletaToAction.infractor}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-500 dark:text-slate-400">Placa / Vehículo:</span>
-                  <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.vehiculoPlaca}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-500 dark:text-slate-400">Infracción:</span>
-                  <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.tipoInfraccionCodigo || 'G01'}</span>
-                </div>
-                <div className="border-t border-emerald-200 dark:border-emerald-800/60 pt-2 flex justify-between items-center">
-                  <span className="font-black text-slate-700 dark:text-slate-300 uppercase">Monto a Cancelar:</span>
-                  <span className="font-mono font-black text-xl text-emerald-600 dark:text-emerald-400">S/ {papeletaToAction.montoTotal.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <FloatingInput id="recibo_real" label="Recibo real" maxLength={50} value={numeroRecibo} onChange={e => setNumeroRecibo(e.target.value)} />
-                <FloatingInput id="fecha_pago" label="Fecha de pago" type="date" value={fechaPago} onChange={e => setFechaPago(e.target.value)} />
-              </div>
-              <FloatingSelect
-                id="metodo_pago"
-                label="Método de Pago"
-                value={metodoPago}
-                onChange={(e) => setMetodoPago(e.target.value)}
-                options={[
-                  { value: 'EFECTIVO', label: 'Efectivo en Caja Municipal' },
-                  { value: 'TRANSFERENCIA', label: 'Transferencia / Depósito Bancario' },
-                  { value: 'TARJETA', label: 'Tarjeta de Débito / Crédito' },
-                ]}
-              />
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsPagarModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmPagar}
-                  disabled={isProcessingAction || !numeroRecibo.trim() || !fechaPago}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2 text-xs font-black text-white shadow-md hover:from-emerald-700 hover:to-teal-700 transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
-                >
-                  <Icon name="payment" className="size-4" />
-                  <span>{isProcessingAction ? 'Procesando...' : 'Confirmar recibo'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {isPagarModalOpen && (
+        <PagoPapeletaModal
+          papeletaToAction={papeletaToAction}
+          onClose={() => setIsPagarModalOpen(false)}
+          numeroRecibo={numeroRecibo}
+          setNumeroRecibo={setNumeroRecibo}
+          fechaPago={fechaPago}
+          setFechaPago={setFechaPago}
+          metodoPago={metodoPago}
+          setMetodoPago={setMetodoPago}
+          isProcessingAction={isProcessingAction}
+          onConfirmar={handleConfirmPagar}
+        />
       )}
 
 
-      {isPreviewModalOpen && selectedPapeleta && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-enter print:static print:block print:p-0 print:bg-transparent">
-          <div className="absolute top-4 right-4 flex gap-3 print:hidden">
-            <button onClick={() => window.print()} className="rounded-xl bg-white px-5 py-2.5 text-xs font-extrabold text-rose-600 shadow-lg hover:bg-rose-50 cursor-pointer flex items-center gap-2">
-              <Icon name="print" className="size-4" /> Imprimir Ticket
-            </button>
-            <button onClick={() => setIsPreviewModalOpen(false)} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-extrabold text-white shadow-lg hover:bg-slate-800 cursor-pointer">
-              Cerrar
-            </button>
-          </div>
-
-          <div id="seccion-impresion-ticket" className="w-full max-w-[320px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl print:shadow-none print:max-w-full">
-            <div className="p-4 border border-slate-200 print:border-none print:p-0">
-              <div className="text-center mb-3">
-                <h2 className="text-sm font-black uppercase mb-1">MUNICIPALIDAD DISTRITAL</h2>
-                <h3 className="text-xs font-bold uppercase mb-1">José Leonardo Ortiz</h3>
-                <p className="text-[10px]">Subgerencia de Tránsito</p>
-                <p className="text-[10px]">RUC: 20141234567</p>
-              </div>
-
-              <div className="border-t-2 border-dashed border-black my-2"></div>
-
-              <div className="text-center mb-2">
-                <h3 className="font-black text-sm uppercase">BOLETA DE INFRACCIÓN</h3>
-                <p className="font-bold text-sm mt-0.5">{selectedPapeleta.numeroPapeleta}</p>
-              </div>
-
-              <div className="border-t-2 border-dashed border-black my-2"></div>
-
-              <div className="space-y-1 mb-2">
-                <div className="flex justify-between">
-                  <span className="font-bold">FECHA/HORA:</span>
-                  <span>{new Date(selectedPapeleta.fechaHora).toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="font-bold">LUGAR:</span>
-                  <p className="break-words">{selectedPapeleta.lugar}</p>
-                </div>
-              </div>
-
-              <div className="border-t-2 border-dashed border-black my-2"></div>
-
-              <div className="space-y-1 mb-2">
-                <span className="font-bold">INFRACCIONES:</span>
-                {selectedPapeleta.detalles?.length > 0 ? (
-                  selectedPapeleta.detalles.map((d, i) => (
-                    <div key={i} className="flex justify-between pl-2">
-                      <span>{d.codigo} ({d.gravedad || 'LEVE'})</span>
-                      <span>S/ {parseFloat(d.monto || selectedPapeleta.montoTotal).toFixed(2)}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex justify-between pl-2">
-                    <span>{selectedPapeleta.tipoInfraccionCodigo || 'N/A'}</span>
-                    <span>S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t-2 border-dashed border-black my-2"></div>
-
-              <div className="space-y-1 mb-2">
-                <div className="flex justify-between">
-                  <span className="font-bold">PLACA:</span>
-                  <span>{selectedPapeleta.vehiculoPlaca}</span>
-                </div>
-                <div>
-                  <span className="font-bold">INFRACTOR:</span>
-                  <p className="break-words uppercase">{selectedPapeleta.infractor}</p>
-                </div>
-                <div>
-                  <span className="font-bold">INSPECTOR:</span>
-                  <p className="break-words uppercase">
-                    {selectedPapeleta.inspector} {selectedPapeleta.inspectorCIP ? `(CIP: ${selectedPapeleta.inspectorCIP})` : ''}
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t-2 border-dashed border-black my-2"></div>
-
-              <div className="space-y-1 mb-2">
-                <div className="flex justify-between">
-                  <span>Monto Base:</span>
-                  <span>S/ {parseFloat(selectedPapeleta.detalles?.[0]?.monto || selectedPapeleta.montoTotal).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Descuento:</span>
-                  <span>- S/ {parseFloat(selectedPapeleta.detalles?.[0]?.descuento || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Gastos/Int:</span>
-                  <span>+ S/ 0.00</span>
-                </div>
-              </div>
-
-              <div className="border-t-2 border-dashed border-black my-2"></div>
-
-              <div className="flex justify-between items-center my-2">
-                <span className="font-black text-sm uppercase">Total a Pagar:</span>
-                <span className="font-black text-sm">S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
-              </div>
-
-              <div className="text-center mt-1">
-                <span className="text-[10px] uppercase block">Estado: {selectedPapeleta.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : selectedPapeleta.estado}</span>
-              </div>
-
-              {selectedPapeleta.firmaConductorImg && (
-                <>
-                  <div className="border-t-2 border-dashed border-black my-2"></div>
-                  <div className="text-center mt-2 flex flex-col items-center">
-                    <img src={selectedPapeleta.firmaConductorImg} alt="Firma Conductor" className="max-h-16 object-contain" />
-                    <span className="text-[10px] uppercase font-bold mt-1">Firma del Infractor</span>
-                  </div>
-                </>
-              )}
-
-              <div className="border-t-2 border-dashed border-black my-2"></div>
-
-              <div className="text-center mt-3 text-[9px] text-slate-800">
-                <p>Tiene 5 días hábiles para acceder</p>
-                <p>al descuento por pronto pago.</p>
-                <p className="mt-2 font-bold">Conserve este ticket</p>
-                <p>www.munijlo.gob.pe/transito</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {isPreviewModalOpen && (
+        <PreviewTicketModal selectedPapeleta={selectedPapeleta} onClose={() => setIsPreviewModalOpen(false)} />
       )}
 
       {selectedInfraccion && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter"
-          onClick={() => setSelectedInfraccion(null)}
-        >
-          <div
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-rose-100 bg-rose-50/80 px-5 py-4 dark:border-rose-950/60 dark:bg-rose-950/40">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-9 place-items-center rounded-xl bg-rose-600 text-white font-black text-sm shadow-sm shadow-rose-500/30">
-                  <Icon name="scale" className="size-4" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                    Detalle de Infracción
-                  </h3>
-                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    Reglamento de Tránsito Municipal
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedInfraccion(null)}
-                className="rounded-full p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-5 space-y-4">
-              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 border border-slate-100 dark:bg-slate-900/50 dark:border-[var(--border)]">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Código</span>
-                  <p className="text-2xl font-black font-mono text-rose-700 dark:text-rose-400">
-                    {selectedInfraccion.codigo}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Gravedad</span>
-                  <div className="mt-0.5">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black ${selectedInfraccion.gravedad === 'MUY GRAVE'
-                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-900'
-                        : selectedInfraccion.gravedad === 'GRAVE'
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-900'
-                          : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-900'
-                      }`}>
-                      {selectedInfraccion.gravedad}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                  Descripción
-                </h4>
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 text-xs font-medium leading-relaxed text-slate-800 dark:border-[var(--border)] dark:bg-slate-900/40 dark:text-slate-200">
-                  {selectedInfraccion.descripcion}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                {selectedInfraccion.monto > 0 && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Monto Multa</span>
-                    <p className="text-base font-black font-mono text-slate-900 dark:text-white">
-                      S/ {Number(selectedInfraccion.monto).toFixed(2)}
-                    </p>
-                  </div>
-                )}
-                {selectedInfraccion.porcentajeUit && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Sanción UIT</span>
-                    <p className="text-base font-black font-mono text-slate-900 dark:text-white">
-                      {selectedInfraccion.porcentajeUit}% UIT
-                    </p>
-                  </div>
-                )}
-                {selectedInfraccion.numeroPapeleta && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40 col-span-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Papeleta Asociada</span>
-                    <p className="text-xs font-bold font-mono text-rose-700 dark:text-rose-400">
-                      {selectedInfraccion.numeroPapeleta}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex justify-end border-t border-slate-100 bg-slate-50/50 p-4 dark:border-[var(--border)] dark:bg-slate-900/40">
-              <button
-                type="button"
-                onClick={() => setSelectedInfraccion(null)}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white transition cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <InfraccionDetalleModal selectedInfraccion={selectedInfraccion} onClose={() => setSelectedInfraccion(null)} />
       )}
 
       {selectedImage && (
