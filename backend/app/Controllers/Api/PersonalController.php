@@ -68,6 +68,60 @@ class PersonalController extends ResourceController
         return $this->respond(['data' => $rows]);
     }
 
+    private function getTrabajadorRow($id_persona)
+    {
+        $db = \Config\Database::connect();
+        $builder = $db->table('trabajadores pe')
+            ->select("
+                pe.id_persona as id,
+                pe.id_persona as id_persona,
+                COALESCE(td.nombre, 'DNI') as tipo_documento,
+                p.numero as numero_documento,
+                c.nombres,
+                c.apellido_paterno,
+                c.apellido_materno,
+                CONCAT(c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')) AS apellidos,
+                '' as email,
+                ca.nombre as cargo,
+                dof.id_unidad_organica,
+                uo.nombre as unidad_organica,
+                jo.nombre as jerarquia,
+                dof.tipo_funcion,
+                dof.solicitud,
+                dof.documento,
+                dof.fecha_documento,
+                dof.firma_documento,
+                dof.fecha_termino,
+                CASE WHEN ua.id IS NULL THEN 0 ELSE 1 END AS tiene_cuenta,
+                pe.estado
+            ", false)
+            ->join('personas p', 'p.id = pe.id_persona', 'inner')
+            ->join('ciudadanos c', 'c.id_persona = pe.id_persona', 'inner')
+            ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
+            ->join('desplazamiento_oficina dof', 'dof.id_trabajador = pe.id_persona AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
+            ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
+            ->join('unidades_organicas uo', 'uo.id = dof.id_unidad_organica', 'left')
+            ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
+            ->join('usuarios ua', "ua.id_persona = pe.id_persona AND ua.estado = 'ACTIVO'", 'left')
+            ->where('pe.id_persona', $id_persona);
+            
+        $row = $builder->get()->getRowArray();
+        
+        if ($row) {
+            $row['historial'] = $db->table('desplazamiento_oficina dof')
+                ->select('dof.solicitud, dof.documento, dof.fecha_documento, dof.firma_documento, dof.tipo_funcion, dof.fecha_created, dof.fecha_termino, ca.nombre as cargo, uo.nombre as unidad_organica, jo.nombre as jerarquia', false)
+                ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
+                ->join('unidades_organicas uo', 'uo.id = dof.id_unidad_organica', 'left')
+                ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
+                ->where('dof.id_trabajador', $row['id'])
+                ->orderBy('dof.fecha_created', 'DESC')
+                ->get()->getResultArray();
+        }
+
+        return $row;
+    }
+
+
     public function catalogos()
     {
         $db = \Config\Database::connect();
@@ -225,8 +279,8 @@ class PersonalController extends ResourceController
         }
 
         if (func_num_args() === 0) {
-            return $this->respondCreated(['data' => ['id' => $id] + $input]);
+            return $this->respondCreated(['data' => $this->getTrabajadorRow($id)]);
         }
-        return $this->respond(['data' => ['id' => $id] + $input]);
+        return $this->respond(['data' => $this->getTrabajadorRow($id)]);
     }
 }
