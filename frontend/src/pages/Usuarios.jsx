@@ -76,8 +76,7 @@ export function Usuarios({ user }) {
 
       if (!usersRes.ok) throw new Error('No se pudo cargar la lista de usuarios.')
       const usersData = await usersRes.json()
-      // Ocultar usuarios con rol TRABAJADOR de la plataforma web
-      const usersList = (usersData.data || []).filter(u => (u.rol || '').toUpperCase() !== 'TRABAJADOR')
+      const usersList = usersData.data || []
       setUsuarios(usersList)
       setCachedData('/usuarios', usersList)
 
@@ -89,8 +88,7 @@ export function Usuarios({ user }) {
       if (rolesRes.ok) {
         const rolesData = await rolesRes.json()
         const fetchedRoles = rolesData.data || []
-        // Ocultar TRABAJADOR de la plataforma web
-        setRoles(fetchedRoles.filter(r => r.nombre.toUpperCase() !== 'TRABAJADOR'))
+        setRoles(fetchedRoles)
       }
     } catch (err) {
       setLoadError(err.message || 'Error al conectar con la base de datos.')
