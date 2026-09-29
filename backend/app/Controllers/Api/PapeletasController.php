@@ -557,7 +557,7 @@ class PapeletasController extends ResourceController
 
         $duenoId = null;
         if (!$vehiculoId) {
-            $placaRegistro = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . random_int(1000, 9999);
+            $placaRegistro = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . strtoupper(substr(uniqid(), -6)) . random_int(10, 99);
             $db->table('vehiculos')->insert([
                 'placa' => $placaRegistro,
                 'id_tipo_vehiculo' => null,

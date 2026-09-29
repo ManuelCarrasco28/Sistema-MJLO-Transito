@@ -131,9 +131,9 @@ class ReportesIntervencionController extends ResourceController
         if ($observaciones === '') {
             return $this->failValidationErrors('Ingrese una observación del reporte.');
         }
-        if ($placa === '' && empty($fotos)) {
-            return $this->failValidationErrors('Si no hay placa, registre al menos una foto como evidencia.');
-        }
+        // if ($placa === '' && empty($fotos)) {
+        //     return $this->failValidationErrors('Si no hay placa, registre al menos una foto como evidencia.');
+        // }
 
         $inspector = $db->table('trabajadores')
             ->where('id_persona', $inspectorId)
@@ -162,7 +162,7 @@ class ReportesIntervencionController extends ResourceController
             if (!$vehiculoId) {
                 // No registramos el vehículo en la base de datos de vehículos formales
                 // Solo guardamos la placa en el texto del reporte.
-                $placa = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . random_int(1000, 9999);
+                $placa = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . strtoupper(substr(uniqid(), -6)) . random_int(10, 99);
                 
                 $obs_extra = "\n[DATOS REPORTADOS]";
                 $marca = trim((string)($input['marcaVehiculo'] ?? ''));
@@ -174,7 +174,7 @@ class ReportesIntervencionController extends ResourceController
                 $duenoNombres = trim((string)($input['nombres_dueño'] ?? ''));
                 $duenoApellidos = trim((string)($input['apellidos_dueño'] ?? ''));
                 if ($duenoDni !== '') {
-                    $obs_extra .= " Supuesto Dueño: $duenoNombres $duenoApellidos (DNI: $duenoDni).";
+                    $obs_extra .= " Supuesto Dueño: $duenoNombres $duenoApellidos (N° Doc: $duenoDni).";
                 }
                 
                 if ($obs_extra !== "\n[DATOS REPORTADOS]") {

@@ -299,7 +299,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'DNI: ${_vehicleData!['propietarioDni'] ?? '-'}',
+                          'N° Doc: ${_vehicleData!['propietarioDni'] ?? '-'}',
                           style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                         ),
                       ],

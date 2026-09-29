@@ -236,7 +236,8 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   }
 
   void _showError(String msg) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+    final cleanMsg = msg.replaceAll('Exception: ', '');
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(cleanMsg), backgroundColor: Colors.red));
   }
 
   @override
@@ -383,21 +384,6 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
                     ),
                   ),
-                  ] else ...[
-                    _buildSectionTitle('Reporte para administración'),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.amber.shade200),
-                      ),
-                      child: const Text(
-                        'El permiso móvil para aplicar papeletas está desactivado. Este registro será enviado como evidencia; administración decidirá si genera la papeleta.',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.brown),
-                      ),
-                    ),
                   ],
 
                   const SizedBox(height: 16),

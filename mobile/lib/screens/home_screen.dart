@@ -177,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     onPressed: () {
                       Navigator.pop(context);
-                      _showSearchDialog(context, 'DNI');
+                      _showSearchDialog(context, 'Documento');
                     },
                   ),
                 ),
@@ -222,6 +222,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             TextField(
               controller: controller,
+              maxLength: searchType == 'PLACA' ? 8 : 15,
               keyboardType: searchType == 'PLACA'
                   ? TextInputType.text
                   : TextInputType.number,
@@ -714,7 +715,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
         _buildActionCard(
           title: 'Escáner',
-          subtitle: 'Escaneo de código QR en\nDNI o placas.',
+          subtitle: 'Escaneo de código QR en\nDocumento o placas.',
           icon: Icons.qr_code_scanner,
           onTap: () {
             Navigator.push(
@@ -724,10 +725,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           },
         ),
         _buildActionCard(
-          title: 'Registrar veh. sin identificar',
+          title: 'Registrar Veh./Pers. sin ident.',
           subtitle: permitePapeleta
-              ? 'Registrar vehículo sin placa y generar infracción.'
-              : 'Registrar vehículo sin placa y generar reporte.',
+              ? 'Registrar vehículo o persona sin placa/doc y generar infracción.'
+              : 'Registrar vehículo o persona sin placa/doc y generar reporte.',
           icon: Icons.motorcycle,
           onTap: () {
             Navigator.push(

@@ -50,11 +50,7 @@ class OperativeHistoryScreen extends StatelessWidget {
                 
                 final placa = (data['vehiculoPlaca']?.toString() ?? data['placa_visual']?.toString() ?? '');
                 final isSinPlaca = placa.isEmpty || placa.startsWith('SIN-PLACA') || placa == 'SIN PLACA' || placa == 'Sin placa';
-                final isSinConductor = (data['conductorNombre'] == null || data['conductorNombre'] == 'No identificado' || data['conductorDni'] == 'S/D');
-                final isSinDueno = (data['propietarioNombre'] == null || data['propietarioNombre'] == 'No Registrado' || data['propietarioDni'] == 'S/D');
-                
-                final esSinIdentificar = isSinPlaca && isSinConductor && isSinDueno;
-                
+                final esSinIdentificar = isSinPlaca;
                 Color cardColor;
                 Color avatarBgColor;
                 IconData iconData;
@@ -136,12 +132,12 @@ class OperativeHistoryScreen extends StatelessWidget {
                   _buildFormattedObservaciones('Obs. Conductor:', data['observacionesConductor']),
                 const Divider(height: 24),
                 if (data['conductorNombre'] != null && data['conductorNombre'].toString().trim().isNotEmpty)
-                  _buildDetailRow('Conductor:', '${data['conductorNombre']}\nDNI: ${data['conductorDni'] ?? 'S/D'}')
+                  _buildDetailRow('Conductor:', '${data['conductorNombre']}\nN° Doc: ${data['conductorDni'] ?? 'S/D'}')
                 else
                   _buildDetailRow('Conductor:', 'No identificado'),
                 const SizedBox(height: 8),
                 if (data['propietarioNombre'] != null && data['propietarioNombre'].toString().trim().isNotEmpty)
-                  _buildDetailRow('Dueño:', '${data['propietarioNombre']}\nDNI: ${data['propietarioDni'] ?? 'S/D'}')
+                  _buildDetailRow('Dueño:', '${data['propietarioNombre']}\nN° Doc: ${data['propietarioDni'] ?? 'S/D'}')
                 else
                   _buildDetailRow('Dueño:', 'No identificado'),
                 const Divider(height: 24),

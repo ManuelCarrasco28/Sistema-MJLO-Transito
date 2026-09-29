@@ -58,7 +58,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   Future<void> _searchPersona(TextEditingController dniCtrl, TextEditingController nomCtrl, TextEditingController apeCtrl) async {
     final dni = dniCtrl.text.trim();
     if (dni.isEmpty) {
-      _showError('Ingrese un DNI para buscar');
+      _showError('Ingrese un documento para buscar');
       return;
     }
 
@@ -338,9 +338,10 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   }
 
   void _showError(String msg) {
+    final cleanMsg = msg.replaceAll('Exception: ', '');
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(cleanMsg), backgroundColor: Colors.red));
     }
   }
 
@@ -417,7 +418,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                   ),
                   if (!_conductorEsDueno) ...[
                     const SizedBox(height: 16),
-                    _buildTextField(_dniConductor, 'DNI del Conductor actual', Icons.badge, TextInputType.number, hasSearch: true, onSearch: () => _searchPersona(_dniConductor, _nombresConductor, _apellidosConductor)),
+                    _buildTextField(_dniConductor, 'N° Doc. del Conductor actual', Icons.badge, TextInputType.number, hasSearch: true, maxLength: 15, onSearch: () => _searchPersona(_dniConductor, _nombresConductor, _apellidosConductor)),
                     const SizedBox(height: 12),
                     _buildTextField(_nombresConductor, 'Nombres', Icons.person, TextInputType.name),
                     const SizedBox(height: 12),
@@ -510,21 +511,6 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
                     ),
                   ),
-                  ] else ...[
-                    _buildSectionTitle('Reporte para administración'),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.amber.shade200),
-                      ),
-                      child: const Text(
-                        'El permiso móvil para aplicar papeletas está desactivado. Este registro será enviado como evidencia; administración decidirá si genera la papeleta.',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.brown),
-                      ),
-                    ),
                   ],
 
                   const SizedBox(height: 24),
@@ -800,11 +786,12 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, TextInputType type, {bool hasSearch = false, VoidCallback? onSearch}) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, TextInputType type, {bool hasSearch = false, VoidCallback? onSearch, int? maxLength}) {
     return TextField(
       controller: controller,
       keyboardType: type,
       textCapitalization: TextCapitalization.characters,
+      maxLength: maxLength,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey.shade600),

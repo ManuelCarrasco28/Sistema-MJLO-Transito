@@ -24,6 +24,15 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
   final _colorController = TextEditingController();
   final _motorController = TextEditingController();
 
+  // Conductor y Propietario
+  bool _conductorEsDueno = false;
+  final _dniConductorController = TextEditingController();
+  final _nombresConductorController = TextEditingController();
+  final _apellidosConductorController = TextEditingController();
+  final _dniDuenoController = TextEditingController();
+  final _nombresDuenoController = TextEditingController();
+  final _apellidosDuenoController = TextEditingController();
+
   // GPS y Evidencias
   bool _isLoadingLocation = false;
   final List<XFile> _fotos = [];
@@ -64,6 +73,38 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
       }
     } catch (e) {
       _showError('Error al tomar la foto: $e');
+    }
+  }
+
+  Future<void> _searchPersona(
+    TextEditingController dniCtrl,
+    TextEditingController nomCtrl,
+    TextEditingController apeCtrl,
+  ) async {
+    final dni = dniCtrl.text.trim();
+    if (dni.isEmpty) {
+      _showError('Ingrese un documento para buscar');
+      return;
+    }
+    
+    // Muestra un loading si lo deseas, aquí por simplicidad lo obviaremos en el UI local 
+    // pero idealmente se usaría un _isSearching
+    try {
+      final persona = await ApiService.getPersonaByDni(dni);
+      if (persona != null) {
+        setState(() {
+          nomCtrl.text = persona['nombres'] ?? '';
+          apeCtrl.text = '${persona['apellidoPaterno'] ?? ''} ${persona['apellidoMaterno'] ?? ''}'.trim();
+        });
+      } else {
+        _showError('Documento no encontrado. Ingrese los datos manualmente.');
+        setState(() {
+          nomCtrl.text = '';
+          apeCtrl.text = '';
+        });
+      }
+    } catch (e) {
+      _showError('Error al buscar: $e');
     }
   }
 
@@ -167,13 +208,13 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
     }
     
     final Map<String, dynamic> reporteData = {
-      'dni_conductor': '',
-      'nombres_conductor': '',
-      'apellidos_conductor': '',
-      'conductor_es_dueno': false,
-      'dni_dueno': '',
-      'nombres_dueno': '',
-      'apellidos_dueno': '',
+      'dni_conductor': _dniConductorController.text.trim(),
+      'nombres_conductor': _nombresConductorController.text.trim(),
+      'apellidos_conductor': _apellidosConductorController.text.trim(),
+      'conductor_es_dueno': _conductorEsDueno,
+      'dni_dueño': _conductorEsDueno ? _dniConductorController.text.trim() : _dniDuenoController.text.trim(),
+      'nombres_dueño': _conductorEsDueno ? _nombresConductorController.text.trim() : _nombresDuenoController.text.trim(),
+      'apellidos_dueño': _conductorEsDueno ? _apellidosConductorController.text.trim() : _apellidosDuenoController.text.trim(),
       'estado_placa': 'SIN_PLACA',
       'placa': null,
       'chasis': null,
@@ -198,8 +239,9 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
 
 
   void _showError(String msg) {
+    final cleanMsg = msg.replaceAll('Exception: ', '');
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(cleanMsg), backgroundColor: Colors.red));
     }
   }
 
@@ -212,6 +254,12 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
     _lugarController.dispose();
     _coordenadasController.dispose();
     _observacionesController.dispose();
+    _dniConductorController.dispose();
+    _nombresConductorController.dispose();
+    _apellidosConductorController.dispose();
+    _dniDuenoController.dispose();
+    _nombresDuenoController.dispose();
+    _apellidosDuenoController.dispose();
     super.dispose();
   }
 
@@ -231,6 +279,58 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
           children: [
             const SizedBox(height: 24),
             
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8.0),
+              child: Text('Datos del Conductor', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+            ),
+            _buildTextField(
+              _dniConductorController, 
+              'N° de Documento del Conductor', 
+              Icons.badge, 
+              TextInputType.number, 
+              hasSearch: true, 
+              maxLength: 15,
+              onSearch: () => _searchPersona(_dniConductorController, _nombresConductorController, _apellidosConductorController)
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(_nombresConductorController, 'Nombres', Icons.person, TextInputType.name),
+            const SizedBox(height: 12),
+            _buildTextField(_apellidosConductorController, 'Apellidos', Icons.person_outline, TextInputType.name),
+
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(12)),
+              child: SwitchListTile(
+                title: const Text('El dueño está conduciendo', style: TextStyle(fontWeight: FontWeight.bold)),
+                value: _conductorEsDueno,
+                activeColor: Colors.orange.shade700,
+                onChanged: (val) => setState(() => _conductorEsDueno = val),
+              ),
+            ),
+            
+            if (!_conductorEsDueno) ...[
+              const SizedBox(height: 16),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8.0),
+                child: Text('Datos del Propietario', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+              ),
+              _buildTextField(
+                _dniDuenoController, 
+                'N° de Documento del Propietario', 
+                Icons.badge, 
+                TextInputType.number, 
+                hasSearch: true, 
+                maxLength: 15,
+                onSearch: () => _searchPersona(_dniDuenoController, _nombresDuenoController, _apellidosDuenoController)
+              ),
+              const SizedBox(height: 12),
+              _buildTextField(_nombresDuenoController, 'Nombres del Propietario', Icons.person, TextInputType.name),
+              const SizedBox(height: 12),
+              _buildTextField(_apellidosDuenoController, 'Apellidos del Propietario', Icons.person_outline, TextInputType.name),
+            ],
+
+            const SizedBox(height: 24),
             const Padding(
               padding: EdgeInsets.only(bottom: 8.0),
               child: Text('Características del Vehículo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
@@ -466,14 +566,38 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, TextInputType type) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon,
+    TextInputType type, {
+    bool hasSearch = false,
+    VoidCallback? onSearch,
+    int? maxLength,
+  }) {
     return TextField(
       controller: controller,
       keyboardType: type,
       textCapitalization: TextCapitalization.characters,
+      maxLength: maxLength,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey.shade600),
+        suffixIcon: hasSearch
+            ? Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: ElevatedButton(
+                  onPressed: onSearch,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: const Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              )
+            : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.white,

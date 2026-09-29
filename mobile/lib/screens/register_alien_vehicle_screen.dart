@@ -77,7 +77,7 @@ class _RegisterAlienVehicleScreenState
   ) async {
     final dni = dniCtrl.text.trim();
     if (dni.isEmpty) {
-      _showError('Ingrese un DNI para buscar');
+      _showError('Ingrese un documento para buscar');
       return;
     }
     setState(() => _isSearching = true);
@@ -91,7 +91,7 @@ class _RegisterAlienVehicleScreenState
                   .trim();
         });
       } else {
-        _showError('DNI no encontrado');
+        _showError('Documento no encontrado. Ingrese datos manualmente.');
         setState(() {
           nomCtrl.text = '';
           apeCtrl.text = '';
@@ -298,11 +298,12 @@ class _RegisterAlienVehicleScreenState
   }
 
   void _showError(String msg) {
+    final cleanMsg = msg.replaceAll('Exception: ', '');
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      ).showSnackBar(SnackBar(content: Text(cleanMsg), backgroundColor: Colors.red));
     }
   }
 
@@ -360,7 +361,7 @@ class _RegisterAlienVehicleScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'DNI: ${widget.conductor['numeroDocumento']}',
+                    'N° Doc: ${widget.conductor['numeroDocumento']}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
@@ -500,7 +501,7 @@ class _RegisterAlienVehicleScreenState
               const SizedBox(height: 12),
               _buildTextField(
                 _duenioDniController,
-                'DNI del Propietario',
+                'N° de Documento del Propietario',
                 Icons.badge,
                 TextInputType.number,
                 hasSearch: true,
@@ -970,7 +971,7 @@ class _RegisterAlienVehicleScreenState
             ),
             const SizedBox(height: 4),
             Text(
-              'DNI/RUC: ${_duenioDniController.text.isNotEmpty ? _duenioDniController.text : "N/A"}',
+              'N° Doc/RUC: ${_duenioDniController.text.isNotEmpty ? _duenioDniController.text : "N/A"}',
               style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
 
