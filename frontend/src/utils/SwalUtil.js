@@ -22,7 +22,13 @@ export const showToast = (title, icon = 'success', timer = 2800) => {
     });
 };
 
-export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelText = 'Cancelar') => {
+/**
+ * options.confirmColor / options.cancelColor: color sólido (ej. un valor
+ * oklch(...)) para aplicar como estilo inline al botón, sin tocar el estilo
+ * por defecto (bg-rose-600 con sombra) que usan los demás módulos.
+ */
+export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelText = 'Cancelar', options = {}) => {
+    const { confirmColor, cancelColor } = options;
     return Swal.fire({
         title: title,
         text: text,
@@ -37,9 +43,23 @@ export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelT
             title: 'text-xl font-black text-slate-800 dark:text-white mt-2',
             htmlContainer: 'text-sm font-medium text-slate-500 dark:text-slate-400 mt-2',
             actions: 'flex gap-3 w-full justify-center mt-6',
-            confirmButton: 'rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-rose-600/20 transition-all hover:bg-rose-700 hover:scale-[1.02] active:scale-95',
-            cancelButton: 'rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-6 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 shadow-sm transition-all hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95',
+            confirmButton: confirmColor
+                ? 'rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95'
+                : 'rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-rose-600/20 transition-all hover:bg-rose-700 hover:scale-[1.02] active:scale-95',
+            cancelButton: cancelColor
+                ? 'rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95'
+                : 'rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-6 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 shadow-sm transition-all hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95',
             icon: 'border-rose-500 text-rose-500',
+        },
+        didOpen: (popup) => {
+            if (confirmColor) {
+                const btn = popup.querySelector('.swal2-confirm');
+                if (btn) btn.style.backgroundColor = confirmColor;
+            }
+            if (cancelColor) {
+                const btn = popup.querySelector('.swal2-cancel');
+                if (btn) btn.style.backgroundColor = cancelColor;
+            }
         }
     });
 };

@@ -46,9 +46,9 @@ export function VehiculoDetalleModal({
             type="button"
             onClick={onClose}
             title="Cerrar ficha"
-            className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+            className="group grid size-8 shrink-0 place-items-center rounded-xl border border-slate-200/80 bg-slate-100/70 text-slate-400 hover:bg-[oklch(71.2%_0.194_13.428)] hover:border-[oklch(71.2%_0.194_13.428)] hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 transition-all duration-200 active:scale-95 cursor-pointer"
           >
-            <Icon name="close" className="size-5" />
+            <Icon name="close" className="size-4 transition-transform duration-200 group-hover:rotate-90" />
           </button>
         </div>
 
@@ -168,8 +168,8 @@ export function VehiculoDetalleModal({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
-              <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Partida Registral SUNARP</p>
-              <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.partidaRegistral || 'N/A'}</p>
+              <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Serie del Motor</p>
+              <p className="mt-1 font-mono font-bold text-slate-700 dark:text-slate-200">{selectedVehiculo.serieMotor || selectedVehiculo.numeroMotor || 'N/A'}</p>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950 lg:col-span-2">
@@ -288,7 +288,8 @@ export function VehiculoDetalleModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg bg-slate-900 px-6 py-2.5 text-xs font-extrabold text-white transition-all hover:bg-slate-800 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 cursor-pointer"
+              className="rounded-xl px-6 py-2.5 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
+              style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
             >
               Cerrar Ficha
             </button>

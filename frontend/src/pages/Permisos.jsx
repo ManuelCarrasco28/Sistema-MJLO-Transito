@@ -54,7 +54,8 @@ export function Permisos() {
       '¿Eliminar autorización?',
       '¿Está seguro de eliminar esta autorización municipal? Esta acción no se puede deshacer.',
       'Sí, eliminar',
-      'Cancelar'
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (!result.isConfirmed) return
     try {
@@ -495,7 +496,8 @@ export function Permisos() {
                 <button
                   type="button"
                   onClick={handleOpenCreate}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-amber-500/30 active:scale-95 cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                 >
                   <span className="text-base leading-none font-black">+</span>
                   <span>Nueva autorización</span>

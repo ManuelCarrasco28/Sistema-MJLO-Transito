@@ -604,7 +604,8 @@ export function TramiteFormularioModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+              className="rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 transition cursor-pointer"
+              style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
             >
               Cancelar
             </button>
@@ -614,7 +615,8 @@ export function TramiteFormularioModal({
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-[var(--border-strong)] bg-slate-100 dark:bg-[var(--bg-subtle)] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer disabled:opacity-50"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 transition cursor-pointer disabled:opacity-50"
+                style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                 title="Guardar directamente con la plantilla predeterminada"
               >
                 <span>Guardar directamente</span>

@@ -270,7 +270,8 @@ export function Trabajadores() {
       '¿Desactivar trabajador?',
       '¿Está seguro de desactivar/eliminar a este trabajador?',
       'Sí, desactivar',
-      'Cancelar'
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (result.isConfirmed) {
       try {
@@ -449,7 +450,8 @@ export function Trabajadores() {
             <button
               type="button"
               onClick={() => openForm(emptyForm)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+              style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Registrar trabajador</span>
@@ -810,11 +812,22 @@ export function Trabajadores() {
             </div>
 
               {/* Footer Modal */}
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3 dark:border-[var(--border)] dark:bg-slate-900/80 rounded-b-3xl">
-                <button type="button" disabled={saving} onClick={() => setForm(null)} className="rounded-xl border border-slate-200/80 bg-white px-5 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-slate-700 shadow-xs cursor-pointer">
+              <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-[var(--border)] dark:bg-slate-900/80 rounded-b-3xl">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setForm(null)}
+                  className="rounded-xl px-5 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
+                  style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
+                >
                   Cancelar
                 </button>
-                <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-6 py-2 text-xs font-extrabold text-white shadow-md shadow-slate-900/20 transition-all hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white dark:shadow-slate-50/20">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl px-6 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
+                >
                   {saving ? 'Guardando...' : 'Guardar trabajador'}
                 </button>
               </div>

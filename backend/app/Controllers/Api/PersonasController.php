@@ -95,16 +95,14 @@ class PersonasController extends ResourceController
                 'errors' => ['required' => 'La dirección es requerida.']
             ],
             'email' => [
-                'rules' => 'required|valid_email',
+                'rules' => 'permit_empty|valid_email',
                 'errors' => [
-                    'required' => 'El correo electrónico es requerido.',
                     'valid_email' => 'Por favor ingresa un correo electrónico válido.'
                 ]
             ],
             'celular' => [
-                'rules' => 'required|numeric|exact_length[9]',
+                'rules' => 'permit_empty|numeric|exact_length[9]',
                 'errors' => [
-                    'required' => 'El número de celular es requerido.',
                     'numeric' => 'El número de celular debe contener solo números.',
                     'exact_length' => 'El número de celular debe tener exactamente 9 dígitos.'
                 ]

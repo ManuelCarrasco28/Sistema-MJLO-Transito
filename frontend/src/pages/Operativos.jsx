@@ -238,7 +238,8 @@ export function Operativos({ user }) {
       '¿Eliminar operativo?',
       'Solo se eliminará si no tiene papeletas vinculadas.',
       'Sí, eliminar',
-      'Cancelar'
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (!result.isConfirmed) return
     const response = await apiFetch(`/operativos/${id}`, { method: 'DELETE' })
@@ -533,7 +534,7 @@ export function Operativos({ user }) {
               <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" /><span>PDF</span>
             </button>
             
-            <button onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-purple-800 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md hover:brightness-105 transition-all">
+            <button onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
               <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
             </button>
           </div>
@@ -600,7 +601,9 @@ export function Operativos({ user }) {
           <form onSubmit={save} className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-[var(--bg-surface)]">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-black">{editing ? 'Editar operativo' : 'Nuevo operativo'}</h2>
-              <button type="button" onClick={() => setModalOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">✕</button>
+              <button type="button" onClick={() => setModalOpen(false)} title="Cerrar" className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs">
+                <Icon name="close" className="size-5" />
+              </button>
             </div>
             
             <fieldset className="mb-5 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
@@ -650,8 +653,8 @@ export function Operativos({ user }) {
             </fieldset>
 
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold">Cancelar</button>
-              <button disabled={saving} className="rounded-xl bg-purple-600 px-5 py-2 text-sm font-black text-white disabled:opacity-60">{saving ? 'Guardando...' : 'Guardar operativo'}</button>
+              <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl px-4 py-2 text-sm font-bold text-white hover:opacity-90" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
+              <button disabled={saving} className="rounded-xl px-5 py-2 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>{saving ? 'Guardando...' : 'Guardar operativo'}</button>
             </div>
           </form>
         </div>

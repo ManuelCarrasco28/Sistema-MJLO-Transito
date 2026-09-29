@@ -29,7 +29,7 @@ class InspeccionesController extends ResourceController
 
             return $this->respond(['data' => $data]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error consultando criterios de inspección: ' . $e->getMessage());
+            return $this->failServerError('Error consultando criterios de inspección.');
         }
     }
 
@@ -81,7 +81,7 @@ class InspeccionesController extends ResourceController
 
             return $this->respond(['status' => 200, 'data' => $row]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error consultando CertiCAV: ' . $e->getMessage());
+            return $this->failServerError('Error consultando CertiCAV.');
         }
     }
 
@@ -123,7 +123,7 @@ class InspeccionesController extends ResourceController
 
             return $this->respond(['data' => $data]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error consultando inspecciones: ' . $e->getMessage());
+            return $this->failServerError('Error consultando inspecciones.');
         }
     }
 
@@ -298,7 +298,7 @@ class InspeccionesController extends ResourceController
             return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
             $db->transRollback();
-            return $this->failServerError('Error creando la inspección: ' . $e->getMessage());
+            return $this->failServerError('Error creando la inspección.');
         }
     }
 
@@ -425,7 +425,7 @@ class InspeccionesController extends ResourceController
             return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
             $db->transRollback();
-            return $this->failServerError('Error actualizando la inspección: ' . $e->getMessage());
+            return $this->failServerError('Error actualizando la inspección.');
         }
     }
 
@@ -441,7 +441,7 @@ class InspeccionesController extends ResourceController
             $db->table('certicav')->where('id', $id)->update(['estado' => 'ANULADA']);
             return $this->respondDeleted(['status' => 200, 'message' => 'Inspección técnica anulada con éxito']);
         } catch (\Exception $e) {
-            return $this->failServerError('Error anulando inspección técnica: ' . $e->getMessage());
+            return $this->failServerError('Error anulando inspección técnica.');
         }
     }
 

@@ -55,6 +55,70 @@ export function FloatingInput({
   )
 }
 
+export function FloatingTextarea({
+  id,
+  label,
+  value,
+  onChange,
+  required = false,
+  maxLength,
+  optional = false,
+  rows = 1,
+  className = '',
+  textareaClassName = '',
+  ...props
+}) {
+  const [isFocused, setIsFocused] = useState(false)
+  const textareaRef = useRef(null)
+
+  const isFloating = isFocused || (value !== undefined && value !== null && String(value).trim() !== '')
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${Math.max(42, textareaRef.current.scrollHeight)}px`
+    }
+  }, [value])
+
+  return (
+    <div className={`relative ${className}`}>
+      <textarea
+        ref={textareaRef}
+        id={id}
+        required={required}
+        maxLength={maxLength}
+        rows={rows}
+        value={value ?? ''}
+        onChange={(e) => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height = `${Math.max(42, textareaRef.current.scrollHeight)}px`
+          }
+          onChange?.(e)
+        }}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        placeholder=" "
+        className={`peer block w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400 resize-none min-h-[42px] overflow-hidden ${textareaClassName}`}
+        {...props}
+      />
+      <label
+        htmlFor={id}
+        className={`pointer-events-none absolute left-3 select-none transition-all duration-150 ${
+          isFloating
+            ? 'top-1 text-[9.5px] font-bold text-slate-500 dark:text-slate-400'
+            : 'top-3 text-xs font-medium text-slate-400 dark:text-slate-500'
+        } ${isFocused ? '!text-blue-600 dark:!text-blue-400' : ''}`}
+      >
+        {label}
+        {optional && (
+          <span className="ml-1 text-[9px] font-normal text-slate-400 dark:text-slate-500">(Opcional)</span>
+        )}
+      </label>
+    </div>
+  )
+}
+
 export function FloatingSelect({
   id,
   label,

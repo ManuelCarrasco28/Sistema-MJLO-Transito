@@ -57,8 +57,9 @@ class PideController extends ResourceController
             CURLOPT_URL => "https://pide.munijlo.gob.pe/api/v1/services/reniec/dni/" . $dni,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => "",
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 8,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => "GET",
             CURLOPT_SSL_VERIFYPEER => $sslVerify,
@@ -75,7 +76,7 @@ class PideController extends ResourceController
         curl_close($curl);
 
         if ($response === false || !empty($curlError)) {
-            return $this->failServerError("Error de conexion con MTC/PIDE: " . $curlError);
+            return $this->failServerError("El servicio de consulta RENIEC no responde en este momento. Ingrese los datos manualmente.");
         }
 
         return $this->response->setStatusCode($httpCode)->setJSON(json_decode($response));
@@ -117,8 +118,9 @@ class PideController extends ResourceController
             CURLOPT_URL => "https://pide.munijlo.gob.pe/api/v1/services/sunarp/placa",
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => "",
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 8,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => "POST",
             CURLOPT_POSTFIELDS => json_encode($data),
@@ -137,7 +139,7 @@ class PideController extends ResourceController
         curl_close($curl);
 
         if ($response === false || !empty($curlError)) {
-            return $this->failServerError("Error de conexion con MTC/PIDE: " . $curlError);
+            return $this->failServerError("El servicio de consulta SUNARP no responde en este momento. Ingrese los datos manualmente.");
         }
 
         return $this->response->setStatusCode($httpCode)->setJSON(json_decode($response));

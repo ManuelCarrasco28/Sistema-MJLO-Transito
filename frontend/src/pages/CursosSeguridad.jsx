@@ -116,7 +116,8 @@ export function CursosSeguridad() {
       '¿Eliminar curso?',
       '¿Estás seguro de eliminar este curso? Esta acción no se puede deshacer.',
       'Sí, eliminar',
-      'Cancelar'
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (result.isConfirmed) {
       try {
@@ -487,7 +488,7 @@ export function CursosSeguridad() {
               <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" /><span>PDF</span>
             </button>
             
-            <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap">
+            <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 whitespace-nowrap hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
               <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
             </button>
           </div>
@@ -788,8 +789,8 @@ export function CursosSeguridad() {
               </fieldset>
             </div>
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-7 py-4 dark:border-[var(--border)]">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">Cancelar</button>
-                <button type="submit" className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-amber-500/25 hover:brightness-105 transition-all cursor-pointer">Guardar Curso</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 cursor-pointer" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
+                <button type="submit" className="rounded-xl px-5 py-2 text-xs font-bold text-white hover:opacity-90 transition-all cursor-pointer" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>Guardar Curso</button>
               </div>
             </form>
           </div>

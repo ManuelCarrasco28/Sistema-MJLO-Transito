@@ -141,10 +141,12 @@ class PapeletasController extends ResourceController
                 ->get()
                 ->getResultArray();
 
+            $fileStorage = new \App\Services\FileStorageService();
             $data = [];
             foreach ($rows as $row) {
                 $row['id'] = (int)$row['id'];
                 $row['montoTotal'] = (float)$row['montoTotal'];
+                $row['firmaConductorImg'] = $fileStorage->urlPublica($row['firmaConductorImg']);
                 
                 $isFormal = !empty($row['vehiculoAsociacionId']);
                 $row['tipoInfractor'] = $isFormal ? 'FORMAL' : 'INFORMAL';
@@ -319,16 +321,17 @@ class PapeletasController extends ResourceController
             if (!empty($fotos) && is_array($fotos)) {
                 // Máximo 5 fotos por papeleta y límite de tamaño (~7MB base64 ~= 5MB binario)
                 $fotos = array_slice($fotos, 0, 5);
+                $fileStorage = new \App\Services\FileStorageService();
                 foreach ($fotos as $foto) {
                     $fotoStr = trim((string)$foto);
                     if ($fotoStr !== '' && strlen($fotoStr) <= 7 * 1024 * 1024) {
-                        if (!str_starts_with($fotoStr, 'data:image/')) {
-                            $fotoStr = 'data:image/jpeg;base64,' . $fotoStr;
+                        $ruta = $fileStorage->guardarImagenBase64($fotoStr, 'papeletas');
+                        if ($ruta !== null) {
+                            $db->table('papeleta_fotos')->insert([
+                                'id_papeleta' => $papeletaId,
+                                'foto' => $ruta,
+                            ]);
                         }
-                        $db->table('papeleta_fotos')->insert([
-                            'id_papeleta' => $papeletaId,
-                            'foto' => $fotoStr,
-                        ]);
                     }
                 }
             }
@@ -447,10 +450,7 @@ class PapeletasController extends ResourceController
 
             $firmaImg = null;
             if ($firmaBase64 !== '') {
-                if (!str_starts_with($firmaBase64, 'data:image/')) {
-                    $firmaBase64 = 'data:image/png;base64,' . $firmaBase64;
-                }
-                $firmaImg = $firmaBase64;
+                $firmaImg = (new \App\Services\FileStorageService())->guardarImagenBase64($firmaBase64, 'firmas');
             }
 
             $update = [
@@ -466,7 +466,7 @@ class PapeletasController extends ResourceController
                 'status' => 200,
                 'message' => 'Firma del conductor registrada correctamente',
                 'data' => [
-                    'firmaConductorImg' => $update['firma_conductor_img'],
+                    'firmaConductorImg' => (new \App\Services\FileStorageService())->urlPublica($update['firma_conductor_img']),
                     'firmaConductorFecha' => $update['firma_conductor_fecha'],
                     'firmaConductorEstado' => $update['firma_conductor_estado'],
                     'firmaConductorObservacion' => $update['firma_conductor_observacion'],
@@ -495,6 +495,11 @@ class PapeletasController extends ResourceController
                 ->getResultArray();
 
             $fotos = array_merge($fotosReporte, $fotosPapeleta);
+            $fileStorage = new \App\Services\FileStorageService();
+            foreach ($fotos as &$foto) {
+                $foto['foto'] = $fileStorage->urlPublica($foto['foto']);
+            }
+            unset($foto);
 
             return $this->respond(['data' => $fotos]);
         } catch (\Exception $e) {

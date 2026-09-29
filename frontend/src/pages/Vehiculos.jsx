@@ -87,6 +87,7 @@ export function Vehiculos({ user }) {
   })
 
   const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false)
+  const [isSearchingReniecPersona, setIsSearchingReniecPersona] = useState(false)
   const initialPersonaForm = {
     tipoDocumento: 'DNI',
     numeroDocumento: '',
@@ -158,29 +159,42 @@ export function Vehiculos({ user }) {
   const handleReniecSearchPersona = async (explicitDni) => {
     const dni = typeof explicitDni === 'string' ? explicitDni : personaFormData.numeroDocumento?.trim()
     if (!dni || dni.length !== 8 || !/^\d{8}$/.test(dni)) {
-      showError('DNI Inválido', 'El número de DNI debe tener exactamente 8 dígitos.')
+      showError('DNI Inválido', 'El número de DNI debe tener exactamente 8 dígitos numéricos.')
       return
     }
 
+    setIsSearchingReniecPersona(true)
     try {
       const response = await apiFetch(`/pide/reniec/${dni}`)
-      if (!response.ok) throw new Error('No se pudo encontrar la información del DNI en RENIEC.')
-      const { data } = await response.json()
+      if (!response.ok) {
+        let errorMsg = 'El servicio de consulta no responde en este momento. Ingrese los datos manualmente.'
+        try {
+          const errData = await response.json()
+          errorMsg = errData.messages?.error || errData.message || errorMsg
+        } catch (_) {}
+        throw new Error(errorMsg)
+      }
+      const res = await response.json()
+      const data = res.data || (res.nombres ? res : null)
       if (data) {
         setPersonaFormData((prev) => ({
           ...prev,
           numeroDocumento: dni,
           nombres: data.nombres || prev.nombres,
-          apellidoPaterno: data.apellidoPaterno || prev.apellidoPaterno,
-          apellidoMaterno: data.apellidoMaterno || prev.apellidoMaterno,
+          apellidoPaterno: data.apellidoPaterno || data.apellido_paterno || prev.apellidoPaterno,
+          apellidoMaterno: data.apellidoMaterno || data.apellido_materno || prev.apellidoMaterno,
           direccion: data.direccion || prev.direccion,
-          estadoCivil: data.estadoCivil || prev.estadoCivil,
-          fotoImg: data.foto_url || prev.fotoImg,
-          fotoUrl: data.foto_url || prev.fotoUrl,
+          estadoCivil: data.estadoCivil || data.estado_civil || prev.estadoCivil,
+          fotoImg: data.foto_url || data.foto || prev.fotoImg,
+          fotoUrl: data.foto_url || data.foto || prev.fotoUrl,
         }))
+      } else {
+        throw new Error('No se encontraron datos para el documento ingresado.')
       }
     } catch (err) {
-      showError('Error', err.message || 'No se pudo consultar RENIEC.')
+      showError('Consulta de Documento', err.message || 'No se pudo consultar el documento.')
+    } finally {
+      setIsSearchingReniecPersona(false)
     }
   }
 
@@ -238,11 +252,9 @@ export function Vehiculos({ user }) {
       !personaFormData.apellidoPaterno.trim() ||
       !personaFormData.apellidoMaterno.trim() ||
       !personaFormData.numeroLicencia.trim() ||
-      !personaFormData.celular.trim() ||
-      !personaFormData.direccion.trim() ||
-      !personaFormData.email.trim()
+      !personaFormData.direccion.trim()
     ) {
-      showError('Validación Fallida', 'Por favor completa todos los campos requeridos (Documento, Nombres, Apellidos, Licencia, Celular, Dirección y Email).')
+      showError('Validación Fallida', 'Por favor completa todos los campos requeridos (Documento, Nombres, Apellidos, Licencia y Dirección).')
       return
     }
     const isDni = personaFormData.tipoDocumento === 'DNI' || personaFormData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD'
@@ -254,11 +266,11 @@ export function Vehiculos({ user }) {
       showError('Documento Inválido', 'El número de documento debe tener entre 8 y 15 caracteres.')
       return
     }
-    if (personaFormData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personaFormData.email)) {
+    if (personaFormData.email && personaFormData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personaFormData.email.trim())) {
       showError('Validación Fallida', 'Por favor ingresa un correo electrónico válido.')
       return
     }
-    if (personaFormData.celular && !/^\d{9}$/.test(personaFormData.celular)) {
+    if (personaFormData.celular && personaFormData.celular.trim() && !/^\d{9}$/.test(personaFormData.celular.trim())) {
       showError('Validación Fallida', 'El número de celular debe tener exactamente 9 dígitos numéricos.')
       return
     }
@@ -340,7 +352,7 @@ export function Vehiculos({ user }) {
       })
 
       if (!response.ok) {
-        let errorMsg = 'No se pudo consultar el servicio vehicular SUNARP.'
+        let errorMsg = 'No se pudo consultar la información del vehículo.'
         try {
           const errData = await response.json()
           errorMsg = errData.messages?.error || errData.message || errorMsg
@@ -352,7 +364,7 @@ export function Vehiculos({ user }) {
       const sunarpData = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
 
       if (!sunarpData) {
-        throw new Error(res.message || 'No se encontraron registros en SUNARP para la placa ingresada.')
+        throw new Error(res.message || 'No se encontraron registros para la placa ingresada.')
       }
 
       const foundInPadron = vehiculos.find(v => (v.placa || '').toUpperCase() === plate)
@@ -425,18 +437,17 @@ export function Vehiculos({ user }) {
 
   const [formData, setFormData] = useState({
     placa: '',
-    tipo: 'Mototaxi (Trimovil)',
+    tipo: '',
     marca: '',
     modelo: '',
     color: '',
-    anio: new Date().getFullYear(),
+    anio: '',
     categoria: '',
     carroceria: '',
     sedeRegistro: '',
     tipoCarroceria: '',
     numeroSerie: '',
     serieMotor: '',
-    partidaRegistral: '',
     asociacion: '',
     propietario: '',
     propietarioDni: '',
@@ -546,22 +557,22 @@ export function Vehiculos({ user }) {
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.messages?.error || errData.message || 'No se pudo consultar el servicio vehicular SUNARP.')
+        throw new Error(errData.messages?.error || errData.message || 'No se pudo consultar la información del vehículo.')
       }
 
       const res = await response.json()
       const sunarpData = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
       if (!sunarpData) {
-        throw new Error(res.message || 'No se encontraron registros en SUNARP para la placa ingresada.')
+        throw new Error(res.message || 'No se encontraron registros para la placa ingresada.')
       }
 
       const cat = (sunarpData.categoria || '').toUpperCase().trim()
       const carr = (sunarpData.carroceria || '').toUpperCase().trim()
       let inferredTipo = formData.tipo
       if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) inferredTipo = 'Moto Lineal'
-      else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredTipo = 'Mototaxi (Trimovil)'
-      else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV')) inferredTipo = 'Automóvil (Sedán/Hatchback)'
-      else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS')) inferredTipo = 'Camioneta Rural (Combi)'
+      else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredTipo = 'Mototaxi'
+      else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV')) inferredTipo = 'Automóvil'
+      else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS')) inferredTipo = 'Camioneta Rural'
 
       const rawProps = Array.isArray(sunarpData.propietarios) ? sunarpData.propietarios : []
       const mappedProps = rawProps.map((p, idx) => {
@@ -621,7 +632,7 @@ export function Vehiculos({ user }) {
         }
       }
       if (!detectedModalAnio || detectedModalAnio < 1900 || detectedModalAnio > 2100) {
-        detectedModalAnio = formData.anio || new Date().getFullYear()
+        detectedModalAnio = ''
       }
 
       setFormData((prev) => ({
@@ -641,7 +652,7 @@ export function Vehiculos({ user }) {
         partidaRegistral: sunarpData.partida || sunarpData.partida_registral || prev.partidaRegistral,
       }))
     } catch (err) {
-      showError('Error de consulta', sanitizarMensaje(err.message, 'No se pudo consultar SUNARP.'))
+      showError('Error de consulta', sanitizarMensaje(err.message, 'No se pudo consultar la información del vehículo.'))
     } finally {
       setIsBuscandoSunarpModal(false)
     }
@@ -668,7 +679,8 @@ export function Vehiculos({ user }) {
       (v.asociacion && v.asociacion.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (v.propietarioDni && v.propietarioDni.includes(searchTerm))
 
-    const matchesTipo = filterTipo === 'TODOS' || v.tipo === filterTipo
+    const cleanTipo = (t) => String(t || '').replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase()
+    const matchesTipo = filterTipo === 'TODOS' || cleanTipo(v.tipo) === cleanTipo(filterTipo)
     const formal = isVehiculoFormal(v)
     const matchesEstado =
       filterEstado === 'TODOS' ||
@@ -810,18 +822,17 @@ export function Vehiculos({ user }) {
     setTitularDetectado(null)
     setFormData({
       placa: '',
-      tipo: 'Mototaxi (Trimovil)',
+      tipo: '',
       marca: '',
       modelo: '',
       color: '',
-      anio: new Date().getFullYear(),
+      anio: '',
       categoria: '',
       carroceria: '',
       sedeRegistro: '',
       tipoCarroceria: '',
       numeroSerie: '',
       serieMotor: '',
-      partidaRegistral: '',
       asociacion: '',
       propietario: '',
       propietarioDni: '',
@@ -868,7 +879,8 @@ export function Vehiculos({ user }) {
       '¿Eliminar vehículo?',
       '¿Está seguro de eliminar este vehículo del registro municipal?',
       'Sí, eliminar',
-      'Cancelar'
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (result.isConfirmed) {
       try {
@@ -956,7 +968,8 @@ export function Vehiculos({ user }) {
             <button
               type="submit"
               disabled={isSearchingSunarp}
-              className={`flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-10 py-4 text-lg font-bold text-white shadow-xl shadow-indigo-600/30 transition hover:bg-indigo-700 active:scale-95 cursor-pointer ${isSearchingSunarp ? 'opacity-75 cursor-wait' : ''}`}
+              className={`flex items-center justify-center gap-2 rounded-2xl px-10 py-4 text-lg font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer ${isSearchingSunarp ? 'opacity-75 cursor-wait' : ''}`}
+              style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
             >
               <Icon name={isSearchingSunarp ? 'loader' : 'search'} className={`size-6 ${isSearchingSunarp ? 'animate-spin' : ''}`} />
               <span>{isSearchingSunarp ? 'Consultando...' : 'Consultar'}</span>
@@ -1187,9 +1200,9 @@ export function Vehiculos({ user }) {
               onChange={setFilterTipo}
               options={[
                 { value: 'TODOS', label: 'Todos los tipos' },
-                { value: 'Mototaxi (Trimovil)', label: 'Mototaxi (Trimovil)' },
-                { value: 'Automóvil (Sedán/Hatchback)', label: 'Automóvil (Sedán/Hatchback)' },
-                { value: 'Camioneta Rural (Combi)', label: 'Camioneta Rural (Combi)' },
+                { value: 'Mototaxi', label: 'Mototaxi' },
+                { value: 'Automóvil', label: 'Automóvil' },
+                { value: 'Camioneta Rural', label: 'Camioneta Rural' },
                 { value: 'Moto Lineal', label: 'Moto Lineal' }
               ]}
             />
@@ -1244,7 +1257,8 @@ export function Vehiculos({ user }) {
                 <button
                   type="button"
                   onClick={handleOpenCreateModal}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                 >
                   <span className="text-base leading-none font-black">+</span>
                   <span>Nuevo Vehículo</span>
@@ -1263,10 +1277,10 @@ export function Vehiculos({ user }) {
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Placa</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Vehículo & Modelo</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Asociación / Empresa</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap">Propietario & Titular</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Serie Chasis / SUNARP</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Asociación / Empresa</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Vehículo & Modelo</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap">Serie Chasis / Motor</th>
                 <th className="px-3.5 py-2.5 whitespace-nowrap text-center">Estado</th>
                 <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] px-3 py-3.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
@@ -1311,17 +1325,18 @@ export function Vehiculos({ user }) {
 
 
                     <td className="px-3.5 py-2.5">
-                      <p className="font-extrabold leading-tight text-slate-800 dark:text-white" title={`${v.marca} ${v.modelo}`}>
-                        {v.marca} {v.modelo}
+                      <p className="font-semibold text-slate-900 dark:text-white text-xs leading-snug" title={v.propietario}>
+                        {v.propietario || 'Sin Propietario'}
                       </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-400">
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                          {v.tipo}
-                        </span>
-                        <span>·</span>
-                        <span>{v.color}</span>
-                        <span>({v.anio})</span>
-                      </div>
+                      {v.propietarioDni ? (
+                        <p className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                          DNI: {v.propietarioDni}
+                        </p>
+                      ) : (
+                        <p className="font-mono text-[11px] text-slate-400 mt-0.5">
+                          Sin DNI
+                        </p>
+                      )}
                     </td>
 
 
@@ -1345,10 +1360,17 @@ export function Vehiculos({ user }) {
 
 
                     <td className="px-3.5 py-2.5">
-                      <p className="font-bold leading-tight text-slate-800 dark:text-slate-100 text-xs" title={v.propietario}>{v.propietario}</p>
-                      <p className="text-xs font-mono text-slate-400">
-                        DNI/RUC: {v.propietarioDni || v.propietarioRuc || 'N/A'}
+                      <p className="font-extrabold leading-tight text-slate-800 dark:text-white" title={`${v.marca} ${v.modelo}`}>
+                        {v.marca} {v.modelo}
                       </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-400">
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                          {v.tipo}
+                        </span>
+                        <span>·</span>
+                        <span>{v.color}</span>
+                        <span>({v.anio})</span>
+                      </div>
                     </td>
 
 
@@ -1356,9 +1378,11 @@ export function Vehiculos({ user }) {
                       <p className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
                         {v.numeroSerie || 'N/A'}
                       </p>
-                      <p className="text-[11px] font-mono text-slate-400">
-                        {v.partidaRegistral || 'N/A'}
-                      </p>
+                      {(v.serieMotor || v.numeroMotor) && (
+                        <p className="text-[11px] font-mono text-slate-400">
+                          Motor: {v.serieMotor || v.numeroMotor}
+                        </p>
+                      )}
                     </td>
 
 
@@ -1456,6 +1480,7 @@ export function Vehiculos({ user }) {
           handleClearPhoto={handleClearPhotoPersona}
           tipoDocOptions={tipoDocOptions}
           handleReniecSearch={handleReniecSearchPersona}
+          isSearchingReniec={isSearchingReniecPersona}
           estadoCivilOptions={ESTADO_CIVIL_OPTIONS}
           estadoOptions={ESTADO_OPTIONS}
           onSubmit={handlePersonaFormSubmit}

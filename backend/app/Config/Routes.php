@@ -15,6 +15,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('mobile/dashboard', 'MunicipalidadController::mobileDashboard');
         $routes->get('mobile/vehiculos/buscar', 'VehiculosController::buscarMobile');
         $routes->get('papeletas/(:num)/fotos', 'PapeletasController::fotos/$1');
+        $routes->get('files/(:segment)/(:segment)', 'FilesController::ver/$1/$2');
 
         $routes->get('pide/reniec/(:segment)', 'PideController::reniec/$1');
         $routes->post('pide/sunarp', 'PideController::sunarp');

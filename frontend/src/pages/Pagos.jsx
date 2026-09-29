@@ -123,7 +123,8 @@ export function Pagos() {
       '¿Anular recibo?',
       '¿Está seguro que desea anular este recibo de pago? Esta acción no se puede revertir.',
       'Sí, anular',
-      'Cancelar'
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (result.isConfirmed) {
       try {
@@ -493,7 +494,8 @@ export function Pagos() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-md shadow-emerald-600/20 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-all cursor-pointer whitespace-nowrap hover:opacity-90"
+              style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
               title="Registrar nuevo pago"
             >
               <Icon name="plus" className="size-3.5" />
@@ -768,8 +770,8 @@ export function Pagos() {
               )}
               </div>
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-7 py-4 dark:border-[var(--border)]">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">Cancelar</button>
-                <button type="submit" disabled={isSaving} className="rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-emerald-600/25 hover:brightness-105 transition-all cursor-pointer disabled:opacity-60">{isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pago'}</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 cursor-pointer" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
+                <button type="submit" disabled={isSaving} className="rounded-xl px-5 py-2 text-xs font-bold text-white hover:opacity-90 transition-all cursor-pointer disabled:opacity-60" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>{isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pago'}</button>
               </div>
             </form>
           </div>

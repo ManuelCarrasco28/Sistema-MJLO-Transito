@@ -42,9 +42,9 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
             type="button"
             onClick={onClose}
             title="Cerrar ficha"
-            className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+            className="group grid size-8 shrink-0 place-items-center rounded-xl border border-slate-200/80 bg-slate-100/70 text-slate-400 hover:bg-[oklch(71.2%_0.194_13.428)] hover:border-[oklch(71.2%_0.194_13.428)] hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 transition-all duration-200 active:scale-95 cursor-pointer"
           >
-            <Icon name="close" className="size-5" />
+            <Icon name="close" className="size-4 transition-transform duration-200 group-hover:rotate-90" />
           </button>
         </div>
 

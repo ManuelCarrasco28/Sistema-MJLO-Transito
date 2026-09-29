@@ -669,7 +669,8 @@ export function Inspecciones() {
                 type="button"
                 disabled={eliminando}
                 onClick={() => setInspeccionAEliminar(null)}
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 active:scale-95 disabled:opacity-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 cursor-pointer"
+                className="flex-1 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-50 cursor-pointer"
+                style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
               >
                 Cancelar
               </button>
@@ -678,7 +679,8 @@ export function Inspecciones() {
                 autoFocus
                 disabled={eliminando}
                 onClick={confirmarEliminacion}
-                className="flex-1 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-xs transition hover:bg-rose-700 active:scale-95 disabled:opacity-60 cursor-pointer"
+                className="flex-1 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-60 cursor-pointer"
+                style={{ backgroundColor: 'oklch(58.6% 0.253 17.585)' }}
               >
                 {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
               </button>
@@ -863,7 +865,8 @@ export function Inspecciones() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-purple-800 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-purple-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+              style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Registrar inspección</span>
@@ -1635,13 +1638,15 @@ export function Inspecciones() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 active:scale-95 cursor-pointer"
+                  className="rounded-xl px-4 py-1.5 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
+                  style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 px-5 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
+                  className="rounded-xl px-5 py-1.5 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
+                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                 >
                   {selectedInspeccion ? 'Actualizar inspección' : 'Guardar inspección'}
                 </button>

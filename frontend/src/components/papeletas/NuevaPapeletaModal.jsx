@@ -42,7 +42,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
       const data = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
 
       if (!data) {
-        throw new Error(res.message || 'No se encontraron registros en SUNARP para la placa.')
+        throw new Error(res.message || 'No se encontraron registros para la placa.')
       }
 
       const cat = (data.categoria || '').toUpperCase().trim()
@@ -65,7 +65,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
 
       showToast('Datos vehiculares obtenidos', 'success')
     } catch (err) {
-      showError('Consulta fallida', err.message || 'Ocurrió un error en la consulta a SUNARP.')
+      showError('Consulta fallida', err.message || 'Ocurrió un error al consultar el vehículo.')
     } finally {
       setIsSearchingSunarp(false)
     }
@@ -83,13 +83,13 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
       const response = await apiFetch(`/pide/reniec/${rawDni}`)
       
       if (!response.ok) {
-        throw new Error('No se pudo encontrar la información del DNI.')
+        throw new Error('No se pudo encontrar la información del documento.')
       }
 
       const { data } = await response.json()
 
       if (!data) {
-        throw new Error('No se encontró a la persona con el DNI ingresado.')
+        throw new Error('No se encontró a la persona con el documento ingresado.')
       }
 
       const nombres = data.nombres || ''
@@ -103,7 +103,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
 
       showToast('Datos de conductor obtenidos', 'success')
     } catch (err) {
-      showError('Consulta fallida', err.message || 'Ocurrió un error en la consulta a RENIEC.')
+      showError('Consulta fallida', err.message || 'Ocurrió un error al consultar el documento.')
     } finally {
       setIsSearchingReniec(false)
     }
@@ -149,7 +149,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
                   onClick={handleSunarpSearch}
                   disabled={isSearchingSunarp || !nuevaForm.vehiculoPlaca?.trim()}
                   className={`flex shrink-0 items-center justify-center rounded-xl bg-indigo-50 px-4 text-indigo-600 transition-colors hover:bg-indigo-100 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-100 dark:border-indigo-500/20 shadow-xs h-[52px]`}
-                  title="Consultar SUNARP"
+                  title="Consultar vehículo"
                 >
                   <Icon name={isSearchingSunarp ? 'loader' : 'search'} className={`size-5 ${isSearchingSunarp ? 'animate-spin' : ''}`} />
                 </button>
@@ -181,7 +181,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
                   onClick={handleReniecSearch}
                   disabled={isSearchingReniec || (nuevaForm.conductorDni || '').length !== 8}
                   className={`flex shrink-0 items-center justify-center rounded-xl bg-indigo-50 px-4 text-indigo-600 transition-colors hover:bg-indigo-100 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-100 dark:border-indigo-500/20 shadow-xs h-[52px]`}
-                  title="Consultar RENIEC"
+                  title="Consultar documento"
                 >
                   <Icon name={isSearchingReniec ? 'loader' : 'search'} className={`size-5 ${isSearchingReniec ? 'animate-spin' : ''}`} />
                 </button>
@@ -246,8 +246,8 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-[var(--border)]">
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">Cancelar</button>
-          <button disabled={creandoPapeleta} type="submit" className="rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-rose-600/25 hover:brightness-105 transition-all cursor-pointer disabled:opacity-60">
+          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 cursor-pointer" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
+          <button disabled={creandoPapeleta} type="submit" className="rounded-xl px-5 py-2 text-xs font-bold text-white hover:opacity-90 transition-all cursor-pointer disabled:opacity-60" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
             {creandoPapeleta ? 'Registrando...' : 'Registrar Papeleta'}
           </button>
         </div>

@@ -1,5 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
-const DEFAULT_TIMEOUT_MS = 15000
+const DEFAULT_TIMEOUT_MS = 25000
 
 const memoryCache = new Map()
 const pendingReads = new Map()
@@ -91,28 +91,33 @@ export async function apiFetch(endpoint, options = {}) {
   // Share only default reads while they are in flight. Each caller gets its
   // own body, and subsequent visits still request fresh server data.
   try {
-  if (method === 'GET' && Object.keys(fetchOptions).length === 0) {
-    let request = pendingReads.get(url)
-    if (!request) {
-      request = fetch(url, config).finally(() => {
-        if (pendingReads.get(url) === request) pendingReads.delete(url)
-      })
-      pendingReads.set(url, request)
+    if (method === 'GET' && Object.keys(fetchOptions).length === 0) {
+      let request = pendingReads.get(url)
+      if (!request) {
+        request = fetch(url, config).finally(() => {
+          if (pendingReads.get(url) === request) pendingReads.delete(url)
+        })
+        pendingReads.set(url, request)
+      }
+      const response = await request
+      return response.clone()
     }
-    const response = await request
-    return response.clone()
-  }
 
-  const response = await fetch(url, config)
+    const response = await fetch(url, config)
 
-  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && response.ok) {
-    const cleanEndpoint = endpoint.split('?')[0].replace(/^\//, '').split('/')[0]
-    if (cleanEndpoint) {
-      invalidateCache(`/${cleanEndpoint}`)
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && response.ok) {
+      const cleanEndpoint = endpoint.split('?')[0].replace(/^\//, '').split('/')[0]
+      if (cleanEndpoint) {
+        invalidateCache(`/${cleanEndpoint}`)
+      }
     }
-  }
 
-  return response
+    return response
+  } catch (err) {
+    if (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort')) {
+      throw new Error('El servicio tardó demasiado tiempo en responder o la conexión fue cancelada.')
+    }
+    throw err
   } finally {
     window.clearTimeout(timeoutId)
   }

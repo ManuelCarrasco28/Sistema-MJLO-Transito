@@ -767,7 +767,8 @@ export function Papeletas({ user }) {
               <button
                 type="button"
                 onClick={handleOpenNuevaPapeleta}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition-all hover:from-rose-500 hover:to-rose-600 active:scale-95 cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+                style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
               >
                 <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
               </button>
@@ -1063,8 +1064,8 @@ export function Papeletas({ user }) {
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600 dark:border-[var(--border-strong)] dark:text-slate-300">Cancelar</button>
-              <button disabled={isProcessingAction} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-black text-white disabled:opacity-60">Rechazar</button>
+              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-xl px-4 py-2 text-sm font-bold text-white hover:opacity-90" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
+              <button disabled={isProcessingAction} className="rounded-xl px-4 py-2 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: 'oklch(58.6% 0.253 17.585)' }}>Rechazar</button>
             </div>
           </form>
         </div>

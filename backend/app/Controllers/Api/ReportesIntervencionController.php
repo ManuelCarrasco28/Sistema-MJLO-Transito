@@ -98,6 +98,11 @@ class ReportesIntervencionController extends ResourceController
         $fotos = $db->table('reporte_intervencion_fotos')
             ->where('id_reporte', $id)
             ->get()->getResultArray();
+        $fileStorage = new \App\Services\FileStorageService();
+        foreach ($fotos as &$foto) {
+            $foto['foto'] = $fileStorage->urlPublica($foto['foto']);
+        }
+        unset($foto);
         return $this->respond(['data' => $fotos]);
     }
 
@@ -220,14 +225,15 @@ class ReportesIntervencionController extends ResourceController
             if (is_array($fotos)) {
                 // Máximo 5 fotos por reporte y límite de tamaño (~7MB base64 ~= 5MB binario)
                 $fotos = array_slice($fotos, 0, 5);
+                $fileStorage = new \App\Services\FileStorageService();
                 foreach ($fotos as $foto) {
                     $fotoStr = trim((string)$foto);
                     if ($fotoStr !== '' && strlen($fotoStr) <= 7 * 1024 * 1024) {
-                        $fotoNormalizada = $this->normalizarFoto($fotoStr);
-                        if ($fotoNormalizada !== '') {
+                        $ruta = $fileStorage->guardarImagenBase64($fotoStr, 'reportes');
+                        if ($ruta !== null) {
                             $db->table('reporte_intervencion_fotos')->insert([
                                 'id_reporte' => $id,
-                                'foto' => $fotoNormalizada,
+                                'foto' => $ruta,
                             ]);
                         }
                     }
@@ -419,18 +425,5 @@ class ReportesIntervencionController extends ResourceController
         if (!$db->fieldExists('id_conductor', 'reportes_intervencion')) {
             $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_conductor INT NULL AFTER id_vehiculo');
         }
-    }
-
-    private function normalizarFoto(string $foto): string
-    {
-        if ($foto === '') {
-            return '';
-        }
-
-        if (str_starts_with($foto, 'data:image/')) {
-            return $foto;
-        }
-
-        return 'data:image/jpeg;base64,' . $foto;
     }
 }

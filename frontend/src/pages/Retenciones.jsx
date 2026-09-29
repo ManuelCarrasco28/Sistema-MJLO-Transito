@@ -315,7 +315,7 @@ export function Retenciones({ user }) {
               <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
               <span>PDF</span>
             </button>
-            <button onClick={handleOpenNuevo} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md hover:from-rose-700 hover:to-rose-800 transition-all active:scale-95">
+            <button onClick={handleOpenNuevo} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
               <span className="text-base leading-none font-black">+</span>
               <span>Nuevo</span>
             </button>
@@ -533,8 +533,8 @@ export function Retenciones({ user }) {
             </div>
 
             <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <button type="button" onClick={() => setIsNuevoModalOpen(false)} className="rounded-xl border border-slate-200 px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition">Cancelar</button>
-              <button disabled={registrando} type="submit" className="rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-4 py-1.5 text-xs font-extrabold text-white shadow-md shadow-rose-600/25 hover:brightness-105 transition-all cursor-pointer disabled:opacity-60">
+              <button type="button" onClick={() => setIsNuevoModalOpen(false)} className="rounded-xl px-3.5 py-1.5 text-xs font-bold text-white hover:opacity-90 cursor-pointer transition" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
+              <button disabled={registrando} type="submit" className="rounded-xl px-4 py-1.5 text-xs font-bold text-white hover:opacity-90 transition-all cursor-pointer disabled:opacity-60" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
                 {registrando ? 'Registrando...' : 'Registrar Internamiento'}
               </button>
             </div>

@@ -8,7 +8,7 @@ import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../con
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 
-import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
+import { FloatingInput, FloatingSelect, FloatingTextarea, RoundedSelect } from '../components/ui/FormInputs'
 import { MapaCoordenadasPicker } from '../components/ui/MapaCoordenadasPicker'
 
 const FILTER_TIPO_OPTIONS = [
@@ -281,7 +281,8 @@ export function Asociaciones() {
       '¿Eliminar asociación?',
       '¿Está seguro de eliminar esta asociación del registro municipal? Esta acción no se puede deshacer.',
       'Sí, eliminar',
-      'Cancelar'
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (result.isConfirmed) {
       try {
@@ -522,7 +523,8 @@ export function Asociaciones() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+              style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Nuevo registro</span>
@@ -538,12 +540,12 @@ export function Asociaciones() {
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[220px]">Asociación / Particular</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[125px]">RUC / Partida</th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[125px]">RUC</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[170px]">Representante Legal</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">Contacto</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[200px]">Ubicación</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[90px] text-center">Estado</th>
-                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
+                <th className="sticky right-0 z-10 bg-slate-50 dark:bg-[var(--bg-subtle)] border-l border-slate-200 dark:border-[var(--border)] px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
@@ -581,7 +583,7 @@ export function Asociaciones() {
                     <td className="px-3 py-3 min-w-[90px] text-center">
                       <div className="mx-auto h-5 w-14 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                     </td>
-                    <td className="sticky right-0 bg-white/50 dark:bg-[var(--bg-surface)]/50 px-3.5 py-3 text-center">
+                    <td className="sticky right-0 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-100 dark:border-[var(--border)] px-3.5 py-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                         <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
@@ -591,15 +593,17 @@ export function Asociaciones() {
                 ))
               ) : filteredOrgs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="p-12 text-center">
-                    <Icon name="building" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
-                    <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron asociaciones</p>
+                  <td colSpan="8" className="p-12 text-center align-middle">
+                    <div className="flex flex-col items-center justify-center">
+                      <Icon name="building" className="size-10 mb-2 text-slate-300 dark:text-slate-600" />
+                      <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron asociaciones</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 paginatedOrgs.map((o) => (
                   <tr key={o.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]">
-                    <td className="px-3.5 py-2.5 min-w-[220px]">
+                    <td className="px-3.5 py-3 align-middle min-w-[220px]">
                       <div className="flex items-center gap-2.5">
                         <div className={`grid size-9 shrink-0 place-items-center rounded-xl font-bold shadow-xs ${o.tipo === 'ASOCIACION'
                             ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
@@ -608,51 +612,79 @@ export function Asociaciones() {
                           <Icon name={o.tipo === 'ASOCIACION' ? 'motoTaxi' : 'building'} className="size-4.5" />
                         </div>
                         <div className="flex-1">
-                          <p className="font-normal text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-snug" title={o.razonSocial}>{o.razonSocial}</p>
+                          <p className="font-semibold text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-snug" title={o.razonSocial}>{o.razonSocial || 'Sin razón social'}</p>
                           <span className="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300 mt-0.5">
                             {o.tipo}
                           </span>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <p className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">RUC: {o.ruc}</p>
-                      <p className="text-[11px] font-mono text-slate-400">{o.partidaRegistral || o.numeroLicencia || '—'}</p>
-                    </td>
-                    <td className="px-3 py-2.5 min-w-[170px]">
-                      {o.representanteNombre ? (
-                        <div>
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug" title={o.representanteNombre}>
-                            {o.representanteNombre}
-                          </p>
-                          <p className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
-                            DNI: {o.representanteDni}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic font-medium">— No asignado —</span>
+                    <td className="px-3 py-3 align-middle whitespace-nowrap">
+                      <p className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{o.ruc ? `RUC: ${o.ruc}` : 'Sin RUC'}</p>
+                      {o.numeroLicencia && (
+                        <p className="text-[11px] font-mono text-slate-400 mt-0.5">{o.numeroLicencia}</p>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 min-w-[150px]">
-                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{o.telefono || '—'}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap" title={o.email}>{o.email || '—'}</p>
+                    <td className="px-3 py-3 align-middle min-w-[170px]">
+                      {o.representanteNombre ? (
+                        <div>
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug" title={o.representanteNombre}>
+                            {o.representanteNombre}
+                          </p>
+                          {o.representanteDni && (
+                            <p className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                              DNI: {o.representanteDni}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-medium">Sin representante</span>
+                      )}
                     </td>
-                    <td className="px-3 py-2.5 min-w-[200px]">
-                      <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug" title={o.direccion}>{o.direccion || '—'}</p>
-                      <button
-                        type="button"
-                        onClick={() => openMap(o.coordenadas, o.razonSocial)}
-                        disabled={!o.coordenadas}
-                        className="mt-0.5 text-[10px] font-bold text-indigo-600 hover:underline disabled:text-slate-300 dark:text-indigo-400 disabled:dark:text-slate-700 cursor-pointer"
-                      >
-                        {o.coordenadas ? 'Ver mapa' : 'Sin coordenadas'}
-                      </button>
+                    <td className="px-3 py-3 align-middle min-w-[150px]">
+                      {o.telefono || o.email ? (
+                        <div>
+                          {o.telefono && (
+                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{o.telefono}</p>
+                          )}
+                          {o.email && (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap truncate max-w-[180px]" title={o.email}>
+                              {o.email}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-medium">Sin contacto</span>
+                      )}
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-center">
+                    <td className="px-3 py-3 align-middle min-w-[200px]">
+                      {o.direccion || o.coordenadas ? (
+                        <div>
+                          {o.direccion && (
+                            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug" title={o.direccion}>
+                              {o.direccion}
+                            </p>
+                          )}
+                          {o.coordenadas && (
+                            <button
+                              type="button"
+                              onClick={() => openMap(o.coordenadas, o.razonSocial)}
+                              className="mt-0.5 text-[10px] font-bold text-indigo-600 hover:underline dark:text-indigo-400 cursor-pointer flex items-center gap-1"
+                            >
+                              <Icon name="mapPin" className="size-3" />
+                              <span>Ver mapa</span>
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-medium">Sin ubicación</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 align-middle whitespace-nowrap text-center min-w-[90px]">
                       <StatusBadge status={o.estado} />
                     </td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3.5 py-2.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-100 dark:border-[var(--border)] px-3.5 py-3 align-middle text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(o)}
@@ -739,7 +771,6 @@ export function Asociaciones() {
                       setFormData({
                         ...formData,
                         tipo,
-                        partidaRegistral: tipo === 'PARTICULAR' ? '' : formData.partidaRegistral,
                         fechaCreacion: tipo === 'PARTICULAR' ? '' : formData.fechaCreacion,
                         coordenadas: tipo === 'PARTICULAR' ? '' : formData.coordenadas,
                         tipoAmbiente: tipo === 'ASOCIACION' ? '' : formData.tipoAmbiente,
@@ -753,7 +784,7 @@ export function Asociaciones() {
                   />
 
                   <div className="sm:col-span-2">
-                    <FloatingInput
+                    <FloatingTextarea
                       id="org_razon"
                       label="Razón Social / Nombre"
                       required
@@ -781,7 +812,8 @@ export function Asociaciones() {
                     <button
                       type="button"
                       onClick={() => showToast('Búsqueda por RUC pendiente de conectar', 'info')}
-                      className="inline-flex min-w-28 items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-extrabold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300"
+                      className="shrink-0 self-end h-[42px] rounded-xl text-white px-4 text-xs font-bold cursor-pointer flex items-center justify-center gap-2"
+                      style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                     >
                       <Icon name="search" className="size-4" />
                       Buscar
@@ -884,23 +916,22 @@ export function Asociaciones() {
                     )}
                   </div>
 
+                  <FloatingInput
+                    id="org_partida"
+                    label="Partida Registral"
+                    value={formData.partidaRegistral || ''}
+                    onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
+                    inputClassName="font-mono uppercase"
+                  />
+
                   {formData.tipo === 'ASOCIACION' && (
-                    <>
-                      <FloatingInput
-                        id="org_partida"
-                        label="Partida Registral SUNARP"
-                        value={formData.partidaRegistral}
-                        onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
-                        inputClassName="font-mono"
-                      />
-                      <FloatingInput
-                        id="org_fecha_creacion"
-                        type="date"
-                        label="Fecha creación"
-                        value={formData.fechaCreacion || ''}
-                        onChange={(e) => setFormData({ ...formData, fechaCreacion: e.target.value })}
-                      />
-                    </>
+                    <FloatingInput
+                      id="org_fecha_creacion"
+                      type="date"
+                      label="Fecha creación"
+                      value={formData.fechaCreacion || ''}
+                      onChange={(e) => setFormData({ ...formData, fechaCreacion: e.target.value })}
+                    />
                   )}
                 </div>
               </fieldset>
@@ -910,9 +941,9 @@ export function Asociaciones() {
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Contacto, ubicación y autorización
                 </legend>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-3 items-start">
                   <div className="sm:col-span-2">
-                    <FloatingInput
+                    <FloatingTextarea
                       id="org_dir"
                       label="Dirección donde se encuentra ubicado"
                       value={formData.direccion}
@@ -922,18 +953,18 @@ export function Asociaciones() {
 
                   {formData.tipo === 'ASOCIACION' ? (
                     <div className="relative">
-                      <FloatingInput
+                      <FloatingTextarea
                         id="org_coordenadas"
                         label="Coordenadas"
                         value={formData.coordenadas}
                         onChange={(e) => setFormData({ ...formData, coordenadas: e.target.value })}
-                        inputClassName="font-mono pr-9"
+                        textareaClassName="font-mono pr-9"
                       />
                       <button
                         type="button"
                         onClick={() => setIsMapPickerOpen(true)}
                         title="Ubicar en el mapa"
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 grid size-6 place-items-center rounded-lg text-indigo-500 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 cursor-pointer"
+                        className="absolute right-2.5 top-3 grid size-6 place-items-center rounded-lg text-indigo-500 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 cursor-pointer"
                       >
                         <Icon name="mapPin" className="size-4" />
                       </button>
@@ -1047,17 +1078,19 @@ export function Asociaciones() {
                 </fieldset>
               )}
               </div>
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-4 py-3.5 sm:px-5 dark:border-[var(--border)]">
+              <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 px-4 py-3 sm:px-5 dark:border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer"
+                  className="rounded-xl px-5 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
+                  style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-2.5 text-xs font-black text-white hover:from-indigo-700 hover:to-violet-700 shadow-md shadow-indigo-600/25 transition-all cursor-pointer"
+                  className="rounded-xl px-6 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
+                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                 >
                   {isEditing ? 'Guardar Cambios' : `Registrar ${formData.tipo === 'PARTICULAR' ? 'Particular' : 'Asociación'}`}
                 </button>
@@ -1106,9 +1139,9 @@ export function Asociaciones() {
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
                 title="Cerrar ficha"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+                className="group grid size-8 shrink-0 place-items-center rounded-xl border border-slate-200/80 bg-slate-100/70 text-slate-400 hover:bg-[oklch(71.2%_0.194_13.428)] hover:border-[oklch(71.2%_0.194_13.428)] hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 transition-all duration-200 active:scale-95 cursor-pointer"
               >
-                <Icon name="close" className="size-5" />
+                <Icon name="close" className="size-4 transition-transform duration-200 group-hover:rotate-90" />
               </button>
             </div>
 
@@ -1130,7 +1163,7 @@ export function Asociaciones() {
                     </div>
                   )}
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
-                    <span className="font-bold text-slate-400">Partida Registral SUNARP</span>
+                    <span className="font-bold text-slate-400">Partida Registral</span>
                     <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{detailOrg.partidaRegistral || '—'}</span>
                   </div>
                   <div className="flex justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
@@ -1312,9 +1345,9 @@ export function Asociaciones() {
                 type="button"
                 onClick={() => setMapPreview(null)}
                 title="Cerrar mapa"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
+                className="group grid size-8 shrink-0 place-items-center rounded-xl border border-slate-200/80 bg-slate-100/70 text-slate-400 hover:bg-[oklch(71.2%_0.194_13.428)] hover:border-[oklch(71.2%_0.194_13.428)] hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 transition-all duration-200 active:scale-95 cursor-pointer"
               >
-                <Icon name="close" className="size-5" />
+                <Icon name="close" className="size-4 transition-transform duration-200 group-hover:rotate-90" />
               </button>
             </div>
             <div className="h-[65vh] bg-slate-100 dark:bg-[var(--bg-surface)]">

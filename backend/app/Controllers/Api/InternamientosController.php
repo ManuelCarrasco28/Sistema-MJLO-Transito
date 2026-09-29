@@ -111,7 +111,7 @@ class InternamientosController extends ResourceController
 
             return $this->respond(['data' => $data]);
         } catch (\Throwable $e) {
-            return $this->failServerError('Error consultando internamientos: ' . $e->getMessage());
+            return $this->failServerError('Error consultando internamientos.');
         }
     }
 
@@ -220,7 +220,7 @@ class InternamientosController extends ResourceController
                 'numeroOrden' => $numeroOrden,
             ]]);
         } catch (\Throwable $e) {
-            return $this->failServerError('Error al registrar el internamiento: ' . $e->getMessage());
+            return $this->failServerError('Error al registrar el internamiento.');
         }
     }
 
@@ -235,7 +235,7 @@ class InternamientosController extends ResourceController
                 ->getResultArray();
             return $this->respond(['data' => $rows]);
         } catch (\Throwable $e) {
-            return $this->failServerError('Error consultando criterios: ' . $e->getMessage());
+            return $this->failServerError('Error consultando criterios.');
         }
     }
 }

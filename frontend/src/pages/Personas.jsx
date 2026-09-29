@@ -57,6 +57,7 @@ export function Personas({ user, onUserUpdate }) {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedPersona, setSelectedPersona] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [isSearchingReniec, setIsSearchingReniec] = useState(false)
   const [loadError, setLoadError] = useState('')
 
   const cachedTipos = getCachedData('/tipo-documentos')
@@ -227,31 +228,41 @@ export function Personas({ user, onUserUpdate }) {
   const handleReniecSearch = async () => {
     const dni = formData.numeroDocumento?.trim()
     if (!dni || dni.length !== 8 || !/^\d{8}$/.test(dni)) {
-      showError('DNI Inválido', 'El número de DNI debe tener exactamente 8 dígitos.')
+      showError('DNI Inválido', 'El número de DNI debe tener exactamente 8 dígitos numéricos.')
       return
     }
 
+    setIsSearchingReniec(true)
     try {
       const response = await apiFetch(`/pide/reniec/${dni}`)
       if (!response.ok) {
-        throw new Error('No se pudo encontrar la información del DNI.')
+        let errorMsg = 'El servicio de consulta no responde en este momento. Ingrese los datos manualmente.'
+        try {
+          const errData = await response.json()
+          errorMsg = errData.messages?.error || errData.message || errorMsg
+        } catch (_) {}
+        throw new Error(errorMsg)
       }
-      const { data } = await response.json()
+      const res = await response.json()
+      const data = res.data || (res.nombres ? res : null)
       
       if (data) {
         setFormData(prev => ({
           ...prev,
           nombres: data.nombres || prev.nombres,
-          apellidoPaterno: data.apellidoPaterno || prev.apellidoPaterno,
-          apellidoMaterno: data.apellidoMaterno || prev.apellidoMaterno,
+          apellidoPaterno: data.apellidoPaterno || data.apellido_paterno || prev.apellidoPaterno,
+          apellidoMaterno: data.apellidoMaterno || data.apellido_materno || prev.apellidoMaterno,
           direccion: data.direccion || prev.direccion,
-          estadoCivil: data.estadoCivil || prev.estadoCivil,
-          fotoImg: data.foto_url || prev.fotoImg
+          estadoCivil: data.estadoCivil || data.estado_civil || prev.estadoCivil,
+          fotoImg: data.foto_url || data.foto || prev.fotoImg
         }))
-        
+      } else {
+        throw new Error('No se encontraron datos para el documento ingresado.')
       }
     } catch (err) {
-      showError('Error', err.message || 'No se pudo consultar la información del DNI.')
+      showError('Consulta de Documento', err.message || 'No se pudo consultar la información del documento.')
+    } finally {
+      setIsSearchingReniec(false)
     }
   }
 
@@ -310,7 +321,8 @@ export function Personas({ user, onUserUpdate }) {
       '¿Eliminar persona?',
       '¿Está seguro de eliminar a esta persona del padrón municipal?',
       'Sí, eliminar',
-      'Cancelar'
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (result.isConfirmed) {
       try {
@@ -356,11 +368,9 @@ export function Personas({ user, onUserUpdate }) {
       !formData.apellidoPaterno.trim() ||
       !formData.apellidoMaterno.trim() ||
       !formData.numeroLicencia.trim() ||
-      !formData.celular.trim() ||
-      !formData.direccion.trim() ||
-      !formData.email.trim()
+      !formData.direccion.trim()
     ) {
-      showError('Validación Fallida', 'Por favor completa todos los campos requeridos (Documento, Nombres, Apellidos, Licencia, Celular, Dirección y Email).')
+      showError('Validación Fallida', 'Por favor completa todos los campos requeridos (Documento, Nombres, Apellidos, Licencia y Dirección).')
       return
     }
     const isDni = formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD'
@@ -372,11 +382,11 @@ export function Personas({ user, onUserUpdate }) {
       alert('El número de documento debe tener entre 8 y 15 caracteres.')
       return
     }
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (formData.email && formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       showError('Validación Fallida', 'Por favor ingresa un correo electrónico válido.')
       return
     }
-    if (formData.celular && !/^\d{9}$/.test(formData.celular)) {
+    if (formData.celular && formData.celular.trim() && !/^\d{9}$/.test(formData.celular.trim())) {
       showError('Validación Fallida', 'El número de celular debe tener exactamente 9 dígitos numéricos.')
       return
     }
@@ -605,7 +615,8 @@ export function Personas({ user, onUserUpdate }) {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+              style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Nueva persona</span>
@@ -619,10 +630,10 @@ export function Personas({ user, onUserUpdate }) {
           <table className="w-full text-left text-xs sm:text-sm">
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
-                <th className="px-4 py-3 whitespace-nowrap">Persona</th>
+                <th className="px-4 py-3 whitespace-nowrap">Nombres y Apellidos</th>
                 <th className="px-4 py-3 whitespace-nowrap">Documento</th>
-                <th className="px-4 py-3 whitespace-nowrap">Licencia</th>
                 <th className="px-4 py-3 whitespace-nowrap">Contacto</th>
+                <th className="px-4 py-3 whitespace-nowrap">Licencia</th>
                 <th className="px-4 py-3 whitespace-nowrap">Estado</th>
                 <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                   Acciones
@@ -728,18 +739,10 @@ export function Personas({ user, onUserUpdate }) {
                         )}
                         <div>
                           <p
-                            className="font-medium text-[13.5px] whitespace-nowrap"
-                            style={{ color: 'var(--text)' }}
-                            title={`${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''} ${p.nombres || ''}`}
+                            className="text-[13.5px] font-medium text-slate-900 dark:text-white whitespace-nowrap"
+                            title={`${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.trim()}
                           >
-                            <span className="font-bold text-slate-900 dark:text-white">
-                              {[p.apellidoPaterno, p.apellidoMaterno].filter(Boolean).join(' ') || p.nombres}
-                            </span>
-                            {p.apellidoPaterno && p.nombres && (
-                              <span className="font-medium text-slate-500 dark:text-slate-400">
-                                , {p.nombres}
-                              </span>
-                            )}
+                            {`${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.trim() || '—'}
                           </p>
                           <p
                             className="text-[12px] whitespace-nowrap mt-0.5"
@@ -764,21 +767,6 @@ export function Personas({ user, onUserUpdate }) {
                     </td>
 
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {p.numeroLicencia ? (
-                        <span
-                          className="font-mono-code text-[12.5px] font-semibold"
-                          style={{ color: 'var(--brand)' }}
-                        >
-                          {p.numeroLicencia}
-                        </span>
-                      ) : (
-                        <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
-                          Sin licencia
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3 whitespace-nowrap">
                       <p className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>
                         {p.celular || p.telefono || '—'}
                       </p>
@@ -790,6 +778,21 @@ export function Personas({ user, onUserUpdate }) {
                         >
                           {p.email}
                         </p>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {p.numeroLicencia ? (
+                        <span
+                          className="font-mono-code text-[12.5px] font-semibold"
+                          style={{ color: 'var(--brand)' }}
+                        >
+                          {p.numeroLicencia}
+                        </span>
+                      ) : (
+                        <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+                          Sin licencia
+                        </span>
                       )}
                     </td>
 
@@ -914,6 +917,7 @@ export function Personas({ user, onUserUpdate }) {
           handleClearPhoto={handleClearPhoto}
           tipoDocOptions={tipoDocOptions}
           handleReniecSearch={handleReniecSearch}
+          isSearchingReniec={isSearchingReniec}
           estadoCivilOptions={ESTADO_CIVIL_OPTIONS}
           estadoOptions={ESTADO_OPTIONS}
           onSubmit={handleFormSubmit}

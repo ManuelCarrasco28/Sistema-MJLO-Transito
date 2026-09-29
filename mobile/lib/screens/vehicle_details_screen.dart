@@ -249,7 +249,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
           ]),
 
           const SizedBox(height: 24),
-          _buildSectionTitle('REGISTRO SUNARP', Icons.account_balance),
+          _buildSectionTitle('DATOS TÉCNICOS & REGISTRO', Icons.account_balance),
           _buildInfoCard([
             _buildInfoRow('Nº Motor', _vehicleData!['serieMotor'] ?? '-'),
             _buildDivider(),

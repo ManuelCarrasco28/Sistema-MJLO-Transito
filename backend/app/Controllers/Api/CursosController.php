@@ -64,7 +64,7 @@ class CursosController extends ResourceController
 
             return $this->respond(['data' => $data]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error consultando cursos: ' . $e->getMessage());
+            return $this->failServerError('Error consultando cursos.');
         }
     }
 
@@ -186,7 +186,7 @@ class CursosController extends ResourceController
             ];
             return $this->respondCreated(['status' => 201, 'data' => $response]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error creando el curso: ' . $e->getMessage());
+            return $this->failServerError('Error creando el curso.');
         }
     }
 
@@ -249,7 +249,7 @@ class CursosController extends ResourceController
             }
             return $this->respond(['status' => 200, 'message' => 'Curso actualizado correctamente']);
         } catch (\Exception $e) {
-            return $this->failServerError('Error actualizando el curso: ' . $e->getMessage());
+            return $this->failServerError('Error actualizando el curso.');
         }
     }
 
@@ -260,7 +260,7 @@ class CursosController extends ResourceController
             $db->table('cursos_seguridad_vial')->where('id', $id)->delete();
             return $this->respondDeleted(['status' => 200, 'message' => 'Curso eliminado correctamente']);
         } catch (\Exception $e) {
-            return $this->failServerError('Error eliminando el curso: ' . $e->getMessage());
+            return $this->failServerError('Error eliminando el curso.');
         }
     }
 
@@ -391,7 +391,7 @@ class CursosController extends ResourceController
             
             return $this->respondCreated(['status' => 201, 'message' => 'Participante inscrito exitosamente.', 'data' => $participanteData]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error al inscribir al participante: ' . $e->getMessage());
+            return $this->failServerError('Error al inscribir al participante.');
         }
     }
 
@@ -427,7 +427,7 @@ class CursosController extends ResourceController
                 
             return $this->respond(['status' => 200, 'message' => 'Nota/asistencia registrada correctamente.']);
         } catch (\Exception $e) {
-            return $this->failServerError('Error al registrar nota: ' . $e->getMessage());
+            return $this->failServerError('Error al registrar nota.');
         }
     }
 }

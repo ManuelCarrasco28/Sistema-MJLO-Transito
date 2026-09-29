@@ -123,9 +123,14 @@ class PagosController extends ResourceController
      * tienen un recibo generado en pagos_transito, para excluirlos de las
      * listas de "pendientes sin recibo".
      */
+    private const COLUMNAS_REFERENCIA_PAGO = ['id_papeleta', 'id_tramite', 'id_inscripcion'];
+
     private function idsConRecibo($db, string $columna): array
     {
-        $rows = $db->table('pagos_transito')->select($columna)->where("$columna IS NOT NULL", null, false)->get()->getResultArray();
+        if (!in_array($columna, self::COLUMNAS_REFERENCIA_PAGO, true)) {
+            throw new \InvalidArgumentException('Columna de referencia de pago no permitida.');
+        }
+        $rows = $db->table('pagos_transito')->select($columna)->where($columna . ' IS NOT NULL')->get()->getResultArray();
         return array_map(static fn($r) => (int)$r[$columna], $rows);
     }
 

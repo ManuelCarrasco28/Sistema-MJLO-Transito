@@ -62,7 +62,7 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
           child: Padding(
             padding: EdgeInsets.all(24.0),
             child: Text(
-              'Persona no registrada en la municipalidad JLO\n\n(Solo los DNIs son consultados automáticamente en RENIEC).', 
+              'Persona no registrada en el padrón municipal de JLO.', 
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, color: Colors.grey)
             ),
