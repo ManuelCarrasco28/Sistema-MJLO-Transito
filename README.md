@@ -23,12 +23,6 @@ docker compose up -d
 - **Backend API:** http://localhost:8080/api/status
 - **PhpMyAdmin:** http://localhost:8081
 
-### Credenciales de acceso (Sistema):
-- Usuario: diegobarturen / Contra: diego123
-- Usuario: manuelcarrasco / Contra: manuel123
-- Usuario: milenkasegundo / Contra: milenka123
-- Usuario: angelosaavedra / Contra: angelo123
-
 ## Contexto de Base de Datos
 
 - **Base de datos:** 	ransitomunicipal (MySQL / MariaDB)
