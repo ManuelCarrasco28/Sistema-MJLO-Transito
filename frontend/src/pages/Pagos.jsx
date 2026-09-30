@@ -4,6 +4,7 @@ import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
@@ -30,7 +31,14 @@ export function Pagos() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipoPago, setFilterTipoPago] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
+  }
   
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [pagoToConfirm, setPagoToConfirm] = useState(null)
@@ -131,6 +139,7 @@ export function Pagos() {
         const response = await apiFetch(`/pagos/${id}`, { method: 'DELETE' })
         if (!response.ok) throw new Error('No se pudo anular el pago')
         setPagos(pagos.map(p => p.id === id ? { ...p, estado: 'ANULADO' } : p))
+        loadStats()
         showToast('Pago anulado exitosamente')
       } catch (err) {
         showError('Error', 'Error al anular el pago')
@@ -168,6 +177,7 @@ export function Pagos() {
       const result = await response.json()
       if (!response.ok) throw new Error(Object.values(result.messages || {}).join(' ') || result.message || 'No se pudo guardar el pago.')
       setPagos(prev => [result.data, ...prev.filter(p => p.id !== result.data.id)])
+      loadStats()
       setIsModalOpen(false)
       showToast('Pago registrado exitosamente')
     } catch (err) { showError('Error', sanitizarMensaje(err.message, 'No se pudo anular el pago.')) }
@@ -193,7 +203,19 @@ export function Pagos() {
     fetchArqueo(arqueoFecha)
   }
 
-  const handleExportPdf = () => {
+  const fetchTodoElFiltroPagos = async () => {
+    const params = new URLSearchParams()
+    if (searchTerm) params.set('buscar', searchTerm)
+    if (filterTipoPago !== 'TODOS') params.set('tipoPago', filterTipoPago)
+    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    const res = await apiFetch(`/pagos?${params.toString()}`)
+    if (!res.ok) return filteredPagos
+    const payload = await res.json()
+    return payload.data || []
+  }
+
+  const handleExportPdf = async () => {
+    const data = await fetchTodoElFiltroPagos()
     exportToPdf({
       filename: `Pagos_${new Date().toISOString().slice(0, 10)}.pdf`,
       title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
@@ -208,15 +230,16 @@ export function Pagos() {
         { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente' },
         { header: 'TIPO PAGO', key: 'tipoPago' },
         { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—' },
-        { header: 'MÉTODO PAGO', key: 'metodo' },
+        { header: 'MÉTODO DE PAGO', key: 'metodo' },
         { header: 'MONTO', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}` },
         { header: 'ESTADO', key: 'estado' }
       ],
-      data: filteredPagos
+      data
     })
   }
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const data = await fetchTodoElFiltroPagos()
     exportToExcel({
       filename: `Pagos_${new Date().toISOString().slice(0, 10)}.xls`,
       sheetName: 'Pagos',
@@ -234,11 +257,11 @@ export function Pagos() {
         { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—', width: 180 },
         { header: 'N° VOUCHER', key: 'numeroVoucher', isText: true, width: 140 },
         { header: 'REFERENCIA', key: 'referenciaPago', width: 160 },
-        { header: 'MÉTODO PAGO', key: 'metodo', width: 120 },
+        { header: 'MÉTODO DE PAGO', key: 'metodo', width: 120 },
         { header: 'MONTO (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}`, align: 'right', width: 120 },
         { header: 'ESTADO', key: 'estado', align: 'center', width: 110 }
       ],
-      data: filteredPagos
+      data
     })
   }
 
@@ -265,7 +288,7 @@ export function Pagos() {
         { header: 'HORA / FECHA', key: 'fecha', width: 150 },
         { header: 'CONCEPTO / TIPO', key: 'tipoPago', width: 140 },
         { header: 'VOUCHER', key: 'numeroVoucher', isText: true, width: 130 },
-        { header: 'MÉTODO', key: 'metodo', width: 120 },
+        { header: 'MÉTODO DE PAGO', key: 'metodo', width: 120 },
         { header: 'CAJERO / OPERADOR', key: 'cajero', width: 180 },
         { header: 'IMPORTE (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}`, align: 'right', width: 120 }
       ],
@@ -273,9 +296,10 @@ export function Pagos() {
     })
   }
 
-  const totalPagos = pagos.length
-  const totalMonto = pagos.filter(p => p.estado === 'PAGADO').reduce((acc, curr) => acc + (curr.montoTotal || 0), 0)
-  const pagosHoy = pagos.filter(p => p.estado === 'PAGADO' && p.fecha && new Date(p.fecha).toDateString() === new Date().toDateString()).length
+  const [stats, setStats] = useState({ totalPagos: 0, totalMonto: 0, pagosHoy: 0 })
+  const totalPagos = stats.totalPagos ?? 0
+  const totalMonto = stats.totalMonto ?? 0
+  const pagosHoy = stats.pagosHoy ?? 0
 
   useEffect(() => {
     const handleAfterPrint = () => {
@@ -303,43 +327,53 @@ export function Pagos() {
   }
 
   const [filterEstado, setFilterEstado] = useState('TODOS')
+  const [totalFiltrado, setTotalFiltrado] = useState(0)
 
-  const filteredPagos = pagos.filter((p) => {
-    const search = searchTerm.toLowerCase()
-    const matchesSearch =
-      (p.numeroRecibo || String(p.id)).toLowerCase().includes(search) ||
-      p.numeroVoucher?.toLowerCase().includes(search) ||
-      p.referenciaPago?.toLowerCase().includes(search) ||
-      p.tipoPago?.toLowerCase().includes(search)
+  const loadPagos = () => {
+    setIsLoading(true)
+    setLoadError('')
+    const params = new URLSearchParams({
+      page: String(currentPage),
+      porPagina: String(itemsPerPage),
+    })
+    if (searchTerm) params.set('buscar', searchTerm)
+    if (filterTipoPago !== 'TODOS') params.set('tipoPago', filterTipoPago)
+    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
-    const matchesTipoPago = filterTipoPago === 'TODOS' || p.tipoPago === filterTipoPago
-    const matchesEstado = filterEstado === 'TODOS' || 
-      (filterEstado === 'PAGADO' ? p.estado === 'PAGADO' : p.estado !== 'PAGADO')
-    
-    return matchesSearch && matchesTipoPago && matchesEstado
-  })
+    apiFetch(`/pagos?${params.toString()}`)
+      .then(res => res.ok ? res.json() : Promise.reject(res))
+      .then(data => {
+        const pData = data.data || []
+        setPagos(pData)
+        setTotalFiltrado(data.meta?.total ?? pData.length)
+      })
+      .catch(() => setLoadError('No se pudo cargar el registro de pagos.'))
+      .finally(() => setIsLoading(false))
+  }
+
+  useEffect(() => {
+    loadPagos()
+  }, [currentPage, itemsPerPage, searchTerm, filterTipoPago, filterEstado, sortBy, sortDir])
+
+  const loadStats = () => {
+    apiFetch('/pagos/estadisticas')
+      .then((res) => res.ok ? res.json() : Promise.reject(res))
+      .then((payload) => setStats(payload.data ?? {}))
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadStats()
+  }, [])
+
+  const filteredPagos = pagos
 
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, filterTipoPago, filterEstado])
 
-  const paginatedPagos = filteredPagos.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
-
-  useEffect(() => {
-    setLoadError('')
-    apiFetch('/pagos')
-      .then(res => res.ok ? res.json() : Promise.reject(res))
-      .then(data => {
-        const pData = data.data || []
-        setPagos(pData)
-        setCachedData('/pagos', pData)
-      })
-      .catch(() => setLoadError('No se pudo cargar el registro de pagos.'))
-      .finally(() => setIsLoading(false))
-  }, [])
+  const paginatedPagos = pagos
 
   return (
     <div className="space-y-4">
@@ -347,16 +381,16 @@ export function Pagos() {
       
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20">
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.2"
+              strokeWidth="2.4"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="size-5.5"
+              className="size-7"
             >
               <rect width="20" height="12" x="2" y="6" rx="2" />
               <circle cx="12" cy="12" r="2" />
@@ -364,7 +398,7 @@ export function Pagos() {
             </svg>
           </span>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
               Pagos de Tránsito
             </h1>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -374,40 +408,55 @@ export function Pagos() {
         </div>
       </div>
 
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 print:hidden">
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+      <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-3 print:hidden">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total Recaudado</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 text-xs">
               <Icon name="payment" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">S/ {totalMonto.toFixed(2)}</p>
+          <div className="mt-1 flex items-baseline justify-between gap-2">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight tracking-tight">
+              S/ {Number(totalMonto || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md shrink-0">
+              Caja Total
+            </span>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-sky-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-sky-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Operaciones</span>
             <span className="grid size-6 place-items-center rounded-md bg-sky-50 text-sky-600 dark:bg-sky-950/60 text-xs">
               <Icon name="receiptCheck" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{totalPagos}</p>
+          <div className="mt-1 flex items-baseline justify-between gap-2">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight tracking-tight">
+              {new Intl.NumberFormat('es-PE').format(totalPagos || 0)}
+            </p>
+            <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.5 rounded-md shrink-0">
+              Emitidos
+            </span>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Pagos de Hoy</span>
             <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60 text-xs">
               <Icon name="calendar" className="size-3.5" />
             </span>
           </div>
-          <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{pagosHoy}</p>
+          <div className="mt-1 flex items-baseline justify-between gap-2">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight tracking-tight">
+              {new Intl.NumberFormat('es-PE').format(pagosHoy || 0)}
+            </p>
+            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded-md shrink-0">
+              Jornada
+            </span>
           </div>
         </div>
       </div>
@@ -505,19 +554,28 @@ export function Pagos() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full min-w-[1080px] table-fixed text-left text-xs sm:text-sm">
+            <colgroup>
+              <col className="w-[140px]" />
+              <col className="w-[125px]" />
+              <col className="w-[130px]" />
+              <col className="w-[160px]" />
+              <col className="w-[120px]" />
+              <col className="w-[110px]" />
+              <col className="w-[210px]" />
+            </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-4 py-3.5 whitespace-nowrap">N° RECIBO</th>
-                <th className="px-4 py-3.5 whitespace-nowrap">FECHA / HORA</th>
+                <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="numeroRecibo" label="N° RECIBO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="fecha" label="FECHA / HORA" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3.5 whitespace-nowrap">TIPO / VOUCHER</th>
-                <th className="px-4 py-3.5 whitespace-nowrap">PAGADO POR</th>
-                <th className="px-4 py-3.5 whitespace-nowrap">MÉTODO</th>
-                <th className="px-4 py-3.5 whitespace-nowrap text-center">MONTO TOTAL</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[var(--bg-surface)] px-4 py-3.5 text-center whitespace-nowrap border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
+                <th className="px-4 py-3.5">PAGADO POR</th>
+                <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="metodoPago" label="MÉTODO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3.5 whitespace-nowrap text-center"><SortableHeader column="montoTotal" label="MONTO TOTAL" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[var(--bg-surface)] px-4 py-3.5 text-center border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] whitespace-nowrap">ACCIONES</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[var(--bg-surface)]">
+            <tbody className={`divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[var(--bg-surface)] transition-opacity ${isLoading && pagos.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && pagos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -545,13 +603,13 @@ export function Pagos() {
               ) : (
                 paginatedPagos.map((p) => (
                   <tr key={p.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-[var(--bg-subtle)]">
-                    <td className="px-4 py-3.5 whitespace-nowrap">
+                    <td className="px-4 py-3.5">
                       <p className="font-bold text-slate-900 dark:text-white">{p.numeroRecibo || 'Pendiente de recibo'}</p>
                       <span className="mt-0.5 inline-block rounded-md bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                         CAJA MUNICIPAL
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
+                    <td className="px-4 py-3.5">
                       <p className="font-bold text-slate-800 dark:text-slate-200">{p.fecha ? new Date(String(p.fecha).slice(0, 10) + 'T00:00:00').toLocaleDateString() : 'Sin fecha de pago'}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         {p.tipoPago} #{p.papeletaId || p.tramiteId || p.inscripcionId}
@@ -565,23 +623,55 @@ export function Pagos() {
                       <p className="font-bold text-slate-800 dark:text-slate-200">{p.pagadoPor || '—'}</p>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider ${p.metodo === 'EFECTIVO'
-                        ? 'bg-slate-100 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
-                        : 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${
+                        p.metodo === 'EFECTIVO'
+                          ? 'bg-slate-100 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
+                          : p.metodo && p.metodo !== 'SIN CONFIRMAR'
+                          ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
+                          : 'bg-amber-100/70 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
                         }`}>
                         {p.metodo || 'Sin confirmar'}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-center">
-                      <p className="font-black text-slate-900 dark:text-white">S/ {p.montoTotal?.toFixed(2) || '0.00'}</p>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">{p.estado}</p>
+                    <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                      <p className="font-black text-slate-900 dark:text-white">
+                        S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className={`text-[10px] font-bold uppercase tracking-wider ${
+                        p.estado === 'PAGADO'
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : p.estado === 'PENDIENTE'
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-rose-600 dark:text-rose-400'
+                      }`}>
+                        {p.estado}
+                      </p>
                     </td>
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-center border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] whitespace-nowrap min-w-[210px]">
                       <div className="flex items-center justify-center gap-1.5">
                         {p.estado === 'PENDIENTE' && p.tipoPago !== 'INTERNAMIENTO' && (
                           typeof p.id === 'string' && (p.id.startsWith('pap_pend_') || p.id.startsWith('cur_pend_'))
-                            ? <button onClick={() => handleGenerarRecibo(p)} className="rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white hover:bg-amber-600 cursor-pointer">Generar recibo</button>
-                            : <button onClick={() => handleConfirm(p)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 cursor-pointer">Confirmar recibo</button>
+                            ? (
+                              <button
+                                type="button"
+                                onClick={() => handleGenerarRecibo(p)}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300/90 bg-amber-50 px-2.5 text-xs font-bold text-amber-700 shadow-2xs transition-all hover:bg-amber-500 hover:border-amber-500 hover:text-white dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-600 dark:hover:text-white active:scale-95 whitespace-nowrap cursor-pointer shrink-0"
+                                title="Generar recibo oficial de pago"
+                              >
+                                <Icon name="payment" className="size-3.5" />
+                                <span>Generar recibo</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleConfirm(p)}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-300/90 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 shadow-2xs transition-all hover:bg-emerald-600 hover:border-emerald-600 hover:text-white dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-600 dark:hover:text-white active:scale-95 whitespace-nowrap cursor-pointer shrink-0"
+                                title="Confirmar recibo de pago"
+                              >
+                                <Icon name="receiptCheck" className="size-3.5" />
+                                <span>Confirmar recibo</span>
+                              </button>
+                            )
                         )}
                         <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver Detalle">
                           <Icon name="eye" className="size-4" />
@@ -605,18 +695,19 @@ export function Pagos() {
 
         <Pagination
           currentPage={currentPage}
-          totalItems={filteredPagos.length}
+          totalItems={totalFiltrado}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
           onItemsPerPageChange={(size) => {
             setItemsPerPage(size)
             setCurrentPage(1)
           }}
+          disabled={isLoading}
         />
       </div>
-      
+
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
           <div className="flex w-full max-w-2xl flex-col rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] rounded-t-3xl">
               <div className="flex items-center gap-2.5">
@@ -638,7 +729,7 @@ export function Pagos() {
               <div className="space-y-6 p-8 min-h-[400px]">
               {pagoToConfirm ? (
                 <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
-                  <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">DETALLES DEL RECIBO</legend>
+                  <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">DETALLES DEL RECIBO</legend>
                   <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                     <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">Monto: S/ {pagoToConfirm.montoTotal.toFixed(2)}</p>
                     <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{pagoToConfirm.referenciaPago}</p>
@@ -666,7 +757,7 @@ export function Pagos() {
               ) : (
                 <>
                 <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
-                  <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Buscar deudas de una persona</legend>
+                  <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Buscar deudas de una persona</legend>
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3">Busca por DNI para ver todas sus papeletas, trámites y cursos pendientes de pago, y elige cuál cobrar.</p>
                   <div className="flex gap-2">
                     <input
@@ -748,7 +839,7 @@ export function Pagos() {
 
                 {formData.origenId && (
                   <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
-                    <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Datos del pago recibido</legend>
+                    <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Datos del pago recibido</legend>
                     <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-4">El número de recibo lo asigna el sistema automáticamente.</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FloatingInput id="pago_fecha_directo" label="Fecha de pago" required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} />

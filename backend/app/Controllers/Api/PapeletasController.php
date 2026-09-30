@@ -35,6 +35,26 @@ class PapeletasController extends ResourceController
         }
     }
 
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        $row = $db->table('papeletas')
+            ->select("
+                COUNT(*) as total,
+                SUM(CASE WHEN estado = 'PENDIENTE_PAGO' THEN 1 ELSE 0 END) as pendientes,
+                SUM(CASE WHEN estado = 'PAGADA' THEN 1 ELSE 0 END) as pagadas,
+                SUM(CASE WHEN estado = 'ANULADA' THEN 1 ELSE 0 END) as anuladas
+            ", false)
+            ->get()->getRowArray();
+
+        return $this->respond(['data' => [
+            'total' => (int) ($row['total'] ?? 0),
+            'pendientes' => (int) ($row['pendientes'] ?? 0),
+            'pagadas' => (int) ($row['pagadas'] ?? 0),
+            'anuladas' => (int) ($row['anuladas'] ?? 0),
+        ]]);
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
@@ -118,6 +138,12 @@ class PapeletasController extends ResourceController
             $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
             $dni = $this->request->getGet('dni');
             $placa = $this->request->getGet('placa');
+            $buscar = trim((string)$this->request->getGet('buscar'));
+            $estado = strtoupper(trim((string)$this->request->getGet('estado')));
+            $origen = strtoupper(trim((string)$this->request->getGet('origen')));
+            $formalidad = strtoupper(trim((string)$this->request->getGet('formalidad')));
+            $tipoInfraccion = (int)($this->request->getGet('tipoInfraccion') ?? 0);
+            $fechaFiltro = strtoupper(trim((string)$this->request->getGet('fecha')));
 
             if ($inspectorId > 0) {
                 $builder->where('p.id_inspector', $inspectorId);
@@ -131,18 +157,103 @@ class PapeletasController extends ResourceController
             if (!empty($placa)) {
                 $builder->where('v.placa', $placa);
             }
-
-            if (empty($dni) && empty($placa)) {
-                $builder->limit(100);
+            if ($estado !== '' && $estado !== 'TODOS') {
+                $builder->where('p.estado', $estado);
+            }
+            if ($origen === 'OPERATIVO') {
+                $builder->where('p.id_operativo IS NOT NULL', null, false);
+            } elseif ($origen === 'RUTINA') {
+                $builder->where('p.id_operativo IS NULL', null, false);
+            }
+            if ($formalidad === 'FORMAL') {
+                $builder->where('v.id_asociacion IS NOT NULL', null, false);
+            } elseif ($formalidad === 'INFORMAL') {
+                $builder->where('v.id_asociacion IS NULL', null, false);
+            }
+            if ($tipoInfraccion > 0) {
+                $builder->where(
+                    'p.id IN (SELECT pd2.id_papeleta FROM papeleta_detalles pd2 WHERE pd2.id_tipo_infraccion = ' . $tipoInfraccion . ')',
+                    null,
+                    false
+                );
+            }
+            if ($fechaFiltro === 'HOY') {
+                $builder->where('DATE(p.fecha_hora)', date('Y-m-d'));
+            } elseif ($fechaFiltro === 'SEMANA') {
+                $builder->where('p.fecha_hora >=', date('Y-m-d H:i:s', strtotime('-7 days')));
+            } elseif ($fechaFiltro === 'MES') {
+                $builder->where('YEAR(p.fecha_hora)', date('Y'))->where('MONTH(p.fecha_hora)', date('n'));
+            }
+            if ($buscar !== '') {
+                $builder->groupStart()
+                    ->like('p.numero_papeleta', $buscar)
+                    ->orLike('v.placa', $buscar)
+                    ->orLike('per.numero', $buscar)
+                    ->orLike('c_per.nombres', $buscar)
+                    ->orLike('c_per.apellido_paterno', $buscar)
+                    ->orLike('p.lugar', $buscar)
+                    ->groupEnd();
             }
 
-            $rows = $builder->groupBy('p.id')
-                ->orderBy('p.id', 'DESC')
-                ->get()
-                ->getResultArray();
+            $page = (int)$this->request->getGet('page');
+            $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
+
+            $builder->groupBy('p.id');
+
+            $columnasOrdenables = [
+                'numeroPapeleta' => 'p.numero_papeleta',
+                'vehiculoPlaca' => 'v.placa',
+                'fechaHora' => 'p.fecha_hora',
+                'montoTotal' => 'p.monto_total',
+                'estado' => 'p.estado',
+            ];
+
+            $total = 0;
+            if ($page > 0) {
+                $subquery = (clone $builder)->select('p.id AS sub_id', false);
+                $total = $db->newQuery()->fromSubquery($subquery, 't_count')->countAllResults();
+
+                $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'p.id')
+                    ->limit($porPagina, ($page - 1) * $porPagina)
+                    ->get()
+                    ->getResultArray();
+            } else {
+                $sinFiltros = empty($dni) && empty($placa) && $buscar === ''
+                    && $estado === '' && $origen === '' && $formalidad === ''
+                    && $tipoInfraccion === 0 && $fechaFiltro === '';
+                if ($sinFiltros) {
+                    $builder->limit(100);
+                }
+                $rows = $builder->orderBy('p.id', 'DESC')
+                    ->get()
+                    ->getResultArray();
+            }
 
             $fileStorage = new \App\Services\FileStorageService();
             $data = [];
+
+            // Optimización por lotes para evitar N+1 al cargar detalles de infracción
+            $papeletaIds = array_column($rows, 'id');
+            $detallesAgrupados = [];
+            if (!empty($papeletaIds)) {
+                $todosDetalles = $db->table('papeleta_detalles pd')
+                    ->select('pd.id_papeleta, pd.id_tipo_infraccion as tipoInfraccionId, ti.codigo, ti.descripcion, ti.gravedad, pd.monto, pd.descuento, pd.monto_final as montoFinal')
+                    ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
+                    ->whereIn('pd.id_papeleta', $papeletaIds)
+                    ->get()
+                    ->getResultArray();
+
+                foreach ($todosDetalles as $d) {
+                    $pid = (int)$d['id_papeleta'];
+                    unset($d['id_papeleta']);
+                    $d['tipoInfraccionId'] = (int)$d['tipoInfraccionId'];
+                    $d['monto'] = (float)$d['monto'];
+                    $d['descuento'] = (float)$d['descuento'];
+                    $d['montoFinal'] = (float)$d['montoFinal'];
+                    $detallesAgrupados[$pid][] = $d;
+                }
+            }
+
             foreach ($rows as $row) {
                 $row['id'] = (int)$row['id'];
                 $row['montoTotal'] = (float)$row['montoTotal'];
@@ -161,26 +272,25 @@ class PapeletasController extends ResourceController
                 }
                 $row['vehiculoCaracteristicas'] = $caract ?: 'Características no especificadas';
                 
-                $detalles = $db->table('papeleta_detalles pd')
-                    ->select('pd.id_tipo_infraccion as tipoInfraccionId, ti.codigo, ti.descripcion, ti.gravedad, pd.monto, pd.descuento, pd.monto_final as montoFinal')
-                    ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
-                    ->where('pd.id_papeleta', $row['id'])
-                    ->get()
-                    ->getResultArray();
-
-                $row['detalles'] = array_map(static function (array $d) {
-                    $d['tipoInfraccionId'] = (int)$d['tipoInfraccionId'];
-                    $d['monto'] = (float)$d['monto'];
-                    $d['descuento'] = (float)$d['descuento'];
-                    $d['montoFinal'] = (float)$d['montoFinal'];
-                    return $d;
-                }, $detalles);
+                $row['detalles'] = $detallesAgrupados[$row['id']] ?? [];
 
                 $row['tipoInfraccionCodigo'] = $row['detalles'][0]['codigo'] ?? 'SIN DETALLE';
                 $row['tipoInfraccionDescripcion'] = $row['detalles'][0]['descripcion'] ?? 'Sin detalle registrado';
                 $row['tipoInfraccionGravedad'] = $row['detalles'][0]['gravedad'] ?? '';
 
                 $data[] = $row;
+            }
+
+            if ($page > 0) {
+                return $this->respond([
+                    'data' => $data,
+                    'meta' => [
+                        'total' => $total,
+                        'page' => $page,
+                        'porPagina' => $porPagina,
+                        'totalPaginas' => (int) ceil($total / $porPagina),
+                    ],
+                ]);
             }
 
             return $this->respond(['data' => $data]);

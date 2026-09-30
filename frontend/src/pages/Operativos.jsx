@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
@@ -54,7 +55,14 @@ export function Operativos({ user }) {
   const [estado, setEstado] = useState('TODOS')
   const [fechaFiltro, setFechaFiltro] = useState('TODAS')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setPage(1)
+  }
   const [modalOpen, setModalOpen] = useState(false)
   const [detail, setDetail] = useState(null)
   const [form, setForm] = useState(initialForm)
@@ -62,55 +70,76 @@ export function Operativos({ user }) {
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
 
+  const [totalFiltrado, setTotalFiltrado] = useState(0)
+
   const loadOperativos = async () => {
-    const response = await apiFetch('/operativos')
+    setLoading(true)
+    const params = new URLSearchParams({
+      page: String(page),
+      porPagina: String(itemsPerPage),
+    })
+    if (search) params.set('buscar', search)
+    if (estado !== 'TODOS') params.set('estado', estado)
+    if (fechaFiltro !== 'TODAS') params.set('fechaFiltro', fechaFiltro)
+    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
+
+    const response = await apiFetch(`/operativos?${params.toString()}`)
     if (!response.ok) throw response
     const payload = await response.json()
     const data = payload.data || []
     setOperativos(data)
-    setCachedData('/operativos', data)
+    setTotalFiltrado(payload.meta?.total ?? data.length)
   }
 
   useEffect(() => {
     setLoadError('')
-    loadOperativos().catch(() => setLoadError('No se pudo cargar el módulo de operativos.')).finally(() => setLoading(false))
-    apiFetch('/personal')
+    loadOperativos()
+      .catch(() => setLoadError('No se pudo cargar el módulo de operativos.'))
+      .finally(() => setLoading(false))
+  }, [page, itemsPerPage, search, estado, fechaFiltro, sortBy, sortDir])
+
+  useEffect(() => {
+    apiFetch('/personal?porPagina=100')
       .then((r) => r.ok ? r.json() : { data: [] })
       .then((r) => setPersonal((r.data || []).filter((p) => p.estado === 'ACTIVO')))
-      .catch(() => setPersonal([]))
+      .catch(() => {
+        setPersonal([])
+        showError('Personal no disponible', 'No se pudo cargar la lista de personal para asignación de operativos.')
+      })
   }, [])
 
   useEffect(() => setPage(1), [search, estado, fechaFiltro])
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    return operativos.filter((op) => {
-      const text = `${op.nombre || ''} ${op.lugar || ''} ${op.fecha || ''}`.toLowerCase()
-      const matchesSearch = text.includes(q)
-      const matchesEstado = estado === 'TODOS' || op.estado === estado
+  const [stats, setStats] = useState({ total: 0, activos: 0, finalizados: 0, papeletas: 0 })
 
-      let matchesFecha = true
-      if (fechaFiltro !== 'TODAS' && op.fecha) {
-        const opDate = new Date(op.fecha)
-        const now = new Date()
-        if (fechaFiltro === 'HOY') {
-          matchesFecha = opDate.toDateString() === now.toDateString()
-        } else if (fechaFiltro === 'SEMANA') {
-          const diffMs = now.getTime() - opDate.getTime()
-          const diffDays = diffMs / (1000 * 60 * 60 * 24)
-          matchesFecha = diffDays >= 0 && diffDays <= 7
-        } else if (fechaFiltro === 'MES') {
-          matchesFecha = opDate.getMonth() === now.getMonth() && opDate.getFullYear() === now.getFullYear()
-        }
-      }
+  const loadStats = () => {
+    apiFetch('/operativos/estadisticas')
+      .then((res) => res.ok ? res.json() : Promise.reject(res))
+      .then((payload) => setStats(payload.data ?? {}))
+      .catch(() => {})
+  }
 
-      return matchesSearch && matchesEstado && matchesFecha
-    })
-  }, [operativos, search, estado, fechaFiltro])
+  useEffect(() => {
+    loadStats()
+  }, [])
 
-  const visible = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const filtered = operativos
+  const visible = operativos
 
-  const handleExportExcel = () => {
+  const fetchTodoElFiltro = async () => {
+    const params = new URLSearchParams()
+    if (search) params.set('buscar', search)
+    if (estado !== 'TODOS') params.set('estado', estado)
+    if (fechaFiltro !== 'TODAS') params.set('fechaFiltro', fechaFiltro)
+    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
+    const res = await apiFetch(`/operativos?${params.toString()}`)
+    if (!res.ok) return filtered
+    const payload = await res.json()
+    return payload.data || []
+  }
+
+  const handleExportExcel = async () => {
+    const data = await fetchTodoElFiltro()
     exportToExcel({
       filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.xls`,
       sheetName: 'Operativos',
@@ -118,7 +147,7 @@ export function Operativos({ user }) {
       subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
       metadata: [
         { label: 'Estado', value: estado },
-        { label: 'Total Operativos', value: String(filtered.length) }
+        { label: 'Total Operativos', value: String(data.length) }
       ],
       columns: [
         { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, isText: true, width: 120, align: 'center' },
@@ -132,18 +161,19 @@ export function Operativos({ user }) {
         { header: 'ESTADO', key: 'estado', width: 120, align: 'center' },
         { header: 'OBSERVACIONES', render: (_, o) => o.observacion || '—', width: 240 }
       ],
-      data: filtered
+      data
     })
   }
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
+    const data = await fetchTodoElFiltro()
     exportToPdf({
       filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.pdf`,
       title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
       subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
       metadata: [
         { label: 'Estado', value: estado },
-        { label: 'Total Operativos', value: String(filtered.length) }
+        { label: 'Total Operativos', value: String(data.length) }
       ],
       columns: [
         { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, width: 25, align: 'center' },
@@ -156,13 +186,13 @@ export function Operativos({ user }) {
         { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 20, align: 'center' },
         { header: 'ESTADO', key: 'estado', width: 25, align: 'center' }
       ],
-      data: filtered
+      data
     })
   }
 
-  const activos = operativos.filter((op) => ['PROGRAMADO', 'EN_CURSO'].includes(op.estado)).length
-  const finalizados = operativos.filter((op) => op.estado === 'FINALIZADO').length
-  const papeletas = operativos.reduce((acc, op) => acc + Number(op.total_papeletas || 0), 0)
+  const activos = stats.activos ?? 0
+  const finalizados = stats.finalizados ?? 0
+  const papeletas = stats.papeletas ?? 0
 
   const openCreate = () => {
     setForm(initialForm)
@@ -225,6 +255,7 @@ export function Operativos({ user }) {
       const result = await response.json()
       if (!response.ok) throw new Error(result.message || result.messages?.error || 'No se pudo guardar el operativo.')
       await loadOperativos()
+      loadStats()
       setModalOpen(false)
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'No se pudo guardar el operativo.'))
@@ -247,6 +278,7 @@ export function Operativos({ user }) {
       const next = operativos.filter((op) => op.id !== id)
       setOperativos(next)
       setCachedData('/operativos', next)
+      loadStats()
       showToast('Operativo eliminado correctamente')
       return
     }
@@ -468,11 +500,11 @@ export function Operativos({ user }) {
       {loadError && <PageLoadError message={loadError} />}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-md">
-            <Icon name="operations" className="size-5.5" />
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="operations" className="size-7 stroke-[2.4]" />
           </span>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">Operativos</h1>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Operativos</h1>
             <p className="text-xs font-medium text-slate-500">Programación, asignación de inspectores e historial de papeletas.</p>
           </div>
         </div>
@@ -480,7 +512,7 @@ export function Operativos({ user }) {
 
       <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
         {[
-          ['Total operativos', operativos.length, 'mapPin'],
+          ['Total operativos', stats.total ?? 0, 'mapPin'],
           ['Activos', activos, 'operations'],
           ['Finalizados', finalizados, 'shieldCheck'],
           ['Papeletas vinculadas', papeletas, 'ticket'],
@@ -541,25 +573,33 @@ export function Operativos({ user }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+            <colgroup>
+              <col className="w-[26%]" />
+              <col className="w-[20%]" />
+              <col className="w-[13%]" />
+              <col className="w-[13%]" />
+              <col className="w-[14%]" />
+              <col className="w-[14%]" />
+            </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-4 py-3">Operativo</th>
-                <th className="px-4 py-3 whitespace-nowrap">Fecha / hora</th>
+                <th className="px-4 py-3"><SortableHeader column="nombre" label="Operativo" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 "><SortableHeader column="fecha" label="Fecha / hora" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 text-center">Inspectores</th>
                 <th className="px-4 py-3 text-center">Papeletas</th>
-                <th className="px-4 py-3 text-center">Estado</th>
+                <th className="px-4 py-3 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+            <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${loading && visible.length > 0 ? 'opacity-50' : ''}`}>
               {visible.map((op) => (
                 <tr key={op.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-[var(--bg-subtle)]">
                   <td className="px-4 py-3">
                     <p className="font-bold text-slate-900 dark:text-white">{op.nombre}</p>
                     <p className="mt-0.5 text-[11px] text-slate-500">{op.lugar}</p>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-4 py-3 ">
                     <p className="font-semibold text-slate-800 dark:text-slate-200">{formatFecha(op.fecha)}</p>
                     <p className="mt-0.5 text-[11px] text-slate-500">{formatHora(op.hora_inicio)}{op.hora_fin ? ` - ${formatHora(op.hora_fin)}` : ''}</p>
                   </td>
@@ -593,11 +633,11 @@ export function Operativos({ user }) {
           </table>
         </div>
 
-        <Pagination currentPage={page} totalItems={filtered.length} itemsPerPage={pageSize} onPageChange={setPage} onItemsPerPageChange={setPageSize} />
+        <Pagination currentPage={page} totalItems={totalFiltrado} itemsPerPage={itemsPerPage} onPageChange={setPage} onItemsPerPageChange={(size) => { setItemsPerPage(size); setPage(1) }} disabled={loading} />
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
           <form onSubmit={save} className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-[var(--bg-surface)]">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-black">{editing ? 'Editar operativo' : 'Nuevo operativo'}</h2>
@@ -607,7 +647,7 @@ export function Operativos({ user }) {
             </div>
             
             <fieldset className="mb-5 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-              <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-500">Datos Generales</legend>
+              <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Datos Generales</legend>
               <div className="grid gap-4 sm:grid-cols-2">
                 <FloatingInput id="op_nombre" label="Nombre" required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
                 <FloatingInput id="op_lugar" label="Lugar" required value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} />
@@ -640,7 +680,7 @@ export function Operativos({ user }) {
             </fieldset>
 
             <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-              <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-500">Inspectores Asignados</legend>
+              <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Inspectores Asignados</legend>
               <div className="grid max-h-56 gap-2 overflow-y-auto sm:grid-cols-2">
                 {personal.map((p) => (
                   <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-[var(--bg-subtle)]">
@@ -739,20 +779,20 @@ export function Operativos({ user }) {
                 <table className="w-full text-left text-xs">
                   <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-[var(--bg-surface)] border-b border-slate-100 dark:border-[var(--border)]">
                     <tr>
-                      <th className="px-4 py-2 whitespace-nowrap min-w-[125px]">Papeleta</th>
-                      <th className="px-4 py-2 whitespace-nowrap min-w-[170px]">Fecha / Lugar</th>
-                      <th className="px-4 py-2 whitespace-nowrap min-w-[170px]">Inspector</th>
-                      <th className="px-4 py-2 whitespace-nowrap min-w-[190px]">Intervenido</th>
-                      <th className="px-4 py-2 whitespace-nowrap min-w-[110px] text-center">Placa</th>
-                      <th className="px-4 py-2 whitespace-nowrap min-w-[110px] text-center">Infracción</th>
-                      <th className="px-4 py-2 whitespace-nowrap min-w-[110px] text-right">Monto</th>
-                      <th className="px-4 py-2 whitespace-nowrap min-w-[110px] text-center">Estado</th>
+                      <th className="px-4 py-2 ">Papeleta</th>
+                      <th className="px-4 py-2 ">Fecha / Lugar</th>
+                      <th className="px-4 py-2 ">Inspector</th>
+                      <th className="px-4 py-2 ">Intervenido</th>
+                      <th className="px-4 py-2 text-center">Placa</th>
+                      <th className="px-4 py-2 text-center">Infracción</th>
+                      <th className="px-4 py-2 text-right">Monto</th>
+                      <th className="px-4 py-2 text-center">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                     {(detail.papeletas || []).map((p) => (
                       <tr key={p.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-[var(--bg-subtle)]">
-                        <td className="px-4 py-2.5 whitespace-nowrap font-mono font-black text-slate-900 dark:text-white">
+                        <td className="px-4 py-2.5 font-mono font-black text-slate-900 dark:text-white">
                           {p.numero_papeleta}
                         </td>
                         <td className="px-4 py-2.5">
@@ -766,18 +806,18 @@ export function Operativos({ user }) {
                           <p className="font-semibold text-slate-800 dark:text-slate-200">{p.intervenido || 'No identificado'}</p>
                           <p className="text-[11px] text-slate-500 font-mono">DNI: {p.conductor_dni || 'S/D'}</p>
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-center">
+                        <td className="px-4 py-2.5 text-center">
                           <span className="inline-block rounded-lg border border-slate-300 bg-amber-50 px-2 py-0.5 font-mono text-[11px] font-black tracking-widest text-slate-900 shadow-xs dark:border-[var(--border-strong)] dark:bg-amber-400/10 dark:text-amber-300">
                             {p.placa || 'SIN PLACA'}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                        <td className="px-4 py-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
                           {p.infracciones || '—'}
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-right font-black text-slate-900 dark:text-white">
+                        <td className="px-4 py-2.5 text-right font-black text-slate-900 dark:text-white">
                           {money(p.monto_total)}
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-center">
+                        <td className="px-4 py-2.5 text-center">
                           <StatusBadge status={p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado} />
                         </td>
                       </tr>

@@ -1,6 +1,8 @@
+import { useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { BoletaInternamientoPrint } from '../components/retenciones/BoletaInternamientoPrint'
 import { OrdenLibertadPrint } from '../components/retenciones/OrdenLibertadPrint'
@@ -27,10 +29,25 @@ export function Retenciones({ user }) {
   const cached = getCachedData('/internamientos')
   const [internamientos, setInternamientos] = useState(cached || [])
   const [isLoading, setIsLoading] = useState(!cached)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm, setSearchTerm] = useState(() => new URLSearchParams(window.location.search).get('search') || '')
+
+  const location = useLocation()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const s = params.get('search')
+    setSearchTerm(s || '')
+  }, [location.search])
+
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
+  }
   const [selectedItem, setSelectedItem] = useState(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [printLayout, setPrintLayout] = useState('FICHA')
@@ -39,13 +56,24 @@ export function Retenciones({ user }) {
   const [registrando, setRegistrando] = useState(false)
   const [papeletas, setPapeletas] = useState([])
 
+  const [totalFiltrado, setTotalFiltrado] = useState(0)
+
   const loadInternamientos = () => {
-    apiFetch('/internamientos')
+    setIsLoading(true)
+    const params = new URLSearchParams({
+      page: String(currentPage),
+      porPagina: String(itemsPerPage),
+    })
+    if (searchTerm) params.set('buscar', searchTerm)
+    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
+
+    apiFetch(`/internamientos?${params.toString()}`)
       .then((res) => res.json())
       .then((res) => {
         const rows = res.data || []
         setInternamientos(rows)
-        setCachedData('/internamientos', rows)
+        setTotalFiltrado(res.meta?.total ?? rows.length)
         setIsLoading(false)
       })
       .catch(() => {
@@ -55,7 +83,23 @@ export function Retenciones({ user }) {
 
   useEffect(() => {
     loadInternamientos()
-    apiFetch('/papeletas')
+  }, [currentPage, itemsPerPage, searchTerm, filterEstado, sortBy, sortDir])
+
+  const [stats, setStats] = useState({ total: 0, enDeposito: 0, liberados: 0, avgDias: 0 })
+
+  const loadStats = () => {
+    apiFetch('/internamientos/estadisticas')
+      .then((res) => res.ok ? res.json() : Promise.reject(res))
+      .then((payload) => setStats(payload.data ?? {}))
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadStats()
+  }, [])
+
+  useEffect(() => {
+    apiFetch('/papeletas?porPagina=100')
       .then((res) => res.ok ? res.json() : Promise.reject(res))
       .then((res) => setPapeletas(res.data || []))
       .catch(() => {})
@@ -94,6 +138,7 @@ export function Retenciones({ user }) {
       if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo registrar el internamiento.')
       setIsNuevoModalOpen(false)
       loadInternamientos()
+      loadStats()
       showToast(`Internamiento ${data.data?.numeroOrden || ''} registrado correctamente`.trim())
     } catch (err) {
       showError('Error', sanitizarMensaje(err.message, 'No se pudo registrar el internamiento.'))
@@ -102,38 +147,31 @@ export function Retenciones({ user }) {
     }
   }
 
-  const totalInternados = internamientos.length
-  const enDeposito = internamientos.filter((i) => i.estado === 'RETENIDO').length
-  const liberados = internamientos.filter((i) => i.estado === 'LIBERADO').length
-  const avgDias = totalInternados > 0
-    ? Math.round(internamientos.reduce((acc, curr) => acc + (Number(curr.totalDias) || 0), 0) / totalInternados)
-    : 0
+  const totalInternados = stats.total ?? 0
+  const enDeposito = stats.enDeposito ?? 0
+  const liberados = stats.liberados ?? 0
+  const avgDias = stats.avgDias ?? 0
 
-  const filteredItems = internamientos.filter((item) => {
-    const search = searchTerm.toLowerCase()
-    const matchSearch =
-      item.vehiculoPlaca?.toLowerCase().includes(search) ||
-      item.numeroBoleta?.toLowerCase().includes(search) ||
-      item.numeroPapeleta?.toLowerCase().includes(search) ||
-      item.interesadoNombre?.toLowerCase().includes(search) ||
-      item.interesadoDni?.toLowerCase().includes(search) ||
-      item.deposito?.toLowerCase().includes(search)
-
-    const matchEstado = filterEstado === 'TODOS' || item.estado === filterEstado
-
-    return matchSearch && matchEstado
-  })
+  const filteredItems = internamientos
 
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, filterEstado])
 
-  const paginatedItems = filteredItems.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  const paginatedItems = internamientos
 
-  const handleExportExcel = () => {
+  const fetchTodoElFiltro = async () => {
+    const params = new URLSearchParams()
+    if (searchTerm) params.set('buscar', searchTerm)
+    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    const res = await apiFetch(`/internamientos?${params.toString()}`)
+    if (!res.ok) return filteredItems
+    const payload = await res.json()
+    return payload.data || []
+  }
+
+  const handleExportExcel = async () => {
+    const data = await fetchTodoElFiltro()
     exportToExcel({
       filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.xls`,
       sheetName: 'Internamientos',
@@ -141,7 +179,7 @@ export function Retenciones({ user }) {
       subtitle: 'Subgerencia de Tránsito y Transporte - Custodia y Órdenes de Libertad',
       metadata: [
         { label: 'Estado', value: filterEstado },
-        { label: 'Total Registros', value: String(filteredItems.length) }
+        { label: 'Total Registros', value: String(data.length) }
       ],
       columns: [
         { header: 'N° BOLETA', key: 'numeroBoleta', isText: true, width: 130, align: 'center' },
@@ -157,18 +195,19 @@ export function Retenciones({ user }) {
         { header: 'FECHA LIBERACIÓN', render: (_, i) => i.fechaLiberacion || 'EN CUSTODIA', width: 130, align: 'center' },
         { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
       ],
-      data: filteredItems
+      data
     })
   }
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
+    const data = await fetchTodoElFiltro()
     exportToPdf({
       filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.pdf`,
       title: 'REGISTRO DE INTERNAMIENTOS EN DEPÓSITO MUNICIPAL DE VEHÍCULOS',
       subtitle: 'Subgerencia de Tránsito y Transporte - Custodia y Órdenes de Libertad',
       metadata: [
         { label: 'Estado', value: filterEstado === 'TODOS' ? 'Todos' : filterEstado },
-        { label: 'Total Registros', value: String(filteredItems.length) }
+        { label: 'Total Registros', value: String(data.length) }
       ],
       columns: [
         { header: 'N° BOLETA', key: 'numeroBoleta', width: 20, align: 'center' },
@@ -177,7 +216,7 @@ export function Retenciones({ user }) {
         { header: 'INTERESADO', key: 'interesadoNombre', width: 35 },
         { header: 'ESTADO', key: 'estado', width: 15, align: 'center' }
       ],
-      data: filteredItems
+      data
     })
   }
 
@@ -223,11 +262,11 @@ export function Retenciones({ user }) {
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose-600 to-orange-600 text-white shadow-md">
-            <Icon name="retention" className="size-5.5" />
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="retention" className="size-7 stroke-[2.4]" />
           </span>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
               Internamientos Vehiculares
             </h1>
             <p className="text-xs font-medium text-slate-500">
@@ -323,20 +362,29 @@ export function Retenciones({ user }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+            <colgroup>
+              <col className="w-[15%]" />
+              <col className="w-[15%]" />
+              <col className="w-[18%]" />
+              <col className="w-[17%]" />
+              <col className="w-[15%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-4 py-3.5">Boleta / Depósito</th>
+                <th className="px-4 py-3.5"><SortableHeader column="numeroBoleta" label="Boleta / Depósito" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3.5">Vehículo & Placa</th>
                 <th className="px-4 py-3.5">Motivo / Infracción</th>
                 <th className="px-4 py-3.5">Interesado / Conductor</th>
-                <th className="px-4 py-3.5">Ingreso & Custodia</th>
-                <th className="px-4 py-3.5 text-center">Estado</th>
+                <th className="px-4 py-3.5"><SortableHeader column="fechaIngreso" label="Ingreso & Custodia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3.5 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3.5 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)] print:divide-black">
-              {isLoading ? (
+            <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] print:divide-black transition-opacity ${isLoading && internamientos.length > 0 ? 'opacity-50' : ''}`}>
+              {isLoading && internamientos.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                     Cargando internamientos...
@@ -439,19 +487,20 @@ export function Retenciones({ user }) {
         <div className="border-t border-slate-100 p-3.5 dark:border-[var(--border)]">
           <Pagination
             currentPage={currentPage}
-            totalItems={filteredItems.length}
+            totalItems={totalFiltrado}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
             onItemsPerPageChange={(size) => {
               setItemsPerPage(size)
               setCurrentPage(1)
             }}
+            disabled={isLoading}
           />
         </div>
       </div>
 
       {isNuevoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsNuevoModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
           <form onSubmit={handleRegistrarInternamiento} className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
@@ -472,7 +521,7 @@ export function Retenciones({ user }) {
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
               <fieldset className="rounded-xl border border-slate-200 p-3.5 dark:border-[var(--border-strong)]">
-                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Papeleta de Origen</legend>
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Papeleta de Origen</legend>
                 <FloatingSelect
                   id="int_papeleta"
                   label="Papeleta"
@@ -490,7 +539,7 @@ export function Retenciones({ user }) {
               </fieldset>
 
               <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Datos del Internamiento</legend>
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Datos del Internamiento</legend>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FloatingInput id="int_deposito" label="Depósito Municipal" required value={nuevoInternamiento.deposito} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, deposito: e.target.value })} />
                   <FloatingInput id="int_lugar" label="Lugar de intervención" optional value={nuevoInternamiento.lugarIntervencion} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, lugarIntervencion: e.target.value })} />
@@ -501,7 +550,7 @@ export function Retenciones({ user }) {
               </fieldset>
 
               <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Interesado / Autoridad</legend>
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Interesado / Autoridad</legend>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FloatingInput
                     id="int_interesado_dni"

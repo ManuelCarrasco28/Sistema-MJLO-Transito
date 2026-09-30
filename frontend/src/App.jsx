@@ -83,11 +83,11 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (path.includes('/personas')) return 'Personas'
     if (path.includes('/trabajadores')) return 'Trabajadores'
     if (path.includes('/asociaciones')) return 'Asociaciones'
-    if (path.includes('/documentos')) return 'Documentos'
-    if (path.includes('/inspecciones')) return 'Inspecciones'
+    if (path.includes('/documentos')) return 'Documentos del Vehículo'
+    if (path.includes('/inspecciones')) return 'Certicav'
     if (path.includes('/papeletas')) return 'Papeletas'
     if (path.includes('/operativos')) return 'Operativos'
-    if (path.includes('/cursos')) return 'Cursos'
+    if (path.includes('/cursos')) return 'Curso de Seguridad Vial'
     if (path.includes('/pagos')) return 'Pagos'
     if (path.includes('/internamientos') || path.includes('/retenciones')) return 'Internamientos'
     if (path.includes('/permisos')) return 'Permisos y Autorizaciones'
@@ -126,11 +126,11 @@ function Layout({ onLogout, user, onUserUpdate }) {
             setNotifications(payload.data)
           }
         }
-      } catch (error) {
-        console.error('Error fetching notificaciones:', error)
+      } catch {
+        // Silencioso: es un sondeo periódico en segundo plano, se reintentará en el próximo ciclo.
       }
     }
-    
+
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000); // Poll every minute
     
@@ -235,9 +235,15 @@ function Layout({ onLogout, user, onUserUpdate }) {
               <Route path="/retenciones" element={onlyNormalUser(<Navigate to="/internamientos" replace />)} />
               <Route path="/permisos" element={onlyOfficeUser(<Permisos />)} />
               <Route path="*" element={
-                <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">
-                  <h2 className="text-xl font-bold">Módulo en desarrollo</h2>
-                  <p className="mt-2 text-slate-500">Esta sección estará disponible próximamente.</p>
+                <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-white dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] shadow-xs">
+                  <div className="size-16 rounded-2xl bg-slate-100 dark:bg-[var(--bg-subtle)] flex items-center justify-center text-slate-500 mb-4">
+                    <span className="text-2xl font-black">404</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">Página no encontrada</h2>
+                  <p className="mt-2 text-sm text-slate-500 max-w-md">La dirección a la que intenta acceder no existe o fue movida a otra ubicación.</p>
+                  <a href="/dashboard" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700">
+                    Volver al Dashboard
+                  </a>
                 </div>
               } />
             </Routes>

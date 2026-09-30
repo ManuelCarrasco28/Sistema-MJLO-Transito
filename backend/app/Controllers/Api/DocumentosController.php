@@ -16,12 +16,48 @@ class DocumentosController extends ResourceController
         return array_intersect_key($record, array_flip(self::COLUMNAS));
     }
 
+    /**
+     * Sinónimos de tipo_documento: el catálogo vigente del módulo es
+     * TARJETA_OPERATIVIDAD / SOAT / TARJETA_PROPIEDAD, pero datos antiguos
+     * (o el seeder) usan nombres previos para el mismo concepto. Se agrupan
+     * aquí para que filtros y estadísticas los traten como uno solo.
+     */
+    private const SINONIMOS_TIPO = [
+        'TARJETA_OPERATIVIDAD' => ['TARJETA_OPERATIVIDAD', 'PERMISO_OPERACION'],
+        'TARJETA_PROPIEDAD' => ['TARJETA_PROPIEDAD', 'TARJETA_CIRCULACION'],
+        'SOAT' => ['SOAT'],
+    ];
+
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        $row = $db->table('documentos_vehiculo')
+            ->select("
+                COUNT(*) as total,
+                SUM(CASE WHEN tipo_documento IN ('TARJETA_OPERATIVIDAD', 'PERMISO_OPERACION') THEN 1 ELSE 0 END) as tuc,
+                SUM(CASE WHEN tipo_documento = 'SOAT' THEN 1 ELSE 0 END) as soat,
+                SUM(CASE WHEN tipo_documento IN ('TARJETA_PROPIEDAD', 'TARJETA_CIRCULACION') THEN 1 ELSE 0 END) as propiedad,
+                SUM(CASE WHEN estado = 'VIGENTE' THEN 1 ELSE 0 END) as vigentes,
+                SUM(CASE WHEN estado != 'VIGENTE' THEN 1 ELSE 0 END) as vencidos
+            ", false)
+            ->get()->getRowArray();
+
+        return $this->respond(['data' => [
+            'total' => (int) ($row['total'] ?? 0),
+            'tucDocs' => (int) ($row['tuc'] ?? 0),
+            'soatDocs' => (int) ($row['soat'] ?? 0),
+            'propiedadDocs' => (int) ($row['propiedad'] ?? 0),
+            'vigentes' => (int) ($row['vigentes'] ?? 0),
+            'inactivosOVencidos' => (int) ($row['vencidos'] ?? 0),
+        ]]);
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
         $resMunicipalCol = "COALESCE(o.resolucion_alcaldia, '')";
 
-        $rows = $db->table('documentos_vehiculo d')
+        $builder = $db->table('documentos_vehiculo d')
             ->select("
                 d.id,
                 d.id_vehiculo AS vehiculoId,
@@ -56,8 +92,73 @@ class DocumentosController extends ResourceController
             ->join('asociaciones o', 'o.id = v.id_asociacion', 'left')
             ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
             ->join('personas p', 'p.id = vp.id_persona', 'left')
-            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-            ->orderBy('d.id', 'DESC')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left');
+
+        $buscar = trim((string)$this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $builder->groupStart()
+                ->like('d.codigo', $buscar)
+                ->orLike('v.placa', $buscar)
+                ->orLike('p.numero', $buscar)
+                ->orLike('c.nombres', $buscar)
+                ->orLike('c.apellido_paterno', $buscar)
+                ->orLike('o.razon_social', $buscar)
+                ->groupEnd();
+        }
+
+        $tipoDoc = strtoupper(trim((string)$this->request->getGet('tipoDocumento')));
+        if ($tipoDoc !== '' && $tipoDoc !== 'TODOS') {
+            $builder->whereIn('d.tipo_documento', self::SINONIMOS_TIPO[$tipoDoc] ?? [$tipoDoc]);
+        }
+
+        $estado = strtoupper(trim((string)$this->request->getGet('estado')));
+        if ($estado !== '' && $estado !== 'TODOS') {
+            $builder->where('d.estado', $estado);
+        }
+
+        $page = (int)$this->request->getGet('page');
+        $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
+
+        $columnasOrdenables = [
+            'vehiculoPlaca' => 'v.placa',
+            'tipoDocumento' => 'd.tipo_documento',
+            'codigo' => 'd.codigo',
+            'fechaExpiracion' => 'd.fecha_expiracion',
+            'estado' => 'd.estado',
+        ];
+
+        if ($page > 0) {
+            $total = (clone $builder)->countAllResults(false);
+            $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'd.id')
+                ->limit($porPagina, ($page - 1) * $porPagina)
+                ->get()
+                ->getResultArray();
+
+            $data = array_map(static function (array $row): array {
+                $propietario = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
+                $apellidos = trim(($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
+                $row['propietario'] = $propietario ?: 'Sin Propietario Asignado';
+                $row['conductorNombres'] = trim($row['propietarioNombres'] ?? '');
+                $row['conductorApellidos'] = $apellidos;
+                $row['conductorDni'] = $row['propietarioDni'] ?? '';
+                $row['numeroLicencia'] = $row['conductorLicencia'] ?? '';
+                $row['hasPropietario'] = !empty($propietario);
+                unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
+                return $row;
+            }, $rows);
+
+            return $this->respond([
+                'data' => $data,
+                'meta' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'porPagina' => $porPagina,
+                    'totalPaginas' => (int) ceil($total / $porPagina),
+                ],
+            ]);
+        }
+
+        $rows = $builder->orderBy('d.id', 'DESC')
             ->get()
             ->getResultArray();
 
@@ -88,10 +189,10 @@ class DocumentosController extends ResourceController
                 'errors' => ['required' => 'El número o código del documento es obligatorio.']
             ],
             'tipoDocumento' => [
-                'rules' => 'required|in_list[TARJETA_OPERATIVIDAD,SOAT,CERTICAV]',
+                'rules' => 'required|in_list[TARJETA_OPERATIVIDAD,SOAT,TARJETA_PROPIEDAD]',
                 'errors' => [
                     'required' => 'El tipo de documento es obligatorio.',
-                    'in_list' => 'Tipo de documento vehicular no válido. Solo se permite Tarjeta de Operatividad, CertiCAV, y SOAT.'
+                    'in_list' => 'Tipo de documento vehicular no válido. Solo se permite Tarjeta de Operatividad, SOAT y Tarjeta de Propiedad.'
                 ]
             ],
             'vehiculoPlaca' => [
@@ -106,16 +207,12 @@ class DocumentosController extends ResourceController
 
         $rawTipo = strtoupper(trim($input['tipoDocumento'] ?? 'TARJETA_OPERATIVIDAD'));
 
-        if ($rawTipo === 'TARJETA_PROPIEDAD') {
-            return $this->failValidationErrors('La Tarjeta de Propiedad es expedida exclusivamente por la SUNARP (Partida Registral) y no constituye un documento emitible por la Municipalidad.');
+        if ($rawTipo === 'CITV' || $rawTipo === 'INSPECCION_TECNICA' || $rawTipo === 'CERTICAV' || $rawTipo === 'REVISION_TECNICA') {
+            return $this->failValidationErrors('Las inspecciones técnicas (CertiCAV/CITV) se registran en el módulo de Inspecciones Técnicas, no aquí.');
         }
 
-        if ($rawTipo === 'CITV' || $rawTipo === 'INSPECCION_TECNICA') {
-            return $this->failValidationErrors('Las inspecciones técnicas (CITV) no son gestionadas en este módulo de emisión de documentos.');
-        }
-
-        if (!in_array($rawTipo, ['TARJETA_OPERATIVIDAD', 'SOAT', 'CERTICAV'], true)) {
-            return $this->failValidationErrors('Tipo de documento vehicular no válido. Solo se permite Tarjeta de Operatividad, CertiCAV, y SOAT.');
+        if (!in_array($rawTipo, ['TARJETA_OPERATIVIDAD', 'SOAT', 'TARJETA_PROPIEDAD'], true)) {
+            return $this->failValidationErrors('Tipo de documento vehicular no válido. Solo se permite Tarjeta de Operatividad, SOAT y Tarjeta de Propiedad.');
         }
 
         $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
@@ -172,7 +269,10 @@ class DocumentosController extends ResourceController
             'tipo_documento'     => $rawTipo,
             'codigo'             => trim($input['codigo']),
             'fecha_expedicion'   => !empty($input['fechaExpedicion']) ? $input['fechaExpedicion'] : date('Y-m-d'),
-            'fecha_expiracion'   => !empty($input['fechaExpiracion']) ? $input['fechaExpiracion'] : date('Y-m-d', strtotime('+1 year')),
+            // La Tarjeta de Propiedad no tiene fecha de vencimiento (no vence).
+            'fecha_expiracion'   => $rawTipo === 'TARJETA_PROPIEDAD'
+                ? null
+                : (!empty($input['fechaExpiracion']) ? $input['fechaExpiracion'] : date('Y-m-d', strtotime('+1 year'))),
             'estado'             => strtoupper($input['estado'] ?? 'VIGENTE'),
         ];
 
@@ -240,24 +340,28 @@ class DocumentosController extends ResourceController
 
         $record = [];
         $tipoDocumento = isset($input['tipoDocumento']) ? strtoupper(trim($input['tipoDocumento'])) : null;
-        // Solo se valida si cambia el tipo: un CITV o Tarjeta de Propiedad ya
-        // registrado debe poder editarse (p. ej. marcarlo VENCIDO).
+        // Solo se valida si cambia el tipo: un CITV/CertiCAV ya registrado
+        // (legado) debe poder seguir editándose (p. ej. marcarlo VENCIDO).
         if ($tipoDocumento !== null && $tipoDocumento !== $actual['tipo_documento']) {
-            if ($tipoDocumento === 'TARJETA_PROPIEDAD') {
-                return $this->failValidationErrors('La Tarjeta de Propiedad es de SUNARP y no es un documento emitible por la Municipalidad.');
+            if ($tipoDocumento === 'CITV' || $tipoDocumento === 'INSPECCION_TECNICA' || $tipoDocumento === 'CERTICAV' || $tipoDocumento === 'REVISION_TECNICA') {
+                return $this->failValidationErrors('Las inspecciones técnicas (CertiCAV/CITV) se registran en el módulo de Inspecciones Técnicas, no aquí.');
             }
-            if ($tipoDocumento === 'CITV' || $tipoDocumento === 'INSPECCION_TECNICA') {
-                return $this->failValidationErrors('Las inspecciones técnicas (CITV) no son gestionadas en este módulo de emisión de documentos.');
-            }
-            if (!in_array($tipoDocumento, ['TARJETA_OPERATIVIDAD', 'SOAT', 'CERTICAV'], true)) {
+            if (!in_array($tipoDocumento, ['TARJETA_OPERATIVIDAD', 'SOAT', 'TARJETA_PROPIEDAD'], true)) {
                 return $this->failValidationErrors('Tipo de documento vehicular no válido.');
             }
             $record['tipo_documento'] = $tipoDocumento;
         }
 
+        $tipoEfectivo = $record['tipo_documento'] ?? $actual['tipo_documento'];
+
         if (isset($input['codigo'])) $record['codigo'] = trim($input['codigo']);
-        if (isset($input['fechaExpedicion'])) $record['fecha_expedicion'] = $input['fechaExpedicion'];
-        if (isset($input['fechaExpiracion'])) $record['fecha_expiracion'] = $input['fechaExpiracion'];
+        if (isset($input['fechaExpedicion'])) $record['fecha_expedicion'] = $input['fechaExpedicion'] ?: null;
+        if (isset($input['fechaExpiracion'])) {
+            // La Tarjeta de Propiedad no tiene fecha de vencimiento.
+            $record['fecha_expiracion'] = in_array($tipoEfectivo, ['TARJETA_PROPIEDAD', 'TARJETA_CIRCULACION'], true)
+                ? null
+                : ($input['fechaExpiracion'] ?: null);
+        }
         if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
         $record = $this->soloColumnasReales($record);
 

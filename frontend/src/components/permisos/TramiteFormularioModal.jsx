@@ -188,8 +188,8 @@ export function TramiteFormularioModal({
       showError('Validación', 'Por favor ingresa o selecciona la Razón Social o Administrado antes de continuar.')
       return
     }
-    if (!formData.solicitanteDocumento?.trim()) {
-      showError('Validación', 'Por favor ingresa el RUC o DNI del solicitante.')
+    if (!/^\d{8}$|^\d{11}$/.test(formData.solicitanteDocumento?.trim() || '')) {
+      showError('Validación', 'El RUC o DNI del solicitante debe tener 8 dígitos (DNI) u 11 dígitos (RUC).')
       return
     }
 
@@ -206,7 +206,7 @@ export function TramiteFormularioModal({
       sessionStorage.setItem('mjlo_permiso_borrador', JSON.stringify(currentData))
       localStorage.setItem('mjlo_permiso_borrador', JSON.stringify(currentData))
     } catch (err) {
-      console.warn('Error guardando borrador temporal:', err)
+      showError('Almacenamiento local', 'No se pudo guardar el borrador en memoria temporal de su navegador.')
     }
 
     const width = Math.min(1380, window.screen.availWidth - 40)
@@ -241,8 +241,8 @@ export function TramiteFormularioModal({
       showError('Validación', 'Por favor ingresa o selecciona la Razón Social o Administrado.')
       return
     }
-    if (!formData.solicitanteDocumento.trim()) {
-      showError('Validación', 'Por favor ingresa el RUC o DNI del solicitante.')
+    if (!/^\d{8}$|^\d{11}$/.test(formData.solicitanteDocumento.trim())) {
+      showError('Validación', 'El RUC o DNI del solicitante debe tener 8 dígitos (DNI) u 11 dígitos (RUC).')
       return
     }
 
@@ -287,7 +287,7 @@ export function TramiteFormularioModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter overflow-y-auto" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") onClose(); e.currentTarget.dataset.downOnOverlay = "" }}>
       <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] my-auto w-full max-w-4xl max-h-[92vh] transition-all duration-200">
         
         {/* Cabecera del Modal Estilo /personas */}
@@ -459,8 +459,8 @@ export function TramiteFormularioModal({
 
           {/* 3. CAMPOS DE DATOS GENERALES */}
           <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs space-y-3">
-            <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
-              <span className="size-2 rounded-full bg-blue-600" />
+            <legend className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white px-1 mb-2 flex items-center gap-2">
+              <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
               Datos del Solicitante, Vehículo y Expediente
             </legend>
 

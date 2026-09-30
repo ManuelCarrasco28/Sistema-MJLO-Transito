@@ -11,6 +11,7 @@ import { formatFecha } from '../utils/formatters'
 import { exportPersonasExcel, exportPersonasPdf } from '../utils/exportPersonas'
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import { PersonaDetalleModal } from '../components/personas/PersonaDetalleModal'
+import { SortableHeader } from '../components/ui/SortableHeader'
 
 function formatTipoDocLabel(t) {
   const code = (t.codigo || '').toUpperCase().trim()
@@ -45,19 +46,37 @@ const ESTADO_CIVIL_OPTIONS = [
 ]
 
 export function Personas({ user, onUserUpdate }) {
-  const cached = getCachedData('/personas')
-  const [personas, setPersonas] = useState(cached || [])
-  const [isLoading, setIsLoading] = useState(!cached)
+  const [personas, setPersonas] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [totalFiltrado, setTotalFiltrado] = useState(0)
+  const [stats, setStats] = useState({ total: 0, conLicencia: 0, sinLicencia: 0, activos: 0, inactivos: 0 })
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
+  }
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+
+  // Espera a que el usuario deje de escribir antes de consultar al backend
+  // (antes se filtraba en cada tecla sobre el padrón completo en memoria).
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearchTerm(searchTerm), 400)
+    return () => clearTimeout(timeout)
+  }, [searchTerm])
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedPersona, setSelectedPersona] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSearchingReniec, setIsSearchingReniec] = useState(false)
+  const [isFetchingFotoReniec, setIsFetchingFotoReniec] = useState(false)
   const [loadError, setLoadError] = useState('')
 
   const cachedTipos = getCachedData('/tipo-documentos')
@@ -87,22 +106,43 @@ export function Personas({ user, onUserUpdate }) {
     fotoImg: '',
   })
 
+  // Trae solo la página actual desde el backend (antes se cargaba el padrón
+  // completo a memoria y se filtraba/paginaba en el navegador; con 30,000+
+  // personas eso era el cuello de botella real del módulo).
   const loadPersonas = async () => {
-    const response = await apiFetch('/personas')
+    const params = new URLSearchParams({
+      page: String(currentPage),
+      porPagina: String(itemsPerPage),
+    })
+    if (debouncedSearchTerm) params.set('buscar', debouncedSearchTerm)
+    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
+
+    const response = await apiFetch(`/personas?${params.toString()}`)
     if (!response.ok) throw response
     const payload = await response.json()
-    const data = payload.data ?? []
-    setPersonas(data)
-    setCachedData('/personas', data)
-    return data
+    setPersonas(payload.data ?? [])
+    setTotalFiltrado(payload.meta?.total ?? 0)
+    return payload.data
+  }
+
+  const loadStats = () => {
+    apiFetch('/personas/estadisticas')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => { if (payload?.data) setStats(payload.data) })
+      .catch(() => {})
   }
 
   useEffect(() => {
+    setIsLoading(true)
     setLoadError('')
-    invalidateCache('/personas')
     loadPersonas()
       .catch(() => setLoadError('No se pudo cargar el padrón de personas.'))
       .finally(() => setIsLoading(false))
+  }, [currentPage, itemsPerPage, debouncedSearchTerm, filterEstado, sortBy, sortDir])
+
+  useEffect(() => {
+    loadStats()
 
     apiFetch('/tipo-documentos')
       .then((res) => (res.ok ? res.json() : null))
@@ -116,14 +156,16 @@ export function Personas({ user, onUserUpdate }) {
           setTipoDocOptions(opts)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
-  const totalPersonas = personas.length
-  const conductores = personas.filter((p) => Boolean(p.numeroLicencia)).length
-  const propietarios = personas.filter((p) => !p.numeroLicencia).length
-  const activos = personas.filter((p) => p.estado === 'ACTIVO').length
-  const inactivos = personas.filter((p) => p.estado !== 'ACTIVO').length
+  // Vienen de /personas/estadisticas (COUNT en SQL), no del array cargado:
+  // con paginación real, "personas" en memoria ya no es el padrón completo.
+  const totalPersonas = stats.total
+  const conductores = stats.conLicencia
+  const propietarios = stats.sinLicencia
+  const activos = stats.activos
+  const inactivos = stats.inactivos
   const porcentajeActivos = totalPersonas > 0 ? Math.round((activos / totalPersonas) * 100) : 0
 
   const kpiItems = [
@@ -171,23 +213,12 @@ export function Personas({ user, onUserUpdate }) {
     },
   ]
 
-  const filteredPersonas = personas.filter((p) => {
-    const fullSearch = `${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''} ${p.numeroDocumento || ''} ${p.numeroLicencia || ''}`.toLowerCase()
-    const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
-    const matchesEstado = filterEstado === 'TODOS' || p.estado === filterEstado
-
-    return matchesSearch && matchesEstado
-  })
+  // "personas" ya viene filtrada y paginada desde el backend.
+  const paginatedPersonas = personas
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterEstado])
-
-
-  const paginatedPersonas = filteredPersonas.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  }, [debouncedSearchTerm, filterEstado])
 
   useQuickCreate(() => handleOpenCreateModal(), !isLoading)
 
@@ -240,13 +271,17 @@ export function Personas({ user, onUserUpdate }) {
         try {
           const errData = await response.json()
           errorMsg = errData.messages?.error || errData.message || errorMsg
-        } catch (_) {}
+        } catch (_) { }
         throw new Error(errorMsg)
       }
       const res = await response.json()
       const data = res.data || (res.nombres ? res : null)
-      
+
       if (data) {
+        // La foto de RENIEC nunca se autocompleta aquí: solo se usa si el
+        // usuario la pide explícitamente con "Usar foto de RENIEC" en la
+        // sección de foto. Al crear/editar, la foto es responsabilidad del
+        // funcionario (subida manual o ese botón explícito).
         setFormData(prev => ({
           ...prev,
           nombres: data.nombres || prev.nombres,
@@ -254,7 +289,6 @@ export function Personas({ user, onUserUpdate }) {
           apellidoMaterno: data.apellidoMaterno || data.apellido_materno || prev.apellidoMaterno,
           direccion: data.direccion || prev.direccion,
           estadoCivil: data.estadoCivil || data.estado_civil || prev.estadoCivil,
-          fotoImg: data.foto_url || data.foto || prev.fotoImg
         }))
       } else {
         throw new Error('No se encontraron datos para el documento ingresado.')
@@ -263,6 +297,33 @@ export function Personas({ user, onUserUpdate }) {
       showError('Consulta de Documento', err.message || 'No se pudo consultar la información del documento.')
     } finally {
       setIsSearchingReniec(false)
+    }
+  }
+
+  const handleUsarFotoReniec = async () => {
+    const dni = formData.numeroDocumento?.trim()
+    if (!dni || dni.length !== 8 || !/^\d{8}$/.test(dni)) {
+      showError('DNI Inválido', 'El número de DNI debe tener exactamente 8 dígitos numéricos para consultar la foto.')
+      return
+    }
+
+    setIsFetchingFotoReniec(true)
+    try {
+      const response = await apiFetch(`/pide/reniec/${dni}`)
+      if (!response.ok) throw new Error('El servicio de consulta no responde en este momento.')
+      const res = await response.json()
+      const data = res.data || (res.nombres ? res : null)
+      const foto = data?.foto_url || data?.foto
+      if (!foto) {
+        showError('Sin foto', 'RENIEC no devolvió una foto para este documento.')
+        return
+      }
+      setFormData(prev => ({ ...prev, fotoImg: foto, fotoUrl: foto }))
+      showToast('Foto de RENIEC aplicada. Recuerda guardar los cambios.')
+    } catch (err) {
+      showError('Consulta de Foto', err.message || 'No se pudo obtener la foto de RENIEC.')
+    } finally {
+      setIsFetchingFotoReniec(false)
     }
   }
 
@@ -311,9 +372,21 @@ export function Personas({ user, onUserUpdate }) {
     setFormData((prev) => ({ ...prev, fotoImg: '', fotoUrl: '' }))
   }
 
-  const handleOpenDetail = (persona) => {
+  const handleOpenDetail = async (persona) => {
     setSelectedPersona(persona)
     setIsDetailModalOpen(true)
+    setIsLoadingDetail(true)
+    try {
+      const response = await apiFetch(`/personas/${persona.id}`)
+      if (response.ok) {
+        const payload = await response.json()
+        if (payload?.data) setSelectedPersona(payload.data)
+      }
+    } catch {
+      // Si falla, se queda con los datos básicos ya cargados en la tabla.
+    } finally {
+      setIsLoadingDetail(false)
+    }
   }
 
   const handleDelete = async (id) => {
@@ -327,18 +400,29 @@ export function Personas({ user, onUserUpdate }) {
     if (result.isConfirmed) {
       try {
         await apiFetch(`/personas/${id}`, { method: 'DELETE' })
-        const nextPersonas = personas.filter((p) => p.id !== id)
-        setPersonas(nextPersonas)
-        setCachedData('/personas', nextPersonas)
         showToast('Se ha eliminado')
+        loadPersonas().catch(() => {})
+        loadStats()
       } catch (err) {
         showError('Error', 'No se pudo eliminar a la persona.')
       }
     }
   }
 
-  const handleExportExcel = () => {
-    const listToExport = filteredPersonas.length > 0 ? filteredPersonas : personas
+  // Los exports piden el dataset completo que coincide con el filtro actual
+  // (sin "page"), no solo la página visible en pantalla.
+  const fetchTodoElFiltro = async () => {
+    const params = new URLSearchParams()
+    if (debouncedSearchTerm) params.set('buscar', debouncedSearchTerm)
+    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    const response = await apiFetch(`/personas?${params.toString()}`)
+    if (!response.ok) return []
+    const payload = await response.json()
+    return payload.data ?? []
+  }
+
+  const handleExportExcel = async () => {
+    const listToExport = await fetchTodoElFiltro()
     if (listToExport.length === 0) {
       showError('Atención', 'No hay registros de personas para exportar.')
       return
@@ -346,16 +430,13 @@ export function Personas({ user, onUserUpdate }) {
     exportPersonasExcel({ listToExport, filterEstado })
   }
 
-  const handleExportPdf = () => {
-    const listToExport = filteredPersonas.length > 0 ? filteredPersonas : personas
+  const handleExportPdf = async () => {
+    const listToExport = await fetchTodoElFiltro()
     if (listToExport.length === 0) {
       showError('Atención', 'No hay registros de personas para exportar.')
       return
     }
-    const abierto = exportPersonasPdf({ listToExport, totalPersonas, conductores, propietarios, activos })
-    if (!abierto) {
-      showError('Bloqueador de ventanas', 'No se pudo abrir la vista previa de impresión. Por favor habilita las ventanas emergentes en tu navegador.')
-    }
+    exportPersonasPdf({ listToExport, totalPersonas, conductores, propietarios, activos })
   }
 
   const handleFormSubmit = async (e) => {
@@ -400,11 +481,8 @@ export function Personas({ user, onUserUpdate }) {
         if (!response.ok) throw response
         const resData = await response.json()
         const updatedPersona = resData.data || { ...selectedPersona, ...formData }
-        const nextPersonas = personas.map((persona) =>
-          persona.id === selectedPersona.id ? updatedPersona : persona
-        )
-        setPersonas(nextPersonas)
-        setCachedData('/personas', nextPersonas)
+        loadPersonas().catch(() => {})
+        loadStats()
         if (Number(user?.id_persona) === Number(updatedPersona.id) && onUserUpdate) {
           onUserUpdate({
             ...user,
@@ -420,15 +498,9 @@ export function Personas({ user, onUserUpdate }) {
           body: formData,
         })
         if (!res.ok) throw response
-        const resData = await res.json()
-        const newPersona = resData.data || {
-          ...formData,
-          id: Date.now(),
-        }
-        const nextPersonas = [newPersona, ...personas]
-        setPersonas(nextPersonas)
-        setCachedData('/personas', nextPersonas)
         setCurrentPage(1)
+        loadPersonas().catch(() => {})
+        loadStats()
         showToast('Se ha agregado')
       }
       setIsModalOpen(false)
@@ -454,12 +526,12 @@ export function Personas({ user, onUserUpdate }) {
       {/* Cabecera Principal */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
-            <Icon name="people" className="size-5.5" />
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="people" className="size-7 stroke-[2.4]" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                 Gestión de Personas
               </h1>
             </div>
@@ -627,20 +699,28 @@ export function Personas({ user, onUserUpdate }) {
 
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+            <colgroup>
+              <col className="w-[26%]" />
+              <col className="w-[16%]" />
+              <col className="w-[22%]" />
+              <col className="w-[14%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
-                <th className="px-4 py-3 whitespace-nowrap">Nombres y Apellidos</th>
-                <th className="px-4 py-3 whitespace-nowrap">Documento</th>
-                <th className="px-4 py-3 whitespace-nowrap">Contacto</th>
-                <th className="px-4 py-3 whitespace-nowrap">Licencia</th>
-                <th className="px-4 py-3 whitespace-nowrap">Estado</th>
-                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
+                <th className="px-4 py-3 "><SortableHeader column="nombres" label="Nombres y Apellidos" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 "><SortableHeader column="numeroDocumento" label="Documento" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 ">Contacto</th>
+                <th className="px-4 py-3 ">Licencia</th>
+                <th className="px-4 py-3 "><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="sticky right-0 z-20 px-4 py-3 text-right bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className={isLoading && personas.length > 0 ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
               {isLoading && personas.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -699,7 +779,7 @@ export function Personas({ user, onUserUpdate }) {
                     </td>
                   </tr>
                 ))
-              ) : filteredPersonas.length === 0 ? (
+              ) : paginatedPersonas.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="p-12 text-center">
                     <Icon name="people" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
@@ -712,7 +792,7 @@ export function Personas({ user, onUserUpdate }) {
                     key={p.id}
                     className="group transition-colors hover:bg-[var(--brand-soft)]"
                   >
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3 ">
                       <div className="flex items-center gap-3">
                         {p.fotoImg ? (
                           <img
@@ -755,7 +835,7 @@ export function Personas({ user, onUserUpdate }) {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3 ">
                       <div className="flex items-center gap-1.5 font-mono">
                         <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400">
                           {p.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : p.tipoDocumento}
@@ -766,7 +846,7 @@ export function Personas({ user, onUserUpdate }) {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3 ">
                       <p className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>
                         {p.celular || p.telefono || '—'}
                       </p>
@@ -781,7 +861,7 @@ export function Personas({ user, onUserUpdate }) {
                       )}
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3 ">
                       {p.numeroLicencia ? (
                         <span
                           className="font-mono-code text-[12.5px] font-semibold"
@@ -796,12 +876,12 @@ export function Personas({ user, onUserUpdate }) {
                       )}
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3 ">
                       <StatusBadge status={p.estado} />
                     </td>
 
                     <td
-                      className="sticky right-0 z-10 px-4 py-3 text-right whitespace-nowrap group-hover:bg-[var(--brand-soft)] transition-colors"
+                      className="sticky right-0 z-10 px-4 py-3 text-right group-hover:bg-[var(--brand-soft)] transition-colors"
                       style={{
                         backgroundColor: 'var(--bg-surface)',
                       }}
@@ -898,13 +978,14 @@ export function Personas({ user, onUserUpdate }) {
 
         <Pagination
           currentPage={currentPage}
-          totalItems={filteredPersonas.length}
+          totalItems={totalFiltrado}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
           onItemsPerPageChange={(size) => {
             setItemsPerPage(size)
             setCurrentPage(1)
           }}
+          disabled={isLoading}
         />
       </div>
 
@@ -918,6 +999,8 @@ export function Personas({ user, onUserUpdate }) {
           tipoDocOptions={tipoDocOptions}
           handleReniecSearch={handleReniecSearch}
           isSearchingReniec={isSearchingReniec}
+          handleUsarFotoReniec={handleUsarFotoReniec}
+          isFetchingFotoReniec={isFetchingFotoReniec}
           estadoCivilOptions={ESTADO_CIVIL_OPTIONS}
           estadoOptions={ESTADO_OPTIONS}
           onSubmit={handleFormSubmit}

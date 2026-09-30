@@ -14,8 +14,8 @@ class AuthController extends ResourceController
         $payload = rtrim(strtr(base64_encode(json_encode($userData)), '+/', '-_'), '=');
         $secret = (string) env('app.sessionSecret', '');
 
-        if ($secret === '') {
-            throw new \RuntimeException('No se configuró app.sessionSecret.');
+        if ($secret === '' || strlen($secret) < 32) {
+            throw new \RuntimeException('La clave app.sessionSecret debe tener al menos 32 caracteres para garantizar seguridad criptográfica.');
         }
 
         return $payload . '.' . hash_hmac('sha256', $payload, $secret);
@@ -44,17 +44,49 @@ class AuthController extends ResourceController
         }
 
         return [
-            'id'          => $userRecord['id'],
-            'nombres'     => $userRecord['nombres'],
-            'apellidos'   => $userRecord['apellidos'],
-            'usuario'     => $userRecord['usuario'],
-            'rol'         => $userRecord['rol'],
-            'id_rol'      => (int) $userRecord['id_rol'],
-            'cargo'       => $userRecord['cargo'],
-            'id_persona'  => (int) $userRecord['id_persona'],
-            'foto_img'    => $userRecord['foto_img'] ?? '',
-            'sv'          => (int) $userRecord['session_version'],
+            'id'           => $userRecord['id'],
+            'nombres'      => $userRecord['nombres'],
+            'apellidos'    => $userRecord['apellidos'],
+            'usuario'      => $userRecord['usuario'],
+            'rol'          => $userRecord['rol'],
+            'id_rol'       => (int) $userRecord['id_rol'],
+            'cargo'        => $userRecord['cargo'],
+            'id_persona'   => (int) $userRecord['id_persona'],
+            'foto_img'     => $userRecord['foto_img'] ?? '',
+            'sv'           => (int) $userRecord['session_version'],
+            'preferencias' => json_decode((string) ($userRecord['preferencias'] ?? ''), true) ?: new \stdClass(),
         ];
+    }
+
+    /**
+     * Guarda preferencias de interfaz del usuario logueado (ej. qué grupos
+     * del sidebar dejó abiertos), para que persistan en su cuenta sin
+     * importar desde qué dispositivo/navegador entre. Hace merge superficial
+     * con lo que ya tenía guardado, así distintas pantallas pueden guardar
+     * cada una su propia clave sin pisarse entre sí.
+     */
+    public function guardarPreferencias()
+    {
+        $cookieUser = $this->decodeSessionCookie($this->request->getCookie('session_user'));
+        $userId = (int) ($cookieUser['id'] ?? 0);
+        if ($userId <= 0) {
+            return $this->failUnauthorized('Sesión no válida o expirada.');
+        }
+
+        $input = $this->request->getJSON(true) ?: [];
+        if (!is_array($input) || empty($input)) {
+            return $this->failValidationErrors('No se recibieron preferencias válidas.');
+        }
+
+        $usuarioModel = new UsuarioModel();
+        $actual = $usuarioModel->asArray()->select('preferencias')->find($userId);
+        $actuales = json_decode((string) ($actual['preferencias'] ?? ''), true) ?: [];
+
+        // Fusión recursiva segura para conservar estructuras anidadas sin sobrescribirlas por completo
+        $fusionadas = array_replace_recursive($actuales, $input);
+        $usuarioModel->update($userId, ['preferencias' => json_encode($fusionadas, JSON_UNESCAPED_UNICODE)]);
+
+        return $this->respond(['status' => true, 'data' => $fusionadas]);
     }
 
     private function rateLimitDirectory(): string
@@ -65,7 +97,24 @@ class AuthController extends ResourceController
             mkdir($dir, 0775, true);
         }
 
+        // Purga oportunista (1% de las veces) de archivos de rate-limit con
+        // más de 24h de antigüedad, para que este directorio no crezca
+        // indefinidamente con entradas de IPs/usuarios que ya no reintentan.
+        if (random_int(1, 100) === 1) {
+            $this->purgeStaleRateLimitFiles($dir);
+        }
+
         return $dir;
+    }
+
+    private function purgeStaleRateLimitFiles(string $dir): void
+    {
+        $limite = time() - 86400;
+        foreach (glob($dir . '*.json') ?: [] as $archivo) {
+            if ((@filemtime($archivo) ?: 0) < $limite) {
+                @unlink($archivo);
+            }
+        }
     }
 
     private function rateLimitKey(string $usuario): string
@@ -103,7 +152,17 @@ class AuthController extends ResourceController
             return $this->freshRateLimitData();
         }
 
-        $data = json_decode((string) file_get_contents($path), true);
+        $fp = @fopen($path, 'rb');
+        if (!$fp) {
+            return $this->freshRateLimitData();
+        }
+
+        @flock($fp, LOCK_SH);
+        $content = stream_get_contents($fp);
+        @flock($fp, LOCK_UN);
+        @fclose($fp);
+
+        $data = json_decode((string) $content, true);
 
         return is_array($data) ? $data : $this->freshRateLimitData();
     }
@@ -199,6 +258,10 @@ class AuthController extends ResourceController
             return $this->failValidationErrors('Debe proporcionar usuario y contraseña.');
         }
 
+        if (strlen($usuario) > 50 || strlen($password) > 128) {
+            return $this->failValidationErrors('El usuario o contraseña exceden la longitud permitida.');
+        }
+
         $rateLimitResponse = $this->ensureLoginIsNotRateLimited($usuario);
         if ($rateLimitResponse) {
             return $rateLimitResponse;
@@ -247,7 +310,7 @@ class AuthController extends ResourceController
 
         // Mitigación de timing attack: si el usuario no existe, se calcula bcrypt contra un hash válido
         // para que el tiempo de respuesta sea indistinguible entre usuarios existentes e inexistentes.
-        $dummyHash = '$2y$10$uC6yLnBuSCPOiqRse39Ifupcrvx6zZJ5e/.sK.Pa340hQGwjbQFJG';
+        $dummyHash = (string) env('auth.dummyBcryptHash', '$2y$10$uC6yLnBuSCPOiqRse39Ifupcrvx6zZJ5e/.sK.Pa340hQGwjbQFJG');
         $hashToCheck = $userRecord ? ($userRecord['clave'] ?? $dummyHash) : $dummyHash;
         $passwordMatches = password_verify($password, $hashToCheck);
 

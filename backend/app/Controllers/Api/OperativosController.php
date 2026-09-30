@@ -13,6 +13,27 @@ class OperativosController extends ResourceController
         return $this->request->getJSON(true) ?: $this->request->getPost() ?: [];
     }
 
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        $row = $db->table('operativos')
+            ->select("
+                COUNT(*) as total,
+                SUM(CASE WHEN estado IN ('PROGRAMADO', 'EN_CURSO') THEN 1 ELSE 0 END) as activos,
+                SUM(CASE WHEN estado = 'FINALIZADO' THEN 1 ELSE 0 END) as finalizados
+            ", false)
+            ->get()->getRowArray();
+
+        $papeletas = (int) $db->table('papeletas')->where('id_operativo IS NOT NULL', null, false)->countAllResults();
+
+        return $this->respond(['data' => [
+            'total' => (int) ($row['total'] ?? 0),
+            'activos' => (int) ($row['activos'] ?? 0),
+            'finalizados' => (int) ($row['finalizados'] ?? 0),
+            'papeletas' => $papeletas,
+        ]]);
+    }
+
     private function findOperativo(int $id): ?array
     {
         $db = \Config\Database::connect();
@@ -126,7 +147,7 @@ class OperativosController extends ResourceController
     public function index()
     {
         $db = \Config\Database::connect();
-        $rows = $db->table('operativos o')
+        $builder = $db->table('operativos o')
             ->select("
                 o.*,
                 COALESCE(
@@ -140,9 +161,68 @@ class OperativosController extends ResourceController
             ->join('usuarios u', 'u.id = o.id_usuario_registra', 'left')
             ->join('ciudadanos cu', 'cu.id_persona = u.id_persona', 'left')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id AND oi.estado = "ASIGNADO"', 'left')
-            ->join('papeletas p', 'p.id_operativo = o.id', 'left')
-            ->groupBy('o.id')
-            ->orderBy('o.fecha', 'DESC')
+            ->join('papeletas p', 'p.id_operativo = o.id', 'left');
+
+        $buscar = trim((string)$this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $builder->groupStart()
+                ->like('o.nombre', $buscar)
+                ->orLike('o.lugar', $buscar)
+                ->orLike('o.fecha', $buscar)
+                ->groupEnd();
+        }
+
+        $estado = strtoupper(trim((string)$this->request->getGet('estado')));
+        if ($estado !== '' && $estado !== 'TODOS') {
+            $builder->where('o.estado', $estado);
+        }
+
+        $fechaFiltro = strtoupper(trim((string)$this->request->getGet('fechaFiltro')));
+        if ($fechaFiltro === 'HOY') {
+            $builder->where('o.fecha', date('Y-m-d'));
+        } elseif ($fechaFiltro === 'SEMANA') {
+            $builder->where('o.fecha >=', date('Y-m-d', strtotime('-7 days')));
+        }
+
+        $page = (int)$this->request->getGet('page');
+        $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
+
+        $builder->groupBy('o.id');
+
+        if ($page > 0) {
+            $subquery = (clone $builder)->select('o.id AS sub_id', false);
+            $total = $db->newQuery()->fromSubquery($subquery, 't_count')->countAllResults();
+
+            $columnasOrdenables = [
+                'nombre' => 'o.nombre',
+                'lugar' => 'o.lugar',
+                'fecha' => 'o.fecha',
+                'estado' => 'o.estado',
+            ];
+            $sortBy = trim((string) $this->request->getGet('sortBy'));
+            if ($sortBy !== '' && isset($columnasOrdenables[$sortBy])) {
+                \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'o.fecha');
+            } else {
+                $builder->orderBy('o.fecha', 'DESC')->orderBy('o.hora_inicio', 'DESC');
+            }
+
+            $rows = $builder
+                ->limit($porPagina, ($page - 1) * $porPagina)
+                ->get()
+                ->getResultArray();
+
+            return $this->respond([
+                'data' => $rows,
+                'meta' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'porPagina' => $porPagina,
+                    'totalPaginas' => (int) ceil($total / $porPagina),
+                ],
+            ]);
+        }
+
+        $rows = $builder->orderBy('o.fecha', 'DESC')
             ->orderBy('o.hora_inicio', 'DESC')
             ->get()
             ->getResultArray();

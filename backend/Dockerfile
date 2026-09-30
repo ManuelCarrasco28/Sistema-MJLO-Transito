@@ -4,10 +4,14 @@ FROM php:8.2-apache
 RUN apt-get update && apt-get install -y \
     libicu-dev \
     libzip-dev \
+    libpng-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
     zip \
     unzip \
     && docker-php-ext-configure intl \
-    && docker-php-ext-install intl mysqli pdo pdo_mysql zip
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install intl mysqli pdo pdo_mysql zip gd
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
@@ -21,6 +25,7 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
 RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
 RUN { \
+      echo 'memory_limit=512M'; \
       echo 'opcache.enable=1'; \
       echo 'opcache.memory_consumption=128'; \
       echo 'opcache.interned_strings_buffer=16'; \

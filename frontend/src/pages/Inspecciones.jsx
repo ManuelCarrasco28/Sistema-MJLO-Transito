@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache, leerMensajeError } from '../config/api'
 import { CerticavFichaPrint } from '../components/documentos/TarjetaOperatividadPrint'
@@ -91,7 +92,14 @@ export function Inspecciones() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterResultado, setFilterResultado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
+  }
   const [loadError, setLoadError] = useState('')
   const [toast, setToast] = useState(null)
 
@@ -134,17 +142,20 @@ export function Inspecciones() {
     detalles: [],
   })
 
-  const loadData = async () => {
-    try {
-      const [inspRes, critRes, vehRes, persRes, asocRes, personasRes] = await Promise.all([
-        apiFetch('/inspecciones'),
-        apiFetch('/inspeccion-criterios'),
-        apiFetch('/vehiculos'),
-        apiFetch('/personal').catch(() => ({ ok: false })),
-        apiFetch('/asociaciones').catch(() => ({ ok: false })),
-        apiFetch('/personas').catch(() => ({ ok: false })),
-      ])
+  const [totalFiltrado, setTotalFiltrado] = useState(0)
 
+  const loadData = async () => {
+    setIsLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        porPagina: String(itemsPerPage),
+      })
+      if (searchTerm) params.set('buscar', searchTerm)
+      if (filterResultado !== 'TODOS') params.set('resultado', filterResultado)
+      if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
+
+      const inspRes = await apiFetch(`/inspecciones?${params.toString()}`)
       if (!inspRes.ok) throw inspRes
       const inspPayload = await inspRes.json()
       const fetched = (inspPayload.data || []).map((i) => ({
@@ -152,38 +163,7 @@ export function Inspecciones() {
         detalles: typeof i.detalles === 'string' ? JSON.parse(i.detalles) : i.detalles || [],
       }))
       setInspecciones(fetched)
-      setCachedData('/inspecciones', fetched)
-
-      if (critRes.ok) {
-        const critPayload = await critRes.json()
-        const cData = critPayload.data || []
-        setCriteriosInspeccion(cData)
-        setCachedData('/inspeccion-criterios', cData)
-      }
-
-      if (vehRes.ok) {
-        const vehPayload = await vehRes.json()
-        const vData = vehPayload.data || []
-        setVehiculos(vData)
-        setCachedData('/vehiculos', vData)
-      }
-
-      if (persRes.ok) {
-        const persPayload = await persRes.json()
-        const pData = (persPayload.data || []).filter((p) => p.estado === 'ACTIVO')
-        setTecnicos(pData)
-      }
-
-      if (asocRes.ok) {
-        const asocPayload = await asocRes.json()
-        const aData = asocPayload.data || []
-        setAsociaciones(aData)
-      }
-
-      if (personasRes.ok) {
-        const personasPayload = await personasRes.json()
-        setPersonas(personasPayload.data || [])
-      }
+      setTotalFiltrado(inspPayload.meta?.total ?? fetched.length)
     } catch {
       setLoadError('No se pudo cargar el módulo de inspecciones.')
     } finally {
@@ -193,8 +173,53 @@ export function Inspecciones() {
 
   useEffect(() => {
     setLoadError('')
-    invalidateCache('/inspecciones')
     loadData()
+  }, [currentPage, itemsPerPage, searchTerm, filterResultado, sortBy, sortDir])
+
+  const [stats, setStats] = useState({ totales: 0, aprobados: 0, observados: 0, desaprobados: 0 })
+
+  const loadStats = () => {
+    apiFetch('/inspecciones/estadisticas')
+      .then((res) => res.ok ? res.json() : Promise.reject(res))
+      .then((payload) => setStats(payload.data ?? {}))
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadStats()
+  }, [])
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch('/inspeccion-criterios').catch(() => ({ ok: false })),
+      apiFetch('/vehiculos?porPagina=100').catch(() => ({ ok: false })),
+      apiFetch('/personal?porPagina=100').catch(() => ({ ok: false })),
+      apiFetch('/asociaciones?porPagina=100').catch(() => ({ ok: false })),
+      apiFetch('/personas?porPagina=100').catch(() => ({ ok: false })),
+    ]).then(async ([critRes, vehRes, persRes, asocRes, personasRes]) => {
+      if (critRes.ok) {
+        const critPayload = await critRes.json()
+        const cData = critPayload.data || []
+        setCriteriosInspeccion(cData)
+        setCachedData('/inspeccion-criterios', cData)
+      }
+      if (vehRes.ok) {
+        const vehPayload = await vehRes.json()
+        setVehiculos(vehPayload.data || [])
+      }
+      if (persRes.ok) {
+        const persPayload = await persRes.json()
+        setTecnicos((persPayload.data || []).filter((p) => p.estado === 'ACTIVO'))
+      }
+      if (asocRes.ok) {
+        const asocPayload = await asocRes.json()
+        setAsociaciones(asocPayload.data || [])
+      }
+      if (personasRes.ok) {
+        const personasPayload = await personasRes.json()
+        setPersonas(personasPayload.data || [])
+      }
+    }).catch(() => {})
   }, [])
 
   // Close plate dropdown on outside click
@@ -226,30 +251,20 @@ export function Inspecciones() {
     })
   }
 
-  // KPIs derived strictly from database
-  const totales = inspecciones.length
-  const aprobados = inspecciones.filter((i) => i.resultado === 'APROBADO').length
-  const observados = inspecciones.filter((i) => i.resultado === 'OBSERVADO').length
-  const desaprobados = inspecciones.filter((i) => i.resultado === 'DESAPROBADO').length
+  // KPIs derivados del total real (COUNT en backend), no de la página cargada
+  const totales = stats.totales ?? 0
+  const aprobados = stats.aprobados ?? 0
+  const observados = stats.observados ?? 0
+  const desaprobados = stats.desaprobados ?? 0
   const porcentajeAprobados = totales > 0 ? Math.round((aprobados / totales) * 100) : 0
 
-  const filteredInspecciones = inspecciones.filter((i) => {
-    const vehiculo = vehiculos.find((v) => v.placa === i.vehiculoPlaca)
-    const numSerie = i.numeroSerieCerticav || ''
-    const fullSearch = `${i.numeroInspeccion || ''} ${i.numeroRegistro || ''} ${numSerie} ${i.vehiculoPlaca || ''} ${i.conductorNombre || ''} ${vehiculo?.propietario || ''} ${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`.toLowerCase()
-    const matchesSearch = fullSearch.includes(searchTerm.toLowerCase().trim())
-    const matchesResultado = filterResultado === 'TODOS' || i.resultado === filterResultado
-    return matchesSearch && matchesResultado
-  })
+  const filteredInspecciones = inspecciones
 
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, filterResultado])
 
-  const paginatedInspecciones = filteredInspecciones.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  const paginatedInspecciones = inspecciones
 
   const filteredPlacas = vehiculos.filter((v) =>
     (v.placa || '').toLowerCase().includes((formData.vehiculoPlaca || '').toLowerCase())
@@ -493,6 +508,7 @@ export function Inspecciones() {
       const next = inspecciones.filter((i) => i.id !== objetivo.id)
       setInspecciones(next)
       setCachedData('/inspecciones', next)
+      loadStats()
       showToast(`Inspección ${objetivo.numeroRegistro || ''} eliminada correctamente`, 'eliminar')
     } catch {
       showToast('No se pudo conectar con el servidor. Intente nuevamente.', 'error')
@@ -563,6 +579,7 @@ export function Inspecciones() {
         : [guardada, ...inspecciones]
       setInspecciones(next)
       setCachedData('/inspecciones', next)
+      loadStats()
       if (!esEdicion) setCurrentPage(1)
       showToast(
         `Inspección ${guardada?.numeroRegistro || ''} ${esEdicion ? 'actualizada' : 'registrada'} correctamente`,
@@ -580,7 +597,21 @@ export function Inspecciones() {
     return json.data
   }
 
-  const handleExportExcel = () => {
+  const fetchTodoElFiltro = async () => {
+    const params = new URLSearchParams()
+    if (searchTerm) params.set('buscar', searchTerm)
+    if (filterResultado !== 'TODOS') params.set('resultado', filterResultado)
+    const res = await apiFetch(`/inspecciones?${params.toString()}`)
+    if (!res.ok) return filteredInspecciones
+    const payload = await res.json()
+    return (payload.data || []).map((i) => ({
+      ...i,
+      detalles: typeof i.detalles === 'string' ? JSON.parse(i.detalles) : i.detalles || [],
+    }))
+  }
+
+  const handleExportExcel = async () => {
+    const data = await fetchTodoElFiltro()
     exportToExcel({
       filename: `Inspecciones_Tecnicas_${new Date().toISOString().slice(0, 10)}.xls`,
       sheetName: 'Inspecciones',
@@ -588,7 +619,7 @@ export function Inspecciones() {
       subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',
       metadata: [
         { label: 'Resultado', value: filterResultado },
-        { label: 'Total Registros', value: String(filteredInspecciones.length) }
+        { label: 'Total Registros', value: String(data.length) }
       ],
       columns: [
         { header: 'N° REGISTRO', key: 'numeroRegistro', isText: true, width: 120, align: 'center' },
@@ -601,21 +632,18 @@ export function Inspecciones() {
         { header: 'FECHA INSPECCIÓN', key: 'fecha', width: 120, align: 'center' },
         { header: 'RESULTADO', key: 'resultado', width: 120, align: 'center' }
       ],
-      data: filteredInspecciones
+      data
     })
   }
 
-  const handleExportPdf = () => {
-    const listToExport = filteredInspecciones.length > 0 ? filteredInspecciones : inspecciones
+  const handleExportPdf = async () => {
+    const listToExport = await fetchTodoElFiltro()
     if (listToExport.length === 0) {
       showError('Atención', 'No hay registros para exportar.')
       return
     }
 
-    const abierto = imprimirInspeccionesPdf({ listToExport, vehiculos, totales, aprobados, observados, desaprobados })
-    if (!abierto) {
-      showError('Atención', 'El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
-    }
+    imprimirInspeccionesPdf({ listToExport, vehiculos, totales, aprobados, observados, desaprobados })
   }
 
   // Agrupación de criterios técnicos por sección
@@ -694,12 +722,12 @@ export function Inspecciones() {
       {/* Cabecera Principal - Estilo Exacto Personas */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-md shadow-purple-500/25">
-            <Icon name="inspection" className="size-5.5" />
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="inspection" className="size-7 stroke-[2.4]" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                 Certificado de Constatación de Características Vehicular
               </h1>
             </div>
@@ -876,20 +904,28 @@ export function Inspecciones() {
 
         {/* TABLA: EN CERTICAV EN LA TABLA VISIBLE NO SE MUESTRA INSPECTOR ASIGNADO */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+            <colgroup>
+              <col className="w-[18%]" />
+              <col className="w-[14%]" />
+              <col className="w-[26%]" />
+              <col className="w-[16%]" />
+              <col className="w-[14%]" />
+              <col className="w-[12%]" />
+            </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
-                <th className="px-4 py-3 whitespace-nowrap">N° Registro / Serie</th>
-                <th className="px-4 py-3 whitespace-nowrap">Placa Vehicular</th>
-                <th className="px-4 py-3 whitespace-nowrap">Vehículo y Titular</th>
-                <th className="px-4 py-3 whitespace-nowrap">Fecha y Vigencia</th>
-                <th className="px-4 py-3 whitespace-nowrap">Resultado</th>
-                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
+                <th className="px-4 py-3 "><SortableHeader column="numeroRegistro" label="N° Registro / Serie" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 "><SortableHeader column="vehiculoPlaca" label="Placa Vehicular" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 ">Vehículo y Titular</th>
+                <th className="px-4 py-3 "><SortableHeader column="fecha" label="Fecha y Vigencia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 "><SortableHeader column="resultado" label="Resultado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="sticky right-0 z-20 px-4 py-3 text-right bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+            <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && inspecciones.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && inspecciones.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -932,7 +968,7 @@ export function Inspecciones() {
                       key={i.id}
                       className="group transition-colors hover:bg-[var(--brand-soft)] dark:hover:bg-[var(--bg-subtle)]"
                     >
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 ">
                         <div className="space-y-0.5">
                           <span className="font-mono font-bold text-slate-900 dark:text-white text-[13px] block">
                             {i.numeroRegistro || i.numeroInspeccion}
@@ -945,7 +981,7 @@ export function Inspecciones() {
                         </div>
                       </td>
 
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 ">
                         <div className="space-y-0.5">
                           <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 shadow-2xs dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
                             {i.vehiculoPlaca}
@@ -981,7 +1017,7 @@ export function Inspecciones() {
                         </div>
                       </td>
 
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 ">
                         <div className="space-y-0.5 font-mono text-xs">
                           <p className="font-semibold text-slate-700 dark:text-slate-300">
                             {formatFecha(i.fecha)}
@@ -992,12 +1028,12 @@ export function Inspecciones() {
                         </div>
                       </td>
 
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 ">
                         {getResultadoBadge(i.resultado)}
                       </td>
 
                       <td
-                        className="sticky right-0 z-10 px-4 py-3 text-right whitespace-nowrap group-hover:bg-[var(--brand-soft)] dark:group-hover:bg-slate-800/40 transition-colors shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"
+                        className="sticky right-0 z-10 px-4 py-3 text-right group-hover:bg-[var(--brand-soft)] dark:group-hover:bg-slate-800/40 transition-colors shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"
                         style={{ backgroundColor: 'var(--bg-surface)' }}
                       >
                         <div className="flex items-center justify-end gap-1.5">
@@ -1120,19 +1156,20 @@ export function Inspecciones() {
 
         <Pagination
           currentPage={currentPage}
-          totalItems={filteredInspecciones.length}
+          totalItems={totalFiltrado}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
           onItemsPerPageChange={(size) => {
             setItemsPerPage(size)
             setCurrentPage(1)
           }}
+          disabled={isLoading}
         />
       </div>
 
       {/* Modal Registrar / Editar Inspección Técnica */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
           <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
@@ -1158,8 +1195,8 @@ export function Inspecciones() {
               <div className="p-4 sm:p-5 space-y-4 max-h-[75vh] overflow-y-auto">
                 {/* 1. Sección: Identificación del Documento y Talonario */}
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-blue-600" />
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                     Documento y registro
                   </h4>
 
@@ -1247,8 +1284,8 @@ export function Inspecciones() {
 
                 {/* 2. Sección: Características Técnicas del Vehículo Menor */}
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-cyan-600" />
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                     Vehículo y transportador
                   </h4>
 
@@ -1326,8 +1363,8 @@ export function Inspecciones() {
                 {/* 3. Sección: Propietario, Conductor y Técnico Responsable */}
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
-                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-emerald-600" />
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                       Propietario, conductor y técnico
                     </h4>
                     <label className="flex items-center gap-2 text-[11px] font-bold text-sky-700 bg-sky-50 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-2.5 py-1 rounded-lg cursor-pointer select-none">
@@ -1454,8 +1491,8 @@ export function Inspecciones() {
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
-                        <span className="size-2 rounded-full bg-indigo-600" />
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                         Checklist técnico
                       </h4>
                       <div className="flex items-center gap-2 text-[10.5px] font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800/90 px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
@@ -1576,8 +1613,8 @@ export function Inspecciones() {
 
                 {/* 5. Sección: Dictamen Oficial, Evaluaciones y Observaciones */}
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-amber-600" />
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                     Dictamen final
                   </h4>
 

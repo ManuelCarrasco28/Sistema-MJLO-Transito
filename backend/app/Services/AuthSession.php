@@ -108,7 +108,17 @@ class AuthSession
     {
         $path = self::rateLimitPath($bucket, $key);
         $now = time();
-        $data = is_file($path) ? (json_decode((string) file_get_contents($path), true) ?: []) : [];
+        $data = [];
+        if (is_file($path)) {
+            $fp = @fopen($path, 'rb');
+            if ($fp) {
+                @flock($fp, LOCK_SH);
+                $content = stream_get_contents($fp);
+                @flock($fp, LOCK_UN);
+                @fclose($fp);
+                $data = json_decode((string) $content, true) ?: [];
+            }
+        }
         $data += ['attempts' => 0, 'first_attempt_at' => $now, 'blocked_until' => 0];
 
         $blockedUntil = (int) $data['blocked_until'];

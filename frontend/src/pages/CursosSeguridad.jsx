@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { CarnetCursoVialPrint, CarnetCursoVialLotePrint } from '../components/documentos/TarjetaOperatividadPrint'
@@ -39,7 +40,7 @@ export function CursosSeguridad() {
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
   const [activeView, setActiveView] = useState('CURSOS')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -214,6 +215,22 @@ export function CursosSeguridad() {
     setCurrentPage(1)
   }, [searchTerm, filterEstado, filterTipo])
 
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
+  }
+  if (sortBy) {
+    const dirMul = sortDir === 'ASC' ? 1 : -1
+    filteredCursos.sort((a, b) => {
+      const valA = String(a[sortBy] ?? '').toLowerCase()
+      const valB = String(b[sortBy] ?? '').toLowerCase()
+      return valA < valB ? -1 * dirMul : valA > valB ? 1 * dirMul : 0
+    })
+  }
+
   const paginatedCursos = filteredCursos.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -301,7 +318,7 @@ export function CursosSeguridad() {
       .finally(() => setIsLoading(false))
 
     if (personas.length === 0) {
-      apiFetch('/personas')
+      apiFetch('/personas?porPagina=100')
         .then(res => res.ok ? res.json() : Promise.reject(res))
         .then(data => {
           const pData = data.data || []
@@ -366,11 +383,11 @@ export function CursosSeguridad() {
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md">
-            <Icon name="course" className="size-5.5" />
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="course" className="size-7 stroke-[2.4]" />
           </span>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
               Cursos de Seguridad Vial
             </h1>
             <p className="text-xs font-medium text-slate-500">
@@ -496,16 +513,25 @@ export function CursosSeguridad() {
 
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+            <colgroup>
+              <col className="w-[14%]" />
+              <col className="w-[22%]" />
+              <col className="w-[14%]" />
+              <col className="w-[13%]" />
+              <col className="w-[18%]" />
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-3 py-3 whitespace-nowrap">CÓDIGO / TIPO</th>
-                <th className="px-3 py-3">TÍTULO DEL CURSO</th>
-                <th className="px-3 py-3 whitespace-nowrap text-center">FECHA PROGRAMADA</th>
-                <th className="px-3 py-3 whitespace-nowrap text-center">INSCRITOS / CAPACIDAD</th>
+                <th className="px-3 py-3 "><SortableHeader column="codigo" label="CÓDIGO / TIPO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-3 py-3"><SortableHeader column="titulo" label="TÍTULO DEL CURSO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-3 py-3 text-center"><SortableHeader column="fecha" label="FECHA PROGRAMADA" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="px-3 py-3 text-center">INSCRITOS / CAPACIDAD</th>
                 <th className="px-3 py-3">INSTRUCTOR / LUGAR</th>
-                <th className="px-3 py-3 whitespace-nowrap text-center">ESTADO</th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[var(--bg-surface)] px-3 py-3 text-center whitespace-nowrap border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
+                <th className="px-3 py-3 text-center"><SortableHeader column="estado" label="ESTADO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[var(--bg-surface)] px-3 py-3 text-center border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
@@ -537,7 +563,7 @@ export function CursosSeguridad() {
                 paginatedCursos.map((c) => (
                   <tr key={c.id} className="group transition-colors hover:bg-purple-50/30 dark:hover:bg-[var(--bg-subtle)]">
 
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3 ">
                       <p className="font-bold text-slate-900 dark:text-white">{c.codigo}</p>
                       <span className="mt-0.5 inline-block rounded-md bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
                         {c.tipoLabel || 'SEGURIDAD VIAL'}
@@ -555,7 +581,7 @@ export function CursosSeguridad() {
                     </td>
 
 
-                    <td className="px-3 py-3 whitespace-nowrap text-center">
+                    <td className="px-3 py-3 text-center">
                       <p className="font-bold text-slate-800 dark:text-slate-200">{c.fecha}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         {c.horario || '09:00 AM - 12:00 PM'}
@@ -563,7 +589,7 @@ export function CursosSeguridad() {
                     </td>
 
 
-                    <td className="px-3 py-3 whitespace-nowrap text-center">
+                    <td className="px-3 py-3 text-center">
                       <p className="font-bold text-slate-900 dark:text-white">
                         {c.inscritos || 0} / {c.capacidad || 50}
                       </p>
@@ -581,12 +607,12 @@ export function CursosSeguridad() {
                     </td>
 
 
-                    <td className="px-3 py-3 whitespace-nowrap text-center">
+                    <td className="px-3 py-3 text-center">
                       <StatusBadge status={c.estado === 'ACTIVO' || c.estado === 'ABIERTO' ? 'PROGRAMADO' : c.estado} />
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-center gap-1">
                         {c.estado === 'FINALIZADO' && (
                           <button onClick={() => handlePrintBatch(c)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white" title="Descargar Carnets (Lote)">
@@ -685,7 +711,7 @@ export function CursosSeguridad() {
                           <p className="font-bold text-slate-800 dark:text-slate-200">{p.curso.fecha}</p>
                           <p className="text-[10px] font-semibold text-slate-500">Vence: {fechaVencimiento}</p>
                         </td>
-                        <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right whitespace-nowrap border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                        <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => handlePrintSingle(p)} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Descargar Carnet Individual">
                               <Icon name="print" className="size-4" />
@@ -713,7 +739,7 @@ export function CursosSeguridad() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
           <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
               <div className="flex items-center gap-2.5">
@@ -737,7 +763,7 @@ export function CursosSeguridad() {
             <div className="min-h-0 flex-1 space-y-7 overflow-y-auto p-7">
               
               <fieldset className="border border-slate-200 rounded-xl p-5 dark:border-[var(--border-strong)]">
-                <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DATOS GENERALES</legend>
+                <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white px-2">DATOS GENERALES</legend>
                 <div className="grid gap-5 sm:grid-cols-2 mb-5">
                   <div className={selectedCurso ? '' : 'sm:col-span-2'}>
                     <FloatingInput id="curso_codigo" label="Código" value={formData.codigo} disabled inputClassName="bg-slate-100 text-slate-500 dark:bg-[var(--bg-subtle)]" />
@@ -756,7 +782,7 @@ export function CursosSeguridad() {
               </fieldset>
 
               <fieldset className="border border-slate-200 rounded-xl p-5 dark:border-[var(--border-strong)]">
-                <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">DETALLES DEL CURSO</legend>
+                <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white px-2">DETALLES DEL CURSO</legend>
                 <div className="grid gap-5 sm:grid-cols-2">
                   <FloatingInput id="curso_fecha" label="Fecha" type="date" required value={formData.fecha} onChange={e => {
                       const newDate = e.target.value;

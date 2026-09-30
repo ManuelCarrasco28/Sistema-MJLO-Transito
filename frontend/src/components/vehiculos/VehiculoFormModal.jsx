@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from '../ui/Icon'
 import { FloatingInput, FloatingSelect } from '../ui/FormInputs'
 
@@ -30,21 +31,63 @@ export function VehiculoFormModal({
 }) {
   const propietarioRef = useRef(null)
   const asociacionRef = useRef(null)
+  const modalBodyRef = useRef(null)
+  const [propietarioDropdownPos, setPropietarioDropdownPos] = useState(null)
+  const [asociacionDropdownPos, setAsociacionDropdownPos] = useState(null)
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (propietarioRef.current && !propietarioRef.current.contains(e.target)) {
+      if (
+        propietarioRef.current && !propietarioRef.current.contains(e.target) &&
+        !e.target.closest('[data-dropdown="propietario"]')
+      ) {
         setShowPropietarioResults(false)
       }
-      if (asociacionRef.current && !asociacionRef.current.contains(e.target)) {
+      if (
+        asociacionRef.current && !asociacionRef.current.contains(e.target) &&
+        !e.target.closest('[data-dropdown="asociacion"]')
+      ) {
         setShowAsociacionResults(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [setShowPropietarioResults, setShowAsociacionResults])
+
+  // El desplegable de resultados se renderiza vía portal (fuera del cuerpo
+  // scrolleable del modal) para que no quede recortado por su overflow.
+  // Recalculamos la posición al abrir y la cerramos si el usuario hace
+  // scroll dentro del modal, para no arrastrar un desplegable desalineado.
+  useEffect(() => {
+    if (showPropietarioResults && propietarioRef.current) {
+      const rect = propietarioRef.current.getBoundingClientRect()
+      setPropietarioDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    } else {
+      setPropietarioDropdownPos(null)
+    }
+  }, [showPropietarioResults])
+
+  useEffect(() => {
+    if (showAsociacionResults && asociacionRef.current) {
+      const rect = asociacionRef.current.getBoundingClientRect()
+      setAsociacionDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    } else {
+      setAsociacionDropdownPos(null)
+    }
+  }, [showAsociacionResults])
+
+  useEffect(() => {
+    const body = modalBodyRef.current
+    if (!body) return
+    const handleScroll = () => {
+      setShowPropietarioResults(false)
+      setShowAsociacionResults(false)
+    }
+    body.addEventListener('scroll', handleScroll)
+    return () => body.removeEventListener('scroll', handleScroll)
+  }, [setShowPropietarioResults, setShowAsociacionResults])
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") onClose(); e.currentTarget.dataset.downOnOverlay = "" }}>
       <div className="relative flex max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-2.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center gap-2">
@@ -76,11 +119,11 @@ export function VehiculoFormModal({
           }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 sm:p-4">
+          <div ref={modalBodyRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 sm:p-4">
             {/* 1. Identificación & Datos Técnicos de la Unidad */}
             <fieldset className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-2.5 sm:p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-              <legend className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-1.5 flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-blue-600" />
+              <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white px-1 mb-1.5 flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-slate-900 dark:bg-white" />
                 Identificación & Datos Técnicos de la Unidad
               </legend>
               <div className="space-y-2">
@@ -92,11 +135,13 @@ export function VehiculoFormModal({
                         id="veh_placa"
                         label="Placa de Rodaje"
                         required
-                        maxLength={15}
+                        maxLength={6}
+                        minLength={6}
+                        pattern="[A-Z0-9]{6}"
+                        title="La placa debe tener exactamente 6 caracteres (letras y números)."
                         value={formData.placa}
                         onChange={(e) => {
-                          const val = e.target.value.toUpperCase();
-                          if (/[^A-Z0-9-]/.test(val)) return;
+                          const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
                           setFormData({ ...formData, placa: val });
                         }}
                         onKeyDown={(e) => {
@@ -177,8 +222,13 @@ export function VehiculoFormModal({
                       id="veh_anio"
                       type="number"
                       label="Año Fabricación"
+                      min={1950}
+                      max={new Date().getFullYear() + 1}
                       value={formData.anio || ''}
-                      onChange={(e) => setFormData({ ...formData, anio: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value.slice(0, 4);
+                        setFormData({ ...formData, anio: val });
+                      }}
                     />
                   </div>
 
@@ -238,17 +288,25 @@ export function VehiculoFormModal({
                   <FloatingInput
                     id="veh_serie"
                     label="Número de Serie (Chasis)"
-                    value={formData.numeroSerie}
-                    onChange={(e) => setFormData({ ...formData, numeroSerie: e.target.value.toUpperCase() })}
-                    inputClassName="font-mono"
+                    maxLength={30}
+                    value={formData.numeroSerie || ''}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                      setFormData({ ...formData, numeroSerie: val });
+                    }}
+                    inputClassName="font-mono uppercase"
                   />
 
                   <FloatingInput
                     id="veh_motor"
                     label="Serie del Motor"
-                    value={formData.serieMotor}
-                    onChange={(e) => setFormData({ ...formData, serieMotor: e.target.value.toUpperCase() })}
-                    inputClassName="font-mono"
+                    maxLength={30}
+                    value={formData.serieMotor || ''}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                      setFormData({ ...formData, serieMotor: val });
+                    }}
+                    inputClassName="font-mono uppercase"
                   />
                 </div>
               </div>
@@ -256,8 +314,8 @@ export function VehiculoFormModal({
 
             {/* 2. Titular & Asociación Autorizada */}
             <fieldset className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-2.5 sm:p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-              <legend className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-1 mb-1.5 flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-emerald-500" />
+              <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white px-1 mb-1.5 flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-slate-900 dark:bg-white" />
                 Titular & Asociación Autorizada
               </legend>
 
@@ -309,8 +367,12 @@ export function VehiculoFormModal({
                       setShowAsociacionResults(false)
                     }}
                   />
-                  {showPropietarioResults && (
-                    <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                  {showPropietarioResults && propietarioDropdownPos && createPortal(
+                    <div
+                      data-dropdown="propietario"
+                      style={{ position: 'fixed', top: propietarioDropdownPos.top, left: propietarioDropdownPos.left, width: propietarioDropdownPos.width }}
+                      className="z-[100] max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]"
+                    >
                       {propietarioResults.length ? (
                         propietarioResults.map((persona) => {
                           const documento = persona.numeroDocumento || persona.numero || persona.dni || ''
@@ -336,7 +398,8 @@ export function VehiculoFormModal({
                           No se encontró persona con ese DNI o nombre.
                         </div>
                       )}
-                    </div>
+                    </div>,
+                    document.body
                   )}
                   {formData.propietarioDni && (
                     <p className="px-2 pt-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 truncate">
@@ -365,8 +428,12 @@ export function VehiculoFormModal({
                       setShowPropietarioResults(false)
                     }}
                   />
-                  {showAsociacionResults && (
-                    <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                  {showAsociacionResults && asociacionDropdownPos && createPortal(
+                    <div
+                      data-dropdown="asociacion"
+                      style={{ position: 'fixed', top: asociacionDropdownPos.top, left: asociacionDropdownPos.left, width: asociacionDropdownPos.width }}
+                      className="z-[100] max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]"
+                    >
                       {asociacionResults.length ? (
                         asociacionResults.map((org) => (
                           <button
@@ -388,7 +455,8 @@ export function VehiculoFormModal({
                           No se encontró asociación.
                         </div>
                       )}
-                    </div>
+                    </div>,
+                    document.body
                   )}
                   {formData.asociacion && (
                     <div className="flex items-center justify-between gap-2 px-2 pt-0.5 text-[11px]">

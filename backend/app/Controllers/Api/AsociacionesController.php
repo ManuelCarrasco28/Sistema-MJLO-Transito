@@ -18,7 +18,7 @@ class AsociacionesController extends ResourceController
         return $db->table('asociaciones o')
             ->select("
                 o.id,
-                CASE WHEN o.tipo = 'EMPRESA' THEN 'PARTICULAR' ELSE o.tipo END AS tipo,
+                o.tipo,
                 o.razon_social AS razonSocial,
                 COALESCE(o.ruc, '') AS ruc,
                 COALESCE(o.partida_registral, '') AS partidaRegistral,
@@ -60,13 +60,90 @@ class AsociacionesController extends ResourceController
         return $r;
     }
 
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        $row = $db->table('asociaciones')
+            ->select("
+                COUNT(*) as total,
+                SUM(CASE WHEN tipo = 'PARTICULAR' THEN 1 ELSE 0 END) as particulares,
+                SUM(CASE WHEN tipo = 'ASOCIACION' THEN 1 ELSE 0 END) as asociaciones
+            ", false)
+            ->get()->getRowArray();
+
+        $flota = (int) $db->table('vehiculos')->where('id_asociacion IS NOT NULL', null, false)->countAllResults();
+
+        return $this->respond(['data' => [
+            'total' => (int) ($row['total'] ?? 0),
+            'particulares' => (int) ($row['particulares'] ?? 0),
+            'asociaciones' => (int) ($row['asociaciones'] ?? 0),
+            'flotaAcumulada' => $flota,
+        ]]);
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
+        $builder = $this->asociacionSelectQuery($db);
 
-        $rows = $this->asociacionSelectQuery($db)
-            ->groupBy('o.id')
-            ->orderBy('o.id', 'DESC')
+        $buscar = trim((string) $this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $builder->groupStart()
+                ->like('o.razon_social', $buscar)
+                ->orLike('o.ruc', $buscar)
+                ->orLike('o.partida_registral', $buscar)
+                ->orLike('o.resolucion_alcaldia', $buscar)
+                ->orLike('p_rep.numero', $buscar)
+                ->orLike('c_rep.nombres', $buscar)
+                ->orLike('c_rep.apellido_paterno', $buscar)
+                ->groupEnd();
+        }
+
+        $tipoFiltro = strtoupper((string) $this->request->getGet('tipo'));
+        if (in_array($tipoFiltro, ['ASOCIACION', 'PARTICULAR'], true)) {
+            $builder->where('o.tipo', $tipoFiltro);
+        }
+
+        $estadoFiltro = strtoupper((string) $this->request->getGet('estado'));
+        if (in_array($estadoFiltro, ['ACTIVO', 'INACTIVO'], true)) {
+            $builder->where('o.estado', $estadoFiltro);
+        }
+
+        $page = (int) $this->request->getGet('page');
+        $porPagina = max(1, min(200, (int) ($this->request->getGet('porPagina') ?: 20)));
+
+        $builder->groupBy('o.id');
+
+        $columnasOrdenables = [
+            'razonSocial' => 'o.razon_social',
+            'ruc' => 'o.ruc',
+            'estado' => 'o.estado',
+        ];
+
+        if ($page > 0) {
+            // Conteo total para paginación considerando el GROUP BY
+            $subquery = (clone $builder)->select('o.id AS sub_id', false);
+            $total = $db->newQuery()->fromSubquery($subquery, 't_count')->countAllResults();
+
+            $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'o.id')
+                ->limit($porPagina, ($page - 1) * $porPagina)
+                ->get()
+                ->getResultArray();
+
+            $data = array_map([$this, 'calcularCupo'], $rows);
+
+            return $this->respond([
+                'data' => $data,
+                'meta' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'porPagina' => $porPagina,
+                    'totalPaginas' => (int) ceil($total / $porPagina),
+                ],
+            ]);
+        }
+
+        $rows = $builder->orderBy('o.id', 'DESC')
             ->get()
             ->getResultArray();
 
@@ -142,6 +219,41 @@ class AsociacionesController extends ResourceController
                 'vehiculos' => $vehiculos,
             ])
         ]);
+    }
+
+    /**
+     * Lista global de socios: propietarios con vehículos registrados en
+     * cualquier asociación, junto con el nombre de la asociación a la que
+     * pertenecen. Usado por la pestaña "Socios" del padrón.
+     */
+    public function socios()
+    {
+        $db = \Config\Database::connect();
+
+        $socios = $db->table('vehiculo_propietarios vp')
+            ->select("
+                p.id AS idPersona,
+                COALESCE(p.numero, '') AS documento,
+                TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) AS nombre,
+                COALESCE(NULLIF(p.telefono, ''), NULLIF(p.celular, ''), '') AS telefono,
+                COALESCE(p.email, '') AS email,
+                o.id AS idAsociacion,
+                o.razon_social AS asociacionNombre,
+                COUNT(DISTINCT vp.id_vehiculo) AS vehiculosTotal,
+                GROUP_CONCAT(DISTINCT v.placa ORDER BY v.placa SEPARATOR ', ') AS placas
+            ", false)
+            ->join('personas p', 'p.id = vp.id_persona', 'inner')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->join('vehiculos v', 'v.id = vp.id_vehiculo', 'inner')
+            ->join('asociaciones o', 'o.id = v.id_asociacion', 'inner')
+            ->where('vp.estado', 'ACTIVO')
+            ->groupBy('p.id, o.id')
+            ->orderBy('asociacionNombre', 'ASC')
+            ->orderBy('nombre', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        return $this->respond(['data' => $socios]);
     }
 
     public function create()

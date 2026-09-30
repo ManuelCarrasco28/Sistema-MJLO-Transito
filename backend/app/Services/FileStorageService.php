@@ -17,10 +17,19 @@ class FileStorageService
      * (ej. "papeletas/6f1a....jpg") que se debe persistir en la base de datos,
      * en vez del base64 completo.
      */
+    private const TAMANO_MAXIMO_BYTES = 8 * 1024 * 1024; // 8 MB
+
     public function guardarImagenBase64(string $base64, string $subcarpeta): ?string
     {
         $base64 = trim($base64);
         if ($base64 === '') {
+            return null;
+        }
+
+        // Solo letras/números/guiones: evita path traversal (../) si en el
+        // futuro $subcarpeta llegara a depender de un valor externo.
+        $subcarpeta = preg_replace('/[^a-zA-Z0-9_-]/', '', trim($subcarpeta, '/'));
+        if ($subcarpeta === '') {
             return null;
         }
 
@@ -32,18 +41,29 @@ class FileStorageService
 
         $extension = self::MIME_EXT[$mime] ?? 'jpg';
         $binario = base64_decode($base64, true);
-        if ($binario === false || $binario === '') {
+        if ($binario === false || $binario === '' || strlen($binario) > self::TAMANO_MAXIMO_BYTES) {
             return null;
         }
 
-        $subcarpeta = trim($subcarpeta, '/');
+        // Verifica que el contenido decodificado sea realmente una imagen
+        // válida (no un archivo arbitrario disfrazado con extensión de imagen).
+        if (@getimagesizefromstring($binario) === false) {
+            return null;
+        }
+
         $directorio = WRITEPATH . 'uploads/' . $subcarpeta . '/';
         if (!is_dir($directorio) && !mkdir($directorio, 0755, true) && !is_dir($directorio)) {
             return null;
         }
 
         $nombre = bin2hex(random_bytes(16)) . '.' . $extension;
-        file_put_contents($directorio . $nombre, $binario);
+        $rutaCompleta = $directorio . $nombre;
+        $escrito = @file_put_contents($rutaCompleta, $binario, LOCK_EX);
+        if ($escrito === false || $escrito !== strlen($binario)) {
+            @unlink($rutaCompleta);
+            log_message('error', "No se pudo escribir archivo en disco: {$rutaCompleta}");
+            return null;
+        }
 
         return $subcarpeta . '/' . $nombre;
     }

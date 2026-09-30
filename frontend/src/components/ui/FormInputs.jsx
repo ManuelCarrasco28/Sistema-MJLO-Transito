@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 export function FloatingInput({
   id,
@@ -128,12 +129,15 @@ export function FloatingSelect({
   className = '',
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [openUpwards, setOpenUpwards] = useState(false)
+  const [menuPos, setMenuPos] = useState(null)
   const containerRef = useRef(null)
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      if (
+        containerRef.current && !containerRef.current.contains(e.target) &&
+        !e.target.closest?.('[data-floating-select-menu]')
+      ) {
         setIsOpen(false)
       }
     }
@@ -141,16 +145,33 @@ export function FloatingSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // El menú se renderiza vía portal (fuera del cuerpo del modal) con
+  // posición fija, para que no quede recortado/con scroll raro cuando el
+  // contenedor padre (ej. un modal) tiene su propio overflow. Se cierra si
+  // el usuario hace scroll, en vez de recalcular la posición en cada frame.
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const handleScroll = () => setIsOpen(false)
+    window.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('resize', handleScroll)
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleScroll)
+    }
+  }, [isOpen])
+
   const handleToggle = () => {
     if (!isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect()
+      const menuHeight = Math.min(224, options.length * 36 + 8)
       const spaceBelow = window.innerHeight - rect.bottom
-      // Si hay menos de 220px abajo y más espacio arriba, abrir hacia arriba
-      if (spaceBelow < 220 && rect.top > spaceBelow) {
-        setOpenUpwards(true)
-      } else {
-        setOpenUpwards(false)
-      }
+      const openUpwards = spaceBelow < menuHeight + 8 && rect.top > spaceBelow
+      setMenuPos({
+        left: rect.left,
+        width: rect.width,
+        top: openUpwards ? undefined : rect.bottom + 4,
+        bottom: openUpwards ? window.innerHeight - rect.top + 4 : undefined,
+      })
     }
     setIsOpen((prev) => !prev)
   }
@@ -195,11 +216,11 @@ export function FloatingSelect({
         {label}
       </label>
 
-      {isOpen && (
+      {isOpen && menuPos && createPortal(
         <div
-          className={`absolute left-0 right-0 ${
-            openUpwards ? 'bottom-full mb-1' : 'top-full mt-1'
-          } max-w-[calc(100vw-2rem)] z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-2xl shadow-slate-900/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100`}
+          data-floating-select-menu
+          style={{ position: 'fixed', left: menuPos.left, width: menuPos.width, top: menuPos.top, bottom: menuPos.bottom }}
+          className="max-w-[calc(100vw-2rem)] z-[100] rounded-xl border border-slate-200 bg-white p-1 shadow-2xl shadow-slate-900/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100"
         >
           <div className="space-y-0.5 max-h-56 overflow-y-auto custom-scrollbar">
             {options.map((opt) => {
@@ -237,7 +258,8 @@ export function FloatingSelect({
               )
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

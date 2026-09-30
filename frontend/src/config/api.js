@@ -105,6 +105,19 @@ export async function apiFetch(endpoint, options = {}) {
 
     const response = await fetch(url, config)
 
+    // Manejo global de expiración de sesión (401)
+    if (response.status === 401 && !url.includes('/api/login') && !url.includes('/api/me')) {
+      const isLoginPath = window.location.pathname === '/login' || window.location.pathname.endsWith('/login')
+      if (!isLoginPath && typeof window !== 'undefined') {
+        // Redirigir a login preservando aviso
+        setTimeout(() => {
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login?expired=1'
+          }
+        }, 100)
+      }
+    }
+
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && response.ok) {
       const cleanEndpoint = endpoint.split('?')[0].replace(/^\//, '').split('/')[0]
       if (cleanEndpoint) {

@@ -10,13 +10,17 @@ export function PersonaFormModal({
   tipoDocOptions,
   handleReniecSearch,
   isSearchingReniec = false,
+  handleUsarFotoReniec,
+  isFetchingFotoReniec = false,
   estadoCivilOptions,
   estadoOptions,
   onSubmit,
   onClose,
 }) {
+  const isDni = formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD'
+  const dniValido = isDni && /^\d{8}$/.test(formData.numeroDocumento || '')
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") onClose(); e.currentTarget.dataset.downOnOverlay = "" }}>
       <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
         <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center gap-2.5">
@@ -81,11 +85,28 @@ export function PersonaFormModal({
                     </button>
                   )}
                 </div>
+
+                {handleUsarFotoReniec && dniValido && (
+                  <button
+                    type="button"
+                    onClick={handleUsarFotoReniec}
+                    disabled={isFetchingFotoReniec}
+                    title="Usar la foto registrada en RENIEC para esta persona (solo si no trae foto propia)"
+                    className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white dark:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] px-2 py-1 text-[10px] font-bold text-slate-600 dark:text-slate-300 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                  >
+                    {isFetchingFotoReniec ? (
+                      <span className="size-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                    ) : (
+                      <Icon name="search" className="size-3" />
+                    )}
+                    <span>Usar foto RENIEC</span>
+                  </button>
+                )}
               </div>
 
               <div className="relative z-20 flex-1 min-w-0 space-y-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-blue-600" />
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                   Datos Personales
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
@@ -105,6 +126,9 @@ export function PersonaFormModal({
                         label="Número de documento"
                         required
                         maxLength={(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') ? 8 : 15}
+                        minLength={(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') ? 8 : undefined}
+                        pattern={(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') ? '\\d{8}' : undefined}
+                        title={(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') ? 'El DNI debe tener exactamente 8 dígitos.' : undefined}
                         value={formData.numeroDocumento}
                         inputClassName="font-mono font-bold"
                         onChange={(e) => {
@@ -182,8 +206,8 @@ export function PersonaFormModal({
             </div>
 
             <div className="relative z-10 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
-                <span className="size-2 rounded-full bg-emerald-600" />
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                 Licencia y contacto
               </h4>
 

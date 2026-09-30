@@ -15,8 +15,25 @@ export function ChartsSection({ data, loading = false, user }) {
   const [operativos, setOperativos] = useState(() => getCachedData('/operativos') || [])
   const [cursos, setCursos] = useState(() => getCachedData('/cursos') || [])
   const [selectedCalendarDay, setSelectedCalendarDay] = useState(null)
-  const [showPreviewModal, setShowPreviewModal] = useState(false)
   const operationsChartRef = useRef(null)
+  const movimientosRecientes = data?.movimientosRecientes ?? []
+  const formatFechaHora = (value) => {
+    if (!value) return '—'
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return '—'
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) + ' · ' + d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+  }
+  const estadoBadgeClass = (estado) => {
+    const e = (estado || '').toUpperCase()
+    if (['PAGADO', 'APROBADO', 'APROBADA', 'CONCLUIDO'].includes(e)) return 'bg-[#E6F9F0] dark:bg-emerald-500/20 text-[#01B574]'
+    if (['ANULADO', 'ANULADA', 'RECHAZADO', 'RECHAZADA'].includes(e)) return 'bg-[#FEEFEE] dark:bg-rose-500/20 text-[#EE5D50]'
+    return 'bg-[#FFF5E6] dark:bg-amber-500/20 text-[#FFB547]'
+  }
+  const getIniciales = (nombre) => {
+    if (!nombre || nombre === '—') return '—'
+    const partes = nombre.trim().split(/\s+/)
+    return ((partes[0]?.[0] || '') + (partes[1]?.[0] || '')).toUpperCase()
+  }
 
   useEffect(() => {
     let active = true
@@ -492,80 +509,19 @@ export function ChartsSection({ data, loading = false, user }) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
                 <h3 className="text-lg font-extrabold text-[#2B3674] dark:text-white tracking-tight">Últimos Movimientos e Intervenciones</h3>
-                <p className="text-xs font-semibold text-[#A3AED0]">Registros procesados por el equipo de fiscalizadores en tiempo real</p>
+                <p className="text-xs font-semibold text-[#A3AED0]">Últimas papeletas y trámites registrados en el sistema</p>
               </div>
-              <div className="flex items-center gap-2">
-                {isOffice && (
-                <button
-                  onClick={() => {
-                    const htmlContent = `
-                      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-                      <head>
-                      <meta charset="utf-8" />
-                      <style>
-                        table { border-collapse: collapse; font-family: Arial, sans-serif; }
-                        th { background-color: #2B3674; color: #ffffff; font-weight: bold; text-align: left; padding: 10px; border: 1px solid #E9EDF7; font-size: 14px; }
-                        td { border: 1px solid #E9EDF7; padding: 10px; font-size: 13px; vertical-align: middle; }
-                        .estado-proceso { color: #FFB547; font-weight: bold; }
-                        .estado-aprobado { color: #01B574; font-weight: bold; }
-                        .monto { font-weight: bold; color: #2B3674; text-align: right; }
-                        .subtitle { color: #A3AED0; font-size: 11px; }
-                        .badge { background-color: #F4F7FE; color: #2B3674; font-weight: bold; font-size: 12px; }
-                      </style>
-                      </head>
-                      <body>
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Conductor / Administrado</th>
-                              <th>Unidad / Placa</th>
-                              <th>Trámite / Infracción</th>
-                              <th>Fecha & Hora</th>
-                              <th>Estado</th>
-                              <th>Monto</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr>
-                              <td><b>Manuel Gonzales R.</b><br><span class="subtitle">DNI: 45892147</span></td>
-                              <td><span class="badge">NC-4821-M</span><br><span class="subtitle">Bajaj Torito · Azul</span></td>
-                              <td><b>Papeleta G-40</b><br><span class="subtitle">Circular sin SOAT</span></td>
-                              <td>11/09 · 11:20 AM</td>
-                              <td class="estado-proceso">En Proceso</td>
-                              <td class="monto">S/ 412.00</td>
-                            </tr>
-                            <tr>
-                              <td><b>Asoc. San Lorenzo</b><br><span class="subtitle">RUC: 20601827361</span></td>
-                              <td><span class="badge">M8-9921</span><br><span class="subtitle">TVS King · Rojo</span></td>
-                              <td><b>Inspección Técnica</b><br><span class="subtitle">Acreditación 2026</span></td>
-                              <td>11/09 · 10:45 AM</td>
-                              <td class="estado-aprobado">Aprobado</td>
-                              <td class="monto">S/ 35.00</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </body>
-                      </html>
-                    `
-                    const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
-                    const link = document.createElement('a')
-                    link.href = URL.createObjectURL(blob)
-                    link.download = 'ultimos_movimientos.xls'
-                    link.click()
-                  }}
-                  className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#F4F7FE] dark:bg-white/5 text-[#707EAE] hover:text-[#2B3674] dark:text-white transition-colors cursor-pointer"
-                >
-                  Exportar Excel
-                </button>
-                )}
-                <button
-                  onClick={() => setShowPreviewModal(true)}
-                  className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#4318FF] text-white shadow-horizon dark:shadow-none-btn hover:bg-[#3311DB] transition-all cursor-pointer"
-                >
-                  Ver todos
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/papeletas')}
+                className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#4318FF] text-white shadow-horizon dark:shadow-none-btn hover:bg-[#3311DB] transition-all cursor-pointer"
+              >
+                Ver todos
+              </button>
             </div>
+            {movimientosRecientes.length === 0 ? (
+              <p className="py-8 text-center text-xs font-semibold text-[#A3AED0]">Sin movimientos registrados todavía.</p>
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-[#707EAE]">
                 <thead className="text-[11px] font-extrabold text-[#A3AED0] uppercase tracking-wider border-b border-[#F4F7FE]">
@@ -579,57 +535,39 @@ export function ChartsSection({ data, loading = false, user }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F4F7FE] font-medium">
-                  <tr className="hover:bg-[#F4F7FE] dark:bg-white/10 transition-colors">
-                    <td className="py-3.5 px-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-[#4318FF]/10 text-[#4318FF] font-black flex items-center justify-center text-xs">MG</div>
-                        <div>
-                          <div className="font-extrabold text-[#2B3674] dark:text-white">Manuel Gonzales R.</div>
-                          <div className="text-[10px] text-[#A3AED0]">DNI: 45892147</div>
+                  {movimientosRecientes.map((mov, idx) => (
+                    <tr key={`${mov.origen}-${idx}`} className="hover:bg-[#F4F7FE] dark:bg-white/10 transition-colors">
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-[#4318FF]/10 text-[#4318FF] font-black flex items-center justify-center text-xs">
+                            {getIniciales(mov.administrado)}
+                          </div>
+                          <div>
+                            <div className="font-extrabold text-[#2B3674] dark:text-white">{mov.administrado}</div>
+                            <div className="text-[10px] text-[#A3AED0]">{mov.documento !== '—' ? `DNI: ${mov.documento}` : ''}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-black bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white border border-[#E9EDF7]">NC-4821-M</span>
-                      <div className="text-[10px] text-[#A3AED0] mt-0.5">Bajaj Torito · Azul</div>
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <div className="font-bold text-[#2B3674] dark:text-white">Papeleta G-40</div>
-                      <div className="text-[10px] text-[#A3AED0]">Circular sin SOAT</div>
-                    </td>
-                    <td className="py-3.5 px-3 font-semibold text-[#707EAE]">11/09 · 11:20 AM</td>
-                    <td className="py-3.5 px-3 text-center">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#FFF5E6] dark:bg-amber-500/20 text-[#FFB547]">En Proceso</span>
-                    </td>
-                    {isOffice && <td className="py-3.5 px-3 text-right font-black text-[#2B3674] dark:text-white">S/ 412.00</td>}
-                  </tr>
-                  <tr className="hover:bg-[#F4F7FE] dark:bg-white/10 transition-colors">
-                    <td className="py-3.5 px-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-[#01B574]/15 text-[#01B574] font-black flex items-center justify-center text-xs">SL</div>
-                        <div>
-                          <div className="font-extrabold text-[#2B3674] dark:text-white">Asoc. San Lorenzo</div>
-                          <div className="text-[10px] text-[#A3AED0]">RUC: 20601827361</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-black bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white border border-[#E9EDF7]">M8-9921</span>
-                      <div className="text-[10px] text-[#A3AED0] mt-0.5">TVS King · Rojo</div>
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <div className="font-bold text-[#2B3674] dark:text-white">Inspección Técnica</div>
-                      <div className="text-[10px] text-[#A3AED0]">Acreditación 2026</div>
-                    </td>
-                    <td className="py-3.5 px-3 font-semibold text-[#707EAE]">11/09 · 10:45 AM</td>
-                    <td className="py-3.5 px-3 text-center">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#E6F9F0] dark:bg-emerald-500/20 text-[#01B574]">Aprobado</span>
-                    </td>
-                    {isOffice && <td className="py-3.5 px-3 text-right font-black text-[#2B3674] dark:text-white">S/ 35.00</td>}
-                  </tr>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-black bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white border border-[#E9EDF7]">{mov.placa}</span>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <div className="font-bold text-[#2B3674] dark:text-white">{mov.origen === 'PAPELETA' ? 'Papeleta' : 'Trámite'} {mov.codigo}</div>
+                        <div className="text-[10px] text-[#A3AED0]">{mov.detalle}</div>
+                      </td>
+                      <td className="py-3.5 px-3 font-semibold text-[#707EAE]">{formatFechaHora(mov.fecha)}</td>
+                      <td className="py-3.5 px-3 text-center">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold ${estadoBadgeClass(mov.estado)}`}>
+                          {mov.estado}
+                        </span>
+                      </td>
+                      {isOffice && <td className="py-3.5 px-3 text-right font-black text-[#2B3674] dark:text-white">{mov.monto > 0 ? `S/ ${mov.monto.toFixed(2)}` : '—'}</td>}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
+            )}
           </div>
 
           {/* Operatividad de permisos (Restaurado interactivo) */}
@@ -1008,9 +946,13 @@ export function ChartsSection({ data, loading = false, user }) {
             </div>
             
             <div className="mt-4 pt-3 border-t border-[#F4F7FE]">
-              <a className="text-[11px] font-extrabold text-[#4318FF] hover:underline flex items-center justify-center gap-1 cursor-pointer">
+              <button
+                type="button"
+                onClick={() => navigate('/internamientos')}
+                className="text-[11px] font-extrabold text-[#4318FF] hover:underline flex items-center justify-center gap-1 cursor-pointer w-full"
+              >
                 Inventario de internamiento →
-              </a>
+              </button>
             </div>
           </article>
         </div>
@@ -1173,93 +1115,6 @@ export function ChartsSection({ data, loading = false, user }) {
         </div>
       )}
 
-      {showPreviewModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setShowPreviewModal(false)} />
-          <div className="relative w-full max-w-4xl bg-white dark:bg-[#111C44] rounded-3xl shadow-2xl overflow-hidden animate-enter">
-            <div className="flex items-center justify-between p-6 border-b border-[#F4F7FE] dark:border-white/10 bg-gradient-to-r from-[#F4F7FE] to-white dark:from-white/5 dark:to-transparent">
-              <div>
-                <h3 className="text-xl font-black text-[#2B3674] dark:text-white tracking-tight">Registro Completo de Movimientos</h3>
-                <p className="text-sm font-semibold text-[#A3AED0] mt-1">Vista previa de todas las intervenciones recientes</p>
-              </div>
-              <button 
-                onClick={() => setShowPreviewModal(false)}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-white/10 text-[#707EAE] hover:text-[#EE5D50] hover:bg-rose-50 dark:hover:bg-rose-500/20 transition-all shadow-sm"
-              >
-                <Icon name="close" className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-              <table className="w-full text-left text-sm text-[#707EAE]">
-                <thead className="text-xs font-extrabold text-[#A3AED0] uppercase tracking-wider border-b border-[#F4F7FE]">
-                  <tr>
-                    <th className="pb-4 px-4">Conductor / Administrado</th>
-                    <th className="pb-4 px-4">Unidad / Placa</th>
-                    <th className="pb-4 px-4">Trámite / Infracción</th>
-                    <th className="pb-4 px-4">Fecha & Hora</th>
-                    <th className="pb-4 px-4 text-center">Estado</th>
-                    <th className="pb-4 px-4 text-right">Monto</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F4F7FE] font-medium">
-                  <tr className="hover:bg-[#F4F7FE] dark:bg-white/10 transition-colors">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#4318FF]/10 text-[#4318FF] font-black flex items-center justify-center text-sm">MG</div>
-                        <div>
-                          <div className="font-extrabold text-[#2B3674] dark:text-white">Manuel Gonzales R.</div>
-                          <div className="text-xs text-[#A3AED0]">DNI: 45892147</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-black bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white border border-[#E9EDF7]">NC-4821-M</span>
-                      <div className="text-xs text-[#A3AED0] mt-1">Bajaj Torito · Azul</div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="font-bold text-[#2B3674] dark:text-white">Papeleta G-40</div>
-                      <div className="text-xs text-[#A3AED0]">Circular sin SOAT</div>
-                    </td>
-                    <td className="py-4 px-4 font-semibold text-[#707EAE]">11/09 · 11:20 AM</td>
-                    <td className="py-4 px-4 text-center">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold bg-[#FFF5E6] dark:bg-amber-500/20 text-[#FFB547]">En Proceso</span>
-                    </td>
-                    <td className="py-4 px-4 text-right font-black text-[#2B3674] dark:text-white">S/ 412.00</td>
-                  </tr>
-                  <tr className="hover:bg-[#F4F7FE] dark:bg-white/10 transition-colors">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#01B574]/15 text-[#01B574] font-black flex items-center justify-center text-sm">SL</div>
-                        <div>
-                          <div className="font-extrabold text-[#2B3674] dark:text-white">Asoc. San Lorenzo</div>
-                          <div className="text-xs text-[#A3AED0]">RUC: 20601827361</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-black bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white border border-[#E9EDF7]">M8-9921</span>
-                      <div className="text-xs text-[#A3AED0] mt-1">TVS King · Rojo</div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="font-bold text-[#2B3674] dark:text-white">Inspección Técnica</div>
-                      <div className="text-xs text-[#A3AED0]">Acreditación 2026</div>
-                    </td>
-                    <td className="py-4 px-4 font-semibold text-[#707EAE]">11/09 · 10:45 AM</td>
-                    <td className="py-4 px-4 text-center">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold bg-[#E6F9F0] dark:bg-emerald-500/20 text-[#01B574]">Aprobado</span>
-                    </td>
-                    <td className="py-4 px-4 text-right font-black text-[#2B3674] dark:text-white">S/ 35.00</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="p-4 bg-gray-50 dark:bg-white/5 border-t border-[#F4F7FE] dark:border-white/10 text-center">
-              <p className="text-xs font-semibold text-[#A3AED0]">Mostrando los 2 últimos registros. El módulo completo de búsqueda estará disponible próximamente.</p>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }

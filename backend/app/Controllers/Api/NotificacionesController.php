@@ -34,7 +34,7 @@ class NotificacionesController extends BaseController
                 'icon' => 'document',
                 'tone' => $dias <= 7 ? 'rose' : 'amber',
                 'unread' => true,
-                'link' => '/permisos'
+                'link' => '/permisos?search=' . urlencode($p->numero_autorizacion)
             ];
         }
 
@@ -56,7 +56,7 @@ class NotificacionesController extends BaseController
                 'icon' => 'vehicle',
                 'tone' => 'blue',
                 'unread' => true,
-                'link' => '/internamientos'
+                'link' => '/internamientos?search=' . urlencode($i->placa)
             ];
         }
 
@@ -77,7 +77,7 @@ class NotificacionesController extends BaseController
                 'icon' => 'ticket',
                 'tone' => 'emerald',
                 'unread' => true,
-                'link' => '/papeletas'
+                'link' => '/papeletas?search=' . urlencode($p->numero_papeleta)
             ];
         }
 

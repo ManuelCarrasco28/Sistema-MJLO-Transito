@@ -688,25 +688,25 @@ export function Trabajadores() {
               )}
 
               {form.id && (
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-blue-600" />
+                <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-2 flex items-center gap-2">
+                    <span className="size-1.5 rounded-full bg-blue-500" />
                     Persona Vinculada
-                  </h4>
+                  </legend>
                   <div className="rounded-xl border border-white bg-white px-4 py-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] shadow-2xs">
                     <p className="text-sm font-black text-slate-900 dark:text-white">{form.nombres} {form.apellidos}</p>
                     <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{form.tipo_documento}: {form.numero_documento}</p>
                   </div>
-                </div>
+                </fieldset>
               )}
 
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-cyan-600" />
+              <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                <legend className="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-2 flex items-center gap-2">
+                  <span className="size-1.5 rounded-full bg-cyan-500" />
                   Datos Laborales
-                </h4>
+                </legend>
                 <div className="grid gap-2.5 sm:grid-cols-2">
-                  <div className="relative sm:col-span-2">
+                  <div className="relative sm:col-span-1">
                     <SearchableSelect 
                       id="cargo" 
                       label="Cargo" 
@@ -717,7 +717,7 @@ export function Trabajadores() {
                     />
                   </div>
                   
-                  <div className="relative sm:col-span-2">
+                  <div className="relative sm:col-span-1">
                     <SearchableSelect 
                       id="unidad" 
                       label="Unidad Orgánica" 
@@ -738,19 +738,19 @@ export function Trabajadores() {
                   <div className="relative sm:col-span-2">
                     <FloatingInput id="solicitud" label="Solicitud / Motivo (Ej. Asignación, Desplazamiento)" value={form.solicitud || ''} onChange={(e) => setForm({ ...form, solicitud: e.target.value })} />
                   </div>
-                </div>
-              </div>
+                  </div>
+                </fieldset>
 
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-emerald-600" />
+              <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                <legend className="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-2 flex items-center gap-2">
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
                   Documentación y Estado
-                </h4>
+                </legend>
                 <div className="grid gap-2.5 sm:grid-cols-2 md:grid-cols-4">
-                  <div className="md:col-span-2">
+                  <div className="sm:col-span-1 md:col-span-2">
                     <FloatingInput id="documento" label="Documento de Asignación" value={form.documento || ''} onChange={(e) => setForm({ ...form, documento: e.target.value })} />
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="sm:col-span-1 md:col-span-2">
                     <FloatingInput id="firma" label="Firma del Documento (Quién autoriza)" value={form.firma_documento || ''} onChange={(e) => setForm({ ...form, firma_documento: e.target.value })} />
                   </div>
                   
@@ -776,11 +776,11 @@ export function Trabajadores() {
                       { value: 'INACTIVO', label: 'INACTIVO' },
                     ]} />
                   )}
-                </div>
-              </div>
+                  </div>
+                </fieldset>
 
               {form.id && (
-                <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20 shadow-xs">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-2.5 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-none">
                   <p className="text-[9px] font-black uppercase tracking-wider text-indigo-500">Estado de Cuenta de Usuario</p>
                   <p className={`mt-0.5 text-[11px] font-bold ${Number(form.tiene_cuenta) === 1 ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-500'}`}>
                     {Number(form.tiene_cuenta) === 1 ? 'El trabajador tiene un usuario activo en el sistema.' : 'No tiene usuario activo asociado.'}
@@ -789,9 +789,12 @@ export function Trabajadores() {
               )}
 
               {form.historial?.length > 0 && (
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                  <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-slate-400">Historial Laboral</p>
-                  <div className="space-y-2">
+                <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
+                  <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2 flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-slate-400" />
+                    Historial Laboral
+                  </legend>
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
                     {form.historial.map((h, idx) => (
                       <div key={idx} className="border-l-2 border-slate-200 pl-2 dark:border-[var(--border-strong)]">
                         <p className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{h.cargo || 'Cargo no registrado'} · {h.unidad_organica || 'Sin unidad'}</p>
@@ -801,7 +804,7 @@ export function Trabajadores() {
                       </div>
                     ))}
                   </div>
-                </div>
+                </fieldset>
               )}
 
               {formError && (

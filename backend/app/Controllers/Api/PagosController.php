@@ -10,27 +10,79 @@ class PagosController extends ResourceController
 {
     protected $format = 'json';
 
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+
+        $recibos = $db->table('pagos_transito')
+            ->select("
+                COUNT(*) as total,
+                SUM(CASE WHEN estado = 'PAGADO' THEN total ELSE 0 END) as monto_pagado,
+                SUM(CASE WHEN estado = 'PAGADO' AND DATE(fecha_pago) = CURDATE() THEN 1 ELSE 0 END) as pagados_hoy
+            ", false)
+            ->get()->getRowArray();
+
+        $liberados = $db->table('ordenes_libertad')
+            ->select("
+                COUNT(*) as total,
+                SUM(monto_total) as monto,
+                SUM(CASE WHEN DATE(fecha_emision) = CURDATE() THEN 1 ELSE 0 END) as hoy
+            ", false)
+            ->get()->getRowArray();
+
+        $pendientesInternamiento = (int) $db->table('ordenes_internamiento')->where('estado', 'RETENIDO')->countAllResults();
+
+        $idsPapeletasConRecibo = $this->idsConRecibo($db, 'id_papeleta');
+        $papeletasPendientesTotal = $db->table('papeletas')->where('estado', 'PENDIENTE_PAGO')->countAllResults();
+        $papeletasPendientes = empty($idsPapeletasConRecibo)
+            ? $papeletasPendientesTotal
+            : $db->table('papeletas')->where('estado', 'PENDIENTE_PAGO')->whereNotIn('id', $idsPapeletasConRecibo)->countAllResults();
+
+        $idsInscripcionesConRecibo = $this->idsConRecibo($db, 'id_inscripcion');
+        $cursosPendientesBuilder = $db->table('inscripciones_curso i')
+            ->join('cursos_seguridad_vial c', 'c.id = i.id_curso')
+            ->where('i.estado_pago', 'PENDIENTE')
+            ->where('c.costo_inscripcion >', 0)
+            ->whereNotIn('i.estado', ['ANULADO', 'CANCELADO']);
+        if (!empty($idsInscripcionesConRecibo)) {
+            $cursosPendientesBuilder->whereNotIn('i.id', $idsInscripcionesConRecibo);
+        }
+        $cursosPendientes = $cursosPendientesBuilder->countAllResults();
+
+        $totalPagos = (int) ($recibos['total'] ?? 0) + (int) ($liberados['total'] ?? 0)
+            + $pendientesInternamiento + $papeletasPendientes + $cursosPendientes;
+        $totalMonto = (float) ($recibos['monto_pagado'] ?? 0) + (float) ($liberados['monto'] ?? 0);
+        $pagosHoy = (int) ($recibos['pagados_hoy'] ?? 0) + (int) ($liberados['hoy'] ?? 0);
+
+        return $this->respond(['data' => [
+            'totalPagos' => $totalPagos,
+            'totalMonto' => $totalMonto,
+            'pagosHoy' => $pagosHoy,
+        ]]);
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
-        
+
+        $page = (int)$this->request->getGet('page');
+        $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
+        $buscar = trim((string)$this->request->getGet('buscar'));
+        $tipoFiltro = strtoupper(trim((string)$this->request->getGet('tipoPago')));
+        $estadoFiltro = strtoupper(trim((string)$this->request->getGet('estado')));
+
         $rows = $db->table('pagos_transito')->orderBy('id', 'DESC')->get()->getResultArray();
-        $pagos = array_map([$this, 'present'], $rows);
 
         $pendientes = $db->table('ordenes_internamiento oi')
             ->select("oi.id, 'INTERNAMIENTO' as tipo_pago, NULL as numero_recibo, NULL as numero_voucher, 'SIN CONFIRMAR' as medio_pago, CONCAT('Boleta #', oi.numero_boleta) as referencia_pago, 0 as total, NULL as fecha_pago, 'PENDIENTE' as estado")
             ->where('oi.estado', 'RETENIDO')
             ->get()->getResultArray();
 
-        foreach ($pendientes as $p) {
-            $pagos[] = $this->formatearPagoInternamiento($p, 'int_p_');
-        }
-
         // El medio de pago se arma listando qué conceptos incluye la orden
         // (guardianía, papeleta y/o remolque), ya que el sistema no registra
         // un único método por cada recibo combinado.
         $pagados = $db->table('ordenes_libertad ol')
-            ->select("ol.id, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_papeleta, ol.numero_recibo_remolque, 'VARIOS') as numero_recibo, NULL as numero_voucher,
+            ->select("ol.id, ol.id_internamiento, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_papeleta, ol.numero_recibo_remolque, 'VARIOS') as numero_recibo, NULL as numero_voucher,
                 COALESCE(NULLIF(CONCAT_WS(' + ',
                     IF(ol.numero_recibo_guardiania IS NOT NULL, 'GUARDIANÍA', NULL),
                     IF(ol.numero_recibo_papeleta IS NOT NULL, 'PAPELETA', NULL),
@@ -38,10 +90,6 @@ class PagosController extends ResourceController
                 ), ''), 'VARIOS CONCEPTOS') as medio_pago,
                 CONCAT('Orden #', ol.numero_orden) as referencia_pago, ol.monto_total as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado", false)
             ->get()->getResultArray();
-
-        foreach ($pagados as $p) {
-            $pagos[] = $this->formatearPagoInternamiento($p, 'int_l_');
-        }
 
         // Papeletas pendientes de pago que aún no tienen un recibo generado
         // en pagos_transito, para que se vean en Pagos sin esperar a que
@@ -53,26 +101,10 @@ class PagosController extends ResourceController
             ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
             ->where('p.estado', 'PENDIENTE_PAGO')
             ->get()->getResultArray();
-
-        foreach ($papeletasPendientes as $p) {
-            if (in_array((int)$p['id'], $idsPapeletasConRecibo, true)) continue;
-            $pagos[] = [
-                'id' => 'pap_pend_' . $p['id'],
-                'tipoPago' => 'PAPELETA',
-                'papeletaId' => (int)$p['id'], 'tramiteId' => null, 'inscripcionId' => null,
-                'origenId' => (int)$p['id'],
-                'numeroRecibo' => null,
-                'numeroVoucher' => null,
-                'metodo' => 'SIN CONFIRMAR',
-                'metodoPago' => 'SIN CONFIRMAR',
-                'referenciaPago' => 'Papeleta ' . $p['numero_papeleta'] . ($p['placa'] ? ' — ' . $p['placa'] : ''),
-                'montoTotal' => (float)$p['monto_total'],
-                'fecha' => $p['fecha_hora'],
-                'fechaHora' => $p['fecha_hora'],
-                'estado' => 'PENDIENTE',
-                'pagadoPor' => $this->resolverPagador(['tipo_pago' => 'PAPELETA', 'id_papeleta' => (int)$p['id']]),
-            ];
-        }
+        $papeletasPendientes = array_values(array_filter(
+            $papeletasPendientes,
+            static fn ($p) => !in_array((int) $p['id'], $idsPapeletasConRecibo, true)
+        ));
 
         // Inscripciones a cursos con costo, pendientes de pago, que aún no
         // tienen un recibo generado.
@@ -87,9 +119,67 @@ class PagosController extends ResourceController
             ->where('c.costo_inscripcion >', 0)
             ->whereNotIn('i.estado', ['ANULADO', 'CANCELADO'])
             ->get()->getResultArray();
+        $cursosPendientes = array_values(array_filter(
+            $cursosPendientes,
+            static fn ($c) => !in_array((int) $c['id'], $idsInscripcionesConRecibo, true)
+        ));
+
+        // Resolución de "pagado por" en bloque (una consulta por tipo de
+        // origen, no una por fila) para evitar N+1 al construir el listado.
+        $idsPapeletaPagador = array_values(array_unique(array_filter(array_merge(
+            array_map(static fn ($r) => (int) ($r['id_papeleta'] ?? 0), $rows),
+            array_map(static fn ($p) => (int) $p['id'], $papeletasPendientes)
+        ))));
+        $idsTramitePagador = array_values(array_unique(array_filter(
+            array_map(static fn ($r) => (int) ($r['id_tramite'] ?? 0), $rows)
+        )));
+        $idsCursoPagador = array_values(array_unique(array_filter(array_merge(
+            array_map(static fn ($r) => (int) ($r['id_inscripcion'] ?? 0), $rows),
+            array_map(static fn ($c) => (int) $c['id'], $cursosPendientes)
+        ))));
+        $idsInternamientoPagador = array_values(array_unique(array_merge(
+            array_map(static fn ($p) => (int) $p['id'], $pendientes),
+            array_map(static fn ($p) => (int) $p['id_internamiento'], $pagados)
+        )));
+
+        $mapasPagador = $this->resolverPagadoresEnBloque(
+            $db,
+            $idsPapeletaPagador,
+            $idsTramitePagador,
+            $idsCursoPagador,
+            $idsInternamientoPagador
+        );
+
+        $pagos = array_map(fn ($row) => $this->present($row, $mapasPagador), $rows);
+
+        foreach ($pendientes as $p) {
+            $pagos[] = $this->formatearPagoInternamiento($p, 'int_p_', $mapasPagador);
+        }
+
+        foreach ($pagados as $p) {
+            $pagos[] = $this->formatearPagoInternamiento($p, 'int_l_', $mapasPagador);
+        }
+
+        foreach ($papeletasPendientes as $p) {
+            $pagos[] = [
+                'id' => 'pap_pend_' . $p['id'],
+                'tipoPago' => 'PAPELETA',
+                'papeletaId' => (int)$p['id'], 'tramiteId' => null, 'inscripcionId' => null,
+                'origenId' => (int)$p['id'],
+                'numeroRecibo' => null,
+                'numeroVoucher' => null,
+                'metodo' => 'SIN CONFIRMAR',
+                'metodoPago' => 'SIN CONFIRMAR',
+                'referenciaPago' => 'Papeleta ' . $p['numero_papeleta'] . ($p['placa'] ? ' — ' . $p['placa'] : ''),
+                'montoTotal' => (float)$p['monto_total'],
+                'fecha' => $p['fecha_hora'],
+                'fechaHora' => $p['fecha_hora'],
+                'estado' => 'PENDIENTE',
+                'pagadoPor' => $mapasPagador['papeleta'][(int) $p['id']] ?? null,
+            ];
+        }
 
         foreach ($cursosPendientes as $c) {
-            if (in_array((int)$c['id'], $idsInscripcionesConRecibo, true)) continue;
             $pagos[] = [
                 'id' => 'cur_pend_' . $c['id'],
                 'tipoPago' => 'CURSO',
@@ -104,16 +194,82 @@ class PagosController extends ResourceController
                 'fecha' => $c['fecha_inscripcion'],
                 'fechaHora' => $c['fecha_inscripcion'],
                 'estado' => 'PENDIENTE',
-                'pagadoPor' => $this->resolverPagador(['tipo_pago' => 'CURSO', 'id_inscripcion' => (int)$c['id']]),
+                'pagadoPor' => $mapasPagador['curso'][(int) $c['id']] ?? null,
             ];
         }
 
-        usort($pagos, function($a, $b) {
-            $dateA = $a['fecha'] ? strtotime($a['fecha']) : 0;
-            $dateB = $b['fecha'] ? strtotime($b['fecha']) : 0;
-            if ($dateA === $dateB) return 0;
-            return $dateB <=> $dateA;
-        });
+        // Filtrado en memoria unificado si se solicita búsqueda o filtros
+        if ($buscar !== '' || ($tipoFiltro !== '' && $tipoFiltro !== 'TODOS') || ($estadoFiltro !== '' && $estadoFiltro !== 'TODOS')) {
+            $pagos = array_values(array_filter($pagos, function ($p) use ($buscar, $tipoFiltro, $estadoFiltro) {
+                if ($tipoFiltro !== '' && $tipoFiltro !== 'TODOS' && strtoupper((string)$p['tipoPago']) !== $tipoFiltro) {
+                    return false;
+                }
+                if ($estadoFiltro !== '' && $estadoFiltro !== 'TODOS' && strtoupper((string)$p['estado']) !== $estadoFiltro) {
+                    return false;
+                }
+                if ($buscar !== '') {
+                    $haystack = strtolower(implode(' ', [
+                        $p['numeroRecibo'] ?? '',
+                        $p['numeroVoucher'] ?? '',
+                        $p['referenciaPago'] ?? '',
+                        $p['pagadoPor'] ?? '',
+                        $p['metodo'] ?? '',
+                    ]));
+                    if (!str_contains($haystack, strtolower($buscar))) {
+                        return false;
+                    }
+                }
+                return true;
+            }));
+        }
+
+        // Ordenamiento: el listado de pagos es un array PHP en memoria (mezcla
+        // pagos_transito + pendientes sin recibo de 3 orígenes distintos), no
+        // una sola consulta SQL, así que el orden pedido por el cliente se
+        // aplica aquí con usort en vez de con QuerySort (que necesita un query builder).
+        $columnasOrdenablesPago = ['numeroRecibo', 'referenciaPago', 'metodoPago', 'montoTotal', 'estado', 'fecha'];
+        $sortBy = trim((string) $this->request->getGet('sortBy'));
+        $sortDir = strtoupper(trim((string) $this->request->getGet('sortDir'))) === 'ASC' ? 'ASC' : 'DESC';
+
+        if (in_array($sortBy, $columnasOrdenablesPago, true)) {
+            usort($pagos, function ($a, $b) use ($sortBy, $sortDir) {
+                $valA = $a[$sortBy] ?? '';
+                $valB = $b[$sortBy] ?? '';
+                if ($sortBy === 'fecha') {
+                    $valA = $valA ? strtotime($valA) : 0;
+                    $valB = $valB ? strtotime($valB) : 0;
+                } elseif ($sortBy === 'montoTotal') {
+                    $valA = (float) $valA;
+                    $valB = (float) $valB;
+                } else {
+                    $valA = strtolower((string) $valA);
+                    $valB = strtolower((string) $valB);
+                }
+                $cmp = $valA <=> $valB;
+                return $sortDir === 'ASC' ? $cmp : -$cmp;
+            });
+        } else {
+            usort($pagos, function($a, $b) {
+                $dateA = $a['fecha'] ? strtotime($a['fecha']) : 0;
+                $dateB = $b['fecha'] ? strtotime($b['fecha']) : 0;
+                if ($dateA === $dateB) return 0;
+                return $dateB <=> $dateA;
+            });
+        }
+
+        if ($page > 0) {
+            $total = count($pagos);
+            $slice = array_slice($pagos, ($page - 1) * $porPagina, $porPagina);
+            return $this->respond([
+                'data' => $slice,
+                'meta' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'porPagina' => $porPagina,
+                    'totalPaginas' => (int) ceil($total / $porPagina),
+                ],
+            ]);
+        }
 
         return $this->respond(['data' => $pagos]);
     }
@@ -139,7 +295,7 @@ class PagosController extends ResourceController
      * liberada), que no vive en pagos_transito pero debe listarse junto a los
      * demás comprobantes.
      */
-    private function formatearPagoInternamiento(array $row, string $idPrefix): array
+    private function formatearPagoInternamiento(array $row, string $idPrefix, ?array $mapasPagador): array
     {
         return [
             'id' => $idPrefix . $row['id'],
@@ -154,11 +310,28 @@ class PagosController extends ResourceController
             'fecha' => $row['fecha_pago'],
             'fechaHora' => $row['fecha_pago'],
             'estado' => $row['estado'],
+            'pagadoPor' => $mapasPagador['internamiento'][(int) ($row['id_internamiento'] ?? $row['id'])] ?? null,
         ];
     }
 
-    public function present(array $row): array
+    public function present(array $row, ?array $mapasPagador = null): array
     {
+        $mapasPagador ??= $this->resolverPagadoresEnBloque(
+            \Config\Database::connect(),
+            !empty($row['id_papeleta']) ? [(int) $row['id_papeleta']] : [],
+            !empty($row['id_tramite']) ? [(int) $row['id_tramite']] : [],
+            !empty($row['id_inscripcion']) ? [(int) $row['id_inscripcion']] : [],
+            []
+        );
+
+        $tipo = strtolower($row['tipo_pago'] ?? '');
+        $pagadoPor = match ($tipo) {
+            'papeleta' => $mapasPagador['papeleta'][(int) ($row['id_papeleta'] ?? 0)] ?? null,
+            'tramite' => $mapasPagador['tramite'][(int) ($row['id_tramite'] ?? 0)] ?? null,
+            'curso' => $mapasPagador['curso'][(int) ($row['id_inscripcion'] ?? 0)] ?? null,
+            default => null,
+        };
+
         return [
             'id' => (int)$row['id'], 'tipoPago' => $row['tipo_pago'],
             'papeletaId' => $row['id_papeleta'], 'tramiteId' => $row['id_tramite'], 'inscripcionId' => $row['id_inscripcion'],
@@ -166,64 +339,98 @@ class PagosController extends ResourceController
             'metodo' => $row['medio_pago'], 'metodoPago' => $row['medio_pago'],
             'referenciaPago' => $row['referencia_pago'], 'montoTotal' => (float)$row['total'],
             'fecha' => $row['fecha_pago'], 'fechaHora' => $row['fecha_pago'], 'estado' => $row['estado'],
-            'pagadoPor' => $this->resolverPagador($row),
+            'pagadoPor' => $pagadoPor,
         ];
     }
 
     /**
-     * Resuelve el nombre de quien realizó el pago según el origen del
-     * comprobante: el infractor de la papeleta, el solicitante del trámite
-     * (persona o asociación), o el inscrito al curso.
+     * Resuelve el nombre de quien realizó cada pago con una sola consulta por
+     * tipo de origen (papeleta/trámite/curso/internamiento) en vez de una
+     * consulta por fila, evitando el patrón N+1 al construir el listado.
      */
-    private function resolverPagador(array $row): ?string
+    private function resolverPagadoresEnBloque($db, array $idsPapeleta, array $idsTramite, array $idsCurso, array $idsInternamiento): array
     {
-        $db = \Config\Database::connect();
-        $tipo = $row['tipo_pago'] ?? '';
+        $mapas = ['papeleta' => [], 'tramite' => [], 'curso' => [], 'internamiento' => []];
 
-        try {
-            if ($tipo === 'PAPELETA' && !empty($row['id_papeleta'])) {
-                $r = $db->table('papeletas p')
-                    ->select("TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', c.apellido_materno)) as nombre", false)
-                    ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
-                    ->join('ciudadanos c', 'c.id_persona = per.id', 'left')
-                    ->where('p.id', $row['id_papeleta'])
-                    ->get()->getRowArray();
-                return $r['nombre'] ?: null;
+        if (!empty($idsPapeleta)) {
+            $rows = $db->table('papeletas p')
+                ->select("p.id, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
+                ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
+                ->join('ciudadanos c', 'c.id_persona = per.id', 'left')
+                ->whereIn('p.id', $idsPapeleta)
+                ->get()->getResultArray();
+            foreach ($rows as $r) {
+                $mapas['papeleta'][(int) $r['id']] = $r['nombre'] ?: null;
             }
-
-            if ($tipo === 'TRAMITE' && !empty($row['id_tramite'])) {
-                $t = $db->table('tramites_documentarios')->select('id_persona, id_asociacion')->where('id', $row['id_tramite'])->get()->getRowArray();
-                if ($t) {
-                    if (!empty($t['id_persona'])) {
-                        $r = $db->table('personas p')
-                            ->select("TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', c.apellido_materno)) as nombre", false)
-                            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-                            ->where('p.id', $t['id_persona'])
-                            ->get()->getRowArray();
-                        if (!empty($r['nombre'])) return $r['nombre'];
-                    }
-                    if (!empty($t['id_asociacion'])) {
-                        $r = $db->table('asociaciones')->select('razon_social')->where('id', $t['id_asociacion'])->get()->getRowArray();
-                        return $r['razon_social'] ?? null;
-                    }
-                }
-                return null;
-            }
-
-            if ($tipo === 'CURSO' && !empty($row['id_inscripcion'])) {
-                $r = $db->table('inscripciones_curso i')
-                    ->select("TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', c.apellido_materno)) as nombre", false)
-                    ->join('personas p', 'p.id = i.id_persona', 'left')
-                    ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-                    ->where('i.id', $row['id_inscripcion'])
-                    ->get()->getRowArray();
-                return $r['nombre'] ?: null;
-            }
-        } catch (\Throwable $e) {
-            return null;
         }
 
-        return null;
+        if (!empty($idsTramite)) {
+            $tramites = $db->table('tramites_documentarios')
+                ->select('id, id_persona, id_asociacion')
+                ->whereIn('id', $idsTramite)
+                ->get()->getResultArray();
+
+            $idsPersonaTramite = array_values(array_unique(array_filter(array_map(static fn ($t) => (int) ($t['id_persona'] ?? 0), $tramites))));
+            $idsAsociacionTramite = array_values(array_unique(array_filter(array_map(static fn ($t) => (int) ($t['id_asociacion'] ?? 0), $tramites))));
+
+            $nombresPersona = [];
+            if (!empty($idsPersonaTramite)) {
+                $rows = $db->table('personas p')
+                    ->select("p.id, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
+                    ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                    ->whereIn('p.id', $idsPersonaTramite)
+                    ->get()->getResultArray();
+                foreach ($rows as $r) {
+                    $nombresPersona[(int) $r['id']] = $r['nombre'] ?: null;
+                }
+            }
+
+            $nombresAsociacion = [];
+            if (!empty($idsAsociacionTramite)) {
+                $rows = $db->table('asociaciones')->select('id, razon_social')->whereIn('id', $idsAsociacionTramite)->get()->getResultArray();
+                foreach ($rows as $r) {
+                    $nombresAsociacion[(int) $r['id']] = $r['razon_social'] ?? null;
+                }
+            }
+
+            foreach ($tramites as $t) {
+                $nombre = null;
+                if (!empty($t['id_persona']) && !empty($nombresPersona[(int) $t['id_persona']])) {
+                    $nombre = $nombresPersona[(int) $t['id_persona']];
+                } elseif (!empty($t['id_asociacion'])) {
+                    $nombre = $nombresAsociacion[(int) $t['id_asociacion']] ?? null;
+                }
+                $mapas['tramite'][(int) $t['id']] = $nombre;
+            }
+        }
+
+        if (!empty($idsCurso)) {
+            $rows = $db->table('inscripciones_curso i')
+                ->select("i.id, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
+                ->join('personas p', 'p.id = i.id_persona', 'left')
+                ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                ->whereIn('i.id', $idsCurso)
+                ->get()->getResultArray();
+            foreach ($rows as $r) {
+                $mapas['curso'][(int) $r['id']] = $r['nombre'] ?: null;
+            }
+        }
+
+        if (!empty($idsInternamiento)) {
+            $rows = $db->table('ordenes_internamiento oi')
+                ->select("oi.id, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
+                ->join('vehiculos v', 'v.id = oi.id_vehiculo', 'left')
+                ->join('vehiculo_propietarios vp', "vp.id_vehiculo = v.id AND vp.estado = 'ACTIVO'", 'left')
+                ->join('personas p', 'p.id = vp.id_persona', 'left')
+                ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                ->whereIn('oi.id', $idsInternamiento)
+                ->get()->getResultArray();
+            foreach ($rows as $r) {
+                $mapas['internamiento'][(int) $r['id']] = $r['nombre'] ?: null;
+            }
+        }
+
+        return $mapas;
     }
 
     public function create()
@@ -407,7 +614,11 @@ class PagosController extends ResourceController
     {
         $db = \Config\Database::connect();
         $fecha = trim($this->request->getGet('fecha') ?? date('Y-m-d'));
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+        $fechaValida = false;
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $fecha, $m)) {
+            $fechaValida = checkdate((int)$m[2], (int)$m[3], (int)$m[1]);
+        }
+        if (!$fechaValida) {
             $fecha = date('Y-m-d');
         }
 

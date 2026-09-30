@@ -181,9 +181,15 @@ export function QuickActions({ user }) {
             return (
               <a 
                 key={action.id}
+                href={action.path}
                 className="group p-4 rounded-[20px] bg-white dark:bg-[#111C44] shadow-horizon dark:shadow-none hover:shadow-horizon dark:shadow-none-hover transition-all duration-300 hover:-translate-y-1 flex items-center gap-4 border border-transparent dark:border-white/10 cursor-pointer" 
                 style={{ '--hover-border': `rgba(${colorRgb}, 0.2)` }}
-                onClick={() => navigate(action.path)}
+                onClick={(e) => {
+                  if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                    e.preventDefault();
+                    navigate(action.path);
+                  }
+                }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = `rgba(${colorRgb}, 0.2)` }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent' }}
               >

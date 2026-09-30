@@ -1,6 +1,8 @@
+import { useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showError, showToast } from '../utils/SwalUtil'
@@ -63,14 +65,33 @@ export function Papeletas({ user }) {
   const [asociaciones, setAsociaciones] = useState(cachedOrgs || [])
   const [isLoading, setIsLoading] = useState(!cachedPapeletas)
   const [loadError, setLoadError] = useState('')
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm, setSearchTerm] = useState(() => new URLSearchParams(window.location.search).get('search') || '')
+
+  const location = useLocation()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const s = params.get('search')
+    setSearchTerm(s || '')
+  }, [location.search])
+
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [filterOrigen, setFilterOrigen] = useState('TODOS')
   const [filterFormalidad, setFilterFormalidad] = useState('TODOS')
   const [filterTipoInfraccion, setFilterTipoInfraccion] = useState('TODOS')
   const [filterFecha, setFilterFecha] = useState('TODAS')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
+  }
+  const [stats, setStats] = useState({ total: 0, pendientes: 0, pagadas: 0, anuladas: 0 })
+  const [reportesSearch, setReportesSearch] = useState('')
+  const [reportesPage, setReportesPage] = useState(1)
+  const [reportesPerPage, setReportesPerPage] = useState(5)
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedPapeletaFotos, setSelectedPapeletaFotos] = useState([])
@@ -131,50 +152,13 @@ export function Papeletas({ user }) {
     window.addEventListener('mouseup', onMouseUp)
   }
 
-  const totales = papeletas.length
+  const totales = stats.total ?? 0
   const reportesPendientes = reportes.filter((r) => r.estado === 'PENDIENTE').length
-  const pendientes = papeletas.filter((p) => p.estado === 'PENDIENTE_PAGO').length
-  const pagadas = papeletas.filter((p) => p.estado === 'PAGADA').length
-  const anuladas = papeletas.filter((p) => p.estado === 'ANULADA').length
-  const montoRecaudado = pagadas > 0 ? papeletas.filter(p => p.estado === 'PAGADA').reduce((acc, curr) => acc + curr.montoTotal, 0) : 0
+  const pendientes = stats.pendientes ?? 0
+  const pagadas = stats.pagadas ?? 0
+  const anuladas = stats.anuladas ?? 0
 
-  const filteredPapeletas = papeletas.filter((p) => {
-    const fullSearch = `${p.numeroPapeleta || ''} ${p.vehiculoPlaca || ''} ${p.vehiculoCaracteristicas || ''} ${p.conductorNombre || p.infractor || ''} ${p.conductorDni || ''} ${p.propietarioNombre || ''} ${p.propietarioDni || ''} ${p.lugar || ''} ${p.tipoInfractor || ''} ${p.tipoInfraccionCodigo || ''} ${p.inspector || ''}`.toLowerCase()
-    const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
-    const matchesEstado = filterEstado === 'TODOS' || p.estado === filterEstado
-
-    // Filtro por Origen (Operativo vs Rutina)
-    const isOp = p.origen === 'OPERATIVO' || Boolean(p.operativoId)
-    const matchesOrigen = filterOrigen === 'TODOS'
-      || (filterOrigen === 'OPERATIVO' && isOp)
-      || (filterOrigen === 'RUTINA' && !isOp)
-
-    // Filtro por Formalidad (Formal vs Informal)
-    const matchesFormalidad = filterFormalidad === 'TODOS' || p.tipoInfractor === filterFormalidad
-
-    // Filtro por Tipo de Infracción
-    const matchesTipo = filterTipoInfraccion === 'TODOS'
-      || String(p.tipoInfraccionCodigo) === String(filterTipoInfraccion)
-      || String(p.detalles?.[0]?.tipoInfraccionId) === String(filterTipoInfraccion)
-
-    // Filtro por Fecha
-    let matchesFecha = true
-    if (filterFecha !== 'TODAS' && p.fechaHora) {
-      const pDate = new Date(p.fechaHora)
-      const now = new Date()
-      if (filterFecha === 'HOY') {
-        matchesFecha = pDate.toDateString() === now.toDateString()
-      } else if (filterFecha === 'SEMANA') {
-        const diffMs = now.getTime() - pDate.getTime()
-        const diffDays = diffMs / (1000 * 60 * 60 * 24)
-        matchesFecha = diffDays >= 0 && diffDays <= 7
-      } else if (filterFecha === 'MES') {
-        matchesFecha = pDate.getMonth() === now.getMonth() && pDate.getFullYear() === now.getFullYear()
-      }
-    }
-
-    return matchesSearch && matchesEstado && matchesOrigen && matchesFormalidad && matchesTipo && matchesFecha
-  })
+  const filteredPapeletas = papeletas
 
   const hasActiveFilters = searchTerm !== '' || filterEstado !== 'TODOS' || filterOrigen !== 'TODOS' || filterFormalidad !== 'TODOS' || filterTipoInfraccion !== 'TODOS' || filterFecha !== 'TODAS'
 
@@ -191,17 +175,56 @@ export function Papeletas({ user }) {
     setCurrentPage(1)
   }, [searchTerm, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha])
 
-  const paginatedPapeletas = filteredPapeletas.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+  useEffect(() => {
+    setReportesPage(1)
+  }, [reportesSearch])
+
+  const filteredReportes = reportes.filter((r) => {
+    if (!reportesSearch.trim()) return true
+    const term = reportesSearch.trim().toLowerCase()
+    return [
+      r.placa,
+      r.placa_visual,
+      r.lugar,
+      r.observaciones,
+      r.inspector_nombre,
+      r.conductorDni,
+      r.conductorNombre,
+      r.infraccion_visual,
+      r.estado,
+      `#${r.id}`,
+      r.numero_papeleta
+    ].some((v) => String(v || '').toLowerCase().includes(term))
+  })
+
+  const paginatedReportes = filteredReportes.slice(
+    (reportesPage - 1) * reportesPerPage,
+    reportesPage * reportesPerPage
   )
+
+  const paginatedPapeletas = papeletas
 
   const tipoInfraccionOptions = [
     { value: 'TODOS', label: 'Todas las infracciones' },
     ...tiposInfraccion.map((t) => ({ value: t.codigo || t.id, label: `${t.codigo} - ${t.descripcion}` }))
   ];
 
-  const handleExportPdf = () => {
+  const fetchTodoElFiltro = async () => {
+    const params = new URLSearchParams()
+    if (searchTerm) params.set('buscar', searchTerm)
+    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    if (filterOrigen !== 'TODOS') params.set('origen', filterOrigen)
+    if (filterFormalidad !== 'TODOS') params.set('formalidad', filterFormalidad)
+    if (filterTipoInfraccion !== 'TODOS') params.set('tipoInfraccion', filterTipoInfraccion)
+    if (filterFecha !== 'TODAS') params.set('fecha', filterFecha)
+    const res = await apiFetch(`/papeletas?${params.toString()}`)
+    if (!res.ok) return filteredPapeletas
+    const payload = await res.json()
+    return (payload.data || []).map(normalizePapeleta)
+  }
+
+  const handleExportPdf = async () => {
+    const data = await fetchTodoElFiltro()
     exportToPdf({
       filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.pdf`,
       title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
@@ -209,7 +232,7 @@ export function Papeletas({ user }) {
       metadata: [
         { label: 'Estado', value: filterEstado },
         { label: 'Formalidad', value: filterFormalidad },
-        { label: 'Total Papeletas', value: String(filteredPapeletas.length) }
+        { label: 'Total Papeletas', value: String(data.length) }
       ],
       columns: [
         { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 80, align: 'center' },
@@ -221,11 +244,12 @@ export function Papeletas({ user }) {
         { header: 'FECHA', key: 'fechaHora', render: (_, p) => new Date(p.fechaHora).toLocaleDateString(), width: 80, align: 'center' },
         { header: 'ESTADO', key: 'estado', width: 80, align: 'center' }
       ],
-      data: filteredPapeletas
+      data
     })
   }
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const data = await fetchTodoElFiltro()
     exportToExcel({
       filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.xls`,
       sheetName: 'Papeletas',
@@ -234,7 +258,7 @@ export function Papeletas({ user }) {
       metadata: [
         { label: 'Estado', value: filterEstado },
         { label: 'Formalidad', value: filterFormalidad },
-        { label: 'Total Papeletas', value: String(filteredPapeletas.length) }
+        { label: 'Total Papeletas', value: String(data.length) }
       ],
       columns: [
         { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 140, align: 'center' },
@@ -250,7 +274,7 @@ export function Papeletas({ user }) {
         { header: 'LUGAR', key: 'lugarInfraccion', width: 200 },
         { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
       ],
-      data: filteredPapeletas
+      data
     })
   }
 
@@ -267,14 +291,35 @@ export function Papeletas({ user }) {
     )
   }
 
+  const [totalFiltrado, setTotalFiltrado] = useState(0)
+
+  const loadStats = () => {
+    apiFetch('/papeletas/estadisticas')
+      .then((res) => res.ok ? res.json() : Promise.reject(res))
+      .then((payload) => setStats(payload.data ?? {}))
+      .catch(() => {})
+  }
+
   const loadData = () => {
     setIsLoading(true)
     setLoadError('')
+    const params = new URLSearchParams({
+      page: String(currentPage),
+      porPagina: String(itemsPerPage),
+    })
+    if (searchTerm) params.set('buscar', searchTerm)
+    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    if (filterOrigen !== 'TODOS') params.set('origen', filterOrigen)
+    if (filterFormalidad !== 'TODOS') params.set('formalidad', filterFormalidad)
+    if (filterTipoInfraccion !== 'TODOS') params.set('tipoInfraccion', filterTipoInfraccion)
+    if (filterFecha !== 'TODAS') params.set('fecha', filterFecha)
+    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
+
     Promise.all([
-      apiFetch('/papeletas').then(res => res.ok ? res.json() : Promise.reject(res)),
+      apiFetch(`/papeletas?${params.toString()}`).then(res => res.ok ? res.json() : Promise.reject(res)),
       apiFetch('/tipos-infraccion').then(res => res.ok ? res.json() : Promise.reject(res)),
-      apiFetch('/vehiculos').then(res => res.ok ? res.json() : Promise.reject(res)),
-      apiFetch('/asociaciones').then(res => res.ok ? res.json() : Promise.reject(res)),
+      apiFetch('/vehiculos?porPagina=50').then(res => res.ok ? res.json() : Promise.reject(res)),
+      apiFetch('/asociaciones?porPagina=50').then(res => res.ok ? res.json() : Promise.reject(res)),
       apiFetch('/reportes-intervencion').then(res => res.ok ? res.json() : Promise.reject(res))
     ]).then(([papeletasRes, tiposRes, vehiculosRes, orgsRes, reportesRes]) => {
       const pData = (papeletasRes.data || []).map(normalizePapeleta)
@@ -283,14 +328,11 @@ export function Papeletas({ user }) {
       const oData = orgsRes.data || []
       const rData = reportesRes.data || []
       setPapeletas(pData)
+      setTotalFiltrado(papeletasRes.meta?.total ?? pData.length)
       setTiposInfraccion(tData)
       setVehiculos(vData)
       setAsociaciones(oData)
       setReportes(rData)
-      setCachedData('/papeletas', pData)
-      setCachedData('/tipos-infraccion', tData)
-      setCachedData('/vehiculos', vData)
-      setCachedData('/asociaciones', oData)
       setIsLoading(false)
     }).catch(() => {
       setLoadError('No se pudo cargar el módulo de papeletas.')
@@ -300,6 +342,10 @@ export function Papeletas({ user }) {
 
   useEffect(() => {
     loadData()
+  }, [currentPage, itemsPerPage, searchTerm, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha, sortBy, sortDir])
+
+  useEffect(() => {
+    loadStats()
   }, [])
 
   const handleOpenDetail = async (papeleta) => {
@@ -321,8 +367,8 @@ export function Papeletas({ user }) {
         fotosList = data.fotos
       }
       setSelectedPapeletaFotos(fotosList)
-    } catch (error) {
-      console.error('Error cargando fotos:', error)
+    } catch (_) {
+      // Fallo al obtener fotos secundarias
     } finally {
       setLoadingPapeletaFotos(false)
     }
@@ -380,8 +426,7 @@ export function Papeletas({ user }) {
         showError('Error', sanitizarMensaje(Object.values(error.messages || {}).join(' '), 'Error al procesar el pago.'))
       }
     } catch (err) {
-      console.error(err)
-      alert('Error de conexión al procesar el pago')
+      showError('Error de conexión', sanitizarMensaje(err?.message, 'Error de conexión al procesar el pago.'))
     } finally {
       setIsProcessingAction(false)
     }
@@ -436,6 +481,7 @@ export function Papeletas({ user }) {
       if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo convertir el reporte.')
       setReporteToConvert(null)
       loadData()
+      loadStats()
       alert(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim())
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'Error al convertir reporte.'))
@@ -496,6 +542,7 @@ export function Papeletas({ user }) {
       if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo registrar la papeleta.')
       setIsNuevaModalOpen(false)
       loadData()
+      loadStats()
       showToast(`Papeleta ${data.data?.numeroPapeleta || ''} registrada correctamente`.trim())
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'No se pudo registrar la papeleta.'))
@@ -522,6 +569,7 @@ export function Papeletas({ user }) {
       setReporteToReject(null)
       setMotivoRechazo('')
       loadData()
+      loadStats()
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'Error al rechazar reporte.'))
     } finally {
@@ -534,12 +582,12 @@ export function Papeletas({ user }) {
       {loadError && <PageLoadError message={loadError} />}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose-600 to-rose-600 text-white shadow-md">
-            <Icon name="ticket" className="size-5.5" />
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="ticket" className="size-7 stroke-[2.4]" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                 Control de Papeletas e Infracciones
               </h1>
             </div>
@@ -633,7 +681,7 @@ export function Papeletas({ user }) {
       </div>
 
       {activeView === 'REPORTES' && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden flex flex-col">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 px-5 py-4 dark:border-[var(--border)]">
             <div>
               <h2 className="text-lg font-black text-slate-900 dark:text-white">Reportes Evidencias</h2>
@@ -645,19 +693,19 @@ export function Papeletas({ user }) {
                 <input
                   type="text"
                   placeholder="Buscar reporte..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={reportesSearch}
+                  onChange={(e) => setReportesSearch(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-sm outline-none transition focus:border-rose-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
-                {searchTerm && (
-                  <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button>
+                {reportesSearch && (
+                  <button onClick={() => setReportesSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">✕</button>
                 )}
               </div>
-              <button onClick={loadData} className="w-full sm:w-auto rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white shrink-0">Actualizar</button>
+              <button onClick={loadData} className="w-full sm:w-auto rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white shrink-0 cursor-pointer hover:bg-slate-800 transition active:scale-95">Actualizar</button>
             </div>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-            {reportes.filter(r => !searchTerm || [r.placa, r.placa_visual, r.lugar, r.observaciones, r.inspector_nombre, r.conductorDni].some(v => String(v || '').toLowerCase().includes(searchTerm.toLowerCase()))).length ? reportes.filter(r => !searchTerm || [r.placa, r.placa_visual, r.lugar, r.observaciones, r.inspector_nombre, r.conductorDni].some(v => String(v || '').toLowerCase().includes(searchTerm.toLowerCase()))).map((reporte) => (
+            {paginatedReportes.length ? paginatedReportes.map((reporte) => (
               <div key={reporte.id} className="grid gap-4 p-5 lg:grid-cols-[1fr_220px] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 flex-1">
@@ -691,7 +739,7 @@ export function Papeletas({ user }) {
                     type="button"
                     disabled={reporte.estado !== 'PENDIENTE'}
                     onClick={() => openConvertReporte(reporte)}
-                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 cursor-pointer"
                   >
                     Generar papeleta
                   </button>
@@ -699,7 +747,7 @@ export function Papeletas({ user }) {
                     type="button"
                     disabled={reporte.estado !== 'PENDIENTE'}
                     onClick={() => { setReporteToReject(reporte); setMotivoRechazo('') }}
-                    className="rounded-xl bg-rose-50 px-4 py-2 text-xs font-black text-rose-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    className="rounded-xl bg-rose-50 px-4 py-2 text-xs font-black text-rose-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
                   >
                     Rechazar
                   </button>
@@ -707,11 +755,29 @@ export function Papeletas({ user }) {
               </div>
             )) : (
               <div className="px-5 py-12 text-center text-slate-400">
-                <Icon name="camera" className="size-8 mx-auto mb-1 text-slate-300 dark:text-slate-600" />
-                <p className="font-bold text-slate-600 dark:text-slate-300">Aún no hay Reportes Evidencias</p>
+                <Icon name={reportesSearch ? 'search' : 'camera'} className="size-8 mx-auto mb-1 text-slate-300 dark:text-slate-600" />
+                <p className="font-bold text-slate-600 dark:text-slate-300">
+                  {reportesSearch
+                    ? 'No se encontraron reportes que coincidan con la búsqueda'
+                    : 'Aún no hay Reportes Evidencias'}
+                </p>
               </div>
             )}
           </div>
+
+          {filteredReportes.length > 0 && (
+            <Pagination
+              currentPage={reportesPage}
+              totalItems={filteredReportes.length}
+              itemsPerPage={reportesPerPage}
+              onPageChange={setReportesPage}
+              onItemsPerPageChange={(size) => {
+                setReportesPerPage(size)
+                setReportesPage(1)
+              }}
+              disabled={isLoading}
+            />
+          )}
         </div>
       )}
 
@@ -828,22 +894,34 @@ export function Papeletas({ user }) {
           aria-label="Listado de papeletas"
           tabIndex={0}
         >
-          <table className="w-full text-left text-sm">
+          <table className="w-full table-fixed text-left text-sm">
+            <colgroup>
+              <col className="w-[110px]" />
+              <col className="w-[150px]" />
+              <col className="w-[150px]" />
+              <col className="w-[110px]" />
+              <col className="w-[100px]" />
+              <col className="w-[140px]" />
+              <col className="w-[110px]" />
+              <col className="w-[90px]" />
+              <col className="w-[100px]" />
+              <col className="w-[90px]" />
+            </colgroup>
             <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-400">
               <tr>
-                <th className="px-3.5 py-3.5 text-center">N° Papeleta</th>
+                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="numeroPapeleta" label="N° Papeleta" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5">Propietario</th>
                 <th className="px-3.5 py-3.5">Infractor</th>
-                <th className="px-3.5 py-3.5">Vehículo</th>
+                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="vehiculoPlaca" label="Vehículo" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5 text-center">Tipo Infractor</th>
                 <th className="px-3.5 py-3.5 text-center">Infracción</th>
-                <th className="px-3.5 py-3.5 text-center">Fecha & Hora</th>
-                <th className="px-3.5 py-3.5 text-center">Monto</th>
-                <th className="px-3.5 py-3.5 text-center">Estado Pago</th>
+                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="fechaHora" label="Fecha & Hora" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="montoTotal" label="Monto" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="estado" label="Estado Pago" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+            <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && papeletas.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && papeletas.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -871,7 +949,7 @@ export function Papeletas({ user }) {
                   const tipoInf = tiposInfraccion.find((t) => t.id === p.detalles?.[0]?.tipoInfraccionId)
                   return (
                     <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-[var(--bg-subtle)]">
-                      <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
+                      <td className="px-3.5 py-3.5 text-center ">
                         <span className="font-mono font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
                         <div className="mt-0.5">{renderOrigen(p)}</div>
                       </td>
@@ -883,7 +961,7 @@ export function Papeletas({ user }) {
                         <p className="font-bold text-slate-800 dark:text-slate-100 text-xs">{p.conductorNombre || p.infractor || 'No Identificado'}</p>
                         <p className="font-mono text-xs text-slate-400">DNI: {p.conductorDni || 'S/D'}</p>
                       </td>
-                      <td className="px-3.5 py-3.5 whitespace-nowrap">
+                      <td className="px-3.5 py-3.5 ">
                         {p.vehiculoPlaca && p.vehiculoPlaca !== 'SIN PLACA' ? (
                           <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
                             {p.vehiculoPlaca}
@@ -964,7 +1042,7 @@ export function Papeletas({ user }) {
                         <p className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-xs">{new Date(p.fechaHora).toLocaleDateString()}</p>
                         <p className="text-[11px] text-slate-400">{new Date(p.fechaHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </td>
-                      <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
+                      <td className="px-3.5 py-3.5 text-center ">
                         <span className="font-mono font-black text-slate-800 dark:text-white text-sm">S/ {p.montoTotal.toFixed(2)}</span>
                       </td>
                       <td className="px-3 py-3.5 text-center">
@@ -1013,13 +1091,14 @@ export function Papeletas({ user }) {
 
         <Pagination
           currentPage={currentPage}
-          totalItems={filteredPapeletas.length}
+          totalItems={totalFiltrado}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
           onItemsPerPageChange={(size) => {
             setItemsPerPage(size)
             setCurrentPage(1)
           }}
+          disabled={isLoading}
         />
       </div>
       }

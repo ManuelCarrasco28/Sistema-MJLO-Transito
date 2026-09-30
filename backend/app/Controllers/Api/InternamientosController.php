@@ -8,12 +8,32 @@ class InternamientosController extends ResourceController
 {
     protected $format = 'json';
 
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        $row = $db->table('ordenes_internamiento')
+            ->select("
+                COUNT(*) as total,
+                SUM(CASE WHEN estado = 'RETENIDO' THEN 1 ELSE 0 END) as en_deposito,
+                SUM(CASE WHEN estado = 'LIBERADO' THEN 1 ELSE 0 END) as liberados,
+                AVG(total_dias) as avg_dias
+            ", false)
+            ->get()->getRowArray();
+
+        return $this->respond(['data' => [
+            'total' => (int) ($row['total'] ?? 0),
+            'enDeposito' => (int) ($row['en_deposito'] ?? 0),
+            'liberados' => (int) ($row['liberados'] ?? 0),
+            'avgDias' => (int) round((float) ($row['avg_dias'] ?? 0)),
+        ]]);
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
 
         try {
-            $rows = $db->table('ordenes_internamiento oi')
+            $builder = $db->table('ordenes_internamiento oi')
                 ->select("
                     oi.id,
                     oi.id_papeleta as papeletaId,
@@ -65,10 +85,47 @@ class InternamientosController extends ResourceController
                 ->join('ciudadanos rem_c', 'rem_c.id_persona = rem.id', 'left')
                 ->join('personas inte', 'inte.id = oi.id_interesado', 'left')
                 ->join('ciudadanos inte_c', 'inte_c.id_persona = inte.id', 'left')
-                ->join('ordenes_libertad ol', 'ol.id_internamiento = oi.id', 'left')
-                ->orderBy('oi.id', 'DESC')
-                ->get()
-                ->getResultArray();
+                ->join('ordenes_libertad ol', 'ol.id_internamiento = oi.id', 'left');
+
+            $buscar = trim((string)$this->request->getGet('buscar'));
+            if ($buscar !== '') {
+                $builder->groupStart()
+                    ->like('oi.numero_boleta', $buscar)
+                    ->orLike('v.placa', $buscar)
+                    ->orLike('p.numero_papeleta', $buscar)
+                    ->orLike('inte.numero', $buscar)
+                    ->orLike('inte_c.nombres', $buscar)
+                    ->orLike('inte_c.apellido_paterno', $buscar)
+                    ->groupEnd();
+            }
+
+            $estado = strtoupper(trim((string)$this->request->getGet('estado')));
+            if ($estado !== '' && $estado !== 'TODOS') {
+                $builder->where('oi.estado', $estado);
+            }
+
+            $page = (int)$this->request->getGet('page');
+            $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
+
+            $columnasOrdenables = [
+                'numeroBoleta' => 'oi.numero_boleta',
+                'fechaIngreso' => 'oi.fecha_ingreso',
+                'estado' => 'oi.estado',
+                'totalDias' => 'oi.total_dias',
+            ];
+
+            $total = 0;
+            if ($page > 0) {
+                $total = (clone $builder)->countAllResults(false);
+                $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'oi.id')
+                    ->limit($porPagina, ($page - 1) * $porPagina)
+                    ->get()
+                    ->getResultArray();
+            } else {
+                $rows = $builder->orderBy('oi.id', 'DESC')
+                    ->get()
+                    ->getResultArray();
+            }
 
             $internamientoIds = array_map(static fn (array $r): int => (int)$r['id'], $rows);
             $inventariosPorOrden = [];
@@ -108,6 +165,18 @@ class InternamientosController extends ResourceController
                 $r['inventario'] = $inventariosPorOrden[$r['id']] ?? [];
                 return $r;
             }, $rows);
+
+            if ($page > 0) {
+                return $this->respond([
+                    'data' => $data,
+                    'meta' => [
+                        'total' => $total,
+                        'page' => $page,
+                        'porPagina' => $porPagina,
+                        'totalPaginas' => (int) ceil($total / $porPagina),
+                    ],
+                ]);
+            }
 
             return $this->respond(['data' => $data]);
         } catch (\Throwable $e) {

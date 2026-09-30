@@ -1,12 +1,5 @@
-function escapeXml(unsafe) {
-  if (unsafe === null || unsafe === undefined) return ''
-  return String(unsafe)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-}
+import { showError } from './SwalUtil'
+import { escapeXml, escapeExcelCell } from './exportHelpers'
 
 /**
  * Exporta una lista de datos a un archivo Excel (.xls) compatible con Microsoft Excel,
@@ -31,7 +24,7 @@ export function exportToExcel({
   data = []
 }) {
   if (!data || data.length === 0) {
-    alert('No hay registros para exportar.')
+    showError('Sin registros', 'No hay registros para exportar.')
     return
   }
 
@@ -66,7 +59,7 @@ export function exportToExcel({
 
           const align = col.align || 'left'
           const textFormat = col.isText ? `mso-number-format:'\\@';` : ''
-          return `<td style="text-align: ${align}; ${textFormat}">${escapeXml(val)}</td>`
+          return `<td style="text-align: ${align}; ${textFormat}">${escapeExcelCell(val)}</td>`
         })
         .join('')
 

@@ -1,6 +1,8 @@
+import { useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { ResolucionPermisoPrint } from '../components/documentos/TarjetaOperatividadPrint'
@@ -31,13 +33,21 @@ export function Permisos() {
   const [permisos, setPermisos] = useState(cachedPermisos || [])
   const [procedimientos, setProcedimientos] = useState(cachedProcs || [])
   const [tramitesDisponibles, setTramitesDisponibles] = useState([])
-  const [isLoading, setIsLoading] = useState(!cachedPermisos)
+  const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('permisos')
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm, setSearchTerm] = useState(() => new URLSearchParams(window.location.search).get('search') || '')
+
+  const location = useLocation()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const s = params.get('search')
+    setSearchTerm(s || '')
+  }, [location.search])
+
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
   const [selectedPermiso, setSelectedPermiso] = useState(null)
   const [editingPermiso, setEditingPermiso] = useState(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -71,36 +81,56 @@ export function Permisos() {
     }
   }
 
+  const [totalFiltrado, setTotalFiltrado] = useState(0)
+
   const loadData = () => {
-    setIsLoading(true)
-    Promise.all([
-      apiFetch('/permisos').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
-      apiFetch('/procedimientos-admin').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
-      apiFetch('/permisos/tramites-disponibles').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
-    ])
-      .then(([permRes, procRes, tramRes]) => {
+    // setIsLoading(true)
+    apiFetch('/permisos')
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((permRes) => {
         const pData = Array.isArray(permRes?.data) ? permRes.data : []
-        const prData = Array.isArray(procRes?.data) ? procRes.data : []
-        const trData = Array.isArray(tramRes?.data) ? tramRes.data : []
         setPermisos(pData)
-        setProcedimientos(prData)
-        setTramitesDisponibles(trData)
         if (pData.length > 0) setCachedData('/permisos', pData)
-        if (prData.length > 0) setCachedData('/procedimientos-admin', prData)
-        setIsLoading(false)
+        // setIsLoading(false)
       })
       .catch(() => {
-        setIsLoading(false)
+        // setIsLoading(false)
       })
   }
 
   useEffect(() => {
     loadData()
+  }, [])
+
+  const [stats, setStats] = useState({ totalPermisos: 0, totalControl: 0, totalCarga: 0, totalVias: 0, totalZonas: 0, vigentes: 0, vencidos: 0 })
+
+  const loadStats = () => {
+    apiFetch('/permisos/estadisticas')
+      .then((res) => res.ok ? res.json() : Promise.reject(res))
+      .then((payload) => setStats(payload.data ?? {}))
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadStats()
+  }, [])
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch('/procedimientos-admin').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
+      apiFetch('/permisos/tramites-disponibles').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
+    ]).then(([procRes, tramRes]) => {
+      const prData = Array.isArray(procRes?.data) ? procRes.data : []
+      const trData = Array.isArray(tramRes?.data) ? tramRes.data : []
+      setProcedimientos(prData)
+      setTramitesDisponibles(trData)
+    })
 
     const handleMessage = (e) => {
       if (e.data?.type === 'PERMISO_GUARDADO') {
         invalidateCache('/permisos')
         loadData()
+        loadStats()
       }
       if (e.data?.type === 'VOLVER_A_DATOS_MODAL') {
         let draft = e.data.draft
@@ -119,6 +149,7 @@ export function Permisos() {
       if (e.key === 'mjlo_permisos_updated') {
         invalidateCache('/permisos')
         loadData()
+        loadStats()
       }
       if (e.key === 'mjlo_volver_a_datos') {
         try {
@@ -152,13 +183,13 @@ export function Permisos() {
     }
   }, [])
 
-  const totalPermisos = permisos.length
-  const totalControl = permisos.filter((p) => p.tipoPermiso === 'CONTROL_VEHICULAR' || p.tipoPermiso === 'OPERACION').length
-  const totalCarga = permisos.filter((p) => p.tipoPermiso === 'CARGA_DESCARGA').length
-  const totalVias = permisos.filter((p) => p.tipoPermiso === 'USO_VIAS').length
-  const totalZonas = permisos.filter((p) => p.tipoPermiso === 'ZONAS_RESERVADAS' || p.tipoPermiso === 'ZONA_RESERVADA').length
-  const vigentes = permisos.filter((p) => p.estado === 'VIGENTE').length
-  const vencidos = permisos.filter((p) => p.estado !== 'VIGENTE').length
+  const totalPermisos = stats.totalPermisos ?? 0
+  const totalControl = stats.totalControl ?? 0
+  const totalCarga = stats.totalCarga ?? 0
+  const totalVias = stats.totalVias ?? 0
+  const totalZonas = stats.totalZonas ?? 0
+  const vigentes = stats.vigentes ?? 0
+  const vencidos = stats.vencidos ?? 0
 
   const filteredPermisos = permisos.filter((p) => {
     const s = searchTerm.toLowerCase()
@@ -186,12 +217,40 @@ export function Permisos() {
     setCurrentPage(1)
   }, [searchTerm, filterEstado, filterTipo, activeTab])
 
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
+  }
+  if (sortBy) {
+    const dirMul = sortDir === 'ASC' ? 1 : -1
+    filteredPermisos.sort((a, b) => {
+      const valA = String(a[sortBy] ?? '').toLowerCase()
+      const valB = String(b[sortBy] ?? '').toLowerCase()
+      return valA < valB ? -1 * dirMul : valA > valB ? 1 * dirMul : 0
+    })
+  }
+
   const paginatedPermisos = filteredPermisos.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
 
-  const handleExportExcel = () => {
+  const fetchTodoElFiltro = async () => {
+    const params = new URLSearchParams()
+    if (searchTerm) params.set('buscar', searchTerm)
+    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    if (filterTipo !== 'TODOS') params.set('tipoPermiso', filterTipo)
+    const res = await apiFetch(`/permisos?${params.toString()}`)
+    if (!res.ok) return filteredPermisos
+    const payload = await res.json()
+    return Array.isArray(payload?.data) ? payload.data : []
+  }
+
+  const handleExportExcel = async () => {
+    const data = await fetchTodoElFiltro()
     exportToExcel({
       filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.xls`,
       sheetName: 'Autorizaciones',
@@ -200,7 +259,7 @@ export function Permisos() {
       metadata: [
         { label: 'Tipo Trámite', value: filterTipo },
         { label: 'Estado', value: filterEstado },
-        { label: 'Total Registros', value: String(filteredPermisos.length) }
+        { label: 'Total Registros', value: String(data.length) }
       ],
       columns: [
         { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', isText: true, width: 150, align: 'center' },
@@ -217,17 +276,18 @@ export function Permisos() {
         { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toFixed(2)}`, align: 'right', width: 110 },
         { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
       ],
-      data: filteredPermisos
+      data
     })
   }
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
+    const data = await fetchTodoElFiltro()
     exportToPdf({
       filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}`,
       subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Autorizaciones y Permisos',
       summaryItems: [
         { label: 'Total autorizaciones', value: totalPermisos },
-        { label: 'Exportando', value: `${filteredPermisos.length} registros` },
+        { label: 'Exportando', value: `${data.length} registros` },
         { label: 'Carga y Descarga', value: totalCarga },
         { label: 'Uso de Vías', value: totalVias },
         { label: 'Vigentes', value: vigentes },
@@ -245,7 +305,7 @@ export function Permisos() {
         { header: 'FIN', key: 'fechaFinVigencia', width: 85, align: 'center' },
         { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
       ],
-      data: filteredPermisos
+      data
     })
   }
 
@@ -281,12 +341,12 @@ export function Permisos() {
       {/* Cabecera Principal - Estilo Personas.jsx */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/25">
-            <Icon name="routePermit" className="size-5.5" />
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="routePermit" className="size-7 stroke-[2.4]" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                 Permisos y Autorizaciones
               </h1>
             </div>
@@ -300,7 +360,7 @@ export function Permisos() {
       {/* Tarjetas KPI con Bordes de Colores: 6 tarjetas separadas compactas */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {/* 1. Total Registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Total</span>
             <span className="grid size-6 place-items-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
@@ -308,14 +368,14 @@ export function Permisos() {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(totalPermisos)}
             </p>
           </div>
         </div>
 
         {/* 2. Control Vehicular */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Ctrl Vehicular</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -323,14 +383,14 @@ export function Permisos() {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(totalControl)}
             </p>
           </div>
         </div>
 
         {/* 3. Carga y Descarga */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Carga/Desc.</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
@@ -338,14 +398,14 @@ export function Permisos() {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(totalCarga)}
             </p>
           </div>
         </div>
 
         {/* 4. Uso de Vías */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Uso de Vías</span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
@@ -353,14 +413,14 @@ export function Permisos() {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(totalVias)}
             </p>
           </div>
         </div>
 
         {/* 5. Zonas Reservadas */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Zonas Reserv.</span>
             <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
@@ -368,14 +428,14 @@ export function Permisos() {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(totalZonas)}
             </p>
           </div>
         </div>
 
         {/* 6. Vigentes */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Vigentes</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
@@ -383,7 +443,7 @@ export function Permisos() {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-white leading-tight">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {new Intl.NumberFormat('es-PE').format(vigentes)}
             </p>
           </div>
@@ -402,7 +462,7 @@ export function Permisos() {
           }`}
         >
           <Icon name="permit" className="size-4" />
-          <span>Padrón de Autorizaciones ({permisos.length})</span>
+          <span>Padrón de Autorizaciones</span>
         </button>
 
         <button
@@ -415,7 +475,7 @@ export function Permisos() {
           }`}
         >
           <Icon name="document" className="size-4" />
-          <span>Catálogo Normativo TUPA ({procedimientos.length})</span>
+          <span>Catálogo Normativo TUPA</span>
         </button>
       </div>
 
@@ -507,17 +567,17 @@ export function Permisos() {
 
             {/* Tabla de Autorizaciones */}
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
+              <table className="w-full table-fixed text-left text-xs sm:text-sm">
                 <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <tr>
-                    <th className="px-4 py-3 whitespace-nowrap">Solicitante</th>
-                    <th className="px-4 py-3 whitespace-nowrap">N° Autorización</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Vehículo</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Zona / Horario</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Vigencia</th>
-                    <th className="px-4 py-3 text-center whitespace-nowrap">Estado</th>
-                    <th className="sticky right-0 z-20 px-4 py-3 text-center whitespace-nowrap bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
-                      Acciones
+                    <th className="px-4 py-3 w-[28%]"><SortableHeader column="solicitanteNombre" label="Solicitante" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-4 py-3 w-[150px]"><SortableHeader column="numeroAutorizacion" label="N° Autorización" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-4 py-3 w-[110px]">Vehículo</th>
+                    <th className="px-4 py-3 w-[25%]">Zona / Horario</th>
+                    <th className="px-4 py-3 w-[120px]">Vigencia</th>
+                    <th className="px-4 py-3 text-center w-[110px]"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                    <th className="sticky right-0 z-20 px-4 py-3 text-center bg-slate-50/75 dark:bg-[var(--bg-subtle)] w-[120px]">
+                        Acciones
                     </th>
                   </tr>
                 </thead>
@@ -782,6 +842,7 @@ export function Permisos() {
         onSave={() => {
           invalidateCache('/permisos')
           loadData()
+          loadStats()
         }}
         procedimientos={procedimientos}
         tramitesDisponibles={tramitesDisponibles}

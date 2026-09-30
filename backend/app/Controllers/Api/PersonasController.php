@@ -8,6 +8,37 @@ class PersonasController extends ResourceController
 {
     protected $format = 'json';
 
+    /**
+     * Decide cómo persistir el valor de foto recibido del formulario:
+     * - Una foto subida manualmente por el usuario llega como data URI
+     *   (base64) y se convierte a archivo real vía FileStorageService.
+     * - Una foto de RENIEC/PIDE ya es una URL servible y se guarda tal cual.
+     */
+    private function resolverFotoParaGuardar(?string $valor): ?string
+    {
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return null;
+        }
+        if (str_starts_with($valor, 'data:image')) {
+            return (new \App\Services\FileStorageService())->guardarImagenBase64($valor, 'personas');
+        }
+        return $valor;
+    }
+
+    /**
+     * Convierte la ruta relativa guardada (ej. "personas/abc.jpg") en una URL
+     * servible por la API antes de devolverla al frontend; una URL externa
+     * (RENIEC) se deja intacta.
+     */
+    private function aplicarFotoPublica(array $r): array
+    {
+        $fileStorage = new \App\Services\FileStorageService();
+        $r['fotoUrl'] = $fileStorage->urlPublica($r['fotoUrl'] ?? null) ?? '';
+        $r['fotoImg'] = $fileStorage->urlPublica($r['fotoImg'] ?? null) ?? '';
+        return $r;
+    }
+
     public function tiposDocumento()
     {
         $db = \Config\Database::connect();
@@ -19,6 +50,32 @@ class PersonasController extends ResourceController
             ->getResultArray();
 
         return $this->respond(['data' => $rows]);
+    }
+
+    /**
+     * Contadores agregados (total, con/sin licencia, activos/inactivos) vía
+     * COUNT() en SQL. Antes esto se calculaba en el navegador recorriendo el
+     * padrón completo ya cargado; con 30,000+ personas y paginación real, el
+     * frontend ya no tiene todo el padrón en memoria, así que necesita estos
+     * totales aparte.
+     */
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        $total = (int) $db->table('personas')->countAllResults();
+        $conLicencia = (int) $db->table('personas p')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->where('c.numero_licencia IS NOT NULL', null, false)
+            ->countAllResults();
+        $activos = (int) $db->table('personas')->where('estado', 'ACTIVO')->countAllResults();
+
+        return $this->respond(['data' => [
+            'total' => $total,
+            'conLicencia' => $conLicencia,
+            'sinLicencia' => $total - $conLicencia,
+            'activos' => $activos,
+            'inactivos' => $total - $activos,
+        ]]);
     }
 
     /**
@@ -154,6 +211,61 @@ class PersonasController extends ResourceController
             $builder->where('p.numero !=', '00000001');
         }
 
+        // Búsqueda por texto aplicada en SQL (antes se traía TODO y se filtraba
+        // en el navegador; con 30,000+ personas eso era el cuello de botella).
+        $buscar = trim((string) $this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $builder->groupStart()
+                ->like('p.numero', $buscar)
+                ->orLike('c.nombres', $buscar)
+                ->orLike('c.apellido_paterno', $buscar)
+                ->orLike('c.apellido_materno', $buscar)
+                ->orLike('c.numero_licencia', $buscar)
+                ->groupEnd();
+        }
+
+        $estadoFiltro = strtoupper((string) $this->request->getGet('estado'));
+        if (in_array($estadoFiltro, ['ACTIVO', 'INACTIVO'], true)) {
+            $builder->where('p.estado', $estadoFiltro);
+        }
+
+        // Paginación real: si el cliente pide una página, solo se trae esa
+        // porción y NO se calcula el historial (eso queda para show($id)).
+        // Sin "page" se mantiene el comportamiento anterior (usado por las
+        // exportaciones a Excel/PDF, que necesitan el padrón completo).
+        $page = (int) $this->request->getGet('page');
+        $porPagina = max(1, min(200, (int) ($this->request->getGet('porPagina') ?: 20)));
+
+        $columnasOrdenables = [
+            'numeroDocumento' => 'p.numero',
+            'nombres' => 'c.nombres',
+            'apellidoPaterno' => 'c.apellido_paterno',
+            'estado' => 'p.estado',
+        ];
+
+        if ($page > 0) {
+            $total = (clone $builder)->countAllResults(false);
+            $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'p.id')
+                ->limit($porPagina, ($page - 1) * $porPagina)
+                ->get()->getResultArray();
+
+            $data = array_map(function ($r) {
+                $r['historialPapeletas'] = [];
+                $r['historialCursos'] = [];
+                return $this->aplicarFotoPublica($r);
+            }, $rows);
+
+            return $this->respond([
+                'data' => $data,
+                'meta' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'porPagina' => $porPagina,
+                    'totalPaginas' => (int) ceil($total / $porPagina),
+                ],
+            ]);
+        }
+
         $rows = $builder->orderBy('p.id', 'DESC')->get()->getResultArray();
 
         if (empty($rows) && $numero && strlen(trim($numero)) === 8 && ctype_digit(trim($numero))) {
@@ -187,64 +299,73 @@ class PersonasController extends ResourceController
             }
         }
 
-        $personaIds = array_values(array_filter(array_map(function($r) { return $r['id'] ?? 0; }, $rows), function($id) { return $id > 0; }));
-        
+        // El historial de papeletas/cursos ya NO se calcula aquí: con un padrón
+        // grande, hacerlo para todas las filas a la vez (WHERE IN con miles de
+        // IDs) era el principal cuello de botella. Ahora se pide bajo demanda
+        // en show($id), que solo lo calcula para una persona a la vez.
         $historialPapeletas = [];
         $historialCursos = [];
-        
-        if (!empty($personaIds)) {
-            // Historial Papeletas (a través de los vehículos del que es propietario)
-            $papeletas = $db->table('papeletas pap')
-                ->select("
-                    vp.id_persona,
-                    pap.numero_papeleta,
-                    pap.fecha_hora,
-                    pap.lugar,
-                    pap.estado,
-                    v.placa
-                ", false)
-                ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = pap.id_vehiculo', 'inner')
-                ->join('vehiculos v', 'v.id = pap.id_vehiculo', 'left')
-                ->whereIn('vp.id_persona', $personaIds)
-                ->orderBy('pap.fecha_hora', 'DESC')
-                ->get()->getResultArray();
-                
-            foreach ($papeletas as $pap) {
-                $pId = $pap['id_persona'];
-                unset($pap['id_persona']);
-                $historialPapeletas[$pId][] = $pap;
-            }
-            
-            // Historial Cursos
-            $cursos = $db->table('inscripciones_curso ic')
-                ->select("
-                    ic.id_persona,
-                    ic.fecha_inscripcion,
-                    ic.estado,
-                    ic.asistio,
-                    c.nombre as curso_nombre,
-                    c.codigo,
-                    c.fecha_inicio
-                ", false)
-                ->join('cursos_seguridad_vial c', 'c.id = ic.id_curso', 'inner')
-                ->whereIn('ic.id_persona', $personaIds)
-                ->orderBy('c.fecha_inicio', 'DESC')
-                ->get()->getResultArray();
-                
-            foreach ($cursos as $cur) {
-                $pId = $cur['id_persona'];
-                unset($cur['id_persona']);
-                $historialCursos[$pId][] = $cur;
-            }
-        }
-        
+
         $data = array_map(function($r) use ($historialPapeletas, $historialCursos) {
             $r['historialPapeletas'] = $historialPapeletas[$r['id']] ?? [];
             $r['historialCursos'] = $historialCursos[$r['id']] ?? [];
-            return $r;
+            return $this->aplicarFotoPublica($r);
         }, $rows);
 
         return $this->respond(['data' => $data]);
+    }
+
+    /**
+     * Detalle de una persona con su historial de papeletas y cursos (antes
+     * este historial se calculaba para el padrón completo en index(), lo
+     * cual era muy costoso con miles de personas; ahora se pide aquí, de a
+     * una, solo cuando el usuario abre la ficha de detalle).
+     */
+    public function show($id = null)
+    {
+        $db = \Config\Database::connect();
+        $id = (int) $id;
+        if ($id <= 0) {
+            return $this->failNotFound('Persona no encontrada.');
+        }
+
+        $row = $this->personaSelectQuery($db)->where('p.id', $id)->get()->getRowArray();
+        if (!$row) {
+            return $this->failNotFound('Persona no encontrada.');
+        }
+
+        $papeletas = $db->table('papeletas pap')
+            ->select("
+                pap.numero_papeleta,
+                pap.fecha_hora,
+                pap.lugar,
+                pap.estado,
+                v.placa
+            ", false)
+            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = pap.id_vehiculo', 'inner')
+            ->join('vehiculos v', 'v.id = pap.id_vehiculo', 'left')
+            ->where('vp.id_persona', $id)
+            ->orderBy('pap.fecha_hora', 'DESC')
+            ->get()->getResultArray();
+
+        $cursos = $db->table('inscripciones_curso ic')
+            ->select("
+                ic.fecha_inscripcion,
+                ic.estado,
+                ic.asistio,
+                c.nombre as curso_nombre,
+                c.codigo,
+                c.fecha_inicio
+            ", false)
+            ->join('cursos_seguridad_vial c', 'c.id = ic.id_curso', 'inner')
+            ->where('ic.id_persona', $id)
+            ->orderBy('c.fecha_inicio', 'DESC')
+            ->get()->getResultArray();
+
+        $row['historialPapeletas'] = $papeletas;
+        $row['historialCursos'] = $cursos;
+
+        return $this->respond(['data' => $this->aplicarFotoPublica($row)]);
     }
 
     public function create()
@@ -296,7 +417,7 @@ class PersonasController extends ResourceController
             'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
             'numero_licencia'  => strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null,
             'estado_civil'     => trim($input['estadoCivil'] ?? '') ?: null,
-            'foto'             => trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '') ?: null,
+            'foto'             => $this->resolverFotoParaGuardar($input['fotoImg'] ?? $input['fotoUrl'] ?? null),
         ];
         $db->table('ciudadanos')->insert($cData);
 
@@ -316,6 +437,7 @@ class PersonasController extends ResourceController
         $newPersona['estadoCivil'] = $cData['estado_civil'];
         $newPersona['fotoUrl'] = $cData['foto'];
         $newPersona['fotoImg'] = $cData['foto'];
+        $newPersona = $this->aplicarFotoPublica($newPersona);
 
         return $this->respondCreated(['status' => true, 'message' => 'Persona registrada con éxito', 'data' => $newPersona]);
     }
@@ -380,7 +502,7 @@ class PersonasController extends ResourceController
         if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = trim($input['apellidoMaterno']);
         if (array_key_exists('numeroLicencia', $input)) $cData['numero_licencia'] = strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null;
         if (array_key_exists('estadoCivil', $input)) $cData['estado_civil'] = trim($input['estadoCivil'] ?? '') ?: null;
-        if (array_key_exists('fotoUrl', $input) || array_key_exists('fotoImg', $input)) $cData['foto'] = trim($input['fotoImg'] ?? $input['fotoUrl'] ?? '') ?: null;
+        if (array_key_exists('fotoUrl', $input) || array_key_exists('fotoImg', $input)) $cData['foto'] = $this->resolverFotoParaGuardar($input['fotoImg'] ?? $input['fotoUrl'] ?? null);
 
         if (!empty($cData)) {
             if ($db->table('ciudadanos')->where('id_persona', $id)->countAllResults()) {
@@ -402,7 +524,7 @@ class PersonasController extends ResourceController
         return $this->respond([
             'status'  => true,
             'message' => 'Persona actualizada con éxito',
-            'data'    => $persona,
+            'data'    => $persona ? $this->aplicarFotoPublica($persona) : $persona,
         ]);
     }
 

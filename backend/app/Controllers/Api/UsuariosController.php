@@ -8,31 +8,38 @@ class UsuariosController extends ResourceController
 {
     protected $format = 'json';
 
+    /**
+     * Usuario de sistema con protecciones especiales (no se puede eliminar,
+     * ni modificar su rol/estado/contraseña salvo por otro SuperAdmin).
+     * Único punto de verdad para no repetir el literal en cada método.
+     */
+    private const USUARIO_PROTEGIDO = 'superadmin';
+
     public function index()
     {
-        $db = \Config\Database::connect();
+        $model = new \App\Models\UsuarioModel();
 
-        $rows = $db->table('usuarios u')
+        $rows = $model
             ->select("
-                u.id,
-                u.id_persona,
-                u.id_persona as id_trabajador,
-                u.usuario as nombre_usuario,
-                u.id_rol,
+                usuarios.id,
+                usuarios.id_persona,
+                usuarios.id_persona as id_trabajador,
+                usuarios.usuario as nombre_usuario,
+                usuarios.id_rol,
                 r.nombre as rol,
-                u.estado as usuario_estado,
+                usuarios.estado as usuario_estado,
                 c.nombres,
                 c.apellido_paterno,
                 c.apellido_materno,
                 CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')) AS nombre_completo,
                 ca.nombre as cargo
             ", false)
-            ->join('ciudadanos c', 'c.id_persona = u.id_persona', 'inner')
-            ->join('roles r', 'r.id = u.id_rol', 'inner')
-            ->join('desplazamiento_oficina dof', 'dof.id_trabajador = u.id_persona AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
+            ->join('ciudadanos c', 'c.id_persona = usuarios.id_persona', 'inner')
+            ->join('roles r', 'r.id = usuarios.id_rol', 'inner')
+            ->join('desplazamiento_oficina dof', 'dof.id_trabajador = usuarios.id_persona AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
             ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
-            ->orderBy('u.id', 'DESC')
-            ->get()->getResultArray();
+            ->orderBy('usuarios.id', 'DESC')
+            ->findAll();
 
         return $this->respond(['data' => $rows]);
     }
@@ -48,30 +55,62 @@ class UsuariosController extends ResourceController
     {
         $input = $this->request->getJSON(true) ?: [];
 
-        $idPersona = (int)($input['id_persona'] ?? $input['id_trabajador'] ?? 0);
-        $nombreUsuario = trim($input['usuario'] ?? $input['nombre_usuario'] ?? '');
-        $password = trim($input['password'] ?? '');
-        $idRol = (int)($input['id_rol'] ?? 0);
-        $estado = trim($input['estado'] ?? 'ACTIVO');
+        $rules = [
+            'id_persona' => [
+                'rules'  => 'required|is_natural_no_zero',
+                'errors' => ['required' => 'Debe seleccionar un trabajador.', 'is_natural_no_zero' => 'Trabajador no válido.']
+            ],
+            'usuario' => [
+                'rules'  => 'required|alpha_dash|min_length[3]|max_length[50]|is_unique[usuarios.usuario]',
+                'errors' => [
+                    'required'   => 'El nombre de usuario es obligatorio.',
+                    'alpha_dash' => 'El usuario solo puede contener letras, números, guiones y guiones bajos.',
+                    'min_length' => 'El usuario debe tener al menos 3 caracteres.',
+                    'max_length' => 'El usuario no puede superar los 50 caracteres.',
+                    'is_unique'  => 'El nombre de usuario ya se encuentra registrado.'
+                ]
+            ],
+            'password' => [
+                'rules'  => 'required|min_length[8]|max_length[128]',
+                'errors' => [
+                    'required'   => 'La contraseña es obligatoria.',
+                    'min_length' => 'La contraseña debe tener al menos 8 caracteres.',
+                    'max_length' => 'La contraseña no puede superar los 128 caracteres.'
+                ]
+            ],
+            'id_rol' => [
+                'rules'  => 'required|is_natural_no_zero',
+                'errors' => ['required' => 'Debe seleccionar un rol.', 'is_natural_no_zero' => 'Rol no válido.']
+            ],
+            'estado' => [
+                'rules'  => 'permit_empty|in_list[ACTIVO,INACTIVO]',
+                'errors' => ['in_list' => 'El estado debe ser ACTIVO o INACTIVO.']
+            ]
+        ];
 
-        if (empty($idPersona) || empty($nombreUsuario) || empty($password) || empty($idRol)) {
-            return $this->failValidationErrors('Seleccione un colaborador, un rol y complete Usuario y Contraseña.');
+        // Compatibilidad con campos alternativos enviados por clientes móviles o formularios legados
+        if (!isset($input['id_persona']) && isset($input['id_trabajador'])) {
+            $input['id_persona'] = $input['id_trabajador'];
+        }
+        if (!isset($input['usuario']) && isset($input['nombre_usuario'])) {
+            $input['usuario'] = $input['nombre_usuario'];
         }
 
-        if (strlen($password) < 8) {
-            return $this->failValidationErrors('La contraseña debe tener al menos 8 caracteres.');
+        if (!$this->validateData($input, $rules)) {
+            return $this->failValidationErrors($this->validator->getErrors());
         }
+
+        $idPersona = (int) $input['id_persona'];
+        $nombreUsuario = trim($input['usuario']);
+        $password = $input['password'];
+        $idRol = (int) $input['id_rol'];
+        $estado = strtoupper(trim($input['estado'] ?? 'ACTIVO'));
 
         $db = \Config\Database::connect();
 
         $rolRow = $db->table('roles')->where('id', $idRol)->where('estado', 'ACTIVO')->get()->getRowArray();
         if (!$rolRow) {
-            return $this->failValidationErrors('El rol seleccionado no es válido.');
-        }
-
-        $existUser = $db->table('usuarios')->where('usuario', $nombreUsuario)->countAllResults();
-        if ($existUser > 0) {
-            return $this->failValidationErrors('El nombre de usuario ya se encuentra registrado.');
+            return $this->failValidationErrors('El rol seleccionado no es válido o no está activo.');
         }
 
         $trabajador = $db->table('trabajadores t')
@@ -96,7 +135,7 @@ class UsuariosController extends ResourceController
             'id_persona' => $idPersona,
             'id_rol'     => $idRol,
             'usuario'    => $nombreUsuario,
-            'clave'      => password_hash($password, PASSWORD_BCRYPT),
+            'clave'      => password_hash($password, PASSWORD_DEFAULT),
             'estado'     => $estado
         ]);
         $newUserId = $db->insertID();
@@ -156,7 +195,7 @@ class UsuariosController extends ResourceController
 
         $actor = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
         $actorRol = strtoupper((string)($actor['rol'] ?? ''));
-        if ($usuario['usuario'] === 'superadmin' && $actorRol !== 'SUPERADMIN') {
+        if ($usuario['usuario'] === self::USUARIO_PROTEGIDO && $actorRol !== 'SUPERADMIN') {
             return $this->fail('Solo un SuperAdmin puede modificar la cuenta superadmin principal.', 403);
         }
 
@@ -212,12 +251,12 @@ class UsuariosController extends ResourceController
 
         $actor = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
         $actorRol = strtoupper((string)($actor['rol'] ?? ''));
-        if ($usuario['usuario'] === 'superadmin' && $actorRol !== 'SUPERADMIN') {
+        if ($usuario['usuario'] === self::USUARIO_PROTEGIDO && $actorRol !== 'SUPERADMIN') {
             return $this->fail('Solo un SuperAdmin puede restablecer la contraseña de la cuenta superadmin principal.', 403);
         }
 
         $db->table('usuarios')->where('id', $id)->update([
-            'clave' => password_hash($input['password'], PASSWORD_BCRYPT)
+            'clave' => password_hash($input['password'], PASSWORD_DEFAULT)
         ]);
         // Fuerza el cierre de cualquier sesión activa con la contraseña anterior.
         \App\Services\AuthSession::invalidateSessions((int)$id);
@@ -242,7 +281,7 @@ class UsuariosController extends ResourceController
             return $this->failNotFound('Usuario no encontrado.');
         }
 
-        if ($usuario['usuario'] === 'superadmin') {
+        if ($usuario['usuario'] === self::USUARIO_PROTEGIDO) {
             return $this->fail('No se puede eliminar al usuario superadmin principal.', 403);
         }
 

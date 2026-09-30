@@ -10,6 +10,9 @@ class MunicipalidadController extends ResourceController
 
     public function config()
     {
+        $this->response->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        $this->response->setHeader('Pragma', 'no-cache');
+
         $db = \Config\Database::connect();
 
         if (!$db->tableExists('municipalidad') || !$db->tableExists('municipalidad_anio')) {

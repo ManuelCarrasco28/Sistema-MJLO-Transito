@@ -12,8 +12,8 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
     const rawPlaca = nuevaForm.vehiculoPlaca?.trim() || ''
     const cleanPlaca = rawPlaca.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
 
-    if (!cleanPlaca || cleanPlaca.length < 5) {
-      showError('Placa requerida', 'Ingresa una placa válida para consultar.')
+    if (!cleanPlaca || cleanPlaca.length !== 6) {
+      showError('Placa inválida', 'Ingresa una placa válida de exactamente 6 caracteres alfanuméricos.')
       return
     }
 
@@ -73,8 +73,8 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
 
   const handleReniecSearch = async () => {
     const rawDni = nuevaForm.conductorDni?.trim() || ''
-    if (rawDni.length !== 8) {
-      showError('DNI requerido', 'Ingresa un DNI válido de 8 dígitos para consultar.')
+    if (rawDni.length !== 8 || !/^\d{8}$/.test(rawDni)) {
+      showError('DNI inválido', 'Ingresa un DNI válido de exactamente 8 dígitos numéricos.')
       return
     }
 
@@ -110,7 +110,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") onClose(); e.currentTarget.dataset.downOnOverlay = "" }}>
       <form onSubmit={onSubmit} className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
           <div className="flex items-center gap-2.5">
@@ -131,7 +131,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
           <fieldset className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-            <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Vehículo</legend>
+            <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Vehículo</legend>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex gap-2">
                 <div className="flex-1">
@@ -162,7 +162,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
           </fieldset>
 
           <fieldset className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-            <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Conductor / Infractor</legend>
+            <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Conductor / Infractor</legend>
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="flex gap-2">
                 <div className="flex-1">
@@ -193,7 +193,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
           </fieldset>
 
           <fieldset className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-            <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Infracción</legend>
+            <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Infracción</legend>
             <div className="space-y-4">
               <FloatingInput id="nueva_lugar" label="Lugar de la infracción" required value={nuevaForm.lugar} onChange={(e) => setNuevaForm({ ...nuevaForm, lugar: e.target.value })} />
 

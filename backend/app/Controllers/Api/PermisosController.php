@@ -8,6 +8,39 @@ class PermisosController extends ResourceController
 {
     protected $format = 'json';
 
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        // "Control Vehicular" es la categoría por defecto en la UI (todo lo que
+        // no es Carga/Descarga, Uso de Vías o Zonas Reservadas), no un valor de
+        // enum propio — replicamos exactamente esa misma regla aquí.
+        $row = $db->table('permisos_circulacion')
+            ->select("
+                COUNT(*) as total,
+                SUM(CASE WHEN tipo_permiso = 'CARGA_DESCARGA' THEN 1 ELSE 0 END) as carga,
+                SUM(CASE WHEN tipo_permiso = 'USO_VIAS' THEN 1 ELSE 0 END) as vias,
+                SUM(CASE WHEN tipo_permiso IN ('ZONAS_RESERVADAS', 'ZONA_RESERVADA') THEN 1 ELSE 0 END) as zonas,
+                SUM(CASE WHEN estado = 'VIGENTE' THEN 1 ELSE 0 END) as vigentes,
+                SUM(CASE WHEN estado != 'VIGENTE' THEN 1 ELSE 0 END) as vencidos
+            ", false)
+            ->get()->getRowArray();
+
+        $total = (int) ($row['total'] ?? 0);
+        $carga = (int) ($row['carga'] ?? 0);
+        $vias = (int) ($row['vias'] ?? 0);
+        $zonas = (int) ($row['zonas'] ?? 0);
+
+        return $this->respond(['data' => [
+            'totalPermisos' => $total,
+            'totalControl' => max(0, $total - $carga - $vias - $zonas),
+            'totalCarga' => $carga,
+            'totalVias' => $vias,
+            'totalZonas' => $zonas,
+            'vigentes' => (int) ($row['vigentes'] ?? 0),
+            'vencidos' => (int) ($row['vencidos'] ?? 0),
+        ]]);
+    }
+
     private function getBaseQuery()
     {
         $db = \Config\Database::connect();
@@ -126,8 +159,62 @@ class PermisosController extends ResourceController
     public function index()
     {
         try {
-            $rows = $this->getBaseQuery()
-                ->orderBy('pc.id', 'DESC')
+            $builder = $this->getBaseQuery();
+
+            $buscar = trim((string)$this->request->getGet('buscar'));
+            if ($buscar !== '') {
+                $builder->groupStart()
+                    ->like('pc.numero_autorizacion', $buscar)
+                    ->orLike('v.placa', $buscar)
+                    ->orLike('pc.flota_placas', $buscar)
+                    ->orLike('o.razon_social', $buscar)
+                    ->orLike('p.numero', $buscar)
+                    ->orLike('c.nombres', $buscar)
+                    ->orLike('c.apellido_paterno', $buscar)
+                    ->orLike('pc.referencia_sisgedo', $buscar)
+                    ->groupEnd();
+            }
+
+            $tipoPermiso = strtoupper(trim((string)$this->request->getGet('tipoPermiso')));
+            if ($tipoPermiso !== '' && $tipoPermiso !== 'TODOS') {
+                $builder->where('pc.tipo_permiso', $tipoPermiso);
+            }
+
+            $estado = strtoupper(trim((string)$this->request->getGet('estado')));
+            if ($estado !== '' && $estado !== 'TODOS') {
+                $builder->where('pc.estado', $estado);
+            }
+
+            $page = (int)$this->request->getGet('page');
+            $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
+
+            $columnasOrdenables = [
+                'tipoPermiso' => 'pc.tipo_permiso',
+                'numeroAutorizacion' => 'pc.numero_autorizacion',
+                'estado' => 'pc.estado',
+            ];
+
+            if ($page > 0) {
+                $total = (clone $builder)->countAllResults(false);
+                $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'pc.id')
+                    ->limit($porPagina, ($page - 1) * $porPagina)
+                    ->get()
+                    ->getResultArray();
+
+                $data = array_map([$this, 'normalizarFila'], $rows);
+
+                return $this->respond([
+                    'data' => $data,
+                    'meta' => [
+                        'total' => $total,
+                        'page' => $page,
+                        'porPagina' => $porPagina,
+                        'totalPaginas' => (int) ceil($total / $porPagina),
+                    ],
+                ]);
+            }
+
+            $rows = $builder->orderBy('pc.id', 'DESC')
                 ->get()
                 ->getResultArray();
 

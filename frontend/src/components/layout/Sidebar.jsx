@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { navigationGroups } from '../../config/navigation'
 import { Icon } from '../ui/Icon'
+import { apiFetch } from '../../config/api'
 
 export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, collapsedOnDesktop, user, onToggleSidebar }) {
   const navigate = useNavigate()
@@ -13,7 +14,11 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const isAdmin = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE'].includes(rolNormalizado)
   const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNormalizado)
 
-  const visibleNavigationGroups = navigationGroups
+  // Memoizado: antes se recalculaba en cada render con una referencia nueva,
+  // lo que el useEffect de auto-apertura (más abajo) no podía declarar como
+  // dependencia real sin re-ejecutarse de más. Al fijar la referencia, el
+  // efecto puede depender de esta lista de forma explícita y predecible.
+  const visibleNavigationGroups = useMemo(() => navigationGroups
     .map((group) => {
       if (group.superAdminOnly && !isSuperAdmin) return null
       if (group.adminOnly && !isAdmin) return null
@@ -30,34 +35,52 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
       if (filteredItems.length === 0) return null
       return { ...group, items: filteredItems }
     })
-    .filter(Boolean)
+    .filter(Boolean), [isSuperAdmin, isAdmin, isOffice])
 
+  // Se compara solo contra la ruta actual (siempre exacta y sincronizada con
+  // el router). Antes también se comparaba contra "activeItem" y contra
+  // prefijos de ruta, lo que a veces marcaba como activo un grupo distinto
+  // al que realmente se estaba visitando.
   const isItemSelected = (item) => {
     if (!item) return false
-    if (activeItem === item.label || activeItem === item.id) return true
-    if (item.path === '/superadmin') return location.pathname === '/superadmin'
-    if (location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path + '/'))) return true
-    if (item.path === '/cursos' && location.pathname.includes('/cursos')) return true
-    if (item.path === '/internamientos' && location.pathname.includes('/retenciones')) return true
+    if (location.pathname === item.path) return true
+    if (item.path === '/cursos' && location.pathname === '/cursos-seguridad') return true
+    if (item.path === '/internamientos' && location.pathname === '/retenciones') return true
     return false
   }
 
-  const [expandedGroups, setExpandedGroups] = useState({
-    'Principal': true,
-    'Super Admin': true,
-    'Padrón municipal': true,
-    'Trámites': true,
-    'Inspecciones Técnicas': true,
-    'Fiscalización': true
-  })
+  // Cada grupo se abre/cierra de forma independiente (se pueden tener varios
+  // abiertos a la vez). El estado inicial se restaura desde las preferencias
+  // guardadas en la cuenta del usuario, y cada cambio se persiste ahí mismo
+  // (con debounce) para que quede igual sin importar el dispositivo/navegador.
+  const [expandedGroups, setExpandedGroups] = useState(() => user?.preferencias?.sidebarExpandedGroups || {})
+  const isFirstRender = useRef(true)
+  const savePreferenceTimeout = useRef(null)
 
   useEffect(() => {
-    visibleNavigationGroups.forEach((group) => {
-      if (group.items.some((item) => isItemSelected(item))) {
-        setExpandedGroups((prev) => ({ ...prev, [group.name]: true }))
-      }
-    })
-  }, [activeItem, location.pathname, isAdmin])
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    if (savePreferenceTimeout.current) clearTimeout(savePreferenceTimeout.current)
+    savePreferenceTimeout.current = setTimeout(() => {
+      apiFetch('/perfil/preferencias', {
+        method: 'PUT',
+        body: { sidebarExpandedGroups: expandedGroups },
+      }).catch(() => {})
+    }, 600)
+    return () => {
+      if (savePreferenceTimeout.current) clearTimeout(savePreferenceTimeout.current)
+    }
+  }, [expandedGroups])
+
+  useEffect(() => {
+    const activeGroup = visibleNavigationGroups.find((group) => group.items.some((item) => isItemSelected(item)))
+    if (activeGroup) {
+      setExpandedGroups((prev) => (prev[activeGroup.name] ? prev : { ...prev, [activeGroup.name]: true }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, visibleNavigationGroups])
 
   const [activeFlyoutGroup, setActiveFlyoutGroup] = useState(null)
   const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 })
@@ -67,16 +90,20 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 })
   const tooltipTimeoutRef = useRef(null)
 
+  // Diseño monocromático: todos los íconos de grupo usan el mismo tono gris
+  // Sin caja de fondo por categoría, pero cada ícono de grupo mantiene su
+  // propio color distintivo (solo el glifo, no un fondo/caja coloreada).
+  const NEUTRAL_ICON = 'text-slate-500 dark:text-slate-400'
   const groupIconConfig = {
-    'Super Admin': { icon: 'shieldCheck', color: 'text-cyan-500 dark:text-cyan-300', bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
-    'Administración': { icon: 'settings', color: 'text-emerald-500 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
-    'Mantenimiento': { icon: 'lock', color: 'text-slate-500 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-[var(--bg-subtle)]' },
-    'Principal': { icon: 'dashboard', color: 'text-[#4318FF]', bg: 'bg-[#EEF2FF] dark:bg-blue-950/40' },
-    'Padrón municipal': { icon: 'people', color: 'text-[#4318FF] dark:text-indigo-400', bg: 'bg-[#EEF2FF] dark:bg-indigo-950/40' },
-    'Trámites': { icon: 'document', color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
-    'Inspecciones Técnicas': { icon: 'certificate', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/40' },
-    'Fiscalización': { icon: 'ticket', color: 'text-[#EE5D50] dark:text-rose-400', bg: 'bg-[#FEEFEE] dark:bg-rose-950/40' },
-    'Pagos': { icon: 'receiptCheck', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+    'Super Admin': { icon: 'shieldCheck', color: 'text-cyan-500 dark:text-cyan-400', bg: '' },
+    'Administración': { icon: 'settings', color: 'text-emerald-500 dark:text-emerald-400', bg: '' },
+    'Mantenimiento': { icon: 'lock', color: NEUTRAL_ICON, bg: '' },
+    'Principal': { icon: 'dashboard', color: 'text-[#4318FF] dark:text-indigo-400', bg: '' },
+    'Padrón municipal': { icon: 'people', color: 'text-[#4318FF] dark:text-indigo-400', bg: '' },
+    'Trámites': { icon: 'document', color: 'text-amber-500 dark:text-amber-400', bg: '' },
+    'Inspecciones Técnicas': { icon: 'certificate', color: 'text-purple-600 dark:text-purple-400', bg: '' },
+    'Fiscalización': { icon: 'ticket', color: 'text-rose-500 dark:text-rose-400', bg: '' },
+    'Pagos': { icon: 'receiptCheck', color: 'text-emerald-600 dark:text-emerald-400', bg: '' },
   }
 
   useEffect(() => {
@@ -96,10 +123,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   }, [])
 
   const toggleGroup = (groupName) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [groupName]: !prev[groupName]
-    }))
+    setExpandedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }))
   }
 
   const openFlyout = (group, e) => {
@@ -206,7 +230,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           </button>
         </div>
 
-        <nav className={`no-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1 py-2 px-3 ${collapsedOnDesktop ? 'lg:px-2 px-3' : 'px-3'}`} aria-label="Navegación principal">
+        <nav className={`no-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1.5 py-2 px-3 ${collapsedOnDesktop ? 'lg:px-2 px-3' : 'px-3'}`} aria-label="Navegación principal">
           {visibleNavigationGroups.map((group) => {
             const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30' }
             const isSingle = group.items.length === 1
@@ -237,11 +261,11 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                     }`}
                   >
                     <span className={`grid size-[32px] place-items-center rounded-[10px] transition-all duration-200 ${
-                      groupSelected 
-                        ? 'bg-[#4318FF] text-white shadow-md' 
+                      groupSelected
+                        ? 'bg-[#4318FF] text-white shadow-md'
                         : activeFlyoutGroup?.name === group.name
-                          ? `ring-2 ring-offset-1 ring-slate-200 dark:ring-slate-700 ${grpCfg.bg} ${grpCfg.color}`
-                          : `${grpCfg.bg} ${grpCfg.color} hover:brightness-95 dark:hover:brightness-110`
+                          ? `ring-2 ring-offset-1 ring-slate-200 dark:ring-slate-700 bg-slate-100 dark:bg-white/5 ${grpCfg.color}`
+                          : `bg-slate-100 dark:bg-white/5 ${grpCfg.color} hover:brightness-95 dark:hover:brightness-110`
                     }`}>
                       <Icon
                         name={isSingle ? mainItem.icon : grpCfg.icon}
@@ -264,43 +288,40 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                     navigate(mainItem.path)
                     if (mobileOpen) onClose()
                   }}
-                  className={`group flex w-full items-center gap-2 rounded-xl px-2.5 py-1 text-left transition-all duration-200 cursor-pointer ${
+                  className={`relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 cursor-pointer ${
                     selected
-                      ? 'bg-[#4318FF] text-white shadow-[0_6px_16px_rgba(67,24,255,0.25)]'
-                      : 'text-[#2B3674] dark:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/5'
+                      ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#4318FF] dark:text-indigo-300'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
-                  <span className={`grid size-6 shrink-0 place-items-center rounded-lg transition-all duration-200 ${selected ? 'bg-white/20 text-white' : `${grpCfg.bg} ${grpCfg.color}`}`}>
-                    <Icon name={mainItem.icon} className="size-3.5" />
-                  </span>
-                  <span className="text-[12.5px] font-bold tracking-tight truncate flex-1">{mainItem.label}</span>
+                  <Icon name={mainItem.icon} className={`size-4 shrink-0 ${selected ? '' : grpCfg.color}`} />
+                  <span className="text-[13px] font-semibold uppercase tracking-tight truncate flex-1">{mainItem.label}</span>
+                  {selected && <span className="absolute right-0 top-1.5 bottom-1.5 w-[3px] rounded-l-full bg-[#4318FF]" />}
                 </button>
               )
             }
 
             return (
-              <div key={group.name} className="space-y-0.5">
+              <div key={group.name}>
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.name)}
-                  className={`group flex w-full items-center gap-2 rounded-xl px-2.5 py-1 text-left transition-all duration-200 cursor-pointer ${
+                  className={`relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 cursor-pointer ${
                     groupSelected && !expandedGroups[group.name]
-                      ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white'
-                      : 'text-[#2B3674] dark:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/5'
+                      ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#4318FF] dark:text-indigo-300'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
-                  <span className={`grid size-6 shrink-0 place-items-center rounded-lg transition-transform duration-200 group-hover:scale-105 ${grpCfg.bg} ${grpCfg.color}`}>
-                    <Icon name={grpCfg.icon} className="size-3.5" />
-                  </span>
-                  <span className="text-[12.5px] font-bold tracking-tight truncate flex-1 text-[#2B3674] dark:text-white">{group.name}</span>
+                  <Icon name={grpCfg.icon} className={`size-4 shrink-0 ${groupSelected && !expandedGroups[group.name] ? '' : grpCfg.color}`} />
+                  <span className="text-[13px] font-semibold uppercase tracking-tight truncate flex-1">{group.name}</span>
                   <Icon
                     name="chevronDown"
-                    className={`size-3 text-slate-400 dark:text-slate-500 transition-transform duration-200 shrink-0 ${expandedGroups[group.name] ? 'rotate-180 text-[#4318FF]' : ''}`}
+                    className={`size-3.5 shrink-0 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${expandedGroups[group.name] ? 'rotate-180' : ''}`}
                   />
                 </button>
 
                 <div className={`grid transition-all duration-150 ease-in-out ${expandedGroups[group.name] ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                  <div className="overflow-hidden space-y-0.5 pl-2.5 ml-2.5 border-l-2 border-slate-100 dark:border-white/10 pt-0.5 pb-0.5">
+                  <div className="overflow-hidden space-y-0.5 pt-0.5 pb-1">
                     {group.items.map((item) => {
                       const selected = isItemSelected(item)
                       return (
@@ -312,14 +333,14 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                             navigate(item.path)
                             if (mobileOpen) onClose()
                           }}
-                          className={`group/sub flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left text-[12px] font-bold tracking-tight transition-all duration-150 cursor-pointer ${
+                          className={`flex w-full items-center gap-2.5 rounded-lg py-1.5 pl-6 pr-2.5 text-left transition-colors duration-150 cursor-pointer ${
                             selected
-                              ? 'bg-[#4318FF] text-white shadow-[0_3px_10px_rgba(67,24,255,0.3)] font-bold'
-                              : 'text-[#2B3674]/85 dark:text-white/85 hover:bg-[#F4F7FE] dark:hover:bg-white/5 hover:text-[#4318FF] dark:hover:text-white'
+                              ? 'text-[#4318FF] dark:text-indigo-300 font-semibold'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                           }`}
                         >
-                          <Icon name={item.icon} className={`size-3.5 shrink-0 transition-transform duration-150 group-hover/sub:scale-110 ${selected ? 'text-white' : `${grpCfg.color} opacity-75 group-hover/sub:opacity-100`}`} />
-                          <span className="truncate flex-1">{item.label}</span>
+                          <span className={`size-1.5 rounded-full shrink-0 ${selected ? 'bg-[#4318FF] dark:bg-indigo-300' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                          <span className="text-[12.5px] tracking-tight truncate flex-1">{item.label}</span>
                         </button>
                       )
                     })}

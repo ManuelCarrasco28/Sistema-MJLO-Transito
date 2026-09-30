@@ -281,6 +281,46 @@ export function VehiculoDetalleModal({
                 )
               })()}
             </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950 lg:col-span-2">
+              <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Historial de propietarios</p>
+              {(() => {
+                const historial = selectedVehiculo.historialPropietarios || []
+
+                if (historial.length === 0) {
+                  return (
+                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[var(--bg-surface)] dark:text-slate-400">
+                      Sin historial de propietarios registrado.
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-[var(--border)]">
+                    {historial.map((prop, index) => {
+                      const activo = prop.estado === 'ACTIVO' && !prop.fecha_fin
+                      return (
+                        <div key={`${prop.dni}-${prop.fecha_inicio}-${index}`} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-[var(--border)] sm:grid-cols-[1fr_170px_100px] sm:items-center">
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-slate-800 dark:text-slate-100">{prop.nombre}</p>
+                            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 font-mono">DNI: {prop.dni || 'S/D'}</p>
+                          </div>
+                          <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                            {prop.fecha_inicio ? new Date(prop.fecha_inicio).toLocaleDateString() : '—'}
+                            {' → '}
+                            {prop.fecha_fin ? new Date(prop.fecha_fin).toLocaleDateString() : 'Actualidad'}
+                          </p>
+                          <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${activo ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : 'bg-slate-200 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'}`}>
+                            <span className="size-1.5 rounded-full bg-current" />
+                            {activo ? 'PROPIETARIO ACTUAL' : 'ANTERIOR'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
           </div>
 
 

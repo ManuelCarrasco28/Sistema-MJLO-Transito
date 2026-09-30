@@ -4,6 +4,7 @@ import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showError, showConfirm, showToast } from '../utils/SwalUtil'
@@ -57,10 +58,10 @@ export function Vehiculos({ user }) {
   const [asociacionSearch, setAsociacionSearch] = useState('')
   const [showAsociacionResults, setShowAsociacionResults] = useState(false)
   const [filterTipo, setFilterTipo] = useState('TODOS')
-  const [filterEstado, setFilterEstado] = useState('FORMAL')
+  const [filterEstado, setFilterEstado] = useState('TODOS')
   const [filterActivo, setFilterActivo] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
   const [loadError, setLoadError] = useState('')
 
 
@@ -691,6 +692,22 @@ export function Vehiculos({ user }) {
     return matchesSearch && matchesTipo && matchesEstado && matchesActivo
   })
 
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
+  }
+  if (sortBy) {
+    const dirMul = sortDir === 'ASC' ? 1 : -1
+    filteredVehiculos.sort((a, b) => {
+      const valA = String(a[sortBy] ?? '').toLowerCase()
+      const valB = String(b[sortBy] ?? '').toLowerCase()
+      return valA < valB ? -1 * dirMul : valA > valB ? 1 * dirMul : 0
+    })
+  }
+
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, filterTipo, filterEstado, filterActivo])
@@ -1072,9 +1089,9 @@ export function Vehiculos({ user }) {
       {/* Cabecera Principal */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-linear-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
-            <Icon name="vehicle" className="size-5.5" />
-          </span>
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+              <Icon name="vehicle" className="size-7 stroke-[2.4]" />
+            </span>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
@@ -1143,33 +1160,6 @@ export function Vehiculos({ user }) {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-[var(--border)]">
-        <button
-          type="button"
-          onClick={() => setFilterEstado(filterEstado === 'FORMAL' ? 'TODOS' : 'FORMAL')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${filterEstado === 'FORMAL'
-              ? 'border-emerald-600 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-            }`}
-        >
-          <Icon name="shieldCheck" className="size-4" />
-          <span>Vehículos Formal ({formales})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilterEstado(filterEstado === 'INFORMAL' ? 'TODOS' : 'INFORMAL')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${filterEstado === 'INFORMAL'
-              ? 'border-amber-500 text-amber-600 dark:border-amber-400 dark:text-amber-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-            }`}
-        >
-          <Icon name="alert" className="size-4" />
-          <span>Vehículos Informal ({informales})</span>
-        </button>
-      </div>
-
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
 
@@ -1196,6 +1186,16 @@ export function Vehiculos({ user }) {
 
           <div className="flex flex-wrap items-center gap-2.5">
             <RoundedSelect
+              value={filterEstado}
+              onChange={setFilterEstado}
+              options={[
+                { value: 'TODOS', label: 'Todos (Form. / Inf.)' },
+                { value: 'FORMAL', label: 'Formales' },
+                { value: 'INFORMAL', label: 'Informales' }
+              ]}
+            />
+
+            <RoundedSelect
               value={filterTipo}
               onChange={setFilterTipo}
               options={[
@@ -1217,12 +1217,13 @@ export function Vehiculos({ user }) {
               ]}
             />
 
-            {(filterTipo !== 'TODOS' || filterActivo !== 'TODOS' || searchTerm !== '') && (
+            {(filterTipo !== 'TODOS' || filterActivo !== 'TODOS' || filterEstado !== 'TODOS' || searchTerm !== '') && (
               <button
                 type="button"
                 onClick={() => {
                   setFilterTipo('TODOS')
                   setFilterActivo('TODOS')
+                  setFilterEstado('TODOS')
                   setSearchTerm('')
                 }}
                 title="Limpiar filtros"
@@ -1238,7 +1239,7 @@ export function Vehiculos({ user }) {
                   type="button"
                   onClick={handleExportExcel}
                   title="Descargar padrón en Excel (.xls)"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
                 >
                   <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                   <span>Excel</span>
@@ -1248,7 +1249,7 @@ export function Vehiculos({ user }) {
                   type="button"
                   onClick={handleExportPdf}
                   title="Descargar o imprimir padrón en PDF"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
                 >
                   <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
                   <span>PDF</span>
@@ -1257,7 +1258,7 @@ export function Vehiculos({ user }) {
                 <button
                   type="button"
                   onClick={handleOpenCreateModal}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer hover:opacity-90"
                   style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                 >
                   <span className="text-base leading-none font-black">+</span>
@@ -1273,16 +1274,25 @@ export function Vehiculos({ user }) {
 
 
         <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Listado de vehículos" tabIndex={0}>
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+            <colgroup>
+              <col className="w-[10%]" />
+              <col className="w-[20%]" />
+              <col className="w-[18%]" />
+              <col className="w-[18%]" />
+              <col className="w-[16%]" />
+              <col className="w-[10%]" />
+              <col className="w-[8%]" />
+            </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Placa</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Propietario & Titular</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Asociación / Empresa</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Vehículo & Modelo</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap">Serie Chasis / Motor</th>
-                <th className="px-3.5 py-2.5 whitespace-nowrap text-center">Estado</th>
-                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] px-3 py-3.5 text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
+                <th className="px-3.5 py-2.5 "><SortableHeader column="placa" label="Placa" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-3.5 py-2.5 "><SortableHeader column="propietario" label="Propietario & Titular" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-3.5 py-2.5 ">Asociación / Empresa</th>
+                <th className="px-3.5 py-2.5 ">Vehículo & Modelo</th>
+                <th className="px-3.5 py-2.5 ">Serie Chasis / Motor</th>
+                <th className="px-3.5 py-2.5 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] px-3 py-3.5 text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
@@ -1317,7 +1327,7 @@ export function Vehiculos({ user }) {
                     className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]"
                   >
 
-                    <td className="px-3.5 py-2.5 whitespace-nowrap">
+                    <td className="px-3.5 py-2.5 ">
                       <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
                         {v.placa}
                       </span>
@@ -1360,21 +1370,18 @@ export function Vehiculos({ user }) {
 
 
                     <td className="px-3.5 py-2.5">
-                      <p className="font-extrabold leading-tight text-slate-800 dark:text-white" title={`${v.marca} ${v.modelo}`}>
+                      <p className="text-xs font-bold leading-tight text-slate-800 dark:text-white" title={`${v.marca} ${v.modelo}`}>
                         {v.marca} {v.modelo}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-400">
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                           {v.tipo}
                         </span>
-                        <span>·</span>
-                        <span>{v.color}</span>
-                        <span>({v.anio})</span>
                       </div>
                     </td>
 
 
-                    <td className="px-3.5 py-2.5 whitespace-nowrap">
+                    <td className="px-3.5 py-2.5 ">
                       <p className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
                         {v.numeroSerie || 'N/A'}
                       </p>
@@ -1386,12 +1393,12 @@ export function Vehiculos({ user }) {
                     </td>
 
 
-                    <td className="px-3.5 py-2.5 whitespace-nowrap text-center">
+                    <td className="px-3.5 py-2.5 text-center">
                       <StatusBadge status={v.estado || 'ACTIVO'} />
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3 py-3.5 whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3 py-3.5 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
@@ -1439,6 +1446,7 @@ export function Vehiculos({ user }) {
             setItemsPerPage(Number(size))
             setCurrentPage(1)
           }}
+          disabled={isLoading}
         />
       </div>
 

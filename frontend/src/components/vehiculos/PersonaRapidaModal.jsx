@@ -92,7 +92,6 @@ export function PersonaRapidaModal({
           apellidoMaterno: data.apellidoMaterno || prev.apellidoMaterno,
           direccion: data.direccion || prev.direccion,
           estadoCivil: data.estadoCivil || prev.estadoCivil,
-          fotoImg: data.foto_url || prev.fotoImg,
         }))
         showToast('Datos de identidad cargados correctamente.')
       }

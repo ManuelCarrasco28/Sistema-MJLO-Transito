@@ -95,8 +95,8 @@ export function SuperAdminDashboard({ user }) {
       if (resStats.ok && dataStats.data) {
         setAuditStats(dataStats.data)
       }
-    } catch (err) {
-      console.error('Error cargando auditoría:', err)
+    } catch (_) {
+      // Error silencioso en carga inicial de auditoría
     } finally {
       setLoadingAudit(false)
     }
@@ -210,7 +210,7 @@ export function SuperAdminDashboard({ user }) {
     const requestId = ++municipalidadRequestRef.current
     setLoadingMunicipalidad(true)
     try {
-      const res = await apiFetch('/municipalidad/config')
+      const res = await apiFetch('/municipalidad/config?_t=' + Date.now())
       const data = await res.json()
       if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo cargar la municipalidad.')
 
@@ -714,15 +714,15 @@ export function SuperAdminDashboard({ user }) {
                       </tr>
                     ) : realAuditLogs.length ? realAuditLogs.map((event) => (
                       <tr key={event.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap text-center">
+                        <td className="px-4 py-3 text-xs font-mono text-slate-500 text-center">
                           {event.fecha_hora ? new Date(event.fecha_hora).toLocaleString('es-PE') : '—'}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <td className="px-4 py-3 text-center">
                           <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-200">
                             {event.modulo}
                           </span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <td className="px-4 py-3 text-center">
                           <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
                             event.accion === 'ELIMINAR' || event.accion === 'ANULAR'
                               ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-200'
@@ -743,13 +743,13 @@ export function SuperAdminDashboard({ user }) {
                             </p>
                           )}
                         </td>
-                        <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                        <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 ">
                           {event.nombre_usuario || 'sistema'}
                         </td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-500 ">
                           {event.rol || '—'}
                         </td>
-                        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap text-center">
+                        <td className="px-4 py-3 text-xs font-mono text-slate-500 text-center">
                           {event.ip || '—'}
                         </td>
                       </tr>

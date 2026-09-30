@@ -13,7 +13,7 @@ class CursosController extends ResourceController
         $db = \Config\Database::connect();
         
         try {
-            $rows = $db->table('cursos_seguridad_vial c')
+            $builder = $db->table('cursos_seguridad_vial c')
                 ->select("
                     c.id,
                     c.codigo,
@@ -25,41 +25,84 @@ class CursosController extends ResourceController
                     c.cupos as cuposTotales,
                     c.estado,
                     c.costo_inscripcion as costo
-                ")
-                ->orderBy('c.id', 'DESC')
-                ->get()
-                ->getResultArray();
+                ");
+
+            $buscar = trim((string)$this->request->getGet('buscar'));
+            if ($buscar !== '') {
+                $builder->groupStart()
+                    ->like('c.codigo', $buscar)
+                    ->orLike('c.nombre', $buscar)
+                    ->orLike('c.resolucion', $buscar)
+                    ->orLike('c.lugar', $buscar)
+                    ->groupEnd();
+            }
+
+            $estado = strtoupper(trim((string)$this->request->getGet('estado')));
+            if ($estado !== '' && $estado !== 'TODOS') {
+                $builder->where('c.estado', $estado);
+            }
+
+            $page = (int)$this->request->getGet('page');
+            $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
+
+            $total = 0;
+            if ($page > 0) {
+                $total = (clone $builder)->countAllResults(false);
+                $rows = $builder->orderBy('c.id', 'DESC')
+                    ->limit($porPagina, ($page - 1) * $porPagina)
+                    ->get()
+                    ->getResultArray();
+            } else {
+                $rows = $builder->orderBy('c.id', 'DESC')
+                    ->get()
+                    ->getResultArray();
+            }
+
+            $cursoIds = array_column($rows, 'id');
+            $participantesPorCurso = [];
+            $conteoPorCurso = [];
+
+            if (!empty($cursoIds)) {
+                $inscripciones = $db->table('inscripciones_curso ic')
+                    ->select('ic.id_curso, c.nombres, c.apellido_paterno, c.apellido_materno, ic.estado, ic.estado_pago, ic.asistio, p.numero AS dni, c.numero_licencia AS licencia, c.foto AS fotoUrl')
+                    ->join('personas p', 'p.id = ic.id_persona', 'left')
+                    ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                    ->whereIn('ic.id_curso', $cursoIds)
+                    ->get()
+                    ->getResultArray();
+
+                foreach ($inscripciones as $ic) {
+                    $cid = (int)$ic['id_curso'];
+                    unset($ic['id_curso']);
+                    $participantesPorCurso[$cid][] = $ic;
+                    $conteoPorCurso[$cid] = ($conteoPorCurso[$cid] ?? 0) + 1;
+                }
+            }
 
             $data = [];
             foreach ($rows as $row) {
-                $row['id'] = (int)$row['id'];
+                $cid = (int)$row['id'];
+                $row['id'] = $cid;
                 $row['costo'] = (float)$row['costo'];
                 $row['cuposTotales'] = (int)($row['cuposTotales'] ?? 50);
                 $row['horario'] = '09:00 AM - 12:00 PM';
-                try {
-                    $row['cuposInscritos'] = (int)$db->table('inscripciones_curso')
-                        ->where('id_curso', $row['id'])
-                        ->countAllResults();
-                } catch (\Throwable $t) {
-                    $row['cuposInscritos'] = 0;
-                }
-
+                $row['cuposInscritos'] = $conteoPorCurso[$cid] ?? 0;
                 $row['temario'] = [];
-                
-                try {
-                    $participantes = $db->table('inscripciones_curso ic')
-                        ->select('c.nombres, c.apellido_paterno, c.apellido_materno, ic.estado, ic.estado_pago, ic.asistio, p.numero AS dni, c.numero_licencia AS licencia, c.foto AS fotoUrl')
-                        ->join('personas p', 'p.id = ic.id_persona', 'left')
-                        ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-                        ->where('ic.id_curso', $row['id'])
-                        ->get()
-                        ->getResultArray();
-                    $row['participantes'] = $participantes;
-                } catch (\Throwable $t) {
-                    $row['participantes'] = [];
-                }
+                $row['participantes'] = $participantesPorCurso[$cid] ?? [];
 
                 $data[] = $row;
+            }
+
+            if ($page > 0) {
+                return $this->respond([
+                    'data' => $data,
+                    'meta' => [
+                        'total' => $total,
+                        'page' => $page,
+                        'porPagina' => $porPagina,
+                        'totalPaginas' => (int) ceil($total / $porPagina),
+                    ],
+                ]);
             }
 
             return $this->respond(['data' => $data]);
@@ -90,7 +133,7 @@ class CursosController extends ResourceController
      * años), condición que aplica tanto para listar personas ya cubiertas
      * como para bloquear una reinscripción individual.
      */
-    private function tieneCursoVigente($db, ?int $idPersona = null, ?string $select = null)
+    private function tieneCursoVigente($db, ?int $idPersona = null, ?string $select = null, ?int $idCurso = null)
     {
         $query = $db->table('inscripciones_curso ic');
         if ($select !== null) {
@@ -105,6 +148,16 @@ class CursosController extends ResourceController
 
         if ($idPersona !== null) {
             $query->where('ic.id_persona', $idPersona);
+        }
+
+        // Si se proporciona curso específico, acotar al mismo curso o curso con igual nombre
+        if ($idCurso !== null) {
+            $cursoBase = $db->table('cursos_seguridad_vial')->select('nombre')->where('id', $idCurso)->get()->getRowArray();
+            if (!empty($cursoBase['nombre'])) {
+                $query->where('c.nombre', $cursoBase['nombre']);
+            } else {
+                $query->where('c.id', $idCurso);
+            }
         }
 
         return $query;
@@ -343,11 +396,11 @@ class CursosController extends ResourceController
             return $this->failValidationErrors('Esta persona ya se encuentra inscrita en este curso.');
         }
 
-        // No permitir reinscribir a quien ya tiene un certificado vigente (últimos 2 años)
-        $vigente = $this->tieneCursoVigente($db, $idPersona)->countAllResults();
+        // No permitir reinscribir a quien ya tiene un certificado vigente del mismo curso (últimos 2 años)
+        $vigente = $this->tieneCursoVigente($db, $idPersona, null, $idCurso)->countAllResults();
 
         if ($vigente > 0) {
-            return $this->failValidationErrors('Esta persona ya cuenta con un certificado vigente de curso (menos de 2 años); no necesita volver a inscribirse.');
+            return $this->failValidationErrors('Esta persona ya cuenta con un certificado vigente para este curso (menos de 2 años); no necesita volver a inscribirse.');
         }
 
         // Verificar cupo disponible

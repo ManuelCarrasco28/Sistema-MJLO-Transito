@@ -542,8 +542,8 @@ export function PermisoFormularioVentana() {
 
             {/* 3. CAMPOS DE DATOS GENERALES */}
             <fieldset className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs space-y-3">
-              <legend className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 px-1 mb-2 flex items-center gap-2">
-                <span className="size-2 rounded-full bg-blue-600" />
+              <legend className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white px-1 mb-2 flex items-center gap-2">
+                <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                 Datos del Solicitante, Vehículo y Expediente
               </legend>
 

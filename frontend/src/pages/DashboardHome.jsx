@@ -61,55 +61,6 @@ export function DashboardHome({ user }) {
       {/* Quick Actions (Accesos rápidos) */}
       <QuickActions user={user} />
 
-      {/* Alertas Preventivas de Vencimiento */}
-      {dashboardData?.alertasVencimiento && dashboardData.alertasVencimiento.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="grid size-8 place-items-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
-                <Icon name="alert-triangle" className="size-4" />
-              </span>
-              <h2 className="text-sm font-bold text-slate-800 dark:text-white">Alertas de Vencimiento</h2>
-            </div>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-400">
-              Próximos 30 días
-            </span>
-          </div>
-          
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {dashboardData.alertasVencimiento.map((alerta, idx) => (
-              <div key={idx} className={`relative overflow-hidden rounded-xl border p-4 ${
-                alerta.nivel === 'rojo' 
-                  ? 'border-rose-200 bg-rose-50/50 dark:border-rose-900/50 dark:bg-rose-950/20' 
-                  : alerta.nivel === 'naranja'
-                  ? 'border-orange-200 bg-orange-50/50 dark:border-orange-900/50 dark:bg-orange-950/20'
-                  : 'border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20'
-              }`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className={`text-xs font-black uppercase tracking-wider ${
-                      alerta.nivel === 'rojo' ? 'text-rose-700 dark:text-rose-400' :
-                      alerta.nivel === 'naranja' ? 'text-orange-700 dark:text-orange-400' :
-                      'text-amber-700 dark:text-amber-400'
-                    }`}>{alerta.tipo}</p>
-                    <p className="mt-1 font-bold text-slate-900 dark:text-white">{alerta.identificador}</p>
-                    <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{alerta.detalle}</p>
-                  </div>
-                  <div className={`flex flex-col items-center justify-center rounded-lg px-2 py-1.5 ${
-                    alerta.nivel === 'rojo' ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300' :
-                    alerta.nivel === 'naranja' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/60 dark:text-orange-300' :
-                    'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
-                  }`}>
-                    <span className="text-lg font-black leading-none">{alerta.dias}</span>
-                    <span className="text-[9px] font-bold uppercase tracking-wider">días</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* KPI Metric Cards */}
       <MetricCards cards={dashboardData?.summaryCards} loading={!dashboardData && !error} user={user} />
       

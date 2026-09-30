@@ -8,6 +8,24 @@ class PersonalController extends ResourceController
 {
     protected $format = 'json';
 
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        $row = $db->table('trabajadores')
+            ->select("
+                COUNT(*) as total,
+                SUM(CASE WHEN estado = 'ACTIVO' THEN 1 ELSE 0 END) as activos,
+                SUM(CASE WHEN estado = 'INACTIVO' THEN 1 ELSE 0 END) as inactivos
+            ", false)
+            ->get()->getRowArray();
+
+        return $this->respond(['data' => [
+            'total' => (int) ($row['total'] ?? 0),
+            'activos' => (int) ($row['activos'] ?? 0),
+            'inactivos' => (int) ($row['inactivos'] ?? 0),
+        ]]);
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
@@ -51,19 +69,97 @@ class PersonalController extends ResourceController
             $builder->where('p.numero !=', '00000001');
         }
 
+        $buscar = trim((string)$this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $builder->groupStart()
+                ->like('p.numero', $buscar)
+                ->orLike('c.nombres', $buscar)
+                ->orLike('c.apellido_paterno', $buscar)
+                ->orLike('c.apellido_materno', $buscar)
+                ->orLike('ca.nombre', $buscar)
+                ->orLike('uo.nombre', $buscar)
+                ->groupEnd();
+        }
+
+        $estado = strtoupper(trim((string)$this->request->getGet('estado')));
+        if (in_array($estado, ['ACTIVO', 'INACTIVO'], true)) {
+            $builder->where('pe.estado', $estado);
+        }
+
+        $page = (int)$this->request->getGet('page');
+        $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
+
+        $columnasOrdenables = [
+            'nombres' => 'c.nombres',
+            'numeroDocumento' => 'p.numero',
+            'estado' => 'pe.estado',
+        ];
+
+        if ($page > 0) {
+            $total = (clone $builder)->countAllResults(false);
+            $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'pe.id_persona')
+                ->limit($porPagina, ($page - 1) * $porPagina)
+                ->get()->getResultArray();
+
+            $trabajadorIds = array_column($rows, 'id');
+            $historialAgrupado = [];
+            if (!empty($trabajadorIds)) {
+                $historialRows = $db->table('desplazamiento_oficina dof')
+                    ->select('dof.id_trabajador, dof.solicitud, dof.documento, dof.fecha_documento, dof.firma_documento, dof.tipo_funcion, dof.fecha_created, dof.fecha_termino, ca.nombre as cargo, uo.nombre as unidad_organica, jo.nombre as jerarquia', false)
+                    ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
+                    ->join('unidades_organicas uo', 'uo.id = dof.id_unidad_organica', 'left')
+                    ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
+                    ->whereIn('dof.id_trabajador', $trabajadorIds)
+                    ->orderBy('dof.fecha_created', 'DESC')
+                    ->get()->getResultArray();
+                foreach ($historialRows as $h) {
+                    $tid = (int)$h['id_trabajador'];
+                    unset($h['id_trabajador']);
+                    $historialAgrupado[$tid][] = $h;
+                }
+            }
+
+            foreach ($rows as &$row) {
+                $row['historial'] = $historialAgrupado[$row['id']] ?? [];
+            }
+            unset($row);
+
+            return $this->respond([
+                'data' => $rows,
+                'meta' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'porPagina' => $porPagina,
+                    'totalPaginas' => (int) ceil($total / $porPagina),
+                ],
+            ]);
+        }
+
         $rows = $builder->orderBy('pe.id_persona', 'DESC')
             ->get()->getResultArray();
 
-        foreach ($rows as &$row) {
-            $row['historial'] = $db->table('desplazamiento_oficina dof')
-                ->select('dof.solicitud, dof.documento, dof.fecha_documento, dof.firma_documento, dof.tipo_funcion, dof.fecha_created, dof.fecha_termino, ca.nombre as cargo, uo.nombre as unidad_organica, jo.nombre as jerarquia', false)
+        $trabajadorIds = array_column($rows, 'id');
+        $historialAgrupado = [];
+        if (!empty($trabajadorIds)) {
+            $historialRows = $db->table('desplazamiento_oficina dof')
+                ->select('dof.id_trabajador, dof.solicitud, dof.documento, dof.fecha_documento, dof.firma_documento, dof.tipo_funcion, dof.fecha_created, dof.fecha_termino, ca.nombre as cargo, uo.nombre as unidad_organica, jo.nombre as jerarquia', false)
                 ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
                 ->join('unidades_organicas uo', 'uo.id = dof.id_unidad_organica', 'left')
                 ->join('jerarquia_organizacional jo', 'jo.id = uo.id_jerarquia', 'left')
-                ->where('dof.id_trabajador', $row['id'])
+                ->whereIn('dof.id_trabajador', $trabajadorIds)
                 ->orderBy('dof.fecha_created', 'DESC')
                 ->get()->getResultArray();
+            foreach ($historialRows as $h) {
+                $tid = (int)$h['id_trabajador'];
+                unset($h['id_trabajador']);
+                $historialAgrupado[$tid][] = $h;
+            }
         }
+
+        foreach ($rows as &$row) {
+            $row['historial'] = $historialAgrupado[$row['id']] ?? [];
+        }
+        unset($row);
 
         return $this->respond(['data' => $rows]);
     }

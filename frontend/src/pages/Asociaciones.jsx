@@ -2,7 +2,9 @@ import { useEffect, useState, useRef } from 'react'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
-import { Pagination } from '../components/ui/Pagination'
+import { Pagination }
+from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
@@ -36,6 +38,15 @@ export function Asociaciones() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(8)
 
+  const [activeTab, setActiveTab] = useState('REGISTRO')
+  const [sociosList, setSociosList] = useState([])
+  const [sociosPage, setSociosPage] = useState(1)
+  const [sociosPerPage, setSociosPerPage] = useState(8)
+  const [sociosSortBy, setSociosSortBy] = useState('nombre')
+  const [sociosSortDir, setSociosSortDir] = useState('ASC')
+  const [sociosSearch, setSociosSearch] = useState('')
+  const [socioOrgFilter, setSocioOrgFilter] = useState('TODOS')
+  const [isSociosLoading, setIsSociosLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -84,6 +95,14 @@ export function Asociaciones() {
 
   useEffect(() => {
     setLoadError('')
+    
+    setIsSociosLoading(true)
+    apiFetch('/asociaciones/socios')
+      .then((res) => res.ok ? res.json() : Promise.reject(res))
+      .then((payload) => setSociosList(payload.data || []))
+      .catch(() => setSociosList([]))
+      .finally(() => setIsSociosLoading(false))
+
     apiFetch('/asociaciones')
       .then((response) => response.ok ? response.json() : Promise.reject(response))
       .then((payload) => {
@@ -231,6 +250,40 @@ export function Asociaciones() {
       }
     }
   }, [isModalOpen, isDetailModalOpen])
+
+
+  // --- LOGICA DE SOCIOS ---
+  const filteredSocios = sociosList.filter(s => {
+    const matchesSearch = (s.nombre + ' ' + s.documento + ' ' + s.placas).toLowerCase().includes(sociosSearch.toLowerCase())
+    const matchesOrg = socioOrgFilter === 'TODOS' || s.asociacionNombre === socioOrgFilter
+    return matchesSearch && matchesOrg
+  })
+
+  // Ordenamiento A-Z | Z-A
+  if (sociosSortBy && sociosSortDir) {
+    const dirMul = sociosSortDir === 'ASC' ? 1 : -1
+    filteredSocios.sort((a, b) => {
+      const valA = a[sociosSortBy]
+      const valB = b[sociosSortBy]
+      
+      // Si la columna es vehiculosTotal, ordenamos como números
+      if (sociosSortBy === 'vehiculosTotal') {
+        const numA = Number(valA) || 0
+        const numB = Number(valB) || 0
+        return (numA - numB) * dirMul
+      }
+      
+      // Ordenamiento alfabético robusto para español
+      const strA = String(valA || '')
+      const strB = String(valB || '')
+      return strA.localeCompare(strB, 'es', { sensitivity: 'base' }) * dirMul
+    })
+  }
+
+  const paginatedSocios = filteredSocios.slice(
+    (sociosPage - 1) * sociosPerPage,
+    sociosPage * sociosPerPage
+  )
 
   const paginatedOrgs = filteredOrgs.slice(
     (currentPage - 1) * itemsPerPage,
@@ -450,7 +503,38 @@ export function Asociaciones() {
       </div>
 
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+      
+      {/* Pestañas: Asociación y Particular / Socios */}
+      <div className="flex items-center gap-1.5 border-b border-slate-200 dark:border-[var(--border)] mb-4">
+        <button
+          type="button"
+          onClick={() => setActiveTab('REGISTRO')}
+          className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+            activeTab === 'REGISTRO'
+              ? 'border-indigo-600 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <Icon name="building" className="size-3.5" />
+          Asociación y Particular
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('SOCIOS')}
+          className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+            activeTab === 'SOCIOS'
+              ? 'border-indigo-600 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <Icon name="idCard" className="size-3.5" />
+          Socios
+        </button>
+      </div>
+
+      {activeTab === 'REGISTRO' && (
+      <>
+<div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
@@ -729,6 +813,163 @@ export function Asociaciones() {
           }}
         />
       </div>
+      </>
+      )}
+
+
+      {activeTab === 'SOCIOS' && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+          <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-1 flex-col sm:flex-row gap-2.5">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar socio por nombre, doc o placa..."
+                  value={sociosSearch}
+                  onChange={(e) => {
+                    setSociosSearch(e.target.value)
+                    setSociosPage(1)
+                  }}
+                  className="w-full rounded-xl border-0 bg-slate-100/70 py-2 pl-9 pr-8 text-xs font-medium text-slate-900 outline-none ring-1 ring-inset ring-slate-200/80 transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-600 dark:bg-slate-900/50 dark:text-white dark:ring-slate-700/50 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 dark:focus:ring-indigo-500"
+                />
+                {sociosSearch && (
+                  <button
+                    onClick={() => {
+                      setSociosSearch('')
+                      setSociosPage(1)
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                  >
+                    <Icon name="close" className="size-3.5" />
+                  </button>
+                )}
+              </div>
+              <RoundedSelect
+                value={socioOrgFilter}
+                onChange={(e) => {
+                  setSocioOrgFilter(e.target.value)
+                  setSociosPage(1)
+                }}
+                options={[
+                  { value: 'TODOS', label: 'Todas las Asociaciones' },
+                  ...Array.from(new Set(sociosList.map(s => s.asociacionNombre))).filter(Boolean).map(org => ({
+                    value: org, label: org
+                  }))
+                ]}
+              />            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                className="group flex h-9 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 cursor-pointer"
+              >
+                <Icon name="fileSpreadsheet" className="size-3.5 transition-transform group-hover:scale-110" />
+                <span className="hidden sm:inline">Excel</span>
+              </button>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50/50 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/20 dark:text-slate-400">
+                <tr>
+                  <th className="px-4 py-3 whitespace-nowrap">
+                    <SortableHeader
+                      column="nombre"
+                      label="Socio Vinculado"
+                      sortBy={sociosSortBy}
+                      sortDir={sociosSortDir}
+                      onSort={(col, dir) => { setSociosSortBy(col); setSociosSortDir(dir) }}
+                    />
+                  </th>
+                  <th className="px-4 py-3 whitespace-nowrap">
+                    <SortableHeader
+                      column="asociacionNombre"
+                      label="Asociación / Particular"
+                      sortBy={sociosSortBy}
+                      sortDir={sociosSortDir}
+                      onSort={(col, dir) => { setSociosSortBy(col); setSociosSortDir(dir) }}
+                    />
+                  </th>
+                  <th className="px-4 py-3 whitespace-nowrap text-center">
+                    <SortableHeader
+                      column="vehiculosTotal"
+                      label="Vehículos"
+                      sortBy={sociosSortBy}
+                      sortDir={sociosSortDir}
+                      align="center"
+                      onSort={(col, dir) => { setSociosSortBy(col); setSociosSortDir(dir) }}
+                    />
+                  </th>
+                  <th className="px-4 py-3 whitespace-nowrap text-center">Placas</th>
+                  <th className="px-4 py-3 whitespace-nowrap text-center">Contacto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+                {isSociosLoading ? (
+                  <tr>
+                    <td colSpan="5" className="p-12 text-center">
+                      <Icon name="refresh" className="mx-auto size-8 animate-spin text-slate-300" />
+                      <p className="mt-2 text-sm font-semibold text-slate-500">Cargando socios...</p>
+                    </td>
+                  </tr>
+                ) : paginatedSocios.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="p-12 text-center">
+                      <Icon name="idCard" className="mx-auto size-8 text-slate-300" />
+                      <p className="mt-2 text-sm font-semibold text-slate-500">No se encontraron socios</p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedSocios.map((socio) => (
+                    <tr key={socio.idPersona} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-900/30">
+                      <td className="px-4 py-3">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white">{socio.nombre}</p>
+                        <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{socio.tipoDocumento}: {socio.documento}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2 py-1 text-[11px] font-black text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                          <Icon name="building" className="size-3" />
+                          {socio.asociacionNombre}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          {socio.vehiculosTotal || 0}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex flex-wrap items-center justify-center gap-1">
+                          {(socio.placas ? socio.placas.split(',') : []).map((placa, i) => (
+                            <span key={i} className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 shadow-2xs">
+                              {placa.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400">
+                        {socio.telefono || '-'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <Pagination
+            currentPage={sociosPage}
+            totalItems={filteredSocios.length}
+            itemsPerPage={sociosPerPage}
+            onPageChange={setSociosPage}
+            onItemsPerPageChange={(size) => {
+              setSociosPerPage(size)
+              setSociosPage(1)
+            }}
+          />
+        </div>
+      )}
+
 
 
       {isModalOpen && (
@@ -1240,67 +1481,6 @@ export function Asociaciones() {
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-[var(--border)] dark:bg-slate-950">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-[var(--border)]">
-                  <div>
-                    <p className="text-sm font-black text-slate-900 dark:text-white">Socios vinculados</p>
-                    <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                      Propietarios con vehículos registrados en esta asociación.
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-                    {isDetailLoading ? '...' : `${detailOrg.socios?.length || 0} socios`}
-                  </span>
-                </div>
-
-                {isDetailLoading ? (
-                  <div className="grid gap-2 p-4">
-                    {Array.from({ length: 3 }).map((_, idx) => (
-                      <div key={idx} className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-[var(--bg-surface)]" />
-                    ))}
-                  </div>
-                ) : detailOrg.socios?.length ? (
-                  <div className="max-h-72 overflow-y-auto p-3">
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {detailOrg.socios.map((socio) => (
-                        <div key={socio.idPersona} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-black text-slate-900 dark:text-white" title={socio.nombre}>
-                                {socio.nombre || 'Sin nombres'}
-                              </p>
-                              <p className="font-mono text-[11px] font-semibold text-slate-500">DNI/RUC: {socio.documento || '—'}</p>
-                            </div>
-                            <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                              {socio.vehiculosTotal} unidad{Number(socio.vehiculosTotal) === 1 ? '' : 'es'}
-                            </span>
-                          </div>
-
-                          <div className="mt-2 grid gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-slate-400">Teléfono</span>
-                              <span className="font-semibold">{socio.telefono || '—'}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-slate-400">Correo</span>
-                              <span className="truncate font-semibold" title={socio.email}>{socio.email || '—'}</span>
-                            </div>
-                            <div className="flex items-start justify-between gap-2">
-                              <span className="font-bold text-slate-400">Placas</span>
-                              <span className="text-right font-mono font-bold text-slate-700 dark:text-slate-200">{socio.placas || '—'}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-6 text-center text-sm font-semibold text-slate-400">
-                    Aún no hay socios. Se mostrarán cuando registres vehículos con propietario en esta asociación.
-                  </div>
-                )}
               </div>
 
               <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur dark:border-[var(--border)] dark:bg-[var(--bg-surface)]/95">

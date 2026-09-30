@@ -1,7 +1,16 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { QRCodeSVG } from 'qrcode.react'
+import DOMPurify from 'dompurify'
 import './TarjetasImpresion.css'
+
+// El contenido de la resolución se edita con un editor de texto enriquecido y
+// se guarda como HTML; se sanitiza antes de inyectarlo para evitar XSS
+// almacenado (scripts, manejadores onerror/onload, iframes, etc.).
+const sanitizarHtml = (html) => DOMPurify.sanitize(html, {
+  ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'a'],
+  ALLOWED_ATTR: ['style', 'href', 'target', 'rel'],
+})
 
 export function PrintWrapper({ children, className = '', orientation = 'portrait' }) {
   React.useEffect(() => {
@@ -1388,7 +1397,7 @@ export function AutorizacionControlVehicularPrint({ data }) {
           {data.contenido && data.contenido.includes('<') ? (
             <div
               style={{ fontSize: '7.2pt', lineHeight: 1.35, color: '#334155' }}
-              dangerouslySetInnerHTML={{ __html: data.contenido }}
+              dangerouslySetInnerHTML={{ __html: sanitizarHtml(data.contenido) }}
             />
           ) : (
             <p style={{ fontSize: '7.2pt', lineHeight: 1.35, color: '#334155', whiteSpace: 'pre-line', margin: 0 }}>
@@ -1544,7 +1553,7 @@ export function AutorizacionZonasReservadasPrint({ data }) {
           {data.contenido && data.contenido.includes('<') ? (
             <div
               style={{ fontSize: '7.2pt', lineHeight: 1.35, color: '#334155' }}
-              dangerouslySetInnerHTML={{ __html: data.contenido }}
+              dangerouslySetInnerHTML={{ __html: sanitizarHtml(data.contenido) }}
             />
           ) : (
             <p style={{ fontSize: '7.2pt', lineHeight: 1.35, color: '#334155', whiteSpace: 'pre-line', margin: 0 }}>

@@ -151,6 +151,7 @@ class DashboardController extends ResourceController
             'operacionesMensuales' => $this->operacionesMensuales($db, $currentYear),
             'multasPagosPorAnio' => $this->multasPagosPorAnio($db),
             'alertasVencimiento' => $alertas,
+            'movimientosRecientes' => $this->movimientosRecientes($db),
         ]);
     }
 
@@ -277,7 +278,7 @@ class DashboardController extends ResourceController
     {
         $orgRow = $db->table('asociaciones')
             ->select("
-                SUM(CASE WHEN tipo = 'EMPRESA' THEN 1 ELSE 0 END) as empresas,
+                SUM(CASE WHEN tipo = 'PARTICULAR' THEN 1 ELSE 0 END) as empresas,
                 SUM(CASE WHEN tipo = 'ASOCIACION' THEN 1 ELSE 0 END) as asociaciones,
                 SUM(CASE WHEN tipo = 'COMITE' THEN 1 ELSE 0 END) as comites,
                 SUM(CASE WHEN estado = 'OBSERVADO' THEN 1 ELSE 0 END) as observadas
@@ -292,6 +293,76 @@ class DashboardController extends ResourceController
         ]);
     }
 
+    private function movimientosRecientes($db): array
+    {
+        $papeletas = $db->table('papeletas p')
+            ->select("
+                'PAPELETA' as origen,
+                p.id,
+                p.numero_papeleta as codigo,
+                p.fecha_hora as fecha,
+                p.estado,
+                p.monto_total as monto,
+                v.placa,
+                c.nombres,
+                c.apellido_paterno,
+                c.apellido_materno,
+                pe.numero as documento,
+                ti.descripcion as detalle
+            ", false)
+            ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
+            ->join('personas pe', 'pe.id = p.id_persona_infractor', 'left')
+            ->join('ciudadanos c', 'c.id_persona = pe.id', 'left')
+            ->join('papeleta_detalles pd', 'pd.id_papeleta = p.id', 'left')
+            ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
+            ->groupBy('p.id')
+            ->orderBy('p.fecha_hora', 'DESC')
+            ->limit(5)
+            ->get()->getResultArray();
+
+        $tramites = $db->table('tramites_documentarios t')
+            ->select("
+                'TRAMITE' as origen,
+                t.id,
+                t.numero_expediente as codigo,
+                t.fecha_solicitud as fecha,
+                t.estado,
+                pa.costo as monto,
+                v.placa,
+                c.nombres,
+                c.apellido_paterno,
+                c.apellido_materno,
+                pe.numero as documento,
+                pa.nombre as detalle
+            ", false)
+            ->join('procedimientos_administrativos pa', 'pa.id = t.id_procedimiento_admin', 'left')
+            ->join('personas pe', 'pe.id = t.id_persona', 'left')
+            ->join('ciudadanos c', 'c.id_persona = pe.id', 'left')
+            ->join('vehiculos v', 'v.id = t.id_vehiculo', 'left')
+            ->orderBy('t.fecha_solicitud', 'DESC')
+            ->limit(5)
+            ->get()->getResultArray();
+
+        $movimientos = array_merge($papeletas, $tramites);
+        usort($movimientos, static fn ($a, $b) => strtotime($b['fecha']) <=> strtotime($a['fecha']));
+        $movimientos = array_slice($movimientos, 0, 8);
+
+        return array_map(static function ($m) {
+            $nombre = trim(($m['nombres'] ?? '') . ' ' . ($m['apellido_paterno'] ?? '') . ' ' . ($m['apellido_materno'] ?? ''));
+            return [
+                'origen' => $m['origen'],
+                'administrado' => $nombre !== '' ? $nombre : '—',
+                'documento' => $m['documento'] ?? '—',
+                'placa' => $m['placa'] ?? '—',
+                'detalle' => $m['detalle'] ?? ($m['origen'] === 'PAPELETA' ? 'Papeleta de infracción' : 'Trámite documentario'),
+                'codigo' => $m['codigo'] ?? '',
+                'fecha' => $m['fecha'],
+                'estado' => $m['estado'],
+                'monto' => (float) ($m['monto'] ?? 0),
+            ];
+        }, $movimientos);
+    }
+
     private function operatividad($db): array
     {
         $permRow = $db->table('documentos_vehiculo')
@@ -300,7 +371,7 @@ class DashboardController extends ResourceController
                 SUM(CASE WHEN estado IN ('EN_TRAMITE', 'EN TRÁMITE', 'EN TRAMITE') THEN 1 ELSE 0 END) as tramite,
                 SUM(CASE WHEN estado = 'VENCIDO' OR (estado = 'VIGENTE' AND fecha_expiracion < CURDATE()) THEN 1 ELSE 0 END) as vencidas
             ", false)
-            ->where('tipo_documento', 'TARJETA_OPERATIVIDAD')
+            ->whereIn('tipo_documento', ['TARJETA_OPERATIVIDAD', 'PERMISO_OPERACION'])
             ->get()->getRowArray() ?? [];
 
         return $this->withPercents([

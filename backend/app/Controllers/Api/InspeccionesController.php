@@ -8,6 +8,26 @@ class InspeccionesController extends ResourceController
 {
     protected $format = 'json';
 
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        $row = $db->table('certicav')
+            ->select("
+                COUNT(*) as total,
+                SUM(CASE WHEN resultado = 'APROBADO' THEN 1 ELSE 0 END) as aprobados,
+                SUM(CASE WHEN resultado = 'OBSERVADO' THEN 1 ELSE 0 END) as observados,
+                SUM(CASE WHEN resultado = 'DESAPROBADO' THEN 1 ELSE 0 END) as desaprobados
+            ", false)
+            ->get()->getRowArray();
+
+        return $this->respond(['data' => [
+            'totales' => (int) ($row['total'] ?? 0),
+            'aprobados' => (int) ($row['aprobados'] ?? 0),
+            'observados' => (int) ($row['observados'] ?? 0),
+            'desaprobados' => (int) ($row['desaprobados'] ?? 0),
+        ]]);
+    }
+
     public function criterios()
     {
         $db = \Config\Database::connect();
@@ -90,12 +110,53 @@ class InspeccionesController extends ResourceController
         $db = \Config\Database::connect();
         
         try {
-            $rows = $this->consultaInspeccion($db)
-                ->where('i.estado !=', 'ANULADA')
-                ->groupBy('i.id')
-                ->orderBy('i.id', 'DESC')
-                ->get()
-                ->getResultArray();
+            $builder = $this->consultaInspeccion($db)
+                ->where('i.estado !=', 'ANULADA');
+
+            $buscar = trim((string)$this->request->getGet('buscar'));
+            if ($buscar !== '') {
+                $builder->groupStart()
+                    ->like('i.numero_registro', $buscar)
+                    ->orLike('i.numero_serie_certicav', $buscar)
+                    ->orLike('v.placa', $buscar)
+                    ->orLike('pc.numero', $buscar)
+                    ->orLike('cc.nombres', $buscar)
+                    ->orLike('cc.apellido_paterno', $buscar)
+                    ->orLike('a.razon_social', $buscar)
+                    ->groupEnd();
+            }
+
+            $resultado = strtoupper(trim((string)$this->request->getGet('resultado')));
+            if (in_array($resultado, ['APROBADO', 'OBSERVADO', 'DESAPROBADO'], true)) {
+                $builder->where('i.resultado', $resultado);
+            }
+
+            $page = (int)$this->request->getGet('page');
+            $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
+
+            $builder->groupBy('i.id');
+
+            $columnasOrdenables = [
+                'numeroRegistro' => 'i.numero_registro',
+                'vehiculoPlaca' => 'v.placa',
+                'fecha' => 'i.fecha',
+                'resultado' => 'i.resultado',
+            ];
+
+            $total = 0;
+            if ($page > 0) {
+                $subquery = (clone $builder)->select('i.id AS sub_id', false);
+                $total = $db->newQuery()->fromSubquery($subquery, 't_count')->countAllResults();
+
+                $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'i.id')
+                    ->limit($porPagina, ($page - 1) * $porPagina)
+                    ->get()
+                    ->getResultArray();
+            } else {
+                $rows = $builder->orderBy('i.id', 'DESC')
+                    ->get()
+                    ->getResultArray();
+            }
 
             $detallesPorInspeccion = [];
             $ids = array_map(static fn (array $r) => (int)$r['id'], $rows);
@@ -119,6 +180,18 @@ class InspeccionesController extends ResourceController
                 $row['detalles'] = $detallesPorInspeccion[$row['id']] ?? [];
 
                 $data[] = $row;
+            }
+
+            if ($page > 0) {
+                return $this->respond([
+                    'data' => $data,
+                    'meta' => [
+                        'total' => $total,
+                        'page' => $page,
+                        'porPagina' => $porPagina,
+                        'totalPaginas' => (int) ceil($total / $porPagina),
+                    ],
+                ]);
             }
 
             return $this->respond(['data' => $data]);

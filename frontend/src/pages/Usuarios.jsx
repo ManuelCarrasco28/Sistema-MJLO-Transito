@@ -3,6 +3,7 @@ import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUti
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
+import { SortableHeader } from '../components/ui/SortableHeader'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
@@ -46,7 +47,7 @@ export function Usuarios({ user }) {
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
 
   // Modales
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -138,10 +139,28 @@ export function Usuarios({ user }) {
     setCurrentPage(1)
   }, [searchTerm, filterEstado, filterRol])
 
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
+  }
+
+  const sortedUsuarios = useMemo(() => {
+    if (!sortBy) return filteredUsuarios
+    const dirMul = sortDir === 'ASC' ? 1 : -1
+    return [...filteredUsuarios].sort((a, b) => {
+      const valA = String(a[sortBy] ?? '').toLowerCase()
+      const valB = String(b[sortBy] ?? '').toLowerCase()
+      return valA < valB ? -1 * dirMul : valA > valB ? 1 * dirMul : 0
+    })
+  }, [filteredUsuarios, sortBy, sortDir])
+
   const paginatedUsuarios = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage
-    return filteredUsuarios.slice(start, start + itemsPerPage)
-  }, [filteredUsuarios, currentPage, itemsPerPage])
+    return sortedUsuarios.slice(start, start + itemsPerPage)
+  }, [sortedUsuarios, currentPage, itemsPerPage])
 
   // Trabajadores disponibles para asignación (que no tengan usuario ya creado o el seleccionado)
   const trabajadoresDisponibles = useMemo(() => {
@@ -698,19 +717,26 @@ export function Usuarios({ user }) {
 
         {/* Tabla */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+            <colgroup>
+              <col className="w-[25%]" />
+              <col className="w-[28%]" />
+              <col className="w-[20%]" />
+              <col className="w-[12%]" />
+              <col className="w-[15%]" />
+            </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
-                <th className="px-4 py-3 whitespace-nowrap">Usuario</th>
-                <th className="px-4 py-3 whitespace-nowrap">Colaborador Asignado</th>
-                <th className="px-4 py-3 whitespace-nowrap">Rol / Permiso</th>
-                <th className="px-4 py-3 whitespace-nowrap">Estado</th>
-                <th className="sticky right-0 z-20 px-4 py-3 text-right whitespace-nowrap bg-slate-50/95 dark:bg-slate-900/95 border-l border-slate-200/60 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                <th className="px-4 py-3 "><SortableHeader column="nombre_usuario" label="Usuario" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 "><SortableHeader column="nombre_completo" label="Colaborador Asignado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 ">Rol / Permiso</th>
+                <th className="px-4 py-3 "><SortableHeader column="usuario_estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="sticky right-0 z-20 px-4 py-3 text-right bg-slate-50/95 dark:bg-slate-900/95 border-l border-slate-200/60 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+            <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && usuarios.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && usuarios.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -762,7 +788,7 @@ export function Usuarios({ user }) {
                       className="group transition-colors hover:bg-slate-50/80 dark:hover:bg-[var(--bg-subtle)]"
                     >
                       {/* Usuario */}
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 ">
                         <div className="flex items-center gap-3">
                           <div className="size-9 shrink-0 rounded-full font-bold flex items-center justify-center text-xs select-none border border-indigo-200/80 bg-indigo-50 text-indigo-700 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-indigo-300 shadow-2xs">
                             {initial}
@@ -784,7 +810,7 @@ export function Usuarios({ user }) {
                       </td>
 
                       {/* Colaborador */}
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 ">
                         <p className="font-bold text-slate-800 dark:text-white text-[13px]">
                           {u.nombre_completo || 'Sin personal vinculado'}
                         </p>
@@ -796,7 +822,7 @@ export function Usuarios({ user }) {
                       </td>
 
                       {/* Rol */}
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 ">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-wide border ${getRoleBadge(
                             u.rol
@@ -812,12 +838,12 @@ export function Usuarios({ user }) {
                       </td>
 
                       {/* Estado */}
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 ">
                         <StatusBadge status={u.usuario_estado || 'ACTIVO'} />
                       </td>
 
                       {/* Acciones */}
-                      <td className="sticky right-0 z-10 px-4 py-3 text-right whitespace-nowrap bg-white dark:bg-[var(--bg-surface)] border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50">
+                      <td className="sticky right-0 z-10 px-4 py-3 text-right bg-white dark:bg-[var(--bg-surface)] border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* OJO: Ver Ficha Detalle */}
                           <button
@@ -946,6 +972,7 @@ export function Usuarios({ user }) {
             setItemsPerPage(size)
             setCurrentPage(1)
           }}
+          disabled={isLoading}
         />
       </div>
 

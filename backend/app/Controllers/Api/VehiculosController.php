@@ -13,6 +13,22 @@ class VehiculosController extends ResourceController
         return strtoupper(preg_replace('/[^A-Z0-9]/', '', trim($value)) ?? '');
     }
 
+    /** Contadores agregados vía COUNT() en SQL (ver PersonasController::estadisticas para el motivo). */
+    public function estadisticas()
+    {
+        $db = \Config\Database::connect();
+        $total = (int) $db->table('vehiculos')->countAllResults();
+        $formales = (int) $db->table('vehiculos')->where('id_asociacion IS NOT NULL', null, false)->countAllResults();
+        $suspendidos = (int) $db->table('vehiculos')->whereIn('estado', ['SUSPENDIDO', 'BAJA'])->countAllResults();
+
+        return $this->respond(['data' => [
+            'total' => $total,
+            'formales' => $formales,
+            'informales' => $total - $formales,
+            'suspendidos' => $suspendidos,
+        ]]);
+    }
+
     /**
      * Resuelve el id de asociaciones a partir del nombre escrito en el
      * formulario, descartando las etiquetas de "sin asociación / particular".
@@ -75,6 +91,7 @@ class VehiculosController extends ResourceController
         $papeletasPorVehiculo = [];
         $certicavPorVehiculo = [];
         $internamientosPorVehiculo = [];
+        $propietariosPorVehiculo = [];
 
         if (!empty($vehiculoIds)) {
             $documentos = $db->table('documentos_vehiculo')
@@ -153,9 +170,36 @@ class VehiculosController extends ResourceController
                 unset($int['id_vehiculo']);
                 $internamientosPorVehiculo[$vehiculoId][] = $int;
             }
+
+            // Historial de propietarios: todos los registros (activos e
+            // históricos ya cerrados con fecha_fin), del más reciente al más
+            // antiguo, para ver quién tuvo el vehículo antes que el dueño actual.
+            $propietarios = $db->table('vehiculo_propietarios vp')
+                ->select("
+                    vp.id_vehiculo,
+                    vp.fecha_inicio,
+                    vp.fecha_fin,
+                    vp.estado,
+                    COALESCE(p.numero, '') as dni,
+                    TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) as nombre
+                ", false)
+                ->join('personas p', 'p.id = vp.id_persona', 'left')
+                ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+                ->whereIn('vp.id_vehiculo', $vehiculoIds)
+                ->orderBy('vp.fecha_inicio', 'DESC')
+                ->orderBy('vp.id', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            foreach ($propietarios as $prop) {
+                $vehiculoId = (int)$prop['id_vehiculo'];
+                unset($prop['id_vehiculo']);
+                $prop['nombre'] = $prop['nombre'] !== '' ? $prop['nombre'] : 'Persona no identificada';
+                $propietariosPorVehiculo[$vehiculoId][] = $prop;
+            }
         }
 
-        $data = array_map(static function (array $row) use ($documentosPorVehiculo, $papeletasPorVehiculo, $certicavPorVehiculo, $internamientosPorVehiculo): array {
+        $data = array_map(static function (array $row) use ($documentosPorVehiculo, $papeletasPorVehiculo, $certicavPorVehiculo, $internamientosPorVehiculo, $propietariosPorVehiculo): array {
             $propietario = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
             unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
             $vehiculoId = (int)$row['id'];
@@ -174,6 +218,7 @@ class VehiculosController extends ResourceController
                 'certicav' => $certicavPorVehiculo[$vehiculoId] ?? null,
                 'historialPapeletas' => $papeletasPorVehiculo[$vehiculoId] ?? [],
                 'historialInternamientos' => $internamientosPorVehiculo[$vehiculoId] ?? [],
+                'historialPropietarios' => $propietariosPorVehiculo[$vehiculoId] ?? [],
                 'soatEstado' => $soat['estado'] ?? 'SIN_REGISTRO',
                 'tucNumero' => 'TUC-2026-' . str_pad($row['id'], 3, '0', STR_PAD_LEFT),
             ];
@@ -185,13 +230,101 @@ class VehiculosController extends ResourceController
     public function index()
     {
         $db = \Config\Database::connect();
+        $builder = $this->vehiculosBaseQuery($db);
 
-        $rows = $this->vehiculosBaseQuery($db)
-            ->orderBy('v.id', 'DESC')
-            ->get()
-            ->getResultArray();
+        // Búsqueda en SQL (antes se traía TODO el padrón y se filtraba en el
+        // navegador; con 14,000+ vehículos eso, sumado al WHERE IN masivo de
+        // abajo, era el cuello de botella principal del módulo).
+        $buscar = trim((string) $this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $builder->groupStart()
+                ->like('v.placa', $buscar)
+                ->orLike('v.marca', $buscar)
+                ->orLike('v.modelo', $buscar)
+                ->orLike('c.nombres', $buscar)
+                ->orLike('c.apellido_paterno', $buscar)
+                ->orLike('p.numero', $buscar)
+                ->orLike('v.numero_serie', $buscar)
+                ->orLike('o.razon_social', $buscar)
+                ->groupEnd();
+        }
 
-        return $this->respond(['data' => $this->appendVehiculoRelations($rows)]);
+        $estadoFiltro = strtoupper((string) $this->request->getGet('estado'));
+        if (in_array($estadoFiltro, ['ACTIVO', 'INACTIVO', 'SUSPENDIDO', 'BAJA'], true)) {
+            $builder->where('v.estado', $estadoFiltro);
+        }
+
+        // Formal = tiene asociación/empresa asignada; informal = independiente.
+        $formalidad = strtoupper((string) $this->request->getGet('formalidad'));
+        if ($formalidad === 'FORMAL') {
+            $builder->where('v.id_asociacion IS NOT NULL', null, false);
+        } elseif ($formalidad === 'INFORMAL') {
+            $builder->where('v.id_asociacion IS NULL', null, false);
+        }
+
+        $tipoFiltro = trim((string) $this->request->getGet('tipo'));
+        if ($tipoFiltro !== '' && strtoupper($tipoFiltro) !== 'TODOS') {
+            $builder->like('tv.nombre', $tipoFiltro);
+        }
+
+        $page = (int) $this->request->getGet('page');
+        $porPagina = max(1, min(200, (int) ($this->request->getGet('porPagina') ?: 20)));
+
+        $columnasOrdenables = [
+            'placa' => 'v.placa',
+            'marca' => 'v.marca',
+            'propietario' => 'c.nombres',
+            'estado' => 'v.estado',
+        ];
+
+        if ($page > 0) {
+            $total = (clone $builder)->countAllResults(false);
+            $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'v.id')
+                ->limit($porPagina, ($page - 1) * $porPagina)
+                ->get()->getResultArray();
+
+            return $this->respond([
+                // Con la página acotada (20-50 filas), calcular documentos,
+                // papeletas, CERTICAV e internamientos por vehículo sigue
+                // siendo barato: el WHERE IN ya no tiene miles de valores.
+                'data' => $this->appendVehiculoRelations($rows),
+                'meta' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'porPagina' => $porPagina,
+                    'totalPaginas' => (int) ceil($total / $porPagina),
+                ],
+            ]);
+        }
+
+        // Modo legacy (sin "page"): usado por las exportaciones a Excel/PDF,
+        // que solo necesitan columnas planas, no el historial por vehículo.
+        $rows = $builder->orderBy('v.id', 'DESC')->get()->getResultArray();
+        $data = array_map(static function (array $row): array {
+            $propietario = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
+            unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
+            return $row + ['propietario' => $propietario ?: 'Sin Propietario Asignado'];
+        }, $rows);
+
+        return $this->respond(['data' => $data]);
+    }
+
+    /** Detalle de un vehículo con su historial completo (documentos, papeletas, CERTICAV, internamientos). */
+    public function show($id = null)
+    {
+        $db = \Config\Database::connect();
+        $id = (int) $id;
+        if ($id <= 0) {
+            return $this->failNotFound('Vehículo no encontrado.');
+        }
+
+        $rows = $this->vehiculosBaseQuery($db)->where('v.id', $id)->get()->getResultArray();
+        if (empty($rows)) {
+            return $this->failNotFound('Vehículo no encontrado.');
+        }
+
+        $data = $this->appendVehiculoRelations($rows);
+        return $this->respond(['data' => $data[0]]);
     }
 
     public function buscarMobile()
@@ -260,6 +393,7 @@ class VehiculosController extends ResourceController
                         'certicav' => null,
                         'historialPapeletas' => [],
                         'historialInternamientos' => [],
+                        'historialPropietarios' => [],
                         'soatEstado' => 'SIN_REGISTRO',
                         'tucNumero' => 'TUC-2026-000',
                     ]]);
@@ -300,8 +434,24 @@ class VehiculosController extends ResourceController
 
         $rules = [
             'placa' => [
+                'rules' => 'required|exact_length[6]|alpha_numeric',
+                'errors' => [
+                    'required' => 'La placa del vehículo es requerida.',
+                    'exact_length' => 'La placa de rodaje debe tener exactamente 6 caracteres alfanuméricos.',
+                    'alpha_numeric' => 'La placa de rodaje solo debe contener letras y números sin caracteres especiales.'
+                ]
+            ],
+            'marca' => [
                 'rules' => 'required',
-                'errors' => ['required' => 'La placa del vehículo es requerida.']
+                'errors' => ['required' => 'La marca del vehículo es requerida.']
+            ],
+            'modelo' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El modelo del vehículo es requerido.']
+            ],
+            'color' => [
+                'rules' => 'required',
+                'errors' => ['required' => 'El color del vehículo es requerido.']
             ],
             'propietarioDni' => [
                 'rules' => 'required',
@@ -426,6 +576,9 @@ class VehiculosController extends ResourceController
         if (isset($input['placa'])) {
             $placa = strtoupper(trim($input['placa']));
             if ($placa !== '') {
+                if (!preg_match('/^[A-Z0-9]{6}$/', $placa)) {
+                    return $this->failValidationErrors('La placa de rodaje debe tener exactamente 6 caracteres alfanuméricos.');
+                }
                 if ($db->table('vehiculos')->where('placa', $placa)->where('id !=', $id)->countAllResults() > 0) {
                     return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
                 }
@@ -477,13 +630,29 @@ class VehiculosController extends ResourceController
                 return $this->failValidationErrors('El propietario no existe. Regístrelo primero en el módulo Personas.');
             }
             $personaId = (int)$personaRow['id'];
-            $db->table('vehiculo_propietarios')->where('id_vehiculo', $id)->delete();
-            $db->table('vehiculo_propietarios')->insert([
-                'id_vehiculo'  => $id,
-                'id_persona'   => $personaId,
-                'fecha_inicio' => date('Y-m-d'),
-                'estado'       => 'ACTIVO',
-            ]);
+
+            // El propietario activo actual (si existe y es distinto al nuevo)
+            // se cierra con fecha_fin en vez de borrarse, para conservar el
+            // historial de quién tuvo el vehículo antes.
+            $propietarioActivo = $db->table('vehiculo_propietarios')
+                ->where('id_vehiculo', $id)
+                ->where('fecha_fin IS NULL')
+                ->orderBy('id', 'DESC')
+                ->get()->getRowArray();
+
+            if (!$propietarioActivo || (int)$propietarioActivo['id_persona'] !== $personaId) {
+                if ($propietarioActivo) {
+                    $db->table('vehiculo_propietarios')
+                        ->where('id', $propietarioActivo['id'])
+                        ->update(['fecha_fin' => date('Y-m-d'), 'estado' => 'INACTIVO']);
+                }
+                $db->table('vehiculo_propietarios')->insert([
+                    'id_vehiculo'  => $id,
+                    'id_persona'   => $personaId,
+                    'fecha_inicio' => date('Y-m-d'),
+                    'estado'       => 'ACTIVO',
+                ]);
+            }
         }
 
         $vehPlaca = $record['placa'] ?? ($db->table('vehiculos')->where('id', $id)->get()->getRowArray()['placa'] ?? "ID $id");
