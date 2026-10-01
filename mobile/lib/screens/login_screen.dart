@@ -16,8 +16,30 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _recordarUsuario = false;
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometricSupport();
+  }
+
+  Future<void> _checkBiometricSupport() async {
+    final creds = await ApiService.getSavedCredentials();
+    final hasCreds = creds != null;
+    if (mounted) {
+      setState(() {
+        if (hasCreds) {
+          _usuarioController.text = creds['username']!;
+          _passwordController.text = creds['password']!;
+          _recordarUsuario = true;
+        }
+      });
+    }
+  }
+
 
   Future<void> _signIn() async {
+    ScaffoldMessenger.of(context).clearSnackBars();
     if (_usuarioController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor llena todos los campos')),
@@ -33,6 +55,15 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text.trim(),
       );
 
+      if (_recordarUsuario) {
+        await ApiService.saveSavedCredentials(
+          _usuarioController.text.trim(),
+          _passwordController.text.trim(),
+        );
+      } else {
+        await ApiService.clearSavedCredentials();
+      }
+
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -41,6 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (error) {
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(error.toString().replaceAll('Exception: ', '')),
@@ -195,7 +227,31 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: Checkbox(
+                            value: _recordarUsuario,
+                            onChanged: (val) {
+                              setState(() => _recordarUsuario = val ?? false);
+                            },
+                            activeColor: AppTheme.primaryBlue,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Recordar mi usuario',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
 
                     SizedBox(
                       width: double.infinity,

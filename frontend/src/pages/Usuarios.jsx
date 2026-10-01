@@ -539,9 +539,9 @@ export function Usuarios({ user }) {
       {/* Cabecera Principal con gradiente idéntico a Personas.jsx */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
-            <Icon name="people" className="size-7 stroke-[2.4]" />
-          </span>
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-900 text-white shadow-md shadow-slate-900/20 dark:bg-[var(--bg-surface)] dark:border dark:border-[var(--border)] dark:shadow-none">
+            <Icon name="people" className="size-5" />
+          </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
@@ -721,7 +721,8 @@ export function Usuarios({ user }) {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-600/30 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+              style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
             >
               <span className="text-base leading-none font-black">+</span>
               <span>Nuevo usuario</span>

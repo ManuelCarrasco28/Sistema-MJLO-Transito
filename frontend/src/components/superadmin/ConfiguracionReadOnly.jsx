@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../ui/Icon'
 import { Modal } from '../ui/Modal'
+import { FloatingInput } from '../ui/FormInputs'
 import { apiFetch } from '../../config/api'
 import { showToast, showSuccess, showError, showConfirm } from '../../utils/SwalUtil'
 

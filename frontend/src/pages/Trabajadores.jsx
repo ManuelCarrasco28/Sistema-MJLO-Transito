@@ -347,9 +347,9 @@ export function Trabajadores() {
       {/* 1. Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
-            <Icon name="workerBadge" className="size-7 stroke-[2.4]" />
-          </span>
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-900 text-white shadow-md shadow-slate-900/20 dark:bg-[var(--bg-surface)] dark:border dark:border-[var(--border)] dark:shadow-none">
+            <Icon name="workerBadge" className="size-5" />
+          </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">

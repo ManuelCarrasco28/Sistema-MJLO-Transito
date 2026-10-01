@@ -12,10 +12,13 @@ class ApiService {
   // en texto plano.
   static const _secureStorage = FlutterSecureStorage();
   static const _sessionCookieKey = 'session_cookie';
+  static const _savedUsernameKey = 'saved_username';
+  static const _savedPasswordKey = 'saved_password';
+  
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://192.168.101.47:8080/api'; // Cambiado a IP actual
+  static const String _defaultUrl = 'http://10.216.7.109:8080/api'; // Cambiado a IP actual
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb
@@ -23,6 +26,27 @@ class ApiService {
       : _configuredUrl;
   static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api/?$'), '');
   static const Duration _requestTimeout = Duration(seconds: 20);
+
+  // --- MÉTODOS DE CREDENCIALES GUARDADAS (BIOMETRÍA) ---
+  static Future<void> saveSavedCredentials(String username, String password) async {
+    await _secureStorage.write(key: _savedUsernameKey, value: username);
+    await _secureStorage.write(key: _savedPasswordKey, value: password);
+  }
+
+  static Future<Map<String, String>?> getSavedCredentials() async {
+    final username = await _secureStorage.read(key: _savedUsernameKey);
+    final password = await _secureStorage.read(key: _savedPasswordKey);
+    if (username != null && password != null && username.isNotEmpty) {
+      return {'username': username, 'password': password};
+    }
+    return null;
+  }
+
+  static Future<void> clearSavedCredentials() async {
+    await _secureStorage.delete(key: _savedUsernameKey);
+    await _secureStorage.delete(key: _savedPasswordKey);
+  }
+  // ----------------------------------------------------
 
   static Future<Map<String, String>> _getHeaders({bool isJson = true}) async {
     final cookie = await _secureStorage.read(key: _sessionCookieKey);
@@ -74,6 +98,7 @@ class ApiService {
         await prefs.setInt('id_persona', parsedId);
         await prefs.setString('nombres', data['data']['nombres']);
         await prefs.setString('apellidos', data['data']['apellidos']);
+        await prefs.setString('usuario', username);
         return data;
       }
     }

@@ -461,11 +461,9 @@ export function SuperAdminDashboard({ user }) {
       {/* Cabecera Principal */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className={`grid size-11 shrink-0 place-items-center rounded-2xl text-white shadow-md ${
-            isDashboard ? 'bg-gradient-to-br from-indigo-600 to-violet-600 shadow-indigo-500/25' : `bg-gradient-to-br ${activeModuleInfo.tone} shadow-indigo-500/25`
-          }`}>
-            <Icon name={isDashboard ? 'shieldCheck' : activeModuleInfo.icon} className="size-5.5" />
-          </span>
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-900 text-white shadow-md shadow-slate-900/20 dark:bg-[var(--bg-surface)] dark:border dark:border-[var(--border)] dark:shadow-none">
+            <Icon name={isDashboard ? 'shieldCheck' : activeModuleInfo.icon} className="size-5" />
+          </div>
           <div>
             <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
               {isDashboard ? 'Panel Super Admin' : activeModuleInfo.label}
