@@ -1,5 +1,6 @@
 import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
+import { PlacaBadge } from '../ui/PlacaBadge'
 
 export function PapeletaDetalleModal({
   selectedPapeleta,
@@ -130,7 +131,9 @@ export function PapeletaDetalleModal({
                 </div>
                 <div>
                   <p className="text-slate-400">Vehículo</p>
-                  <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.vehiculoPlaca}</p>
+                  <div className="mt-0.5">
+                    <PlacaBadge placa={selectedPapeleta.vehiculoPlaca} />
+                  </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">{selectedPapeleta.vehiculoCaracteristicas}</p>
                 </div>
                 <div>

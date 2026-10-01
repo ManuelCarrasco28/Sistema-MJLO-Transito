@@ -8,8 +8,10 @@ import { BoletaInternamientoPrint } from '../components/retenciones/BoletaIntern
 import { OrdenLibertadPrint } from '../components/retenciones/OrdenLibertadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { showToast, showError } from '../utils/SwalUtil'
 import { sanitizarMensaje } from '../config/api'
 
@@ -30,6 +32,18 @@ export function Retenciones({ user }) {
   const [internamientos, setInternamientos] = useState(cached || [])
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState(() => new URLSearchParams(window.location.search).get('search') || '')
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setCurrentPage(1)
+    }, 160)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const location = useLocation()
   useEffect(() => {
@@ -64,7 +78,7 @@ export function Retenciones({ user }) {
       page: String(currentPage),
       porPagina: String(itemsPerPage),
     })
-    if (searchTerm) params.set('buscar', searchTerm)
+    if (debouncedSearch) params.set('buscar', debouncedSearch)
     if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
@@ -83,7 +97,7 @@ export function Retenciones({ user }) {
 
   useEffect(() => {
     loadInternamientos()
-  }, [currentPage, itemsPerPage, searchTerm, filterEstado, sortBy, sortDir])
+  }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, sortBy, sortDir])
 
   const [stats, setStats] = useState({ total: 0, enDeposito: 0, liberados: 0, avgDias: 0 })
 
@@ -171,53 +185,64 @@ export function Retenciones({ user }) {
   }
 
   const handleExportExcel = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToExcel({
-      filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Internamientos',
-      title: 'REGISTRO DE INTERNAMIENTOS EN DEPÓSITO MUNICIPAL DE VEHÍCULOS',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Custodia y Órdenes de Libertad',
-      metadata: [
-        { label: 'Estado', value: filterEstado },
-        { label: 'Total Registros', value: String(data.length) }
-      ],
-      columns: [
-        { header: 'N° BOLETA', key: 'numeroBoleta', isText: true, width: 130, align: 'center' },
-        { header: 'DEPÓSITO', key: 'deposito', width: 160 },
-        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
-        { header: 'TIPO VEHÍCULO', key: 'vehiculoTipo', width: 140 },
-        { header: 'PAPELETA ASOCIADA', render: (_, i) => i.numeroPapeleta || '—', isText: true, width: 130, align: 'center' },
-        { header: 'MOTIVO INTERNAMIENTO', key: 'motivoIngreso', width: 220 },
-        { header: 'CONDUCTOR / INTERESADO', key: 'interesadoNombre', width: 180 },
-        { header: 'DNI CONDUCTOR', key: 'interesadoDni', isText: true, width: 110, align: 'center' },
-        { header: 'FECHA INGRESO', render: (_, i) => `${i.fechaIngreso || ''} ${i.horaIngreso || ''}`.trim(), width: 130, align: 'center' },
-        { header: 'DÍAS RETENIDO', render: (_, i) => String(i.totalDias || 0), width: 100, align: 'center' },
-        { header: 'FECHA LIBERACIÓN', render: (_, i) => i.fechaLiberacion || 'EN CUSTODIA', width: 130, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
-      ],
-      data
-    })
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const data = await fetchTodoElFiltro()
+          exportToExcel({
+            filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Internamientos',
+            title: 'REGISTRO DE INTERNAMIENTOS EN DEPÓSITO MUNICIPAL DE VEHÍCULOS',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Custodia y Órdenes de Libertad',
+            metadata: [
+              { label: 'Estado', value: filterEstado },
+              { label: 'Total Registros', value: String(data.length) }
+            ],
+            columns: [
+              { header: 'N° BOLETA', key: 'numeroBoleta', isText: true, width: 130, align: 'center' },
+              { header: 'DEPÓSITO', key: 'deposito', width: 160 },
+              { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+              { header: 'TIPO VEHÍCULO', key: 'vehiculoTipo', width: 140 },
+              { header: 'PAPELETA ASOCIADA', render: (_, i) => i.numeroPapeleta || '—', isText: true, width: 130, align: 'center' },
+              { header: 'MOTIVO INTERNAMIENTO', key: 'motivoIngreso', width: 220 },
+              { header: 'CONDUCTOR / INTERESADO', key: 'interesadoNombre', width: 180 },
+              { header: 'DNI CONDUCTOR', key: 'interesadoDni', isText: true, width: 110, align: 'center' },
+              { header: 'FECHA INGRESO', render: (_, i) => `${i.fechaIngreso || ''} ${i.horaIngreso || ''}`.trim(), width: 130, align: 'center' },
+              { header: 'DÍAS RETENIDO', render: (_, i) => String(i.totalDias || 0), width: 100, align: 'center' },
+              { header: 'FECHA LIBERACIÓN', render: (_, i) => i.fechaLiberacion || 'EN CUSTODIA', width: 130, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
   const handleExportPdf = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToPdf({
-      filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.pdf`,
-      title: 'REGISTRO DE INTERNAMIENTOS EN DEPÓSITO MUNICIPAL DE VEHÍCULOS',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Custodia y Órdenes de Libertad',
-      metadata: [
-        { label: 'Estado', value: filterEstado === 'TODOS' ? 'Todos' : filterEstado },
-        { label: 'Total Registros', value: String(data.length) }
-      ],
-      columns: [
-        { header: 'N° BOLETA', key: 'numeroBoleta', width: 20, align: 'center' },
-        { header: 'PLACA', key: 'vehiculoPlaca', width: 15, align: 'center' },
-        { header: 'MOTIVO', key: 'motivoIngreso', width: 30 },
-        { header: 'INTERESADO', key: 'interesadoNombre', width: 35 },
-        { header: 'ESTADO', key: 'estado', width: 15, align: 'center' }
-      ],
-      data
-    })
+    setIsExportingPdf(true)
+    try {
+      const data = await fetchTodoElFiltro()
+          await exportToPdf({
+            filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.pdf`,
+            title: 'REGISTRO DE INTERNAMIENTOS EN DEPÓSITO MUNICIPAL DE VEHÍCULOS',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Custodia y Órdenes de Libertad',
+            metadata: [
+              { label: 'Estado', value: filterEstado === 'TODOS' ? 'Todos' : filterEstado },
+              { label: 'Total Registros', value: String(data.length) }
+            ],
+            columns: [
+              { header: 'N° BOLETA', key: 'numeroBoleta', width: 20, align: 'center' },
+              { header: 'PLACA', key: 'vehiculoPlaca', width: 15, align: 'center' },
+              { header: 'MOTIVO', key: 'motivoIngreso', width: 30 },
+              { header: 'INTERESADO', key: 'interesadoNombre', width: 35 },
+              { header: 'ESTADO', key: 'estado', width: 15, align: 'center' }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
 
   const handleOpenDetail = (item) => {
@@ -285,7 +310,7 @@ export function Retenciones({ user }) {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{totalInternados}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(totalInternados)}</p>
           </div>
         </div>
 
@@ -297,7 +322,7 @@ export function Retenciones({ user }) {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{enDeposito}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(enDeposito)}</p>
           </div>
         </div>
 
@@ -309,7 +334,7 @@ export function Retenciones({ user }) {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{liberados}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(liberados)}</p>
           </div>
         </div>
 
@@ -321,7 +346,7 @@ export function Retenciones({ user }) {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{avgDias} días</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(avgDias)} días</p>
           </div>
         </div>
       </div>
@@ -329,30 +354,63 @@ export function Retenciones({ user }) {
       <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col print:hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
           <div className="relative w-full sm:max-w-xs">
-            <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Icon
+              name={isLoading ? "refresh" : "search"}
+              className={`absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-rose-500' : 'text-slate-400'}`}
+            />
             <input
               type="text"
               placeholder="Buscar por placa, boleta o conductor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-rose-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 dark:placeholder-slate-500"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-rose-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 dark:placeholder-slate-500"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <RoundedSelect
               value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
+              onChange={(val) => {
+                setFilterEstado(val)
+                setCurrentPage(1)
+              }}
               options={FILTER_ESTADO_OPTIONS}
             />
 
-            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-emerald-400 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Excel</span>
+            {(filterEstado !== 'TODOS' || searchTerm !== '') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterEstado('TODOS')
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
+                title="Limpiar filtros"
+                className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
+              >
+                <Icon name="filterX" className="size-4" />
+              </button>
+            )}
+
+            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-emerald-400 dark:hover:bg-[var(--bg-subtle)] transition-colors" disabled={isExportingExcel}>
+              <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
+              <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
-            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-rose-400 dark:hover:bg-[var(--bg-subtle)] transition-colors">
-              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
-              <span>PDF</span>
+            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-rose-400 dark:hover:bg-[var(--bg-subtle)] transition-colors" disabled={isExportingPdf}>
+              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
+              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
             <button onClick={handleOpenNuevo} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
               <span className="text-base leading-none font-black">+</span>
@@ -362,7 +420,7 @@ export function Retenciones({ user }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[15%]" />
               <col className="w-[15%]" />
@@ -401,7 +459,7 @@ export function Retenciones({ user }) {
                 paginatedItems.map((item) => (
                   <tr key={item.id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-[var(--bg-subtle)]">
                     <td className="px-4 py-3.5">
-                      <div className="font-extrabold text-slate-900 dark:text-white">
+                      <div className="font-extrabold text-xs text-slate-900 dark:text-white">
                         {item.numeroBoleta || `BOL-DEP-${String(item.id).padStart(4, '0')}`}
                       </div>
                       <div className="mt-0.5 text-[11px] text-slate-400" title={item.deposito}>
@@ -411,9 +469,7 @@ export function Retenciones({ user }) {
 
                     <td className="px-4 py-3.5 print:px-1 print:py-1">
                       <div className="flex items-center gap-2 print:gap-1">
-                        <span className="font-mono text-xs font-black tracking-wider text-slate-900 dark:text-white bg-slate-100 dark:bg-[var(--bg-subtle)] px-2 py-0.5 rounded-md border border-slate-200 dark:border-[var(--border-strong)] print:border-none print:bg-transparent print:p-0 print:text-black">
-                          {item.vehiculoPlaca}
-                        </span>
+                        <PlacaBadge placa={item.vehiculoPlaca} />
                         <span
                           className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold print:border print:border-black print:bg-transparent print:text-black ${
                             item.vehiculoFormalidad === 'FORMAL'
@@ -430,7 +486,7 @@ export function Retenciones({ user }) {
                     </td>
 
                     <td className="px-4 py-3.5">
-                      <div className="font-semibold text-slate-800 dark:text-slate-200" title={item.motivo}>
+                      <div className="font-semibold text-xs text-slate-800 dark:text-slate-200" title={item.motivo}>
                         {item.motivo}
                       </div>
                       {item.numeroPapeleta && (
@@ -443,7 +499,7 @@ export function Retenciones({ user }) {
                     </td>
 
                     <td className="px-4 py-3.5 print:px-1 print:py-1">
-                      <div className="font-semibold text-slate-800 dark:text-slate-200 print:text-black">
+                      <div className="font-semibold text-xs text-slate-800 dark:text-slate-200 print:text-black">
                         {item.interesadoNombre}
                       </div>
                       <div className="mt-0.5 text-[11px] text-slate-400">
@@ -634,9 +690,9 @@ export function Retenciones({ user }) {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-0.5">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Vehículo Retenido</span>
-                    <p className="font-mono text-base font-black text-slate-900 dark:text-white leading-tight">
-                      {selectedItem.vehiculoPlaca}
-                    </p>
+                    <div className="mt-0.5">
+                      <PlacaBadge placa={selectedItem.vehiculoPlaca} size="lg" />
+                    </div>
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                       {selectedItem.vehiculoMarca} {selectedItem.vehiculoModelo} <span className="text-slate-500">({selectedItem.vehiculoColor})</span>
                     </p>

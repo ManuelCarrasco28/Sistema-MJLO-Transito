@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -6,12 +6,15 @@ import { Pagination }
 from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { formatNumeroTarjeta } from '../utils/formatters'
 
 import { FloatingInput, FloatingSelect, FloatingTextarea, RoundedSelect } from '../components/ui/FormInputs'
 import { MapaCoordenadasPicker } from '../components/ui/MapaCoordenadasPicker'
+import { MapaInline, MapaPreviewModal } from '../components/ui/MapaVisualizador'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -25,28 +28,39 @@ const FILTER_ESTADO_OPTIONS = [
   { value: 'SUSPENDIDO', label: 'Suspendidas' },
 ]
 
+const normalizeSocio = (s) => {
+  const cleanPlacas = `${s.placas || ''} ${String(s.placas || '').replace(/[^a-zA-Z0-9]/g, '')}`
+  return {
+    ...s,
+    _search: `${s.nombre || ''} ${s.documento || ''} ${cleanPlacas} ${s.asociacionNombre || ''} ${s.telefono || ''} ${s.email || ''}`.toLowerCase(),
+  }
+}
+
+const normalizeOrg = (o) => ({
+  ...o,
+  _search: `${o.razonSocial || ''} ${o.ruc || ''} ${o.partidaRegistral || ''} ${o.direccion || ''} ${o.numeroLicencia || ''} ${o.resolucionAlcaldia || ''} ${o.representanteNombre || ''} ${o.representanteDni || ''}`.toLowerCase(),
+})
 
 export function Asociaciones() {
   const cached = getCachedData('/asociaciones')
-  const cachedPersonas = getCachedData('/personas')
-  const [asociaciones, setAsociaciones] = useState(cached || [])
-  const [personas, setPersonas] = useState(cachedPersonas || [])
+  const cachedSocios = getCachedData('/asociaciones/socios')
+  const [asociaciones, setAsociaciones] = useState(() => (Array.isArray(cached) ? cached.map(normalizeOrg) : []))
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(8)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
 
   const [activeTab, setActiveTab] = useState('REGISTRO')
-  const [sociosList, setSociosList] = useState([])
+  const [sociosList, setSociosList] = useState(() => (Array.isArray(cachedSocios) ? cachedSocios.map(normalizeSocio) : []))
   const [sociosPage, setSociosPage] = useState(1)
-  const [sociosPerPage, setSociosPerPage] = useState(8)
+  const [sociosPerPage, setSociosPerPage] = useState(5)
   const [sociosSortBy, setSociosSortBy] = useState('nombre')
   const [sociosSortDir, setSociosSortDir] = useState('ASC')
   const [sociosSearch, setSociosSearch] = useState('')
   const [socioOrgFilter, setSocioOrgFilter] = useState('TODOS')
-  const [isSociosLoading, setIsSociosLoading] = useState(false)
+  const [isSociosLoading, setIsSociosLoading] = useState(!cachedSocios)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -59,7 +73,20 @@ export function Asociaciones() {
 
   const [repSearch, setRepSearch] = useState('')
   const [showRepResults, setShowRepResults] = useState(false)
+  const [repResults, setRepResults] = useState([])
+  const [isSearchingRep, setIsSearchingRep] = useState(false)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
   const repDropdownRef = useRef(null)
+
+  // Reset de página inmediato al cambiar filtros o términos de búsqueda
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterTipo, filterEstado])
+
+  useEffect(() => {
+    setSociosPage(1)
+  }, [sociosSearch, socioOrgFilter])
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -99,31 +126,44 @@ export function Asociaciones() {
     setIsSociosLoading(true)
     apiFetch('/asociaciones/socios')
       .then((res) => res.ok ? res.json() : Promise.reject(res))
-      .then((payload) => setSociosList(payload.data || []))
+      .then((payload) => {
+        const raw = payload.data || []
+        const normalized = raw.map(normalizeSocio)
+        setSociosList(normalized)
+        setCachedData('/asociaciones/socios', normalized)
+      })
       .catch(() => setSociosList([]))
       .finally(() => setIsSociosLoading(false))
 
     apiFetch('/asociaciones')
       .then((response) => response.ok ? response.json() : Promise.reject(response))
       .then((payload) => {
-        const data = payload.data ?? []
-        setAsociaciones(data)
-        setCachedData('/asociaciones', data)
+        const raw = payload.data ?? []
+        const normalized = raw.map(normalizeOrg)
+        setAsociaciones(normalized)
+        setCachedData('/asociaciones', normalized)
       })
       .catch(() => setLoadError('No se pudo cargar el padrón de asociaciones.'))
       .finally(() => setIsLoading(false))
 
-    if (!cachedPersonas || cachedPersonas.length === 0) {
-      apiFetch('/personas')
-        .then((response) => response.ok ? response.json() : Promise.reject(response))
-        .then((payload) => {
-          const pData = payload.data ?? []
-          setPersonas(pData)
-          setCachedData('/personas', pData)
-        })
-        .catch(() => {})
-    }
   }, [])
+
+  // Búsqueda dinámica y debounced de representantes (evita descargar 30,000 personas en memoria)
+  useEffect(() => {
+    const rawQuery = (repSearch || '').trim()
+    if (!rawQuery || rawQuery.length < 2) {
+      return
+    }
+    const timer = setTimeout(() => {
+      setIsSearchingRep(true)
+      apiFetch(`/personas?buscar=${encodeURIComponent(rawQuery)}&porPagina=10`)
+        .then((response) => response.ok ? response.json() : { data: [] })
+        .then((payload) => setRepResults(payload.data || []))
+        .catch(() => {})
+        .finally(() => setIsSearchingRep(false))
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [repSearch])
 
   const getPersonaNombre = (p) => {
     if (!p) return ''
@@ -131,16 +171,6 @@ export function Asociaciones() {
     const full = `${p.nombres || ''} ${p.apellidoPaterno || p.apellido_paterno || ''} ${p.apellidoMaterno || p.apellido_materno || ''}`.trim()
     return full || p.razon_social || p.razonSocial || 'Sin Nombre'
   }
-
-  const repResults = personas
-    .filter((p) => {
-      const q = repSearch.trim().toLowerCase()
-      if (!q) return true
-      const doc = String(p.numeroDocumento || p.numero || '').toLowerCase()
-      const nom = getPersonaNombre(p).toLowerCase()
-      return doc.includes(q) || nom.includes(q)
-    })
-    .slice(0, 10)
 
   const selectRepresentante = (p) => {
     const dni = String(p.numeroDocumento || p.numero || '')
@@ -171,73 +201,117 @@ export function Asociaciones() {
   const asociacionesCount = asociaciones.filter((o) => o.tipo === 'ASOCIACION').length
   const flotaAcumulada = asociaciones.reduce((sum, o) => sum + Number(o.flotaTotal || 0), 0)
 
-  const handleExportExcel = () => {
-    const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
-    exportToExcel({
-      filename: `Padron_Asociaciones_${new Date().getFullYear()}.xls`,
-      sheetName: 'Asociaciones',
-      title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
-      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
-      metadata: [
-        { label: 'Filtro Tipo', value: filterTipo },
-        { label: 'Filtro Estado', value: filterEstado },
-        { label: 'Flota Total Registrada', value: `${flotaAcumulada} unidades` },
-      ],
-      columns: [
-        { header: 'N°', align: 'center', width: 45, render: (_, __, i) => i + 1 },
-        { header: 'Tipo', key: 'tipo', width: 110, align: 'center' },
-        { header: 'Razón Social / Organización', key: 'razonSocial', width: 260 },
-        { header: 'RUC', key: 'ruc', width: 120, align: 'center', isText: true },
-        { header: 'Partida Registral', key: 'partidaRegistral', width: 130, align: 'center', isText: true },
-        { header: 'Resolución Alcaldía', key: 'resolucionAlcaldia', width: 160, align: 'center' },
-        { header: 'Flota Registrada', key: 'flotaTotal', width: 110, align: 'center' },
-        { header: 'Teléfono', key: 'telefono', width: 110, align: 'center', isText: true },
-        { header: 'Correo Electrónico', key: 'email', width: 180 },
-        { header: 'Dirección', key: 'direccion', width: 220 },
-        { header: 'Estado', key: 'estado', width: 90, align: 'center' },
-      ],
-      data: listToExport,
-    })
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
+          exportToExcel({
+            filename: `Padron_Asociaciones_${new Date().getFullYear()}.xls`,
+            sheetName: 'Asociaciones',
+            title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
+            subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
+            metadata: [
+              { label: 'Filtro Tipo', value: filterTipo },
+              { label: 'Filtro Estado', value: filterEstado },
+              { label: 'Flota Total Registrada', value: `${flotaAcumulada} unidades` },
+            ],
+            columns: [
+              { header: 'N°', align: 'center', width: 45, render: (_, __, i) => i + 1 },
+              { header: 'Tipo', key: 'tipo', width: 110, align: 'center' },
+              { header: 'Razón Social / Organización', key: 'razonSocial', width: 260 },
+              { header: 'RUC', key: 'ruc', width: 120, align: 'center', isText: true },
+              { header: 'Partida Registral', key: 'partidaRegistral', width: 130, align: 'center', isText: true },
+              { header: 'Resolución Alcaldía', key: 'resolucionAlcaldia', width: 160, align: 'center' },
+              { header: 'Flota Registrada', key: 'flotaTotal', width: 110, align: 'center' },
+              { header: 'Teléfono', key: 'telefono', width: 110, align: 'center', isText: true },
+              { header: 'Correo Electrónico', key: 'email', width: 180 },
+              { header: 'Dirección', key: 'direccion', width: 220 },
+              { header: 'Estado', key: 'estado', width: 90, align: 'center' },
+            ],
+            data: listToExport,
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
-  const handleExportPdf = () => {
-    const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
-    exportToPdf({
-      filename: `Padron_Asociaciones_${new Date().getFullYear()}`,
-      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
-      summaryItems: [
-        { label: 'Total registros', value: totalOrgs },
-        { label: 'Exportando', value: `${listToExport.length} registros` },
-        { label: 'Asociaciones', value: asociacionesCount },
-        { label: 'Particulares', value: particulares },
-        { label: 'Flota registrada', value: `${flotaAcumulada} vehículos` },
-      ],
-      columns: [
-        { header: 'RAZÓN SOCIAL', key: 'razonSocial', width: 220 },
-        { header: 'RUC', key: 'ruc', width: 100, align: 'center' },
-        { header: 'REPRESENTANTE', key: 'representanteNombre', width: 180 },
-        { header: 'DNI REP.', key: 'representanteDni', width: 90, align: 'center' },
-        { header: 'TIPO', key: 'tipo', width: 110, align: 'center' },
-        { header: 'FLOTA', key: 'flotaTotal', width: 60, align: 'center' },
-        { header: 'EXPEDIENTE', key: 'expediente', width: 110, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 90, align: 'center' },
-      ],
-      data: listToExport
-    })
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true)
+    try {
+      const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
+          await exportToPdf({
+            filename: `Padron_Asociaciones_${new Date().getFullYear()}`,
+            subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
+            summaryItems: [
+              { label: 'Total registros', value: totalOrgs },
+              { label: 'Exportando', value: `${listToExport.length} registros` },
+              { label: 'Asociaciones', value: asociacionesCount },
+              { label: 'Particulares', value: particulares },
+              { label: 'Flota registrada', value: `${flotaAcumulada} vehículos` },
+            ],
+            columns: [
+              { header: 'RAZÓN SOCIAL', key: 'razonSocial', width: 220 },
+              { header: 'RUC', key: 'ruc', width: 100, align: 'center' },
+              { header: 'REPRESENTANTE', key: 'representanteNombre', width: 180 },
+              { header: 'DNI REP.', key: 'representanteDni', width: 90, align: 'center' },
+              { header: 'TIPO', key: 'tipo', width: 110, align: 'center' },
+              { header: 'FLOTA', key: 'flotaTotal', width: 60, align: 'center' },
+              { header: 'EXPEDIENTE', key: 'expediente', width: 110, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 90, align: 'center' },
+            ],
+            data: listToExport
+          })
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
 
-  const filteredOrgs = asociaciones.filter((o) => {
-    const fullSearch = `${o.razonSocial} ${o.ruc} ${o.partidaRegistral || ''} ${o.direccion || ''} ${o.numeroLicencia || ''} ${o.resolucionAlcaldia || ''} ${o.representanteNombre || ''} ${o.representanteDni || ''}`.toLowerCase()
-    const matchesSearch = fullSearch.includes(searchTerm.toLowerCase())
-    const matchesTipo = filterTipo === 'TODOS' || o.tipo === filterTipo
-    const matchesEstado = filterEstado === 'TODOS' || o.estado === filterEstado
+  const handleExportSociosExcel = async () => {
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const listToExport = filteredSocios.length > 0 ? filteredSocios : sociosList
+      exportToExcel({
+        filename: `Padron_Socios_${new Date().getFullYear()}.xls`,
+        sheetName: 'Socios',
+        title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
+        subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Socios',
+        metadata: [
+          { label: 'Filtro Asociación', value: socioOrgFilter },
+          { label: 'Total Registros', value: `${listToExport.length} socios` },
+        ],
+        columns: [
+          { header: 'N°', align: 'center', width: 45, render: (_, __, i) => i + 1 },
+          { header: 'Socio / Propietario', key: 'nombre', width: 260 },
+          { header: 'Documento', key: 'documento', width: 120, align: 'center', isText: true },
+          { header: 'Asociación / Empresa', key: 'asociacionNombre', width: 260 },
+          { header: 'Vehículos', key: 'vehiculosTotal', width: 90, align: 'center' },
+          { header: 'Placas', key: 'placas', width: 200 },
+          { header: 'Teléfono', key: 'telefono', width: 120, align: 'center', isText: true },
+        ],
+        data: listToExport,
+      })
+    } finally {
+      setIsExportingExcel(false)
+    }
+  }
 
-    return matchesSearch && matchesTipo && matchesEstado
-  })
+  const filteredOrgs = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    return asociaciones.filter((o) => {
+      const matchesSearch = !term || (o._search ? o._search.includes(term) : `${o.razonSocial || ''} ${o.ruc || ''}`.toLowerCase().includes(term))
+      const matchesTipo = filterTipo === 'TODOS' || o.tipo === filterTipo
+      const matchesEstado = filterEstado === 'TODOS' || o.estado === filterEstado
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, filterTipo, filterEstado])
+      return matchesSearch && matchesTipo && matchesEstado
+    })
+  }, [asociaciones, searchTerm, filterTipo, filterEstado])
+
+  const paginatedOrgs = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    return filteredOrgs.slice(start, start + itemsPerPage)
+  }, [filteredOrgs, currentPage, itemsPerPage])
 
   // Bloquea el scroll de la página de fondo mientras hay un modal abierto,
   // para que no arrastre visualmente la cabecera del modal al desplazarse.
@@ -251,44 +325,54 @@ export function Asociaciones() {
     }
   }, [isModalOpen, isDetailModalOpen])
 
-
-  // --- LOGICA DE SOCIOS ---
-  const filteredSocios = sociosList.filter(s => {
-    const matchesSearch = (s.nombre + ' ' + s.documento + ' ' + s.placas).toLowerCase().includes(sociosSearch.toLowerCase())
-    const matchesOrg = socioOrgFilter === 'TODOS' || s.asociacionNombre === socioOrgFilter
-    return matchesSearch && matchesOrg
-  })
-
-  // Ordenamiento A-Z | Z-A
-  if (sociosSortBy && sociosSortDir) {
-    const dirMul = sociosSortDir === 'ASC' ? 1 : -1
-    filteredSocios.sort((a, b) => {
-      const valA = a[sociosSortBy]
-      const valB = b[sociosSortBy]
-      
-      // Si la columna es vehiculosTotal, ordenamos como números
-      if (sociosSortBy === 'vehiculosTotal') {
-        const numA = Number(valA) || 0
-        const numB = Number(valB) || 0
-        return (numA - numB) * dirMul
+  // Opciones de organizaciones para el filtro en pestaña Socios (memoizado para no regenerar en cada render)
+  const uniqueOrgOptions = useMemo(() => {
+    const set = new Set()
+    for (let i = 0; i < sociosList.length; i++) {
+      if (sociosList[i].asociacionNombre) {
+        set.add(sociosList[i].asociacionNombre)
       }
-      
-      // Ordenamiento alfabético robusto para español
-      const strA = String(valA || '')
-      const strB = String(valB || '')
-      return strA.localeCompare(strB, 'es', { sensitivity: 'base' }) * dirMul
+    }
+    const orgs = Array.from(set).sort()
+    return [
+      { value: 'TODOS', label: 'Todas las Asociaciones' },
+      ...orgs.map(org => ({ value: org, label: org }))
+    ]
+  }, [sociosList])
+
+  const esCollator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base', numeric: true }), [])
+
+  // --- LOGICA DE SOCIOS (Ultra optimizada con useMemo y búsqueda directa sub-milisegundo) ---
+  const filteredSocios = useMemo(() => {
+    const term = sociosSearch.trim().toLowerCase()
+    const hasOrgFilter = socioOrgFilter !== 'TODOS'
+
+    const result = sociosList.filter(s => {
+      const matchesSearch = !term || (s._search ? s._search.includes(term) : `${s.nombre || ''} ${s.documento || ''} ${s.placas || ''} ${s.asociacionNombre || ''}`.toLowerCase().includes(term))
+      const matchesOrg = !hasOrgFilter || s.asociacionNombre === socioOrgFilter
+      return matchesSearch && matchesOrg
     })
-  }
 
-  const paginatedSocios = filteredSocios.slice(
-    (sociosPage - 1) * sociosPerPage,
-    sociosPage * sociosPerPage
-  )
+    if (sociosSortBy && sociosSortDir) {
+      const dirMul = sociosSortDir === 'ASC' ? 1 : -1
+      if (sociosSortBy === 'vehiculosTotal') {
+        result.sort((a, b) => ((Number(a.vehiculosTotal) || 0) - (Number(b.vehiculosTotal) || 0)) * dirMul)
+      } else {
+        result.sort((a, b) => {
+          const valA = String(a[sociosSortBy] || '')
+          const valB = String(b[sociosSortBy] || '')
+          return esCollator.compare(valA, valB) * dirMul
+        })
+      }
+    }
 
-  const paginatedOrgs = filteredOrgs.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+    return result
+  }, [sociosList, sociosSearch, socioOrgFilter, sociosSortBy, sociosSortDir, esCollator])
+
+  const paginatedSocios = useMemo(() => {
+    const start = (sociosPage - 1) * sociosPerPage
+    return filteredSocios.slice(start, start + sociosPerPage)
+  }, [filteredSocios, sociosPage, sociosPerPage])
 
   const handleOpenCreateModal = () => {
     setFormData(emptyForm)
@@ -343,6 +427,7 @@ export function Asociaciones() {
         const nextList = asociaciones.filter((o) => o.id !== id)
         setAsociaciones(nextList)
         setCachedData('/asociaciones', nextList)
+        showToast('Asociación eliminada correctamente', 'eliminar')
       } catch (err) {
         showError('Error', 'No se pudo eliminar la asociación.')
       }
@@ -368,6 +453,7 @@ export function Asociaciones() {
     }
 
     try {
+      const buildSearchStr = (o) => `${o.razonSocial || ''} ${o.ruc || ''} ${o.partidaRegistral || ''} ${o.direccion || ''} ${o.numeroLicencia || ''} ${o.resolucionAlcaldia || ''} ${o.representanteNombre || ''} ${o.representanteDni || ''}`.toLowerCase()
       if (isEditing) {
         const res = await apiFetch(`/asociaciones/${selectedOrg.id}`, {
           method: 'PUT',
@@ -377,10 +463,12 @@ export function Asociaciones() {
           ...selectedOrg,
           ...formData,
           id: selectedOrg.id,
+          _search: buildSearchStr({ ...selectedOrg, ...formData }),
         }
         const nextList = asociaciones.map((o) => (o.id === selectedOrg.id ? updated : o))
         setAsociaciones(nextList)
         setCachedData('/asociaciones', nextList)
+        showToast('Asociación actualizada correctamente', 'editar')
       } else {
         const res = await apiFetch('/asociaciones', {
           method: 'POST',
@@ -389,9 +477,13 @@ export function Asociaciones() {
         const resData = await res.json()
         if (!res.ok) throw new Error(resData.messages?.error || 'Error al crear')
         
-        const newOrg = resData.data || {
+        const rawNew = resData.data || {
           ...formData,
           id: Date.now(),
+        }
+        const newOrg = {
+          ...rawNew,
+          _search: buildSearchStr(rawNew),
         }
         const nextList = [newOrg, ...asociaciones]
         setAsociaciones(nextList)
@@ -405,12 +497,13 @@ export function Asociaciones() {
     }
   }
 
-  const openMap = (coordenadas, title = 'Ubicación registrada') => {
+  const openMap = (coordenadas, title = 'Ubicación registrada', direccion = '', tipo = '') => {
     if (!coordenadas?.trim()) return
     setMapPreview({
       title,
       coordenadas: coordenadas.trim(),
-      url: `https://maps.google.com/maps?q=${encodeURIComponent(coordenadas.trim())}&z=17&output=embed`,
+      direccion,
+      tipo,
     })
   }
 
@@ -423,8 +516,8 @@ export function Asociaciones() {
       {/* Cabecera Principal */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
-            <Icon name="building" className="size-5.5" />
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="building" className="size-7 stroke-[2.4]" />
           </span>
           <div>
             <div className="flex items-center gap-2">
@@ -452,7 +545,7 @@ export function Asociaciones() {
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(totalOrgs)}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(totalOrgs)}</p>
             <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">Padrón 2026</span>
           </div>
         </div>
@@ -466,7 +559,7 @@ export function Asociaciones() {
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(asociacionesCount)}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(asociacionesCount)}</p>
             <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">Trimóviles</span>
           </div>
         </div>
@@ -480,7 +573,7 @@ export function Asociaciones() {
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(particulares)}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(particulares)}</p>
             <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 px-1.5 py-0.5 rounded-md">Independientes</span>
           </div>
         </div>
@@ -493,7 +586,7 @@ export function Asociaciones() {
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(flotaAcumulada)}
+              {formatNumeroTarjeta(flotaAcumulada)}
             </p>
             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">
               Vehículos
@@ -537,7 +630,10 @@ export function Asociaciones() {
 <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+            <Icon
+              name="search"
+              className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
+            />
             <input
               type="text"
               placeholder="Buscar por nombre, RUC, partida, dirección o licencia..."
@@ -549,7 +645,7 @@ export function Asociaciones() {
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 ✕
               </button>
@@ -589,9 +685,9 @@ export function Asociaciones() {
               onClick={handleExportExcel}
               title="Descargar padrón en Excel (.xls)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Excel</span>
+             disabled={isExportingExcel}>
+              <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
+              <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
             <button
@@ -599,9 +695,9 @@ export function Asociaciones() {
               onClick={handleExportPdf}
               title="Descargar o imprimir padrón en PDF"
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
-              <span>PDF</span>
+             disabled={isExportingPdf}>
+              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
+              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
 
             <button
@@ -620,7 +716,7 @@ export function Asociaciones() {
 
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
                 <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[220px]">Asociación / Particular</th>
@@ -628,8 +724,8 @@ export function Asociaciones() {
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[170px]">Representante Legal</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">Contacto</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[200px]">Ubicación</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[90px] text-center">Estado</th>
-                <th className="sticky right-0 z-10 bg-slate-50 dark:bg-[var(--bg-subtle)] border-l border-slate-200 dark:border-[var(--border)] px-3.5 py-2.5 whitespace-nowrap min-w-[95px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
+                <th className="px-4 py-2.5 whitespace-nowrap min-w-[140px] text-center">Estado</th>
+                <th className="sticky right-0 z-10 bg-slate-50 dark:bg-[var(--bg-subtle)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-2.5 whitespace-nowrap min-w-[130px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.04)]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
@@ -637,12 +733,9 @@ export function Asociaciones() {
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
                     <td className="px-3.5 py-3 min-w-[220px]">
-                      <div className="flex items-center gap-2.5">
-                        <div className="size-8 rounded-xl bg-slate-200 dark:bg-[var(--bg-subtle)] shrink-0" />
-                        <div className="space-y-1.5 flex-1">
-                          <div className="h-3.5 w-40 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                          <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                        </div>
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-40 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                       </div>
                     </td>
                     <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
@@ -664,10 +757,10 @@ export function Asociaciones() {
                         <div className="h-2.5 w-16 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                       </div>
                     </td>
-                    <td className="px-3 py-3 min-w-[90px] text-center">
-                      <div className="mx-auto h-5 w-14 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                    <td className="px-4 py-3 min-w-[140px] text-center">
+                      <div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                     </td>
-                    <td className="sticky right-0 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-100 dark:border-[var(--border)] px-3.5 py-3 text-center">
+                    <td className="sticky right-0 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3 text-center min-w-[130px]">
                       <div className="flex items-center justify-center gap-1.5">
                         <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                         <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
@@ -677,7 +770,7 @@ export function Asociaciones() {
                 ))
               ) : filteredOrgs.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="p-12 text-center align-middle">
+                  <td colSpan="7" className="p-12 text-center align-middle">
                     <div className="flex flex-col items-center justify-center">
                       <Icon name="building" className="size-10 mb-2 text-slate-300 dark:text-slate-600" />
                       <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron asociaciones</p>
@@ -688,19 +781,17 @@ export function Asociaciones() {
                 paginatedOrgs.map((o) => (
                   <tr key={o.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]">
                     <td className="px-3.5 py-3 align-middle min-w-[220px]">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`grid size-9 shrink-0 place-items-center rounded-xl font-bold shadow-xs ${o.tipo === 'ASOCIACION'
-                            ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
-                            : 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400'
-                          }`}>
-                          <Icon name={o.tipo === 'ASOCIACION' ? 'motoTaxi' : 'building'} className="size-4.5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-snug" title={o.razonSocial}>{o.razonSocial || 'Sin razón social'}</p>
-                          <span className="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300 mt-0.5">
-                            {o.tipo}
+                      <div>
+                        <p className="font-semibold text-xs text-slate-800 dark:text-slate-100 leading-snug" title={o.razonSocial}>{o.razonSocial || 'Sin razón social'}</p>
+                        {o.tipo === 'ASOCIACION' ? (
+                          <span className="inline-flex items-center rounded-md bg-amber-100 text-amber-900 border border-amber-300/80 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60 mt-0.5">
+                            ASOCIACIÓN
                           </span>
-                        </div>
+                        ) : (
+                          <span className="inline-flex items-center rounded-md bg-cyan-100 text-cyan-900 border border-cyan-300/80 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800/60 mt-0.5">
+                            PARTICULAR
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-3 align-middle whitespace-nowrap">
@@ -752,7 +843,7 @@ export function Asociaciones() {
                           {o.coordenadas && (
                             <button
                               type="button"
-                              onClick={() => openMap(o.coordenadas, o.razonSocial)}
+                              onClick={() => openMap(o.coordenadas, o.razonSocial, o.direccion, o.tipo)}
                               className="mt-0.5 text-[10px] font-bold text-indigo-600 hover:underline dark:text-indigo-400 cursor-pointer flex items-center gap-1"
                             >
                               <Icon name="mapPin" className="size-3" />
@@ -764,10 +855,12 @@ export function Asociaciones() {
                         <span className="text-xs text-slate-400 font-medium">Sin ubicación</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 align-middle whitespace-nowrap text-center min-w-[90px]">
-                      <StatusBadge status={o.estado} />
+                    <td className="px-4 py-3 align-middle whitespace-nowrap text-center min-w-[140px]">
+                      <div className="flex items-center justify-center">
+                        <StatusBadge status={o.estado} />
+                      </div>
                     </td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-100 dark:border-[var(--border)] px-3.5 py-3 align-middle text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3 align-middle text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.04)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 min-w-[130px]">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
@@ -822,55 +915,65 @@ export function Asociaciones() {
           <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-1 flex-col sm:flex-row gap-2.5">
               <div className="relative flex-1 sm:max-w-xs">
-                <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+                <Icon
+                  name="search"
+                  className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
+                />
                 <input
                   type="text"
                   placeholder="Buscar socio por nombre, doc o placa..."
                   value={sociosSearch}
-                  onChange={(e) => {
-                    setSociosSearch(e.target.value)
-                    setSociosPage(1)
-                  }}
+                  onChange={(e) => setSociosSearch(e.target.value)}
                   className="w-full rounded-xl border-0 bg-slate-100/70 py-2 pl-9 pr-8 text-xs font-medium text-slate-900 outline-none ring-1 ring-inset ring-slate-200/80 transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-600 dark:bg-slate-900/50 dark:text-white dark:ring-slate-700/50 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 dark:focus:ring-indigo-500"
                 />
                 {sociosSearch && (
                   <button
-                    onClick={() => {
-                      setSociosSearch('')
-                      setSociosPage(1)
-                    }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                    type="button"
+                    onClick={() => setSociosSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
                   >
-                    <Icon name="close" className="size-3.5" />
+                    ✕
                   </button>
                 )}
               </div>
               <RoundedSelect
                 value={socioOrgFilter}
-                onChange={(e) => {
-                  setSocioOrgFilter(e.target.value)
-                  setSociosPage(1)
-                }}
-                options={[
-                  { value: 'TODOS', label: 'Todas las Asociaciones' },
-                  ...Array.from(new Set(sociosList.map(s => s.asociacionNombre))).filter(Boolean).map(org => ({
-                    value: org, label: org
-                  }))
-                ]}
-              />            </div>
+                onChange={setSocioOrgFilter}
+                options={uniqueOrgOptions}
+              />
+              {(socioOrgFilter !== 'TODOS' || sociosSearch !== '') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSocioOrgFilter('TODOS')
+                    setSociosSearch('')
+                  }}
+                  title="Limpiar filtros de socios"
+                  className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs shrink-0"
+                >
+                  <Icon name="filterX" className="size-4" />
+                </button>
+              )}
+            </div>
             <div className="flex shrink-0 items-center gap-1.5">
               <button
                 type="button"
-                className="group flex h-9 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 cursor-pointer"
+                onClick={handleExportSociosExcel}
+                disabled={isExportingExcel}
+                title="Descargar padrón de socios en Excel (.xls)"
+                className="group flex h-9 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 cursor-pointer shadow-2xs"
               >
-                <Icon name="fileSpreadsheet" className="size-3.5 transition-transform group-hover:scale-110" />
-                <span className="hidden sm:inline">Excel</span>
+                <Icon
+                  name={isExportingExcel ? "refresh" : "fileSpreadsheet"}
+                  className={`size-3.5 transition-transform group-hover:scale-110 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`}
+                />
+                <span className="hidden sm:inline">{isExportingExcel ? 'Generando...' : 'Excel'}</span>
               </button>
             </div>
           </div>
           
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-200 bg-slate-50/50 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-slate-900/20 dark:text-slate-400">
                 <tr>
                   <th className="px-4 py-3 whitespace-nowrap">
@@ -921,11 +1024,11 @@ export function Asociaciones() {
                     </td>
                   </tr>
                 ) : (
-                  paginatedSocios.map((socio) => (
-                    <tr key={socio.idPersona} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-900/30">
+                  paginatedSocios.map((socio, idx) => (
+                    <tr key={`${socio.idPersona}-${socio.idAsociacion || '0'}-${idx}`} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-900/30">
                       <td className="px-4 py-3">
                         <p className="text-xs font-bold text-slate-900 dark:text-white">{socio.nombre}</p>
-                        <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{socio.tipoDocumento}: {socio.documento}</p>
+                        <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{socio.tipoDocumento || 'DNI'}: {socio.documento}</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2 py-1 text-[11px] font-black text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
@@ -941,9 +1044,7 @@ export function Asociaciones() {
                       <td className="px-4 py-3 text-center">
                         <div className="flex flex-wrap items-center justify-center gap-1">
                           {(socio.placas ? socio.placas.split(',') : []).map((placa, i) => (
-                            <span key={i} className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 shadow-2xs">
-                              {placa.trim()}
-                            </span>
+                            <PlacaBadge key={i} placa={placa.trim()} size="sm" />
                           ))}
                         </div>
                       </td>
@@ -1100,7 +1201,15 @@ export function Asociaciones() {
                             type="text"
                             placeholder="Buscar representante por DNI o Nombres y Apellidos..."
                             value={repSearch}
-                            onFocus={() => setShowRepResults(true)}
+                            onFocus={() => {
+                              setShowRepResults(true)
+                              if (repResults.length === 0 && !repSearch) {
+                                apiFetch('/personas?porPagina=10')
+                                  .then((res) => (res.ok ? res.json() : { data: [] }))
+                                  .then((payload) => setRepResults(payload.data || []))
+                                  .catch(() => {})
+                              }
+                            }}
                             onChange={(e) => {
                               setRepSearch(e.target.value)
                               setShowRepResults(true)
@@ -1112,7 +1221,7 @@ export function Asociaciones() {
                         {showRepResults && (
                           <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
                             <div className="flex items-center justify-between px-2.5 py-1 border-b border-slate-100 dark:border-[var(--border)] text-[10px] font-bold text-slate-400 uppercase">
-                              <span>Personas registradas ({repResults.length})</span>
+                              <span>Padrón de Ciudadanos ({repResults.length})</span>
                               <button
                                 type="button"
                                 onClick={() => setShowRepResults(false)}
@@ -1121,7 +1230,12 @@ export function Asociaciones() {
                                 ✕ Cerrar
                               </button>
                             </div>
-                            {repResults.length === 0 ? (
+                            {isSearchingRep && (
+                              <div className="p-3 text-center text-xs text-slate-400 font-medium animate-pulse">
+                                Buscando en padrón de ciudadanos...
+                              </div>
+                            )}
+                            {!isSearchingRep && repResults.length === 0 ? (
                               <div className="p-3 text-center text-xs text-slate-400 font-medium">
                                 No se encontraron personas con ese DNI o nombre.
                               </div>
@@ -1366,9 +1480,15 @@ export function Asociaciones() {
                     <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
                       {detailOrg.razonSocial}
                     </h3>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      {detailOrg.tipo}
-                    </span>
+                    {detailOrg.tipo === 'ASOCIACION' ? (
+                      <span className="rounded-md bg-amber-100 px-2 py-0.5 font-mono text-[10px] font-black text-amber-900 border border-amber-300/80 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60">
+                        ASOCIACIÓN
+                      </span>
+                    ) : (
+                      <span className="rounded-md bg-cyan-100 px-2 py-0.5 font-mono text-[10px] font-black text-cyan-900 border border-cyan-300/80 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800/60">
+                        PARTICULAR
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
                     RUC: {detailOrg.ruc || 'Sin RUC'} • Registro Autorizado MDJLO
@@ -1460,20 +1580,18 @@ export function Asociaciones() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => openMap(detailOrg.coordenadas, detailOrg.razonSocial)}
+                      onClick={() => openMap(detailOrg.coordenadas, detailOrg.razonSocial, detailOrg.direccion, detailOrg.tipo)}
                       disabled={!detailOrg.coordenadas}
-                      className="rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-700 transition hover:bg-indigo-100 disabled:bg-slate-100 disabled:text-slate-400 dark:bg-indigo-950/50 dark:text-indigo-300 dark:disabled:bg-slate-900"
+                      className="rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-700 transition hover:bg-indigo-100 disabled:bg-slate-100 disabled:text-slate-400 dark:bg-indigo-950/50 dark:text-indigo-300 dark:disabled:bg-slate-900 cursor-pointer"
                     >
                       Ampliar
                     </button>
                   </div>
                   {detailOrg.coordenadas ? (
-                    <iframe
-                      title={`Ubicación de ${detailOrg.razonSocial}`}
-                      src={`https://maps.google.com/maps?q=${encodeURIComponent(detailOrg.coordenadas.trim())}&z=17&output=embed`}
-                      className="h-72 w-full border-0"
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
+                    <MapaInline
+                      coordenadas={detailOrg.coordenadas}
+                      title={detailOrg.razonSocial}
+                      className="h-72 w-full rounded-b-xl"
                     />
                   ) : (
                     <div className="grid h-72 place-items-center px-6 text-center text-sm font-semibold text-slate-400">
@@ -1497,51 +1615,14 @@ export function Asociaciones() {
         </div>
       )}
 
-      {mapPreview && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-            {/* Header estilo /personas */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                  <Icon name="mapPin" className="size-4" />
-                </span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      {mapPreview.title}
-                    </h3>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      Mapa de ubicación
-                    </span>
-                  </div>
-                  <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
-                    {mapPreview.coordenadas}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setMapPreview(null)}
-                title="Cerrar mapa"
-                className="group grid size-8 shrink-0 place-items-center rounded-xl border border-slate-200/80 bg-slate-100/70 text-slate-400 hover:bg-[oklch(71.2%_0.194_13.428)] hover:border-[oklch(71.2%_0.194_13.428)] hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 transition-all duration-200 active:scale-95 cursor-pointer"
-              >
-                <Icon name="close" className="size-4 transition-transform duration-200 group-hover:rotate-90" />
-              </button>
-            </div>
-            <div className="h-[65vh] bg-slate-100 dark:bg-[var(--bg-surface)]">
-              <iframe
-                title={`Mapa de ${mapPreview.title}`}
-                src={mapPreview.url}
-                className="h-full w-full border-0"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <MapaPreviewModal
+        isOpen={Boolean(mapPreview)}
+        onClose={() => setMapPreview(null)}
+        coordenadas={mapPreview?.coordenadas}
+        title={mapPreview?.title}
+        direccion={mapPreview?.direccion}
+        tipo={mapPreview?.tipo}
+      />
 
     </div>
   )

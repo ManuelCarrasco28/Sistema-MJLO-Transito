@@ -198,8 +198,6 @@ class PapeletasController extends ResourceController
             $page = (int)$this->request->getGet('page');
             $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
 
-            $builder->groupBy('p.id');
-
             $columnasOrdenables = [
                 'numeroPapeleta' => 'p.numero_papeleta',
                 'vehiculoPlaca' => 'v.placa',
@@ -210,14 +208,16 @@ class PapeletasController extends ResourceController
 
             $total = 0;
             if ($page > 0) {
-                $subquery = (clone $builder)->select('p.id AS sub_id', false);
-                $total = $db->newQuery()->fromSubquery($subquery, 't_count')->countAllResults();
+                $countRow = (clone $builder)->select('COUNT(DISTINCT p.id) AS total_count', false)->get()->getRowArray();
+                $total = (int)($countRow['total_count'] ?? 0);
 
+                $builder->groupBy('p.id');
                 $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'p.id')
                     ->limit($porPagina, ($page - 1) * $porPagina)
                     ->get()
                     ->getResultArray();
             } else {
+                $builder->groupBy('p.id');
                 $sinFiltros = empty($dni) && empty($placa) && $buscar === ''
                     && $estado === '' && $origen === '' && $formalidad === ''
                     && $tipoInfraccion === 0 && $fechaFiltro === '';

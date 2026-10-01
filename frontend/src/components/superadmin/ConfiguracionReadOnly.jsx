@@ -1,9 +1,8 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Icon } from '../ui/Icon'
 import { Modal } from '../ui/Modal'
-import { FloatingInput } from '../ui/FormInputs'
 import { apiFetch } from '../../config/api'
-import { showSuccess, showError, showConfirm } from '../../utils/SwalUtil'
+import { showToast, showSuccess, showError, showConfirm } from '../../utils/SwalUtil'
 
 export function ConfiguracionReadOnly({
   municipalidad,
@@ -62,7 +61,7 @@ export function ConfiguracionReadOnly({
         body: formData
       })
       if (res.ok) {
-        showSuccess('Datos de la municipalidad guardados correctamente')
+        showToast('Datos de la municipalidad guardados correctamente', 'editar')
         onReload()
       } else {
         const error = await res.json()
@@ -87,7 +86,7 @@ export function ConfiguracionReadOnly({
     try {
       const res = await apiFetch(`/municipalidad/anios/${item.id}`, { method: 'DELETE' })
       if (res.ok) {
-        showSuccess('Año fiscal eliminado correctamente')
+        showToast('Año fiscal eliminado correctamente', 'eliminar')
         onReload()
       } else {
         const error = await res.json().catch(() => ({}))
@@ -114,7 +113,7 @@ export function ConfiguracionReadOnly({
         body: payload
       })
       if (res.ok) {
-        showSuccess(isEdit ? 'Año actualizado correctamente' : 'Año registrado correctamente')
+        showToast(isEdit ? 'Año actualizado correctamente' : 'Año registrado correctamente', isEdit ? 'editar' : 'crear')
         setAnioModalOpen(false)
         onReload()
       } else {

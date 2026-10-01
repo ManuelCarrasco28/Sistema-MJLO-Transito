@@ -8,8 +8,10 @@ import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../con
 import { showError, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { PagoPapeletaModal } from '../components/papeletas/PagoPapeletaModal'
 import { NuevaPapeletaModal } from '../components/papeletas/NuevaPapeletaModal'
 import { PapeletaDetalleModal } from '../components/papeletas/PapeletaDetalleModal'
@@ -43,6 +45,13 @@ const FILTER_FECHA_OPTIONS = [
   { value: 'MES', label: 'Este mes' }
 ];
 
+const FILTER_REPORTES_ESTADOS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'PENDIENTE', label: 'Pendientes' },
+  { value: 'CONVERTIDO_PAPELETA', label: 'Convertidos a papeleta' },
+  { value: 'RECHAZADO', label: 'Rechazados' },
+];
+
 export function Papeletas({ user }) {
   const cachedPapeletas = getCachedData('/papeletas')
   const cachedTipos = getCachedData('/tipos-infraccion')
@@ -66,6 +75,18 @@ export function Papeletas({ user }) {
   const [isLoading, setIsLoading] = useState(!cachedPapeletas)
   const [loadError, setLoadError] = useState('')
   const [searchTerm, setSearchTerm] = useState(() => new URLSearchParams(window.location.search).get('search') || '')
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setCurrentPage(1)
+    }, 160)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const location = useLocation()
   useEffect(() => {
@@ -90,8 +111,11 @@ export function Papeletas({ user }) {
   }
   const [stats, setStats] = useState({ total: 0, pendientes: 0, pagadas: 0, anuladas: 0 })
   const [reportesSearch, setReportesSearch] = useState('')
+  const [reportesFilterEstado, setReportesFilterEstado] = useState('TODOS')
   const [reportesPage, setReportesPage] = useState(1)
-  const [reportesPerPage, setReportesPerPage] = useState(5)
+  const [reportesPerPage, setReportesPerPage] = useState(8)
+  const [loadingReportes, setLoadingReportes] = useState(false)
+  const [fotosModalReporte, setFotosModalReporte] = useState(null)
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedPapeletaFotos, setSelectedPapeletaFotos] = useState([])
@@ -177,9 +201,16 @@ export function Papeletas({ user }) {
 
   useEffect(() => {
     setReportesPage(1)
-  }, [reportesSearch])
+  }, [reportesSearch, reportesFilterEstado])
 
   const filteredReportes = reportes.filter((r) => {
+    if (reportesFilterEstado !== 'TODOS') {
+      if (reportesFilterEstado === 'CONVERTIDO_PAPELETA') {
+        if (r.estado !== 'CONVERTIDO_PAPELETA' && r.estado !== 'FINALIZADO') return false
+      } else if (r.estado !== reportesFilterEstado) {
+        return false
+      }
+    }
     if (!reportesSearch.trim()) return true
     const term = reportesSearch.trim().toLowerCase()
     return [
@@ -224,58 +255,69 @@ export function Papeletas({ user }) {
   }
 
   const handleExportPdf = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToPdf({
-      filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.pdf`,
-      title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Fiscalización Municipal',
-      metadata: [
-        { label: 'Estado', value: filterEstado },
-        { label: 'Formalidad', value: filterFormalidad },
-        { label: 'Total Papeletas', value: String(data.length) }
-      ],
-      columns: [
-        { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 80, align: 'center' },
-        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 60, align: 'center' },
-        { header: 'CÓDIGO', key: 'infraccionCodigo', isText: true, width: 60, align: 'center' },
-        { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 80 },
-        { header: 'CONDUCTOR', key: 'conductorNombre', width: 120 },
-        { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 120 },
-        { header: 'FECHA', key: 'fechaHora', render: (_, p) => new Date(p.fechaHora).toLocaleDateString(), width: 80, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 80, align: 'center' }
-      ],
-      data
-    })
+    setIsExportingPdf(true)
+    try {
+      const data = await fetchTodoElFiltro()
+          await exportToPdf({
+            filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.pdf`,
+            title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Fiscalización Municipal',
+            metadata: [
+              { label: 'Estado', value: filterEstado },
+              { label: 'Formalidad', value: filterFormalidad },
+              { label: 'Total Papeletas', value: String(data.length) }
+            ],
+            columns: [
+              { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 80, align: 'center' },
+              { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 60, align: 'center' },
+              { header: 'CÓDIGO', key: 'infraccionCodigo', isText: true, width: 60, align: 'center' },
+              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 80 },
+              { header: 'CONDUCTOR', key: 'conductorNombre', width: 120 },
+              { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 120 },
+              { header: 'FECHA', key: 'fechaHora', render: (_, p) => new Date(p.fechaHora).toLocaleDateString(), width: 80, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 80, align: 'center' }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
 
   const handleExportExcel = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToExcel({
-      filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Papeletas',
-      title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Fiscalización Municipal',
-      metadata: [
-        { label: 'Estado', value: filterEstado },
-        { label: 'Formalidad', value: filterFormalidad },
-        { label: 'Total Papeletas', value: String(data.length) }
-      ],
-      columns: [
-        { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 140, align: 'center' },
-        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
-        { header: 'CÓDIGO INFRACCIÓN', key: 'infraccionCodigo', isText: true, width: 140, align: 'center' },
-        { header: 'DESCRIPCIÓN INFRACCIÓN', key: 'infraccionDescripcion', width: 260 },
-        { header: 'GRAVEDAD', key: 'gravedad', width: 110, align: 'center' },
-        { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 120 },
-        { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
-        { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
-        { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 170 },
-        { header: 'FECHA INFRACCIÓN', key: 'fechaInfraccion', width: 130, align: 'center' },
-        { header: 'LUGAR', key: 'lugarInfraccion', width: 200 },
-        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
-      ],
-      data
-    })
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const data = await fetchTodoElFiltro()
+          exportToExcel({
+            filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Papeletas',
+            title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Fiscalización Municipal',
+            metadata: [
+              { label: 'Estado', value: filterEstado },
+              { label: 'Formalidad', value: filterFormalidad },
+              { label: 'Total Papeletas', value: String(data.length) }
+            ],
+            columns: [
+              { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 140, align: 'center' },
+              { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+              { header: 'CÓDIGO INFRACCIÓN', key: 'infraccionCodigo', isText: true, width: 140, align: 'center' },
+              { header: 'DESCRIPCIÓN INFRACCIÓN', key: 'infraccionDescripcion', width: 260 },
+              { header: 'GRAVEDAD', key: 'gravedad', width: 110, align: 'center' },
+              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 120 },
+              { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
+              { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
+              { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 170 },
+              { header: 'FECHA INFRACCIÓN', key: 'fechaInfraccion', width: 130, align: 'center' },
+              { header: 'LUGAR', key: 'lugarInfraccion', width: 200 },
+              { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
   const renderOrigen = (p) => {
@@ -300,6 +342,50 @@ export function Papeletas({ user }) {
       .catch(() => {})
   }
 
+  const loadCatalogs = () => {
+    Promise.all([
+      apiFetch('/tipos-infraccion').then((res) => (res.ok ? res.json() : { data: [] })),
+      apiFetch('/vehiculos?porPagina=50').then((res) => (res.ok ? res.json() : { data: [] })),
+      apiFetch('/asociaciones?porPagina=50').then((res) => (res.ok ? res.json() : { data: [] })),
+      apiFetch('/reportes-intervencion').then((res) => (res.ok ? res.json() : { data: [] })),
+    ])
+      .then(([tiposRes, vehiculosRes, orgsRes, reportesRes]) => {
+        setTiposInfraccion(tiposRes.data || [])
+        setVehiculos(vehiculosRes.data || [])
+        setAsociaciones(orgsRes.data || [])
+        setReportes(reportesRes.data || [])
+      })
+      .catch(() => {})
+  }
+
+  const loadReportes = () => {
+    setLoadingReportes(true)
+    apiFetch('/reportes-intervencion')
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((reportesRes) => {
+        setReportes(reportesRes.data || [])
+      })
+      .catch(() => {})
+      .finally(() => setLoadingReportes(false))
+  }
+
+  const handleVerFotosReporte = async (reporte) => {
+    setFotosModalReporte({ id: reporte.id, placa: reporte.placa_visual, lugar: reporte.lugar, fotos: [], loading: true })
+    try {
+      const res = await apiFetch(`/reportes-intervencion/${reporte.id}/fotos`)
+      const data = await res.json()
+      setFotosModalReporte({
+        id: reporte.id,
+        placa: reporte.placa_visual,
+        lugar: reporte.lugar,
+        fotos: data.data || [],
+        loading: false
+      })
+    } catch {
+      setFotosModalReporte(prev => prev ? { ...prev, loading: false } : null)
+    }
+  }
+
   const loadData = () => {
     setIsLoading(true)
     setLoadError('')
@@ -307,7 +393,7 @@ export function Papeletas({ user }) {
       page: String(currentPage),
       porPagina: String(itemsPerPage),
     })
-    if (searchTerm) params.set('buscar', searchTerm)
+    if (debouncedSearch) params.set('buscar', debouncedSearch)
     if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
     if (filterOrigen !== 'TODOS') params.set('origen', filterOrigen)
     if (filterFormalidad !== 'TODOS') params.set('formalidad', filterFormalidad)
@@ -315,37 +401,27 @@ export function Papeletas({ user }) {
     if (filterFecha !== 'TODAS') params.set('fecha', filterFecha)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
-    Promise.all([
-      apiFetch(`/papeletas?${params.toString()}`).then(res => res.ok ? res.json() : Promise.reject(res)),
-      apiFetch('/tipos-infraccion').then(res => res.ok ? res.json() : Promise.reject(res)),
-      apiFetch('/vehiculos?porPagina=50').then(res => res.ok ? res.json() : Promise.reject(res)),
-      apiFetch('/asociaciones?porPagina=50').then(res => res.ok ? res.json() : Promise.reject(res)),
-      apiFetch('/reportes-intervencion').then(res => res.ok ? res.json() : Promise.reject(res))
-    ]).then(([papeletasRes, tiposRes, vehiculosRes, orgsRes, reportesRes]) => {
-      const pData = (papeletasRes.data || []).map(normalizePapeleta)
-      const tData = tiposRes.data || []
-      const vData = vehiculosRes.data || []
-      const oData = orgsRes.data || []
-      const rData = reportesRes.data || []
-      setPapeletas(pData)
-      setTotalFiltrado(papeletasRes.meta?.total ?? pData.length)
-      setTiposInfraccion(tData)
-      setVehiculos(vData)
-      setAsociaciones(oData)
-      setReportes(rData)
-      setIsLoading(false)
-    }).catch(() => {
-      setLoadError('No se pudo cargar el módulo de papeletas.')
-      setIsLoading(false)
-    })
+    apiFetch(`/papeletas?${params.toString()}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((papeletasRes) => {
+        const pData = (papeletasRes.data || []).map(normalizePapeleta)
+        setPapeletas(pData)
+        setTotalFiltrado(papeletasRes.meta?.total ?? pData.length)
+        setIsLoading(false)
+      })
+      .catch(() => {
+        setLoadError('No se pudo cargar el módulo de papeletas.')
+        setIsLoading(false)
+      })
   }
 
   useEffect(() => {
     loadData()
-  }, [currentPage, itemsPerPage, searchTerm, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha, sortBy, sortDir])
+  }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha, sortBy, sortDir])
 
   useEffect(() => {
     loadStats()
+    loadCatalogs()
   }, [])
 
   const handleOpenDetail = async (papeleta) => {
@@ -482,7 +558,8 @@ export function Papeletas({ user }) {
       setReporteToConvert(null)
       loadData()
       loadStats()
-      alert(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim())
+      loadReportes()
+      showToast(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim(), 'success')
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'Error al convertir reporte.'))
     } finally {
@@ -568,8 +645,10 @@ export function Papeletas({ user }) {
       if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo rechazar el reporte.')
       setReporteToReject(null)
       setMotivoRechazo('')
+      loadReportes()
       loadData()
       loadStats()
+      showToast('Reporte de intervención rechazado', 'eliminar')
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'Error al rechazar reporte.'))
     } finally {
@@ -607,7 +686,7 @@ export function Papeletas({ user }) {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{totales}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(totales)}</p>
           </div>
         </div>
 
@@ -619,7 +698,7 @@ export function Papeletas({ user }) {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{pendientes}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(pendientes)}</p>
           </div>
         </div>
 
@@ -631,7 +710,7 @@ export function Papeletas({ user }) {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{pagadas}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(pagadas)}</p>
           </div>
         </div>
 
@@ -643,7 +722,7 @@ export function Papeletas({ user }) {
             </span>
           </div>
           <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{anuladas}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(anuladas)}</p>
           </div>
         </div>
       </div>
@@ -681,102 +760,282 @@ export function Papeletas({ user }) {
       </div>
 
       {activeView === 'REPORTES' && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden flex flex-col">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 px-5 py-4 dark:border-[var(--border)]">
-            <div>
-              <h2 className="text-lg font-black text-slate-900 dark:text-white">Reportes Evidencias</h2>
-              <p className="text-xs font-semibold text-slate-500">No son papeletas. Administración decide si procede o no.</p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-              <div className="relative w-full sm:w-64">
-                <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col print:hidden">
+          {/* Top toolbar */}
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 dark:border-[var(--border)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-md">
+                <Icon
+                  name={loadingReportes ? "refresh" : "search"}
+                  className={`absolute left-3.5 top-1/2 size-4 -translate-y-1/2 transition-colors ${loadingReportes ? 'animate-spin text-amber-500' : 'text-slate-400'}`}
+                />
                 <input
                   type="text"
-                  placeholder="Buscar reporte..."
+                  placeholder="Buscar por placa, lugar, inspector, infracción, ID..."
                   value={reportesSearch}
                   onChange={(e) => setReportesSearch(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-sm outline-none transition focus:border-rose-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-xs text-slate-800 outline-none transition focus:border-amber-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-amber-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-amber-400"
                 />
                 {reportesSearch && (
-                  <button onClick={() => setReportesSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">✕</button>
+                  <button
+                    type="button"
+                    onClick={() => setReportesSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  >
+                    ✕
+                  </button>
                 )}
               </div>
-              <button onClick={loadData} className="w-full sm:w-auto rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white shrink-0 cursor-pointer hover:bg-slate-800 transition active:scale-95">Actualizar</button>
+
+              <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+                {(reportesFilterEstado !== 'TODOS' || reportesSearch) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportesSearch('')
+                      setReportesFilterEstado('TODOS')
+                    }}
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors whitespace-nowrap"
+                  >
+                    Limpiar Filtros
+                  </button>
+                )}
+
+                <RoundedSelect
+                  value={reportesFilterEstado}
+                  onChange={setReportesFilterEstado}
+                  options={FILTER_REPORTES_ESTADOS}
+                />
+
+                <button
+                  type="button"
+                  onClick={loadReportes}
+                  disabled={loadingReportes}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-slate-800 transition-all cursor-pointer whitespace-nowrap disabled:opacity-60"
+                  title="Actualizar listado de reportes"
+                >
+                  <Icon name="refresh" className={`size-3.5 text-slate-600 dark:text-slate-300 ${loadingReportes ? 'animate-spin' : ''}`} />
+                  <span>{loadingReportes ? 'Actualizando...' : 'Actualizar'}</span>
+                </button>
+              </div>
             </div>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-            {paginatedReportes.length ? paginatedReportes.map((reporte) => (
-              <div key={reporte.id} className="grid gap-4 p-5 lg:grid-cols-[1fr_220px] lg:items-center">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 flex-1">
-                    <StatusBadge status={reporte.estado === 'CONVERTIDO_PAPELETA' ? 'FINALIZADO' : reporte.estado} />
-                    <span className="font-mono text-xs font-black text-slate-500">#{reporte.id}</span>
-                    {reporte.numero_papeleta && <span className="rounded-full bg-rose-100 px-2 py-1 text-[11px] font-black text-rose-700">{reporte.numero_papeleta}</span>}
-                  </div>
-                  <h3 className="mt-2 text-base font-black text-slate-900 dark:text-white">
-                    {reporte.placa_visual || 'SIN PLACA'} · {reporte.lugar}
-                  </h3>
-                  <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">{reporte.observaciones}</p>
-                  {reporte.infraccion_visual && (
-                    <p className="mt-1 text-xs font-black text-rose-600">INFRACCIÓN SUGERIDA: {reporte.infraccion_visual}</p>
-                  )}
-                  <div className="mt-2 grid gap-1 text-xs font-semibold text-slate-500 sm:grid-cols-3">
-                    <span>Inspector: {reporte.inspector_nombre}</span>
-                    <span>Fecha: {new Date(reporte.fecha_hora).toLocaleString()}</span>
-                    <span>GPS: {reporte.coordenadas || 'S/D'}</span>
-                  </div>
-                  {!!reporte.fotos?.length && (
-                    <div className="mt-3 flex gap-2 overflow-x-auto">
-                      {reporte.fotos.map((foto) => (
-                        <img key={foto.id} src={foto.foto} alt="Evidencia" className="h-20 w-28 rounded-xl border border-slate-200 object-cover" />
-                      ))}
-                    </div>
-                  )}
-                  {reporte.motivo_rechazo && <p className="mt-2 text-xs font-bold text-rose-600">Motivo: {reporte.motivo_rechazo}</p>}
-                </div>
-                <div className="flex flex-wrap justify-end gap-2">
-                  <button
-                    type="button"
-                    disabled={reporte.estado !== 'PENDIENTE'}
-                    onClick={() => openConvertReporte(reporte)}
-                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 cursor-pointer"
-                  >
-                    Generar papeleta
-                  </button>
-                  <button
-                    type="button"
-                    disabled={reporte.estado !== 'PENDIENTE'}
-                    onClick={() => { setReporteToReject(reporte); setMotivoRechazo('') }}
-                    className="rounded-xl bg-rose-50 px-4 py-2 text-xs font-black text-rose-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
-                  >
-                    Rechazar
-                  </button>
-                </div>
-              </div>
-            )) : (
-              <div className="px-5 py-12 text-center text-slate-400">
-                <Icon name={reportesSearch ? 'search' : 'camera'} className="size-8 mx-auto mb-1 text-slate-300 dark:text-slate-600" />
-                <p className="font-bold text-slate-600 dark:text-slate-300">
-                  {reportesSearch
-                    ? 'No se encontraron reportes que coincidan con la búsqueda'
-                    : 'Aún no hay Reportes Evidencias'}
-                </p>
-              </div>
-            )}
+
+          {(reportesFilterEstado !== 'TODOS' || reportesSearch) && (
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4 py-2 dark:border-[var(--border)] dark:bg-slate-900/30">
+              <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                Filtros activos: {filteredReportes.length} {filteredReportes.length === 1 ? 'reporte encontrado' : 'reportes encontrados'}
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Página {reportesPage} de {Math.max(1, Math.ceil(filteredReportes.length / reportesPerPage))}
+              </span>
+            </div>
+          )}
+
+          {/* Table */}
+          <div
+            className="overflow-x-auto overscroll-x-contain"
+            role="region"
+            aria-label="Listado de reportes de intervención"
+          >
+            <table className="w-full table-fixed text-left text-xs">
+              <colgroup>
+                <col className="w-[110px]" />
+                <col className="w-[140px]" />
+                <col className="w-[190px]" />
+                <col className="w-[230px]" />
+                <col className="w-[170px]" />
+                <col className="w-[95px]" />
+                <col className="w-[140px]" />
+              </colgroup>
+              <thead className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-400">
+                <tr>
+                  <th className="px-3.5 py-3.5 text-center">N° / Estado</th>
+                  <th className="px-3.5 py-3.5 text-center">Vehículo / Placa</th>
+                  <th className="px-3.5 py-3.5">Infracción / Lugar</th>
+                  <th className="px-3.5 py-3.5">Observaciones de Campo</th>
+                  <th className="px-3.5 py-3.5">Inspector & Fecha</th>
+                  <th className="px-3.5 py-3.5 text-center">Evidencias</th>
+                  <th className="px-3.5 py-3.5 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${loadingReportes && reportes.length > 0 ? 'opacity-50' : ''}`}>
+                {loadingReportes && reportes.length === 0 ? (
+                  Array.from({ length: 4 }).map((_, idx) => (
+                    <tr key={idx} className="animate-pulse">
+                      <td className="px-3.5 py-4"><div className="h-5 w-16 mx-auto rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                      <td className="px-3.5 py-4"><div className="h-6 w-20 mx-auto rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                      <td className="px-3.5 py-4"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                      <td className="px-3.5 py-4"><div className="h-4 w-40 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                      <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                      <td className="px-3.5 py-4 text-center"><div className="h-6 w-16 mx-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                      <td className="px-3.5 py-4 text-center"><div className="h-7 w-24 mx-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    </tr>
+                  ))
+                ) : filteredReportes.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
+                      <Icon name={reportesSearch ? 'search' : 'camera'} className="size-8 mx-auto mb-1 text-slate-300 dark:text-slate-600" />
+                      <p className="font-bold text-slate-600 dark:text-slate-300">
+                        {reportesSearch
+                          ? 'No se encontraron reportes que coincidan con la búsqueda'
+                          : 'Aún no hay reportes de evidencia registrados'}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedReportes.map((reporte) => (
+                    <tr key={reporte.id} className="group transition-colors hover:bg-slate-50/60 dark:hover:bg-[var(--bg-subtle)]">
+                      {/* N° / Estado */}
+                      <td className="px-3.5 py-3.5 text-center">
+                        <span className="font-mono text-xs font-black text-slate-700 dark:text-slate-200">
+                          #{reporte.id}
+                        </span>
+                        <div className="mt-1 flex flex-col items-center gap-1">
+                          <StatusBadge status={reporte.estado === 'CONVERTIDO_PAPELETA' ? 'FINALIZADO' : reporte.estado} />
+                          {reporte.numero_papeleta && (
+                            <span className="inline-block rounded-md bg-rose-50 border border-rose-200/70 px-1.5 py-0.5 font-mono text-[10px] font-black text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/60" title="Papeleta generada">
+                              {reporte.numero_papeleta}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Vehículo / Placa */}
+                      <td className="px-3.5 py-3.5 text-center">
+                        <PlacaBadge placa={reporte.placa_visual} />
+                        {(reporte.vehiculo_marca || reporte.vehiculo_modelo || reporte.vehiculo_color) ? (
+                          <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[130px] mx-auto" title={[reporte.vehiculo_marca, reporte.vehiculo_modelo, reporte.vehiculo_color].filter(Boolean).join(' ')}>
+                            {[reporte.vehiculo_marca, reporte.vehiculo_modelo, reporte.vehiculo_color].filter(Boolean).join(' ')}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[11px] text-slate-400">Sin datos veh.</p>
+                        )}
+                      </td>
+
+                      {/* Infracción / Lugar */}
+                      <td className="px-3.5 py-3.5">
+                        {reporte.infraccion_visual ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 font-mono text-xs font-black text-rose-700 border border-rose-200/70 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/60">
+                            {reporte.infraccion_visual}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-medium text-slate-400 italic">No especificada</span>
+                        )}
+                        <div className="mt-1 flex items-start gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          <Icon name="mapPin" className="size-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <span className="line-clamp-2 leading-tight" title={reporte.lugar}>{reporte.lugar || 'Lugar no especificado'}</span>
+                        </div>
+                        {reporte.coordenadas && (
+                          <p className="mt-0.5 font-mono text-[10px] text-slate-400 truncate" title={`GPS: ${reporte.coordenadas}`}>
+                            GPS: {reporte.coordenadas}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Observaciones de Campo */}
+                      <td className="px-3.5 py-3.5">
+                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug line-clamp-2 font-medium" title={reporte.observaciones}>
+                          {reporte.observaciones || <span className="text-slate-400 italic">Sin observaciones</span>}
+                        </p>
+                        {reporte.conductorNombre && reporte.conductorNombre !== 'No identificado' && (
+                          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 truncate" title={`${reporte.conductorNombre} (${reporte.conductorDni || 'S/D'})`}>
+                            <span className="font-bold text-slate-600 dark:text-slate-300">Cond:</span> {reporte.conductorNombre}
+                            {reporte.conductorDni && ` (${reporte.conductorDni})`}
+                          </p>
+                        )}
+                        {reporte.motivo_rechazo && (
+                          <div className="mt-1 rounded-md bg-rose-50/80 border border-rose-200/60 p-1.5 dark:bg-rose-950/40 dark:border-rose-900/50">
+                            <p className="text-[11px] font-bold text-rose-700 dark:text-rose-400 leading-tight">
+                              <span className="font-black uppercase tracking-wider text-[10px] text-rose-500 block">Motivo Rechazo</span>
+                              {reporte.motivo_rechazo}
+                            </p>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Inspector & Fecha */}
+                      <td className="px-3.5 py-3.5">
+                        <p className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate" title={reporte.inspector_nombre}>
+                          {reporte.inspector_nombre || 'Inspector S/D'}
+                        </p>
+                        {reporte.operativoNombre && (
+                          <span className="inline-block mt-0.5 rounded bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.2 font-mono text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-900/50 truncate max-w-full" title={reporte.operativoNombre}>
+                            {reporte.operativoNombre}
+                          </span>
+                        )}
+                        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                          {reporte.fecha_hora ? new Date(reporte.fecha_hora).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                        </p>
+                      </td>
+
+                      {/* Evidencias */}
+                      <td className="px-3.5 py-3.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleVerFotosReporte(reporte)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:border-amber-300 hover:bg-amber-50/60 hover:text-amber-800 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-amber-950/40 dark:hover:text-amber-300 transition-all cursor-pointer active:scale-95"
+                          title="Ver evidencias fotográficas"
+                        >
+                          <Icon name="camera" className="size-3.5 text-slate-500 dark:text-slate-400" />
+                          <span>Fotos</span>
+                        </button>
+                      </td>
+
+                      {/* Acciones */}
+                      <td className="px-3.5 py-3.5 text-center">
+                        {reporte.estado === 'PENDIENTE' ? (
+                          <div className="flex flex-col gap-1.5 items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => openConvertReporte(reporte)}
+                              className="w-full inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition active:scale-95 cursor-pointer shadow-xs"
+                              title="Generar papeleta a partir de este reporte"
+                            >
+                              <Icon name="ticket" className="size-3.5 shrink-0" />
+                              <span>Generar papeleta</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setReporteToReject(reporte); setMotivoRechazo('') }}
+                              className="w-full inline-flex items-center justify-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700 border border-rose-200/80 hover:bg-rose-100 transition active:scale-95 cursor-pointer dark:bg-rose-950/50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-900/60"
+                              title="Rechazar reporte"
+                            >
+                              <Icon name="close" className="size-3 shrink-0" />
+                              <span>Rechazar</span>
+                            </button>
+                          </div>
+                        ) : reporte.estado === 'CONVERTIDO_PAPELETA' || reporte.estado === 'FINALIZADO' ? (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">
+                            <Icon name="check" className="size-3 text-emerald-600" /> Convertido
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50">
+                            <Icon name="close" className="size-3 text-rose-600" /> Rechazado
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
 
           {filteredReportes.length > 0 && (
-            <Pagination
-              currentPage={reportesPage}
-              totalItems={filteredReportes.length}
-              itemsPerPage={reportesPerPage}
-              onPageChange={setReportesPage}
-              onItemsPerPageChange={(size) => {
-                setReportesPerPage(size)
-                setReportesPage(1)
-              }}
-              disabled={isLoading}
-            />
+            <div className="border-t border-slate-100 dark:border-[var(--border)]">
+              <Pagination
+                currentPage={reportesPage}
+                totalItems={filteredReportes.length}
+                itemsPerPage={reportesPerPage}
+                onPageChange={setReportesPage}
+                onItemsPerPageChange={(size) => {
+                  setReportesPerPage(size)
+                  setReportesPage(1)
+                }}
+                disabled={loadingReportes}
+              />
+            </div>
           )}
         </div>
       )}
@@ -786,7 +1045,10 @@ export function Papeletas({ user }) {
           {/* Top row: Search and Action Buttons */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:max-w-md">
-              <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <Icon
+                name={isLoading ? "refresh" : "search"}
+                className={`absolute left-3.5 top-1/2 size-4 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-rose-500' : 'text-slate-400'}`}
+              />
               <input
                 type="text"
                 placeholder="Buscar por código PAP, placa, infractor, DNI..."
@@ -795,7 +1057,14 @@ export function Papeletas({ user }) {
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-rose-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-rose-400"
               />
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('')
+                    setCurrentPage(1)
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
                   ✕
                 </button>
               )}
@@ -815,9 +1084,9 @@ export function Papeletas({ user }) {
                 onClick={handleExportExcel}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all cursor-pointer whitespace-nowrap"
                 title="Descargar padrón de papeletas en Excel"
-              >
-                <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600" />
-                <span>Excel</span>
+               disabled={isExportingExcel}>
+                <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 ${isExportingExcel ? 'animate-spin' : ''}`} />
+                <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
               </button>
               
               <button 
@@ -825,9 +1094,9 @@ export function Papeletas({ user }) {
                 onClick={handleExportPdf} 
                 className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 dark:hover:bg-rose-900/60 transition-all cursor-pointer whitespace-nowrap"
                 title="Exportar a PDF"
-              >
-                <Icon name="filePdf" className="size-3.5 text-rose-600" />
-                <span>PDF</span>
+               disabled={isExportingPdf}>
+                <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 ${isExportingPdf ? 'animate-spin' : ''}`} />
+                <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
               </button>
 
               <button
@@ -894,7 +1163,7 @@ export function Papeletas({ user }) {
           aria-label="Listado de papeletas"
           tabIndex={0}
         >
-          <table className="w-full table-fixed text-left text-sm">
+          <table className="w-full table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[110px]" />
               <col className="w-[150px]" />
@@ -907,7 +1176,7 @@ export function Papeletas({ user }) {
               <col className="w-[100px]" />
               <col className="w-[90px]" />
             </colgroup>
-            <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-400">
+            <thead className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-400">
               <tr>
                 <th className="px-3.5 py-3.5 text-center"><SortableHeader column="numeroPapeleta" label="N° Papeleta" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5">Propietario</th>
@@ -950,7 +1219,7 @@ export function Papeletas({ user }) {
                   return (
                     <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-[var(--bg-subtle)]">
                       <td className="px-3.5 py-3.5 text-center ">
-                        <span className="font-mono font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
+                        <span className="font-mono text-xs font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
                         <div className="mt-0.5">{renderOrigen(p)}</div>
                       </td>
                       <td className="px-3.5 py-3.5">
@@ -963,14 +1232,10 @@ export function Papeletas({ user }) {
                       </td>
                       <td className="px-3.5 py-3.5 ">
                         {p.vehiculoPlaca && p.vehiculoPlaca !== 'SIN PLACA' ? (
-                          <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
-                            {p.vehiculoPlaca}
-                          </span>
+                          <PlacaBadge placa={p.vehiculoPlaca} />
                         ) : (
                           <div>
-                            <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-2 py-0.5 font-mono text-[11px] font-black text-rose-800 dark:bg-rose-950/80 dark:text-rose-300">
-                              <Icon name="alert" className="size-3" /> SIN PLACA
-                            </span>
+                            <PlacaBadge placa={null} />
                             <p className="text-xs font-bold text-rose-700 dark:text-rose-400 mt-0.5">
                               {p.vehiculoCaracteristicas || 'Características Obligatorias'}
                             </p>
@@ -1043,7 +1308,7 @@ export function Papeletas({ user }) {
                         <p className="text-[11px] text-slate-400">{new Date(p.fechaHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </td>
                       <td className="px-3.5 py-3.5 text-center ">
-                        <span className="font-mono font-black text-slate-800 dark:text-white text-sm">S/ {p.montoTotal.toFixed(2)}</span>
+                        <span className="font-mono font-black text-slate-800 dark:text-white text-xs">S/ {p.montoTotal.toFixed(2)}</span>
                       </td>
                       <td className="px-3 py-3.5 text-center">
                         <StatusBadge status={p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado} />
@@ -1183,6 +1448,81 @@ export function Papeletas({ user }) {
 
       {selectedInfraccion && (
         <InfraccionDetalleModal selectedInfraccion={selectedInfraccion} onClose={() => setSelectedInfraccion(null)} />
+      )}
+
+      {fotosModalReporte && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200 dark:border-[var(--border)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Icon name="camera" className="size-5 text-amber-500" />
+                  Evidencias Fotográficas — Reporte #{fotosModalReporte.id}
+                </h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <PlacaBadge placa={fotosModalReporte.placa} size="sm" />
+                  {fotosModalReporte.lugar && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">· {fotosModalReporte.lugar}</span>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFotosModalReporte(null)}
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                <Icon name="close" className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              {fotosModalReporte.loading ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
+                  <Icon name="refresh" className="size-8 animate-spin text-amber-500" />
+                  <p className="text-xs font-bold">Cargando evidencias fotográficas...</p>
+                </div>
+              ) : fotosModalReporte.fotos?.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {fotosModalReporte.fotos.map((foto, idx) => (
+                    <div
+                      key={foto.id || idx}
+                      onClick={() => setSelectedImage(foto.foto)}
+                      className="group relative aspect-4/3 cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900 transition-all hover:scale-[1.02] hover:shadow-md"
+                      title="Clic para ampliar"
+                    >
+                      <img
+                        src={foto.foto}
+                        alt={`Evidencia ${idx + 1}`}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-slate-950/0 transition-colors group-hover:bg-slate-950/30 flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-white/90 p-2 text-slate-900 shadow-md">
+                          <Icon name="maximize" className="size-4" />
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+                  <Icon name="camera" className="size-10 text-slate-300 dark:text-slate-600" />
+                  <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No se adjuntaron fotos en este reporte</p>
+                  <p className="text-xs text-slate-400">El inspector no subió imágenes de evidencia durante la intervención.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-100 bg-slate-50/50 px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+              <button
+                type="button"
+                onClick={() => setFotosModalReporte(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-[var(--border)] dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700 transition cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {selectedImage && (

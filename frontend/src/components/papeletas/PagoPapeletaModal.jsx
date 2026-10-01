@@ -1,4 +1,5 @@
 import { Icon } from '../ui/Icon'
+import { PlacaBadge } from '../ui/PlacaBadge'
 import { FloatingInput, FloatingSelect } from '../ui/FormInputs'
 
 export function PagoPapeletaModal({
@@ -37,9 +38,9 @@ export function PagoPapeletaModal({
               <span className="font-bold text-slate-500 dark:text-slate-400">Infractor:</span>
               <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.conductorNombre || papeletaToAction.infractor}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="font-bold text-slate-500 dark:text-slate-400">Placa / Vehículo:</span>
-              <span className="font-bold text-slate-800 dark:text-white">{papeletaToAction.vehiculoPlaca}</span>
+              <PlacaBadge placa={papeletaToAction.vehiculoPlaca} size="sm" />
             </div>
             <div className="flex justify-between">
               <span className="font-bold text-slate-500 dark:text-slate-400">Infracción{papeletaToAction.detalles?.length > 1 ? 'es' : ''}:</span>

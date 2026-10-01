@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { navigationGroups } from '../../config/navigation'
+import { navigationGroups, PREFETCH_MAP } from '../../config/navigation'
 import { Icon } from '../ui/Icon'
 import { apiFetch } from '../../config/api'
 
@@ -90,6 +90,13 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 })
   const tooltipTimeoutRef = useRef(null)
 
+  // Dispara el import() dinámico del módulo en hover para que esté listo antes del clic.
+  // Los imports dinámicos se cachean: llamarlo N veces = una sola petición real.
+  const handleItemPrefetch = useCallback((path) => {
+    const fn = PREFETCH_MAP[path]
+    if (fn) fn().catch(() => {})
+  }, [])
+
   // Diseño monocromático: todos los íconos de grupo usan el mismo tono gris
   // Sin caja de fondo por categoría, pero cada ícono de grupo mantiene su
   // propio color distintivo (solo el glifo, no un fondo/caja coloreada).
@@ -173,18 +180,18 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
       <aside
         style={{ height: '100%', maxHeight: '100dvh' }}
         className={`fixed inset-y-0 left-0 z-50 flex h-screen max-h-screen h-dvh max-h-dvh flex-col overflow-hidden bg-white dark:bg-[#111C44] text-slate-800 dark:text-slate-100 border-r border-slate-200/80 dark:border-white/10 shadow-2xl transition-all duration-300 lg:relative lg:z-auto lg:h-full lg:max-h-full lg:translate-x-0 lg:shadow-none shrink-0 select-none ${
-          collapsedOnDesktop ? 'w-20' : 'w-[19.5rem]'
+          collapsedOnDesktop ? 'w-20' : 'w-64'
         } ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
         data-purpose="sidebar-navigation"
       >
-        <div className="flex h-[68px] shrink-0 items-center justify-between border-b border-slate-100 dark:border-white/10 px-3.5 relative group/header">
+        <div className="flex h-[72px] shrink-0 items-center justify-center border-b border-slate-100 dark:border-white/10 px-3 relative group/header">
           {/* Logo Container */}
-          <div className={`flex items-center transition-opacity duration-200 ${
+          <div className={`flex items-center justify-center transition-opacity duration-200 ${
             collapsedOnDesktop 
               ? 'justify-center w-full absolute inset-0 opacity-100 group-hover/header:opacity-0 pointer-events-none' 
-              : 'w-full justify-center pr-2'
+              : 'w-full flex items-center justify-center px-7'
           }`}>
             {collapsedOnDesktop ? (
               <span className="text-xl font-black text-[#2B3674] dark:text-white">JLO</span>
@@ -193,13 +200,13 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 <img
                   src="/img/logo-mjlo.png"
                   alt="Logo Municipalidad JLO"
-                  className="h-[52px] max-w-[11rem] object-contain dark:hidden block"
+                  className="h-[54px] max-w-[12.5rem] object-contain dark:hidden block"
                   onError={(event) => { event.currentTarget.src = '/escudo-jlo.png' }}
                 />
                 <img
                   src="/img/logo-mjlo-blanco.png"
                   alt="Logo Municipalidad JLO"
-                  className="h-[52px] max-w-[11rem] object-contain dark:block hidden"
+                  className="h-[54px] max-w-[12.5rem] object-contain dark:block hidden"
                   onError={(event) => { event.currentTarget.src = '/escudo-jlo.png' }}
                 />
               </>
@@ -211,7 +218,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
             type="button"
             onClick={onClose}
             aria-label="Cerrar menú"
-            className="rounded-lg p-1 text-slate-400 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 lg:hidden ml-auto relative z-10"
+            className="rounded-lg p-1 text-slate-400 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 lg:hidden absolute right-2.5 top-1/2 -translate-y-1/2 z-10"
           >
             <Icon name="close" />
           </button>
@@ -220,8 +227,10 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           <button
             type="button"
             onClick={onToggleSidebar}
-            className={`hidden lg:flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all duration-200 p-1.5 cursor-pointer relative z-10 ${
-              collapsedOnDesktop ? 'mx-auto opacity-0 group-hover/header:opacity-100' : 'ml-auto'
+            className={`hidden lg:flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all duration-200 p-1.5 cursor-pointer z-10 ${
+              collapsedOnDesktop
+                ? 'absolute inset-0 m-auto size-9 opacity-0 group-hover/header:opacity-100'
+                : 'absolute right-2.5 top-1/2 -translate-y-1/2'
             }`}
             onMouseEnter={(e) => handleMouseEnter(collapsedOnDesktop ? "Expandir panel" : "Ocultar panel", e, null)}
             onMouseLeave={handleMouseLeave}
@@ -230,7 +239,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           </button>
         </div>
 
-        <nav className={`no-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1.5 py-2 px-3 ${collapsedOnDesktop ? 'lg:px-2 px-3' : 'px-3'}`} aria-label="Navegación principal">
+        <nav className={`no-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1.5 py-2 px-2.5 ${collapsedOnDesktop ? 'lg:px-2 px-2.5' : 'px-2.5'}`} aria-label="Navegación principal">
           {visibleNavigationGroups.map((group) => {
             const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30' }
             const isSingle = group.items.length === 1
@@ -243,7 +252,10 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                   <button
                     type="button"
                     data-flyout-trigger="true"
-                    onMouseEnter={(e) => handleMouseEnter(isSingle ? mainItem.label : group.name, e, group.name)}
+                    onMouseEnter={(e) => {
+                      handleMouseEnter(isSingle ? mainItem.label : group.name, e, group.name)
+                      if (isSingle) handleItemPrefetch(mainItem.path)
+                    }}
                     onMouseLeave={handleMouseLeave}
                     onClick={(e) => {
                       if (isSingle) {
@@ -283,6 +295,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 <button
                   key={group.name}
                   type="button"
+                  onMouseEnter={() => handleItemPrefetch(mainItem.path)}
                   onClick={() => {
                     onSelect(mainItem.label)
                     navigate(mainItem.path)
@@ -296,7 +309,6 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 >
                   <Icon name={mainItem.icon} className={`size-4 shrink-0 ${selected ? '' : grpCfg.color}`} />
                   <span className="text-[13px] font-semibold uppercase tracking-tight truncate flex-1">{mainItem.label}</span>
-                  {selected && <span className="absolute right-0 top-1.5 bottom-1.5 w-[3px] rounded-l-full bg-[#4318FF]" />}
                 </button>
               )
             }
@@ -328,6 +340,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                         <button
                           key={item.id}
                           type="button"
+                          onMouseEnter={() => handleItemPrefetch(item.path)}
                           onClick={() => {
                             onSelect(item.label)
                             navigate(item.path)
@@ -351,7 +364,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           })}
         </nav>
 
-        <div className="mt-auto shrink-0 border-t border-slate-100 dark:border-white/10 px-3 py-2 bg-white dark:bg-[#111C44]">
+        <div className="mt-auto shrink-0 border-t border-slate-100 dark:border-white/10 px-2.5 py-2 bg-white dark:bg-[#111C44]">
           <button
             type="button"
             onClick={onLogout}
@@ -390,6 +403,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 <button
                   key={item.id}
                   type="button"
+                  onMouseEnter={() => handleItemPrefetch(item.path)}
                   onClick={() => {
                     onSelect(item.label)
                     navigate(item.path)

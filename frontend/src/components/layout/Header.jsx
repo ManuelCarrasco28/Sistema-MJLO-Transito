@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../ui/Icon'
-import { useLocation, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../config/api'
 
 export function Header({
@@ -20,7 +19,6 @@ export function Header({
   onLogout,
   user,
 }) {
-  const navigate = useNavigate()
   const rawDate = new Intl.DateTimeFormat('es-PE', {
     weekday: 'long',
     day: 'numeric',
@@ -125,30 +123,30 @@ export function Header({
   const avatarImage = user?.foto_img || ''
 
   return (
-    <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6 px-4 sm:px-6 lg:px-8" data-purpose="horizon-topbar">
-      {/* Mobile Menu Button - Added for functionality */}
-      <div className="flex items-center gap-3 lg:hidden mb-2 md:mb-0">
+    <header className="flex items-center justify-between gap-3 mt-2 mb-0.5 px-3.5 sm:px-5 lg:px-6" data-purpose="horizon-topbar">
+      {/* Left side: Mobile trigger */}
+      <div className="flex items-center lg:hidden">
         <button
           type="button"
           onClick={onOpenMobile}
-          className="p-2 rounded-xl bg-white text-[#2B3674] shadow-sm border border-[#E9EDF7]"
+          className="p-1.5 rounded-xl bg-white dark:bg-[#111C44] text-[#2B3674] dark:text-white shadow-xs border border-[#E9EDF7] dark:border-white/10 cursor-pointer"
         >
           <Icon name="menu" className="size-5" />
         </button>
       </div>
       
       {/* Right Horizon Floating Search & Control Capsule */}
-      <div className="ml-auto flex flex-wrap md:flex-nowrap items-center gap-3 bg-white dark:bg-[#111C44] p-2 sm:p-2.5 rounded-[30px] shadow-[0px_18px_40px_rgba(112,144,176,0.12)] dark:shadow-none border border-white/60 dark:border-none">
+      <div className="ml-auto flex items-center gap-2 bg-white dark:bg-[#111C44] px-2.5 py-1.5 rounded-2xl shadow-xs border border-slate-200/80 dark:border-white/10 shrink-0">
 
         {/* Date and Time Pill */}
-        <div className="hidden xl:flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-slate-200/60 dark:border-white/10 bg-white/50 dark:bg-white/5">
-          <Icon name="calendar" className="size-4 text-slate-400 dark:text-white/60" />
-          <span className="text-xs font-semibold text-slate-500 dark:text-white/70">{currentDate}</span>
-          <div className="w-[1px] h-3.5 bg-slate-200 dark:bg-white/10 mx-1"></div>
+        <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-xl border border-slate-200/60 dark:border-white/10 bg-slate-50/70 dark:bg-white/5">
+          <Icon name="calendar" className="size-3.5 text-slate-400 dark:text-white/60" />
+          <span className="text-[11.5px] font-semibold text-slate-600 dark:text-white/70">{currentDate}</span>
+          <div className="w-[1px] h-3 bg-slate-200 dark:bg-white/10 mx-0.5"></div>
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#01B574]"></span>
-            <div className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-[#4318FF]/20">
-              <span className="text-[11px] font-bold text-[#4318FF] dark:text-blue-300 tracking-wide tabular-nums">{currentTime}</span>
+            <div className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-[#4318FF]/20">
+              <span className="text-[10px] font-bold text-[#4318FF] dark:text-blue-300 tracking-wide tabular-nums">{currentTime}</span>
             </div>
           </div>
         </div>
@@ -156,20 +154,19 @@ export function Header({
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>
           <button 
-            className="relative p-2.5 rounded-full text-[#A3AED0] dark:text-white/70 hover:text-[#2B3674] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/10 transition-colors cursor-pointer" 
+            className="relative size-8 grid place-items-center rounded-xl text-slate-400 dark:text-white/70 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" 
             title="Notificaciones"
             onClick={() => {
               setNotifOpen(!notifOpen)
               setUserMenuOpen(false)
             }}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="size-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" strokeLinecap="round" strokeLinejoin="round"></path>
             </svg>
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 flex items-center justify-center z-10">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#EE5D50] opacity-60"></span>
-                <span className="relative inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EE5D50] px-[5px] pb-[1px] text-[10px] font-black leading-none text-white shadow-sm">
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center z-10">
+                <span className="relative inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[#EE5D50] px-[4px] text-[9px] font-black leading-none text-white shadow-2xs">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               </span>
@@ -255,24 +252,25 @@ export function Header({
 
         {/* Dark Mode Toggle Button */}
         <button 
-          className="p-2.5 rounded-full text-[#A3AED0] dark:text-white/70 hover:text-[#2B3674] dark:hover:text-white hover:bg-[#F4F7FE] dark:hover:bg-white/10 transition-colors cursor-pointer" 
+          className="size-8 grid place-items-center rounded-xl text-slate-400 dark:text-white/70 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" 
           title="Modo Claro/Oscuro"
           onClick={() => setDarkMode(!darkMode)}
         >
           {darkMode ? (
-            <Icon name="sun" className="size-5" />
+            <Icon name="sun" className="size-4.5" />
           ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="size-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" strokeLinecap="round" strokeLinejoin="round"></path>
             </svg>
           )}
         </button>
 
+        <div className="w-[1px] h-4.5 bg-slate-200 dark:bg-white/10 mx-0.5"></div>
 
         {/* User Profile Pill */}
         <div className="relative" ref={userMenuRef}>
           <div 
-            className="flex items-center gap-2.5 pl-1 pr-2 cursor-pointer"
+            className="flex items-center gap-2 pl-0.5 pr-1 cursor-pointer select-none"
             onClick={() => {
               setUserMenuOpen(!userMenuOpen)
               setNotifOpen(false)
@@ -280,17 +278,17 @@ export function Header({
           >
             <div className="relative">
               {avatarImage ? (
-                <img src={avatarImage} alt={userFullName} className="h-9 w-9 rounded-full object-cover shadow-sm ring-2 ring-white dark:ring-[#111C44]" />
+                <img src={avatarImage} alt={userFullName} className="size-7.5 rounded-full object-cover shadow-2xs ring-1.5 ring-white dark:ring-[#111C44]" />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#4318FF] to-[#39B8FF] flex items-center justify-center font-extrabold text-white text-xs shadow-sm">
+                <div className="size-7.5 rounded-full bg-gradient-to-tr from-[#4318FF] to-[#39B8FF] flex items-center justify-center font-extrabold text-white text-[11px] shadow-2xs">
                   {userInitials}
                 </div>
               )}
-              <span className="w-2.5 h-2.5 bg-[#01B574] rounded-full border-2 border-white dark:border-[#111C44] absolute bottom-0 right-0"></span>
+              <span className="size-2 bg-[#01B574] rounded-full border border-white dark:border-[#111C44] absolute -bottom-0.5 -right-0.5"></span>
             </div>
             <div className="hidden xl:block text-left leading-tight">
-              <h4 className="text-xs font-bold text-[#2B3674] dark:text-white">{userFullName}</h4>
-              <p className="text-[10px] font-semibold text-[#A3AED0] dark:text-white/60">{userRole}</p>
+              <h4 className="text-[11.5px] font-bold text-slate-800 dark:text-white">{userFullName}</h4>
+              <p className="text-[9px] font-semibold text-slate-400 dark:text-white/60 uppercase tracking-tight">{userRole}</p>
             </div>
           </div>
 

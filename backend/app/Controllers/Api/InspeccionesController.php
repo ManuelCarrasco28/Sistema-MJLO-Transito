@@ -134,8 +134,6 @@ class InspeccionesController extends ResourceController
             $page = (int)$this->request->getGet('page');
             $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
 
-            $builder->groupBy('i.id');
-
             $columnasOrdenables = [
                 'numeroRegistro' => 'i.numero_registro',
                 'vehiculoPlaca' => 'v.placa',
@@ -145,14 +143,16 @@ class InspeccionesController extends ResourceController
 
             $total = 0;
             if ($page > 0) {
-                $subquery = (clone $builder)->select('i.id AS sub_id', false);
-                $total = $db->newQuery()->fromSubquery($subquery, 't_count')->countAllResults();
+                $countRow = (clone $builder)->select('COUNT(DISTINCT i.id) AS total_count', false)->get()->getRowArray();
+                $total = (int)($countRow['total_count'] ?? 0);
 
+                $builder->groupBy('i.id');
                 $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'i.id')
                     ->limit($porPagina, ($page - 1) * $porPagina)
                     ->get()
                     ->getResultArray();
             } else {
+                $builder->groupBy('i.id');
                 $rows = $builder->orderBy('i.id', 'DESC')
                     ->get()
                     ->getResultArray();

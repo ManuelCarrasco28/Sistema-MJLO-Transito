@@ -1,5 +1,6 @@
 import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
+import { PlacaBadge } from '../ui/PlacaBadge'
 import { formatFecha } from '../../utils/formatters'
 
 function calcularEdad(fechaNacStr) {
@@ -195,7 +196,10 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
                         <strong className="text-rose-600 dark:text-rose-400 font-mono">{pap.numero_papeleta}</strong>
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[var(--bg-surface)] text-slate-600 dark:text-slate-400">{pap.estado}</span>
                       </div>
-                      <p className="text-slate-600 dark:text-slate-300 font-semibold">Placa: {pap.placa}</p>
+                      <div className="flex items-center gap-1.5 my-1">
+                        <span className="text-slate-600 dark:text-slate-300 font-semibold text-xs">Placa:</span>
+                        <PlacaBadge placa={pap.placa} size="sm" />
+                      </div>
                       <p className="text-slate-500 dark:text-slate-400 text-[10px]">{formatFecha(pap.fecha_hora)} - {pap.lugar}</p>
                     </div>
                   ))

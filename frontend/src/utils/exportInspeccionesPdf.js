@@ -3,7 +3,7 @@ import { formatFecha } from './formatters'
 
 // Genera y descarga el padrón de inspecciones CERTICAV como PDF real
 // (dompdf, generado en el servidor), reutilizando el endpoint genérico.
-export function imprimirInspeccionesPdf({ listToExport, vehiculos, totales, aprobados, observados, desaprobados }) {
+export async function imprimirInspeccionesPdf({ listToExport, vehiculos, totales, aprobados, observados, desaprobados }) {
   const columns = [
     { header: 'N° Registro', key: 'numeroRegistro', align: 'center', width: 90 },
     { header: 'Serie CertiCAV', key: 'numeroSerieCerticav', align: 'center', width: 90 },
@@ -29,7 +29,7 @@ export function imprimirInspeccionesPdf({ listToExport, vehiculos, totales, apro
     }
   })
 
-  exportToPdf({
+  return await exportToPdf({
     filename: `Padron_Inspecciones_CERTICAV_${new Date().toISOString().slice(0, 10)}`,
     subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Inspecciones Técnicas Vehiculares (CERTICAV)',
     summaryItems: [

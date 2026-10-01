@@ -8,6 +8,7 @@ import { SortableHeader } from '../components/ui/SortableHeader'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 
 const FILTER_ESTADO_OPTIONS = [
@@ -29,6 +30,16 @@ export function Pagos() {
   const [pagos, setPagos] = useState(cached || [])
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setCurrentPage(1)
+    }, 160)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   const [filterTipoPago, setFilterTipoPago] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
@@ -215,54 +226,65 @@ export function Pagos() {
   }
 
   const handleExportPdf = async () => {
-    const data = await fetchTodoElFiltroPagos()
-    exportToPdf({
-      filename: `Pagos_${new Date().toISOString().slice(0, 10)}.pdf`,
-      title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
-      subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',
-      metadata: [
-        { label: 'Estado', value: filterEstado },
-        { label: 'Tipo', value: filterTipoPago },
-        { label: 'Total Recaudado', value: `S/ ${totalMonto.toFixed(2)}` }
-      ],
-      columns: [
-        { header: 'N° RECIBO', key: 'numeroRecibo' },
-        { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente' },
-        { header: 'TIPO PAGO', key: 'tipoPago' },
-        { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—' },
-        { header: 'MÉTODO DE PAGO', key: 'metodo' },
-        { header: 'MONTO', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}` },
-        { header: 'ESTADO', key: 'estado' }
-      ],
-      data
-    })
+    setIsExportingPdf(true)
+    try {
+      const data = await fetchTodoElFiltroPagos()
+          await exportToPdf({
+            filename: `Pagos_${new Date().toISOString().slice(0, 10)}.pdf`,
+            title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
+            subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',
+            metadata: [
+              { label: 'Estado', value: filterEstado },
+              { label: 'Tipo', value: filterTipoPago },
+              { label: 'Total Recaudado', value: `S/ ${totalMonto.toFixed(2)}` }
+            ],
+            columns: [
+              { header: 'N° RECIBO', key: 'numeroRecibo' },
+              { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente' },
+              { header: 'TIPO PAGO', key: 'tipoPago' },
+              { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—' },
+              { header: 'MÉTODO DE PAGO', key: 'metodo' },
+              { header: 'MONTO', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}` },
+              { header: 'ESTADO', key: 'estado' }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
 
   const handleExportExcel = async () => {
-    const data = await fetchTodoElFiltroPagos()
-    exportToExcel({
-      filename: `Pagos_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Pagos',
-      title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
-      subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',
-      metadata: [
-        { label: 'Estado', value: filterEstado },
-        { label: 'Tipo', value: filterTipoPago },
-        { label: 'Total Recaudado', value: `S/ ${totalMonto.toFixed(2)}` }
-      ],
-      columns: [
-        { header: 'N° RECIBO', key: 'numeroRecibo', isText: true, width: 140 },
-        { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente', width: 110 },
-        { header: 'TIPO PAGO', key: 'tipoPago', width: 130 },
-        { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—', width: 180 },
-        { header: 'N° VOUCHER', key: 'numeroVoucher', isText: true, width: 140 },
-        { header: 'REFERENCIA', key: 'referenciaPago', width: 160 },
-        { header: 'MÉTODO DE PAGO', key: 'metodo', width: 120 },
-        { header: 'MONTO (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}`, align: 'right', width: 120 },
-        { header: 'ESTADO', key: 'estado', align: 'center', width: 110 }
-      ],
-      data
-    })
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const data = await fetchTodoElFiltroPagos()
+          exportToExcel({
+            filename: `Pagos_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Pagos',
+            title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
+            subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',
+            metadata: [
+              { label: 'Estado', value: filterEstado },
+              { label: 'Tipo', value: filterTipoPago },
+              { label: 'Total Recaudado', value: `S/ ${totalMonto.toFixed(2)}` }
+            ],
+            columns: [
+              { header: 'N° RECIBO', key: 'numeroRecibo', isText: true, width: 140 },
+              { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente', width: 110 },
+              { header: 'TIPO PAGO', key: 'tipoPago', width: 130 },
+              { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—', width: 180 },
+              { header: 'N° VOUCHER', key: 'numeroVoucher', isText: true, width: 140 },
+              { header: 'REFERENCIA', key: 'referenciaPago', width: 160 },
+              { header: 'MÉTODO DE PAGO', key: 'metodo', width: 120 },
+              { header: 'MONTO (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}`, align: 'right', width: 120 },
+              { header: 'ESTADO', key: 'estado', align: 'center', width: 110 }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
   const handleExportArqueoExcel = () => {
@@ -297,6 +319,8 @@ export function Pagos() {
   }
 
   const [stats, setStats] = useState({ totalPagos: 0, totalMonto: 0, pagosHoy: 0 })
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
   const totalPagos = stats.totalPagos ?? 0
   const totalMonto = stats.totalMonto ?? 0
   const pagosHoy = stats.pagosHoy ?? 0
@@ -336,7 +360,7 @@ export function Pagos() {
       page: String(currentPage),
       porPagina: String(itemsPerPage),
     })
-    if (searchTerm) params.set('buscar', searchTerm)
+    if (debouncedSearch) params.set('buscar', debouncedSearch)
     if (filterTipoPago !== 'TODOS') params.set('tipoPago', filterTipoPago)
     if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
@@ -354,7 +378,7 @@ export function Pagos() {
 
   useEffect(() => {
     loadPagos()
-  }, [currentPage, itemsPerPage, searchTerm, filterTipoPago, filterEstado, sortBy, sortDir])
+  }, [currentPage, itemsPerPage, debouncedSearch, filterTipoPago, filterEstado, sortBy, sortDir])
 
   const loadStats = () => {
     apiFetch('/pagos/estadisticas')
@@ -435,7 +459,7 @@ export function Pagos() {
           </div>
           <div className="mt-1 flex items-baseline justify-between gap-2">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight tracking-tight">
-              {new Intl.NumberFormat('es-PE').format(totalPagos || 0)}
+              {formatNumeroTarjeta(totalPagos)}
             </p>
             <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.5 rounded-md shrink-0">
               Emitidos
@@ -452,7 +476,7 @@ export function Pagos() {
           </div>
           <div className="mt-1 flex items-baseline justify-between gap-2">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight tracking-tight">
-              {new Intl.NumberFormat('es-PE').format(pagosHoy || 0)}
+              {formatNumeroTarjeta(pagosHoy)}
             </p>
             <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded-md shrink-0">
               Jornada
@@ -464,7 +488,10 @@ export function Pagos() {
       <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col print:hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
           <div className="relative w-full sm:w-56 md:w-64 lg:w-72 shrink-0">
-            <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+            <Icon
+              name={isLoading ? "refresh" : "search"}
+              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-emerald-500' : 'text-slate-400'}`}
+            />
             <input
               type="text"
               placeholder="Buscar por N° recibo, voucher..."
@@ -475,7 +502,10 @@ export function Pagos() {
             {searchTerm && (
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
+                onClick={() => {
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 ✕
@@ -486,12 +516,18 @@ export function Pagos() {
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <RoundedSelect
               value={filterEstado}
-              onChange={setFilterEstado}
+              onChange={(val) => {
+                setFilterEstado(val)
+                setCurrentPage(1)
+              }}
               options={FILTER_ESTADO_OPTIONS}
             />
             <RoundedSelect
               value={filterTipoPago}
-              onChange={setFilterTipoPago}
+              onChange={(val) => {
+                setFilterTipoPago(val)
+                setCurrentPage(1)
+              }}
               options={FILTER_TIPO_OPTIONS}
             />
 
@@ -502,6 +538,7 @@ export function Pagos() {
                   setFilterEstado('TODOS')
                   setFilterTipoPago('TODOS')
                   setSearchTerm('')
+                  setCurrentPage(1)
                 }}
                 title="Limpiar filtros"
                 className="grid size-[32px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
@@ -525,9 +562,9 @@ export function Pagos() {
               onClick={handleExportExcel}
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-emerald-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer shadow-2xs whitespace-nowrap"
               title="Descargar reporte de pagos en Excel"
-            >
-              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Excel</span>
+             disabled={isExportingExcel}>
+              <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
+              <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
             
             <button
@@ -535,9 +572,9 @@ export function Pagos() {
               onClick={handleExportPdf}
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-rose-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer shadow-2xs whitespace-nowrap"
               title="Imprimir o exportar PDF"
-            >
-              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
-              <span>PDF</span>
+             disabled={isExportingPdf}>
+              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
+              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
 
             <button
@@ -554,7 +591,7 @@ export function Pagos() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] table-fixed text-left text-xs sm:text-sm">
+          <table className="w-full min-w-[1080px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[140px]" />
               <col className="w-[125px]" />
@@ -604,23 +641,23 @@ export function Pagos() {
                 paginatedPagos.map((p) => (
                   <tr key={p.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-[var(--bg-subtle)]">
                     <td className="px-4 py-3.5">
-                      <p className="font-bold text-slate-900 dark:text-white">{p.numeroRecibo || 'Pendiente de recibo'}</p>
+                      <p className="font-bold text-xs text-slate-900 dark:text-white">{p.numeroRecibo || 'Pendiente de recibo'}</p>
                       <span className="mt-0.5 inline-block rounded-md bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                         CAJA MUNICIPAL
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">{p.fecha ? new Date(String(p.fecha).slice(0, 10) + 'T00:00:00').toLocaleDateString() : 'Sin fecha de pago'}</p>
+                      <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.fecha ? new Date(String(p.fecha).slice(0, 10) + 'T00:00:00').toLocaleDateString() : 'Sin fecha de pago'}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         {p.tipoPago} #{p.papeletaId || p.tramiteId || p.inscripcionId}
                       </p>
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-bold text-slate-900 dark:text-white">{p.tipoPago || 'TRAMITE'}</p>
+                      <p className="font-bold text-xs text-slate-900 dark:text-white">{p.tipoPago || 'TRAMITE'}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500">{p.numeroVoucher || 'Sin voucher'}</p>
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">{p.pagadoPor || '—'}</p>
+                      <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.pagadoPor || '—'}</p>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${
@@ -634,7 +671,7 @@ export function Pagos() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                      <p className="font-black text-slate-900 dark:text-white">
+                      <p className="font-black text-xs text-slate-900 dark:text-white">
                         S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       <p className={`text-[10px] font-bold uppercase tracking-wider ${

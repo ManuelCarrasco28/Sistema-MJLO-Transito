@@ -1,4 +1,5 @@
 import { Icon } from '../ui/Icon'
+import { PlacaBadge } from '../ui/PlacaBadge'
 
 export function ConvertirReporteModal({
   reporteToConvert,
@@ -33,7 +34,10 @@ export function ConvertirReporteModal({
                 <h4 className="font-black text-sm uppercase tracking-wider">Reporte #{reporteToConvert.id}</h4>
               </div>
               <div className="space-y-3">
-                <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Placa Detectada</span><strong className="text-slate-800 dark:text-white text-base bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 shadow-sm">{reporteToConvert.placa_visual || 'SIN PLACA'}</strong></p>
+                <div>
+                  <span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-1">Placa Detectada</span>
+                  <PlacaBadge placa={reporteToConvert.placa_visual} size="lg" />
+                </div>
                 <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Lugar</span><span className="font-semibold text-slate-700 dark:text-slate-300 leading-snug">{reporteToConvert.lugar}</span></p>
                 <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Observación del Inspector</span><span className="font-semibold text-rose-600 dark:text-rose-400 italic leading-snug">"{reporteToConvert.observaciones}"</span></p>
               </div>

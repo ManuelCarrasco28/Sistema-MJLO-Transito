@@ -79,6 +79,23 @@ class PideController extends ResourceController
             return $this->failServerError("El servicio de consulta RENIEC no responde en este momento. Ingrese los datos manualmente.");
         }
 
+        $decoded = json_decode($response, true);
+        if (is_array($decoded)) {
+            $formatTitle = function ($str) {
+                if (!is_string($str) || trim($str) === '') return $str;
+                return mb_convert_case(preg_replace('/\s+/', ' ', trim($str)), MB_CASE_TITLE, 'UTF-8');
+            };
+            if (isset($decoded['data']) && is_array($decoded['data'])) {
+                if (isset($decoded['data']['direccion'])) {
+                    $decoded['data']['direccion'] = $formatTitle($decoded['data']['direccion']);
+                }
+            }
+            if (isset($decoded['direccion'])) {
+                $decoded['direccion'] = $formatTitle($decoded['direccion']);
+            }
+            return $this->response->setStatusCode($httpCode)->setJSON($decoded);
+        }
+
         return $this->response->setStatusCode($httpCode)->setJSON(json_decode($response));
     }
 

@@ -1,9 +1,9 @@
-import { lazy, Suspense, useState, useRef, useEffect } from 'react'
+import { lazy, Suspense, useState, useRef, useEffect, useMemo } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Login } from './components/auth/Login'
 import { Sidebar } from './components/layout/Sidebar'
 import { Header } from './components/layout/Header'
-import { navigationGroups } from './config/navigation'
+import { PREFETCH_MAP } from './config/navigation'
 import { apiFetch } from './config/api'
 
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000
@@ -69,32 +69,33 @@ function ModuleFallback() {
 function Layout({ onLogout, user, onUserUpdate }) {
   const location = useLocation()
 
-  const getActiveItem = () => {
-    const path = location.pathname
-    if (path.includes('/superadmin/respaldo')) return 'Respaldo'
-    if (path.includes('/superadmin/auditoria')) return 'Auditoría y logs'
-    if (path.includes('/superadmin/configuracion')) return 'Configuración'
-    if (path.includes('/superadmin/roles')) return 'Roles y permisos'
-    if (path.includes('/superadmin/usuarios')) return 'Gestión de usuarios'
-    if (path.includes('/superadmin/personas')) return 'Personas'
-    if (path.includes('/superadmin/trabajadores')) return 'Trabajadores'
-    if (path.includes('/superadmin')) return 'Dashboard Super Admin'
-    if (path.includes('/vehiculos')) return 'Vehículos'
-    if (path.includes('/personas')) return 'Personas'
-    if (path.includes('/trabajadores')) return 'Trabajadores'
-    if (path.includes('/asociaciones')) return 'Asociaciones'
-    if (path.includes('/documentos')) return 'Documentos del Vehículo'
-    if (path.includes('/inspecciones')) return 'Certicav'
-    if (path.includes('/papeletas')) return 'Papeletas'
-    if (path.includes('/operativos')) return 'Operativos'
-    if (path.includes('/cursos')) return 'Curso de Seguridad Vial'
-    if (path.includes('/pagos')) return 'Pagos'
-    if (path.includes('/internamientos') || path.includes('/retenciones')) return 'Internamientos'
-    if (path.includes('/permisos')) return 'Permisos y Autorizaciones'
+  // useMemo derivado directo de pathname — sin useState ni useEffect extra,
+  // evita el flash de 1 render con valor incorrecto al navegar.
+  const activeItem = useMemo(() => {
+    const p = location.pathname
+    if (p.startsWith('/superadmin/respaldo'))      return 'Respaldo'
+    if (p.startsWith('/superadmin/auditoria'))     return 'Auditoría y logs'
+    if (p.startsWith('/superadmin/configuracion')) return 'Configuración'
+    if (p.startsWith('/superadmin/roles'))         return 'Roles y permisos'
+    if (p.startsWith('/superadmin/usuarios'))      return 'Gestión de usuarios'
+    if (p.startsWith('/superadmin/personas'))      return 'Personas'
+    if (p.startsWith('/superadmin/trabajadores'))  return 'Trabajadores'
+    if (p.startsWith('/superadmin'))               return 'Dashboard Super Admin'
+    if (p.startsWith('/vehiculos'))                return 'Vehículos'
+    if (p.startsWith('/personas'))                 return 'Personas'
+    if (p.startsWith('/trabajadores'))             return 'Trabajadores'
+    if (p.startsWith('/asociaciones'))             return 'Asociaciones'
+    if (p.startsWith('/documentos'))               return 'Documentos del Vehículo'
+    if (p.startsWith('/inspecciones'))             return 'Certicav'
+    if (p.startsWith('/papeletas'))                return 'Papeletas'
+    if (p.startsWith('/operativos'))               return 'Operativos'
+    if (p.startsWith('/cursos'))                   return 'Curso de Seguridad Vial'
+    if (p.startsWith('/pagos'))                    return 'Pagos'
+    if (p.startsWith('/internamientos') || p.startsWith('/retenciones')) return 'Internamientos'
+    if (p.startsWith('/permisos'))                 return 'Permisos y Autorizaciones'
     return 'Dashboard'
-  }
+  }, [location.pathname])
 
-  const [activeItem, setActiveItem] = useState(getActiveItem())
   const [mobileOpen, setMobileOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [notifications, setNotifications] = useState([])
@@ -110,10 +111,6 @@ function Layout({ onLogout, user, onUserUpdate }) {
   })
   const notifRef = useRef(null)
   const userMenuRef = useRef(null)
-
-  useEffect(() => {
-    setActiveItem(getActiveItem())
-  }, [location.pathname])
 
   useEffect(() => {
     let cancelled = false;
@@ -165,6 +162,29 @@ function Layout({ onLogout, user, onUserUpdate }) {
     }
   }, [])
 
+  // Prefetch de todos los módulos visibles para este rol en segundo plano.
+  // Se ejecuta 1.5s después del montaje del layout (cuando el dashboard ya se ve)
+  // para no competir con el render inicial. Los imports() se cachean: si el
+  // usuario ya visitó un módulo, este effect simplemente reutiliza la caché.
+  useEffect(() => {
+    const rolNorm = (user?.rol || '').toUpperCase()
+    const isSA = rolNorm === 'SUPERADMIN'
+    const isOff = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNorm)
+
+    const timer = setTimeout(() => {
+      Object.entries(PREFETCH_MAP).forEach(([path, fn]) => {
+        // Filtrar rutas superadmin si no aplica, y rutas de office si no aplica
+        if (path.startsWith('/superadmin') && !isSA) return
+        if (!path.startsWith('/superadmin') && isSA) return
+        const needsOffice = ['/personas','/trabajadores','/asociaciones','/documentos','/permisos','/cursos','/pagos'].includes(path)
+        if (needsOffice && !isOff) return
+        fn().catch(() => {})
+      })
+    }, 1500)
+
+    return () => clearTimeout(timer)
+  }, [user])
+
   const isSuperAdmin = isSuperAdminUser(user)
   const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes((user?.rol || '').toUpperCase())
 
@@ -173,13 +193,13 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
   return (
     <main
-      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white ${sidebarCollapsed ? 'lg:grid-cols-[5.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[19.5rem_minmax(0,1fr)]'
+      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white ${sidebarCollapsed ? 'lg:grid-cols-[5rem_minmax(0,1fr)]' : 'lg:grid-cols-[16rem_minmax(0,1fr)]'
         }`}
     >
       <div className="print:hidden">
         <Sidebar
           activeItem={activeItem}
-          onSelect={setActiveItem}
+          onSelect={() => {}}
           mobileOpen={mobileOpen}
           onClose={() => setMobileOpen(false)}
           onLogout={onLogout}
@@ -209,7 +229,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
           />
         </div>
 
-        <div className="app-content mx-auto w-full max-w-[96rem] flex-1 space-y-4 p-3.5 sm:p-5 lg:p-6 print:block print:p-0 print:space-y-0 print:m-0 print:max-w-none">
+        <div className="app-content mx-auto w-full max-w-[96rem] flex-1 space-y-4 px-3.5 sm:px-5 lg:px-6 pt-1.5 pb-6 print:block print:p-0 print:space-y-0 print:m-0 print:max-w-none">
           <Suspense fallback={<ModuleFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />

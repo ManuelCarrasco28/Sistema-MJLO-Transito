@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '../ui/Icon'
+import { PlacaBadge } from '../ui/PlacaBadge'
 import { apiFetch, getCachedData, setCachedData } from '../../config/api'
 
 export function ChartsSection({ data, loading = false, user }) {
@@ -549,7 +550,7 @@ export function ChartsSection({ data, loading = false, user }) {
                         </div>
                       </td>
                       <td className="py-3.5 px-3">
-                        <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-black bg-[#F4F7FE] dark:bg-white/5 text-[#2B3674] dark:text-white border border-[#E9EDF7]">{mov.placa}</span>
+                        <PlacaBadge placa={mov.placa} size="sm" />
                       </td>
                       <td className="py-3.5 px-3">
                         <div className="font-bold text-[#2B3674] dark:text-white">{mov.origen === 'PAPELETA' ? 'Papeleta' : 'Trámite'} {mov.codigo}</div>

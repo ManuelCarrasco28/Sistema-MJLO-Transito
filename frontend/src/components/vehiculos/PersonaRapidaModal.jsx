@@ -3,6 +3,7 @@ import { Icon } from '../ui/Icon'
 import { FloatingInput } from '../ui/FormInputs'
 import { apiFetch, leerMensajeError } from '../../config/api'
 import { showError, showToast } from '../../utils/SwalUtil'
+import { toTitleCase } from '../../utils/formatters'
 
 export function PersonaRapidaModal({
   isOpen,
@@ -87,11 +88,11 @@ export function PersonaRapidaModal({
       if (data) {
         setFormData((prev) => ({
           ...prev,
-          nombres: data.nombres || prev.nombres,
-          apellidoPaterno: data.apellidoPaterno || prev.apellidoPaterno,
-          apellidoMaterno: data.apellidoMaterno || prev.apellidoMaterno,
-          direccion: data.direccion || prev.direccion,
-          estadoCivil: data.estadoCivil || prev.estadoCivil,
+          nombres: (data.nombres || '').toUpperCase() || prev.nombres,
+          apellidoPaterno: (data.apellidoPaterno || '').toUpperCase() || prev.apellidoPaterno,
+          apellidoMaterno: (data.apellidoMaterno || '').toUpperCase() || prev.apellidoMaterno,
+          direccion: toTitleCase(data.direccion) || prev.direccion,
+          estadoCivil: (data.estadoCivil || '').toUpperCase() || prev.estadoCivil,
         }))
         showToast('Datos de identidad cargados correctamente.')
       }

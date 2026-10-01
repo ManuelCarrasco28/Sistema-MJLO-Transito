@@ -113,7 +113,7 @@ export function exportPersonasExcel({ listToExport, filterEstado }) {
 
 // Genera y descarga el padrón de personas como PDF real (dompdf, generado
 // en el servidor), reutilizando el mismo endpoint genérico de exportToPdf.
-export function exportPersonasPdf({ listToExport, totalPersonas, conductores, propietarios, activos }) {
+export async function exportPersonasPdf({ listToExport, totalPersonas, conductores, propietarios, activos }) {
   const columns = [
     { header: 'Tipo Doc.', key: 'docTipo', align: 'center', width: 60 },
     { header: 'N° Documento', key: 'numeroDocumento', align: 'center', width: 90 },
@@ -142,7 +142,7 @@ export function exportPersonasPdf({ listToExport, totalPersonas, conductores, pr
     }
   })
 
-  exportToPdf({
+  return await exportToPdf({
     filename: `Padron_Personas_MJLO_${new Date().toISOString().slice(0, 10)}`,
     subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Conductores y Propietarios',
     summaryItems: [

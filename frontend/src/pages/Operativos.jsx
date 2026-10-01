@@ -5,10 +5,12 @@ import { SortableHeader } from '../components/ui/SortableHeader'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { formatNumeroTarjeta } from '../utils/formatters'
 
 const getPeruDateInputValue = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -52,6 +54,16 @@ export function Operativos({ user }) {
   const [personal, setPersonal] = useState([])
   const [loading, setLoading] = useState(!cached)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 160)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const [estado, setEstado] = useState('TODOS')
   const [fechaFiltro, setFechaFiltro] = useState('TODAS')
   const [page, setPage] = useState(1)
@@ -71,6 +83,8 @@ export function Operativos({ user }) {
   const [loadError, setLoadError] = useState('')
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const loadOperativos = async () => {
     setLoading(true)
@@ -78,7 +92,7 @@ export function Operativos({ user }) {
       page: String(page),
       porPagina: String(itemsPerPage),
     })
-    if (search) params.set('buscar', search)
+    if (debouncedSearch) params.set('buscar', debouncedSearch)
     if (estado !== 'TODOS') params.set('estado', estado)
     if (fechaFiltro !== 'TODAS') params.set('fechaFiltro', fechaFiltro)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
@@ -96,7 +110,7 @@ export function Operativos({ user }) {
     loadOperativos()
       .catch(() => setLoadError('No se pudo cargar el módulo de operativos.'))
       .finally(() => setLoading(false))
-  }, [page, itemsPerPage, search, estado, fechaFiltro, sortBy, sortDir])
+  }, [page, itemsPerPage, debouncedSearch, estado, fechaFiltro, sortBy, sortDir])
 
   useEffect(() => {
     apiFetch('/personal?porPagina=100')
@@ -108,7 +122,7 @@ export function Operativos({ user }) {
       })
   }, [])
 
-  useEffect(() => setPage(1), [search, estado, fechaFiltro])
+  useEffect(() => setPage(1), [estado, fechaFiltro])
 
   const [stats, setStats] = useState({ total: 0, activos: 0, finalizados: 0, papeletas: 0 })
 
@@ -139,55 +153,66 @@ export function Operativos({ user }) {
   }
 
   const handleExportExcel = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToExcel({
-      filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Operativos',
-      title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
-      metadata: [
-        { label: 'Estado', value: estado },
-        { label: 'Total Operativos', value: String(data.length) }
-      ],
-      columns: [
-        { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, isText: true, width: 120, align: 'center' },
-        { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 220 },
-        { header: 'LUGAR / ZONA', key: 'lugar', width: 200 },
-        { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
-        { header: 'HORA INICIO', key: 'hora_inicio', width: 100, align: 'center' },
-        { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 100, align: 'center' },
-        { header: 'INSPECTORES', render: (_, o) => String(o.inspectores_total || o.inspectores?.length || 0), width: 110, align: 'center' },
-        { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 100, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' },
-        { header: 'OBSERVACIONES', render: (_, o) => o.observacion || '—', width: 240 }
-      ],
-      data
-    })
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const data = await fetchTodoElFiltro()
+          exportToExcel({
+            filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Operativos',
+            title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
+            metadata: [
+              { label: 'Estado', value: estado },
+              { label: 'Total Operativos', value: String(data.length) }
+            ],
+            columns: [
+              { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, isText: true, width: 120, align: 'center' },
+              { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 220 },
+              { header: 'LUGAR / ZONA', key: 'lugar', width: 200 },
+              { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
+              { header: 'HORA INICIO', key: 'hora_inicio', width: 100, align: 'center' },
+              { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 100, align: 'center' },
+              { header: 'INSPECTORES', render: (_, o) => String(o.inspectores_total || o.inspectores?.length || 0), width: 110, align: 'center' },
+              { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 100, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 120, align: 'center' },
+              { header: 'OBSERVACIONES', render: (_, o) => o.observacion || '—', width: 240 }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
   const handleExportPdf = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToPdf({
-      filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.pdf`,
-      title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
-      metadata: [
-        { label: 'Estado', value: estado },
-        { label: 'Total Operativos', value: String(data.length) }
-      ],
-      columns: [
-        { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, width: 25, align: 'center' },
-        { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 40 },
-        { header: 'LUGAR / ZONA', key: 'lugar', width: 40 },
-        { header: 'FECHA', key: 'fecha', width: 20, align: 'center' },
-        { header: 'HORA INICIO', key: 'hora_inicio', width: 20, align: 'center' },
-        { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 20, align: 'center' },
-        { header: 'INSPECTORES', render: (_, o) => String(o.inspectores_total || o.inspectores?.length || 0), width: 25, align: 'center' },
-        { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 20, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 25, align: 'center' }
-      ],
-      data
-    })
+    setIsExportingPdf(true)
+    try {
+      const data = await fetchTodoElFiltro()
+          await exportToPdf({
+            filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.pdf`,
+            title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
+            metadata: [
+              { label: 'Estado', value: estado },
+              { label: 'Total Operativos', value: String(data.length) }
+            ],
+            columns: [
+              { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, width: 25, align: 'center' },
+              { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 40 },
+              { header: 'LUGAR / ZONA', key: 'lugar', width: 40 },
+              { header: 'FECHA', key: 'fecha', width: 20, align: 'center' },
+              { header: 'HORA INICIO', key: 'hora_inicio', width: 20, align: 'center' },
+              { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 20, align: 'center' },
+              { header: 'INSPECTORES', render: (_, o) => String(o.inspectores_total || o.inspectores?.length || 0), width: 25, align: 'center' },
+              { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 20, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 25, align: 'center' }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
 
   const activos = stats.activos ?? 0
@@ -256,6 +281,7 @@ export function Operativos({ user }) {
       if (!response.ok) throw new Error(result.message || result.messages?.error || 'No se pudo guardar el operativo.')
       await loadOperativos()
       loadStats()
+      showToast(editing ? 'Operativo actualizado correctamente' : 'Operativo registrado correctamente', editing ? 'editar' : 'crear')
       setModalOpen(false)
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'No se pudo guardar el operativo.'))
@@ -525,7 +551,7 @@ export function Operativos({ user }) {
               </span>
             </div>
             <div className="mt-1">
-              <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{loading ? '—' : value}</p>
+              <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{loading ? '—' : formatNumeroTarjeta(value)}</p>
             </div>
           </div>
         ))}
@@ -534,36 +560,67 @@ export function Operativos({ user }) {
       <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
           <div className="relative w-full sm:max-w-xs">
-            <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, lugar o fecha..." className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs font-semibold outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" />
+            <Icon
+              name={loading ? "refresh" : "search"}
+              className={`absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors ${loading ? 'animate-spin text-purple-500' : 'text-slate-400'}`}
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nombre, lugar o fecha..."
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-xs font-semibold outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('')
+                  setPage(1)
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <RoundedSelect
               value={estado}
-              onChange={setEstado}
+              onChange={(val) => {
+                setEstado(val)
+                setPage(1)
+              }}
               options={FILTER_ESTADO_OPTIONS}
             />
             <RoundedSelect
               value={fechaFiltro}
-              onChange={setFechaFiltro}
+              onChange={(val) => {
+                setFechaFiltro(val)
+                setPage(1)
+              }}
               options={FILTER_FECHA_OPTIONS}
             />
             {(search || estado !== 'TODOS' || fechaFiltro !== 'TODAS') && (
               <button
                 type="button"
-                onClick={() => { setSearch(''); setEstado('TODOS'); setFechaFiltro('TODAS') }}
+                onClick={() => {
+                  setSearch('')
+                  setEstado('TODOS')
+                  setFechaFiltro('TODAS')
+                  setPage(1)
+                }}
                 className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors"
               >
                 Limpiar
               </button>
             )}
             
-            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition-colors">
-              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" /><span>Excel</span>
+            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition-colors" disabled={isExportingExcel}>
+              <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} /><span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
             
-            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors">
-              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" /><span>PDF</span>
+            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors" disabled={isExportingPdf}>
+              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} /><span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
             
             <button onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
@@ -573,7 +630,7 @@ export function Operativos({ user }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[26%]" />
               <col className="w-[20%]" />
@@ -596,11 +653,11 @@ export function Operativos({ user }) {
               {visible.map((op) => (
                 <tr key={op.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-[var(--bg-subtle)]">
                   <td className="px-4 py-3">
-                    <p className="font-bold text-slate-900 dark:text-white">{op.nombre}</p>
+                    <p className="font-bold text-xs text-slate-900 dark:text-white">{op.nombre}</p>
                     <p className="mt-0.5 text-[11px] text-slate-500">{op.lugar}</p>
                   </td>
                   <td className="px-4 py-3 ">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">{formatFecha(op.fecha)}</p>
+                    <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{formatFecha(op.fecha)}</p>
                     <p className="mt-0.5 text-[11px] text-slate-500">{formatHora(op.hora_inicio)}{op.hora_fin ? ` - ${formatHora(op.hora_fin)}` : ''}</p>
                   </td>
                   <td className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">{op.total_inspectores || 0}</td>
@@ -807,9 +864,7 @@ export function Operativos({ user }) {
                           <p className="text-[11px] text-slate-500 font-mono">DNI: {p.conductor_dni || 'S/D'}</p>
                         </td>
                         <td className="px-4 py-2.5 text-center">
-                          <span className="inline-block rounded-lg border border-slate-300 bg-amber-50 px-2 py-0.5 font-mono text-[11px] font-black tracking-widest text-slate-900 shadow-xs dark:border-[var(--border-strong)] dark:bg-amber-400/10 dark:text-amber-300">
-                            {p.placa || 'SIN PLACA'}
-                          </span>
+                          <PlacaBadge placa={p.placa} />
                         </td>
                         <td className="px-4 py-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
                           {p.infracciones || '—'}

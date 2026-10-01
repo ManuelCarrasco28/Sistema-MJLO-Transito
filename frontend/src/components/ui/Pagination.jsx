@@ -15,13 +15,13 @@ function PaginationRowsSelect({ value, onChange }) {
   }, [])
 
   return (
-    <div ref={containerRef} className="relative inline-block">
+    <div ref={containerRef} className="relative inline-block select-none">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/70 py-1 px-2.5 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-[var(--border-strong)] dark:bg-slate-800/70 dark:text-slate-200 cursor-pointer"
+        className="inline-flex select-none items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/70 py-1 px-2.5 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 dark:border-[var(--border-strong)] dark:bg-slate-800/70 dark:text-slate-200 cursor-pointer"
       >
-        <span>{value}</span>
+        <span className="select-none">{value}</span>
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -37,8 +37,8 @@ function PaginationRowsSelect({ value, onChange }) {
       </button>
 
       {isOpen && (
-        <div className="absolute bottom-full mb-1.5 left-0 z-50 min-w-[70px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
-          <div className="space-y-0.5">
+        <div className="absolute bottom-full mb-1.5 left-0 z-50 min-w-[70px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100 select-none">
+          <div className="space-y-0.5 select-none">
             {[5, 10, 20, 50].map((num) => {
               const isSelected = num === value
               return (
@@ -49,13 +49,13 @@ function PaginationRowsSelect({ value, onChange }) {
                     onChange(num)
                     setIsOpen(false)
                   }}
-                  className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`flex w-full select-none items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold'
                       : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
                   }`}
                 >
-                  <span>{num}</span>
+                  <span className="select-none">{num}</span>
                   {isSelected && (
                     <svg
                       aria-hidden="true"
@@ -108,10 +108,10 @@ export function Pagination({
   const hasNextBlock = endPage < totalPages
 
   return (
-    <div className="relative flex flex-col sm:flex-row items-center justify-center min-h-[52px] gap-3 border-t border-slate-100 bg-white px-4 py-2.5 text-xs text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400">
+    <div className="relative flex flex-col sm:flex-row items-center justify-center min-h-[52px] gap-3 border-t border-slate-100 bg-white px-4 py-2.5 text-xs text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 select-none">
       {onItemsPerPageChange && (
-        <div className="flex items-center gap-1.5 sm:absolute sm:left-4">
-          <span className="text-[11px] text-slate-500 dark:text-slate-400">Por página:</span>
+        <div className="flex items-center gap-1.5 sm:absolute sm:left-4 select-none">
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 select-none">Por página:</span>
           <PaginationRowsSelect
             value={itemsPerPage}
             onChange={(val) => {
@@ -122,21 +122,21 @@ export function Pagination({
         </div>
       )}
 
-      <nav aria-label="Paginación de registros" className="flex max-w-full flex-wrap items-center justify-center gap-1">
+      <nav aria-label="Paginación de registros" className="flex max-w-full flex-wrap items-center justify-center gap-1 select-none">
         <button
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1 || disabled}
-          className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
+          className="inline-flex h-8 select-none items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
           title="Página Anterior"
           aria-label="Página anterior"
         >
-          <span className="text-sm leading-none font-black">&lsaquo;</span>
-          <span className="hidden sm:inline">Anterior</span>
+          <span className="text-sm leading-none font-black select-none">&lsaquo;</span>
+          <span className="hidden sm:inline select-none">Anterior</span>
         </button>
 
-        <span className="px-2 font-semibold sm:hidden">{currentPage} / {totalPages}</span>
-        <div className="hidden items-center gap-1 sm:flex">
+        <span className="px-2 font-semibold select-none sm:hidden">{currentPage} / {totalPages}</span>
+        <div className="hidden items-center gap-1 sm:flex select-none">
           {hasPrevBlock && (
             <button
               type="button"
@@ -144,7 +144,7 @@ export function Pagination({
               title={`Páginas ${Math.max(1, startPage - BLOCK_SIZE)} - ${startPage - 1}`}
               onClick={() => onPageChange(Math.max(1, startPage - BLOCK_SIZE))}
               disabled={disabled}
-              className="flex size-8 items-center justify-center rounded-lg text-xs font-black tracking-widest text-slate-400 hover:border hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-slate-200 transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-40"
+              className="flex size-8 select-none items-center justify-center rounded-lg text-xs font-black tracking-widest text-slate-400 hover:border hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-slate-200 transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-40"
             >
               ...
             </button>
@@ -158,7 +158,7 @@ export function Pagination({
               aria-current={p === currentPage ? 'page' : undefined}
               onClick={() => onPageChange(p)}
               disabled={disabled}
-              className={`flex size-8 items-center justify-center rounded-lg text-xs font-extrabold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-60 ${
+              className={`flex size-8 select-none items-center justify-center rounded-lg text-xs font-extrabold transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-60 ${
                 p === currentPage
                   ? 'bg-[#0b3458] text-white shadow-xs dark:bg-cyan-600'
                   : 'border border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-[var(--bg-subtle)]'
@@ -175,7 +175,7 @@ export function Pagination({
               title={`Páginas ${endPage + 1} - ${Math.min(endPage + BLOCK_SIZE, totalPages)}`}
               onClick={() => onPageChange(endPage + 1)}
               disabled={disabled}
-              className="flex size-8 items-center justify-center rounded-lg text-xs font-black tracking-widest text-slate-400 hover:border hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-slate-200 transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-40"
+              className="flex size-8 select-none items-center justify-center rounded-lg text-xs font-black tracking-widest text-slate-400 hover:border hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-slate-200 transition-all cursor-pointer disabled:pointer-events-none disabled:opacity-40"
             >
               ...
             </button>
@@ -186,12 +186,12 @@ export function Pagination({
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages || disabled}
-          className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
+          className="inline-flex h-8 select-none items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
           title="Página Siguiente"
           aria-label="Página siguiente"
         >
-          <span className="hidden sm:inline">Siguiente</span>
-          <span className="text-sm leading-none font-black">&rsaquo;</span>
+          <span className="hidden sm:inline select-none">Siguiente</span>
+          <span className="text-sm leading-none font-black select-none">&rsaquo;</span>
         </button>
       </nav>
     </div>

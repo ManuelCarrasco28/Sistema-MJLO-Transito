@@ -18,5 +18,34 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      chunkSizeWarningLimit: 800, // kB — TinyMCE y Leaflet son grandes por diseño
+      rollupOptions: {
+        output: {
+          // Separa librerías pesadas en chunks independientes para mejor caché:
+          // - El navegador solo re-descarga el chunk que cambió en cada deploy.
+          // - Al navegar entre módulos, estos chunks ya están en caché.
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+                return 'vendor-react'
+              }
+              if (id.includes('sweetalert2') || id.includes('dompurify')) {
+                return 'vendor-ui'
+              }
+              if (id.includes('qrcode.react')) {
+                return 'vendor-qr'
+              }
+              if (id.includes('leaflet') || id.includes('react-leaflet')) {
+                return 'vendor-map'
+              }
+              if (id.includes('@tinymce')) {
+                return 'vendor-tinymce'
+              }
+            }
+          },
+        },
+      },
+    },
   }
 })

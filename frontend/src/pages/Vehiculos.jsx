@@ -6,10 +6,12 @@ import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { formatNumeroTarjeta, toTitleCase } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { VehiculoFormModal } from '../components/vehiculos/VehiculoFormModal'
 import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleModal'
@@ -45,16 +47,16 @@ export function Vehiculos({ user }) {
   const rolNormalizado = (user?.rol || '').toUpperCase()
   const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNormalizado)
 
-  const cachedVeh = getCachedData('/vehiculos')
   const cachedOrg = getCachedData('/asociaciones')
-  const cachedPersonas = getCachedData('/personas')
-  const [vehiculos, setVehiculos] = useState(cachedVeh || [])
+  const [vehiculos, setVehiculos] = useState([])
+  const [personas, setPersonas] = useState([])
   const [asociaciones, setAsociaciones] = useState(cachedOrg || [])
-  const [personas, setPersonas] = useState(cachedPersonas || [])
-  const [isLoading, setIsLoading] = useState(!cachedVeh)
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [propietarioSearch, setPropietarioSearch] = useState('')
   const [showPropietarioResults, setShowPropietarioResults] = useState(false)
+  const [propietarioResults, setPropietarioResults] = useState([])
   const [asociacionSearch, setAsociacionSearch] = useState('')
   const [showAsociacionResults, setShowAsociacionResults] = useState(false)
   const [filterTipo, setFilterTipo] = useState('TODOS')
@@ -62,7 +64,34 @@ export function Vehiculos({ user }) {
   const [filterActivo, setFilterActivo] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [totalFiltrado, setTotalFiltrado] = useState(0)
+  const [stats, setStats] = useState({ total: 0, formales: 0, informales: 0, suspendidos: 0 })
   const [loadError, setLoadError] = useState('')
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setCurrentPage(1)
+    }, 160)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Búsqueda dinámica de propietarios bajo demanda (evita descargar 30,000 personas en memoria)
+  useEffect(() => {
+    const rawQuery = (propietarioSearch || '').trim()
+    if (!rawQuery || rawQuery.includes('—') || rawQuery.length < 2) {
+      return
+    }
+    const timer = setTimeout(() => {
+      apiFetch(`/personas?buscar=${encodeURIComponent(rawQuery)}&porPagina=10`)
+        .then((r) => r.ok ? r.json() : { data: [] })
+        .then((payload) => setPropietarioResults(payload.data || []))
+        .catch(() => {})
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [propietarioSearch])
 
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -181,11 +210,11 @@ export function Vehiculos({ user }) {
         setPersonaFormData((prev) => ({
           ...prev,
           numeroDocumento: dni,
-          nombres: data.nombres || prev.nombres,
-          apellidoPaterno: data.apellidoPaterno || data.apellido_paterno || prev.apellidoPaterno,
-          apellidoMaterno: data.apellidoMaterno || data.apellido_materno || prev.apellidoMaterno,
-          direccion: data.direccion || prev.direccion,
-          estadoCivil: data.estadoCivil || data.estado_civil || prev.estadoCivil,
+          nombres: (data.nombres || '').toUpperCase() || prev.nombres,
+          apellidoPaterno: (data.apellidoPaterno || data.apellido_paterno || '').toUpperCase() || prev.apellidoPaterno,
+          apellidoMaterno: (data.apellidoMaterno || data.apellido_materno || '').toUpperCase() || prev.apellidoMaterno,
+          direccion: toTitleCase(data.direccion) || prev.direccion,
+          estadoCivil: (data.estadoCivil || data.estado_civil || '').toUpperCase() || prev.estadoCivil,
           fotoImg: data.foto_url || data.foto || prev.fotoImg,
           fotoUrl: data.foto_url || data.foto || prev.fotoUrl,
         }))
@@ -295,25 +324,8 @@ export function Vehiculos({ user }) {
         apellidoMaterno: (newPersona.apellidoMaterno || newPersona.apellido_materno || personaFormData.apellidoMaterno || '').trim(),
       }
 
-      const nextPersonas = [
-        standardizedPersona,
-        ...personas.filter((p) => String(p.numeroDocumento || p.numero || '').trim() !== standardizedPersona.numeroDocumento)
-      ]
-      setPersonas(nextPersonas)
-      setCachedData('/personas', nextPersonas)
-
-      // Sincronizar en segundo plano con el backend
-      apiFetch('/personas')
-        .then((r) => r.ok ? r.json() : null)
-        .then((payload) => {
-          if (payload?.data && Array.isArray(payload.data)) {
-            setPersonas(payload.data)
-            setCachedData('/personas', payload.data)
-          }
-        })
-        .catch(() => {})
-
       selectPropietario(standardizedPersona)
+      setPropietarioResults((prev) => [standardizedPersona, ...prev.filter((p) => String(p.numeroDocumento || p.numero || '').trim() !== standardizedPersona.numeroDocumento)])
       setTitularDetectado({
         nombre: `${standardizedPersona.nombres} ${standardizedPersona.apellidoPaterno} ${standardizedPersona.apellidoMaterno}`.trim(),
         documento: standardizedPersona.numeroDocumento,
@@ -456,49 +468,68 @@ export function Vehiculos({ user }) {
     soatEstado: 'VIGENTE',
     tucNumero: 'TUC-2026-000',
   })
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
+
+  const loadStats = () => {
+    apiFetch('/vehiculos/estadisticas')
+      .then((res) => res.ok ? res.json() : Promise.reject(res))
+      .then((payload) => {
+        if (payload?.data) setStats(payload.data)
+      })
+      .catch(() => {})
+  }
+
+  const loadVehiculos = async () => {
+    setIsLoading(true)
+    setLoadError('')
+    try {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        porPagina: String(itemsPerPage),
+      })
+      if (debouncedSearchTerm) params.set('buscar', debouncedSearchTerm)
+      if (filterTipo !== 'TODOS') params.set('tipo', filterTipo)
+      if (filterEstado !== 'TODOS') params.set('formalidad', filterEstado)
+      if (filterActivo !== 'TODOS') params.set('estado', filterActivo)
+      if (sortBy) {
+        params.set('sortBy', sortBy)
+        params.set('sortDir', sortDir)
+      }
+
+      const res = await apiFetch(`/vehiculos?${params.toString()}`)
+      if (!res.ok) throw res
+      const payload = await res.json()
+      setVehiculos(payload.data ?? [])
+      setTotalFiltrado(payload.meta?.total ?? payload.data?.length ?? 0)
+    } catch {
+      setLoadError('No se pudo cargar el padrón vehicular.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    setLoadError('')
-    Promise.all([
-      apiFetch('/vehiculos').then((response) => response.ok ? response.json() : Promise.reject(response)),
-      apiFetch('/asociaciones').then((response) => response.ok ? response.json() : Promise.reject(response)),
-      apiFetch('/personas').then((response) => response.ok ? response.json() : Promise.reject(response))
-    ]).then(([vehPayload, orgPayload, personasPayload]) => {
-      const vData = vehPayload.data ?? []
-      const oData = orgPayload.data ?? []
-      const pData = personasPayload.data ?? []
-      setVehiculos(vData)
-      setAsociaciones(oData)
-      setPersonas(pData)
-      setCachedData('/vehiculos', vData)
-      setCachedData('/asociaciones', oData)
-      setCachedData('/personas', pData)
-    }).catch(() => {
-      setLoadError('No se pudo cargar el padrón vehicular.')
-    })
-      .finally(() => setIsLoading(false))
+    loadStats()
+    apiFetch('/asociaciones')
+      .then((res) => res.ok ? res.json() : null)
+      .then((payload) => {
+        if (payload?.data) {
+          setAsociaciones(payload.data)
+          setCachedData('/asociaciones', payload.data)
+        }
+      })
+      .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    loadVehiculos()
+  }, [currentPage, itemsPerPage, debouncedSearchTerm, filterTipo, filterEstado, filterActivo, sortBy, sortDir])
 
   const getPersonaNombre = (persona) => (
     persona.nombreCompleto ||
     `${persona.nombres || ''} ${persona.apellidoPaterno || persona.apellido_paterno || ''} ${persona.apellidoMaterno || persona.apellido_materno || ''}`.trim()
   )
-
-  const propietarioResults = personas
-    .filter((persona) => {
-      const rawQuery = (propietarioSearch || '').trim().toLowerCase()
-      if (!rawQuery) return true
-      const documento = String(persona.numeroDocumento || persona.numero || persona.dni || '').toLowerCase().trim()
-      const nombre = getPersonaNombre(persona).toLowerCase()
-      
-      // Si la búsqueda contiene "73129239 — Jose Manuel" o guión, probar las partes individuales
-      const parts = rawQuery.split(/[—\-]/).map((s) => s.trim()).filter(Boolean)
-      if (parts.length > 1) {
-        return parts.some((p) => documento.includes(p) || nombre.includes(p))
-      }
-      return documento.includes(rawQuery) || nombre.includes(rawQuery)
-    })
-    .slice(0, 12)
 
   const selectPropietario = (persona) => {
     const documento = String(persona.numeroDocumento || persona.numero || persona.dni || '').trim()
@@ -591,14 +622,35 @@ export function Vehiculos({ user }) {
       if (legalOwner) {
         let matched = null
         if (legalOwner.documento) {
-          matched = personas.find(p => (p.numeroDocumento || '').trim() === legalOwner.documento.trim())
+          matched = (personas || []).find(p => (p.numeroDocumento || '').trim() === legalOwner.documento.trim())
+          if (!matched) {
+            try {
+              const resP = await apiFetch(`/personas?buscar=${encodeURIComponent(legalOwner.documento.trim())}&porPagina=5`)
+              if (resP.ok) {
+                const payloadP = await resP.json()
+                matched = (payloadP.data || []).find(p => (p.numeroDocumento || '').trim() === legalOwner.documento.trim()) || null
+              }
+            } catch (_) {}
+          }
         }
         if (!matched && legalOwner.nombre) {
           const cleanOwnerName = legalOwner.nombre.toUpperCase().trim()
-          matched = personas.find(p => {
+          matched = (personas || []).find(p => {
             const fullPName = `${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.toUpperCase().trim()
             return fullPName && (cleanOwnerName.includes(fullPName) || fullPName.includes(cleanOwnerName))
           })
+          if (!matched) {
+            try {
+              const resP = await apiFetch(`/personas?buscar=${encodeURIComponent(legalOwner.nombre.trim())}&porPagina=5`)
+              if (resP.ok) {
+                const payloadP = await resP.json()
+                matched = (payloadP.data || []).find(p => {
+                  const fullPName = `${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.toUpperCase().trim()
+                  return fullPName && (cleanOwnerName.includes(fullPName) || fullPName.includes(cleanOwnerName))
+                }) || null
+              }
+            } catch (_) {}
+          }
         }
 
         if (matched) {
@@ -664,114 +716,97 @@ export function Vehiculos({ user }) {
     (v?.asociacion && v.asociacion !== 'Sin Asociación' && v.asociacion !== 'Independiente' && v.asociacion !== 'Independiente / Particular')
   )
 
-  const totalVehiculos = vehiculos.length
-  const formales = vehiculos.filter((v) => isVehiculoFormal(v)).length
-  const informales = vehiculos.filter((v) => !isVehiculoFormal(v)).length
-  const suspendidos = vehiculos.filter((v) => v.estado === 'SUSPENDIDO' || v.estado === 'BAJA').length
-
+  const totalVehiculos = stats.total ?? 0
+  const formales = stats.formales ?? 0
+  const informales = stats.informales ?? 0
+  const suspendidos = stats.suspendidos ?? 0
   const porcentajeFormales = totalVehiculos > 0 ? Math.round((formales / totalVehiculos) * 100) : 0
 
-  const filteredVehiculos = vehiculos.filter((v) => {
-    const matchesSearch =
-      v.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.marca.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.propietario.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.asociacion && v.asociacion.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (v.propietarioDni && v.propietarioDni.includes(searchTerm))
-
-    const cleanTipo = (t) => String(t || '').replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase()
-    const matchesTipo = filterTipo === 'TODOS' || cleanTipo(v.tipo) === cleanTipo(filterTipo)
-    const formal = isVehiculoFormal(v)
-    const matchesEstado =
-      filterEstado === 'TODOS' ||
-      (filterEstado === 'FORMAL' && formal) ||
-      (filterEstado === 'INFORMAL' && !formal)
-    const matchesActivo = filterActivo === 'TODOS' || v.estado === filterActivo
-
-    return matchesSearch && matchesTipo && matchesEstado && matchesActivo
-  })
-
-  const [sortBy, setSortBy] = useState('')
-  const [sortDir, setSortDir] = useState('DESC')
   const handleSort = (column, dir) => {
     setSortBy(column)
     setSortDir(dir)
     setCurrentPage(1)
   }
-  if (sortBy) {
-    const dirMul = sortDir === 'ASC' ? 1 : -1
-    filteredVehiculos.sort((a, b) => {
-      const valA = String(a[sortBy] ?? '').toLowerCase()
-      const valB = String(b[sortBy] ?? '').toLowerCase()
-      return valA < valB ? -1 * dirMul : valA > valB ? 1 * dirMul : 0
-    })
+
+  const paginatedVehiculos = vehiculos
+  const filteredVehiculos = vehiculos
+
+  const fetchTodoElFiltro = async () => {
+    const params = new URLSearchParams()
+    if (debouncedSearchTerm) params.set('buscar', debouncedSearchTerm)
+    if (filterTipo !== 'TODOS') params.set('tipo', filterTipo)
+    if (filterEstado !== 'TODOS') params.set('formalidad', filterEstado)
+    if (filterActivo !== 'TODOS') params.set('estado', filterActivo)
+    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
+    const res = await apiFetch(`/vehiculos?${params.toString()}`)
+    if (!res.ok) return vehiculos
+    const payload = await res.json()
+    return payload.data || []
   }
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, filterTipo, filterEstado, filterActivo])
-
-  const paginatedVehiculos = filteredVehiculos.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
-
-  const handleExportExcel = () => {
-    exportToExcel({
-      filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Vehículos',
-      title: 'PADRÓN VEHICULAR MUNICIPAL',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
-      metadata: [
-        { label: 'Tipo Vehículo', value: filterTipo },
-        { label: 'Formalidad', value: filterEstado },
-        { label: 'Estado', value: filterActivo }
-      ],
-      columns: [
-        { header: 'PLACA', key: 'placa', isText: true, width: 110, align: 'center' },
-        { header: 'TIPO VEHÍCULO', key: 'tipo', width: 140 },
-        { header: 'MARCA', key: 'marca', width: 120 },
-        { header: 'MODELO', key: 'modelo', width: 120 },
-        { header: 'COLOR', key: 'color', width: 110 },
-        { header: 'AÑO', key: 'anio', width: 80, align: 'center' },
-        { header: 'N° MOTOR', key: 'numeroMotor', isText: true, width: 140 },
-        { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 140 },
-        { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
-        { header: 'PROPIETARIO', key: 'propietario', width: 180 },
-        { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
-      ],
-      data: filteredVehiculos
-    })
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const dataToExport = await fetchTodoElFiltro()
+      exportToExcel({
+            filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Vehículos',
+            title: 'PADRÓN VEHICULAR MUNICIPAL',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
+            metadata: [
+              { label: 'Tipo Vehículo', value: filterTipo },
+              { label: 'Formalidad', value: filterEstado },
+              { label: 'Estado', value: filterActivo }
+            ],
+            columns: [
+              { header: 'PLACA', key: 'placa', isText: true, width: 110, align: 'center' },
+              { header: 'TIPO VEHÍCULO', key: 'tipo', width: 140 },
+              { header: 'MARCA', key: 'marca', width: 120 },
+              { header: 'MODELO', key: 'modelo', width: 120 },
+              { header: 'COLOR', key: 'color', width: 110 },
+              { header: 'AÑO', key: 'anio', width: 80, align: 'center' },
+              { header: 'N° MOTOR', key: 'numeroMotor', isText: true, width: 140 },
+              { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 140 },
+              { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
+              { header: 'PROPIETARIO', key: 'propietario', width: 180 },
+              { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+            ],
+            data: dataToExport
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
-  const handleExportPdf = () => {
-    exportToPdf({
-      filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}`,
-      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial Vehicular',
-      summaryItems: [
-        { label: 'Total en padrón', value: totalVehiculos },
-        { label: 'Exportando', value: `${filteredVehiculos.length} vehículos` },
-        { label: 'Formales', value: formales },
-        { label: 'Informales', value: informales },
-        { label: 'Inhabilitados', value: suspendidos },
-      ],
-      columns: [
-        { header: 'PLACA', key: 'placa', width: 80, align: 'center' },
-        { header: 'TIPO', key: 'tipo', width: 130 },
-        { header: 'MARCA', key: 'marca', width: 90 },
-        { header: 'MODELO', key: 'modelo', width: 90 },
-        { header: 'COLOR', key: 'color', width: 80 },
-        { header: 'AÑO', key: 'anio', width: 45, align: 'center' },
-        { header: 'N° SERIE', key: 'numeroSerie', width: 120 },
-        { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'SIN ASOC.', width: 180 },
-        { header: 'PROPIETARIO', key: 'propietario', width: 150 },
-        { header: 'DNI/RUC', key: 'propietarioDni', width: 90, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
-      ],
-      data: filteredVehiculos
-    })
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true)
+    try {
+      const dataToExport = await fetchTodoElFiltro()
+      await exportToPdf({
+            filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}`,
+            subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial Vehicular',
+            summaryItems: [
+              { label: 'Total en padrón', value: totalVehiculos },
+              { label: 'Exportando', value: `${dataToExport.length} vehículos` },
+              { label: 'Formales', value: formales },
+              { label: 'Informales', value: informales },
+              { label: 'Inhabilitados', value: suspendidos },
+            ],
+            columns: [
+              { header: 'Placa', key: 'placa' },
+              { header: 'Tipo', key: 'tipo' },
+              { header: 'Marca/Modelo', render: (_, r) => `${r.marca} ${r.modelo}` },
+              { header: 'Asociación', render: (_, r) => r.asociacion || 'Particular' },
+              { header: 'Propietario', key: 'propietario' },
+              { header: 'Estado', key: 'estado' },
+            ],
+            data: dataToExport
+          })
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
 
   const getVehiculoDocumento = (vehiculo, tipoDocumento) => (
@@ -869,7 +904,7 @@ export function Vehiculos({ user }) {
     setShowPropietarioResults(false)
     setAsociacionSearch(isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '')
     setShowAsociacionResults(false)
-    const matchedOwner = vehiculo.propietarioDni ? personas.find(p => p.numeroDocumento === vehiculo.propietarioDni) : null
+    const matchedOwner = vehiculo.propietarioDni ? (personas || []).find(p => p.numeroDocumento === vehiculo.propietarioDni) : null
     setTitularDetectado(vehiculo.propietario ? {
       nombre: vehiculo.propietario,
       documento: vehiculo.propietarioDni || '',
@@ -886,9 +921,16 @@ export function Vehiculos({ user }) {
     setIsModalOpen(true)
   }
 
-  const handleOpenDetail = (vehiculo) => {
+  const handleOpenDetail = async (vehiculo) => {
     setSelectedVehiculo(vehiculo)
     setIsDetailModalOpen(true)
+    try {
+      const res = await apiFetch(`/vehiculos/${vehiculo.id}`)
+      if (res.ok) {
+        const full = await res.json()
+        if (full?.data) setSelectedVehiculo(full.data)
+      }
+    } catch {}
   }
 
   const handleDelete = async (id) => {
@@ -936,7 +978,9 @@ export function Vehiculos({ user }) {
         })
         const resData = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(resData.messages?.error || resData.message || 'No se pudo actualizar el vehículo.')
-        setVehiculos(vehiculos.map((v) => (v.id === selectedVehiculo.id ? { ...v, ...formData, id: v.id } : v)))
+        loadVehiculos()
+        loadStats()
+        showToast('Vehículo actualizado correctamente', 'editar')
       } else {
         const res = await apiFetch('/vehiculos', {
           method: 'POST',
@@ -944,9 +988,10 @@ export function Vehiculos({ user }) {
         })
         const resData = await res.json().catch(() => ({}))
         if (!res.ok || !resData.data?.id) throw new Error(resData.messages?.error || resData.message || 'No se pudo registrar el vehículo.')
-        const newVehiculo = resData.data
-        setVehiculos([newVehiculo, ...vehiculos])
         setCurrentPage(1)
+        loadVehiculos()
+        loadStats()
+        showToast('Vehículo registrado correctamente', 'crear')
       }
       setIsModalOpen(false)
     } catch (err) {
@@ -1010,11 +1055,9 @@ export function Vehiculos({ user }) {
                 <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 dark:bg-[var(--bg-subtle)]">
                   <Icon name="motoTaxi" className="size-8 text-slate-600 dark:text-slate-300" />
                 </div>
-                <div>
-                  <h2 className="text-3xl font-black tracking-widest text-slate-900 dark:text-white">
-                    {consultaResult.placa}
-                  </h2>
-                  <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                <div className="space-y-1.5">
+                  <PlacaBadge placa={consultaResult.placa} size="lg" />
+                  <span className="text-sm font-bold text-slate-500 uppercase tracking-wider block">
                     {consultaResult.marca} {consultaResult.modelo}
                   </span>
                 </div>
@@ -1118,7 +1161,7 @@ export function Vehiculos({ user }) {
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(totalVehiculos)}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(totalVehiculos)}</p>
             <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">Padrón 2026</span>
           </div>
         </div>
@@ -1130,7 +1173,7 @@ export function Vehiculos({ user }) {
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(formales)}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(formales)}</p>
             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">{porcentajeFormales}% En Asoc.</span>
           </div>
         </div>
@@ -1142,7 +1185,7 @@ export function Vehiculos({ user }) {
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs"><Icon name="alert" className="size-3.5" /></span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(informales)}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(informales)}</p>
             <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">Sin Asoc.</span>
           </div>
         </div>
@@ -1154,7 +1197,7 @@ export function Vehiculos({ user }) {
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">✕</span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{new Intl.NumberFormat('es-PE').format(suspendidos)}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(suspendidos)}</p>
             <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-1.5 py-0.5 rounded-md">Susp. o Baja</span>
           </div>
         </div>
@@ -1164,7 +1207,10 @@ export function Vehiculos({ user }) {
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
 
           <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+            <Icon
+              name={isLoading ? "refresh" : "search"}
+              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-blue-500' : 'text-slate-400'}`}
+            />
             <input
               type="text"
               placeholder="Buscar por placa, marca, modelo, DNI o propietario..."
@@ -1175,8 +1221,11 @@ export function Vehiculos({ user }) {
             {searchTerm && (
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                onClick={() => {
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 ✕
               </button>
@@ -1187,7 +1236,10 @@ export function Vehiculos({ user }) {
           <div className="flex flex-wrap items-center gap-2.5">
             <RoundedSelect
               value={filterEstado}
-              onChange={setFilterEstado}
+              onChange={(val) => {
+                setFilterEstado(val)
+                setCurrentPage(1)
+              }}
               options={[
                 { value: 'TODOS', label: 'Todos (Form. / Inf.)' },
                 { value: 'FORMAL', label: 'Formales' },
@@ -1197,7 +1249,10 @@ export function Vehiculos({ user }) {
 
             <RoundedSelect
               value={filterTipo}
-              onChange={setFilterTipo}
+              onChange={(val) => {
+                setFilterTipo(val)
+                setCurrentPage(1)
+              }}
               options={[
                 { value: 'TODOS', label: 'Todos los tipos' },
                 { value: 'Mototaxi', label: 'Mototaxi' },
@@ -1209,7 +1264,10 @@ export function Vehiculos({ user }) {
 
             <RoundedSelect
               value={filterActivo}
-              onChange={setFilterActivo}
+              onChange={(val) => {
+                setFilterActivo(val)
+                setCurrentPage(1)
+              }}
               options={[
                 { value: 'TODOS', label: 'Todos los estados' },
                 { value: 'ACTIVO', label: 'Activos' },
@@ -1225,6 +1283,7 @@ export function Vehiculos({ user }) {
                   setFilterActivo('TODOS')
                   setFilterEstado('TODOS')
                   setSearchTerm('')
+                  setCurrentPage(1)
                 }}
                 title="Limpiar filtros"
                 className="grid size-8.5 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
@@ -1240,9 +1299,9 @@ export function Vehiculos({ user }) {
                   onClick={handleExportExcel}
                   title="Descargar padrón en Excel (.xls)"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
-                >
-                  <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Excel</span>
+                 disabled={isExportingExcel}>
+                  <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
+                  <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
                 </button>
 
                 <button
@@ -1250,9 +1309,9 @@ export function Vehiculos({ user }) {
                   onClick={handleExportPdf}
                   title="Descargar o imprimir padrón en PDF"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
-                >
-                  <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
-                  <span>PDF</span>
+                 disabled={isExportingPdf}>
+                  <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
+                  <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
                 </button>
 
                 <button
@@ -1274,7 +1333,7 @@ export function Vehiculos({ user }) {
 
 
         <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Listado de vehículos" tabIndex={0}>
-          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[10%]" />
               <col className="w-[20%]" />
@@ -1291,11 +1350,11 @@ export function Vehiculos({ user }) {
                 <th className="px-3.5 py-2.5 ">Asociación / Empresa</th>
                 <th className="px-3.5 py-2.5 ">Vehículo & Modelo</th>
                 <th className="px-3.5 py-2.5 ">Serie Chasis / Motor</th>
-                <th className="px-3.5 py-2.5 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] px-3 py-3.5 text-center shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">Acciones</th>
+                <th className="px-4 py-2.5 min-w-[130px] text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3.5 text-center min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+            <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity duration-150 ${isLoading && vehiculos.length > 0 ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
               {isLoading && vehiculos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -1309,11 +1368,11 @@ export function Vehiculos({ user }) {
                     <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3.5 py-2.5"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-2.5 text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3 py-4 shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-4 py-2.5 min-w-[130px] text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-4 min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
-              ) : filteredVehiculos.length === 0 ? (
+              ) : vehiculos.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-12 text-center">
                     <Icon name="vehicle" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
@@ -1328,9 +1387,7 @@ export function Vehiculos({ user }) {
                   >
 
                     <td className="px-3.5 py-2.5 ">
-                      <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-3 py-1 font-mono text-xs font-black tracking-widest text-slate-950 shadow-xs dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
-                        {v.placa}
-                      </span>
+                      <PlacaBadge placa={v.placa} />
                     </td>
 
 
@@ -1393,12 +1450,14 @@ export function Vehiculos({ user }) {
                     </td>
 
 
-                    <td className="px-3.5 py-2.5 text-center">
-                      <StatusBadge status={v.estado || 'ACTIVO'} />
+                    <td className="px-4 py-2.5 min-w-[130px] text-center">
+                      <div className="flex items-center justify-center">
+                        <StatusBadge status={v.estado || 'ACTIVO'} />
+                      </div>
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3 py-3.5 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3.5 min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
@@ -1439,7 +1498,7 @@ export function Vehiculos({ user }) {
 
         <Pagination
           currentPage={currentPage}
-          totalItems={filteredVehiculos.length}
+          totalItems={totalFiltrado}
           itemsPerPage={itemsPerPage}
           onPageChange={(page) => setCurrentPage(Number(page))}
           onItemsPerPageChange={(size) => {

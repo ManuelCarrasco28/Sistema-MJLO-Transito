@@ -6,6 +6,7 @@ import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { formatNumeroTarjeta } from '../utils/formatters'
 import { FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 
 const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
@@ -167,14 +168,18 @@ export function Trabajadores() {
   const [search, setSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(8)
+  const [pageSize, setPageSize] = useState(5)
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [catalogos, setCatalogos] = useState({ cargos: [], unidades: [] })
-  const [personas, setPersonas] = useState([])
+  const [personasResultados, setPersonasResultados] = useState([])
+  const [isSearchingPersona, setIsSearchingPersona] = useState(false)
+  const [selectedPersonaObj, setSelectedPersonaObj] = useState(null)
   const [personaSearch, setPersonaSearch] = useState('')
   const [personaDropdownOpen, setPersonaDropdownOpen] = useState(false)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -192,15 +197,24 @@ export function Trabajadores() {
     return () => { active = false }
   }, [])
 
+  // Búsqueda dinámica y debounced de personas (evita descargar 30,000 registros en memoria)
   useEffect(() => {
-    let active = true
-    if (form !== null && personas.length === 0) {
-      apiFetch('/personas').then((r) => r.ok ? r.json() : { data: [] }).then((data) => {
-        if (active) setPersonas(data.data || [])
-      }).catch(() => { if (active) setError('No se pudo cargar personas para asignar trabajadores.') })
+    const rawQuery = (personaSearch || '').trim()
+    if (!rawQuery || rawQuery.includes('—') || rawQuery.length < 2) {
+      return
     }
-    return () => { active = false }
-  }, [form, personas.length])
+    const timer = setTimeout(() => {
+      setIsSearchingPersona(true)
+      apiFetch(`/personas?buscar=${encodeURIComponent(rawQuery)}&porPagina=10`)
+        .then((r) => (r.ok ? r.json() : { data: [] }))
+        .then((payload) => {
+          setPersonasResultados(payload.data || [])
+        })
+        .catch(() => {})
+        .finally(() => setIsSearchingPersona(false))
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [personaSearch])
 
   const filtered = rows.filter((row) => {
     const fullSearch = `${row.nombres} ${row.apellidos} ${row.numero_documento} ${row.cargo} ${row.unidad_organica} ${row.jerarquia} ${row.documento} ${row.solicitud}`.toLowerCase()
@@ -211,56 +225,79 @@ export function Trabajadores() {
   
   const visible = filtered.slice((page - 1) * pageSize, page * pageSize)
 
-  const handleExportExcel = () => {
-    exportToExcel({
-      filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Personal',
-      title: 'PADRÓN INSTITUCIONAL DE TRABAJADORES Y FISCALIZADORES',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Gestión de Personal',
-      metadata: [
-        { label: 'Estado', value: filterEstado }
-      ],
-      columns: [
-        { header: 'TIPO DOC', key: 'tipo_documento', width: 90, align: 'center' },
-        { header: 'N° DOCUMENTO', key: 'numero_documento', isText: true, width: 120, align: 'center' },
-        { header: 'NOMBRES', key: 'nombres', width: 140 },
-        { header: 'APELLIDOS', key: 'apellidos', width: 160 },
-        { header: 'CARGO', key: 'cargo', width: 180 },
-        { header: 'UNIDAD ORGÁNICA', key: 'unidad_organica', width: 220 },
-        { header: 'FUNCIÓN', key: 'tipo_funcion', width: 100, align: 'center' },
-        { header: 'DOC. DESIGNACIÓN', key: 'documento', width: 150 },
-        { header: 'FECHA ALTA', key: 'fecha_documento', width: 110, align: 'center' },
-        { header: 'VENCIMIENTO', render: (_, r) => r.fecha_termino || 'INDETERMINADO', width: 120, align: 'center' },
-        { header: 'TIENE ACCESO', render: (_, r) => r.tiene_usuario ? 'SÍ' : 'NO', width: 110, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 100, align: 'center' }
-      ],
-      data: filtered
-    })
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      exportToExcel({
+            filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Personal',
+            title: 'PADRÓN INSTITUCIONAL DE TRABAJADORES Y FISCALIZADORES',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Gestión de Personal',
+            metadata: [
+              { label: 'Estado', value: filterEstado }
+            ],
+            columns: [
+              { header: 'TIPO DOC', key: 'tipo_documento', width: 90, align: 'center' },
+              { header: 'N° DOCUMENTO', key: 'numero_documento', isText: true, width: 120, align: 'center' },
+              { header: 'NOMBRES', key: 'nombres', width: 140 },
+              { header: 'APELLIDOS', key: 'apellidos', width: 160 },
+              { header: 'CARGO', key: 'cargo', width: 180 },
+              { header: 'UNIDAD ORGÁNICA', key: 'unidad_organica', width: 220 },
+              { header: 'FUNCIÓN', key: 'tipo_funcion', width: 100, align: 'center' },
+              { header: 'DOC. DESIGNACIÓN', key: 'documento', width: 150 },
+              { header: 'FECHA ALTA', key: 'fecha_documento', width: 110, align: 'center' },
+              { header: 'VENCIMIENTO', render: (_, r) => r.fecha_termino || 'INDETERMINADO', width: 120, align: 'center' },
+              { header: 'TIENE ACCESO', render: (_, r) => r.tiene_usuario ? 'SÍ' : 'NO', width: 110, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 100, align: 'center' }
+            ],
+            data: filtered
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
-  const handleExportPdf = () => {
-    exportToPdf({
-      filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}`,
-      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Personal Municipal',
-      summaryItems: [
-        { label: 'Total registrados', value: rows.length },
-        { label: 'Exportando', value: `${filtered.length} trabajadores` },
-      ],
-      columns: [
-        { header: 'NOMBRES', render: (_, r) => `${r.nombres || ''} ${r.apellidoPaterno || ''} ${r.apellidoMaterno || ''}`.trim(), width: 200 },
-        { header: 'DNI', key: 'numeroDocumento', width: 90, align: 'center' },
-        { header: 'CARGO', key: 'cargo', width: 160 },
-        { header: 'UNIDAD ORGÁNICA', key: 'unidadOrganica', width: 180 },
-        { header: 'TELÉFONO', key: 'celular', width: 100, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
-      ],
-      data: filtered
-    })
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true)
+    try {
+      await exportToPdf({
+            filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}`,
+            subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Personal Municipal',
+            summaryItems: [
+              { label: 'Total registrados', value: rows.length },
+              { label: 'Exportando', value: `${filtered.length} trabajadores` },
+            ],
+            columns: [
+              { header: 'NOMBRES', render: (_, r) => `${r.nombres || ''} ${r.apellidoPaterno || ''} ${r.apellidoMaterno || ''}`.trim(), width: 200 },
+              { header: 'DNI', key: 'numeroDocumento', width: 90, align: 'center' },
+              { header: 'CARGO', key: 'cargo', width: 160 },
+              { header: 'UNIDAD ORGÁNICA', key: 'unidadOrganica', width: 180 },
+              { header: 'TELÉFONO', key: 'celular', width: 100, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
+            ],
+            data: filtered
+          })
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
   
   const openForm = (record) => {
     setForm({ ...emptyForm, ...record, id_persona: record?.id_persona || record?.id || '' })
-    setPersonaSearch(record?.id ? `${record.numero_documento || ''} — ${record.nombres || ''} ${record.apellidos || ''}`.trim() : '')
+    if (record?.id) {
+      setPersonaSearch(record?.numero_documento ? `${record.numero_documento} — ${record.nombres || ''} ${record.apellidos || ''}`.trim() : '')
+      setSelectedPersonaObj({
+        id: record.id_persona || record.id,
+        nombres: record.nombres,
+        apellidoPaterno: record.apellidos || '',
+        numeroDocumento: record.numero_documento,
+      })
+    } else {
+      setPersonaSearch('')
+      setSelectedPersonaObj(null)
+      setPersonasResultados([])
+    }
     setPersonaDropdownOpen(false)
     setFormError('')
   }
@@ -284,14 +321,9 @@ export function Trabajadores() {
     }
   }
 
-  const selectedPersona = personas.find((persona) => String(persona.id) === String(form?.id_persona))
-  const personasDisponibles = personas
+  const selectedPersona = selectedPersonaObj || personasResultados.find((persona) => String(persona.id) === String(form?.id_persona))
+  const personasDisponibles = personasResultados
     .filter((persona) => !rows.some((row) => String(row.id_persona || row.id) === String(persona.id)) || String(form?.id_persona) === String(persona.id))
-    .filter((persona) => {
-      const query = personaSearch.trim().toLowerCase()
-      if (!query) return true
-      return `${persona.numeroDocumento} ${persona.nombres} ${persona.apellidoPaterno} ${persona.apellidoMaterno}`.toLowerCase().includes(query)
-    })
     .slice(0, 8)
 
   async function save(event) {
@@ -303,6 +335,7 @@ export function Trabajadores() {
       const result = await response.json()
       if (!response.ok) throw new Error(result.messages ? Object.values(result.messages).join(' ') : 'No se pudo guardar el trabajador.')
       setRows((current) => form.id ? current.map((row) => String(row.id) === String(form.id) ? result.data : row) : [result.data, ...current])
+      showToast(form.id ? 'Trabajador actualizado correctamente' : 'Trabajador registrado correctamente', form.id ? 'editar' : 'crear')
       setForm(null)
     } catch (e) { setFormError(e.message) }
     finally { setSaving(false) }
@@ -314,8 +347,8 @@ export function Trabajadores() {
       {/* 1. Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
-            <Icon name="workerBadge" className="size-5.5" />
+          <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="workerBadge" className="size-7 stroke-[2.4]" />
           </span>
           <div>
             <div className="flex items-center gap-2">
@@ -342,7 +375,7 @@ export function Trabajadores() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black leading-tight text-slate-800 dark:text-white">
-              {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-700">...</span> : error ? '—' : new Intl.NumberFormat('es-PE').format(rows.length)}
+              {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-700">...</span> : error ? '—' : formatNumeroTarjeta(rows.length)}
             </p>
           </div>
         </div>
@@ -357,7 +390,7 @@ export function Trabajadores() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black leading-tight text-slate-800 dark:text-white">
-              {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-700">...</span> : error ? '—' : new Intl.NumberFormat('es-PE').format(rows.filter((r) => r.estado === 'ACTIVO').length)}
+              {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-700">...</span> : error ? '—' : formatNumeroTarjeta(rows.filter((r) => r.estado === 'ACTIVO').length)}
             </p>
           </div>
         </div>
@@ -372,7 +405,7 @@ export function Trabajadores() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black leading-tight text-slate-800 dark:text-white">
-              {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-700">...</span> : error ? '—' : new Intl.NumberFormat('es-PE').format(rows.filter((r) => r.estado === 'INACTIVO').length)}
+              {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-700">...</span> : error ? '—' : formatNumeroTarjeta(rows.filter((r) => r.estado === 'INACTIVO').length)}
             </p>
           </div>
         </div>
@@ -432,9 +465,9 @@ export function Trabajadores() {
               onClick={handleExportExcel}
               title="Descargar padrón en Excel (.xls)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Excel</span>
+             disabled={isExportingExcel}>
+              <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
+              <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
             <button
@@ -442,9 +475,9 @@ export function Trabajadores() {
               onClick={handleExportPdf}
               title="Descargar o imprimir padrón en PDF"
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
-              <span>PDF</span>
+             disabled={isExportingPdf}>
+              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
+              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
 
             <button
@@ -461,7 +494,7 @@ export function Trabajadores() {
         
         {/* Grid Clean */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 whitespace-nowrap">Trabajador</th>
@@ -477,14 +510,14 @@ export function Trabajadores() {
                 <tr key={row.id} className="group transition-colors hover:bg-[var(--brand-soft)] dark:hover:bg-[var(--bg-subtle)]">
                   {/* Trabajador */}
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <p className="text-[13.5px] font-bold text-slate-900 dark:text-white" style={{ color: 'var(--text)' }}>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white" style={{ color: 'var(--text)' }}>
                       {row.nombres} {row.apellidos}
                     </p>
                     <div className="flex items-center gap-1.5 font-mono mt-0.5">
                       <span className="text-[11px] font-semibold text-slate-400">
                         {row.tipo_documento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : (row.tipo_documento || 'DNI')}
                       </span>
-                      <span className="font-bold text-slate-800 dark:text-white text-[13px]">
+                      <span className="font-bold text-slate-800 dark:text-white text-xs">
                         {row.numero_documento}
                       </span>
                     </div>
@@ -492,15 +525,15 @@ export function Trabajadores() {
                   
                   {/* Cargo & Unidad */}
                   <td className="px-4 py-3 max-w-[240px]">
-                    <p className="truncate text-[13px] font-bold text-slate-700 dark:text-slate-200" title={row.cargo}>{row.cargo || 'Sin cargo'}</p>
-                    <p className="truncate text-xs font-semibold text-slate-500" title={row.unidad_organica}>{row.unidad_organica || 'Sin unidad'}</p>
+                    <p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200" title={row.cargo}>{row.cargo || 'Sin cargo'}</p>
+                    <p className="truncate text-[11px] font-semibold text-slate-500" title={row.unidad_organica}>{row.unidad_organica || 'Sin unidad'}</p>
                     {row.jerarquia && <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-500">{row.jerarquia}</p>}
                   </td>
                   
                   {/* Asignación */}
                   <td className="px-4 py-3 max-w-[200px]">
-                    <p className="text-[12.5px] font-bold text-slate-700 dark:text-slate-300">{row.documento || 'Sin doc.'}</p>
-                    <p className="text-xs font-medium text-slate-500">{row.fecha_documento || '—'}</p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.documento || 'Sin doc.'}</p>
+                    <p className="text-[11px] font-medium text-slate-500">{row.fecha_documento || '—'}</p>
                     <span className="mt-1 inline-block rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">{row.tipo_funcion}</span>
                   </td>
                   
@@ -645,12 +678,21 @@ export function Trabajadores() {
                       className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pb-1 pt-4 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
                       placeholder=" "
                       value={personaSearch}
-                      onFocus={() => setPersonaDropdownOpen(true)}
+                      onFocus={() => {
+                        setPersonaDropdownOpen(true)
+                        if (personasResultados.length === 0 && !personaSearch) {
+                          apiFetch('/personas?porPagina=10')
+                            .then((r) => r.ok ? r.json() : { data: [] })
+                            .then((payload) => setPersonasResultados(payload.data || []))
+                            .catch(() => {})
+                        }
+                      }}
                       onBlur={() => { window.setTimeout(() => setPersonaDropdownOpen(false), 150) }}
                       onChange={(e) => {
                         setPersonaSearch(e.target.value)
                         setPersonaDropdownOpen(true)
                         setForm({ ...form, id_persona: '' })
+                        setSelectedPersonaObj(null)
                       }}
                     />
                     <label htmlFor="buscarPersona" className="pointer-events-none absolute left-3 right-3 truncate whitespace-nowrap top-1/2 -translate-y-1/2 select-none text-xs font-medium text-slate-400 transition-all duration-150 peer-focus:top-1 peer-focus:-translate-y-0 peer-focus:text-[9.5px] peer-focus:font-bold peer-focus:text-blue-600 peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:-translate-y-0 peer-[:not(:placeholder-shown)]:text-[9.5px] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:text-slate-500 dark:peer-[:not(:placeholder-shown)]:text-slate-400">
@@ -659,10 +701,14 @@ export function Trabajadores() {
 
                     {personaDropdownOpen && !selectedPersona && (
                       <div className="absolute left-0 top-full z-20 mt-1 p-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
+                        {isSearchingPersona && (
+                          <p className="p-2 text-xs font-semibold text-slate-400 text-center animate-pulse">Buscando en padrón...</p>
+                        )}
                         {personasDisponibles.map((p) => (
                           <button key={p.id} type="button" onMouseDown={(e) => {
                               e.preventDefault(); e.stopPropagation();
                               setForm(c => ({...c, id_persona: p.id}));
+                              setSelectedPersonaObj(p);
                               setPersonaSearch(`${p.numeroDocumento} — ${p.nombres} ${p.apellidoPaterno} ${p.apellidoMaterno || ''}`.trim());
                               setPersonaDropdownOpen(false);
                           }} className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors cursor-pointer font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60">
@@ -670,7 +716,7 @@ export function Trabajadores() {
                             <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">{p.tipoDocumento}: <span className="font-bold text-slate-700 dark:text-slate-300">{p.numeroDocumento}</span></span>
                           </button>
                         ))}
-                        {!personasDisponibles.length && (
+                        {!isSearchingPersona && !personasDisponibles.length && (
                           <p className="p-2 text-xs font-semibold text-slate-500 text-center">No hay personas disponibles para asignar.</p>
                         )}
                       </div>

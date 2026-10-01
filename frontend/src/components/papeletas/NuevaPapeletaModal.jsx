@@ -3,6 +3,7 @@ import { Icon } from '../ui/Icon'
 import { FloatingInput } from '../ui/FormInputs'
 import { apiFetch } from '../../config/api'
 import { showError, showToast } from '../../utils/SwalUtil'
+import { toTitleCase } from '../../utils/formatters'
 
 export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, creandoPapeleta, onSubmit, onClose }) {
   const [isSearchingSunarp, setIsSearchingSunarp] = useState(false)
@@ -92,8 +93,8 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
         throw new Error('No se encontró a la persona con el documento ingresado.')
       }
 
-      const nombres = data.nombres || ''
-      const apellidos = `${data.apellidoPaterno || ''} ${data.apellidoMaterno || ''}`.trim()
+      const nombres = (data.nombres || '').toUpperCase()
+      const apellidos = `${data.apellidoPaterno || ''} ${data.apellidoMaterno || ''}`.trim().toUpperCase()
 
       setNuevaForm(prev => ({
         ...prev,

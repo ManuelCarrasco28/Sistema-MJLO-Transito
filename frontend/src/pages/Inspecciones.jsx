@@ -4,6 +4,7 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache, leerMensajeError } from '../config/api'
 import { CerticavFichaPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
@@ -11,7 +12,7 @@ import { showError } from '../utils/SwalUtil'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { VistaPreviaEscalada } from '../components/ui/VistaPreviaEscalada'
 import { ActionToast, TOAST_DURACION_MS } from '../components/ui/ActionToast'
-import { formatFecha } from '../utils/formatters'
+import { formatFecha, formatNumeroTarjeta } from '../utils/formatters'
 import { imprimirInspeccionesPdf } from '../utils/exportInspeccionesPdf'
 
 const FILTER_RESULTADO_OPTIONS = [
@@ -90,6 +91,16 @@ export function Inspecciones() {
   const [eliminando, setEliminando] = useState(false)
   const [isLoading, setIsLoading] = useState(!cachedInsp)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setCurrentPage(1)
+    }, 160)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   const [filterResultado, setFilterResultado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
@@ -143,6 +154,8 @@ export function Inspecciones() {
   })
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const loadData = async () => {
     setIsLoading(true)
@@ -151,7 +164,7 @@ export function Inspecciones() {
         page: String(currentPage),
         porPagina: String(itemsPerPage),
       })
-      if (searchTerm) params.set('buscar', searchTerm)
+      if (debouncedSearch) params.set('buscar', debouncedSearch)
       if (filterResultado !== 'TODOS') params.set('resultado', filterResultado)
       if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
@@ -174,7 +187,7 @@ export function Inspecciones() {
   useEffect(() => {
     setLoadError('')
     loadData()
-  }, [currentPage, itemsPerPage, searchTerm, filterResultado, sortBy, sortDir])
+  }, [currentPage, itemsPerPage, debouncedSearch, filterResultado, sortBy, sortDir])
 
   const [stats, setStats] = useState({ totales: 0, aprobados: 0, observados: 0, desaprobados: 0 })
 
@@ -611,39 +624,50 @@ export function Inspecciones() {
   }
 
   const handleExportExcel = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToExcel({
-      filename: `Inspecciones_Tecnicas_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Inspecciones',
-      title: 'REGISTRO DE INSPECCIONES TÉCNICAS VEHICULARES - CERTICAV',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',
-      metadata: [
-        { label: 'Resultado', value: filterResultado },
-        { label: 'Total Registros', value: String(data.length) }
-      ],
-      columns: [
-        { header: 'N° REGISTRO', key: 'numeroRegistro', isText: true, width: 120, align: 'center' },
-        { header: 'SERIE CERTICAV', render: (_, i) => i.numeroSerieCerticav || ('CCV-2026-' + String(i.id || '').padStart(6, '0')), isText: true, width: 140, align: 'center' },
-        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
-        { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
-        { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
-        { header: 'LICENCIA', key: 'conductorLicencia', isText: true, width: 120, align: 'center' },
-        { header: 'INSPECTOR', key: 'inspector', width: 180 },
-        { header: 'FECHA INSPECCIÓN', key: 'fecha', width: 120, align: 'center' },
-        { header: 'RESULTADO', key: 'resultado', width: 120, align: 'center' }
-      ],
-      data
-    })
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const data = await fetchTodoElFiltro()
+          exportToExcel({
+            filename: `Inspecciones_Tecnicas_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Inspecciones',
+            title: 'REGISTRO DE INSPECCIONES TÉCNICAS VEHICULARES - CERTICAV',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',
+            metadata: [
+              { label: 'Resultado', value: filterResultado },
+              { label: 'Total Registros', value: String(data.length) }
+            ],
+            columns: [
+              { header: 'N° REGISTRO', key: 'numeroRegistro', isText: true, width: 120, align: 'center' },
+              { header: 'SERIE CERTICAV', render: (_, i) => i.numeroSerieCerticav || ('CCV-2026-' + String(i.id || '').padStart(6, '0')), isText: true, width: 140, align: 'center' },
+              { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+              { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
+              { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
+              { header: 'LICENCIA', key: 'conductorLicencia', isText: true, width: 120, align: 'center' },
+              { header: 'INSPECTOR', key: 'inspector', width: 180 },
+              { header: 'FECHA INSPECCIÓN', key: 'fecha', width: 120, align: 'center' },
+              { header: 'RESULTADO', key: 'resultado', width: 120, align: 'center' }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
   const handleExportPdf = async () => {
-    const listToExport = await fetchTodoElFiltro()
-    if (listToExport.length === 0) {
-      showError('Atención', 'No hay registros para exportar.')
-      return
+    setIsExportingPdf(true)
+    try {
+      const listToExport = await fetchTodoElFiltro()
+          if (listToExport.length === 0) {
+            showError('Atención', 'No hay registros para exportar.')
+            return
+          }
+      
+          await imprimirInspeccionesPdf({ listToExport, vehiculos, totales, aprobados, observados, desaprobados })
+    } finally {
+      setIsExportingPdf(false)
     }
-
-    imprimirInspeccionesPdf({ listToExport, vehiculos, totales, aprobados, observados, desaprobados })
   }
 
   // Agrupación de criterios técnicos por sección
@@ -752,7 +776,7 @@ export function Inspecciones() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(totales)}
+              {formatNumeroTarjeta(totales)}
             </p>
           </div>
         </div>
@@ -769,7 +793,7 @@ export function Inspecciones() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(aprobados)}
+              {formatNumeroTarjeta(aprobados)}
             </p>
           </div>
         </div>
@@ -786,7 +810,7 @@ export function Inspecciones() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(observados)}
+              {formatNumeroTarjeta(observados)}
             </p>
           </div>
         </div>
@@ -803,7 +827,7 @@ export function Inspecciones() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(desaprobados)}
+              {formatNumeroTarjeta(desaprobados)}
             </p>
           </div>
         </div>
@@ -830,7 +854,10 @@ export function Inspecciones() {
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+            <Icon
+              name={isLoading ? "refresh" : "search"}
+              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-indigo-500' : 'text-slate-400'}`}
+            />
             <input
               type="text"
               placeholder="Buscar por código, serie CertiCAV, placa, conductor o titular"
@@ -841,7 +868,10 @@ export function Inspecciones() {
             {searchTerm && (
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
+                onClick={() => {
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 ✕
@@ -852,7 +882,10 @@ export function Inspecciones() {
           <div className="flex flex-wrap items-center gap-2">
             <RoundedSelect
               value={filterResultado}
-              onChange={setFilterResultado}
+              onChange={(val) => {
+                setFilterResultado(val)
+                setCurrentPage(1)
+              }}
               options={FILTER_RESULTADO_OPTIONS}
             />
 
@@ -862,6 +895,7 @@ export function Inspecciones() {
                 onClick={() => {
                   setFilterResultado('TODOS')
                   setSearchTerm('')
+                  setCurrentPage(1)
                 }}
                 title="Limpiar filtros"
                 className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
@@ -875,9 +909,9 @@ export function Inspecciones() {
               onClick={handleExportExcel}
               title="Descargar padrón en Excel (.xls)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Excel</span>
+             disabled={isExportingExcel}>
+              <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
+              <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
             <button
@@ -885,9 +919,9 @@ export function Inspecciones() {
               onClick={handleExportPdf}
               title="Descargar o imprimir padrón en PDF"
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
-              <span>PDF</span>
+             disabled={isExportingPdf}>
+              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
+              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
 
             <button
@@ -904,7 +938,7 @@ export function Inspecciones() {
 
         {/* TABLA: EN CERTICAV EN LA TABLA VISIBLE NO SE MUESTRA INSPECTOR ASIGNADO */}
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[18%]" />
               <col className="w-[14%]" />
@@ -970,7 +1004,7 @@ export function Inspecciones() {
                     >
                       <td className="px-4 py-3 ">
                         <div className="space-y-0.5">
-                          <span className="font-mono font-bold text-slate-900 dark:text-white text-[13px] block">
+                          <span className="font-mono font-bold text-slate-900 dark:text-white text-xs block">
                             {i.numeroRegistro || i.numeroInspeccion}
                           </span>
                           {numSerie && (
@@ -983,9 +1017,7 @@ export function Inspecciones() {
 
                       <td className="px-4 py-3 ">
                         <div className="space-y-0.5">
-                          <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 shadow-2xs dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
-                            {i.vehiculoPlaca}
-                          </span>
+                          <PlacaBadge placa={i.vehiculoPlaca} />
                           {(vehiculo?.marca || i.vehiculoMarca || vehiculo?.modelo || i.vehiculoModelo) && (
                             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                               {[vehiculo?.marca || i.vehiculoMarca, vehiculo?.modelo || i.vehiculoModelo].filter(Boolean).join(' ')}
@@ -997,7 +1029,7 @@ export function Inspecciones() {
                       <td className="px-4 py-3 max-w-[210px]">
                         <div>
                           <p
-                            className="font-bold text-[13px] text-slate-900 dark:text-white truncate"
+                            className="font-bold text-xs text-slate-900 dark:text-white truncate"
                             title={vehiculo?.propietario || i.propietario}
                           >
                             {vehiculo?.propietario || i.propietario || 'Propietario no asignado'}
@@ -1735,9 +1767,7 @@ export function Inspecciones() {
                       <span className="font-mono text-lg font-black text-slate-900 dark:text-white">
                         {selectedInspeccion.numeroRegistro || selectedInspeccion.numeroInspeccion}
                       </span>
-                      <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 shadow-2xs">
-                        {selectedInspeccion.vehiculoPlaca}
-                      </span>
+                      <PlacaBadge placa={selectedInspeccion.vehiculoPlaca} />
                       {selectedInspeccion.numeroSerieCerticav && (
                         <span className="inline-flex items-center rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 font-mono text-xs font-black tracking-wider text-rose-600 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 shadow-2xs">
                           SERIE: {selectedInspeccion.numeroSerieCerticav}

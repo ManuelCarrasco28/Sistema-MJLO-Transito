@@ -5,11 +5,12 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { PlantillaImpresionTUC } from '../components/documentos/PlantillaImpresionTUC'
 import { exportToExcel } from '../utils/exportToExcel'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
-import { formatFecha } from '../utils/formatters'
+import { formatFecha, formatNumeroTarjeta } from '../utils/formatters'
 
 const TIPO_DOC_OPTIONS = [
   { value: 'TARJETA_OPERATIVIDAD', label: 'Tarjeta de Operatividad (TUC)' },
@@ -121,6 +122,16 @@ export function Documentos() {
   const [vehiculos, setVehiculos] = useState([])
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setCurrentPage(1)
+    }, 160)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
@@ -139,7 +150,6 @@ export function Documentos() {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [toast, setToast] = useState(null)
 
   // Search dropdown for vehicle plate inside modal
   const [isPlacaDropdownOpen, setIsPlacaDropdownOpen] = useState(false)
@@ -158,6 +168,8 @@ export function Documentos() {
   })
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const loadData = async () => {
     setIsLoading(true)
@@ -166,7 +178,7 @@ export function Documentos() {
         page: String(currentPage),
         porPagina: String(itemsPerPage),
       })
-      if (searchTerm) params.set('buscar', searchTerm)
+      if (debouncedSearch) params.set('buscar', debouncedSearch)
       if (filterTipo !== 'TODOS') params.set('tipoDocumento', filterTipo)
       if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
       if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
@@ -187,7 +199,7 @@ export function Documentos() {
   useEffect(() => {
     setLoadError('')
     loadData()
-  }, [currentPage, itemsPerPage, searchTerm, filterTipo, filterEstado, sortBy, sortDir])
+  }, [currentPage, itemsPerPage, debouncedSearch, filterTipo, filterEstado, sortBy, sortDir])
 
   const [stats, setStats] = useState({ total: 0, tucDocs: 0, soatDocs: 0, vigentes: 0, inactivosOVencidos: 0 })
 
@@ -224,20 +236,6 @@ export function Documentos() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  useEffect(() => {
-    if (!toast) return undefined
-    const timer = window.setTimeout(() => setToast(null), 3000)
-    return () => window.clearTimeout(timer)
-  }, [toast])
-
-  const showToast = (message, type = 'success') => {
-    setToast({
-      id: Date.now(),
-      message,
-      type,
-    })
-  }
 
   // KPIs derivados del total real (COUNT en backend), no de la página cargada
   const totalDocs = stats.total ?? 0
@@ -416,203 +414,189 @@ export function Documentos() {
   }
 
   const handleExportExcel = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToExcel({
-      filename: `Documentos_Transito_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Documentos',
-      title: 'PADRÓN OFICIAL DE DOCUMENTOS DE TRANSPORTE Y VIALIDAD',
-      subtitle: 'TUC, Carnets de Seguridad Vial, CERTICAV y SOAT - Control Municipal',
-      metadata: [
-        { label: 'Tipo Documento', value: filterTipo },
-        { label: 'Estado', value: filterEstado }
-      ],
-      columns: [
-        { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
-        { header: 'TIPO DOCUMENTO', key: 'tipoDocumento', width: 180 },
-        { header: 'N° / CÓDIGO', key: 'codigo', isText: true, width: 140, align: 'center' },
-        { header: 'EXPEDICIÓN', key: 'fechaExpedicion', width: 110, align: 'center' },
-        { header: 'VENCIMIENTO', key: 'fechaExpiracion', width: 110, align: 'center' },
-        { header: 'PROPIETARIO / TITULAR', key: 'propietario', width: 190 },
-        { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
-        { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 200 },
-        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
-      ],
-      data
-    })
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const data = await fetchTodoElFiltro()
+          exportToExcel({
+            filename: `Documentos_Transito_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Documentos',
+            title: 'PADRÓN OFICIAL DE DOCUMENTOS DE TRANSPORTE Y VIALIDAD',
+            subtitle: 'TUC, Carnets de Seguridad Vial, CERTICAV y SOAT - Control Municipal',
+            metadata: [
+              { label: 'Tipo Documento', value: filterTipo },
+              { label: 'Estado', value: filterEstado }
+            ],
+            columns: [
+              { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+              { header: 'TIPO DOCUMENTO', key: 'tipoDocumento', width: 180 },
+              { header: 'N° / CÓDIGO', key: 'codigo', isText: true, width: 140, align: 'center' },
+              { header: 'EXPEDICIÓN', key: 'fechaExpedicion', width: 110, align: 'center' },
+              { header: 'VENCIMIENTO', key: 'fechaExpiracion', width: 110, align: 'center' },
+              { header: 'PROPIETARIO / TITULAR', key: 'propietario', width: 190 },
+              { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
+              { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 200 },
+              { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
   const handleExportPdf = async () => {
-    const listToExport = await fetchTodoElFiltro()
-    if (listToExport.length === 0) {
-      alert('No hay registros para exportar.')
-      return
+    setIsExportingPdf(true)
+    try {
+      const listToExport = await fetchTodoElFiltro()
+          if (listToExport.length === 0) {
+            alert('No hay registros para exportar.')
+            return
+          }
+      
+          const printWin = window.open('', '_blank', 'width=1100,height=750')
+          if (!printWin) {
+            alert('El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
+            return
+          }
+      
+          const escapeXml = (unsafe) => {
+            if (unsafe === null || unsafe === undefined) return ''
+            return String(unsafe)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+          }
+      
+          const rowsHtml = listToExport
+            .map((d, index) => {
+              const isVigente = d.estado === 'VIGENTE'
+              const estadoBadge = isVigente
+                ? `<span style="background:#dcfce7; color:#15803d; padding:2px 7px; border-radius:4px; font-weight:700; font-size:9.5px;">VIGENTE</span>`
+                : d.estado === 'EN_TRAMITE'
+                  ? `<span style="background:#dbeafe; color:#1d4ed8; padding:2px 7px; border-radius:4px; font-weight:700; font-size:9.5px;">EN TRÁMITE</span>`
+                  : `<span style="background:#fee2e2; color:#b91c1c; padding:2px 7px; border-radius:4px; font-weight:700; font-size:9.5px;">VENCIDO</span>`
+      
+              return `
+                <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                  <td style="text-align: center; color: #64748b; font-size: 10px;">${index + 1}</td>
+                  <td style="font-family: monospace; font-weight: 700; font-size: 11px; text-align: center;">${escapeXml(d.codigo || '')}</td>
+                  <td style="font-size: 10px; font-weight: 600;">${escapeXml(d.tipoDocumento || '')}</td>
+                  <td style="font-family: monospace; font-weight: 700; font-size: 11px; text-align: center; background: #fef3c7;">${escapeXml(d.vehiculoPlaca || '')}</td>
+                  <td style="font-size: 10.5px; font-weight: 700; color: #0f172a;">${escapeXml(d.propietario || '—')}</td>
+                  <td style="font-family: monospace; font-size: 10.5px; text-align: center;">${escapeXml(d.propietarioDni || '—')}</td>
+                  <td style="font-size: 10px; color: #475569;">${escapeXml(d.asociacion || 'Independiente')}</td>
+                  <td style="text-align: center; font-family: monospace; font-size: 10px;">${escapeXml(formatFecha(d.fechaExpedicion))}</td>
+                  <td style="text-align: center; font-family: monospace; font-size: 10px; font-weight: bold;">${escapeXml(formatFecha(d.fechaExpiracion))}</td>
+                  <td style="text-align: center;">${estadoBadge}</td>
+                </tr>
+              `
+            })
+            .join('')
+      
+          const pdfHtml = `
+            <!doctype html>
+            <html lang="es">
+              <head>
+                <meta charset="utf-8"/>
+                <title>Padron_Documentos_MJLO_${new Date().toISOString().slice(0, 10)}</title>
+                <style>
+                  @page { size: A4 landscape; margin: 10mm 12mm 10mm 12mm; }
+                  * { box-sizing: border-box; }
+                  body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    color: #0f172a; margin: 0; padding: 0; font-size: 10.5px;
+                  }
+                  .header {
+                    border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 10px;
+                    display: flex; justify-content: space-between; align-items: flex-start;
+                  }
+                  .title {
+                    font-size: 15px; font-weight: 900; color: #0f172a; letter-spacing: -0.3px; text-transform: uppercase;
+                  }
+                  .subtitle {
+                    font-size: 10.5px; font-weight: 600; color: #475569; margin-top: 2px;
+                  }
+                  .meta { font-size: 9.5px; color: #64748b; text-align: right; }
+                  .summary-bar {
+                    display: flex; gap: 16px; margin-bottom: 10px; background: #f1f5f9; padding: 6px 12px;
+                    border-radius: 6px; font-size: 10.5px;
+                  }
+                  .summary-item strong { color: #0f172a; }
+                  table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+                  thead { display: table-header-group; }
+                  tr { page-break-inside: avoid; break-inside: avoid; }
+                  th {
+                    background-color: #0f172a; color: #ffffff; text-transform: uppercase; font-size: 9px;
+                    font-weight: 800; letter-spacing: 0.4px; padding: 6px 7px; border: 1px solid #0f172a; text-align: left;
+                  }
+                  td { border: 1px solid #e2e8f0; padding: 5px 7px; vertical-align: middle; }
+                  .footer {
+                    margin-top: 12px; font-size: 8.5px; color: #94a3b8; display: flex;
+                    justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 5px;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="header">
+                  <div>
+                    <div class="title">Municipalidad Distrital José Leonardo Ortiz</div>
+                    <div class="subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Documentos Vehiculares (TUC / SOAT / CertiCAV)</div>
+                  </div>
+                  <div class="meta">
+                    <div><strong>Fecha de emisión:</strong> ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</div>
+                    <div><strong>Sistema:</strong> MJLO Tránsito Digital v2026</div>
+                  </div>
+                </div>
+                <div class="summary-bar">
+                  <div>Total en padrón: <strong>${totalDocs}</strong></div>
+                  <div>· Exportando: <strong>${listToExport.length}</strong> documentos</div>
+                  <div>· Vigentes: <strong>${vigentes}</strong></div>
+                  <div>· Vencidos / Trámite: <strong>${inactivosOVencidos}</strong></div>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 28px; text-align: center;">N°</th>
+                      <th style="width: 105px; text-align: center;">Código</th>
+                      <th style="width: 110px;">Tipo Doc.</th>
+                      <th style="width: 80px; text-align: center;">Placa</th>
+                      <th style="width: 170px;">Titular / Propietario</th>
+                      <th style="width: 75px; text-align: center;">DNI</th>
+                      <th>Asociación</th>
+                      <th style="width: 75px; text-align: center;">Expedición</th>
+                      <th style="width: 75px; text-align: center;">Vencimiento</th>
+                      <th style="width: 75px; text-align: center;">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rowsHtml}
+                  </tbody>
+                </table>
+                <div class="footer">
+                  <span>Documento oficial generado para fiscalización y control del transporte en José Leonardo Ortiz.</span>
+                  <span>Página 1 de 1</span>
+                </div>
+                <script>
+                  window.onload = function() {
+                    window.focus();
+                    setTimeout(function() { window.print(); }, 250);
+                  };
+                </script>
+              </body>
+            </html>
+          `
+      
+          printWin.document.open()
+          printWin.document.write(pdfHtml)
+          printWin.document.close()
+    } finally {
+      setIsExportingPdf(false)
     }
-
-    const printWin = window.open('', '_blank', 'width=1100,height=750')
-    if (!printWin) {
-      alert('El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
-      return
-    }
-
-    const escapeXml = (unsafe) => {
-      if (unsafe === null || unsafe === undefined) return ''
-      return String(unsafe)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-    }
-
-    const rowsHtml = listToExport
-      .map((d, index) => {
-        const isVigente = d.estado === 'VIGENTE'
-        const estadoBadge = isVigente
-          ? `<span style="background:#dcfce7; color:#15803d; padding:2px 7px; border-radius:4px; font-weight:700; font-size:9.5px;">VIGENTE</span>`
-          : d.estado === 'EN_TRAMITE'
-            ? `<span style="background:#dbeafe; color:#1d4ed8; padding:2px 7px; border-radius:4px; font-weight:700; font-size:9.5px;">EN TRÁMITE</span>`
-            : `<span style="background:#fee2e2; color:#b91c1c; padding:2px 7px; border-radius:4px; font-weight:700; font-size:9.5px;">VENCIDO</span>`
-
-        return `
-          <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-            <td style="text-align: center; color: #64748b; font-size: 10px;">${index + 1}</td>
-            <td style="font-family: monospace; font-weight: 700; font-size: 11px; text-align: center;">${escapeXml(d.codigo || '')}</td>
-            <td style="font-size: 10px; font-weight: 600;">${escapeXml(d.tipoDocumento || '')}</td>
-            <td style="font-family: monospace; font-weight: 700; font-size: 11px; text-align: center; background: #fef3c7;">${escapeXml(d.vehiculoPlaca || '')}</td>
-            <td style="font-size: 10.5px; font-weight: 700; color: #0f172a;">${escapeXml(d.propietario || '—')}</td>
-            <td style="font-family: monospace; font-size: 10.5px; text-align: center;">${escapeXml(d.propietarioDni || '—')}</td>
-            <td style="font-size: 10px; color: #475569;">${escapeXml(d.asociacion || 'Independiente')}</td>
-            <td style="text-align: center; font-family: monospace; font-size: 10px;">${escapeXml(formatFecha(d.fechaExpedicion))}</td>
-            <td style="text-align: center; font-family: monospace; font-size: 10px; font-weight: bold;">${escapeXml(formatFecha(d.fechaExpiracion))}</td>
-            <td style="text-align: center;">${estadoBadge}</td>
-          </tr>
-        `
-      })
-      .join('')
-
-    const pdfHtml = `
-      <!doctype html>
-      <html lang="es">
-        <head>
-          <meta charset="utf-8"/>
-          <title>Padron_Documentos_MJLO_${new Date().toISOString().slice(0, 10)}</title>
-          <style>
-            @page { size: A4 landscape; margin: 10mm 12mm 10mm 12mm; }
-            * { box-sizing: border-box; }
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-              color: #0f172a; margin: 0; padding: 0; font-size: 10.5px;
-            }
-            .header {
-              border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 10px;
-              display: flex; justify-content: space-between; align-items: flex-start;
-            }
-            .title {
-              font-size: 15px; font-weight: 900; color: #0f172a; letter-spacing: -0.3px; text-transform: uppercase;
-            }
-            .subtitle {
-              font-size: 10.5px; font-weight: 600; color: #475569; margin-top: 2px;
-            }
-            .meta { font-size: 9.5px; color: #64748b; text-align: right; }
-            .summary-bar {
-              display: flex; gap: 16px; margin-bottom: 10px; background: #f1f5f9; padding: 6px 12px;
-              border-radius: 6px; font-size: 10.5px;
-            }
-            .summary-item strong { color: #0f172a; }
-            table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-            thead { display: table-header-group; }
-            tr { page-break-inside: avoid; break-inside: avoid; }
-            th {
-              background-color: #0f172a; color: #ffffff; text-transform: uppercase; font-size: 9px;
-              font-weight: 800; letter-spacing: 0.4px; padding: 6px 7px; border: 1px solid #0f172a; text-align: left;
-            }
-            td { border: 1px solid #e2e8f0; padding: 5px 7px; vertical-align: middle; }
-            .footer {
-              margin-top: 12px; font-size: 8.5px; color: #94a3b8; display: flex;
-              justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 5px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <div class="title">Municipalidad Distrital José Leonardo Ortiz</div>
-              <div class="subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Documentos Vehiculares (TUC / SOAT / CertiCAV)</div>
-            </div>
-            <div class="meta">
-              <div><strong>Fecha de emisión:</strong> ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</div>
-              <div><strong>Sistema:</strong> MJLO Tránsito Digital v2026</div>
-            </div>
-          </div>
-          <div class="summary-bar">
-            <div>Total en padrón: <strong>${totalDocs}</strong></div>
-            <div>· Exportando: <strong>${listToExport.length}</strong> documentos</div>
-            <div>· Vigentes: <strong>${vigentes}</strong></div>
-            <div>· Vencidos / Trámite: <strong>${inactivosOVencidos}</strong></div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 28px; text-align: center;">N°</th>
-                <th style="width: 105px; text-align: center;">Código</th>
-                <th style="width: 110px;">Tipo Doc.</th>
-                <th style="width: 80px; text-align: center;">Placa</th>
-                <th style="width: 170px;">Titular / Propietario</th>
-                <th style="width: 75px; text-align: center;">DNI</th>
-                <th>Asociación</th>
-                <th style="width: 75px; text-align: center;">Expedición</th>
-                <th style="width: 75px; text-align: center;">Vencimiento</th>
-                <th style="width: 75px; text-align: center;">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-          <div class="footer">
-            <span>Documento oficial generado para fiscalización y control del transporte en José Leonardo Ortiz.</span>
-            <span>Página 1 de 1</span>
-          </div>
-          <script>
-            window.onload = function() {
-              window.focus();
-              setTimeout(function() { window.print(); }, 250);
-            };
-          </script>
-        </body>
-      </html>
-    `
-
-    printWin.document.open()
-    printWin.document.write(pdfHtml)
-    printWin.document.close()
   }
 
   return (
     <div className="space-y-4">
-      {toast && (
-        <div
-          key={toast.id}
-          className="fixed right-6 top-6 z-[80] flex items-center gap-2.5 rounded-[var(--radius)] border px-4 py-3 text-[13px] font-medium shadow-md transition-all animate-enter"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-ok)',
-            color: 'var(--text)',
-            boxShadow: 'var(--shadow-md)',
-          }}
-        >
-          <span
-            className="grid size-6 place-items-center rounded-full text-xs font-semibold shrink-0 border"
-            style={{
-              backgroundColor: 'var(--ok-bg)',
-              color: 'var(--ok-fg)',
-              borderColor: 'var(--border-ok)',
-            }}
-          >
-            ✓
-          </span>
-          <span>{toast.message}</span>
-        </div>
-      )}
-
       {loadError && <PageLoadError message={loadError} />}
 
       {/* Cabecera Principal - Estilo Exacto Personas */}
@@ -648,7 +632,7 @@ export function Documentos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(totalDocs)}
+              {formatNumeroTarjeta(totalDocs)}
             </p>
           </div>
         </div>
@@ -665,7 +649,7 @@ export function Documentos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(tucDocs)}
+              {formatNumeroTarjeta(tucDocs)}
             </p>
           </div>
         </div>
@@ -682,7 +666,7 @@ export function Documentos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(soatDocs)}
+              {formatNumeroTarjeta(soatDocs)}
             </p>
           </div>
         </div>
@@ -699,7 +683,7 @@ export function Documentos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(vigentes)}
+              {formatNumeroTarjeta(vigentes)}
             </p>
           </div>
         </div>
@@ -716,7 +700,7 @@ export function Documentos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(inactivosOVencidos)}
+              {formatNumeroTarjeta(inactivosOVencidos)}
             </p>
           </div>
         </div>
@@ -726,7 +710,10 @@ export function Documentos() {
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
-            <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+            <Icon
+              name={isLoading ? "refresh" : "search"}
+              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-indigo-500' : 'text-slate-400'}`}
+            />
             <input
               type="text"
               placeholder="Buscar por código, placa, titular, DNI o asociación..."
@@ -737,7 +724,10 @@ export function Documentos() {
             {searchTerm && (
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
+                onClick={() => {
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 ✕
@@ -748,13 +738,19 @@ export function Documentos() {
           <div className="flex flex-wrap items-center gap-2">
             <RoundedSelect
               value={filterTipo}
-              onChange={setFilterTipo}
+              onChange={(val) => {
+                setFilterTipo(val)
+                setCurrentPage(1)
+              }}
               options={FILTER_TIPO_OPTIONS}
             />
 
             <RoundedSelect
               value={filterEstado}
-              onChange={setFilterEstado}
+              onChange={(val) => {
+                setFilterEstado(val)
+                setCurrentPage(1)
+              }}
               options={FILTER_ESTADO_OPTIONS}
             />
 
@@ -765,6 +761,7 @@ export function Documentos() {
                   setFilterTipo('TODOS')
                   setFilterEstado('TODOS')
                   setSearchTerm('')
+                  setCurrentPage(1)
                 }}
                 title="Limpiar filtros"
                 className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
@@ -778,9 +775,9 @@ export function Documentos() {
               onClick={handleExportExcel}
               title="Descargar padrón en Excel (.xls)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Excel</span>
+             disabled={isExportingExcel}>
+              <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
+              <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
             <button
@@ -788,9 +785,9 @@ export function Documentos() {
               onClick={handleExportPdf}
               title="Descargar o imprimir padrón en PDF"
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
-              <span>PDF</span>
+             disabled={isExportingPdf}>
+              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
+              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
 
             <button
@@ -806,15 +803,15 @@ export function Documentos() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[22%]" />
               <col className="w-[13%]" />
               <col className="w-[24%]" />
               <col className="w-[12%]" />
               <col className="w-[12%]" />
-              <col className="w-[9%]" />
-              <col className="w-[8%]" />
+              <col className="w-[110px]" />
+              <col className="w-[110px]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
@@ -823,8 +820,8 @@ export function Documentos() {
                 <th className="px-4 py-3 ">Titular / Propietario</th>
                 <th className="px-4 py-3 ">Expedición</th>
                 <th className="px-4 py-3 "><SortableHeader column="fechaExpiracion" label="Vencimiento" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="px-4 py-3 "><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="sticky right-0 z-20 px-4 py-3 text-right bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
+                <th className="px-4 py-3 text-center"><SortableHeader column="estado" align="center" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="sticky right-0 z-20 px-4 py-3 text-center bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                   Acciones
                 </th>
               </tr>
@@ -875,7 +872,7 @@ export function Documentos() {
                     <td className="px-4 py-3 ">
                       <div className="space-y-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-slate-900 dark:text-white text-[13px]">
+                          <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
                             {d.codigo}
                           </span>
                         </div>
@@ -885,9 +882,7 @@ export function Documentos() {
 
                     <td className="px-4 py-3 ">
                       <div className="space-y-0.5">
-                        <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2.5 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 shadow-2xs dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950">
-                          {d.vehiculoPlaca}
-                        </span>
+                        <PlacaBadge placa={d.vehiculoPlaca} />
                         {(d.vehiculoMarca || d.vehiculoModelo) && (
                           <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                             {d.vehiculoMarca} {d.vehiculoModelo}
@@ -899,7 +894,7 @@ export function Documentos() {
                     <td className="px-4 py-3 max-w-[200px]">
                       <div>
                         <p
-                          className="font-bold text-[13px] text-slate-900 dark:text-white truncate"
+                          className="font-bold text-xs text-slate-900 dark:text-white truncate"
                           title={d.propietario}
                         >
                           {d.propietario || 'Sin Propietario Asignado'}
@@ -929,7 +924,7 @@ export function Documentos() {
                       </span>
                     </td>
 
-                    <td className="px-4 py-3 ">
+                    <td className="px-4 py-3 text-center">
                       <StatusBadge status={d.estado} />
                     </td>
 
@@ -1323,9 +1318,7 @@ export function Documentos() {
                       <span className="font-mono text-lg font-black text-slate-900 dark:text-white">
                         {selectedDoc.codigo}
                       </span>
-                      <span className="inline-flex items-center justify-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2 py-0.5 font-mono text-xs font-black tracking-widest text-slate-950 shadow-2xs">
-                        {selectedDoc.vehiculoPlaca}
-                      </span>
+                      <PlacaBadge placa={selectedDoc.vehiculoPlaca} />
                     </div>
                     <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
                       {selectedDoc.propietario || 'Sin Propietario Asignado'} · {selectedDoc.asociacion || 'Independiente'}

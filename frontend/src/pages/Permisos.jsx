@@ -9,7 +9,9 @@ import { ResolucionPermisoPrint } from '../components/documentos/TarjetaOperativ
 import { exportToExcel } from '../utils/exportToExcel'
 import { TramiteFormularioModal } from '../components/permisos/TramiteFormularioModal'
 import { exportToPdf } from '../utils/exportToPdf'
+import { formatNumeroTarjeta } from '../utils/formatters'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 
 const FILTER_TIPO_OPTIONS = [
@@ -52,6 +54,8 @@ export function Permisos() {
   const [editingPermiso, setEditingPermiso] = useState(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
   const previewScrollRef = useRef(null)
 
   useEffect(() => {
@@ -131,6 +135,7 @@ export function Permisos() {
         invalidateCache('/permisos')
         loadData()
         loadStats()
+        showToast('Autorización guardada correctamente', 'crear')
       }
       if (e.data?.type === 'VOLVER_A_DATOS_MODAL') {
         let draft = e.data.draft
@@ -150,6 +155,7 @@ export function Permisos() {
         invalidateCache('/permisos')
         loadData()
         loadStats()
+        showToast('Autorización guardada correctamente', 'crear')
       }
       if (e.key === 'mjlo_volver_a_datos') {
         try {
@@ -250,63 +256,74 @@ export function Permisos() {
   }
 
   const handleExportExcel = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToExcel({
-      filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Autorizaciones',
-      title: 'PADRÓN OFICIAL DE AUTORIZACIONES DE CARGA, DESCARGA Y USO DE VÍAS',
-      subtitle: 'Subgerencia de Tránsito y Transporte - Resoluciones y Permisos Especiales',
-      metadata: [
-        { label: 'Tipo Trámite', value: filterTipo },
-        { label: 'Estado', value: filterEstado },
-        { label: 'Total Registros', value: String(data.length) }
-      ],
-      columns: [
-        { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', isText: true, width: 150, align: 'center' },
-        { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 140 },
-        { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', isText: true, width: 130, align: 'center' },
-        { header: 'SOLICITANTE / EMPRESA', key: 'solicitanteNombre', width: 220 },
-        { header: 'DNI / RUC', key: 'solicitanteDocumento', isText: true, width: 120, align: 'center' },
-        { header: 'EXPEDIENTE', key: 'expediente', isText: true, width: 130, align: 'center' },
-        { header: 'ZONA', key: 'zonaCirculacion', width: 180 },
-        { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 130, align: 'center' },
-        { header: 'INICIO VIGENCIA', key: 'fechaInicioVigencia', width: 120, align: 'center' },
-        { header: 'FIN VIGENCIA', key: 'fechaFinVigencia', width: 120, align: 'center' },
-        { header: 'RECIBO INGRESO', key: 'reciboIngresoNumero', isText: true, width: 130, align: 'center' },
-        { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toFixed(2)}`, align: 'right', width: 110 },
-        { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
-      ],
-      data
-    })
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      const data = await fetchTodoElFiltro()
+          exportToExcel({
+            filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Autorizaciones',
+            title: 'PADRÓN OFICIAL DE AUTORIZACIONES DE CARGA, DESCARGA Y USO DE VÍAS',
+            subtitle: 'Subgerencia de Tránsito y Transporte - Resoluciones y Permisos Especiales',
+            metadata: [
+              { label: 'Tipo Trámite', value: filterTipo },
+              { label: 'Estado', value: filterEstado },
+              { label: 'Total Registros', value: String(data.length) }
+            ],
+            columns: [
+              { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', isText: true, width: 150, align: 'center' },
+              { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 140 },
+              { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', isText: true, width: 130, align: 'center' },
+              { header: 'SOLICITANTE / EMPRESA', key: 'solicitanteNombre', width: 220 },
+              { header: 'DNI / RUC', key: 'solicitanteDocumento', isText: true, width: 120, align: 'center' },
+              { header: 'EXPEDIENTE', key: 'expediente', isText: true, width: 130, align: 'center' },
+              { header: 'ZONA', key: 'zonaCirculacion', width: 180 },
+              { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 130, align: 'center' },
+              { header: 'INICIO VIGENCIA', key: 'fechaInicioVigencia', width: 120, align: 'center' },
+              { header: 'FIN VIGENCIA', key: 'fechaFinVigencia', width: 120, align: 'center' },
+              { header: 'RECIBO INGRESO', key: 'reciboIngresoNumero', isText: true, width: 130, align: 'center' },
+              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toFixed(2)}`, align: 'right', width: 110 },
+              { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+            ],
+            data
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
   const handleExportPdf = async () => {
-    const data = await fetchTodoElFiltro()
-    exportToPdf({
-      filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}`,
-      subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Autorizaciones y Permisos',
-      summaryItems: [
-        { label: 'Total autorizaciones', value: totalPermisos },
-        { label: 'Exportando', value: `${data.length} registros` },
-        { label: 'Carga y Descarga', value: totalCarga },
-        { label: 'Uso de Vías', value: totalVias },
-        { label: 'Vigentes', value: vigentes },
-        { label: 'Vencidos', value: vencidos },
-      ],
-      columns: [
-        { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', width: 110, align: 'center' },
-        { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 120 },
-        { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', width: 100, align: 'center' },
-        { header: 'SOLICITANTE', key: 'solicitanteNombre', width: 180 },
-        { header: 'DNI / RUC', key: 'solicitanteDocumento', width: 100, align: 'center' },
-        { header: 'ZONA', key: 'zonaCirculacion', width: 150 },
-        { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 100, align: 'center' },
-        { header: 'INICIO', key: 'fechaInicioVigencia', width: 85, align: 'center' },
-        { header: 'FIN', key: 'fechaFinVigencia', width: 85, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
-      ],
-      data
-    })
+    setIsExportingPdf(true)
+    try {
+      const data = await fetchTodoElFiltro()
+          await exportToPdf({
+            filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}`,
+            subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Autorizaciones y Permisos',
+            summaryItems: [
+              { label: 'Total autorizaciones', value: totalPermisos },
+              { label: 'Exportando', value: `${data.length} registros` },
+              { label: 'Carga y Descarga', value: totalCarga },
+              { label: 'Uso de Vías', value: totalVias },
+              { label: 'Vigentes', value: vigentes },
+              { label: 'Vencidos', value: vencidos },
+            ],
+            columns: [
+              { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', width: 110, align: 'center' },
+              { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 120 },
+              { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', width: 100, align: 'center' },
+              { header: 'SOLICITANTE', key: 'solicitanteNombre', width: 180 },
+              { header: 'DNI / RUC', key: 'solicitanteDocumento', width: 100, align: 'center' },
+              { header: 'ZONA', key: 'zonaCirculacion', width: 150 },
+              { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 100, align: 'center' },
+              { header: 'INICIO', key: 'fechaInicioVigencia', width: 85, align: 'center' },
+              { header: 'FIN', key: 'fechaFinVigencia', width: 85, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
+            ],
+            data
+          })
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
 
   const handleOpenDetail = (p) => {
@@ -369,7 +386,7 @@ export function Permisos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(totalPermisos)}
+              {formatNumeroTarjeta(totalPermisos)}
             </p>
           </div>
         </div>
@@ -384,7 +401,7 @@ export function Permisos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(totalControl)}
+              {formatNumeroTarjeta(totalControl)}
             </p>
           </div>
         </div>
@@ -399,7 +416,7 @@ export function Permisos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(totalCarga)}
+              {formatNumeroTarjeta(totalCarga)}
             </p>
           </div>
         </div>
@@ -414,7 +431,7 @@ export function Permisos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(totalVias)}
+              {formatNumeroTarjeta(totalVias)}
             </p>
           </div>
         </div>
@@ -429,7 +446,7 @@ export function Permisos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(totalZonas)}
+              {formatNumeroTarjeta(totalZonas)}
             </p>
           </div>
         </div>
@@ -444,7 +461,7 @@ export function Permisos() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {new Intl.NumberFormat('es-PE').format(vigentes)}
+              {formatNumeroTarjeta(vigentes)}
             </p>
           </div>
         </div>
@@ -538,9 +555,9 @@ export function Permisos() {
                   onClick={handleExportExcel}
                   title="Descargar padrón en Excel (.xls)"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-                >
-                  <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Excel</span>
+                 disabled={isExportingExcel}>
+                  <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
+                  <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
                 </button>
 
                 <button
@@ -548,9 +565,9 @@ export function Permisos() {
                   onClick={handleExportPdf}
                   title="Descargar o imprimir padrón en PDF"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-                >
-                  <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" />
-                  <span>PDF</span>
+                 disabled={isExportingPdf}>
+                  <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
+                  <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
                 </button>
 
                 <button
@@ -567,7 +584,7 @@ export function Permisos() {
 
             {/* Tabla de Autorizaciones */}
             <div className="overflow-x-auto">
-              <table className="w-full table-fixed text-left text-xs sm:text-sm">
+              <table className="w-full table-fixed text-left text-xs">
                 <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <tr>
                     <th className="px-4 py-3 w-[28%]"><SortableHeader column="solicitanteNombre" label="Solicitante" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
@@ -601,24 +618,18 @@ export function Permisos() {
                       const isVias = p.tipoPermiso === 'USO_VIAS'
                       const isZonas = p.tipoPermiso === 'ZONAS_RESERVADAS' || p.tipoPermiso === 'ZONA_RESERVADA'
                       const solicitanteText = p.solicitanteNombre || p.solicitante || '—'
-                      const initials = solicitanteText.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || 'AU'
 
                       return (
                           <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
-                            {/* Solicitante / Titular con Avatar */}
+                            {/* Solicitante / Titular */}
                             <td className="px-4 py-3 align-top">
-                              <div className="flex items-center gap-3">
-                                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 font-bold text-slate-700 text-xs shadow-2xs dark:bg-[var(--bg-subtle)] dark:text-slate-300 border border-slate-200 dark:border-[var(--border-strong)]">
-                                  {initials}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-[13px] font-bold text-slate-900 dark:text-white">
-                                    {solicitanteText}
-                                  </p>
-                                  <p className="text-[10px] text-slate-400 font-mono">
-                                    {p.solicitanteDocumento || p.solicitanteDoc ? `DOC: ${p.solicitanteDocumento || p.solicitanteDoc}` : 'Sin documento'}
-                                  </p>
-                                </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                  {solicitanteText}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                  {p.solicitanteDocumento || p.solicitanteDoc ? `DOC: ${p.solicitanteDocumento || p.solicitanteDoc}` : 'Sin documento'}
+                                </p>
                               </div>
                             </td>
 
@@ -637,7 +648,7 @@ export function Permisos() {
                               >
                                 {isCarga ? 'Carga y Descarga' : isVias ? 'Uso de Vías' : isZonas ? 'Zonas Reservadas' : 'Control Vehicular'}
                               </span>
-                              <div className="text-[13px] font-bold text-slate-700 dark:text-slate-200 font-mono">
+                              <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-mono">
                                 {p.numeroAutorizacion}
                               </div>
                               <div className="text-[10px] text-slate-400 font-mono">
@@ -648,14 +659,12 @@ export function Permisos() {
                             {/* Vehículo / Flota */}
                             <td className="px-4 py-3 align-top">
                               {p.vehiculoPlaca && p.vehiculoPlaca !== '—' ? (
-                                <span className="inline-flex items-center rounded-lg border-2 border-slate-900 bg-amber-300 px-2 py-0.5 font-mono text-[11px] font-black text-slate-950 shadow-xs">
-                                  {p.vehiculoPlaca}
-                                </span>
+                                <PlacaBadge placa={p.vehiculoPlaca} />
                               ) : p.flotaPlacas ? (
-                                <div className="flex flex-col gap-1">
-                                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                                    Flota General
-                                  </span>
+                                <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                  {p.flotaPlacas.split(/[\s,]+/).filter(Boolean).map((placa, idx) => (
+                                    <PlacaBadge key={idx} placa={placa.trim()} size="sm" />
+                                  ))}
                                 </div>
                               ) : (
                                 <span className="text-slate-400 dark:text-slate-500 italic text-xs">No especificado</span>

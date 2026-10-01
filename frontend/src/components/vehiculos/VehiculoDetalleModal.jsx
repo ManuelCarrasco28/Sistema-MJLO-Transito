@@ -1,6 +1,7 @@
 import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
+import { PlacaBadge } from '../ui/PlacaBadge'
 
 export function VehiculoDetalleModal({
   selectedVehiculo,
@@ -22,9 +23,7 @@ export function VehiculoDetalleModal({
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white font-mono">
-                  {selectedVehiculo.placa}
-                </h3>
+                <PlacaBadge placa={selectedVehiculo.placa} size="sm" />
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
                     isVehiculoFormal(selectedVehiculo)
@@ -90,7 +89,9 @@ export function VehiculoDetalleModal({
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Placa</p>
-                  <p className="font-mono text-lg font-black text-slate-900 dark:text-white">{selectedVehiculo.placa}</p>
+                  <div className="mt-1">
+                    <PlacaBadge placa={selectedVehiculo.placa} size="lg" />
+                  </div>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Color</p>

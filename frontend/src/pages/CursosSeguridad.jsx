@@ -47,7 +47,8 @@ export function CursosSeguridad() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedCurso, setSelectedCurso] = useState(null)
   const [loadError, setLoadError] = useState('')
-  const [personas, setPersonas] = useState(getCachedData('/personas') || [])
+  const [participanteResults, setParticipanteResults] = useState([])
+  const [isSearchingParticipante, setIsSearchingParticipante] = useState(false)
   const [participanteSearch, setParticipanteSearch] = useState('')
   const [showParticipanteResults, setShowParticipanteResults] = useState(false)
   const [inscribiendo, setInscribiendo] = useState(false)
@@ -70,6 +71,8 @@ export function CursosSeguridad() {
 
   const [printCurso, setPrintCurso] = useState(null)
   const [printAprobado, setPrintAprobado] = useState(null)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const handlePrintBatch = (curso) => {
     if (!curso.participantes || curso.participantes.length === 0) {
@@ -236,57 +239,68 @@ export function CursosSeguridad() {
     currentPage * itemsPerPage
   )
 
-  const handleExportExcel = () => {
-    exportToExcel({
-      filename: `Cursos_Seguridad_Vial_${new Date().toISOString().slice(0, 10)}.xls`,
-      sheetName: 'Cursos',
-      title: 'PROGRAMA MUNICIPAL DE EDUCACIÓN Y SEGURIDAD VIAL',
-      subtitle: 'Capacitación y Emisión de Carnets para Conductores y Transportistas',
-      metadata: [
-        { label: 'Tipo', value: filterTipo },
-        { label: 'Estado', value: filterEstado },
-        { label: 'Total Cursos', value: String(filteredCursos.length) }
-      ],
-      columns: [
-        { header: 'CÓDIGO', key: 'codigo', isText: true, width: 130, align: 'center' },
-        { header: 'TÍTULO DEL CURSO', key: 'titulo', width: 260 },
-        { header: 'TIPO', key: 'tipo', width: 160 },
-        { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
-        { header: 'HORARIO', key: 'horario', width: 140, align: 'center' },
-        { header: 'INSTRUCTOR', key: 'instructor', width: 180 },
-        { header: 'LUGAR', key: 'lugar', width: 200 },
-        { header: 'VACANTES', key: 'capacidad', width: 90, align: 'center' },
-        { header: 'INSCRITOS', render: (_, c) => String(c.inscritos || c.participantes?.length || 0), width: 90, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
-      ],
-      data: filteredCursos
-    })
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true)
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      exportToExcel({
+            filename: `Cursos_Seguridad_Vial_${new Date().toISOString().slice(0, 10)}.xls`,
+            sheetName: 'Cursos',
+            title: 'PROGRAMA MUNICIPAL DE EDUCACIÓN Y SEGURIDAD VIAL',
+            subtitle: 'Capacitación y Emisión de Carnets para Conductores y Transportistas',
+            metadata: [
+              { label: 'Tipo', value: filterTipo },
+              { label: 'Estado', value: filterEstado },
+              { label: 'Total Cursos', value: String(filteredCursos.length) }
+            ],
+            columns: [
+              { header: 'CÓDIGO', key: 'codigo', isText: true, width: 130, align: 'center' },
+              { header: 'TÍTULO DEL CURSO', key: 'titulo', width: 260 },
+              { header: 'TIPO', key: 'tipo', width: 160 },
+              { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
+              { header: 'HORARIO', key: 'horario', width: 140, align: 'center' },
+              { header: 'INSTRUCTOR', key: 'instructor', width: 180 },
+              { header: 'LUGAR', key: 'lugar', width: 200 },
+              { header: 'VACANTES', key: 'capacidad', width: 90, align: 'center' },
+              { header: 'INSCRITOS', render: (_, c) => String(c.inscritos || c.participantes?.length || 0), width: 90, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
+            ],
+            data: filteredCursos
+          })
+    } finally {
+      setIsExportingExcel(false)
+    }
   }
 
-  const handleExportPdf = () => {
-    exportToPdf({
-      filename: `Cursos_Seguridad_Vial_${new Date().toISOString().slice(0, 10)}.pdf`,
-      title: 'PROGRAMA MUNICIPAL DE EDUCACIÓN Y SEGURIDAD VIAL',
-      subtitle: 'Capacitación y Emisión de Carnets para Conductores y Transportistas',
-      metadata: [
-        { label: 'Tipo', value: filterTipo },
-        { label: 'Estado', value: filterEstado },
-        { label: 'Total Cursos', value: String(filteredCursos.length) }
-      ],
-      columns: [
-        { header: 'CÓDIGO', key: 'codigo', isText: true, width: 130, align: 'center' },
-        { header: 'TÍTULO DEL CURSO', key: 'titulo', width: 260 },
-        { header: 'TIPO', key: 'tipo', width: 160 },
-        { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
-        { header: 'HORARIO', key: 'horario', width: 140, align: 'center' },
-        { header: 'INSTRUCTOR', key: 'instructor', width: 180 },
-        { header: 'LUGAR', key: 'lugar', width: 200 },
-        { header: 'VACANTES', key: 'capacidad', width: 90, align: 'center' },
-        { header: 'INSCRITOS', render: (_, c) => String(c.inscritos || c.participantes?.length || 0), width: 90, align: 'center' },
-        { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
-      ],
-      data: filteredCursos
-    })
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true)
+    try {
+      await exportToPdf({
+            filename: `Cursos_Seguridad_Vial_${new Date().toISOString().slice(0, 10)}.pdf`,
+            title: 'PROGRAMA MUNICIPAL DE EDUCACIÓN Y SEGURIDAD VIAL',
+            subtitle: 'Capacitación y Emisión de Carnets para Conductores y Transportistas',
+            metadata: [
+              { label: 'Tipo', value: filterTipo },
+              { label: 'Estado', value: filterEstado },
+              { label: 'Total Cursos', value: String(filteredCursos.length) }
+            ],
+            columns: [
+              { header: 'CÓDIGO', key: 'codigo', isText: true, width: 130, align: 'center' },
+              { header: 'TÍTULO DEL CURSO', key: 'titulo', width: 260 },
+              { header: 'TIPO', key: 'tipo', width: 160 },
+              { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
+              { header: 'HORARIO', key: 'horario', width: 140, align: 'center' },
+              { header: 'INSTRUCTOR', key: 'instructor', width: 180 },
+              { header: 'LUGAR', key: 'lugar', width: 200 },
+              { header: 'VACANTES', key: 'capacidad', width: 90, align: 'center' },
+              { header: 'INSCRITOS', render: (_, c) => String(c.inscritos || c.participantes?.length || 0), width: 90, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
+            ],
+            data: filteredCursos
+          })
+    } finally {
+      setIsExportingPdf(false)
+    }
   }
 
   // Bloquea el scroll de la página de fondo mientras hay un modal abierto.
@@ -317,17 +331,6 @@ export function CursosSeguridad() {
       .catch(() => setLoadError('No se pudo cargar el registro de cursos viales.'))
       .finally(() => setIsLoading(false))
 
-    if (personas.length === 0) {
-      apiFetch('/personas?porPagina=100')
-        .then(res => res.ok ? res.json() : Promise.reject(res))
-        .then(data => {
-          const pData = data.data || []
-          setPersonas(pData)
-          setCachedData('/personas', pData)
-        })
-        .catch(() => {})
-    }
-
     apiFetch('/cursos/personas-vigentes')
       .then(res => res.ok ? res.json() : Promise.reject(res))
       .then(data => setPersonasVigentes(data.data || []))
@@ -340,24 +343,33 @@ export function CursosSeguridad() {
     return `${p.nombres || ''} ${p.apellidoPaterno || p.apellido_paterno || ''} ${p.apellidoMaterno || p.apellido_materno || ''}`.trim() || 'Sin Nombre'
   }
 
-  const participanteResults = participanteSearch.trim()
-    ? personas.filter((p) => {
-        // Oculta personas que ya cuentan con un certificado vigente (últimos 2
-        // años) de algún curso, salvo que ya estén inscritas en este mismo
-        // curso (para que sigan mostrándose como "ya inscrito").
-        const yaInscritoAqui = selectedCurso?.participantes?.some(
-          (part) => part.dni === (p.numeroDocumento || p.numero)
-        )
-        if (personasVigentes.includes(p.id) && !yaInscritoAqui) return false
-        // Filtra registros basura/placeholder (ej. "Sin Propietario Asignado").
-        if (getPersonaNombre(p).toUpperCase().includes('SIN PROPIETARIO')) return false
-
-        const q = participanteSearch.trim().toLowerCase()
-        const doc = String(p.numeroDocumento || p.numero || '').toLowerCase()
-        const nom = getPersonaNombre(p).toLowerCase()
-        return doc.includes(q) || nom.includes(q)
-      }).slice(0, 8)
-    : []
+  // Búsqueda dinámica y debounced de participantes (evita descargar miles de personas en memoria)
+  useEffect(() => {
+    const rawQuery = (participanteSearch || '').trim()
+    if (!rawQuery || rawQuery.length < 2) {
+      setParticipanteResults([])
+      return
+    }
+    const timer = setTimeout(() => {
+      setIsSearchingParticipante(true)
+      apiFetch(`/personas?buscar=${encodeURIComponent(rawQuery)}&porPagina=12`)
+        .then((res) => (res.ok ? res.json() : { data: [] }))
+        .then((payload) => {
+          const list = (payload.data || []).filter((p) => {
+            const yaInscritoAqui = selectedCurso?.participantes?.some(
+              (part) => part.dni === (p.numeroDocumento || p.numero)
+            )
+            if (personasVigentes.includes(p.id) && !yaInscritoAqui) return false
+            if (getPersonaNombre(p).toUpperCase().includes('SIN PROPIETARIO')) return false
+            return true
+          })
+          setParticipanteResults(list.slice(0, 8))
+        })
+        .catch(() => {})
+        .finally(() => setIsSearchingParticipante(false))
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [participanteSearch, personasVigentes, selectedCurso])
 
   const aprobados = cursos.flatMap(c => 
     (c.estado === 'FINALIZADO' && c.participantes) 
@@ -483,8 +495,20 @@ export function CursosSeguridad() {
               placeholder="Buscar por código, título, instructor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-purple-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-purple-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-purple-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-purple-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <RoundedSelect
@@ -497,12 +521,28 @@ export function CursosSeguridad() {
               onChange={setFilterEstado}
               options={FILTER_ESTADO_OPTIONS}
             />
+
+            {(filterTipo !== 'TODOS' || filterEstado !== 'TODOS' || searchTerm !== '') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterTipo('TODOS')
+                  setFilterEstado('TODOS')
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
+                title="Limpiar filtros"
+                className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
+              >
+                <Icon name="filterX" className="size-4" />
+              </button>
+            )}
             
-            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors">
-              <Icon name="fileSpreadsheet" className="size-3.5 text-emerald-600 dark:text-emerald-400" /><span>Excel</span>
+            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors" disabled={isExportingExcel}>
+              <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} /><span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
-            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-colors">
-              <Icon name="filePdf" className="size-3.5 text-rose-600 dark:text-rose-400" /><span>PDF</span>
+            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-colors" disabled={isExportingPdf}>
+              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} /><span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
             
             <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 whitespace-nowrap hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
@@ -513,15 +553,15 @@ export function CursosSeguridad() {
 
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+          <table className="w-full table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[14%]" />
               <col className="w-[22%]" />
               <col className="w-[14%]" />
               <col className="w-[13%]" />
               <col className="w-[18%]" />
-              <col className="w-[9%]" />
-              <col className="w-[10%]" />
+              <col className="w-[110px]" />
+              <col className="w-[110px]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
@@ -564,7 +604,7 @@ export function CursosSeguridad() {
                   <tr key={c.id} className="group transition-colors hover:bg-purple-50/30 dark:hover:bg-[var(--bg-subtle)]">
 
                     <td className="px-3 py-3 ">
-                      <p className="font-bold text-slate-900 dark:text-white">{c.codigo}</p>
+                      <p className="font-bold text-xs text-slate-900 dark:text-white">{c.codigo}</p>
                       <span className="mt-0.5 inline-block rounded-md bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
                         {c.tipoLabel || 'SEGURIDAD VIAL'}
                       </span>
@@ -573,7 +613,7 @@ export function CursosSeguridad() {
 
                     <td className="px-3 py-3">
                       <div>
-                        <p className="font-bold text-slate-900 dark:text-white" title={c.titulo}>{c.titulo}</p>
+                        <p className="font-bold text-xs text-slate-900 dark:text-white" title={c.titulo}>{c.titulo}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400" title={c.descripcion}>
                           {c.descripcion || 'Educación Vial Obligatoria para Conductores'}
                         </p>
@@ -582,7 +622,7 @@ export function CursosSeguridad() {
 
 
                     <td className="px-3 py-3 text-center">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">{c.fecha}</p>
+                      <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{c.fecha}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         {c.horario || '09:00 AM - 12:00 PM'}
                       </p>
@@ -590,7 +630,7 @@ export function CursosSeguridad() {
 
 
                     <td className="px-3 py-3 text-center">
-                      <p className="font-bold text-slate-900 dark:text-white">
+                      <p className="font-bold text-xs text-slate-900 dark:text-white">
                         {c.inscritos || 0} / {c.capacidad || 50}
                       </p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
@@ -601,7 +641,7 @@ export function CursosSeguridad() {
 
                     <td className="px-3 py-3">
                       <div>
-                        <p className="font-semibold text-slate-800 dark:text-slate-200" title={c.instructor}>{c.instructor || 'Ing. Fernando Ramos'}</p>
+                        <p className="font-semibold text-xs text-slate-800 dark:text-slate-200" title={c.instructor}>{c.instructor || 'Ing. Fernando Ramos'}</p>
                         <p className="text-xs text-slate-400 dark:text-slate-500" title={c.lugar}>{c.lugar || 'Auditorio Municipal JLO'}</p>
                       </div>
                     </td>
@@ -666,7 +706,7 @@ export function CursosSeguridad() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs sm:text-sm">
+            <table className="w-full text-left text-xs">
               <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-5 py-4">Conductor</th>
@@ -697,18 +737,18 @@ export function CursosSeguridad() {
                     return (
                       <tr key={i} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-[var(--bg-subtle)]">
                         <td className="px-5 py-4">
-                          <p className="font-bold text-slate-800 dark:text-slate-200">{p.nombres} {p.apellido_paterno} {p.apellido_materno}</p>
+                          <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.nombres} {p.apellido_paterno} {p.apellido_materno}</p>
                         </td>
                         <td className="px-5 py-4">
-                          <p className="font-bold text-slate-800 dark:text-slate-200">{p.dni}</p>
+                          <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.dni}</p>
                           <p className="text-[10px] font-semibold text-slate-500">LIC. {p.licencia || 'S/N'}</p>
                         </td>
                         <td className="px-5 py-4">
-                          <p className="font-semibold text-slate-800 dark:text-slate-200">{p.curso.codigo}</p>
+                          <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{p.curso.codigo}</p>
                           <p className="text-[10px] font-semibold text-slate-500 max-w-[150px] truncate">{p.curso.titulo}</p>
                         </td>
                         <td className="px-5 py-4">
-                          <p className="font-bold text-slate-800 dark:text-slate-200">{p.curso.fecha}</p>
+                          <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.curso.fecha}</p>
                           <p className="text-[10px] font-semibold text-slate-500">Vence: {fechaVencimiento}</p>
                         </td>
                         <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
@@ -902,7 +942,12 @@ export function CursosSeguridad() {
                             <span>Personas registradas ({participanteResults.length})</span>
                             <button type="button" onClick={() => setShowParticipanteResults(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕ Cerrar</button>
                           </div>
-                          {participanteResults.length === 0 ? (
+                          {isSearchingParticipante && (
+                            <div className="p-3 text-center text-xs text-slate-400 font-medium animate-pulse">
+                              Buscando en padrón de ciudadanos...
+                            </div>
+                          )}
+                          {!isSearchingParticipante && participanteResults.length === 0 ? (
                             <div className="p-3 text-center text-xs text-slate-400 font-medium space-y-2">
                               <p>No se encontró ninguna persona con ese DNI o nombre.</p>
                               <a
@@ -1041,6 +1086,7 @@ export function CursosSeguridad() {
                                   const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes };
                                   setSelectedCurso(updatedCurso);
                                   setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
+                                  showToast('Estado de participante actualizado', 'editar');
                                 } catch (err) {
                                   showError('Error', sanitizarMensaje(err.message, 'Ocurrió un error al procesar la solicitud.'));
                                 }

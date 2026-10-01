@@ -121,9 +121,13 @@ class AsociacionesController extends ResourceController
         ];
 
         if ($page > 0) {
-            // Conteo total para paginación considerando el GROUP BY
-            $subquery = (clone $builder)->select('o.id AS sub_id', false);
-            $total = $db->newQuery()->fromSubquery($subquery, 't_count')->countAllResults();
+            // Conteo total para paginación optimizado sin subconsulta pesada
+            $countBuilder = clone $builder;
+            $countRow = $countBuilder->select('COUNT(DISTINCT o.id) AS total_count', false)
+                ->groupBy(null)
+                ->get()
+                ->getRowArray();
+            $total = (int) ($countRow['total_count'] ?? 0);
 
             $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'o.id')
                 ->limit($porPagina, ($page - 1) * $porPagina)

@@ -1,3 +1,28 @@
+// Mapa de prefetch por path: cada función dispara un import() dinámico silencioso.
+// El módulo ES ya cachea la promesa internamente — llamarlo varias veces no
+// genera peticiones duplicadas, simplemente devuelve la misma promesa resuelta.
+export const PREFETCH_MAP = {
+  '/dashboard':               () => import('../pages/DashboardHome'),
+  '/vehiculos':               () => import('../pages/Vehiculos'),
+  '/personas':                () => import('../pages/Personas'),
+  '/superadmin/personas':     () => import('../pages/Personas'),
+  '/trabajadores':            () => import('../pages/Trabajadores'),
+  '/superadmin/trabajadores': () => import('../pages/Trabajadores'),
+  '/asociaciones':            () => import('../pages/Asociaciones'),
+  '/documentos':              () => import('../pages/Documentos'),
+  '/inspecciones':            () => import('../pages/Inspecciones'),
+  '/papeletas':               () => import('../pages/Papeletas'),
+  '/cursos':                  () => import('../pages/CursosSeguridad'),
+  '/cursos-seguridad':        () => import('../pages/CursosSeguridad'),
+  '/pagos':                   () => import('../pages/Pagos'),
+  '/internamientos':          () => import('../pages/Retenciones'),
+  '/retenciones':             () => import('../pages/Retenciones'),
+  '/permisos':                () => import('../pages/Permisos'),
+  '/operativos':              () => import('../pages/Operativos'),
+  '/superadmin':              () => import('../pages/SuperAdminDashboard'),
+  '/superadmin/usuarios':     () => import('../pages/Usuarios'),
+}
+
 export const navigationGroups = [
   {
     name: 'Super Admin',
@@ -33,33 +58,33 @@ export const navigationGroups = [
   {
     name: 'Padrón municipal',
     items: [
-      { id: 'personas', label: 'Personas', icon: 'idCard', path: '/personas', officeOnly: true },
-      { id: 'trabajadores', label: 'Trabajadores', icon: 'workerBadge', path: '/trabajadores', officeOnly: true },
-      { id: 'asociaciones', label: 'Asociaciones', icon: 'office', path: '/asociaciones', officeOnly: true },
-      { id: 'vehiculos', label: 'Vehículos', icon: 'motoTaxi', path: '/vehiculos' },
+      { id: 'personas',      label: 'Personas',      icon: 'idCard',       path: '/personas',      officeOnly: true },
+      { id: 'trabajadores',  label: 'Trabajadores',  icon: 'workerBadge',  path: '/trabajadores',  officeOnly: true },
+      { id: 'asociaciones',  label: 'Asociaciones',  icon: 'office',       path: '/asociaciones',  officeOnly: true },
+      { id: 'vehiculos',     label: 'Vehículos',     icon: 'motoTaxi',     path: '/vehiculos' },
     ]
   },
   {
     name: 'Trámites',
     officeOnly: true,
     items: [
-      { id: 'permisos', label: 'Permisos y Autorizaciones', icon: 'routePermit', path: '/permisos' },
-      { id: 'cursos', label: 'Curso de Seguridad Vial', icon: 'course', path: '/cursos' },
-      { id: 'documentos', label: 'Documentos del Vehículo', icon: 'folderShield', path: '/documentos' },
+      { id: 'permisos',    label: 'Permisos y Autorizaciones', icon: 'routePermit',  path: '/permisos' },
+      { id: 'cursos',      label: 'Curso de Seguridad Vial',   icon: 'course',       path: '/cursos' },
+      { id: 'documentos',  label: 'Documentos del Vehículo',   icon: 'folderShield', path: '/documentos' },
     ]
   },
   {
     name: 'Inspecciones Técnicas',
     items: [
-      { id: 'certicav', label: 'Certicav', icon: 'certificate', path: '/inspecciones' },
-      { id: 'operativos', label: 'Operativos', icon: 'operations', path: '/operativos' },
+      { id: 'certicav',   label: 'Certicav',   icon: 'certificate', path: '/inspecciones' },
+      { id: 'operativos', label: 'Operativos', icon: 'operations',  path: '/operativos' },
     ]
   },
   {
     name: 'Fiscalización',
     items: [
-      { id: 'papeletas', label: 'Papeletas', icon: 'ticket', path: '/papeletas' },
-      { id: 'internamientos', label: 'Internamientos', icon: 'garage', path: '/internamientos' },
+      { id: 'papeletas',     label: 'Papeletas',     icon: 'ticket', path: '/papeletas' },
+      { id: 'internamientos',label: 'Internamientos',icon: 'garage', path: '/internamientos' },
     ]
   },
   {

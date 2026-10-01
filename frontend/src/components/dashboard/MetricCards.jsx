@@ -1,4 +1,5 @@
 import { Icon } from '../ui/Icon'
+import { formatNumeroTarjeta } from '../../utils/formatters'
 
 export function MetricCards({ cards = [], loading = false, user }) {
   const rolNormalizado = (user?.rol || '').toUpperCase()
@@ -51,7 +52,7 @@ export function MetricCards({ cards = [], loading = false, user }) {
             <div className="min-w-0">
               <p className="text-xs font-semibold text-[#A3AED0] dark:text-white/60">{card.label}</p>
               <h3 className="text-2xl font-extrabold text-[#2B3674] dark:text-white tracking-tight">
-                {typeof card.value === 'number' ? new Intl.NumberFormat('es-PE').format(card.value) : card.value}
+                {typeof card.value === 'number' ? formatNumeroTarjeta(card.value) : card.value}
               </h3>
               {card.change && (
                 <div className="flex items-center gap-1 mt-0.5">

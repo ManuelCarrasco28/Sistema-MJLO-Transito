@@ -71,6 +71,91 @@ class PagosController extends ResourceController
         $tipoFiltro = strtoupper(trim((string)$this->request->getGet('tipoPago')));
         $estadoFiltro = strtoupper(trim((string)$this->request->getGet('estado')));
 
+        // Optimización de alto rendimiento: cuando se consulta una página específica y no es solo PENDIENTE,
+        // paginar directamente en SQL sobre pagos_transito (evita cargar 30,000 registros en RAM por cada tecla).
+        if ($page > 0 && $estadoFiltro !== 'PENDIENTE') {
+            $builder = $db->table('pagos_transito pt')
+                ->select("
+                    pt.id,
+                    pt.id_papeleta,
+                    pt.id_tramite,
+                    pt.id_inscripcion,
+                    pt.fecha_pago,
+                    pt.hora_pago,
+                    pt.tipo_pago,
+                    pt.numero_recibo,
+                    pt.numero_voucher,
+                    pt.medio_pago,
+                    pt.referencia_pago,
+                    pt.total,
+                    pt.estado
+                ");
+
+            if ($tipoFiltro !== '' && $tipoFiltro !== 'TODOS') {
+                $builder->where('pt.tipo_pago', $tipoFiltro);
+            }
+
+            if ($estadoFiltro === 'PAGADO') {
+                $builder->where('pt.estado', 'PAGADO');
+            }
+
+            if ($buscar !== '') {
+                $builder->join('papeletas pap', 'pap.id = pt.id_papeleta', 'left')
+                    ->join('personas per_pap', 'per_pap.id = pap.id_persona_infractor', 'left')
+                    ->join('ciudadanos c_pap', 'c_pap.id_persona = per_pap.id', 'left')
+                    ->groupStart()
+                        ->like('pt.numero_recibo', $buscar)
+                        ->orLike('pt.numero_voucher', $buscar)
+                        ->orLike('pt.referencia_pago', $buscar)
+                        ->orLike('pt.medio_pago', $buscar)
+                        ->orLike('per_pap.numero', $buscar)
+                        ->orLike('c_pap.nombres', $buscar)
+                        ->orLike('c_pap.apellido_paterno', $buscar)
+                    ->groupEnd();
+            }
+
+            $total = (clone $builder)->countAllResults(false);
+
+            $columnasOrden = [
+                'numeroRecibo' => 'pt.numero_recibo',
+                'referenciaPago' => 'pt.referencia_pago',
+                'metodoPago' => 'pt.medio_pago',
+                'montoTotal' => 'pt.total',
+                'estado' => 'pt.estado',
+                'fecha' => 'pt.fecha_pago',
+            ];
+            $sortBy = trim((string) $this->request->getGet('sortBy'));
+            $sortDir = strtoupper(trim((string) $this->request->getGet('sortDir'))) === 'ASC' ? 'ASC' : 'DESC';
+            $orderCol = $columnasOrden[$sortBy] ?? 'pt.id';
+
+            $rows = $builder->orderBy($orderCol, $sortDir)
+                ->limit($porPagina, ($page - 1) * $porPagina)
+                ->get()
+                ->getResultArray();
+
+            $idsPapeleta = [];
+            $idsTramite = [];
+            $idsCurso = [];
+            foreach ($rows as $r) {
+                if (!empty($r['id_papeleta'])) $idsPapeleta[] = (int)$r['id_papeleta'];
+                if (!empty($r['id_tramite'])) $idsTramite[] = (int)$r['id_tramite'];
+                if (!empty($r['id_inscripcion'])) $idsCurso[] = (int)$r['id_inscripcion'];
+            }
+
+            $mapasPagador = $this->resolverPagadoresEnBloque($db, $idsPapeleta, $idsTramite, $idsCurso, []);
+            $data = array_map(fn ($row) => $this->present($row, $mapasPagador), $rows);
+
+            return $this->respond([
+                'data' => $data,
+                'meta' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'porPagina' => $porPagina,
+                    'totalPaginas' => (int) ceil($total / $porPagina),
+                ],
+            ]);
+        }
+
         $rows = $db->table('pagos_transito')->orderBy('id', 'DESC')->get()->getResultArray();
 
         $pendientes = $db->table('ordenes_internamiento oi')

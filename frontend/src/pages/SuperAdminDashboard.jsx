@@ -5,6 +5,7 @@ import { apiFetch } from '../config/api'
 import { showConfirm, showSuccess, showError } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { formatNumeroTarjeta } from '../utils/formatters'
 import { FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { Modal } from '../components/ui/Modal'
 import { RolesTable } from '../components/superadmin/RolesTable'
@@ -498,7 +499,7 @@ export function SuperAdminDashboard({ user }) {
                 </div>
                 <div className="mt-1">
                   <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-                    {stat.value}
+                    {typeof stat.value === 'number' ? formatNumeroTarjeta(stat.value) : stat.value}
                   </p>
                   <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{stat.detail}</p>
                 </div>
@@ -693,7 +694,7 @@ export function SuperAdminDashboard({ user }) {
               </div>
 
               <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 dark:border-[var(--border)]">
-                <table className="w-full text-left text-sm">
+                <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 dark:bg-slate-950 dark:text-slate-400">
                     <tr>
                       <th className="px-4 py-3 text-center">Fecha y Hora</th>
@@ -736,7 +737,7 @@ export function SuperAdminDashboard({ user }) {
                           </span>
                         </td>
                         <td className="px-4 py-3 ">
-                          <p className="font-semibold text-slate-800 dark:text-white leading-snug">{event.descripcion}</p>
+                          <p className="font-semibold text-xs text-slate-800 dark:text-white leading-snug">{event.descripcion}</p>
                           {event.user_agent && (
                             <p className="mt-0.5 text-[10px] text-slate-400  " title={event.user_agent}>
                               {event.user_agent}

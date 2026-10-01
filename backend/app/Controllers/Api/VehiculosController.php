@@ -283,11 +283,17 @@ class VehiculosController extends ResourceController
                 ->limit($porPagina, ($page - 1) * $porPagina)
                 ->get()->getResultArray();
 
+            $data = array_map(static function (array $row): array {
+                $propietario = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
+                unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
+                return $row + [
+                    'propietario' => $propietario ?: 'Sin Propietario Asignado',
+                    'tucNumero' => 'TUC-2026-' . str_pad($row['id'], 3, '0', STR_PAD_LEFT),
+                ];
+            }, $rows);
+
             return $this->respond([
-                // Con la página acotada (20-50 filas), calcular documentos,
-                // papeletas, CERTICAV e internamientos por vehículo sigue
-                // siendo barato: el WHERE IN ya no tiene miles de valores.
-                'data' => $this->appendVehiculoRelations($rows),
+                'data' => $data,
                 'meta' => [
                     'total' => $total,
                     'page' => $page,

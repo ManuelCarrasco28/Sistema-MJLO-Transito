@@ -61,7 +61,13 @@ class PideService
         }
 
         $decoded = json_decode($response, true);
-        return $decoded['data'] ?? $decoded;
+        $data = $decoded['data'] ?? $decoded;
+        if (is_array($data)) {
+            if (isset($data['direccion']) && is_string($data['direccion'])) {
+                $data['direccion'] = mb_convert_case(preg_replace('/\s+/', ' ', trim($data['direccion'])), MB_CASE_TITLE, 'UTF-8');
+            }
+        }
+        return $data;
     }
 
     public static function sunarp($placa)

@@ -8,7 +8,7 @@ export function StatusBadge({ status, className = '' }) {
     tokenType = 'ok'
   } else if (['EN_TRAMITE', 'EN TRÁMITE', 'EN TRAMITE', 'PENDIENTE', 'INFORMAL', 'POR_COBRAR', 'EN REVISIÓN', 'EN REVISION', 'INSCRITO', 'PROGRAMADO'].includes(norm)) {
     tokenType = 'warn'
-  } else if (['VENCIDO', 'EXPIRADO', 'OBSERVADO', 'EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'RETENIDO', 'BAJA', 'SUSPENDIDO', 'CANCELADO', 'DESAPROBADO', 'INACTIVO'].includes(norm)) {
+  } else if (['VENCIDO', 'EXPIRADO', 'OBSERVADO', 'EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'RETENIDO', 'BAJA', 'SUSPENDIDO', 'CANCELADO', 'DESAPROBADO', 'INACTIVO', 'RECHAZADO'].includes(norm)) {
     tokenType = 'danger'
   } else if (['ANULADO', 'ANULADA', 'PRESCRITO', 'HISTORICO', 'EFECTIVO', 'TRANSFERENCIA', 'MULTIPLE'].includes(norm)) {
     tokenType = 'neutral'
