@@ -369,6 +369,15 @@ export function Papeletas({ user }) {
       .finally(() => setLoadingReportes(false))
   }
 
+  const loadVehiculos = () => {
+    apiFetch('/vehiculos?porPagina=50')
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((vehiculosRes) => {
+        setVehiculos(vehiculosRes.data || [])
+      })
+      .catch(() => {})
+  }
+
   const handleVerFotosReporte = async (reporte) => {
     setFotosModalReporte({ id: reporte.id, placa: reporte.placa_visual, lugar: reporte.lugar, fotos: [], loading: true })
     try {
@@ -1391,6 +1400,7 @@ export function Papeletas({ user }) {
           tiposInfraccion={tiposInfraccion}
           isProcessingAction={isProcessingAction}
           onVerImagen={setSelectedImage}
+          onReloadVehiculos={loadVehiculos}
         />
       )}
 

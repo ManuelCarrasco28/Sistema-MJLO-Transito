@@ -19,6 +19,17 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
   List<Map<String, dynamic>> _listaOperativos = [];
   bool _isLoading = true;
 
+  String _searchQuery = '';
+  String _dateFilter = 'Todos'; // 'Todos', 'Hoy', 'Ayer', 'Última semana', 'Personalizado'
+  DateTimeRange? _customDateRange;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +68,13 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
       }
       
       for (var r in reportes) {
+        // Si el reporte ya fue convertido a papeleta, no lo mostramos para evitar duplicados
+        // ya que la papeleta correspondiente ya viene en la lista de papeletas.
+        final estadoReporte = r['estado']?.toString().toUpperCase() ?? '';
+        if (estadoReporte.contains('CONVERTIDO') || r['id_papeleta'] != null) {
+          continue;
+        }
+
         todas.add({...r, 'es_reporte': true});
         if (r['operativoId'] != null) {
           final opId = r['operativoId'].toString();
@@ -125,18 +143,229 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
-            : TabBarView(
+            : Column(
                 children: [
-                  _buildListActividades(_todasActividades),
-                  _buildListOperativos(),
+                  _buildFilterBar(),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildListActividades(_getFilteredActividades()),
+                        _buildListOperativos(_getFilteredOperativos()),
+                      ],
+                    ),
+                  ),
                 ],
               ),
       ),
     );
   }
 
-  Widget _buildListOperativos() {
-    if (_listaOperativos.isEmpty) {
+  List<dynamic> _getFilteredActividades() {
+    DateTime now = DateTime.now();
+    DateTime startOfToday = DateTime(now.year, now.month, now.day);
+
+    return _todasActividades.where((item) {
+      bool passDate = true;
+      final dateStr = item['fecha_hora']?.toString() ?? item['fechaHora']?.toString() ?? '';
+      DateTime? itemDate = DateTime.tryParse(dateStr);
+
+      if (itemDate != null) {
+        if (_dateFilter == 'Hoy') {
+          passDate = itemDate.isAfter(startOfToday) || itemDate.isAtSameMomentAs(startOfToday);
+        } else if (_dateFilter == 'Ayer') {
+          DateTime startOfYesterday = startOfToday.subtract(const Duration(days: 1));
+          passDate = (itemDate.isAfter(startOfYesterday) || itemDate.isAtSameMomentAs(startOfYesterday)) && itemDate.isBefore(startOfToday);
+        } else if (_dateFilter == 'Última semana') {
+          DateTime startOfWeek = startOfToday.subtract(const Duration(days: 7));
+          passDate = itemDate.isAfter(startOfWeek) || itemDate.isAtSameMomentAs(startOfWeek);
+        } else if (_dateFilter == 'Personalizado' && _customDateRange != null) {
+          passDate = itemDate.isAfter(_customDateRange!.start) && itemDate.isBefore(_customDateRange!.end.add(const Duration(days: 1)));
+        }
+      }
+
+      if (!passDate) return false;
+
+      if (_searchQuery.isNotEmpty) {
+        String query = _searchQuery.toLowerCase();
+        String placa = (item['vehiculoPlaca']?.toString() ?? item['placa_visual']?.toString() ?? '').toLowerCase();
+        String numDoc = (item['es_reporte'] == true ? 'REP N° ${item['id']}' : (item['numeroPapeleta'] ?? 'PAP N° ${item['id']}')).toString().toLowerCase();
+        String opName = (item['operativoNombre']?.toString() ?? '').toLowerCase();
+
+        if (!placa.contains(query) && !numDoc.contains(query) && !opName.contains(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _getFilteredOperativos() {
+    if (_searchQuery.isEmpty) return _listaOperativos;
+    String query = _searchQuery.toLowerCase();
+    return _listaOperativos.where((op) {
+      return (op['nombre']?.toString() ?? '').toLowerCase().contains(query);
+    }).toList();
+  }
+
+  Widget _buildFilterBar() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar placa, papeleta, reporte...',
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, color: Colors.grey),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.primaryBlue),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.filter_list,
+                  color: _dateFilter == 'Todos' ? Colors.grey.shade700 : AppTheme.primaryBlue,
+                ),
+                tooltip: 'Filtrar por fecha',
+                onSelected: (String result) async {
+                  if (result == 'Personalizado') {
+                    final DateTimeRange? picked = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: const ColorScheme.light(
+                              primary: AppTheme.primaryBlue,
+                              onPrimary: Colors.white,
+                              onSurface: Colors.black,
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _customDateRange = picked;
+                        _dateFilter = result;
+                      });
+                    }
+                  } else {
+                    setState(() {
+                      _dateFilter = result;
+                      if (result != 'Personalizado') {
+                        _customDateRange = null;
+                      }
+                    });
+                  }
+                },
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'Todos',
+                    child: Text('Todos los tiempos'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'Hoy',
+                    child: Text('Hoy'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'Ayer',
+                    child: Text('Ayer'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'Última semana',
+                    child: Text('Última semana'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'Personalizado',
+                    child: Text('Rango personalizado...'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (_dateFilter != 'Todos')
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today, size: 12, color: AppTheme.primaryBlue),
+                        const SizedBox(width: 4),
+                        Text(
+                          _dateFilter == 'Personalizado' && _customDateRange != null
+                              ? '${_customDateRange!.start.day}/${_customDateRange!.start.month} - ${_customDateRange!.end.day}/${_customDateRange!.end.month}'
+                              : _dateFilter,
+                          style: const TextStyle(fontSize: 12, color: AppTheme.primaryBlue, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _dateFilter = 'Todos';
+                              _customDateRange = null;
+                            });
+                          },
+                          child: const Icon(Icons.close, size: 14, color: AppTheme.primaryBlue),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListOperativos(List<Map<String, dynamic>> list) {
+    if (list.isEmpty) {
       final String mensaje = (widget.filterDni != null || widget.filterPlaca != null)
           ? 'No registra intervenciones en operativos'
           : 'No participaste en ningún operativo';
@@ -155,9 +384,9 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _listaOperativos.length,
+      itemCount: list.length,
       itemBuilder: (context, index) {
-        final op = _listaOperativos[index];
+        final op = list[index];
         return Card(
           elevation: 2,
           margin: const EdgeInsets.only(bottom: 12),
@@ -276,7 +505,15 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
         final isSinDueno = (data['propietarioNombre'] == null || data['propietarioNombre'] == 'No Registrado' || data['propietarioDni'] == 'S/D');
         final esSinIdentificar = isSinPlaca && isSinConductor && isSinDueno;
         
-        final tipoTextoVehiculo = esSinIdentificar ? "Sin identificar" : (isFormal ? "Formal" : "Informal");
+        final tipoTextoVehiculo = isSinPlaca ? "Sin identificar" : (isFormal ? "Formal" : "Informal");
+
+        final propDniText = (data['propietarioDni'] != null && data['propietarioDni'].toString().trim().isNotEmpty && data['propietarioDni'] != 'S/D')
+            ? '\nN° Doc: ${data['propietarioDni']}'
+            : '';
+            
+        final condDniText = (data['conductorDni'] != null && data['conductorDni'].toString().trim().isNotEmpty && data['conductorDni'] != 'S/D')
+            ? '\nN° Doc: ${data['conductorDni']}'
+            : '';
 
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -299,13 +536,13 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                   _buildFormattedObservaciones('Obs. Conductor:', data['observacionesConductor']),
                 const Divider(height: 24),
                 if (data['conductorNombre'] != null && data['conductorNombre'].toString().trim().isNotEmpty)
-                  _buildDetailRow('Conductor:', '${data['conductorNombre']}\nN° Doc: ${data['conductorDni'] ?? 'S/D'}')
+                  _buildDetailRow('Conductor:', '${data['conductorNombre']}$condDniText')
                 else
                   _buildDetailRow('Conductor:', 'No identificado'),
                 const SizedBox(height: 8),
                 if (data['propietarioNombre'] != null && data['propietarioNombre'].toString().trim().isNotEmpty)
-                  _buildDetailRow('Dueño:', '${data['propietarioNombre']}\nN° Doc: ${data['propietarioDni'] ?? 'S/D'}')
-                else
+                  _buildDetailRow(isSinPlaca ? 'Supuesto Dueño:' : 'Dueño:', '${data['propietarioNombre']}$propDniText')
+                else if (!isSinPlaca)
                   _buildDetailRow('Dueño:', 'No identificado'),
                 const Divider(height: 24),
                 
@@ -331,7 +568,7 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                             errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
                           )
                         : Image.network(
-                            '${ApiService.fileBaseUrl}/${data['firmaConductorImg']}',
+                            data['firmaConductorImg'].toString(),
                             height: 100,
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
@@ -372,7 +609,7 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                                         errorBuilder: (context, error, stackTrace) => const Text('Error al cargar'),
                                       )
                                     : Image.network(
-                                        '${ApiService.fileBaseUrl}/$fotoUrl',
+                                        fotoUrl.toString(),
                                         height: 100,
                                         width: 100,
                                         fit: BoxFit.cover,

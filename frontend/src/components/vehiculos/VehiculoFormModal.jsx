@@ -110,6 +110,7 @@ export function VehiculoFormModal({
 
         <form
           onSubmit={onSubmit}
+          noValidate
           autoComplete="off"
           onMouseDown={(event) => {
             if (!event.target.closest('[data-combobox="vehiculo"]')) {
@@ -361,7 +362,7 @@ export function VehiculoFormModal({
                       setFormData((prev) => ({
                         ...prev,
                         propietarioDni: '',
-                        propietario: ''
+                        propietario: value
                       }))
                       setShowPropietarioResults(true)
                       setShowAsociacionResults(false)
@@ -395,7 +396,7 @@ export function VehiculoFormModal({
                         })
                       ) : (
                         <div className="px-2.5 py-2 text-xs font-semibold text-amber-600">
-                          No se encontró persona con ese DNI o nombre.
+                          {propietarioSearch ? 'No se encontró persona con ese DNI o nombre.' : 'Escriba para buscar un titular...'}
                         </div>
                       )}
                     </div>,
@@ -422,7 +423,7 @@ export function VehiculoFormModal({
                       setAsociacionSearch(value)
                       setFormData((prev) => ({
                         ...prev,
-                        asociacion: ''
+                        asociacion: value
                       }))
                       setShowAsociacionResults(true)
                       setShowPropietarioResults(false)
@@ -452,7 +453,7 @@ export function VehiculoFormModal({
                         ))
                       ) : (
                         <div className="px-2.5 py-2 text-xs font-semibold text-amber-600">
-                          No se encontró asociación.
+                          {asociacionSearch ? 'No se encontró asociación.' : 'Escriba para buscar una asociación...'}
                         </div>
                       )}
                     </div>,

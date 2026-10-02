@@ -39,8 +39,13 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
 
   Future<void> _loadTiposInfraccion() async {
     try {
-      final permite = await ApiService.permiteAplicarPapeletaMovil();
-      final response = permite ? await ApiService.getTiposInfraccion() : <dynamic>[];
+      bool permite = await ApiService.permiteAplicarPapeletaMovil();
+      final placa = widget.reporteData['placa']?.toString().toUpperCase().trim() ?? '';
+      if (widget.reporteData['estado_placa'] == 'SIN_PLACA' || placa.startsWith('SIN PLACA') || placa.startsWith('SIN-PLACA')) {
+        permite = false;
+      }
+      
+      final response = await ApiService.getTiposInfraccion();
       setState(() {
         _permitePapeletaMovil = permite;
         _tiposInfraccion = response;
@@ -76,7 +81,13 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
   Future<void> _submitReportAndTicket() async {
     bool permisoActual = _permitePapeletaMovil == true;
     try {
-      permisoActual = await ApiService.permiteAplicarPapeletaMovil();
+      bool backendPermite = await ApiService.permiteAplicarPapeletaMovil();
+      final placa = widget.reporteData['placa']?.toString().toUpperCase().trim() ?? '';
+      if (widget.reporteData['estado_placa'] == 'SIN_PLACA' || placa.startsWith('SIN PLACA') || placa.startsWith('SIN-PLACA')) {
+        permisoActual = false;
+      } else {
+        permisoActual = backendPermite;
+      }
       if (mounted) {
         setState(() => _permitePapeletaMovil = permisoActual);
       }
@@ -299,7 +310,30 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                   ),
                   const SizedBox(height: 24),
                   
-                  if (permitePapeleta) ...[
+                  if (!permitePapeleta) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        border: Border.all(color: Colors.amber.shade400),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.amber.shade800),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'El vehículo no tiene placa registrada. Las infracciones se guardarán como evidencia y serán verificadas por la administración.',
+                              style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   _buildSectionTitle('Infracciones a Aplicar'),
                   Container(
                     decoration: BoxDecoration(
@@ -377,14 +411,14 @@ class _IssueTicketInformalScreenState extends State<IssueTicketInformalScreen> {
                   ),
                   
                   const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'TOTAL DE PAPELETA: S/ $_montoTotal',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                  if (permitePapeleta)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'TOTAL DE PAPELETA: S/ $_montoTotal',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
                     ),
-                  ),
-                  ],
 
                   const SizedBox(height: 16),
 

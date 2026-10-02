@@ -898,6 +898,14 @@ export function Vehiculos({ user }) {
 
   useQuickCreate(handleOpenCreateModal, !isLoading)
 
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    if (searchParams.get('action') === 'new') {
+      handleOpenCreateModal()
+      window.history.replaceState(null, '', '/vehiculos')
+    }
+  }, [])
+
   const handleOpenEditModal = (vehiculo) => {
     setSelectedVehiculo(vehiculo)
     setPropietarioSearch(vehiculo.propietarioDni ? `${vehiculo.propietarioDni} — ${vehiculo.propietario || ''}` : '')
@@ -957,16 +965,16 @@ export function Vehiculos({ user }) {
     // Validaciones
     const placaClean = formData.placa.trim().toUpperCase()
     if (!placaClean || !formData.propietarioDni.trim()) {
-      alert('Por favor completa los campos requeridos (Placa y Propietario registrado).')
+      showError('Campos Incompletos', 'Por favor completa los campos requeridos (Placa y Propietario registrado).')
       return
     }
     if (placaClean.length < 6) {
-      alert('La placa debe tener al menos 6 caracteres.')
+      showError('Placa Inválida', 'La placa debe tener al menos 6 caracteres.')
       return
     }
     const anioActual = new Date().getFullYear()
     if (formData.anio && (formData.anio < 1950 || formData.anio > anioActual + 1)) {
-      alert(`El año de fabricación debe ser válido (entre 1950 y ${anioActual + 1}).`)
+      showError('Año Inválido', `El año de fabricación debe ser válido (entre 1950 y ${anioActual + 1}).`)
       return
     }
 

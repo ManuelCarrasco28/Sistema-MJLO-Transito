@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Icon } from '../ui/Icon'
 import { PlacaBadge } from '../ui/PlacaBadge'
+import { StandaloneVehiculoFormModal } from '../vehiculos/StandaloneVehiculoFormModal'
 
 export function ConvertirReporteModal({
   reporteToConvert,
@@ -11,11 +13,15 @@ export function ConvertirReporteModal({
   tiposInfraccion,
   isProcessingAction,
   onVerImagen,
+  onReloadVehiculos,
 }) {
+  const [showVehiculoModal, setShowVehiculoModal] = useState(false)
+
   if (!reporteToConvert) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+    <>
+    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
       <form onSubmit={onSubmit} className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
         <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-emerald-50 px-6 py-4 dark:border-[var(--border)] dark:bg-emerald-950/30">
           <div>
@@ -98,7 +104,21 @@ export function ConvertirReporteModal({
             <legend className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-2 ml-2 bg-white dark:bg-[var(--bg-surface)]">Datos Generales</legend>
             <div className="space-y-4">
               <label className="block space-y-1.5">
-                <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Vehículo identificado</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Vehículo identificado</span>
+                  <div className="flex items-center gap-4">
+                    <button type="button" onClick={() => setShowVehiculoModal(true)} className="flex items-center gap-1.5 text-[11px] font-bold uppercase text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors">
+                      <span>+</span>
+                      <span>Registrar Vehículo</span>
+                    </button>
+                    {onReloadVehiculos && (
+                      <button type="button" onClick={onReloadVehiculos} className="flex items-center gap-1.5 text-[11px] font-bold uppercase text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors" title="Actualizar lista">
+                        <Icon name="refresh-cw" className="size-3.5" />
+                        <span>Actualizar</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <select required value={convertForm.vehiculoId} onChange={(e) => setConvertForm({ ...convertForm, vehiculoId: e.target.value })} className="w-full min-w-0 overflow-hidden text-ellipsis rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)]">
                   <option value="">Selecciona vehículo</option>
                   {vehiculos.map((v) => (
@@ -160,5 +180,15 @@ export function ConvertirReporteModal({
         </div>
       </form>
     </div>
+
+    {showVehiculoModal && (
+      <StandaloneVehiculoFormModal 
+        onClose={() => setShowVehiculoModal(false)}
+        onSuccess={() => {
+          if (onReloadVehiculos) onReloadVehiculos()
+        }}
+      />
+    )}
+    </>
   )
 }

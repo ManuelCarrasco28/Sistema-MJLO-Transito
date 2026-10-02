@@ -297,15 +297,18 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                           _vehicleData!['propietario'] ?? 'Sin Propietario Asignado',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'N° Doc: ${_vehicleData!['propietarioDni'] ?? '-'}',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                        ),
+                        if (_vehicleData!['propietarioDni'] != null && _vehicleData!['propietarioDni'].toString().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'N° Doc: ${_vehicleData!['propietarioDni']}',
+                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                          ),
+                        ]
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: Colors.grey),
+                  if (_vehicleData!['propietarioDni'] != null && _vehicleData!['propietarioDni'].toString().isNotEmpty)
+                    const Icon(Icons.chevron_right, color: Colors.grey),
                 ],
               ),
             ),
@@ -317,7 +320,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
             _buildInfoCard([
               _buildInfoRow('Razón Social', _vehicleData!['asociacion'] ?? '-'),
               _buildDivider(),
-              _buildInfoRow('Estado', _vehicleData!['estado'] ?? 'INFORMAL', isHighlight: true),
+              _buildInfoRow('Estado', (_vehicleData!['estado']?.toString().toUpperCase() == 'ACTIVO') ? 'FORMAL' : (_vehicleData!['estado'] ?? 'INFORMAL'), isHighlight: true),
             ]),
           ] else ...[
             const SizedBox(height: 24),

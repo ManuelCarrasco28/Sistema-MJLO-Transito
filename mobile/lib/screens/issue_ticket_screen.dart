@@ -255,7 +255,9 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'marcaVehiculo': widget.vehicleData['marca'] ?? '',
         'colorVehiculo': widget.vehicleData['color'] ?? '',
         'duenoDni': widget.vehicleData['propietarioDni'] ?? '',
-        'duenoNombres': widget.vehicleData['propietarioNombres'] ?? '',
+        'duenoNombres': (widget.vehicleData['propietarioNombres']?.toString().isNotEmpty == true)
+            ? widget.vehicleData['propietarioNombres']
+            : (widget.vehicleData['propietario'] ?? ''),
         'duenoApellidos': '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim(),
       };
 
@@ -316,7 +318,9 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'nombres_conductor': conductor['nombres'],
         'apellidos_conductor': conductor['apellidos'],
         'dni_dueño': widget.vehicleData['propietarioDni'] ?? '',
-        'nombres_dueño': widget.vehicleData['propietarioNombres'] ?? '',
+        'nombres_dueño': (widget.vehicleData['propietarioNombres']?.toString().isNotEmpty == true)
+            ? widget.vehicleData['propietarioNombres']
+            : (widget.vehicleData['propietario'] ?? ''),
         'apellidos_dueño': '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim(),
         'claseVehiculo': widget.vehicleData['tipo'] ?? '',
         'marcaVehiculo': widget.vehicleData['marca'] ?? '',

@@ -244,7 +244,11 @@ class _RegisterAlienVehicleScreenState
       return;
     }
 
-    final bool permite = _permitePapeleta ?? true;
+    bool permite = _permitePapeleta ?? true;
+    if (_estadoPlaca == 'SIN_PLACA') {
+      permite = false;
+    }
+
     if (!permite) {
       if (_lugarController.text.trim().isEmpty) {
         _showError('Falta ingresar el lugar de intervención (ubicación)');
@@ -811,7 +815,7 @@ class _RegisterAlienVehicleScreenState
               label: Text(
                 _permitePapeleta == null
                     ? 'Cargando...'
-                    : (_permitePapeleta!
+                    : ((_permitePapeleta! && _estadoPlaca != 'SIN_PLACA')
                           ? 'Siguiente: Generar Papeleta'
                           : 'Siguiente: Enviar Reporte'),
                 style: const TextStyle(
