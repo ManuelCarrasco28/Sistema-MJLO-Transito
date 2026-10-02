@@ -24,6 +24,8 @@ const PermisoFormularioVentana = lazy(() => import('./pages/PermisoFormularioVen
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard').then((module) => ({ default: module.SuperAdminDashboard })))
 const Usuarios = lazy(() => import('./pages/Usuarios').then((module) => ({ default: module.Usuarios })))
 const Operativos = lazy(() => import('./pages/Operativos').then((module) => ({ default: module.Operativos })))
+const CursoDetalleVentana = lazy(() => import('./pages/CursoDetalleVentana'))
+
 
 const isSuperAdminUser = (user) => (user?.rol || '').toUpperCase() === 'SUPERADMIN'
 
@@ -412,6 +414,15 @@ function App() {
             element={user ? (
               <Suspense fallback={<ModuleFallback />}>
                 <PermisoFormularioVentana />
+              </Suspense>
+            ) : <Navigate to="/login" replace />}
+          />
+          
+          <Route
+            path="/cursos/:id/popup"
+            element={user ? (
+              <Suspense fallback={<ModuleFallback />}>
+                <CursoDetalleVentana />
               </Suspense>
             ) : <Navigate to="/login" replace />}
           />

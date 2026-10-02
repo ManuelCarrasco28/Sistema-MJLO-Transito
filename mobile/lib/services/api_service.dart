@@ -18,7 +18,7 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://192.168.101.47:8080/api'; // Cambiado a IP actual
+  static const String _defaultUrl = 'http://10.0.2.2:8080/api'; // Por defecto: Emulador Android
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb

@@ -11,6 +11,7 @@ import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
+import { SearchableMultiSelect } from '../components/ui/SearchableMultiSelect'
 
 const getPeruDateInputValue = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -653,12 +654,12 @@ export function Operativos({ user }) {
               {visible.map((op) => (
                 <tr key={op.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-[var(--bg-subtle)]">
                   <td className="px-4 py-3">
-                    <p className="font-bold text-xs text-slate-900 dark:text-white">{op.nombre}</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">{op.lugar}</p>
+                    <p className="font-bold uppercase text-xs text-slate-900 dark:text-white">{op.nombre}</p>
+                    <p className="mt-0.5 uppercase text-[11px] text-slate-500">{op.lugar}</p>
                   </td>
                   <td className="px-4 py-3 ">
-                    <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{formatFecha(op.fecha)}</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">{formatHora(op.hora_inicio)}{op.hora_fin ? ` - ${formatHora(op.hora_fin)}` : ''}</p>
+                    <p className="font-semibold uppercase text-xs text-slate-800 dark:text-slate-200">{formatFecha(op.fecha)}</p>
+                    <p className="mt-0.5 uppercase text-[11px] text-slate-500">{formatHora(op.hora_inicio)}{op.hora_fin ? ` - ${formatHora(op.hora_fin)}` : ''}</p>
                   </td>
                   <td className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">{op.total_inspectores || 0}</td>
                   <td className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">{op.total_papeletas || 0}</td>
@@ -736,17 +737,14 @@ export function Operativos({ user }) {
               </div>
             </fieldset>
 
-            <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
+            <fieldset className="rounded-xl border border-slate-200 p-4 pb-6 dark:border-[var(--border-strong)]">
               <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Inspectores Asignados</legend>
-              <div className="grid max-h-56 gap-2 overflow-y-auto sm:grid-cols-2">
-                {personal.map((p) => (
-                  <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-[var(--bg-subtle)]">
-                    <input type="checkbox" checked={form.inspectores.includes(String(p.id))} onChange={() => toggleInspector(p.id)} />
-                    <span className="font-semibold">{p.nombres} {p.apellidos}</span>
-                  </label>
-                ))}
-                {!personal.length && <p className="text-sm text-slate-500">No hay inspectores/trabajadores activos disponibles.</p>}
-              </div>
+              <SearchableMultiSelect
+                options={personal.map(p => ({ value: String(p.id), label: `${p.nombres} ${p.apellidos}` }))}
+                selectedIds={form.inspectores}
+                onChange={(newIds) => setForm({ ...form, inspectores: newIds })}
+                placeholder="Escribe el nombre del inspector..."
+              />
             </fieldset>
 
             <div className="mt-6 flex justify-end gap-3">

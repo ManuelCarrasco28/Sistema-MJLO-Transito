@@ -9,7 +9,7 @@ export function SortableHeader({ column, label, sortBy, sortDir, onSort, classNa
     <button
       type="button"
       onClick={() => onSort(column, nextDir)}
-      className={`inline-flex items-center gap-1 cursor-pointer select-none hover:text-slate-700 dark:hover:text-white transition-colors ${
+      className={`inline-flex items-center gap-1 cursor-pointer select-none font-bold uppercase tracking-wider hover:text-slate-800 dark:hover:text-white transition-colors ${
         align === 'center' ? 'justify-center w-full' : align === 'right' ? 'justify-end w-full' : ''
       } ${className}`}
       title={`Ordenar por ${label}`}

@@ -8,53 +8,7 @@ class UsuariosSeeder extends Seeder
 {
     public function run()
     {
-        $usersData = [
-            [
-                'nombres' => 'Diego',
-                'apellido_paterno' => 'Barturen',
-                'apellido_materno' => '',
-                'numero' => '11111111',
-                'usuario' => 'diegobarturen',
-                'password' => 'diego123',
-                'cargo' => 'Administrador'
-            ],
-            [
-                'nombres' => 'Manuel',
-                'apellido_paterno' => 'Carrasco',
-                'apellido_materno' => '',
-                'numero' => '22222222',
-                'usuario' => 'manuelcarrasco',
-                'password' => 'manuel123',
-                'cargo' => 'Administrador'
-            ],
-            [
-                'nombres' => 'Milenka',
-                'apellido_paterno' => 'Segundo',
-                'apellido_materno' => '',
-                'numero' => '33333333',
-                'usuario' => 'milenkasegundo',
-                'password' => 'milenka123',
-                'cargo' => 'Administrador'
-            ],
-            [
-                'nombres' => 'Angelo',
-                'apellido_paterno' => 'Saavedra',
-                'apellido_materno' => '',
-                'numero' => '44444444',
-                'usuario' => 'angelosaavedra',
-                'password' => 'angelo123',
-                'cargo' => 'Administrador'
-            ],
-            [
-                'nombres' => 'Inspector',
-                'apellido_paterno' => 'Municipal',
-                'apellido_materno' => '',
-                'numero' => '99999999',
-                'usuario' => 'inspector',
-                'password' => 'inspector123',
-                'cargo' => 'Inspector de Tránsito'
-            ],
-        ];
+        $usersData = []; // Ya sembrado en BD
 
         foreach ($usersData as $u) {
             // 1. Crear en `personas`

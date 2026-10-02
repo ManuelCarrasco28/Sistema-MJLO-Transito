@@ -5,9 +5,7 @@ services:
     image: mariadb:10.6
     container_name: mjlo_db
     restart: always
-    environment:
-      MYSQL_DATABASE: transitomunicipal
-      MYSQL_ROOT_PASSWORD: root
+    env_file: .env
     ports:
       - "3307:3306"
     volumes:
@@ -32,15 +30,8 @@ services:
       - backend_vendor:/var/www/html/vendor
       - backend_cache:/var/www/html/writable/cache
       - backend_session:/var/www/html/writable/session
-    environment:
-      # En producción: CI_ENVIRONMENT=production (oculta trazas de error en las respuestas).
-      - CI_ENVIRONMENT=${CI_ENVIRONMENT:-development}
-      - database.default.hostname=db
-      - database.default.database=transitomunicipal
-      - database.default.username=root
-      - database.default.password=root
-      - database.default.DBDriver=MySQLi
-      - database.default.port=3306
+      - ./.env:/var/www/html/.env
+    env_file: .env
 
   frontend:
     build:
@@ -53,11 +44,8 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - VITE_API_BASE_URL=/api
-      - VITE_BACKEND_URL=http://backend
-      - VITE_TINYMCE_API_KEY=unmcqzdx4e88wfy3gqtlbelk1w21unqt3sl8hlcltd49u0o8
+
+    env_file: .env
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
@@ -65,10 +53,10 @@ services:
     restart: always
     ports:
       - "8081:80"
+    env_file: .env
     environment:
       PMA_HOST: db
       PMA_PORT: 3306
-      MYSQL_ROOT_PASSWORD: root
     depends_on:
       - db
 

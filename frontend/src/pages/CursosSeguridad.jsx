@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
@@ -32,6 +33,7 @@ const FORM_ESTADO_OPTIONS = [
 ]
 
 export function CursosSeguridad() {
+  const navigate = useNavigate();
   const cached = getCachedData('/cursos')
   const [cursos, setCursos] = useState(cached || [])
   const [isLoading, setIsLoading] = useState(!cached)
@@ -220,6 +222,21 @@ export function CursosSeguridad() {
 
   const [sortBy, setSortBy] = useState('')
   const [sortDir, setSortDir] = useState('DESC')
+  
+  useEffect(() => {
+    const bc = new BroadcastChannel('cursos_channel')
+    bc.onmessage = (e) => {
+      if (e.data && e.data.type === 'CURSO_UPDATED') {
+        apiFetch('/cursos').then(res => res.json()).then(data => {
+          if (data.data) {
+            setCursos(data.data)
+          }
+        }).catch(err => console.error(err))
+      }
+    }
+    return () => bc.close()
+  }, [])
+
   const handleSort = (column, dir) => {
     setSortBy(column)
     setSortDir(dir)
@@ -601,7 +618,7 @@ export function CursosSeguridad() {
                 </tr>
               ) : (
                 paginatedCursos.map((c) => (
-                  <tr key={c.id} className="group transition-colors hover:bg-purple-50/30 dark:hover:bg-[var(--bg-subtle)]">
+                  <tr key={c.id} onClick={() => navigate(`/cursos/${c.id}/popup`)} className="group transition-colors hover:bg-purple-50/30 dark:hover:bg-[var(--bg-subtle)] cursor-pointer">
 
                     <td className="px-3 py-3 ">
                       <p className="font-bold text-xs text-slate-900 dark:text-white">{c.codigo}</p>
@@ -655,17 +672,15 @@ export function CursosSeguridad() {
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-center gap-1">
                         {c.estado === 'FINALIZADO' && (
-                          <button onClick={() => handlePrintBatch(c)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white" title="Descargar Carnets (Lote)">
+                          <button onClick={(e) => { e.stopPropagation(); handlePrintBatch(c); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white" title="Descargar Carnets (Lote)">
                             <Icon name="print" className="size-4" />
                           </button>
                         )}
-                        <button onClick={() => { setSelectedCurso(c); setIsDetailModalOpen(true); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver Detalles">
-                          <Icon name="eye" className="size-4" />
-                        </button>
-                        <button onClick={() => handleOpenEditModal(c)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar Curso">
+                        
+                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditModal(c); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar Curso">
                           <Icon name="pencil" className="size-4" />
                         </button>
-                        <button onClick={() => handleDelete(c.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar Curso">
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar Curso">
                           <Icon name="trash" className="size-4" />
                         </button>
                       </div>
@@ -863,274 +878,7 @@ export function CursosSeguridad() {
         </div>
       )}
 
-      {isDetailModalOpen && selectedCurso && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-7 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                  <Icon name="course" className="size-4" />
-                </span>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">{selectedCurso.titulo}</h3>
-                  <p className="text-xs font-mono text-slate-400">{selectedCurso.codigo}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                title="Cerrar"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-7 space-y-7">
-              <div className="grid grid-cols-2 gap-4 text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-[var(--bg-subtle)] p-4 rounded-xl border border-slate-100 dark:border-slate-700/50">
-                <p><strong>Fecha:</strong> {selectedCurso.fecha}</p>
-                <p><strong>Horario:</strong> {selectedCurso.horario}</p>
-                <p><strong>Instructor:</strong> {selectedCurso.instructor}</p>
-                <p><strong>Lugar:</strong> {selectedCurso.lugar}</p>
-                <p><strong>Inscritos:</strong> {selectedCurso.inscritos || (selectedCurso.participantes?.length || 0)} / {selectedCurso.capacidad}</p>
-                <p className="flex items-center gap-1.5"><strong>Estado:</strong> <StatusBadge status={selectedCurso.estado} /></p>
-              </div>
-
-              <div className="border-t border-slate-100 dark:border-[var(--border)] pt-6">
-                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                  <strong className="text-base text-slate-800 dark:text-slate-200">Participantes</strong>
-                  {selectedCurso.participantes && selectedCurso.participantes.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => handlePrintBatch(selectedCurso)}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700 transition shadow-xs cursor-pointer active:scale-95"
-                      title="Imprimir carnets oficiales (4 por hoja A4)"
-                    >
-                      <Icon name="print" className="size-3.5" />
-                      <span>Imprimir Carnets (Lote 4 por hoja)</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Buscador de inscripción */}
-                {selectedCurso.estado !== 'FINALIZADO' && (() => {
-                  const cupoLleno = selectedCurso.capacidad > 0 && (selectedCurso.participantes?.length || 0) >= selectedCurso.capacidad
-                  return cupoLleno ? (
-                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
-                      Este curso ya alcanzó su cupo máximo ({selectedCurso.capacidad} participantes).
-                    </div>
-                  ) : (
-                    <div className="relative mb-4">
-                      <div className="relative">
-                        <Icon name="search" className="absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        <input
-                          type="text"
-                          placeholder="Buscar participante por DNI o nombres..."
-                          value={participanteSearch}
-                          onFocus={() => setShowParticipanteResults(true)}
-                          onChange={(e) => {
-                            setParticipanteSearch(e.target.value)
-                            setShowParticipanteResults(true)
-                          }}
-                          className="w-full h-[38px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none transition focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
-                        />
-                      </div>
-
-                      {showParticipanteResults && participanteSearch.trim() && (
-                        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
-                          <div className="flex items-center justify-between px-2.5 py-1 border-b border-slate-100 dark:border-[var(--border)] text-[10px] font-bold text-slate-400 uppercase">
-                            <span>Personas registradas ({participanteResults.length})</span>
-                            <button type="button" onClick={() => setShowParticipanteResults(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕ Cerrar</button>
-                          </div>
-                          {isSearchingParticipante && (
-                            <div className="p-3 text-center text-xs text-slate-400 font-medium animate-pulse">
-                              Buscando en padrón de ciudadanos...
-                            </div>
-                          )}
-                          {!isSearchingParticipante && participanteResults.length === 0 ? (
-                            <div className="p-3 text-center text-xs text-slate-400 font-medium space-y-2">
-                              <p>No se encontró ninguna persona con ese DNI o nombre.</p>
-                              <a
-                                href={`/personas?accion=registrar`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
-                              >
-                                <Icon name="idCard" className="size-3.5" /> Registrar persona nueva
-                              </a>
-                            </div>
-                          ) : (
-                            participanteResults.map((p) => {
-                              const dni = p.numeroDocumento || p.numero || ''
-                              const yaInscrito = selectedCurso.participantes?.some((part) => part.dni === dni)
-                              return (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  disabled={inscribiendo || yaInscrito}
-                                  onClick={async () => {
-                                    setInscribiendo(true)
-                                    try {
-                                      const res = await apiFetch(`/cursos/${selectedCurso.id}/participantes`, {
-                                        method: 'POST',
-                                        body: { dni }
-                                      });
-                                      const result = await res.json();
-                                      if (!res.ok) throw new Error(result.messages?.error || 'Error al inscribir');
-
-                                      showToast('Participante inscrito correctamente');
-                                      setParticipanteSearch('')
-                                      setShowParticipanteResults(false)
-
-                                      const updatedParticipantes = [...(selectedCurso.participantes || []), result.data];
-                                      const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes, inscritos: updatedParticipantes.length };
-                                      setSelectedCurso(updatedCurso);
-                                      setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
-                                    } catch (err) {
-                                      showError('Error de inscripción', sanitizarMensaje(err.message, 'No se pudo registrar la inscripción.'));
-                                    } finally {
-                                      setInscribiendo(false)
-                                    }
-                                  }}
-                                  className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center justify-between gap-3 transition-colors cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  <div className="min-w-0">
-                                    <p className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-amber-600 dark:group-hover:text-amber-400">
-                                      {getPersonaNombre(p)}
-                                    </p>
-                                    <p className="font-mono text-[11px] text-slate-400">DNI: {dni}</p>
-                                  </div>
-                                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">
-                                    {yaInscrito ? 'Ya inscrito' : 'Inscribir →'}
-                                  </span>
-                                </button>
-                              )
-                            })
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()}
-
-                {(!selectedCurso.participantes || selectedCurso.participantes.length === 0) ? (
-                  <p className="text-sm text-slate-500 italic text-center py-4 bg-slate-50 dark:bg-slate-800/30 rounded-xl">No hay participantes inscritos en este curso.</p>
-                ) : (
-                  <ul className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                    {selectedCurso.participantes.map((p, i) => {
-                      const estadoReal = selectedCurso.estado === 'FINALIZADO' 
-                        ? (p.asistio ? 'APROBADO' : 'DESAPROBADO') 
-                        : (p.estado || 'PENDIENTE');
-                        
-                      return (
-                      <li key={i} className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-slate-50 dark:bg-[var(--bg-subtle)] p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                            {p.nombres} {p.apellido_paterno} {p.apellido_materno}
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-xs text-slate-500 font-semibold">DNI: {p.dni || p.numero}</p>
-                            {p.estado_pago && <StatusBadge status={p.estado_pago} />}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-3">
-                          {/* Controles de Asistencia y Estado */}
-                          <div className="flex items-center gap-2 bg-white dark:bg-[var(--bg-surface)] px-2 py-1.5 rounded-lg border border-slate-200 dark:border-[var(--border-strong)]">
-                            <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer">
-                              <input 
-                                type="checkbox" 
-                                checked={!!p.asistio}
-                                onChange={async (e) => {
-                                  const asistio = e.target.checked ? 1 : 0;
-                                  try {
-                                    const res = await apiFetch(`/cursos/${selectedCurso.id}/participantes/${p.dni || p.numero}`, {
-                                      method: 'PUT',
-                                      body: { asistio }
-                                    });
-                                    if (!res.ok) {
-                                      const payload = await res.json();
-                                      throw new Error(payload.messages?.error || 'Error al guardar asistencia');
-                                    }
-                                    
-                                    const updatedParticipantes = [...selectedCurso.participantes];
-                                    updatedParticipantes[i] = { ...p, asistio };
-                                    const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes };
-                                    setSelectedCurso(updatedCurso);
-                                    setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
-                                    showToast(asistio ? 'Marcado como asistente' : 'Desmarcado como asistente');
-                                  } catch (err) {
-                                    showError('Error', sanitizarMensaje(err.message, 'Ocurrió un error al procesar la solicitud.'));
-                                  }
-                                }}
-                                className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
-                              />
-                              Asistió
-                            </label>
-                            
-                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                            
-                            <select 
-                              value={p.estado || 'INSCRITO'}
-                              onChange={async (e) => {
-                                const nuevoEstado = e.target.value;
-                                try {
-                                  const res = await apiFetch(`/cursos/${selectedCurso.id}/participantes/${p.dni || p.numero}`, {
-                                    method: 'PUT',
-                                    body: { estado: nuevoEstado }
-                                  });
-                                  if (!res.ok) throw new Error('Error al guardar estado');
-                                  
-                                  const updatedParticipantes = [...selectedCurso.participantes];
-                                  updatedParticipantes[i] = { ...p, estado: nuevoEstado };
-                                  const updatedCurso = { ...selectedCurso, participantes: updatedParticipantes };
-                                  setSelectedCurso(updatedCurso);
-                                  setCursos(cursos.map(c => c.id === selectedCurso.id ? updatedCurso : c));
-                                  showToast('Estado de participante actualizado', 'editar');
-                                } catch (err) {
-                                  showError('Error', sanitizarMensaje(err.message, 'Ocurrió un error al procesar la solicitud.'));
-                                }
-                              }}
-                              className={`text-xs font-bold bg-transparent outline-none cursor-pointer ${
-                                (p.estado === 'APROBADO' || estadoReal === 'APROBADO') ? 'text-emerald-600 dark:text-emerald-400' : 
-                                (p.estado === 'DESAPROBADO' || estadoReal === 'DESAPROBADO') ? 'text-rose-600 dark:text-rose-400' : 
-                                'text-slate-600 dark:text-slate-400'
-                              }`}
-                            >
-                              <option value="INSCRITO">Inscrito</option>
-                              <option value="CONFIRMADO">Confirmado</option>
-                              <option value="APROBADO">Aprobado</option>
-                              <option value="DESAPROBADO">Desaprobado</option>
-                            </select>
-                          </div>
-                          
-                          <span className="text-[10px] font-black uppercase w-20 text-center">
-                            {estadoReal === 'APROBADO' ? (
-                              <span className="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-1 rounded-md block">Aprobado</span>
-                            ) : estadoReal === 'DESAPROBADO' ? (
-                              <span className="text-rose-600 bg-rose-50 dark:bg-rose-950/50 px-2 py-1 rounded-md block">Desaprobado</span>
-                            ) : estadoReal === 'CONFIRMADO' ? (
-                              <span className="text-blue-600 bg-blue-50 dark:bg-blue-950/50 px-2 py-1 rounded-md block">Confirmado</span>
-                            ) : estadoReal === 'INSCRITO' ? (
-                              <span className="text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-1 rounded-md block">Inscrito</span>
-                            ) : (
-                              <span className="text-slate-500 bg-slate-100 dark:bg-[var(--bg-subtle)] px-2 py-1 rounded-md block">{estadoReal}</span>
-                            )}
-                          </span>
-                        </div>
-                      </li>
-                    )})}
-                  </ul>
-                )}
-              </div>
-            </div>
-            
-            <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex justify-end dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl bg-slate-900 px-6 py-2 text-sm font-extrabold text-white hover:bg-slate-800 cursor-pointer shadow-md">Cerrar</button>
-            </div>
-          </div>
-        </div>
-      )}
+      
       {/* SECCIÓN OFICIAL DE IMPRESIÓN EN LOTE (4 CARNETS POR HOJA A4) */}
       {printCurso && (() => {
         const dt = new Date(printCurso.fecha);

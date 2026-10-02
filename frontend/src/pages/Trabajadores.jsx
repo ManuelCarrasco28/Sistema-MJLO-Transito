@@ -347,8 +347,8 @@ export function Trabajadores() {
       {/* 1. Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-900 text-white shadow-md shadow-slate-900/20 dark:bg-[var(--bg-surface)] dark:border dark:border-[var(--border)] dark:shadow-none">
-            <Icon name="workerBadge" className="size-5" />
+          <div className="grid shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="workerBadge" className="size-8" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -540,7 +540,7 @@ export function Trabajadores() {
                   {/* Cuenta */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${Number(row.tiene_cuenta) === 1 ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400' : 'bg-slate-50 text-slate-500 dark:bg-[var(--bg-subtle)] dark:text-slate-400'}`}>
-                      {Number(row.tiene_cuenta) === 1 ? 'Sí' : 'No'}
+                      {Number(row.tiene_cuenta) === 1 ? 'SÍ' : 'NO'}
                     </span>
                   </td>
                   
@@ -662,7 +662,7 @@ export function Trabajadores() {
             </div>
 
             {/* Body Modal */}
-            <div className="p-4 sm:p-4.5 space-y-3">
+            <div className="p-6 sm:p-8 space-y-0">
               
               {!form.id && (
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
@@ -734,22 +734,18 @@ export function Trabajadores() {
               )}
 
               {form.id && (
-                <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
-                  <legend className="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-2 flex items-center gap-2">
-                    <span className="size-1.5 rounded-full bg-blue-500" />
-                    Persona Vinculada
+                <fieldset className="mb-5 min-w-0 rounded-xl border border-slate-200 p-5 space-y-4 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                  <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Persona Vinculada
                   </legend>
                   <div className="rounded-xl border border-white bg-white px-4 py-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] shadow-2xs">
-                    <p className="text-sm font-black text-slate-900 dark:text-white">{form.nombres} {form.apellidos}</p>
-                    <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{form.tipo_documento}: {form.numero_documento}</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white mt-1">{form.nombres} {form.apellidos}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{form.tipo_documento}: {form.numero_documento}</p>
                   </div>
                 </fieldset>
               )}
 
-              <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
-                <legend className="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-2 flex items-center gap-2">
-                  <span className="size-1.5 rounded-full bg-cyan-500" />
-                  Datos Laborales
+              <fieldset className="mb-5 min-w-0 rounded-xl border border-slate-200 p-5 space-y-4 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Datos Laborales
                 </legend>
                 <div className="grid gap-2.5 sm:grid-cols-2">
                   <div className="relative sm:col-span-1">
@@ -787,10 +783,8 @@ export function Trabajadores() {
                   </div>
                 </fieldset>
 
-              <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
-                <legend className="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-2 flex items-center gap-2">
-                  <span className="size-1.5 rounded-full bg-emerald-500" />
-                  Documentación y Estado
+              <fieldset className="mb-5 min-w-0 rounded-xl border border-slate-200 p-5 space-y-4 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Documentación y Estado
                 </legend>
                 <div className="grid gap-2.5 sm:grid-cols-2 md:grid-cols-4">
                   <div className="sm:col-span-1 md:col-span-2">

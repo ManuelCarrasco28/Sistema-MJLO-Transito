@@ -21,6 +21,8 @@ class CursosController extends ResourceController
                     c.descripcion,
                     c.resolucion as instructor,
                     c.fecha_inicio as fecha,
+                    c.fecha_inicio,
+                    c.fecha_fin,
                     c.lugar,
                     c.cupos as cuposTotales,
                     c.estado,
