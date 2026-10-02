@@ -53,6 +53,11 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   final _nombresConductor = TextEditingController();
   final _apellidosConductor = TextEditingController();
 
+  // Datos del Dueño (si falta info)
+  final _dniDueno = TextEditingController();
+  final _nombresDueno = TextEditingController();
+  final _apellidosDueno = TextEditingController();
+
   bool _isSearching = false;
 
   Future<void> _searchPersona(TextEditingController dniCtrl, TextEditingController nomCtrl, TextEditingController apeCtrl) async {
@@ -85,6 +90,12 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   void initState() {
     super.initState();
     _lugarController = TextEditingController(text: _lugar);
+    
+    // Initialize Dueño fields if data exists
+    _dniDueno.text = widget.vehicleData['propietarioDni']?.toString() ?? '';
+    _nombresDueno.text = widget.vehicleData['propietarioNombre']?.toString() ?? widget.vehicleData['propietario']?.toString() ?? '';
+    _apellidosDueno.text = widget.vehicleData['propietarioApellidos']?.toString() ?? '';
+
     _loadTiposInfraccion();
   }
 
@@ -162,16 +173,16 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   /// del vehículo; si no, de los campos capturados en el formulario.
   Map<String, String> _resolverDatosConductor() {
     final String nombre = _conductorEsDueno
-        ? (widget.vehicleData['propietario'] ?? 'Dueño')
+        ? '${_nombresDueno.text.trim()} ${_apellidosDueno.text.trim()}'
         : '${_nombresConductor.text.trim()} ${_apellidosConductor.text.trim()}';
     final String dni = _conductorEsDueno
-        ? (widget.vehicleData['propietarioDni'] ?? '').toString()
+        ? _dniDueno.text.trim()
         : _dniConductor.text.trim();
     final String nombres = _conductorEsDueno
-        ? (widget.vehicleData['propietarioNombres'] ?? nombre).toString()
+        ? _nombresDueno.text.trim()
         : _nombresConductor.text.trim();
     final String apellidos = _conductorEsDueno
-        ? '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim()
+        ? _apellidosDueno.text.trim()
         : _apellidosConductor.text.trim();
 
     return {
@@ -254,11 +265,9 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'claseVehiculo': widget.vehicleData['tipo'] ?? '',
         'marcaVehiculo': widget.vehicleData['marca'] ?? '',
         'colorVehiculo': widget.vehicleData['color'] ?? '',
-        'duenoDni': widget.vehicleData['propietarioDni'] ?? '',
-        'duenoNombres': (widget.vehicleData['propietarioNombres']?.toString().isNotEmpty == true)
-            ? widget.vehicleData['propietarioNombres']
-            : (widget.vehicleData['propietario'] ?? ''),
-        'duenoApellidos': '${widget.vehicleData['propietarioPaterno'] ?? ''} ${widget.vehicleData['propietarioMaterno'] ?? ''}'.trim(),
+        'duenoDni': _dniDueno.text.trim(),
+        'duenoNombres': _nombresDueno.text.trim(),
+        'duenoApellidos': _apellidosDueno.text.trim(),
       };
 
       final result = await ApiService.createPapeleta(requestData);
@@ -427,6 +436,26 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                     _buildTextField(_nombresConductor, 'Nombres', Icons.person, TextInputType.name),
                     const SizedBox(height: 12),
                     _buildTextField(_apellidosConductor, 'Apellidos', Icons.person_outline, TextInputType.name),
+                  ],
+
+                  if (widget.vehicleData['propietarioDni'] == null || widget.vehicleData['propietarioDni'].toString().trim().isEmpty || widget.vehicleData['propietarioDni'] == 'S/D') ...[
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Identificación del Titular/Dueño (Opcional)'),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
+                      child: Column(
+                        children: [
+                          const Text('Complete estos datos si los conoce o desea buscarlos.', style: TextStyle(fontSize: 12, color: Colors.blueGrey)),
+                          const SizedBox(height: 12),
+                          _buildTextField(_dniDueno, 'N° Doc. del Dueño', Icons.badge, TextInputType.number, hasSearch: true, maxLength: 15, onSearch: () => _searchPersona(_dniDueno, _nombresDueno, _apellidosDueno)),
+                          const SizedBox(height: 12),
+                          _buildTextField(_nombresDueno, 'Nombres', Icons.person, TextInputType.name),
+                          const SizedBox(height: 12),
+                          _buildTextField(_apellidosDueno, 'Apellidos', Icons.person_outline, TextInputType.name),
+                        ],
+                      ),
+                    ),
                   ],
 
                   const SizedBox(height: 24),

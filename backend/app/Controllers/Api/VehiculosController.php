@@ -374,7 +374,7 @@ class VehiculosController extends ResourceController
                     return $this->respond(['data' => [
                         'id' => 0,
                         'placa' => $sunarpData['placa'] ?? $normalizado,
-                        'tipo' => 'Vehículo',
+                        'tipo' => $sunarpData['clase'] ?? $sunarpData['tipo'] ?? 'Vehículo',
                         'marca' => $sunarpData['marca'] ?? '',
                         'modelo' => $sunarpData['modelo'] ?? '',
                         'color' => $sunarpData['color'] ?? '',
