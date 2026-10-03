@@ -1,5 +1,7 @@
-import { showError } from './SwalUtil'
-import { apiFetch } from '../config/api'
+import { showError, loading, closeLoading } from './SwalUtil'
+import { apiFetch, leerMensajeError } from '../config/api'
+
+const MAXIMO_FILAS_PDF = 10000
 
 /**
  * Pide al backend que genere un PDF real (dompdf) a partir de
@@ -30,19 +32,37 @@ export async function exportToPdf({
     return
   }
 
+  if (data.length > MAXIMO_FILAS_PDF) {
+    showError(
+      'PDF demasiado grande',
+      `El PDF admite hasta ${MAXIMO_FILAS_PDF.toLocaleString('es-PE')} registros y hay ${data.length.toLocaleString('es-PE')}. Aplique filtros o descargue el Excel, que incluye todos los datos.`
+    )
+    return
+  }
+
+  // Las columnas calculadas (solo "render", sin "key") reciben una clave propia: antes se omitían
+  // y salían vacías en el PDF.
+  columns = columns.map((col, i) => ({ ...col, key: col.key ?? `columna_${i}` }))
+
   // Aplica cada render(...) del lado del cliente antes de enviar al backend
   // (los render son funciones JS, no se pueden serializar).
   const filas = data.map((row, index) => {
     const fila = {}
     for (const col of columns) {
-      if (!col.key) continue
       fila[col.key] = col.render ? col.render(row[col.key], row, index) : row[col.key]
     }
     return fila
   })
 
+  // Generar un PDF grande en el servidor tarda: se avisa y se espera hasta 15 minutos.
+  const esGrande = data.length > 500
+  if (esGrande) {
+    loading('Generando PDF...', `${data.length.toLocaleString('es-PE')} registros. Puede tardar unos minutos, no cierre esta ventana.`)
+  }
+
   try {
     const response = await apiFetch('/export-pdf', {
+      timeoutMs: 15 * 60 * 1000,
       method: 'POST',
       body: {
         filename,
@@ -56,11 +76,14 @@ export async function exportToPdf({
     })
 
     if (!response.ok) {
-      showError('Error al generar PDF', 'No se pudo generar el documento en el servidor. Intenta nuevamente.')
+      if (esGrande) closeLoading()
+      const motivo = await leerMensajeError(response, 'No se pudo generar el documento en el servidor. Intenta nuevamente.')
+      showError('Error al generar PDF', motivo)
       return
     }
 
     const blob = await response.blob()
+    if (esGrande) closeLoading()
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -70,6 +93,7 @@ export async function exportToPdf({
     document.body.removeChild(link)
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   } catch {
+    if (esGrande) closeLoading()
     showError('Error al generar PDF', 'No se pudo conectar con el servidor para generar el documento.')
   }
 }

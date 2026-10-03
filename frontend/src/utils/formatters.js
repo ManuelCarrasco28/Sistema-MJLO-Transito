@@ -49,3 +49,14 @@ export function toTitleCase(str) {
     .join('')
 }
 
+
+// Las placas se registran sin guion ni espacios: exactamente 6 letras o números, en mayúsculas.
+export const LONGITUD_PLACA = 6
+
+export function normalizarPlaca(valor) {
+  return String(valor ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, LONGITUD_PLACA)
+}
+
+export function esPlacaValida(valor) {
+  return /^[A-Z0-9]{6}$/.test(String(valor ?? ''))
+}

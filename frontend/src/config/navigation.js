@@ -69,7 +69,7 @@ export const navigationGroups = [
     officeOnly: true,
     items: [
       { id: 'permisos',    label: 'Permisos y Autorizaciones', icon: 'routePermit',  path: '/permisos' },
-      { id: 'cursos',      label: 'Curso de Seguridad Vial',   icon: 'course',       path: '/cursos' },
+      { id: 'cursos',      label: 'Cursos de Seguridad Vial',   icon: 'course',       path: '/cursos' },
       { id: 'documentos',  label: 'Documentos del Vehículo',   icon: 'folderShield', path: '/documentos' },
     ]
   },

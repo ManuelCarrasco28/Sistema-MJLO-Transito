@@ -102,6 +102,8 @@ function getOrCreateToastContainer() {
   return toastContainer;
 }
 
+const MAX_TOASTS_VISIBLES = 2;
+
 export const showToast = (title, iconOrType = null, duration = 3200) => {
   if (typeof document === 'undefined') return;
 
@@ -110,8 +112,21 @@ export const showToast = (title, iconOrType = null, duration = 3200) => {
 
   const actionType = detectActionType(title, iconOrType);
   const cfg = ACTION_CONFIG[actionType] || ACTION_CONFIG.crear;
+  const clave = `${actionType}|${title}`;
+
+  // Anti-spam: si ya hay una notificación igual en pantalla no se apila otra, se reinicia su tiempo.
+  const repetida = Array.from(container.children).find((el) => el.__clave === clave && el.__reiniciar);
+  if (repetida) {
+    repetida.__reiniciar(duration);
+    return;
+  }
+
+  // Máximo de notificaciones visibles a la vez: al llegar una nueva se cierran las más antiguas.
+  const visibles = Array.from(container.children).filter((el) => el.__cerrar && !el.classList.contains('toast-out'));
+  visibles.slice(0, Math.max(0, visibles.length - (MAX_TOASTS_VISIBLES - 1))).forEach((el) => el.__cerrar());
 
   const toastEl = document.createElement('div');
+  toastEl.__clave = clave;
   toastEl.className = `mjlo-toast-card ${actionType === 'error' ? 'toast-shake' : 'toast-in'}`;
   toastEl.style.borderLeft = `4px solid ${cfg.accentBorder}`;
 
@@ -152,6 +167,20 @@ export const showToast = (title, iconOrType = null, duration = 3200) => {
   timerId = setTimeout(removeToast, duration);
 
   const bar = toastEl.querySelector('.toast-progress');
+
+  toastEl.__cerrar = removeToast;
+  toastEl.__reiniciar = (nuevaDuracion) => {
+    if (isClosed) return;
+    if (timerId) clearTimeout(timerId);
+    if (bar) {
+      bar.style.animation = 'none';
+      void bar.offsetWidth;
+      bar.style.animation = '';
+      bar.style.animationDuration = `${nuevaDuracion}ms`;
+      bar.style.animationPlayState = 'running';
+    }
+    timerId = setTimeout(removeToast, nuevaDuracion);
+  };
 
   toastEl.addEventListener('mouseenter', () => {
     if (timerId) clearTimeout(timerId);
@@ -201,7 +230,7 @@ export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelT
             actions: 'flex gap-3 w-full justify-center mt-6',
             confirmButton: confirmColor
                 ? 'rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95'
-                : 'rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-rose-600/20 transition-all hover:bg-rose-700 hover:scale-[1.02] active:scale-95',
+                : 'rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-rose-700 hover:scale-[1.02] active:scale-95',
             cancelButton: cancelColor
                 ? 'rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95'
                 : 'rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-6 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 shadow-sm transition-all hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95',
@@ -248,7 +277,7 @@ export const showSuccess = (title, text) => {
             popup: 'rounded-3xl shadow-2xl border border-emerald-100 dark:border-emerald-900/30 dark:bg-slate-900 p-6',
             title: 'text-2xl font-black text-slate-800 dark:text-white mt-3',
             htmlContainer: 'text-sm font-medium text-slate-500 dark:text-slate-400 mt-2',
-            confirmButton: 'rounded-xl bg-emerald-600 px-8 py-2.5 text-sm font-extrabold text-white shadow-md shadow-emerald-600/20 transition-all hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 mt-5',
+            confirmButton: 'rounded-xl bg-emerald-600 px-8 py-2.5 text-sm font-extrabold text-white shadow-md transition-all hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 mt-5',
             icon: 'border-emerald-500 text-emerald-500 scale-125 mb-2',
         }
     });

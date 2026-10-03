@@ -58,6 +58,16 @@ export async function leerMensajeError(response, fallback = 'Ocurrió un error e
   }
 }
 
+function redirigirSiSesionExpirada(response, url) {
+  if (response.status !== 401 || url.includes('/api/login') || url.includes('/api/me')) return
+  if (window.location.pathname.endsWith('/login')) return
+  window.setTimeout(() => {
+    if (!window.location.pathname.endsWith('/login')) {
+      window.location.href = '/login?expired=1'
+    }
+  }, 100)
+}
+
 export async function apiFetch(endpoint, options = {}) {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options
   const url = endpoint.startsWith('http://') || endpoint.startsWith('https://')
@@ -99,24 +109,14 @@ export async function apiFetch(endpoint, options = {}) {
         })
         pendingReads.set(url, request)
       }
-      const response = await request
-      return response.clone()
+      const shared = await request
+      redirigirSiSesionExpirada(shared, url)
+      return shared.clone()
     }
 
     const response = await fetch(url, config)
 
-    // Manejo global de expiración de sesión (401)
-    if (response.status === 401 && !url.includes('/api/login') && !url.includes('/api/me')) {
-      const isLoginPath = window.location.pathname === '/login' || window.location.pathname.endsWith('/login')
-      if (!isLoginPath && typeof window !== 'undefined') {
-        // Redirigir a login preservando aviso
-        setTimeout(() => {
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login?expired=1'
-          }
-        }, 100)
-      }
-    }
+    redirigirSiSesionExpirada(response, url)
 
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && response.ok) {
       const cleanEndpoint = endpoint.split('?')[0].replace(/^\//, '').split('/')[0]
