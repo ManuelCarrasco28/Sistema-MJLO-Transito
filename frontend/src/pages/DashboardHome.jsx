@@ -3,7 +3,7 @@ import { MetricCards } from '../components/dashboard/MetricCards'
 import { ChartsSection } from '../components/dashboard/ChartsSection'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
 import { Icon } from '../components/ui/Icon'
-import { QuickActions } from '../components/dashboard/QuickActions'
+
 
 export function DashboardHome({ user }) {
   const cached = getCachedData('/dashboard')
@@ -13,23 +13,34 @@ export function DashboardHome({ user }) {
   useEffect(() => {
     let active = true
 
-    apiFetch('/dashboard')
-      .then((response) => {
-        if (!response.ok) throw new Error('No se pudo cargar el resumen del dashboard.')
-        return response.json()
-      })
-      .then((data) => {
-        if (active) {
-          setDashboardData(data)
-          setCachedData('/dashboard', data)
-        }
-      })
-      .catch(() => {
-        if (active && !cached) setError('No se pudo cargar la información del panel principal.')
-      })
+    const cargar = () => {
+      apiFetch('/dashboard')
+        .then((response) => {
+          if (!response.ok) throw new Error('No se pudo cargar el resumen del dashboard.')
+          return response.json()
+        })
+        .then((data) => {
+          if (active) {
+            setDashboardData(data)
+            setCachedData('/dashboard', data)
+            setError('')
+          }
+        })
+        .catch(() => {
+          if (active && !cached) setError('No se pudo cargar la información del panel principal.')
+        })
+    }
+
+    cargar()
+    // Se actualiza solo cada minuto y al volver a la pestaña (mes, dias y montos siempre al dia)
+    const timer = setInterval(cargar, 60000)
+    const alVolver = () => { if (document.visibilityState === 'visible') cargar() }
+    document.addEventListener('visibilitychange', alVolver)
 
     return () => {
       active = false
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', alVolver)
     }
   }, [])
 
@@ -37,8 +48,8 @@ export function DashboardHome({ user }) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="flex items-center gap-3.5">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#0075FF] text-white shadow-lg shadow-[#0075FF]/30">
-            <Icon name="dashboard" className="size-6" />
+          <span className="grid shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="dashboard" className="size-9" />
           </span>
           <div>
             <div className="flex items-center gap-2">
@@ -58,8 +69,8 @@ export function DashboardHome({ user }) {
         </div>
       )}
 
-      {/* Quick Actions (Accesos rápidos) */}
-      <QuickActions user={user} />
+
+
 
       {/* KPI Metric Cards */}
       <MetricCards cards={dashboardData?.summaryCards} loading={!dashboardData && !error} user={user} />

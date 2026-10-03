@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BotonCancelar, BotonGuardar } from '../ui/ModalControls'
 
 const AVAILABLE_SHORTCUTS = [
   {
@@ -7,7 +8,7 @@ const AVAILABLE_SHORTCUTS = [
     path: '/vehiculos?accion=registrar',
     title: 'Registrar Vehículo',
     desc: 'Nueva unidad / mototaxi',
-    color: '#4318FF',
+    color: '#5B6EE1',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
         <path d="M12 4.5v15m7.5-7.5h-15" strokeLinecap="round" strokeLinejoin="round"></path>
@@ -19,7 +20,7 @@ const AVAILABLE_SHORTCUTS = [
     path: '/inspecciones?accion=registrar',
     title: 'Nueva Inspección',
     desc: 'Control y revisión técnica',
-    color: '#39B8FF',
+    color: '#6CB8E8',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
         <path d="M9 12.75L11.25 15 15 9.75m-2.182 7.848a9 9 0 11-1.636 0M12 3v1.5" strokeLinecap="round" strokeLinejoin="round"></path>
@@ -158,14 +159,14 @@ export function QuickActions({ user }) {
         <h4 className="text-base font-extrabold text-[#2B3674] dark:text-white tracking-tight">Accesos Rápidos Operativos</h4>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="text-xs font-bold text-[#4318FF] hover:underline cursor-pointer focus:outline-none bg-transparent border-none p-0"
+          className="text-xs font-bold text-[#5B6EE1] hover:underline cursor-pointer focus:outline-none bg-transparent border-none p-0"
         >
           Personalizar atajos
         </button>
       </div>
       
       {activeShortcuts.length === 0 ? (
-        <div className="bg-white dark:bg-[#111C44] rounded-[20px] p-6 text-center text-sm font-medium text-slate-500 shadow-sm border border-dashed border-slate-300 dark:border-white/10">
+        <div className="bg-white dark:bg-[#1C2438] rounded-[20px] p-6 text-center text-sm font-medium text-slate-500 shadow-sm border border-dashed border-slate-300 dark:border-white/10">
           No hay atajos seleccionados. Haz clic en "Personalizar atajos" para agregar algunos.
         </div>
       ) : (
@@ -182,7 +183,7 @@ export function QuickActions({ user }) {
               <a 
                 key={action.id}
                 href={action.path}
-                className="group p-4 rounded-[20px] bg-white dark:bg-[#111C44] shadow-horizon dark:shadow-none hover:shadow-horizon dark:shadow-none-hover transition-all duration-300 hover:-translate-y-1 flex items-center gap-4 border border-transparent dark:border-white/10 cursor-pointer" 
+                className="group p-4 rounded-[20px] bg-white dark:bg-[#1C2438] shadow-horizon dark:shadow-none hover:shadow-horizon dark:shadow-none-hover transition-all duration-300 hover:-translate-y-1 flex items-center gap-4 border border-transparent dark:border-white/10 cursor-pointer" 
                 style={{ '--hover-border': `rgba(${colorRgb}, 0.2)` }}
                 onClick={(e) => {
                   if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
@@ -249,10 +250,10 @@ function CustomizeModal({ availableShortcuts, initialSelection, onSave, onClose 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white dark:bg-[#111C44] w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div className="bg-white dark:bg-[#1C2438] w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
         <div className="px-5 py-4 border-b border-slate-100 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
           <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            <svg className="w-5 h-5 text-[#4318FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <svg className="w-5 h-5 text-[#5B6EE1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
             </svg>
             Personalizar atajos
@@ -280,14 +281,14 @@ function CustomizeModal({ availableShortcuts, initialSelection, onSave, onClose 
                   key={shortcut.id}
                   className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all cursor-pointer ${
                     isSelected 
-                      ? 'border-[#4318FF] bg-[#4318FF]/5' 
+                      ? 'border-[#5B6EE1] bg-[#5B6EE1]/5' 
                       : 'border-slate-100 dark:border-white/5 hover:border-slate-200 dark:hover:border-white/10'
                   }`}
                 >
                   <div className="pt-0.5">
                     <input 
                       type="checkbox" 
-                      className="w-4 h-4 text-[#4318FF] rounded border-slate-300 focus:ring-[#4318FF]"
+                      className="w-4 h-4 text-[#5B6EE1] rounded border-slate-300 focus:ring-[#5B6EE1]"
                       checked={isSelected}
                       onChange={() => toggleSelection(shortcut.id)}
                     />
@@ -307,18 +308,10 @@ function CustomizeModal({ availableShortcuts, initialSelection, onSave, onClose 
         </div>
         
         <div className="px-5 py-4 border-t border-slate-100 dark:border-white/10 flex justify-end gap-3 bg-slate-50 dark:bg-white/5">
-          <button 
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-colors"
-          >
-            Cancelar
-          </button>
-          <button 
-            onClick={() => onSave(selection)}
-            className="px-5 py-2 text-xs font-bold text-white bg-[#4318FF] hover:bg-[#3412cb] shadow-md shadow-[#4318FF]/30 rounded-lg transition-all active:scale-95"
-          >
-            Guardar cambios
-          </button>
+          <BotonCancelar onClick={onClose} />
+          <BotonGuardar type="button" onClick={() => onSave(selection)}>
+Guardar cambios
+</BotonGuardar>
         </div>
       </div>
     </div>
