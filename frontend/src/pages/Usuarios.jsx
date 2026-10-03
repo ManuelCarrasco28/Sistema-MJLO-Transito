@@ -3,11 +3,13 @@ import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUti
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
+import { crearComparador } from '../utils/ordenMultiple'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { formatNumeroTarjeta } from '../utils/formatters'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -152,12 +154,7 @@ export function Usuarios({ user }) {
 
   const sortedUsuarios = useMemo(() => {
     if (!sortBy) return filteredUsuarios
-    const dirMul = sortDir === 'ASC' ? 1 : -1
-    return [...filteredUsuarios].sort((a, b) => {
-      const valA = String(a[sortBy] ?? '').toLowerCase()
-      const valB = String(b[sortBy] ?? '').toLowerCase()
-      return valA < valB ? -1 * dirMul : valA > valB ? 1 * dirMul : 0
-    })
+    return [...filteredUsuarios].sort(crearComparador(sortBy, sortDir))
   }, [filteredUsuarios, sortBy, sortDir])
 
   const paginatedUsuarios = useMemo(() => {
@@ -327,7 +324,7 @@ export function Usuarios({ user }) {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
-      const listToExport = filteredUsuarios
+      const listToExport = sortedUsuarios
           if (listToExport.length === 0) {
             showToast('No hay usuarios para exportar con los filtros actuales', 'warning')
             return
@@ -410,7 +407,7 @@ export function Usuarios({ user }) {
   const handleExportPdf = async () => {
     setIsExportingPdf(true)
     try {
-      const listToExport = filteredUsuarios
+      const listToExport = sortedUsuarios
           if (listToExport.length === 0) {
             showToast('No hay usuarios para imprimir con los filtros actuales', 'warning')
             return
@@ -539,8 +536,8 @@ export function Usuarios({ user }) {
       {/* Cabecera Principal con gradiente idéntico a Personas.jsx */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-900 text-white shadow-md shadow-slate-900/20 dark:bg-[var(--bg-surface)] dark:border dark:border-[var(--border)] dark:shadow-none">
-            <Icon name="people" className="size-5" />
+          <div className="grid shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name="people" className="size-8" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -556,9 +553,9 @@ export function Usuarios({ user }) {
       </div>
 
       {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas idénticas al diseño de Personas.jsx */}
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="kpi-grid">
         {/* 1. Total usuarios */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Total usuarios
@@ -575,7 +572,7 @@ export function Usuarios({ user }) {
         </div>
 
         {/* 2. Administradores */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
               Administración
@@ -592,7 +589,7 @@ export function Usuarios({ user }) {
         </div>
 
         {/* 3. Inspectores */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
               Inspectores
@@ -609,7 +606,7 @@ export function Usuarios({ user }) {
         </div>
 
         {/* 4. Activos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Activos
@@ -626,7 +623,7 @@ export function Usuarios({ user }) {
         </div>
 
         {/* 5. Inactivos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
               Inactivos
@@ -644,7 +641,7 @@ export function Usuarios({ user }) {
       </div>
 
       {/* Contenedor de la Tabla con estilo exacto de Personas.jsx */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
         {/* Barra de Filtros y Acciones */}
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -773,7 +770,7 @@ export function Usuarios({ user }) {
                     <td className="px-4 py-3.5">
                       <div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                     </td>
-                    <td className="sticky right-0 z-10 px-4 py-3.5 text-right bg-white dark:bg-[var(--bg-surface)]">
+                    <td className="sticky right-0 z-10 px-4 py-3.5 text-right bg-white dark:bg-[#1C2438]">
                       <div className="h-8 w-28 ml-auto rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
                     </td>
                   </tr>
@@ -858,7 +855,7 @@ export function Usuarios({ user }) {
                       </td>
 
                       {/* Acciones */}
-                      <td className="sticky right-0 z-10 px-4 py-3 text-right bg-white dark:bg-[var(--bg-surface)] border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50">
+                      <td className="sticky right-0 z-10 px-4 py-3 text-right bg-white dark:bg-[#1C2438] border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* OJO: Ver Ficha Detalle */}
                           <button
@@ -994,8 +991,8 @@ export function Usuarios({ user }) {
       {/* MODAL 1: NUEVO USUARIO */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-visible">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] rounded-t-3xl">
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)] overflow-visible">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[#1C2438] rounded-t-3xl">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
                   <Icon name="people" className="size-5" />
@@ -1009,13 +1006,7 @@ export function Usuarios({ user }) {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
-              >
-                ✕
-              </button>
+              <BotonCerrarModal onClick={() => setIsCreateModalOpen(false)} title="Cerrar" />
             </div>
 
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
@@ -1037,7 +1028,7 @@ export function Usuarios({ user }) {
                       setTrabajadorDropdownOpen(true)
                     }}
                     placeholder="Escribe DNI o nombres para buscar en el padrón..."
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
                   />
                 </div>
 
@@ -1150,21 +1141,11 @@ export function Usuarios({ user }) {
               </div>
 
               <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-indigo-600/25 hover:scale-[1.02] active:scale-95 transition cursor-pointer disabled:opacity-50"
-                >
+                <BotonCancelar onClick={() => setIsCreateModalOpen(false)} />
+                <BotonGuardar disabled={saving}>
                   <Icon name="check" className="size-4" />
                   <span>{saving ? 'Guardando...' : 'Crear Usuario'}</span>
-                </button>
+                </BotonGuardar>
               </div>
             </form>
           </div>
@@ -1174,8 +1155,8 @@ export function Usuarios({ user }) {
       {/* MODAL 2: EDITAR ROL Y ESTADO */}
       {isEditModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] overflow-visible">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] rounded-t-3xl">
+          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)] overflow-visible">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[#1C2438] rounded-t-3xl">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
                   <Icon name="pencil" className="size-4" />
@@ -1189,13 +1170,7 @@ export function Usuarios({ user }) {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsEditModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
-              >
-                ✕
-              </button>
+              <BotonCerrarModal onClick={() => setIsEditModalOpen(false)} title="Cerrar" />
             </div>
 
             <form onSubmit={handleSaveEditUser} className="p-6 space-y-4">
@@ -1226,21 +1201,11 @@ export function Usuarios({ user }) {
               />
 
               <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-linear-to-r from-amber-500 to-orange-500 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-amber-500/25 hover:scale-[1.02] active:scale-95 transition cursor-pointer disabled:opacity-50"
-                >
+                <BotonCancelar onClick={() => setIsEditModalOpen(false)} />
+                <BotonGuardar disabled={saving}>
                   <Icon name="check" className="size-4" />
                   <span>{saving ? 'Guardando...' : 'Guardar Cambios'}</span>
-                </button>
+                </BotonGuardar>
               </div>
             </form>
           </div>
@@ -1250,8 +1215,8 @@ export function Usuarios({ user }) {
       {/* MODAL 3: RESTABLECER CONTRASEÑA */}
       {isPasswordModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] rounded-t-3xl">
+          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[#1C2438] rounded-t-3xl">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
                   <Icon name="settings" className="size-4" />
@@ -1265,13 +1230,7 @@ export function Usuarios({ user }) {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsPasswordModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
-              >
-                ✕
-              </button>
+              <BotonCerrarModal onClick={() => setIsPasswordModalOpen(false)} title="Cerrar" />
             </div>
 
             <form onSubmit={handleResetPassword} className="p-6 space-y-4">
@@ -1300,21 +1259,11 @@ export function Usuarios({ user }) {
               </div>
 
               <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsPasswordModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 px-5 py-2 text-xs font-extrabold text-white shadow-md shadow-purple-600/25 hover:scale-[1.02] active:scale-95 transition cursor-pointer disabled:opacity-50"
-                >
+                <BotonCancelar onClick={() => setIsPasswordModalOpen(false)} />
+                <BotonGuardar disabled={saving}>
                   <Icon name="check" className="size-4" />
                   <span>{saving ? 'Cambiando...' : 'Actualizar Clave'}</span>
-                </button>
+                </BotonGuardar>
               </div>
             </form>
           </div>
@@ -1324,8 +1273,8 @@ export function Usuarios({ user }) {
       {/* MODAL 4: FICHA DETALLE DEL USUARIO */}
       {isDetailModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
                   <Icon name="eye" className="size-4" />
@@ -1339,13 +1288,7 @@ export function Usuarios({ user }) {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                className="grid size-8 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
-              >
-                ✕
-              </button>
+              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar" />
             </div>
 
             <div className="p-6 space-y-4">
@@ -1405,13 +1348,7 @@ export function Usuarios({ user }) {
               </div>
 
               <div className="mt-5 flex items-center justify-end gap-2 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition cursor-pointer"
-                >
-                  Cerrar
-                </button>
+                <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
               </div>
             </div>
           </div>

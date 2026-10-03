@@ -6,11 +6,16 @@ import { showConfirm, showSuccess, showError } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
-import { FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
+import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { Modal } from '../components/ui/Modal'
 import { RolesTable } from '../components/superadmin/RolesTable'
 import { ConfiguracionReadOnly } from '../components/superadmin/ConfiguracionReadOnly'
 import { Usuarios } from './Usuarios'
+import { BotonCancelar, BotonGuardar } from '../components/ui/ModalControls'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import { Pagination } from '../components/ui/Pagination'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { BotonExcel, BotonPdf, TarjetaKpi, CLASE_TABLA_ENCABEZADO } from '../components/ui/ToolbarButtons'
 
 const DEFAULT_USER_FORM = {
   id_trabajador: '',
@@ -74,7 +79,13 @@ export function SuperAdminDashboard({ user }) {
   const [realAuditLogs, setRealAuditLogs] = useState([])
   const [loadingAudit, setLoadingAudit] = useState(false)
   const [auditStats, setAuditStats] = useState({ total: 0, hoy: 0, porModulo: [] })
+  const [auditPage, setAuditPage] = useState(1)
+  const [auditPerPage, setAuditPerPage] = useState(10)
+  const [exportandoExcel, setExportandoExcel] = useState(false)
+  const [exportandoPdf, setExportandoPdf] = useState(false)
   const municipalidadRequestRef = useRef(0)
+
+  useEffect(() => { setAuditPage(1) }, [realAuditLogs])
 
   const fetchAuditLogs = async () => {
     setLoadingAudit(true)
@@ -104,7 +115,26 @@ export function SuperAdminDashboard({ user }) {
   }
 
   
-  const handleExportAuditoriaPdf = () => {
+  // La exportación descarga todos los eventos que coinciden con los filtros, no solo los cargados en pantalla.
+  const fetchTodaLaAuditoria = () =>
+    fetchTodasLasFilas('/auditoria', {
+      search: auditSearch,
+      modulo: auditType === 'TODOS' ? '' : auditType,
+      accion: auditSeverity === 'TODOS' ? '' : auditSeverity,
+    }, { campoPorPagina: 'limit', mensaje: 'Preparando la descarga de auditoría...' })
+
+  const handleExportAuditoriaPdf = async () => {
+    let eventos
+    setExportandoPdf(true)
+    try {
+      eventos = await fetchTodaLaAuditoria()
+    } catch (err) {
+      console.warn('No se pudo descargar la auditoría:', err)
+      showError('Error', 'No se pudo preparar la descarga de auditoría.')
+      return
+    } finally {
+      setExportandoPdf(false)
+    }
     exportToPdf({
       filename: `Auditoria_Sistema_${new Date().getFullYear()}.pdf`,
       title: 'Reporte de Auditoría del Sistema',
@@ -114,29 +144,40 @@ export function SuperAdminDashboard({ user }) {
         { label: 'Fecha', value: new Date().toLocaleString('es-PE') }
       ],
       columns: [
-        { header: 'FECHA Y HORA', dataKey: 'fecha_hora' },
-        { header: 'MÓDULO', dataKey: 'modulo' },
-        { header: 'ACCIÓN', dataKey: 'accion' },
-        { header: 'DESCRIPCIÓN', dataKey: 'descripcion' },
-        { header: 'USUARIO', dataKey: 'nombre_usuario' },
-        { header: 'ROL', dataKey: 'rol_nombre' },
-        { header: 'IP', dataKey: 'direccion_ip' }
+        { header: 'FECHA Y HORA', key: 'fecha_hora' },
+        { header: 'MÓDULO', key: 'modulo' },
+        { header: 'ACCIÓN', key: 'accion' },
+        { header: 'DESCRIPCIÓN', key: 'descripcion' },
+        { header: 'USUARIO', key: 'nombre_usuario' },
+        { header: 'ROL', key: 'rol' },
+        { header: 'IP', key: 'ip' }
       ],
-      data: realAuditLogs.map(log => ({
+      data: eventos.map(log => ({
         ...log,
         fecha_hora: new Date(log.fecha_hora).toLocaleString('es-PE')
       }))
     })
   }
 
-  const handleExportAuditoria = () => {
+  const handleExportAuditoria = async () => {
+    let eventos
+    setExportandoExcel(true)
+    try {
+      eventos = await fetchTodaLaAuditoria()
+    } catch (err) {
+      console.warn('No se pudo descargar la auditoría:', err)
+      showError('Error', 'No se pudo preparar la descarga de auditoría.')
+      return
+    } finally {
+      setExportandoExcel(false)
+    }
     exportToExcel({
       filename: `Auditoria_Sistema_${new Date().getFullYear()}.xls`,
       sheetName: 'Auditoria',
       title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
       subtitle: 'Subgerencia de Tránsito y Transporte · Registro Oficial de Auditoría y Trazabilidad',
       metadata: [
-        { label: 'Total eventos', value: String(realAuditLogs.length) },
+        { label: 'Total eventos', value: String(eventos.length) },
         { label: 'Filtro Módulo', value: auditType },
         { label: 'Filtro Acción', value: auditSeverity },
       ],
@@ -151,17 +192,17 @@ export function SuperAdminDashboard({ user }) {
         { header: 'Dirección IP', key: 'ip', width: 120, align: 'center', isText: true },
         { header: 'Dispositivo / Navegador', key: 'user_agent', width: 220 },
       ],
-      data: realAuditLogs,
+      data: eventos,
     })
   }
 
   const adminModules = [
-    { id: 'personas', label: 'Personas', detail: 'Registrar y mantener datos personales base del sistema.', icon: 'idCard', tone: 'from-sky-600 to-cyan-500' },
-    { id: 'trabajadores', label: 'Trabajadores', detail: 'Gestionar personal municipal antes de crear credenciales.', icon: 'workerBadge', tone: 'from-indigo-600 to-blue-500' },
-    { id: 'usuarios', label: 'Gestión de usuarios', detail: 'Crear cuentas, activar usuarios y asignar responsables.', icon: 'people', tone: 'from-blue-600 to-indigo-500' },
-    { id: 'roles', label: 'Roles y permisos', detail: 'Definir accesos por perfil y estado de cuenta.', icon: 'shieldCheck', tone: 'from-emerald-600 to-teal-500' },
-    { id: 'configuracion', label: 'Configuración del sistema', detail: 'Parámetros globales, seguridad y sesiones.', icon: 'settings', tone: 'from-violet-600 to-purple-500' },
-    { id: 'auditoria', label: 'Auditoría y logs', detail: 'Revisar acciones críticas realizadas por usuarios.', icon: 'document', tone: 'from-amber-500 to-orange-500' }
+    { id: 'personas', label: 'Personas', detail: 'Registrar y mantener datos personales base del sistema.', icon: 'idCard', color: 'cyan' },
+    { id: 'trabajadores', label: 'Trabajadores', detail: 'Gestionar personal municipal antes de crear credenciales.', icon: 'workerBadge', color: 'indigo' },
+    { id: 'usuarios', label: 'Gestión de usuarios', detail: 'Crear cuentas, activar usuarios y asignar responsables.', icon: 'people', color: 'indigo' },
+    { id: 'roles', label: 'Roles y permisos', detail: 'Definir accesos por perfil y estado de cuenta.', icon: 'shieldCheck', color: 'emerald' },
+    { id: 'configuracion', label: 'Configuración del sistema', detail: 'Parámetros globales, seguridad y sesiones.', icon: 'settings', color: 'violet' },
+    { id: 'auditoria', label: 'Auditoría y logs', detail: 'Revisar acciones críticas realizadas por usuarios.', icon: 'document', color: 'amber' }
   ]
 
   useEffect(() => {
@@ -461,8 +502,8 @@ export function SuperAdminDashboard({ user }) {
       {/* Cabecera Principal */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-900 text-white shadow-md shadow-slate-900/20 dark:bg-[var(--bg-surface)] dark:border dark:border-[var(--border)] dark:shadow-none">
-            <Icon name={isDashboard ? 'shieldCheck' : activeModuleInfo.icon} className="size-5" />
+          <div className="grid shrink-0 place-items-center text-slate-900 dark:text-white">
+            <Icon name={isDashboard ? 'shieldCheck' : activeModuleInfo.icon} className="size-8" />
           </div>
           <div>
             <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
@@ -488,7 +529,7 @@ export function SuperAdminDashboard({ user }) {
           {/* Tarjetas KPI con Bordes de Colores */}
           <div className="grid gap-2.5 grid-cols-2 xl:grid-cols-4">
             {dashboardStats.map((stat) => (
-              <div key={stat.label} className={`relative overflow-hidden rounded-xl border-[1.5px] ${stat.borderColor} bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]`}>
+              <div key={stat.label} className={`relative overflow-hidden rounded-xl border-[1.5px] ${stat.borderColor} bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]`}>
                 <div className="flex items-center justify-between">
                   <span className={`text-[10px] font-bold uppercase tracking-wider ${stat.textColor}`}>{stat.label}</span>
                   <span className={`grid size-6 place-items-center rounded-md ${stat.tone}`}>
@@ -533,37 +574,34 @@ export function SuperAdminDashboard({ user }) {
             ))}
           </div>
 
-          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-            <div className="mb-5">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Administración del sistema</p>
-              <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-white">Módulos administrativos</h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">Funciones exclusivas para superadministración. Los módulos operativos quedan fuera de este perfil.</p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {adminModules.map((module) => (
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            {adminModules.map((module) => {
+              const colores = {
+                cyan: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400',
+                indigo: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400',
+                emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+                violet: 'bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400',
+                amber: 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
+              }
+              return (
                 <button
                   key={module.id}
                   type="button"
                   onClick={() => navigate(`/superadmin/${module.id}`)}
-                  className="group rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-lg dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]"
+                  className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xs transition-all hover:border-indigo-300 hover:shadow-sm active:scale-[0.99] cursor-pointer dark:border-[var(--border)] dark:bg-[#1C2438] dark:hover:border-indigo-500/50"
                 >
-                  <div className="flex items-start gap-4">
-                    <span className={`grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${module.tone} text-white shadow-lg`}>
-                      <Icon name={module.icon} className="size-5" />
-                    </span>
-                    <div className="min-w-0">
-                      <h2 className="text-base font-black text-slate-950 dark:text-white">{module.label}</h2>
-                      <p className="mt-1 text-sm font-semibold leading-5 text-slate-500 dark:text-slate-400">{module.detail}</p>
-                      <span className="mt-4 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 shadow-sm group-hover:text-blue-700 dark:bg-[var(--bg-surface)] dark:text-slate-300">
-                        Abrir módulo
-                      </span>
-                    </div>
-                  </div>
+                  <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${colores[module.color]}`}>
+                    <Icon name={module.icon} className="size-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-black text-slate-900 dark:text-white">{module.label}</span>
+                    <span className="mt-0.5 block text-xs font-medium leading-snug text-slate-500 dark:text-slate-400">{module.detail}</span>
+                  </span>
+                  <Icon name="arrow" className="size-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-500" />
                 </button>
-              ))}
-            </div>
-          </section>
+              )
+            })}
+          </div>
         </>
       )}
 
@@ -571,21 +609,9 @@ export function SuperAdminDashboard({ user }) {
         activeModule === 'usuarios' ? (
           <Usuarios user={user} />
         ) : (
-          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Módulo administrativo</p>
-                <p className="mt-1 text-sm font-semibold text-slate-500">{activeModuleInfo?.detail}</p>
-              </div>
-              {activeModule === 'roles' && (
-                <button onClick={fetchUsuarios} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white cursor-pointer">
-                  Actualizar
-                </button>
-              )}
-            </div>
-
+          <>
             {activeModule === 'roles' && (
-              <RolesTable roles={rolesAgrupados} loading={loadingUsers} onEdit={setEditingUser} />
+              <RolesTable roles={rolesAgrupados} loading={loadingUsers} onEdit={setEditingUser} onReload={fetchUsuarios} />
             )}
 
         {activeModule === 'configuracion' && (
@@ -611,144 +637,146 @@ export function SuperAdminDashboard({ user }) {
 
         {activeModule === 'auditoria' && (
           <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-4">
-              {[
-                { label: 'Total eventos', value: auditStats.total || realAuditLogs.length, detail: 'Registros en base de datos', tone: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200' },
-                { label: 'Eventos hoy', value: auditStats.hoy, detail: 'Actividad de la jornada', tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200' },
-                { label: 'Módulos activos', value: (auditStats.porModulo || []).length || '6', detail: 'Trazabilidad del sistema', tone: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200' },
-                { label: 'Mostrados', value: realAuditLogs.length, detail: 'Coincidencias con filtros', tone: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200' }
-              ].map((item) => (
-                <div key={item.label} className={`rounded-2xl px-4 py-4 ${item.tone}`}>
-                  <p className="text-[11px] font-black uppercase tracking-wider opacity-70">{item.label}</p>
-                  <p className="mt-2 text-3xl font-black">{item.value}</p>
-                  <p className="mt-1 text-xs font-bold opacity-80">{item.detail}</p>
-                </div>
-              ))}
+            <div className="kpi-grid">
+              <TarjetaKpi label="Total eventos" value={formatNumeroTarjeta(auditStats.total || realAuditLogs.length)} detail="Registros en base de datos" icon="document" color="indigo" />
+              <TarjetaKpi label="Eventos hoy" value={formatNumeroTarjeta(auditStats.hoy || 0)} detail="Actividad de la jornada" icon="calendar" color="emerald" />
+              <TarjetaKpi label="Módulos activos" value={(auditStats.porModulo || []).length || '6'} detail="Trazabilidad del sistema" icon="shieldCheck" color="cyan" />
+              <TarjetaKpi label="Mostrados" value={formatNumeroTarjeta(realAuditLogs.length)} detail="Coincidencias con filtros" icon="search" color="amber" />
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 dark:border-[var(--border)] lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white">Centro de auditoría institucional</h3>
-                  <p className="text-xs font-semibold text-slate-500">
-                    Registro formal y trazabilidad de eventos, inicios de sesión y modificaciones de datos en el sistema.
-                  </p>
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
+              <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative flex-1">
+                  <Icon
+                    name={loadingAudit ? 'refresh' : 'search'}
+                    className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${loadingAudit ? 'animate-spin text-indigo-500' : 'text-slate-400'}`}
+                  />
+                  <input
+                    type="text"
+                    value={auditSearch}
+                    onChange={(event) => setAuditSearch(event.target.value)}
+                    placeholder="Buscar por descripción, usuario, módulo o IP..."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                  />
+                  {auditSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setAuditSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleExportAuditoria}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
-                >
-                  <Icon name="table" className="size-4" />
-                  <span>Exportar a Excel</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExportAuditoriaPdf}
-                  disabled={loadingAudit || realAuditLogs.length === 0}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-black text-rose-700 shadow-xs hover:bg-rose-50 active:scale-95 disabled:opacity-50 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-400 cursor-pointer"
-                >
-                  <Icon name="document" className="size-4" />
-                  <span>Exportar a PDF</span>
-                </button>
 
+                <div className="flex flex-wrap items-center gap-2">
+                  <RoundedSelect
+                    value={auditType}
+                    onChange={setAuditType}
+                    options={[
+                      { value: 'TODOS', label: 'Todos los módulos' },
+                      { value: 'SEGURIDAD', label: 'Seguridad (Login/Logout)' },
+                      { value: 'USUARIOS', label: 'Usuarios' },
+                      { value: 'VEHICULOS', label: 'Vehículos' },
+                      { value: 'ASOCIACIONES', label: 'Asociaciones' },
+                      { value: 'PAGOS', label: 'Pagos y Recaudación' },
+                      { value: 'PAPELETAS', label: 'Papeletas' },
+                      { value: 'CONFIGURACION', label: 'Configuración' }
+                    ]}
+                  />
+                  <RoundedSelect
+                    value={auditSeverity}
+                    onChange={setAuditSeverity}
+                    options={[
+                      { value: 'TODOS', label: 'Todas las acciones' },
+                      { value: 'CREAR', label: 'Creación' },
+                      { value: 'MODIFICAR', label: 'Modificación' },
+                      { value: 'ELIMINAR', label: 'Eliminación' },
+                      { value: 'LOGIN', label: 'Inicio de sesión' },
+                      { value: 'LOGOUT', label: 'Cierre de sesión' },
+                      { value: 'CONFIRMAR', label: 'Confirmación de pago' },
+                      { value: 'ANULAR', label: 'Anulación' }
+                    ]}
+                  />
+                  {(auditType !== 'TODOS' || auditSeverity !== 'TODOS' || auditSearch !== '') && (
+                    <button
+                      type="button"
+                      onClick={() => { setAuditType('TODOS'); setAuditSeverity('TODOS'); setAuditSearch('') }}
+                      title="Limpiar filtros"
+                      className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                    >
+                      <Icon name="filterX" className="size-4" />
+                    </button>
+                  )}
+                  <BotonExcel onClick={handleExportAuditoria} cargando={exportandoExcel} disabled={exportandoExcel} title="Descargar la auditoría en Excel (.xls)" />
+                  <BotonPdf onClick={handleExportAuditoriaPdf} cargando={exportandoPdf} disabled={exportandoPdf || loadingAudit || realAuditLogs.length === 0} title="Descargar o imprimir la auditoría en PDF" />
+                </div>
               </div>
 
-              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_200px_200px]">
-                <input
-                  value={auditSearch}
-                  onChange={(event) => setAuditSearch(event.target.value)}
-                  placeholder="Buscar por descripción, usuario, módulo o IP..."
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-[var(--border-strong)] dark:bg-slate-950 dark:text-white"
-                />
-                <RoundedSelect
-                  value={auditType}
-                  onChange={setAuditType}
-                  options={[
-                    { value: 'TODOS', label: 'Todos los módulos' },
-                    { value: 'SEGURIDAD', label: 'Seguridad (Login/Logout)' },
-                    { value: 'USUARIOS', label: 'Usuarios' },
-                    { value: 'VEHICULOS', label: 'Vehículos' },
-                    { value: 'ASOCIACIONES', label: 'Asociaciones' },
-                    { value: 'PAGOS', label: 'Pagos y Recaudación' },
-                    { value: 'PAPELETAS', label: 'Papeletas' },
-                    { value: 'CONFIGURACION', label: 'Configuración' }
-                  ]}
-                />
-                <RoundedSelect
-                  value={auditSeverity}
-                  onChange={setAuditSeverity}
-                  options={[
-                    { value: 'TODOS', label: 'Todas las acciones' },
-                    { value: 'CREAR', label: 'Creación' },
-                    { value: 'MODIFICAR', label: 'Modificación' },
-                    { value: 'ELIMINAR', label: 'Eliminación' },
-                    { value: 'LOGIN', label: 'Inicio de sesión' },
-                    { value: 'LOGOUT', label: 'Cierre de sesión' },
-                    { value: 'CONFIRMAR', label: 'Confirmación de pago' },
-                    { value: 'ANULAR', label: 'Anulación' }
-                  ]}
-                />
-              </div>
-
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 dark:border-[var(--border)]">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px] text-left text-xs">
+                  <thead className={CLASE_TABLA_ENCABEZADO}>
                     <tr>
-                      <th className="px-4 py-3 text-center">Fecha y Hora</th>
+                      <th className="px-4 py-3 text-center">Fecha y hora</th>
                       <th className="px-4 py-3 text-center">Módulo</th>
                       <th className="px-4 py-3 text-center">Acción</th>
-                      <th className="px-4 py-3">Descripción del Evento</th>
+                      <th className="px-4 py-3">Descripción del evento</th>
                       <th className="px-4 py-3">Usuario</th>
                       <th className="px-4 py-3">Rol</th>
-                      <th className="px-4 py-3">Dirección IP</th>
+                      <th className="px-4 py-3 text-center">Dirección IP</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-                    {loadingAudit ? (
+                    {loadingAudit && realAuditLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-sm font-bold text-slate-500">
-                          Cargando eventos de auditoría desde la base de datos...
+                        <td colSpan={7} className="px-4 py-10 text-center text-sm font-bold text-slate-500">
+                          <Icon name="refresh" className="mx-auto mb-2 size-7 animate-spin text-slate-300" />
+                          Cargando eventos de auditoría...
                         </td>
                       </tr>
-                    ) : realAuditLogs.length ? realAuditLogs.map((event) => (
-                      <tr key={event.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td className="px-4 py-3 text-xs font-mono text-slate-500 text-center">
-                          {event.fecha_hora ? new Date(event.fecha_hora).toLocaleString('es-PE') : '—'}
+                    ) : realAuditLogs.length ? realAuditLogs.slice((auditPage - 1) * auditPerPage, auditPage * auditPerPage).map((event) => (
+                      <tr key={event.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
+                        <td className="px-4 py-3 text-center align-top">
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                            {event.fecha_hora ? new Date(event.fecha_hora).toLocaleDateString('es-PE') : '—'}
+                          </p>
+                          <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                            {event.fecha_hora ? new Date(event.fecha_hora).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </p>
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-200">
+                        <td className="px-4 py-3 text-center align-top">
+                          <span className="inline-flex rounded-md border border-indigo-200/80 bg-indigo-50/70 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300">
                             {event.modulo}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
+                        <td className="px-4 py-3 text-center align-top">
+                          <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase ${
                             event.accion === 'ELIMINAR' || event.accion === 'ANULAR'
-                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-200'
+                              ? 'border-rose-200/80 bg-rose-50/70 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300'
                               : event.accion === 'MODIFICAR' || event.accion === 'CAMBIO_PASSWORD'
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-200'
+                                ? 'border-amber-200/80 bg-amber-50/70 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300'
                                 : event.accion === 'CREAR' || event.accion === 'CONFIRMAR'
-                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-200'
-                                  : 'bg-slate-100 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
+                                  ? 'border-emerald-200/80 bg-emerald-50/70 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-300'
                           }`}>
                             {event.accion}
                           </span>
                         </td>
-                        <td className="px-4 py-3 ">
-                          <p className="font-semibold text-xs text-slate-800 dark:text-white leading-snug">{event.descripcion}</p>
+                        <td className="px-4 py-3 align-top">
+                          <p className="text-xs font-semibold leading-snug text-slate-800 dark:text-white">{event.descripcion}</p>
                           {event.user_agent && (
-                            <p className="mt-0.5 text-[10px] text-slate-400  " title={event.user_agent}>
+                            <p className="mt-0.5 line-clamp-1 text-[10px] text-slate-400" title={event.user_agent}>
                               {event.user_agent}
                             </p>
                           )}
                         </td>
-                        <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 ">
+                        <td className="px-4 py-3 align-top text-xs font-bold text-slate-800 dark:text-slate-200">
                           {event.nombre_usuario || 'sistema'}
                         </td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-500 ">
+                        <td className="px-4 py-3 align-top text-xs font-medium text-slate-600 dark:text-slate-300">
                           {event.rol || '—'}
                         </td>
-                        <td className="px-4 py-3 text-xs font-mono text-slate-500 text-center">
+                        <td className="px-4 py-3 text-center align-top font-mono text-[11px] text-slate-600 dark:text-slate-300">
                           {event.ip || '—'}
                         </td>
                       </tr>
@@ -763,11 +791,20 @@ export function SuperAdminDashboard({ user }) {
                   </tbody>
                 </table>
               </div>
+
+              <Pagination
+                currentPage={auditPage}
+                totalItems={realAuditLogs.length}
+                itemsPerPage={auditPerPage}
+                onPageChange={setAuditPage}
+                onItemsPerPageChange={(size) => { setAuditPerPage(size); setAuditPage(1) }}
+                disabled={loadingAudit}
+              />
             </div>
           </div>
         )}
 
-      </section>
+          </>
         )
       )}
 
@@ -792,7 +829,10 @@ export function SuperAdminDashboard({ user }) {
                 { value: 'INACTIVO', label: 'INACTIVO' }
               ]}
             />
-            <button className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700 cursor-pointer">Guardar cambios</button>
+            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
+              <BotonCancelar onClick={() => setEditingUser(null)} />
+              <BotonGuardar>Guardar cambios</BotonGuardar>
+            </div>
           </form>
         </Modal>
       )}
@@ -819,7 +859,7 @@ export function SuperAdminDashboard({ user }) {
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
                 {trabajadorDropdownOpen && !selectedTrabajador && (
-                  <div className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                  <div className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
                     {trabajadoresSinUsuario.map((trabajador) => (
                       <button
                         key={trabajador.id_persona || trabajador.id}
@@ -866,12 +906,10 @@ export function SuperAdminDashboard({ user }) {
               </select>
             </div>
             <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
-              <button type="button" onClick={() => setUserModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)]">
-                Cancelar
-              </button>
-              <button className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2 text-sm font-black text-white shadow-md shadow-blue-600/20 hover:shadow-lg">
+              <BotonCancelar onClick={() => setUserModalOpen(false)} />
+              <BotonGuardar>
                 Crear usuario
-              </button>
+              </BotonGuardar>
             </div>
           </form>
         </Modal>
@@ -881,8 +919,11 @@ export function SuperAdminDashboard({ user }) {
         <Modal title="Restablecer contraseña" onClose={() => setPasswordUser(null)}>
           <form onSubmit={resetPassword} className="space-y-4">
             <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Usuario: <strong className="text-slate-900 dark:text-white">{passwordUser.nombre_usuario}</strong></p>
-            <input minLength={6} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nueva contraseña" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white outline-none" />
-            <button className="w-full rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white hover:bg-amber-600 cursor-pointer">Actualizar contraseña</button>
+            <FloatingInput id="nueva_password" label="Nueva contraseña" type="password" minLength={6} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
+              <BotonCancelar onClick={() => setPasswordUser(null)} />
+              <BotonGuardar>Actualizar contraseña</BotonGuardar>
+            </div>
           </form>
         </Modal>
       )}
