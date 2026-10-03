@@ -14,6 +14,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { showToast, showError } from '../utils/SwalUtil'
 import { sanitizarMensaje } from '../config/api'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos' },
@@ -178,6 +179,7 @@ export function Retenciones({ user }) {
     const params = new URLSearchParams()
     if (searchTerm) params.set('buscar', searchTerm)
     if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
     const res = await apiFetch(`/internamientos?${params.toString()}`)
     if (!res.ok) return filteredItems
     const payload = await res.json()
@@ -203,13 +205,38 @@ export function Retenciones({ user }) {
               { header: 'DEPÓSITO', key: 'deposito', width: 160 },
               { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
               { header: 'TIPO VEHÍCULO', key: 'vehiculoTipo', width: 140 },
+              { header: 'MARCA', key: 'vehiculoMarca', width: 110 },
+              { header: 'MODELO', key: 'vehiculoModelo', width: 110 },
+              { header: 'COLOR', key: 'vehiculoColor', width: 100 },
+              { header: 'AÑO', key: 'vehiculoAnio', width: 70, align: 'center' },
+              { header: 'SERIE DEL MOTOR', key: 'vehiculoMotor', isText: true, width: 140 },
+              { header: 'FORMALIDAD', key: 'vehiculoFormalidad', width: 110, align: 'center' },
+              { header: 'ASOCIACIÓN', render: (_, i) => i.vehiculoAsociacion || 'PARTICULAR / SIN ASOC.', width: 200 },
               { header: 'PAPELETA ASOCIADA', render: (_, i) => i.numeroPapeleta || '—', isText: true, width: 130, align: 'center' },
-              { header: 'MOTIVO INTERNAMIENTO', key: 'motivoIngreso', width: 220 },
+              { header: 'MONTO PAPELETA (S/)', render: (_, i) => `S/ ${Number(i.montoPapeleta || 0).toFixed(2)}`, align: 'right', width: 130 },
+              { header: 'MOTIVO INTERNAMIENTO', key: 'motivo', width: 220 },
+              { header: 'AUTORIDAD QUE DISPONE', key: 'autoridadQueDispone', width: 180 },
+              { header: 'DOCUMENTO DE REFERENCIA', key: 'documentoReferencia', width: 160 },
+              { header: 'REMISOR', key: 'remisorNombre', width: 170 },
+              { header: 'GRADO REMISOR', key: 'gradoRemisor', width: 110 },
+              { header: 'CARNET REMISOR', key: 'carnetRemisor', isText: true, width: 110, align: 'center' },
+              { header: 'ESTADO DE CARROCERÍA', key: 'estadoCarroceria', width: 160 },
               { header: 'CONDUCTOR / INTERESADO', key: 'interesadoNombre', width: 180 },
-              { header: 'DNI CONDUCTOR', key: 'interesadoDni', isText: true, width: 110, align: 'center' },
-              { header: 'FECHA INGRESO', render: (_, i) => `${i.fechaIngreso || ''} ${i.horaIngreso || ''}`.trim(), width: 130, align: 'center' },
+              { header: 'DNI INTERESADO', key: 'interesadoDni', isText: true, width: 110, align: 'center' },
+              { header: 'DIRECCIÓN INTERESADO', key: 'interesadoDireccion', width: 220 },
+              { header: 'FECHA INGRESO', key: 'fechaIngreso', width: 130, align: 'center' },
               { header: 'DÍAS RETENIDO', render: (_, i) => String(i.totalDias || 0), width: 100, align: 'center' },
+              { header: 'FECHA SALIDA', render: (_, i) => i.fechaSalida || 'EN CUSTODIA', width: 130, align: 'center' },
+              { header: 'N° ORDEN DE LIBERTAD', key: 'numeroOrdenLibertad', isText: true, width: 140, align: 'center' },
               { header: 'FECHA LIBERACIÓN', render: (_, i) => i.fechaLiberacion || 'EN CUSTODIA', width: 130, align: 'center' },
+              { header: 'RECIBO PAPELETA', key: 'reciboPapeleta', isText: true, width: 120, align: 'center' },
+              { header: 'MONTO PAPELETA COBRADO (S/)', render: (_, i) => `S/ ${Number(i.montoPapeletaCobrada || 0).toFixed(2)}`, align: 'right', width: 150 },
+              { header: 'RECIBO GUARDIANÍA', key: 'reciboGuardiania', isText: true, width: 120, align: 'center' },
+              { header: 'MONTO GUARDIANÍA (S/)', render: (_, i) => `S/ ${Number(i.montoGuardiania || 0).toFixed(2)}`, align: 'right', width: 140 },
+              { header: 'RECIBO REMOLQUE', key: 'reciboRemolque', isText: true, width: 120, align: 'center' },
+              { header: 'MONTO REMOLQUE (S/)', render: (_, i) => `S/ ${Number(i.montoRemolque || 0).toFixed(2)}`, align: 'right', width: 140 },
+              { header: 'TOTAL LIBERACIÓN (S/)', render: (_, i) => `S/ ${Number(i.montoTotalLiberacion || 0).toFixed(2)}`, align: 'right', width: 140 },
+              { header: 'OBSERVACIONES', key: 'observaciones', width: 240 },
               { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
             ],
             data
@@ -234,7 +261,7 @@ export function Retenciones({ user }) {
             columns: [
               { header: 'N° BOLETA', key: 'numeroBoleta', width: 20, align: 'center' },
               { header: 'PLACA', key: 'vehiculoPlaca', width: 15, align: 'center' },
-              { header: 'MOTIVO', key: 'motivoIngreso', width: 30 },
+              { header: 'MOTIVO', key: 'motivo', width: 30 },
               { header: 'INTERESADO', key: 'interesadoNombre', width: 35 },
               { header: 'ESTADO', key: 'estado', width: 15, align: 'center' }
             ],
@@ -301,8 +328,8 @@ export function Retenciones({ user }) {
         </div>
       </div>
 
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4 print:hidden">
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+      <div className="kpi-grid print:hidden">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Total Internamientos</span>
             <span className="grid size-6 place-items-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60">
@@ -314,7 +341,7 @@ export function Retenciones({ user }) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">En Depósito</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60">
@@ -326,7 +353,7 @@ export function Retenciones({ user }) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Liberados</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60">
@@ -338,7 +365,7 @@ export function Retenciones({ user }) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Días Promedio</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60">
@@ -351,7 +378,7 @@ export function Retenciones({ user }) {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col print:hidden">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col print:hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
           <div className="relative w-full sm:max-w-xs">
             <Icon
@@ -420,7 +447,7 @@ export function Retenciones({ user }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs">
+          <table className="w-full min-w-[1050px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[15%]" />
               <col className="w-[15%]" />
@@ -433,10 +460,10 @@ export function Retenciones({ user }) {
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3.5"><SortableHeader column="numeroBoleta" label="Boleta / Depósito" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="px-4 py-3.5">Vehículo & Placa</th>
+                <th className="px-4 py-3.5">Vehículo y placa</th>
                 <th className="px-4 py-3.5">Motivo / Infracción</th>
                 <th className="px-4 py-3.5">Interesado / Conductor</th>
-                <th className="px-4 py-3.5"><SortableHeader column="fechaIngreso" label="Ingreso & Custodia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3.5"><SortableHeader column="fechaIngreso" label="Ingreso y custodia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3.5 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3.5 text-center">Acciones</th>
               </tr>
@@ -557,22 +584,15 @@ export function Retenciones({ user }) {
 
       {isNuevoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsNuevoModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
-          <form onSubmit={handleRegistrarInternamiento} className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <form onSubmit={handleRegistrarInternamiento} className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-9 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="garage" className="size-4.5" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">Nuevo Internamiento</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsNuevoModalOpen(false)}
-                title="Cerrar"
-                className="grid size-8.5 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-4.5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsNuevoModalOpen(false)} title="Cerrar" />
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
@@ -637,11 +657,11 @@ export function Retenciones({ user }) {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-              <button type="button" onClick={() => setIsNuevoModalOpen(false)} className="rounded-xl px-3.5 py-1.5 text-xs font-bold text-white hover:opacity-90 cursor-pointer transition" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
-              <button disabled={registrando} type="submit" className="rounded-xl px-4 py-1.5 text-xs font-bold text-white hover:opacity-90 transition-all cursor-pointer disabled:opacity-60" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
+            <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[#1C2438]">
+              <BotonCancelar onClick={() => setIsNuevoModalOpen(false)} />
+              <BotonGuardar disabled={registrando}>
                 {registrando ? 'Registrando...' : 'Registrar Internamiento'}
-              </button>
+              </BotonGuardar>
             </div>
           </form>
         </div>
@@ -651,10 +671,10 @@ export function Retenciones({ user }) {
         <div className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter ${printLayout === 'FICHA' ? 'print:static print:block print:p-0 print:bg-transparent print:overflow-visible' : 'print:hidden'}`}>
           <div
             id={printLayout === 'FICHA' ? "seccion-impresion-ticket" : undefined}
-            className={`relative flex flex-col w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#111C44] border border-slate-200/80 ${printLayout === 'FICHA' ? 'print:shadow-none print:border-none print:m-0 print:p-0 print:max-h-none print:overflow-visible print:max-w-full' : ''}`}
+            className={`relative flex flex-col w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] border border-slate-200/80 ${printLayout === 'FICHA' ? 'print:shadow-none print:border-none print:m-0 print:p-0 print:max-h-none print:overflow-visible print:max-w-full' : ''}`}
           >
             {/* Modal Header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 dark:border-[var(--border)] dark:bg-[#111C44]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-9 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
                   <Icon name="retention" className="size-4.5" />
@@ -673,14 +693,7 @@ export function Retenciones({ user }) {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                title="Cerrar ventana"
-                className="grid size-8.5 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs print:hidden"
-              >
-                <Icon name="close" className="size-4.5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} className="print:hidden" title="Cerrar ventana" />
             </div>
 
             {/* Modal Body: Scrollable & Compact */}
@@ -775,7 +788,7 @@ export function Retenciones({ user }) {
                 <div className="rounded-xl border border-slate-200/80 overflow-hidden dark:border-[var(--border)]">
                   <div className="max-h-56 overflow-y-auto print:max-h-none print:overflow-visible">
                     <table className="w-full text-left text-xs">
-                      <thead className="sticky top-0 z-10 bg-slate-100 text-[10px] font-extrabold uppercase text-slate-600 dark:bg-[#111C44] dark:text-slate-400">
+                      <thead className="sticky top-0 z-10 bg-slate-100 text-[10px] font-extrabold uppercase text-slate-600 dark:bg-[#1C2438] dark:text-slate-400">
                         <tr>
                           <th className="px-3 py-2">Código</th>
                           <th className="px-3 py-2">Componente / Criterio</th>
@@ -785,7 +798,7 @@ export function Retenciones({ user }) {
                           <th className="px-3 py-2">Observación</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)] bg-white dark:bg-[#111C44]">
+                      <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)] bg-white dark:bg-[#1C2438]">
                         {(!selectedItem.inventario || selectedItem.inventario.length === 0) ? (
                           <tr>
                             <td colSpan={6} className="px-3.5 py-4 text-center text-xs text-slate-400">
@@ -840,7 +853,7 @@ export function Retenciones({ user }) {
             </div>
 
             {/* Modal Footer: Fixed at bottom */}
-            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden">
+            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[#1C2438] print:hidden">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -872,13 +885,7 @@ export function Retenciones({ user }) {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                className="rounded-xl bg-slate-900 px-4 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 transition cursor-pointer"
-              >
-                Cerrar
-              </button>
+              <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
             </div>
           </div>
         </div>

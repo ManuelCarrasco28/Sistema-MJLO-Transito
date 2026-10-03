@@ -113,7 +113,7 @@ export function BuscadorAdministrados({ onSelect }) {
 
       {/* Dropdown de Resultados */}
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
           {isLoading && results.length === 0 ? (
             <div className="p-4 text-center text-xs text-slate-500 font-medium">
               Buscando en la base de datos municipal...

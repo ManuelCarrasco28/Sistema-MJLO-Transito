@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '../ui/Icon'
 import { PlacaBadge } from '../ui/PlacaBadge'
 import { StandaloneVehiculoFormModal } from '../vehiculos/StandaloneVehiculoFormModal'
+import { BotonCancelar, BotonCerrarModal } from '../ui/ModalControls'
 
 export function ConvertirReporteModal({
   reporteToConvert,
@@ -22,13 +23,13 @@ export function ConvertirReporteModal({
   return (
     <>
     <div className="fixed inset-0 z-[50] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-      <form onSubmit={onSubmit} className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
+      <form onSubmit={onSubmit} className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438]">
         <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-emerald-50 px-6 py-4 dark:border-[var(--border)] dark:bg-emerald-950/30">
           <div>
             <h3 className="text-lg font-black text-slate-900 dark:text-white">Generar papeleta desde reporte</h3>
             <p className="text-xs font-bold text-slate-500">Revisa la evidencia y completa la infracción.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-200/50 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white transition-colors">✕</button>
+          <BotonCerrarModal onClick={onClose} title="Cerrar" />
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -101,7 +102,7 @@ export function ConvertirReporteModal({
           </div>
 
           <fieldset className="min-w-0 border border-slate-200 rounded-xl p-4 dark:border-[var(--border)]">
-            <legend className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-2 ml-2 bg-white dark:bg-[var(--bg-surface)]">Datos Generales</legend>
+            <legend className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-2 ml-2 bg-white dark:bg-[#1C2438]">Datos Generales</legend>
             <div className="space-y-4">
               <label className="block space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -135,7 +136,7 @@ export function ConvertirReporteModal({
           </fieldset>
 
           <fieldset className="min-w-0 border border-slate-200 rounded-xl p-4 dark:border-[var(--border)]">
-            <legend className="text-[11px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 px-2 ml-2 bg-white dark:bg-[var(--bg-surface)]">Infracciones y Observaciones</legend>
+            <legend className="text-[11px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 px-2 ml-2 bg-white dark:bg-[#1C2438]">Infracciones y Observaciones</legend>
             <div className="space-y-4">
               <div className="space-y-2">
                 <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Infracciones a Aplicar</span>
@@ -175,7 +176,7 @@ export function ConvertirReporteModal({
           </fieldset>
         </div>
         <div className="shrink-0 flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-5 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-[var(--bg-surface)] dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">Cancelar</button>
+          <BotonCancelar onClick={onClose} />
           <button disabled={isProcessingAction} className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed">Generar papeleta legal</button>
         </div>
       </form>

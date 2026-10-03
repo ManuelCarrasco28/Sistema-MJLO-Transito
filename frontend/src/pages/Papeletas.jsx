@@ -18,6 +18,8 @@ import { PapeletaDetalleModal } from '../components/papeletas/PapeletaDetalleMod
 import { ConvertirReporteModal } from '../components/papeletas/ConvertirReporteModal'
 import { PreviewTicketModal } from '../components/papeletas/PreviewTicketModal'
 import { InfraccionDetalleModal } from '../components/papeletas/InfraccionDetalleModal'
+import { BotonCancelar, BotonCerrarModal } from '../components/ui/ModalControls'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 
 const FILTER_ORIGEN_OPTIONS = [
   { value: 'TODOS', label: 'Todos los orígenes' },
@@ -241,17 +243,17 @@ export function Papeletas({ user }) {
   ];
 
   const fetchTodoElFiltro = async () => {
-    const params = new URLSearchParams()
-    if (searchTerm) params.set('buscar', searchTerm)
-    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
-    if (filterOrigen !== 'TODOS') params.set('origen', filterOrigen)
-    if (filterFormalidad !== 'TODOS') params.set('formalidad', filterFormalidad)
-    if (filterTipoInfraccion !== 'TODOS') params.set('tipoInfraccion', filterTipoInfraccion)
-    if (filterFecha !== 'TODAS') params.set('fecha', filterFecha)
-    const res = await apiFetch(`/papeletas?${params.toString()}`)
-    if (!res.ok) return filteredPapeletas
-    const payload = await res.json()
-    return (payload.data || []).map(normalizePapeleta)
+    const filas = await fetchTodasLasFilas('/papeletas', {
+      buscar: searchTerm,
+      estado: filterEstado === 'TODOS' ? '' : filterEstado,
+      origen: filterOrigen === 'TODOS' ? '' : filterOrigen,
+      formalidad: filterFormalidad === 'TODOS' ? '' : filterFormalidad,
+      tipoInfraccion: filterTipoInfraccion === 'TODOS' ? '' : filterTipoInfraccion,
+      fecha: filterFecha === 'TODAS' ? '' : filterFecha,
+      sortBy,
+      sortDir: sortBy ? sortDir : '',
+    }, { mensaje: 'Preparando la descarga de papeletas...' })
+    return filas.map(normalizePapeleta)
   }
 
   const handleExportPdf = async () => {
@@ -270,11 +272,11 @@ export function Papeletas({ user }) {
             columns: [
               { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 80, align: 'center' },
               { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 60, align: 'center' },
-              { header: 'CÓDIGO', key: 'infraccionCodigo', isText: true, width: 60, align: 'center' },
+              { header: 'INFRACCIÓN', key: 'tipoInfraccionCodigo', isText: true, width: 70, align: 'center' },
               { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 80 },
               { header: 'CONDUCTOR', key: 'conductorNombre', width: 120 },
               { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 120 },
-              { header: 'FECHA', key: 'fechaHora', render: (_, p) => new Date(p.fechaHora).toLocaleDateString(), width: 80, align: 'center' },
+              { header: 'FECHA', key: 'fechaHora', render: (_, p) => (p.fechaHora ? new Date(String(p.fechaHora).replace(' ', 'T')).toLocaleDateString('es-PE') : '—'), width: 80, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 80, align: 'center' }
             ],
             data
@@ -302,15 +304,32 @@ export function Papeletas({ user }) {
             columns: [
               { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 140, align: 'center' },
               { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
-              { header: 'CÓDIGO INFRACCIÓN', key: 'infraccionCodigo', isText: true, width: 140, align: 'center' },
-              { header: 'DESCRIPCIÓN INFRACCIÓN', key: 'infraccionDescripcion', width: 260 },
-              { header: 'GRAVEDAD', key: 'gravedad', width: 110, align: 'center' },
+              { header: 'MARCA', key: 'vehiculoMarca', width: 110 },
+              { header: 'MODELO', key: 'vehiculoModelo', width: 110 },
+              { header: 'COLOR', key: 'vehiculoColor', width: 100 },
+              { header: 'AÑO', key: 'vehiculoAnio', width: 70, align: 'center' },
+              { header: 'FORMALIDAD VEHÍCULO', key: 'vehiculoEstadoFormalizacion', width: 130, align: 'center' },
+              { header: 'ASOCIACIÓN', render: (_, p) => p.vehiculoAsociacion || 'PARTICULAR / SIN ASOC.', width: 200 },
+              { header: 'CÓDIGO INFRACCIÓN', key: 'tipoInfraccionCodigo', isText: true, width: 140, align: 'center' },
+              { header: 'DESCRIPCIÓN INFRACCIÓN', key: 'tipoInfraccionDescripcion', width: 260 },
+              { header: 'GRAVEDAD', key: 'tipoInfraccionGravedad', width: 110, align: 'center' },
               { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 120 },
-              { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
+              { header: 'TIPO DE INFRACTOR', key: 'tipoInfractor', width: 120, align: 'center' },
+              { header: 'CONDUCTOR / INFRACTOR', render: (_, p) => p.conductorNombre || p.infractor || '—', width: 180 },
               { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
+              { header: 'PROPIETARIO', key: 'propietarioNombre', width: 180 },
+              { header: 'DNI PROPIETARIO', key: 'propietarioDni', isText: true, width: 120, align: 'center' },
               { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 170 },
-              { header: 'FECHA INFRACCIÓN', key: 'fechaInfraccion', width: 130, align: 'center' },
-              { header: 'LUGAR', key: 'lugarInfraccion', width: 200 },
+              { header: 'CIP INSPECTOR', key: 'inspectorCIP', isText: true, width: 100, align: 'center' },
+              { header: 'FECHA Y HORA', render: (_, p) => (p.fechaHora ? new Date(String(p.fechaHora).replace(' ', 'T')).toLocaleString('es-PE') : '—'), key: 'fechaHora', width: 150, align: 'center' },
+              { header: 'LUGAR', key: 'lugar', width: 200 },
+              { header: 'ORIGEN', key: 'origen', width: 100, align: 'center' },
+              { header: 'OPERATIVO', key: 'operativoNombre', width: 180 },
+              { header: 'OBSERVACIONES AUTORIDAD', key: 'observacionesAutoridad', width: 240 },
+              { header: 'OBSERVACIONES CONDUCTOR', key: 'observacionesConductor', width: 240 },
+              { header: 'FIRMA DEL CONDUCTOR', key: 'firmaConductorEstado', width: 120, align: 'center' },
+              { header: 'VEHÍCULO RETENIDO', render: (_, p) => (p.vehiculoRetenido ? 'SÍ' : 'NO'), width: 110, align: 'center' },
+              { header: 'ESTADO DE RETENCIÓN', render: (_, p) => p.retencionEstado || '—', width: 130, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
             ],
             data
@@ -466,11 +485,11 @@ export function Papeletas({ user }) {
 
   const handleOpenPagar = (papeleta) => {
     if (papeleta.estado === 'ANULADA') {
-      alert('Esta papeleta está anulada y no puede ser cancelada ni pagada.')
+      showError('Atención', 'Esta papeleta está anulada y no puede ser cancelada ni pagada.')
       return
     }
     if (papeleta.estado === 'PAGADA') {
-      alert('Esta papeleta ya se encuentra pagada.')
+      showError('Atención', 'Esta papeleta ya se encuentra pagada.')
       return
     }
     setPapeletaToAction(papeleta)
@@ -485,11 +504,11 @@ export function Papeletas({ user }) {
 
     // Validaciones
     if (!numeroRecibo.trim() || !fechaPago) {
-      alert('Por favor ingresa el número de recibo y la fecha de pago.')
+      showError('Atención', 'Por favor ingresa el número de recibo y la fecha de pago.')
       return
     }
     if (new Date(fechaPago) > new Date()) {
-      alert('La fecha de pago no puede ser futura.')
+      showError('Atención', 'La fecha de pago no puede ser futura.')
       return
     }
 
@@ -544,11 +563,11 @@ export function Papeletas({ user }) {
     if (!reporteToConvert) return
     const validInfracciones = convertForm.infraccionesIds.filter(id => id).map(Number)
     if (validInfracciones.length === 0) {
-      alert('Selecciona al menos una infracción.')
+      showError('Atención', 'Selecciona al menos una infracción.')
       return
     }
     if (!convertForm.vehiculoId) {
-      alert('Para generar papeleta primero debes identificar o registrar el vehículo.')
+      showError('Atención', 'Para generar papeleta primero debes identificar o registrar el vehículo.')
       return
     }
     setIsProcessingAction(true)
@@ -641,7 +660,7 @@ export function Papeletas({ user }) {
     event.preventDefault()
     if (!reporteToReject) return
     if (!motivoRechazo.trim()) {
-      alert('Ingresa el motivo de rechazo.')
+      showError('Atención', 'Ingresa el motivo de rechazo.')
       return
     }
     setIsProcessingAction(true)
@@ -686,8 +705,8 @@ export function Papeletas({ user }) {
         </div>
       </div>
 
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 print:hidden">
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+      <div className="kpi-grid print:hidden">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Total Impuestas</span>
             <span className="grid size-6 place-items-center rounded-md bg-slate-50 text-slate-600 dark:bg-slate-950/60">
@@ -699,7 +718,7 @@ export function Papeletas({ user }) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pendientes</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 font-bold text-xs">
@@ -711,7 +730,7 @@ export function Papeletas({ user }) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Pagadas</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 font-bold text-xs">
@@ -723,7 +742,7 @@ export function Papeletas({ user }) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Anuladas</span>
             <span className="grid size-6 place-items-center rounded-md bg-slate-50 text-slate-600 dark:bg-slate-950/60 font-bold text-xs">
@@ -769,7 +788,7 @@ export function Papeletas({ user }) {
       </div>
 
       {activeView === 'REPORTES' && (
-        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col print:hidden">
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col print:hidden">
           {/* Top toolbar */}
           <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 dark:border-[var(--border)]">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -847,7 +866,7 @@ export function Papeletas({ user }) {
             role="region"
             aria-label="Listado de reportes de intervención"
           >
-            <table className="w-full table-fixed text-left text-xs">
+            <table className="w-full min-w-[1150px] table-fixed text-left text-xs">
               <colgroup>
                 <col className="w-[110px]" />
                 <col className="w-[140px]" />
@@ -1049,7 +1068,7 @@ export function Papeletas({ user }) {
         </div>
       )}
 
-      {activeView === 'PAPELETAS' && <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col print:hidden">
+      {activeView === 'PAPELETAS' && <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col print:hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 dark:border-[var(--border)]">
           {/* Top row: Search and Action Buttons */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1191,11 +1210,11 @@ export function Papeletas({ user }) {
                 <th className="px-3.5 py-3.5">Propietario</th>
                 <th className="px-3.5 py-3.5">Infractor</th>
                 <th className="px-3.5 py-3.5 text-center"><SortableHeader column="vehiculoPlaca" label="Vehículo" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="px-3.5 py-3.5 text-center">Tipo Infractor</th>
+                <th className="px-3.5 py-3.5 text-center">Condición</th>
                 <th className="px-3.5 py-3.5 text-center">Infracción</th>
-                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="fechaHora" label="Fecha & Hora" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="fechaHora" label="Fecha y hora" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5 text-center"><SortableHeader column="montoTotal" label="Monto" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="estado" label="Estado Pago" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="estado" label="Estado de pago" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5 text-center">Acciones</th>
               </tr>
             </thead>
@@ -1406,10 +1425,10 @@ export function Papeletas({ user }) {
 
       {reporteToReject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <form onSubmit={handleRejectReporte} className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)]">
+          <form onSubmit={handleRejectReporte} className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438]">
             <div className="flex items-center justify-between border-b border-slate-100 bg-rose-50 px-6 py-4 dark:border-[var(--border)] dark:bg-rose-950/30">
               <h3 className="text-lg font-black text-slate-900 dark:text-white">Rechazar reporte #{reporteToReject.id}</h3>
-              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-full p-1 text-slate-400 hover:bg-white dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white">✕</button>
+              <BotonCerrarModal onClick={() => setReporteToReject(null)} title="Cerrar" />
             </div>
             <div className="space-y-3 p-6">
               <label className="block space-y-1">
@@ -1418,7 +1437,7 @@ export function Papeletas({ user }) {
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-              <button type="button" onClick={() => setReporteToReject(null)} className="rounded-xl px-4 py-2 text-sm font-bold text-white hover:opacity-90" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
+              <BotonCancelar onClick={() => setReporteToReject(null)} />
               <button disabled={isProcessingAction} className="rounded-xl px-4 py-2 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: 'oklch(58.6% 0.253 17.585)' }}>Rechazar</button>
             </div>
           </form>
@@ -1462,7 +1481,7 @@ export function Papeletas({ user }) {
 
       {fotosModalReporte && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200 dark:border-[var(--border)]">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200 dark:border-[var(--border)]">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
               <div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -1476,13 +1495,7 @@ export function Papeletas({ user }) {
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setFotosModalReporte(null)}
-                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setFotosModalReporte(null)} />
             </div>
 
             <div className="p-6 max-h-[70vh] overflow-y-auto">
@@ -1523,13 +1536,7 @@ export function Papeletas({ user }) {
             </div>
 
             <div className="flex justify-end border-t border-slate-100 bg-slate-50/50 px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-              <button
-                type="button"
-                onClick={() => setFotosModalReporte(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-[var(--border)] dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700 transition cursor-pointer"
-              >
-                Cerrar
-              </button>
+              <BotonCancelar onClick={() => setFotosModalReporte(null)}>Cerrar</BotonCancelar>
             </div>
           </div>
         </div>

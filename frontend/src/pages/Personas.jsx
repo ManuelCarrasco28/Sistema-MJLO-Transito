@@ -4,7 +4,7 @@ import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
+import { apiFetch, getCachedData, setCachedData, invalidateCache, leerMensajeError } from '../config/api'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { formatFecha, formatNumeroTarjeta, toTitleCase } from '../utils/formatters'
@@ -12,6 +12,7 @@ import { exportPersonasExcel, exportPersonasPdf } from '../utils/exportPersonas'
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import { PersonaDetalleModal } from '../components/personas/PersonaDetalleModal'
 import { SortableHeader } from '../components/ui/SortableHeader'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 
 function formatTipoDocLabel(t) {
   const code = (t.codigo || '').toUpperCase().trim()
@@ -40,7 +41,6 @@ const ESTADO_CIVIL_OPTIONS = [
   { value: '', label: 'Seleccionar...' },
   { value: 'SOLTERO', label: 'SOLTERO' },
   { value: 'CASADO', label: 'CASADO' },
-  { value: 'CONVIVIENTE', label: 'CONVIVIENTE' },
   { value: 'DIVORCIADO', label: 'DIVORCIADO' },
   { value: 'VIUDO', label: 'VIUDO' },
 ]
@@ -271,12 +271,7 @@ export function Personas({ user, onUserUpdate }) {
     try {
       const response = await apiFetch(`/pide/reniec/${dni}`)
       if (!response.ok) {
-        let errorMsg = 'El servicio de consulta no responde en este momento. Ingrese los datos manualmente.'
-        try {
-          const errData = await response.json()
-          errorMsg = errData.messages?.error || errData.message || errorMsg
-        } catch (_) { }
-        throw new Error(errorMsg)
+        throw new Error(await leerMensajeError(response, 'El servicio de consulta no responde en este momento. Ingrese los datos manualmente.'))
       }
       const res = await response.json()
       const data = res.data || (res.nombres ? res : null)
@@ -415,15 +410,13 @@ export function Personas({ user, onUserUpdate }) {
 
   // Los exports piden el dataset completo que coincide con el filtro actual
   // (sin "page"), no solo la página visible en pantalla.
-  const fetchTodoElFiltro = async () => {
-    const params = new URLSearchParams()
-    if (debouncedSearchTerm) params.set('buscar', debouncedSearchTerm)
-    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
-    const response = await apiFetch(`/personas?${params.toString()}`)
-    if (!response.ok) return []
-    const payload = await response.json()
-    return payload.data ?? []
-  }
+  const fetchTodoElFiltro = () =>
+    fetchTodasLasFilas('/personas', {
+      buscar: debouncedSearchTerm,
+      estado: filterEstado === 'TODOS' ? '' : filterEstado,
+      sortBy,
+      sortDir: sortBy ? sortDir : '',
+    }, { mensaje: 'Preparando la descarga de personas...' })
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
@@ -471,11 +464,11 @@ export function Personas({ user, onUserUpdate }) {
     }
     const isDni = formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD'
     if (isDni && (docLen !== 8 || !/^\d{8}$/.test(formData.numeroDocumento.trim()))) {
-      alert('El DNI debe tener exactamente 8 dígitos numéricos.')
+      showError('Atención', 'El DNI debe tener exactamente 8 dígitos numéricos.')
       return
     }
     if (!isDni && (docLen < 8 || docLen > 15)) {
-      alert('El número de documento debe tener entre 8 y 15 caracteres.')
+      showError('Atención', 'El número de documento debe tener entre 8 y 15 caracteres.')
       return
     }
     if (formData.email && formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
@@ -558,9 +551,9 @@ export function Personas({ user, onUserUpdate }) {
       </div>
 
       {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas separadas compactas */}
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="kpi-grid">
         {/* 1. Total registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registros</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -575,7 +568,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 2. Con licencia */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Con Licencia</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
@@ -590,7 +583,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 3. Sin licencia */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Sin Licencia</span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
@@ -605,7 +598,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 4. Activos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Activos</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
@@ -620,7 +613,7 @@ export function Personas({ user, onUserUpdate }) {
         </div>
 
         {/* 5. Inactivos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Inactivos</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
@@ -636,7 +629,7 @@ export function Personas({ user, onUserUpdate }) {
       </div>
 
       {/* Contenedor de la Tabla */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon
@@ -724,7 +717,7 @@ export function Personas({ user, onUserUpdate }) {
 
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs">
+          <table className="w-full min-w-[900px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[26%]" />
               <col className="w-[16%]" />

@@ -1,6 +1,7 @@
 import { Icon } from '../ui/Icon'
 import { PlacaBadge } from '../ui/PlacaBadge'
 import { FloatingInput, FloatingSelect } from '../ui/FormInputs'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
 
 export function PagoPapeletaModal({
   papeletaToAction,
@@ -18,7 +19,7 @@ export function PagoPapeletaModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-      <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-emerald-500/30 dark:border-emerald-500/20">
+      <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-emerald-500/30 dark:border-emerald-500/20">
         <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50/80 px-6 py-4 rounded-t-3xl dark:border-emerald-900/30 dark:bg-emerald-950/40">
           <div className="flex items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-xl bg-emerald-600 text-white font-black text-sm">
@@ -29,7 +30,7 @@ export function PagoPapeletaModal({
               <p className="text-xs font-mono text-emerald-700 dark:text-emerald-400">Papeleta: {papeletaToAction.numeroPapeleta}</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer">✕</button>
+          <BotonCerrarModal onClick={onClose} title="Cerrar" />
         </div>
 
         <div className="p-6 space-y-4">
@@ -73,22 +74,16 @@ export function PagoPapeletaModal({
           />
 
           <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[var(--border)]">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:text-slate-300 cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
+            <BotonCancelar onClick={onClose} />
+            <BotonGuardar
               type="button"
               onClick={onConfirmar}
               disabled={isProcessingAction || !numeroRecibo.trim() || !fechaPago}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2 text-xs font-black text-white shadow-md hover:from-emerald-700 hover:to-teal-700 transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5"
             >
               <Icon name="payment" className="size-4" />
               <span>{isProcessingAction ? 'Procesando...' : 'Confirmar recibo'}</span>
-            </button>
+            </BotonGuardar>
           </div>
         </div>
       </div>

@@ -8,6 +8,7 @@ import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 
 const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 
@@ -60,7 +61,7 @@ function SearchableSelect({ id, label, value, onChange, options = [], className 
         type="text"
         title={displayValue}
         required={required}
-        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white pl-3 pr-8 pt-4 pb-1 text-xs font-semibold text-slate-800 text-ellipsis overflow-hidden whitespace-nowrap outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
+        className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white pl-3 pr-8 pt-4 pb-1 text-xs font-semibold text-slate-800 text-ellipsis overflow-hidden whitespace-nowrap outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
         placeholder=" "
         value={displayValue}
         onChange={(e) => {
@@ -169,7 +170,9 @@ export function Trabajadores() {
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(5)
+  const [paginaHistorial, setPaginaHistorial] = useState(0)
   const [form, setForm] = useState(null)
+  useEffect(() => { setPaginaHistorial(0) }, [form?.id])
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [catalogos, setCatalogos] = useState({ cargos: [], unidades: [] })
@@ -242,13 +245,16 @@ export function Trabajadores() {
               { header: 'N° DOCUMENTO', key: 'numero_documento', isText: true, width: 120, align: 'center' },
               { header: 'NOMBRES', key: 'nombres', width: 140 },
               { header: 'APELLIDOS', key: 'apellidos', width: 160 },
+              { header: 'CORREO', key: 'email', width: 200 },
               { header: 'CARGO', key: 'cargo', width: 180 },
               { header: 'UNIDAD ORGÁNICA', key: 'unidad_organica', width: 220 },
+              { header: 'JERARQUÍA', key: 'jerarquia', width: 160 },
               { header: 'FUNCIÓN', key: 'tipo_funcion', width: 100, align: 'center' },
+              { header: 'N° SOLICITUD', key: 'solicitud', isText: true, width: 130, align: 'center' },
               { header: 'DOC. DESIGNACIÓN', key: 'documento', width: 150 },
               { header: 'FECHA ALTA', key: 'fecha_documento', width: 110, align: 'center' },
               { header: 'VENCIMIENTO', render: (_, r) => r.fecha_termino || 'INDETERMINADO', width: 120, align: 'center' },
-              { header: 'TIENE ACCESO', render: (_, r) => r.tiene_usuario ? 'SÍ' : 'NO', width: 110, align: 'center' },
+              { header: 'TIENE ACCESO', render: (_, r) => (r.tiene_cuenta ? 'SÍ' : 'NO'), width: 110, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 100, align: 'center' }
             ],
             data: filtered
@@ -269,11 +275,11 @@ export function Trabajadores() {
               { label: 'Exportando', value: `${filtered.length} trabajadores` },
             ],
             columns: [
-              { header: 'NOMBRES', render: (_, r) => `${r.nombres || ''} ${r.apellidoPaterno || ''} ${r.apellidoMaterno || ''}`.trim(), width: 200 },
-              { header: 'DNI', key: 'numeroDocumento', width: 90, align: 'center' },
+              { header: 'NOMBRES Y APELLIDOS', render: (_, r) => `${r.nombres || ''} ${r.apellidos || ''}`.trim(), width: 200 },
+              { header: 'DOCUMENTO', render: (_, r) => `${r.tipo_documento || 'DNI'} ${r.numero_documento || ''}`.trim(), width: 110, align: 'center' },
               { header: 'CARGO', key: 'cargo', width: 160 },
-              { header: 'UNIDAD ORGÁNICA', key: 'unidadOrganica', width: 180 },
-              { header: 'TELÉFONO', key: 'celular', width: 100, align: 'center' },
+              { header: 'UNIDAD ORGÁNICA', key: 'unidad_organica', width: 180 },
+              { header: 'FUNCIÓN', key: 'tipo_funcion', width: 90, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
             ],
             data: filtered
@@ -364,9 +370,9 @@ export function Trabajadores() {
       </div>
 
       {/* 2. Tarjetas KPI con Bordes de Colores: 3 tarjetas para Personal */}
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3">
+      <div className="kpi-grid">
         {/* Total Registrados */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registrados</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -381,7 +387,7 @@ export function Trabajadores() {
         </div>
 
         {/* Activos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Trabajadores Activos</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
@@ -396,7 +402,7 @@ export function Trabajadores() {
         </div>
 
         {/* Inactivos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Trabajadores Inactivos</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
@@ -414,7 +420,7 @@ export function Trabajadores() {
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
 
       {/* 3. Contenedor de la Tabla y Barra de Herramientas */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
         
         {/* Toolbar */}
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
@@ -494,7 +500,7 @@ export function Trabajadores() {
         
         {/* Grid Clean */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[820px] text-left text-xs">
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 whitespace-nowrap">Trabajador</th>
@@ -638,11 +644,11 @@ export function Trabajadores() {
       {/* 4. Modal (Glassmorphism & Floating Labels - Estilo Personas) */}
       {form && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs animate-enter" onKeyDown={(e) => { if (e.key === 'Escape' && !saving) setForm(null) }}>
-          <div className="flex min-h-full items-center justify-center p-4 sm:p-6 pb-24">
-            <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="relative flex w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+          <div className="flex min-h-full items-center justify-center p-3 sm:p-4">
+            <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="personal-title" className="relative flex w-full max-w-5xl flex-col rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             
             {/* Header Modal - Estilo Personas.jsx */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="workerBadge" className="size-4" />
@@ -651,18 +657,11 @@ export function Trabajadores() {
                   {form.id ? 'Editar trabajador' : 'Nuevo trabajador'}
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setForm(null)}
-                title="Cerrar"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setForm(null)} title="Cerrar" />
             </div>
 
             {/* Body Modal */}
-            <div className="p-6 sm:p-8 space-y-0">
+            <div className="p-4 sm:p-5 space-y-0">
               
               {!form.id && (
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
@@ -675,7 +674,7 @@ export function Trabajadores() {
                     <input
                       id="buscarPersona"
                       required
-                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pb-1 pt-4 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
+                      className="peer flex h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pb-1 pt-4 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
                       placeholder=" "
                       value={personaSearch}
                       onFocus={() => {
@@ -734,17 +733,17 @@ export function Trabajadores() {
               )}
 
               {form.id && (
-                <fieldset className="mb-5 min-w-0 rounded-xl border border-slate-200 p-5 space-y-4 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                <fieldset className="mb-3 min-w-0 rounded-xl border border-slate-200 px-4 pb-3 pt-1 dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
                   <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Persona Vinculada
                   </legend>
-                  <div className="rounded-xl border border-white bg-white px-4 py-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] shadow-2xs">
-                    <p className="text-sm font-bold text-slate-800 dark:text-white mt-1">{form.nombres} {form.apellidos}</p>
+                  <div className="rounded-xl border border-white bg-white px-3 py-1.5 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] shadow-2xs">
+                    <p className="text-sm font-bold text-slate-800 dark:text-white">{form.nombres} {form.apellidos}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{form.tipo_documento}: {form.numero_documento}</p>
                   </div>
                 </fieldset>
               )}
 
-              <fieldset className="mb-5 min-w-0 rounded-xl border border-slate-200 p-5 space-y-4 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+              <fieldset className="mb-3 min-w-0 rounded-xl border border-slate-200 px-4 pb-3 pt-1 space-y-3 dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
                 <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Datos Laborales
                 </legend>
                 <div className="grid gap-2.5 sm:grid-cols-2">
@@ -783,7 +782,7 @@ export function Trabajadores() {
                   </div>
                 </fieldset>
 
-              <fieldset className="mb-5 min-w-0 rounded-xl border border-slate-200 p-5 space-y-4 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+              <fieldset className="mb-3 min-w-0 rounded-xl border border-slate-200 px-4 pb-3 pt-1 space-y-3 dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
                 <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Documentación y Estado
                 </legend>
                 <div className="grid gap-2.5 sm:grid-cols-2 md:grid-cols-4">
@@ -828,24 +827,44 @@ export function Trabajadores() {
                 </div>
               )}
 
-              {form.historial?.length > 0 && (
-                <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
-                  <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2 flex items-center gap-1.5">
-                    <span className="size-1.5 rounded-full bg-slate-400" />
-                    Historial Laboral
-                  </legend>
-                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
-                    {form.historial.map((h, idx) => (
-                      <div key={idx} className="border-l-2 border-slate-200 pl-2 dark:border-[var(--border-strong)]">
-                        <p className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{h.cargo || 'Cargo no registrado'} · {h.unidad_organica || 'Sin unidad'}</p>
-                        <p className="text-[10.5px] font-medium text-slate-500 mt-0.5">{h.documento || 'Sin doc.'} · {h.fecha_documento || 'Sin fecha'}</p>
-                        <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">{h.tipo_funcion || 'Sin función'} {h.fecha_termino ? `(Terminó ${h.fecha_termino})` : '(Vigente)'}</p>
-                        {h.solicitud && <p className="mt-1 text-[11px] font-medium italic text-slate-500">{h.solicitud}</p>}
+              {form.historial?.length > 0 && (() => {
+                const POR_PAGINA = 2
+                const total = form.historial.length
+                const paginas = Math.ceil(total / POR_PAGINA)
+                const pagina = Math.min(paginaHistorial, paginas - 1)
+                const desde = pagina * POR_PAGINA
+                const visibles = form.historial.slice(desde, desde + POR_PAGINA)
+                const flecha = 'grid size-6 place-items-center rounded-full bg-white dark:bg-white/10 text-slate-500 shadow-xs transition enabled:hover:text-slate-900 enabled:cursor-pointer disabled:opacity-30'
+                return (
+                  <fieldset className="relative mt-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 pb-3 pt-1 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
+                    {paginas > 1 && (
+                      <div className="absolute -top-3 right-3 flex items-center gap-1.5 rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold text-slate-500 dark:bg-[#1C2438]">
+                        <button type="button" className={flecha} disabled={pagina === 0} onClick={() => setPaginaHistorial(pagina - 1)} aria-label="Registros más recientes" title="Más recientes">
+                          <svg className="size-3" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        <span>{desde + 1}–{Math.min(desde + POR_PAGINA, total)} de {total}</span>
+                        <button type="button" className={flecha} disabled={pagina >= paginas - 1} onClick={() => setPaginaHistorial(pagina + 1)} aria-label="Registros anteriores" title="Más antiguos">
+                          <svg className="size-3" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                </fieldset>
-              )}
+                    )}
+                    <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2 flex items-center gap-1.5">
+                      <span className="size-1.5 rounded-full bg-slate-400" />
+                      Historial Laboral
+                    </legend>
+                    <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+                      {visibles.map((h, idx) => (
+                        <div key={desde + idx} className="border-l-2 border-slate-200 pl-2 dark:border-[var(--border-strong)]">
+                          <p className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{h.cargo || 'Cargo no registrado'} · {h.unidad_organica || 'Sin unidad'}</p>
+                          <p className="text-[10.5px] font-medium text-slate-500 mt-0.5">{h.documento || 'Sin doc.'} · {h.fecha_documento || 'Sin fecha'}</p>
+                          <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">{h.tipo_funcion || 'Sin función'} {h.fecha_termino ? `(Terminó ${h.fecha_termino})` : '(Vigente)'}</p>
+                          {h.solicitud && <p className="mt-1 line-clamp-2 text-[11px] font-medium italic text-slate-500">{h.solicitud}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </fieldset>
+                )
+              })()}
 
               {formError && (
                 <div className="mt-4 rounded-xl border border-rose-200/80 bg-rose-50 p-3 text-xs font-semibold text-rose-600 dark:bg-rose-950/40 dark:border-rose-900/50 dark:text-rose-400 shadow-xs">
@@ -856,23 +875,10 @@ export function Trabajadores() {
 
               {/* Footer Modal */}
               <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-[var(--border)] dark:bg-slate-900/80 rounded-b-3xl">
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => setForm(null)}
-                  className="rounded-xl px-5 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
-                  style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl px-6 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-50 cursor-pointer"
-                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
-                >
+                <BotonCancelar onClick={() => setForm(null)} disabled={saving} />
+                <BotonGuardar disabled={saving}>
                   {saving ? 'Guardando...' : 'Guardar trabajador'}
-                </button>
+                </BotonGuardar>
               </div>
           </form>
           </div>

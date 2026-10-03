@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Icon } from '../ui/Icon'
+import { BotonCancelar } from '../ui/ModalControls'
 
 export function PreviewTicketModal({ selectedPapeleta, onClose }) {
   useEffect(() => {
@@ -38,9 +39,7 @@ export function PreviewTicketModal({ selectedPapeleta, onClose }) {
         <button onClick={() => window.print()} className="rounded-xl bg-white px-5 py-2.5 text-xs font-extrabold text-rose-600 shadow-lg hover:bg-rose-50 cursor-pointer flex items-center gap-2">
           <Icon name="print" className="size-4" /> Imprimir Ticket
         </button>
-        <button onClick={onClose} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-extrabold text-white shadow-lg hover:bg-slate-800 cursor-pointer">
-          Cerrar
-        </button>
+        <BotonCancelar onClick={onClose}>Cerrar</BotonCancelar>
       </div>
 
       <div id="seccion-impresion-ticket" className="w-full max-w-[330px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:max-w-full">

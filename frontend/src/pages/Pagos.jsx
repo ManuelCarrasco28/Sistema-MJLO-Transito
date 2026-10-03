@@ -10,6 +10,7 @@ import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -219,6 +220,7 @@ export function Pagos() {
     if (searchTerm) params.set('buscar', searchTerm)
     if (filterTipoPago !== 'TODOS') params.set('tipoPago', filterTipoPago)
     if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
+    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
     const res = await apiFetch(`/pagos?${params.toString()}`)
     if (!res.ok) return filteredPagos
     const payload = await res.json()
@@ -433,7 +435,7 @@ export function Pagos() {
       </div>
 
       <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-3 print:hidden">
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total Recaudado</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 text-xs">
@@ -450,7 +452,7 @@ export function Pagos() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-sky-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-sky-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Operaciones</span>
             <span className="grid size-6 place-items-center rounded-md bg-sky-50 text-sky-600 dark:bg-sky-950/60 text-xs">
@@ -467,7 +469,7 @@ export function Pagos() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Pagos de Hoy</span>
             <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60 text-xs">
@@ -485,7 +487,7 @@ export function Pagos() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col print:hidden">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col print:hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
           <div className="relative w-full sm:w-56 md:w-64 lg:w-72 shrink-0">
             <Icon
@@ -609,10 +611,10 @@ export function Pagos() {
                 <th className="px-4 py-3.5">PAGADO POR</th>
                 <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="metodoPago" label="MÉTODO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3.5 whitespace-nowrap text-center"><SortableHeader column="montoTotal" label="MONTO TOTAL" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[var(--bg-surface)] px-4 py-3.5 text-center border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] whitespace-nowrap">ACCIONES</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#1C2438] px-4 py-3.5 text-center border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] whitespace-nowrap">ACCIONES</th>
               </tr>
             </thead>
-            <tbody className={`divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[var(--bg-surface)] transition-opacity ${isLoading && pagos.length > 0 ? 'opacity-50' : ''}`}>
+            <tbody className={`divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#1C2438] transition-opacity ${isLoading && pagos.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && pagos.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -627,7 +629,7 @@ export function Pagos() {
                     </td>
                     <td className="px-4 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-4 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-4 py-4 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] px-4 py-4 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : filteredPagos.length === 0 ? (
@@ -684,7 +686,7 @@ export function Pagos() {
                         {p.estado}
                       </p>
                     </td>
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-center border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] whitespace-nowrap min-w-[210px]">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#1C2438] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-center border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] whitespace-nowrap min-w-[210px]">
                       <div className="flex items-center justify-center gap-1.5">
                         {p.estado === 'PENDIENTE' && p.tipoPago !== 'INTERNAMIENTO' && (
                           typeof p.id === 'string' && (p.id.startsWith('pap_pend_') || p.id.startsWith('cur_pend_'))
@@ -745,22 +747,15 @@ export function Pagos() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
-          <div className="flex w-full max-w-2xl flex-col rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] rounded-t-3xl">
+          <div className="flex w-full max-w-2xl flex-col rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438] rounded-t-3xl">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="payment" className="size-4" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">{pagoToConfirm ? 'Confirmar recibo de pago' : 'Registrar Pago'}</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                title="Cerrar"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsModalOpen(false)} title="Cerrar" />
             </div>
             <form onSubmit={handleFormSubmit} className="flex flex-col rounded-b-3xl">
               <div className="space-y-6 p-8 min-h-[400px]">
@@ -842,7 +837,7 @@ export function Pagos() {
                             className={`w-full flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left transition cursor-pointer ${
                               seleccionada
                                 ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/40'
-                                : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:hover:bg-emerald-950/20'
+                                : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:hover:bg-emerald-950/20'
                             }`}
                           >
                             <div className="min-w-0">
@@ -898,8 +893,10 @@ export function Pagos() {
               )}
               </div>
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-7 py-4 dark:border-[var(--border)]">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 cursor-pointer" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
-                <button type="submit" disabled={isSaving} className="rounded-xl px-5 py-2 text-xs font-bold text-white hover:opacity-90 transition-all cursor-pointer disabled:opacity-60" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>{isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pago'}</button>
+                <BotonCancelar onClick={() => setIsModalOpen(false)} />
+                <BotonGuardar disabled={isSaving}>
+                  {isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pago'}
+                </BotonGuardar>
               </div>
             </form>
           </div>
@@ -908,7 +905,7 @@ export function Pagos() {
 
       {isDetailModalOpen && selectedPago && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] p-6">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] p-6">
             <h3 className="text-xl font-black mb-2 text-slate-800 dark:text-white">Detalle del Recibo</h3>
             <p className="text-xs text-slate-500 mb-6">{selectedPago.numeroRecibo}</p>
             <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
@@ -922,7 +919,7 @@ export function Pagos() {
             </div>
             <div className="mt-8 flex justify-end gap-2">
               <button disabled={selectedPago.estado !== 'PAGADO'} onClick={() => { setIsDetailModalOpen(false); setIsPreviewModalOpen(true); }} className="rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-sky-700 cursor-pointer inline-flex items-center gap-1.5"><Icon name="print" className="size-4" /> Imprimir</button>
-              <button onClick={() => setIsDetailModalOpen(false)} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800 cursor-pointer">Cerrar</button>
+              <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
             </div>
           </div>
         </div>
@@ -946,7 +943,7 @@ export function Pagos() {
             </div>
             <div className="mt-8 pt-4 border-t border-slate-300 flex justify-between print:hidden">
               <button onClick={handlePrintTicket} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-sans font-bold hover:bg-emerald-700 cursor-pointer">Imprimir Ticket</button>
-              <button onClick={() => setIsPreviewModalOpen(false)} className="bg-slate-800 text-white px-4 py-2 rounded-xl font-sans font-bold hover:bg-slate-700 cursor-pointer">Cerrar</button>
+              <BotonCancelar onClick={() => setIsPreviewModalOpen(false)}>Cerrar</BotonCancelar>
             </div>
           </div>
         </div>
@@ -955,7 +952,7 @@ export function Pagos() {
       {/* MODAL DE ARQUEO Y CIERRE DE CAJA DIARIO */}
       {isArqueoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-enter print:static print:block print:p-8 print:bg-transparent print:overflow-visible">
-          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:max-h-none print:border-none print:shadow-none print:rounded-none">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] print:max-h-none print:border-none print:shadow-none print:rounded-none">
             {/* Cabecera del modal */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4 rounded-t-3xl dark:border-[var(--border)] dark:bg-slate-900/80 print:bg-transparent print:border-black print:pb-2 print:mb-4 print:px-0">
               <div className="flex items-center gap-3 print:w-full print:justify-center print:flex-col print:gap-1">
@@ -990,13 +987,7 @@ export function Pagos() {
                 >
                   <Icon name="refresh" className={`size-4 ${isLoadingArqueo ? 'animate-spin' : ''}`} />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsArqueoModalOpen(false)}
-                  className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-slate-200 cursor-pointer"
-                >
-                  ✕
-                </button>
+                <BotonCerrarModal onClick={() => setIsArqueoModalOpen(false)} title="Cerrar" />
               </div>
             </div>
 
@@ -1154,7 +1145,7 @@ export function Pagos() {
 
                     <div className="max-h-56 overflow-y-auto print:max-h-none print:overflow-visible">
                       <table className="w-full text-left text-xs print:table-fixed">
-                        <thead className="sticky top-0 bg-white border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:bg-[var(--bg-surface)] dark:border-[var(--border)] print:static print:bg-transparent print:text-black print:border-black">
+                        <thead className="sticky top-0 bg-white border-b border-slate-200 text-[10px] font-bold uppercase text-slate-400 dark:bg-[#1C2438] dark:border-[var(--border)] print:static print:bg-transparent print:text-black print:border-black">
                           <tr>
                             <th className="py-2 print:py-1">N° Recibo</th>
                             <th className="py-2 print:py-1">Hora</th>
@@ -1206,7 +1197,7 @@ export function Pagos() {
             </div>
 
             {/* Footer de Acciones del Arqueo */}
-            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] print:hidden">
+            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[#1C2438] print:hidden">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1227,13 +1218,7 @@ export function Pagos() {
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsArqueoModalOpen(false)}
-                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 cursor-pointer"
-              >
-                Cerrar
-              </button>
+              <BotonCancelar onClick={() => setIsArqueoModalOpen(false)}>Cerrar</BotonCancelar>
             </div>
           </div>
         </div>

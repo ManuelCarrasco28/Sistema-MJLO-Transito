@@ -7,15 +7,17 @@ import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
-import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
+import { sanitizarMensaje, leerMensajeError, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
-import { formatNumeroTarjeta, toTitleCase } from '../utils/formatters'
+import { formatNumeroTarjeta, toTitleCase, normalizarPlaca } from '../utils/formatters'
+import { isVehiculoFormal, getVehiculoDocumento, buildVehiculoQrValue } from '../utils/vehiculos'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { VehiculoFormModal } from '../components/vehiculos/VehiculoFormModal'
 import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleModal'
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 
 function formatTipoDocLabel(t) {
   const code = (t.codigo || '').toUpperCase().trim()
@@ -33,7 +35,6 @@ const ESTADO_CIVIL_OPTIONS = [
   { value: '', label: 'Seleccionar...' },
   { value: 'SOLTERO', label: 'SOLTERO' },
   { value: 'CASADO', label: 'CASADO' },
-  { value: 'CONVIVIENTE', label: 'CONVIVIENTE' },
   { value: 'DIVORCIADO', label: 'DIVORCIADO' },
   { value: 'VIUDO', label: 'VIUDO' },
 ]
@@ -197,12 +198,7 @@ export function Vehiculos({ user }) {
     try {
       const response = await apiFetch(`/pide/reniec/${dni}`)
       if (!response.ok) {
-        let errorMsg = 'El servicio de consulta no responde en este momento. Ingrese los datos manualmente.'
-        try {
-          const errData = await response.json()
-          errorMsg = errData.messages?.error || errData.message || errorMsg
-        } catch (_) {}
-        throw new Error(errorMsg)
+        throw new Error(await leerMensajeError(response, 'El servicio de consulta no responde en este momento. Ingrese los datos manualmente.'))
       }
       const res = await response.json()
       const data = res.data || (res.nombres ? res : null)
@@ -365,12 +361,7 @@ export function Vehiculos({ user }) {
       })
 
       if (!response.ok) {
-        let errorMsg = 'No se pudo consultar la información del vehículo.'
-        try {
-          const errData = await response.json()
-          errorMsg = errData.messages?.error || errData.message || errorMsg
-        } catch (_) { }
-        throw new Error(errorMsg)
+        throw new Error(await leerMensajeError(response, 'No se pudo consultar la información del vehículo.'))
       }
 
       const res = await response.json()
@@ -630,7 +621,7 @@ export function Vehiculos({ user }) {
                 const payloadP = await resP.json()
                 matched = (payloadP.data || []).find(p => (p.numeroDocumento || '').trim() === legalOwner.documento.trim()) || null
               }
-            } catch (_) {}
+            } catch (err) { console.warn("No se pudo buscar al titular legal en personas:", err) }
           }
         }
         if (!matched && legalOwner.nombre) {
@@ -649,7 +640,7 @@ export function Vehiculos({ user }) {
                   return fullPName && (cleanOwnerName.includes(fullPName) || fullPName.includes(cleanOwnerName))
                 }) || null
               }
-            } catch (_) {}
+            } catch (err) { console.warn("No se pudo buscar al titular legal en personas:", err) }
           }
         }
 
@@ -711,11 +702,6 @@ export function Vehiculos({ user }) {
     }
   }
 
-  const isVehiculoFormal = (v) => Boolean(
-    v?.asociacionId ||
-    (v?.asociacion && v.asociacion !== 'Sin Asociación' && v.asociacion !== 'Independiente' && v.asociacion !== 'Independiente / Particular')
-  )
-
   const totalVehiculos = stats.total ?? 0
   const formales = stats.formales ?? 0
   const informales = stats.informales ?? 0
@@ -731,18 +717,15 @@ export function Vehiculos({ user }) {
   const paginatedVehiculos = vehiculos
   const filteredVehiculos = vehiculos
 
-  const fetchTodoElFiltro = async () => {
-    const params = new URLSearchParams()
-    if (debouncedSearchTerm) params.set('buscar', debouncedSearchTerm)
-    if (filterTipo !== 'TODOS') params.set('tipo', filterTipo)
-    if (filterEstado !== 'TODOS') params.set('formalidad', filterEstado)
-    if (filterActivo !== 'TODOS') params.set('estado', filterActivo)
-    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
-    const res = await apiFetch(`/vehiculos?${params.toString()}`)
-    if (!res.ok) return vehiculos
-    const payload = await res.json()
-    return payload.data || []
-  }
+  const fetchTodoElFiltro = () =>
+    fetchTodasLasFilas('/vehiculos', {
+      buscar: debouncedSearchTerm,
+      tipo: filterTipo === 'TODOS' ? '' : filterTipo,
+      formalidad: filterEstado === 'TODOS' ? '' : filterEstado,
+      estado: filterActivo === 'TODOS' ? '' : filterActivo,
+      sortBy,
+      sortDir: sortBy ? sortDir : '',
+    }, { mensaje: 'Preparando la descarga de vehículos...' })
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
@@ -766,11 +749,21 @@ export function Vehiculos({ user }) {
               { header: 'MODELO', key: 'modelo', width: 120 },
               { header: 'COLOR', key: 'color', width: 110 },
               { header: 'AÑO', key: 'anio', width: 80, align: 'center' },
-              { header: 'N° MOTOR', key: 'numeroMotor', isText: true, width: 140 },
-              { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 140 },
+              { header: 'CATEGORÍA', key: 'categoria', width: 90, align: 'center' },
+              { header: 'CARROCERÍA', key: 'carroceria', width: 130 },
+              { header: 'TIPO DE CARROCERÍA', key: 'tipoCarroceria', width: 140 },
+              { header: 'SEDE DE REGISTRO', key: 'sedeRegistro', width: 170 },
+              { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 150 },
+              { header: 'SERIE DEL MOTOR', key: 'serieMotor', isText: true, width: 150 },
+              { header: 'PARTIDA REGISTRAL', key: 'partidaRegistral', isText: true, width: 140 },
+              { header: 'N° TUC', key: 'tucNumero', isText: true, width: 130 },
+              { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 150 },
               { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
+              { header: 'RUC ASOCIACIÓN', key: 'asociacionRuc', isText: true, width: 120, align: 'center' },
               { header: 'PROPIETARIO', key: 'propietario', width: 180 },
-              { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
+              { header: 'TIPO DOC. PROPIETARIO', key: 'propietarioTipoDocumento', width: 120, align: 'center' },
+              { header: 'DNI / RUC PROPIETARIO', key: 'propietarioDni', isText: true, width: 130, align: 'center' },
+              { header: 'FORMALIDAD', key: 'formalidad', width: 110, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
             ],
             data: dataToExport
@@ -807,63 +800,6 @@ export function Vehiculos({ user }) {
     } finally {
       setIsExportingPdf(false)
     }
-  }
-
-  const getVehiculoDocumento = (vehiculo, tipoDocumento) => (
-    vehiculo?.documentosVehiculo?.find((doc) => doc.tipoDocumento === tipoDocumento)
-  )
-
-  const formatDocumentoQr = (label, documento) => {
-    if (!documento) return `${label}: SIN REGISTRO`
-
-    return `${label}: ${documento.codigo || 'SIN CODIGO'} | Estado: ${documento.estado || 'SIN ESTADO'} | Vence: ${documento.fechaExpiracion || 'SIN FECHA'}`
-  }
-
-  const formatCerticavQr = (certicav) => {
-    if (!certicav) return 'CERTICAV / Inspeccion tecnica: SIN REGISTRO'
-
-    return [
-      `CERTICAV / Inspeccion tecnica: ${certicav.numeroSerieCerticav || certicav.numeroRegistro || 'SIN NUMERO'}`,
-      `Resultado: ${certicav.resultado || 'SIN RESULTADO'}`,
-      `Estado: ${certicav.estado || 'SIN ESTADO'}`,
-      `Fecha: ${certicav.fecha || 'SIN FECHA'}`,
-    ].join(' | ')
-  }
-
-  const buildVehiculoQrValue = (vehiculo) => {
-    const tarjetaPropiedad = getVehiculoDocumento(vehiculo, 'TARJETA_PROPIEDAD')
-    const soat = getVehiculoDocumento(vehiculo, 'SOAT')
-    const certicav = vehiculo.certicav
-    const papeletas = vehiculo.historialPapeletas || []
-    const papeletasQr = papeletas.length > 0
-      ? papeletas.slice(0, 8).map((papeleta, index) => (
-        `${index + 1}. ${papeleta.numeroPapeleta || 'SIN NUMERO'} | ${papeleta.estado || 'SIN ESTADO'} | S/ ${Number(papeleta.montoTotal || 0).toFixed(2)} | ${papeleta.fechaHora || 'SIN FECHA'}`
-      )).join('\n')
-      : 'SIN PAPELETAS REGISTRADAS'
-
-    return [
-      'MDJLO - Sistema de Gestion de Transito Municipal',
-      `Codigo QR: ${vehiculo.codigoQr || 'SIN CODIGO'}`,
-      `Placa del vehiculo: ${vehiculo.placa || 'SIN PLACA'}`,
-      `Tipo de vehiculo: ${vehiculo.tipo || 'SIN TIPO'}`,
-      `Marca: ${vehiculo.marca || 'SIN MARCA'}`,
-      `Modelo: ${vehiculo.modelo || 'SIN MODELO'}`,
-      `Color: ${vehiculo.color || 'SIN COLOR'}`,
-      `Anio fabricacion: ${vehiculo.anio || 'SIN ANIO'}`,
-      `Categoria: ${vehiculo.categoria || 'SIN CATEGORIA'}`,
-      `Carroceria: ${vehiculo.carroceria || 'SIN CARROCERIA'}`,
-      `Sede de registro: ${vehiculo.sedeRegistro || 'SIN SEDE'}`,
-      `Tipo de carroceria: ${vehiculo.tipoCarroceria || 'SIN TIPO CARROCERIA'}`,
-      `Propietario: ${vehiculo.propietario || 'SIN PROPIETARIO'}`,
-      `DNI propietario: ${vehiculo.propietarioTipoDocumento === 'DNI' ? vehiculo.propietarioDni || 'SIN DNI' : 'NO APLICA'}`,
-      `RUC asociacion: ${vehiculo.asociacionRuc || 'SIN RUC'}`,
-      `Asociacion vehiculo: ${vehiculo.asociacion || 'INDEPENDIENTE'}`,
-      formatDocumentoQr('Tarjeta de propiedad numero', tarjetaPropiedad),
-      formatDocumentoQr('SOAT', soat),
-      formatCerticavQr(certicav),
-      'Historial de papeletas del vehiculo:',
-      papeletasQr,
-    ].join('\n')
   }
 
   const handleOpenCreateModal = () => {
@@ -938,7 +874,7 @@ export function Vehiculos({ user }) {
         const full = await res.json()
         if (full?.data) setSelectedVehiculo(full.data)
       }
-    } catch {}
+    } catch (err) { console.warn("No se pudo cargar el detalle completo del vehículo:", err) }
   }
 
   const handleDelete = async (id) => {
@@ -1010,7 +946,7 @@ export function Vehiculos({ user }) {
   if (!isOffice) {
     return (
       <div className="mx-auto w-full max-w-3xl animate-enter py-6">
-        <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="mb-8 flex flex-col items-center justify-center text-center">
             <div className="mb-4 flex size-20 items-center justify-center rounded-3xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
               <Icon name="search" className="size-10" />
@@ -1028,9 +964,9 @@ export function Vehiculos({ user }) {
               </div>
               <input
                 type="text"
-                placeholder="Ej. 1234-AB"
+                placeholder="Ej. M6Y544"
                 value={consultaPlaca}
-                onChange={(e) => setConsultaPlaca(e.target.value.toUpperCase())}
+                onChange={(e) => setConsultaPlaca(normalizarPlaca(e.target.value))}
                 className="block w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-4 pl-14 pr-4 text-2xl font-black uppercase tracking-widest text-slate-900 transition focus:border-indigo-500 focus:bg-white focus:outline-hidden focus:ring-4 focus:ring-indigo-500/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400 placeholder:text-slate-300 dark:placeholder:text-slate-600"
                 autoFocus
               />
@@ -1057,7 +993,7 @@ export function Vehiculos({ user }) {
         </div>
 
         {consultaResult && (
-          <div className="animate-enter rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="animate-enter rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">
             <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center dark:border-[var(--border)]">
               <div className="flex items-center gap-4">
                 <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 dark:bg-[var(--bg-subtle)]">
@@ -1158,10 +1094,10 @@ export function Vehiculos({ user }) {
 
 
       {/* Tarjetas KPI con Bordes de Colores */}
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="kpi-grid">
 
         {/* 1. Total Unidades */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total Unidades</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -1175,7 +1111,7 @@ export function Vehiculos({ user }) {
         </div>
 
         {/* 2. Formales */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Formales</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
@@ -1187,7 +1123,7 @@ export function Vehiculos({ user }) {
         </div>
 
         {/* 3. Informales */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Informales</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs"><Icon name="alert" className="size-3.5" /></span>
@@ -1199,7 +1135,7 @@ export function Vehiculos({ user }) {
         </div>
 
         {/* 4. Observados / Baja */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Inhabilitados</span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">✕</span>
@@ -1211,7 +1147,7 @@ export function Vehiculos({ user }) {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
 
           <div className="relative flex-1">
@@ -1341,7 +1277,7 @@ export function Vehiculos({ user }) {
 
 
         <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Listado de vehículos" tabIndex={0}>
-          <table className="w-full table-fixed text-left text-xs">
+          <table className="w-full min-w-[1050px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[10%]" />
               <col className="w-[20%]" />
@@ -1354,9 +1290,9 @@ export function Vehiculos({ user }) {
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
                 <th className="px-3.5 py-2.5 "><SortableHeader column="placa" label="Placa" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="px-3.5 py-2.5 "><SortableHeader column="propietario" label="Propietario & Titular" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-3.5 py-2.5 "><SortableHeader column="propietario" label="Propietario y titular" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-3.5 py-2.5 ">Asociación / Empresa</th>
-                <th className="px-3.5 py-2.5 ">Vehículo & Modelo</th>
+                <th className="px-3.5 py-2.5 ">Vehículo y modelo</th>
                 <th className="px-3.5 py-2.5 ">Serie Chasis / Motor</th>
                 <th className="px-4 py-2.5 min-w-[130px] text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3.5 text-center min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]">Acciones</th>
@@ -1377,7 +1313,7 @@ export function Vehiculos({ user }) {
                     <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3.5 py-2.5"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-4 py-2.5 min-w-[130px] text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-4 min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-4 min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : vehiculos.length === 0 ? (
@@ -1465,7 +1401,7 @@ export function Vehiculos({ user }) {
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3.5 min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3.5 min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"

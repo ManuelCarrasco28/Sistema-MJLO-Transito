@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
+import { crearComparador } from '../utils/ordenMultiple'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
@@ -11,6 +12,7 @@ import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -243,12 +245,7 @@ export function CursosSeguridad() {
     setCurrentPage(1)
   }
   if (sortBy) {
-    const dirMul = sortDir === 'ASC' ? 1 : -1
-    filteredCursos.sort((a, b) => {
-      const valA = String(a[sortBy] ?? '').toLowerCase()
-      const valB = String(b[sortBy] ?? '').toLowerCase()
-      return valA < valB ? -1 * dirMul : valA > valB ? 1 * dirMul : 0
-    })
+    filteredCursos.sort(crearComparador(sortBy, sortDir))
   }
 
   const paginatedCursos = filteredCursos.slice(
@@ -274,12 +271,16 @@ export function CursosSeguridad() {
               { header: 'CÓDIGO', key: 'codigo', isText: true, width: 130, align: 'center' },
               { header: 'TÍTULO DEL CURSO', key: 'titulo', width: 260 },
               { header: 'TIPO', key: 'tipo', width: 160 },
+              { header: 'DESCRIPCIÓN', key: 'descripcion', width: 260 },
               { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
+              { header: 'FECHA INICIO', key: 'fecha_inicio', width: 110, align: 'center' },
+              { header: 'FECHA FIN', key: 'fecha_fin', width: 110, align: 'center' },
               { header: 'HORARIO', key: 'horario', width: 140, align: 'center' },
               { header: 'INSTRUCTOR', key: 'instructor', width: 180 },
               { header: 'LUGAR', key: 'lugar', width: 200 },
-              { header: 'VACANTES', key: 'capacidad', width: 90, align: 'center' },
-              { header: 'INSCRITOS', render: (_, c) => String(c.inscritos || c.participantes?.length || 0), width: 90, align: 'center' },
+              { header: 'COSTO (S/)', render: (_, c) => `S/ ${Number(c.costo || 0).toFixed(2)}`, align: 'right', width: 100 },
+              { header: 'CUPOS TOTALES', key: 'capacidad', width: 100, align: 'center' },
+              { header: 'INSCRITOS', render: (_, c) => String(c.inscritos ?? c.participantes?.length ?? 0), width: 90, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
             ],
             data: filteredCursos
@@ -426,8 +427,8 @@ export function CursosSeguridad() {
         </div>
       </div>
 
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+      <div className="kpi-grid">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">TOTAL CURSOS</span>
             <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60">
@@ -439,7 +440,7 @@ export function CursosSeguridad() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">CURSOS ACTIVOS</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60">
@@ -451,7 +452,7 @@ export function CursosSeguridad() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">TOTAL INSCRITOS</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60">
@@ -463,7 +464,7 @@ export function CursosSeguridad() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">FINALIZADOS</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60">
@@ -502,7 +503,7 @@ export function CursosSeguridad() {
       </div>
 
       {activeView === 'CURSOS' && (
-      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col">
 
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
           <div className="relative w-full sm:max-w-xs">
@@ -570,7 +571,7 @@ export function CursosSeguridad() {
 
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs">
+          <table className="w-full min-w-[1050px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[14%]" />
               <col className="w-[22%]" />
@@ -588,7 +589,7 @@ export function CursosSeguridad() {
                 <th className="px-3 py-3 text-center">INSCRITOS / CAPACIDAD</th>
                 <th className="px-3 py-3">INSTRUCTOR / LUGAR</th>
                 <th className="px-3 py-3 text-center"><SortableHeader column="estado" label="ESTADO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[var(--bg-surface)] px-3 py-3 text-center border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
+                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#1C2438] px-3 py-3 text-center border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
@@ -606,7 +607,7 @@ export function CursosSeguridad() {
                     <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3 py-3"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] px-3 py-3 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] px-3 py-3 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : filteredCursos.length === 0 ? (
@@ -669,7 +670,7 @@ export function CursosSeguridad() {
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[#1C2438] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-center gap-1">
                         {c.estado === 'FINALIZADO' && (
                           <button onClick={(e) => { e.stopPropagation(); handlePrintBatch(c); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white" title="Descargar Carnets (Lote)">
@@ -706,7 +707,7 @@ export function CursosSeguridad() {
       )}
 
       {activeView === 'APROBADOS' && (
-        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col">
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col">
           {/* Controls Aprobados */}
           <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
             <div className="relative w-full sm:max-w-xs">
@@ -766,7 +767,7 @@ export function CursosSeguridad() {
                           <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.curso.fecha}</p>
                           <p className="text-[10px] font-semibold text-slate-500">Vence: {fechaVencimiento}</p>
                         </td>
-                        <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[var(--bg-surface)] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                        <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#1C2438] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => handlePrintSingle(p)} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Descargar Carnet Individual">
                               <Icon name="print" className="size-4" />
@@ -795,8 +796,8 @@ export function CursosSeguridad() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
-          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="course" className="size-4" />
@@ -805,14 +806,7 @@ export function CursosSeguridad() {
                   {selectedCurso ? 'Editar Curso de Seguridad' : 'Programar Nuevo Curso'}
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                title="Cerrar"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsModalOpen(false)} title="Cerrar" />
             </div>
             <form onSubmit={handleFormSubmit} className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-7 overflow-y-auto p-7">
@@ -870,8 +864,10 @@ export function CursosSeguridad() {
               </fieldset>
             </div>
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-7 py-4 dark:border-[var(--border)]">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 cursor-pointer" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
-                <button type="submit" className="rounded-xl px-5 py-2 text-xs font-bold text-white hover:opacity-90 transition-all cursor-pointer" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>Guardar Curso</button>
+                <BotonCancelar onClick={() => setIsModalOpen(false)} />
+                <BotonGuardar>
+                  Guardar Curso
+                </BotonGuardar>
               </div>
             </form>
           </div>

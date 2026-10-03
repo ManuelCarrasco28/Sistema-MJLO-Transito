@@ -6,12 +6,13 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
-import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
+import { sanitizarMensaje, apiFetch, setCachedData } from '../config/api'
 import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { SearchableMultiSelect } from '../components/ui/SearchableMultiSelect'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 
 const getPeruDateInputValue = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -50,10 +51,11 @@ const FILTER_FECHA_OPTIONS = [
 ]
 
 export function Operativos({ user }) {
-  const cached = getCachedData('/operativos')
-  const [operativos, setOperativos] = useState(cached || [])
+  // La caché '/operativos' del dashboard guarda TODOS los operativos (para el calendario); esta tabla es paginada,
+  // así que no puede arrancar con esa lista (mostraba los 120 un instante y luego se achicaba a 5).
+  const [operativos, setOperativos] = useState([])
   const [personal, setPersonal] = useState([])
-  const [loading, setLoading] = useState(!cached)
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
@@ -174,9 +176,11 @@ export function Operativos({ user }) {
               { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
               { header: 'HORA INICIO', key: 'hora_inicio', width: 100, align: 'center' },
               { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 100, align: 'center' },
-              { header: 'INSPECTORES', render: (_, o) => String(o.inspectores_total || o.inspectores?.length || 0), width: 110, align: 'center' },
-              { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 100, align: 'center' },
+              { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 110, align: 'center' },
+              { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 100, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 120, align: 'center' },
+              { header: 'REGISTRADO POR', render: (_, o) => o.usuario_registra || '—', width: 160 },
+              { header: 'FECHA DE REGISTRO', render: (_, o) => o.created_at || '—', width: 150, align: 'center' },
               { header: 'OBSERVACIONES', render: (_, o) => o.observacion || '—', width: 240 }
             ],
             data
@@ -205,8 +209,8 @@ export function Operativos({ user }) {
               { header: 'FECHA', key: 'fecha', width: 20, align: 'center' },
               { header: 'HORA INICIO', key: 'hora_inicio', width: 20, align: 'center' },
               { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 20, align: 'center' },
-              { header: 'INSPECTORES', render: (_, o) => String(o.inspectores_total || o.inspectores?.length || 0), width: 25, align: 'center' },
-              { header: 'PAPELETAS', render: (_, o) => String(o.papeletas_total || 0), width: 20, align: 'center' },
+              { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 25, align: 'center' },
+              { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 20, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 25, align: 'center' }
             ],
             data
@@ -264,7 +268,7 @@ export function Operativos({ user }) {
   const save = async (event) => {
     event.preventDefault()
     if (!form.nombre.trim() || !form.lugar.trim() || !form.fecha || !form.hora_inicio) {
-      alert('Completa nombre, lugar, fecha y hora de inicio.')
+      showError('Atención', 'Completa nombre, lugar, fecha y hora de inicio.')
       return
     }
     setSaving(true)
@@ -302,9 +306,9 @@ export function Operativos({ user }) {
     if (!result.isConfirmed) return
     const response = await apiFetch(`/operativos/${id}`, { method: 'DELETE' })
     if (response.ok) {
-      const next = operativos.filter((op) => op.id !== id)
-      setOperativos(next)
-      setCachedData('/operativos', next)
+      setOperativos((actual) => actual.filter((op) => op.id !== id))
+      setCachedData('/operativos', null) // el calendario del dashboard vuelve a pedir su lista
+      loadOperativos().catch(() => {}).finally(() => setLoading(false))
       loadStats()
       showToast('Operativo eliminado correctamente')
       return
@@ -471,7 +475,7 @@ export function Operativos({ user }) {
   const exportOperativoPdf = (op) => {
     const printable = window.open('', '_blank', 'width=1200,height=800')
     if (!printable) {
-      alert('No se pudo abrir la vista para PDF. Permite ventanas emergentes en el navegador.')
+      showError('Atención', 'No se pudo abrir la vista para PDF. Permite ventanas emergentes en el navegador.')
       return
     }
     printable.document.write(`
@@ -537,14 +541,14 @@ export function Operativos({ user }) {
         </div>
       </div>
 
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
+      <div className="kpi-grid">
         {[
           ['Total operativos', stats.total ?? 0, 'mapPin'],
           ['Activos', activos, 'operations'],
           ['Finalizados', finalizados, 'shieldCheck'],
           ['Papeletas vinculadas', papeletas, 'ticket'],
         ].map(([label, value, icon]) => (
-          <div key={label} className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+          <div key={label} className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">{label}</span>
               <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60">
@@ -558,7 +562,7 @@ export function Operativos({ user }) {
         ))}
       </div>
 
-      <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+      <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
           <div className="relative w-full sm:max-w-xs">
             <Icon
@@ -631,7 +635,7 @@ export function Operativos({ user }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs">
+          <table className="w-full min-w-[820px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[26%]" />
               <col className="w-[20%]" />
@@ -696,12 +700,10 @@ export function Operativos({ user }) {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
-          <form onSubmit={save} className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-[var(--bg-surface)]">
+          <form onSubmit={save} className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#1C2438]">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-black">{editing ? 'Editar operativo' : 'Nuevo operativo'}</h2>
-              <button type="button" onClick={() => setModalOpen(false)} title="Cerrar" className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs">
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setModalOpen(false)} title="Cerrar" />
             </div>
             
             <fieldset className="mb-5 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
@@ -733,7 +735,7 @@ export function Operativos({ user }) {
                     </p>
                   </div>
                 )}
-                <label className="text-sm font-bold sm:col-span-2">Observación<textarea value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} className="mt-1 min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]" /></label>
+                <label className="text-sm font-bold sm:col-span-2">Observación<textarea value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} className="mt-1 min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-[var(--border-strong)] dark:bg-[#1C2438]" /></label>
               </div>
             </fieldset>
 
@@ -748,8 +750,8 @@ export function Operativos({ user }) {
             </fieldset>
 
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl px-4 py-2 text-sm font-bold text-white hover:opacity-90" style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}>Cancelar</button>
-              <button disabled={saving} className="rounded-xl px-5 py-2 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>{saving ? 'Guardando...' : 'Guardar operativo'}</button>
+              <BotonCancelar onClick={() => setModalOpen(false)} />
+              <BotonGuardar disabled={saving}>{saving ? 'Guardando...' : 'Guardar operativo'}</BotonGuardar>
             </div>
           </form>
         </div>
@@ -757,7 +759,7 @@ export function Operativos({ user }) {
 
       {detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-xs">
-          <div className="flex max-h-[94dvh] w-full max-w-[92rem] flex-col rounded-2xl bg-white p-4 shadow-2xl dark:bg-[var(--bg-surface)]">
+          <div className="flex max-h-[94dvh] w-full max-w-[92rem] flex-col rounded-2xl bg-white p-4 shadow-2xl dark:bg-[#1C2438]">
             <div className="mb-3 shrink-0 flex items-start justify-between border-b border-slate-100 pb-3 dark:border-[var(--border)]">
               <div>
                 <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">{detail.nombre}</h2>
@@ -765,7 +767,7 @@ export function Operativos({ user }) {
                   {detail.lugar} · {formatFecha(detail.fecha)} · <span className="font-semibold text-slate-700 dark:text-slate-300">{formatHora(detail.hora_inicio)}{detail.hora_fin ? ` - ${formatHora(detail.hora_fin)}` : ''}</span>
                 </p>
               </div>
-              <button onClick={() => setDetail(null)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white transition-colors">✕</button>
+              <BotonCerrarModal onClick={() => setDetail(null)} title="Cerrar" />
             </div>
 
             <div className="mb-3 shrink-0 grid gap-3 sm:grid-cols-4">
@@ -832,7 +834,7 @@ export function Operativos({ user }) {
               </div>
               <div className="min-h-0 flex-1 overflow-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-[var(--bg-surface)] border-b border-slate-100 dark:border-[var(--border)]">
+                  <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-[#1C2438] border-b border-slate-100 dark:border-[var(--border)]">
                     <tr>
                       <th className="px-4 py-2 ">Papeleta</th>
                       <th className="px-4 py-2 ">Fecha / Lugar</th>

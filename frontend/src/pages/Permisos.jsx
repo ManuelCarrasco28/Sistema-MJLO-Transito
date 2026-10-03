@@ -9,10 +9,13 @@ import { ResolucionPermisoPrint } from '../components/documentos/TarjetaOperativ
 import { exportToExcel } from '../utils/exportToExcel'
 import { TramiteFormularioModal } from '../components/permisos/TramiteFormularioModal'
 import { exportToPdf } from '../utils/exportToPdf'
+import { leerBorradorPermiso, limpiarBorradorPermiso } from '../utils/borradorPermiso'
+import { useListaServidor } from '../hooks/useListaServidor'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
+import { BotonCancelar, BotonCerrarModal } from '../components/ui/ModalControls'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -29,13 +32,10 @@ const FILTER_ESTADO_OPTIONS = [
 ]
 
 export function Permisos() {
-  const cachedPermisos = getCachedData('/permisos')
   const cachedProcs = getCachedData('/procedimientos-admin')
 
-  const [permisos, setPermisos] = useState(cachedPermisos || [])
   const [procedimientos, setProcedimientos] = useState(cachedProcs || [])
   const [tramitesDisponibles, setTramitesDisponibles] = useState([])
-  const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('permisos')
   const [searchTerm, setSearchTerm] = useState(() => new URLSearchParams(window.location.search).get('search') || '')
 
@@ -77,34 +77,48 @@ export function Permisos() {
       if (!res.ok) {
         throw new Error('Error al eliminar la autorización.')
       }
-      setPermisos((prev) => prev.filter((p) => p.id !== id))
       invalidateCache('/permisos')
+      loadDataRef.current()
+      loadStats()
       showToast('Autorización eliminada correctamente')
     } catch (err) {
       showError('Error', sanitizarMensaje(err.message, 'No se pudo eliminar la autorización.'))
     }
   }
 
-  const [totalFiltrado, setTotalFiltrado] = useState(0)
+  const [sortBy, setSortBy] = useState('')
+  const [sortDir, setSortDir] = useState('DESC')
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
 
-  const loadData = () => {
-    // setIsLoading(true)
-    apiFetch('/permisos')
-      .then((r) => (r.ok ? r.json() : { data: [] }))
-      .then((permRes) => {
-        const pData = Array.isArray(permRes?.data) ? permRes.data : []
-        setPermisos(pData)
-        if (pData.length > 0) setCachedData('/permisos', pData)
-        // setIsLoading(false)
-      })
-      .catch(() => {
-        // setIsLoading(false)
-      })
+  const handleSort = (column, dir) => {
+    setSortBy(column)
+    setSortDir(dir)
+    setCurrentPage(1)
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 300)
+    return () => window.clearTimeout(timer)
+  }, [searchTerm])
+
+  const { filas: permisos, total: totalFiltrado, isLoading, recargar: loadData } = useListaServidor({
+    endpoint: '/permisos',
+    page: currentPage,
+    porPagina: itemsPerPage,
+    descripcion: 'el listado de permisos',
+    params: {
+      buscar: debouncedSearch,
+      estado: filterEstado === 'TODOS' ? '' : filterEstado,
+      tipoPermiso: filterTipo === 'TODOS' ? '' : filterTipo,
+      sortBy,
+      sortDir: sortBy ? sortDir : '',
+    },
+  })
+
+  // Los listeners de ventana (message/storage) se registran una sola vez: la ref
+  // les entrega siempre la versión de loadData con los filtros actuales.
+  const loadDataRef = useRef(loadData)
+  loadDataRef.current = loadData
 
   const [stats, setStats] = useState({ totalPermisos: 0, totalControl: 0, totalCarga: 0, totalVias: 0, totalZonas: 0, vigentes: 0, vencidos: 0 })
 
@@ -133,16 +147,14 @@ export function Permisos() {
     const handleMessage = (e) => {
       if (e.data?.type === 'PERMISO_GUARDADO') {
         invalidateCache('/permisos')
-        loadData()
+        loadDataRef.current()
         loadStats()
         showToast('Autorización guardada correctamente', 'crear')
       }
       if (e.data?.type === 'VOLVER_A_DATOS_MODAL') {
         let draft = e.data.draft
         if (!draft) {
-          try {
-            draft = JSON.parse(sessionStorage.getItem('mjlo_permiso_borrador') || localStorage.getItem('mjlo_permiso_borrador'))
-          } catch (_) {}
+          draft = leerBorradorPermiso()
         }
         if (draft) {
           setEditingPermiso(draft)
@@ -153,31 +165,27 @@ export function Permisos() {
     const handleStorage = (e) => {
       if (e.key === 'mjlo_permisos_updated') {
         invalidateCache('/permisos')
-        loadData()
+        loadDataRef.current()
         loadStats()
         showToast('Autorización guardada correctamente', 'crear')
       }
       if (e.key === 'mjlo_volver_a_datos') {
-        try {
-          const draft = JSON.parse(sessionStorage.getItem('mjlo_permiso_borrador') || localStorage.getItem('mjlo_permiso_borrador'))
-          if (draft) {
-            setEditingPermiso(draft)
-            setIsCreateModalOpen(true)
-          }
-        } catch (_) {}
+        const draft = leerBorradorPermiso()
+        if (draft) {
+          setEditingPermiso(draft)
+          setIsCreateModalOpen(true)
+        }
       }
     }
 
     // Si viene redirigido con reopenDraft=1
     const params = new URLSearchParams(window.location.search)
     if (params.get('reopenDraft')) {
-      try {
-        const draft = JSON.parse(sessionStorage.getItem('mjlo_permiso_borrador') || localStorage.getItem('mjlo_permiso_borrador'))
-        if (draft) {
-          setEditingPermiso(draft)
-          setIsCreateModalOpen(true)
-        }
-      } catch (_) {}
+      const draft = leerBorradorPermiso()
+      if (draft) {
+        setEditingPermiso(draft)
+        setIsCreateModalOpen(true)
+      }
       window.history.replaceState({}, '', '/permisos')
     }
 
@@ -197,60 +205,21 @@ export function Permisos() {
   const vigentes = stats.vigentes ?? 0
   const vencidos = stats.vencidos ?? 0
 
-  const filteredPermisos = permisos.filter((p) => {
-    const s = searchTerm.toLowerCase()
-    const matchSearch =
-      p.numeroAutorizacion?.toLowerCase().includes(s) ||
-      p.solicitante?.toLowerCase().includes(s) ||
-      p.solicitanteNombre?.toLowerCase().includes(s) ||
-      p.vehiculoPlaca?.toLowerCase().includes(s) ||
-      p.expediente?.toLowerCase().includes(s) ||
-      p.expedienteNumero?.toLowerCase().includes(s) ||
-      p.zonaCirculacion?.toLowerCase().includes(s) ||
-      p.reciboIngresoNumero?.toLowerCase().includes(s)
-
-    const matchEstado = filterEstado === 'TODOS' || p.estado === filterEstado
-    const matchTipo =
-      filterTipo === 'TODOS' ||
-      p.tipoPermiso === filterTipo ||
-      (filterTipo === 'CONTROL_VEHICULAR' && (p.tipoPermiso === 'OPERACION' || !p.tipoPermiso)) ||
-      (filterTipo === 'ZONAS_RESERVADAS' && p.tipoPermiso === 'ZONA_RESERVADA')
-
-    return matchSearch && matchEstado && matchTipo
-  })
-
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterEstado, filterTipo, activeTab])
-
-  const [sortBy, setSortBy] = useState('')
-  const [sortDir, setSortDir] = useState('DESC')
-  const handleSort = (column, dir) => {
-    setSortBy(column)
-    setSortDir(dir)
-    setCurrentPage(1)
-  }
-  if (sortBy) {
-    const dirMul = sortDir === 'ASC' ? 1 : -1
-    filteredPermisos.sort((a, b) => {
-      const valA = String(a[sortBy] ?? '').toLowerCase()
-      const valB = String(b[sortBy] ?? '').toLowerCase()
-      return valA < valB ? -1 * dirMul : valA > valB ? 1 * dirMul : 0
-    })
-  }
-
-  const paginatedPermisos = filteredPermisos.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  }, [debouncedSearch, filterEstado, filterTipo, activeTab])
 
   const fetchTodoElFiltro = async () => {
     const params = new URLSearchParams()
-    if (searchTerm) params.set('buscar', searchTerm)
+    if (debouncedSearch.trim()) params.set('buscar', debouncedSearch.trim())
     if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
     if (filterTipo !== 'TODOS') params.set('tipoPermiso', filterTipo)
+    if (sortBy) {
+      params.set('sortBy', sortBy)
+      params.set('sortDir', sortDir)
+    }
     const res = await apiFetch(`/permisos?${params.toString()}`)
-    if (!res.ok) return filteredPermisos
+    if (!res.ok) return permisos
     const payload = await res.json()
     return Array.isArray(payload?.data) ? payload.data : []
   }
@@ -276,13 +245,26 @@ export function Permisos() {
               { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', isText: true, width: 130, align: 'center' },
               { header: 'SOLICITANTE / EMPRESA', key: 'solicitanteNombre', width: 220 },
               { header: 'DNI / RUC', key: 'solicitanteDocumento', isText: true, width: 120, align: 'center' },
+              { header: 'REPRESENTANTE LEGAL', key: 'representanteLegal', width: 180 },
+              { header: 'PROCEDIMIENTO (TUPA)', key: 'procedimientoNombre', width: 220 },
+              { header: 'ASUNTO', key: 'asunto', width: 240 },
               { header: 'EXPEDIENTE', key: 'expediente', isText: true, width: 130, align: 'center' },
+              { header: 'FECHA SOLICITUD', key: 'fechaSolicitud', width: 120, align: 'center' },
+              { header: 'N° DE REGISTRO', key: 'registroNumero', isText: true, width: 120, align: 'center' },
               { header: 'ZONA', key: 'zonaCirculacion', width: 180 },
+              { header: 'UBICACIÓN', key: 'ubicacion', width: 200 },
+              { header: 'RECORRIDO DE INGRESO', key: 'recorridoIngreso', width: 200 },
+              { header: 'RECORRIDO DE SALIDA', key: 'recorridoSalida', width: 200 },
+              { header: 'TONELAJE', key: 'tonelaje', width: 90, align: 'center' },
+              { header: 'N° DE SEGURIDAD', key: 'numeroSeguridad', isText: true, width: 120, align: 'center' },
               { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 130, align: 'center' },
+              { header: 'FECHA EMISIÓN', key: 'fechaEmision', width: 120, align: 'center' },
               { header: 'INICIO VIGENCIA', key: 'fechaInicioVigencia', width: 120, align: 'center' },
               { header: 'FIN VIGENCIA', key: 'fechaFinVigencia', width: 120, align: 'center' },
               { header: 'RECIBO INGRESO', key: 'reciboIngresoNumero', isText: true, width: 130, align: 'center' },
               { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toFixed(2)}`, align: 'right', width: 110 },
+              { header: 'FECHA DE PAGO', key: 'reciboIngresoFecha', width: 120, align: 'center' },
+              { header: 'OBSERVACIONES', key: 'observaciones', width: 240 },
               { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
             ],
             data
@@ -332,19 +314,13 @@ export function Permisos() {
   }
 
   const handleOpenCreate = () => {
-    try {
-      sessionStorage.removeItem('mjlo_permiso_borrador')
-      localStorage.removeItem('mjlo_permiso_borrador')
-    } catch (_) {}
+    limpiarBorradorPermiso()
     setEditingPermiso(null)
     setIsCreateModalOpen(true)
   }
 
   const handleOpenEdit = (p) => {
-    try {
-      sessionStorage.removeItem('mjlo_permiso_borrador')
-      localStorage.removeItem('mjlo_permiso_borrador')
-    } catch (_) {}
+    limpiarBorradorPermiso()
     setEditingPermiso(p)
     setIsCreateModalOpen(true)
   }
@@ -375,9 +351,9 @@ export function Permisos() {
       </div>
 
       {/* Tarjetas KPI con Bordes de Colores: 6 tarjetas separadas compactas */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="kpi-grid">
         {/* 1. Total Registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Total</span>
             <span className="grid size-6 place-items-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
@@ -392,7 +368,7 @@ export function Permisos() {
         </div>
 
         {/* 2. Control Vehicular */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Ctrl Vehicular</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -407,7 +383,7 @@ export function Permisos() {
         </div>
 
         {/* 3. Carga y Descarga */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Carga/Desc.</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
@@ -422,7 +398,7 @@ export function Permisos() {
         </div>
 
         {/* 4. Uso de Vías */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Uso de Vías</span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
@@ -437,7 +413,7 @@ export function Permisos() {
         </div>
 
         {/* 5. Zonas Reservadas */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Zonas Reserv.</span>
             <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
@@ -452,7 +428,7 @@ export function Permisos() {
         </div>
 
         {/* 6. Vigentes */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Vigentes</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
@@ -499,7 +475,7 @@ export function Permisos() {
       {activeTab === 'permisos' && (
         <div className="space-y-4">
           {/* Contenedor de la Tabla - Exacto a Personas.jsx */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
             
             {/* Barra de Filtros y Acciones */}
             <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
@@ -584,11 +560,11 @@ export function Permisos() {
 
             {/* Tabla de Autorizaciones */}
             <div className="overflow-x-auto">
-              <table className="w-full table-fixed text-left text-xs">
+              <table className="w-full min-w-[1050px] table-fixed text-left text-xs">
                 <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <tr>
-                    <th className="px-4 py-3 w-[28%]"><SortableHeader column="solicitanteNombre" label="Solicitante" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                     <th className="px-4 py-3 w-[150px]"><SortableHeader column="numeroAutorizacion" label="N° Autorización" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-4 py-3 w-[28%]"><SortableHeader column="solicitanteNombre" label="Solicitante" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                     <th className="px-4 py-3 w-[110px]">Vehículo</th>
                     <th className="px-4 py-3 w-[25%]">Zona / Horario</th>
                     <th className="px-4 py-3 w-[120px]">Vigencia</th>
@@ -598,14 +574,14 @@ export function Permisos() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-                  {isLoading ? (
+                <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && permisos.length > 0 ? 'opacity-50' : ''}`}>
+                  {isLoading && permisos.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                         Cargando autorizaciones municipales...
                       </td>
                     </tr>
-                  ) : paginatedPermisos.length === 0 ? (
+                  ) : permisos.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="p-12 text-center">
                         <Icon name="permit" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
@@ -613,7 +589,7 @@ export function Permisos() {
                       </td>
                     </tr>
                   ) : (
-                    paginatedPermisos.map((p) => {
+                    permisos.map((p) => {
                       const isCarga = p.tipoPermiso === 'CARGA_DESCARGA'
                       const isVias = p.tipoPermiso === 'USO_VIAS'
                       const isZonas = p.tipoPermiso === 'ZONAS_RESERVADAS' || p.tipoPermiso === 'ZONA_RESERVADA'
@@ -622,18 +598,6 @@ export function Permisos() {
                       return (
                           <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
                             {/* Solicitante / Titular */}
-                            <td className="px-4 py-3 align-top">
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-slate-900 dark:text-white">
-                                  {solicitanteText}
-                                </p>
-                                <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                                  {p.solicitanteDocumento || p.solicitanteDoc ? `DOC: ${p.solicitanteDocumento || p.solicitanteDoc}` : 'Sin documento'}
-                                </p>
-                              </div>
-                            </td>
-
-                            {/* Nº Autorización & Tipo Badge */}
                             <td className="px-4 py-3 align-top">
                               <span
                                 className={`inline-block rounded-md px-2 py-0.5 text-[9px] font-black uppercase mb-0.5 tracking-widest ${
@@ -657,6 +621,18 @@ export function Permisos() {
                             </td>
 
                             {/* Vehículo / Flota */}
+                            <td className="px-4 py-3 align-top">
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                  {solicitanteText}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                  {p.solicitanteDocumento || p.solicitanteDoc ? `DOC: ${p.solicitanteDocumento || p.solicitanteDoc}` : 'Sin documento'}
+                                </p>
+                              </div>
+                            </td>
+
+                            {/* Nº Autorización & Tipo Badge */}
                             <td className="px-4 py-3 align-top">
                               {p.vehiculoPlaca && p.vehiculoPlaca !== '—' ? (
                                 <PlacaBadge placa={p.vehiculoPlaca} />
@@ -697,7 +673,7 @@ export function Permisos() {
                             </td>
 
                             {/* Acciones - Estilo Personas.jsx */}
-                            <td className="sticky right-0 z-20 px-4 py-3 text-center align-top bg-white/95 dark:bg-[var(--bg-surface)]/95">
+                            <td className="sticky right-0 z-20 px-4 py-3 text-center align-top bg-white/95 dark:bg-[#1C2438]/95">
                               <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   type="button"
@@ -791,13 +767,14 @@ export function Permisos() {
 
             <Pagination
               currentPage={currentPage}
-              totalItems={filteredPermisos.length}
+              totalItems={totalFiltrado}
               itemsPerPage={itemsPerPage}
               onPageChange={setCurrentPage}
               onItemsPerPageChange={(size) => {
                 setItemsPerPage(size)
                 setCurrentPage(1)
               }}
+              disabled={isLoading}
             />
           </div>
         </div>
@@ -809,7 +786,7 @@ export function Permisos() {
           {procedimientos.map((proc) => (
             <div
               key={proc.id}
-              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-horizon dark:shadow-none dark:border-[var(--border)] dark:bg-[#111C44]"
+              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-horizon dark:shadow-none dark:border-[var(--border)] dark:bg-[#1C2438]"
             >
               <div>
                 <div className="flex items-center justify-between">
@@ -850,7 +827,7 @@ export function Permisos() {
         initialData={editingPermiso}
         onSave={() => {
           invalidateCache('/permisos')
-          loadData()
+          loadDataRef.current()
           loadStats()
         }}
         procedimientos={procedimientos}
@@ -860,10 +837,10 @@ export function Permisos() {
       {/* MODAL DE PREVISUALIZACIÓN E IMPRESIÓN OFICIAL HOJA A4 */}
       {isDetailModalOpen && selectedPermiso && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xs animate-enter overflow-y-auto">
-          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] my-auto">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] my-auto">
             
             {/* Header del visualizador estilo /personas */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="print" className="size-4" />
@@ -888,14 +865,7 @@ export function Permisos() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                title="Cerrar previsualización"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar previsualización" />
             </div>
 
             {/* Vista Previa del Documento Oficial */}
@@ -913,23 +883,17 @@ export function Permisos() {
             </div>
 
             {/* Footer de Acciones */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-[var(--border)] bg-white dark:bg-[var(--bg-surface)]">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-[var(--border)] bg-white dark:bg-[#1C2438]">
               <button
                 type="button"
                 onClick={handlePrint}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-xs font-black text-white shadow-md shadow-violet-600/25 hover:from-violet-500 hover:to-indigo-500 transition cursor-pointer active:scale-95"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-xs font-black text-white shadow-md hover:from-violet-500 hover:to-indigo-500 transition cursor-pointer active:scale-95"
               >
                 <Icon name="print" className="size-4" />
                 <span>Imprimir Documento Oficial A4</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 cursor-pointer"
-              >
-                Cerrar
-              </button>
+              <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
             </div>
           </div>
         </div>

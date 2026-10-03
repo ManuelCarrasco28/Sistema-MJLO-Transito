@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { Editor } from '@tinymce/tinymce-react'
 import { Icon } from '../components/ui/Icon'
 import { FloatingInput } from '../components/ui/FormInputs'
-import { sanitizarMensaje, apiFetch } from '../config/api'
+import { sanitizarMensaje, leerMensajeError, apiFetch } from '../config/api'
+import { leerBorradorPermiso, guardarBorradorPermiso, limpiarBorradorPermiso, avisarPermisoActualizado } from '../utils/borradorPermiso'
 import { showError } from '../utils/SwalUtil'
+import { normalizarPlaca } from '../utils/formatters'
 import { BuscadorAdministrados } from '../components/permisos/BuscadorAdministrados'
 import { generarPlantillaCuerpo } from '../utils/permisosPlantilla'
+import { BotonCancelar, BotonGuardar } from '../components/ui/ModalControls'
 
 const TINYMCE_API_KEY =
   import.meta.env.VITE_TINYMCE_API_KEY ||
@@ -59,12 +62,7 @@ export function PermisoFormularioVentana() {
   useEffect(() => {
     let draftData = null
     if (draftParam) {
-      try {
-        const stored = sessionStorage.getItem('mjlo_permiso_borrador') || localStorage.getItem('mjlo_permiso_borrador')
-        if (stored) {
-          draftData = JSON.parse(stored)
-        }
-      } catch (_) {}
+      draftData = leerBorradorPermiso()
     }
 
     if (!permitId) {
@@ -237,11 +235,7 @@ export function PermisoFormularioVentana() {
       id: effectiveId
     }
 
-    try {
-      sessionStorage.setItem('mjlo_permiso_borrador', JSON.stringify(dataToSave))
-      localStorage.setItem('mjlo_permiso_borrador', JSON.stringify(dataToSave))
-      localStorage.setItem('mjlo_volver_a_datos', Date.now().toString())
-    } catch (_) {}
+    guardarBorradorPermiso(dataToSave)
 
     // Notificar a la ventana principal / modal opener
     if (window.opener && !window.opener.closed) {
@@ -299,33 +293,19 @@ export function PermisoFormularioVentana() {
       })
 
       if (!res.ok) {
-        let msg = 'Error al procesar la autorización municipal.'
-        try {
-          const errData = await res.json()
-          if (errData?.message) msg = errData.message
-          else if (errData?.messages?.error) msg = errData.messages.error
-          else if (errData?.messages && typeof errData.messages === 'object') {
-            msg = Object.values(errData.messages).join(' ')
-          }
-        } catch (_) {}
-        throw new Error(msg)
+        throw new Error(await leerMensajeError(res, 'Error al procesar la autorización municipal.'))
       }
 
       const resData = await res.json()
       setSuccessMsg('¡Autorización municipal guardada exitosamente!')
 
-      try {
-        sessionStorage.removeItem('mjlo_permiso_borrador')
-        localStorage.removeItem('mjlo_permiso_borrador')
-      } catch (_) {}
+      limpiarBorradorPermiso()
 
       // Notificar a la ventana principal / pestaña padre
       if (window.opener) {
         window.opener.postMessage({ type: 'PERMISO_GUARDADO', id: resData.id || effectiveId }, '*')
       }
-      try {
-        localStorage.setItem('mjlo_permisos_updated', Date.now().toString())
-      } catch (_) {}
+      avisarPermisoActualizado()
 
       // Cerrar ventana tras breve confirmación
       setTimeout(() => {
@@ -362,9 +342,9 @@ export function PermisoFormularioVentana() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-[#070d1e] dark:text-slate-100 flex flex-col">
       {/* Barra Superior de la Ventana */}
-      <header className="sticky top-0 z-40 bg-white/95 dark:bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-slate-200 dark:border-[var(--border)] px-4 sm:px-6 py-3.5 shadow-sm flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#1C2438]/95 backdrop-blur-md border-b border-slate-200 dark:border-[var(--border)] px-4 sm:px-6 py-3.5 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/30">
+          <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md">
             <Icon name="fileText" className="size-5" />
           </span>
           <div>
@@ -403,19 +383,13 @@ export function PermisoFormularioVentana() {
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handleCerrar}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
-          >
-            Cerrar ventana
-          </button>
+          <BotonCancelar onClick={handleCerrar}>Cerrar ventana</BotonCancelar>
 
           <button
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-5 py-2 text-xs font-black text-white shadow-md shadow-emerald-600/25 transition active:scale-95 cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-5 py-2 text-xs font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
@@ -448,12 +422,12 @@ export function PermisoFormularioVentana() {
         {activeScreen === 'DATOS' && (
           <div className="space-y-5 animate-enter">
             {/* 1. BUSCADOR INTELIGENTE EN BASE DE DATOS (Auto-rellenado) */}
-            <div className="rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">
               <BuscadorAdministrados onSelect={handleSelectAdministrado} />
             </div>
 
             {/* 2. CLASIFICACIÓN / SELECTOR DE TIPO */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] space-y-3">
               <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                 Clasificación / Tipo de Permiso *
               </label>
@@ -464,7 +438,7 @@ export function PermisoFormularioVentana() {
                   className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                     formData.tipoPermiso === 'CONTROL_VEHICULAR' || formData.tipoPermiso === 'OPERACION'
                       ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-200 shadow-sm ring-1 ring-indigo-500/20'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -484,7 +458,7 @@ export function PermisoFormularioVentana() {
                   className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                     formData.tipoPermiso === 'CARGA_DESCARGA'
                       ? 'border-sky-500 bg-sky-50/80 dark:bg-sky-950/40 text-sky-950 dark:text-sky-200 shadow-sm ring-1 ring-sky-500/20'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -504,7 +478,7 @@ export function PermisoFormularioVentana() {
                   className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                     formData.tipoPermiso === 'USO_VIAS'
                       ? 'border-amber-500 bg-amber-50/80 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 shadow-sm ring-1 ring-amber-500/20'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -524,7 +498,7 @@ export function PermisoFormularioVentana() {
                   className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                     formData.tipoPermiso === 'ZONAS_RESERVADAS' || formData.tipoPermiso === 'ZONA_RESERVADA'
                       ? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200 shadow-sm ring-1 ring-emerald-500/20'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -589,7 +563,7 @@ export function PermisoFormularioVentana() {
                     id="perm_vehiculo_placa_win"
                     label="Vehículo / Placa"
                     value={formData.vehiculoPlaca}
-                    onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData({ ...formData, vehiculoPlaca: normalizarPlaca(e.target.value) })}
                     inputClassName="font-mono font-bold uppercase"
                   />
                 </div>
@@ -684,33 +658,26 @@ export function PermisoFormularioVentana() {
 
             {/* Barra Inferior en Pantalla 1: Continuar a Redacción */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-8">
-              <button
-                type="button"
-                onClick={handleCerrar}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
-              >
-                Cerrar ventana
-              </button>
+              <BotonCancelar onClick={handleCerrar} className="w-full sm:w-auto">Cerrar ventana</BotonCancelar>
 
               <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button
+                <BotonGuardar
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer disabled:opacity-50"
-                  title="Guardar directamente con la plantilla predeterminada"
+                  className="hidden sm:inline-flex items-center gap-1.5"
                 >
                   <span>Guardar directamente</span>
-                </button>
+                </BotonGuardar>
 
-                <button
+                <BotonGuardar
                   type="button"
                   onClick={() => goToScreen('CUERPO')}
-                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 px-6 py-2.5 text-xs font-black text-white shadow-md shadow-indigo-600/30 transition active:scale-95 cursor-pointer"
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2"
                 >
                   <span>Continuar a Redacción de Resolución (Cuerpo Oficial)</span>
                   <span className="text-base leading-none">→</span>
-                </button>
+                </BotonGuardar>
               </div>
             </div>
           </div>
@@ -722,7 +689,7 @@ export function PermisoFormularioVentana() {
         {activeScreen === 'CUERPO' && (
           <div className="space-y-4 animate-enter">
             {/* Barra Superior de Redacción: Información de contexto y controles */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <button
                   type="button"
@@ -762,7 +729,7 @@ export function PermisoFormularioVentana() {
             </div>
 
             {/* Contenedor del Editor TinyMCE: Alto y Espacioso para Redacción Cómoda */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-3">
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-[var(--border)] pb-2.5">
                 <div>
                   <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
@@ -815,19 +782,13 @@ export function PermisoFormularioVentana() {
               </button>
 
               <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={handleCerrar}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
+                <BotonCancelar onClick={handleCerrar} />
 
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
-                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-6 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-600/30 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-6 py-2.5 text-xs font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <>

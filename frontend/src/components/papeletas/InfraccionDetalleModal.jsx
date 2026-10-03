@@ -1,4 +1,5 @@
 import { Icon } from '../ui/Icon'
+import { BotonCancelar, BotonCerrarModal } from '../ui/ModalControls'
 
 export function InfraccionDetalleModal({ selectedInfraccion, onClose }) {
   if (!selectedInfraccion) return null
@@ -9,12 +10,12 @@ export function InfraccionDetalleModal({ selectedInfraccion, onClose }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]"
+        className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-rose-100 bg-rose-50/80 px-5 py-4 dark:border-rose-950/60 dark:bg-rose-950/40">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-rose-600 text-white font-black text-sm shadow-sm shadow-rose-500/30">
+            <span className="grid size-9 place-items-center rounded-xl bg-rose-600 text-white font-black text-sm shadow-sm">
               <Icon name="scale" className="size-4" />
             </span>
             <div>
@@ -26,13 +27,7 @@ export function InfraccionDetalleModal({ selectedInfraccion, onClose }) {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-[var(--bg-subtle)] dark:hover:text-white transition-colors cursor-pointer"
-          >
-            ✕
-          </button>
+          <BotonCerrarModal onClick={onClose} title="Cerrar" />
         </div>
 
         <div className="p-5 space-y-4">
@@ -96,13 +91,7 @@ export function InfraccionDetalleModal({ selectedInfraccion, onClose }) {
         </div>
 
         <div className="flex justify-end border-t border-slate-100 bg-slate-50/50 p-4 dark:border-[var(--border)] dark:bg-slate-900/40">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white transition cursor-pointer"
-          >
-            Cerrar
-          </button>
+          <BotonCancelar onClick={onClose}>Cerrar</BotonCancelar>
         </div>
       </div>
     </div>

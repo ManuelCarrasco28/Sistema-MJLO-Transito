@@ -2,6 +2,7 @@ import React from 'react'
 import { Icon } from '../ui/Icon'
 import { TarjetaOperatividadPrint, CarnetCursoVialPrint, CerticavFichaPrint, SoatConstanciaPrint } from './TarjetaOperatividadPrint'
 import './TarjetasImpresion.css'
+import { BotonCerrarModal } from '../ui/ModalControls'
 
 export function PlantillaImpresionTUC({ documento, onClose }) {
   if (!documento) return null
@@ -78,10 +79,10 @@ export function PlantillaImpresionTUC({ documento, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-enter">
-      <div className="w-full max-w-4xl bg-white dark:bg-[var(--bg-surface)] rounded-3xl shadow-2xl border border-slate-200 dark:border-[var(--border)] overflow-hidden my-auto">
+      <div className="w-full max-w-4xl bg-white dark:bg-[#1C2438] rounded-3xl shadow-2xl border border-slate-200 dark:border-[var(--border)] overflow-hidden my-auto">
         
         {/* Header estilo /personas */}
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-2.5">
             <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
               <Icon name="document" className="size-4" />
@@ -116,14 +117,7 @@ export function PlantillaImpresionTUC({ documento, onClose }) {
               <span>{isSoat ? 'Imprimir Constancia SOAT' : 'Imprimir Documento'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={onClose}
-              title="Cerrar previsualización"
-              className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-            >
-              <Icon name="close" className="size-5" />
-            </button>
+            <BotonCerrarModal onClick={onClose} title="Cerrar previsualización" />
           </div>
         </div>
 

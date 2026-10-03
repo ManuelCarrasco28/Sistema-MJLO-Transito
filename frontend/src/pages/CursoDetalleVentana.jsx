@@ -47,7 +47,7 @@ export default function CursoDetalleVentana() {
   })
   const [isSearchingReniec, setIsSearchingReniec] = useState(false)
   const [isFetchingFotoReniec, setIsFetchingFotoReniec] = useState(false)
-  const ESTADO_CIVIL_OPTIONS = ['SOLTERO(A)', 'CASADO(A)', 'CONVIVIENTE', 'DIVORCIADO(A)', 'VIUDO(A)']
+  const ESTADO_CIVIL_OPTIONS = ['SOLTERO(A)', 'CASADO(A)', 'DIVORCIADO(A)', 'VIUDO(A)']
   const ESTADO_OPTIONS = ['ACTIVO', 'INACTIVO', 'FALLECIDO', 'RETIRADO']
 
   const handleReniecSearch = async () => {
@@ -117,8 +117,12 @@ export default function CursoDetalleVentana() {
             const updatedParticipantes = [...(curso.participantes || []), resInsData.data]
             setCurso({ ...curso, participantes: updatedParticipantes, inscritos: updatedParticipantes.length })
             showToast('Persona inscrita en el curso automáticamente')
+          } else {
+            showError('Inscripción pendiente', resInsData?.messages?.error || resInsData?.message || 'La persona se registró, pero no se pudo inscribir en el curso. Inscríbala manualmente.')
           }
-        } catch(e) {}
+        } catch (err) {
+          showError('Inscripción pendiente', 'La persona se registró, pero no se pudo inscribir en el curso. Inscríbala manualmente.')
+        }
       }
     } catch (err) {
       showError('Error', err.message)
@@ -188,11 +192,11 @@ export default function CursoDetalleVentana() {
   if (error || !curso) return <div className="p-10 text-center font-bold text-rose-500">{error || 'Curso no encontrado.'}</div>
 
   return (
-    <div className="h-screen w-full bg-white dark:bg-[var(--bg-surface)] flex flex-col font-sans overflow-hidden">
+    <div className="h-screen w-full bg-white dark:bg-[#1C2438] flex flex-col font-sans overflow-hidden">
       <div className="w-full flex flex-col flex-1 h-full">
         
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-5 dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/cursos')}
@@ -262,7 +266,7 @@ export default function CursoDetalleVentana() {
                         setParticipanteSearch(e.target.value)
                         setShowParticipanteResults(true)
                       }}
-                      className="w-full h-[46px] pl-11 pr-4 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-800 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
+                      className="w-full h-[46px] pl-11 pr-4 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-800 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
                     />
                       </div>
                       
@@ -281,7 +285,7 @@ export default function CursoDetalleVentana() {
                     </div>
 
                     {showParticipanteResults && participanteSearch.trim() && (
-                    <div className="absolute left-0 right-0 top-full mt-2 z-50 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                    <div className="absolute left-0 right-0 top-full mt-2 z-50 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
                       <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-[var(--border)] text-xs font-bold text-slate-400 uppercase">
                         <span>Resultados ({participanteResults.length})</span>
                         <button type="button" onClick={() => setShowParticipanteResults(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">✕ Cerrar</button>
@@ -386,7 +390,7 @@ export default function CursoDetalleVentana() {
                     
                     <div className="flex items-center gap-3">
                       {/* Controles de Asistencia y Estado */}
-                      <div className="flex items-center gap-3 bg-slate-50 dark:bg-[var(--bg-surface)] px-3 py-2 rounded-lg border border-slate-200 dark:border-[var(--border-strong)]">
+                      <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#1C2438] px-3 py-2 rounded-lg border border-slate-200 dark:border-[var(--border-strong)]">
                         <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
                           <input 
                             type="checkbox" 

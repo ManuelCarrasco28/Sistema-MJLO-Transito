@@ -123,13 +123,13 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess }) {
   const handleFormSubmit = async (e) => {
     e.preventDefault()
     
-    const placaClean = formData.placa.trim().toUpperCase()
+    const placaClean = formData.placa.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
     if (!placaClean || !formData.propietarioDni.trim()) {
       showError('Campos Incompletos', 'Por favor completa los campos requeridos (Placa y Propietario registrado).')
       return
     }
-    if (placaClean.length < 6) {
-      showError('Placa Inválida', 'La placa debe tener al menos 6 caracteres.')
+    if (placaClean.length !== 6) {
+      showError('Placa Inválida', 'La placa debe tener exactamente 6 caracteres (letras y números), sin guion.')
       return
     }
     const anioActual = new Date().getFullYear()
@@ -140,7 +140,7 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess }) {
 
     try {
       const payload = {
-        placa: formData.placa,
+        placa: placaClean,
         tipo: formData.tipo,
         marca: formData.marca,
         modelo: formData.modelo,

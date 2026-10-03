@@ -2,6 +2,30 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
 import { PlacaBadge } from '../ui/PlacaBadge'
+import { BotonCerrarModal } from '../ui/ModalControls'
+
+const COLORES_ESTADO = {
+  VIGENTE: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800',
+  APROBADO: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800',
+  VENCIDO: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800',
+  DESAPROBADO: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800',
+  RECHAZADO: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800',
+  ANULADO: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
+  ANULADA: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
+  OBSERVADO: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
+  EN_TRAMITE: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800',
+  SIN_REGISTRO: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
+}
+
+function InsigniaEstado({ estado }) {
+  const clave = String(estado || 'SIN_REGISTRO').toUpperCase().replace(/\s+/g, '_')
+  const clases = COLORES_ESTADO[clave] || COLORES_ESTADO.SIN_REGISTRO
+  return (
+    <span className={`rounded-full border px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wide ${clases}`}>
+      {clave.replace(/_/g, ' ')}
+    </span>
+  )
+}
 
 export function VehiculoDetalleModal({
   selectedVehiculo,
@@ -14,9 +38,9 @@ export function VehiculoDetalleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-xs animate-enter sm:p-4">
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
 
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-2.5">
             <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
               <Icon name="car" className="size-4" />
@@ -41,14 +65,7 @@ export function VehiculoDetalleModal({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            title="Cerrar ficha"
-            className="group grid size-8 shrink-0 place-items-center rounded-xl border border-slate-200/80 bg-slate-100/70 text-slate-400 hover:bg-[oklch(71.2%_0.194_13.428)] hover:border-[oklch(71.2%_0.194_13.428)] hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 transition-all duration-200 active:scale-95 cursor-pointer"
-          >
-            <Icon name="close" className="size-4 transition-transform duration-200 group-hover:rotate-90" />
-          </button>
+          <BotonCerrarModal onClick={onClose} title="Cerrar ficha" />
         </div>
 
 
@@ -144,21 +161,19 @@ export function VehiculoDetalleModal({
                 ['Tarjeta de propiedad', getVehiculoDocumento(selectedVehiculo, 'TARJETA_PROPIEDAD')],
                 ['SOAT', getVehiculoDocumento(selectedVehiculo, 'SOAT')],
               ].map(([label, documento]) => (
-                <div key={label} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-[var(--bg-surface)]">
+                <div key={label} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-[#1C2438]">
                   <span className="font-bold text-slate-600 dark:text-slate-300">{label}</span>
-                  <span className="text-right font-mono font-black text-slate-800 dark:text-white">
+                  <span className="flex items-center gap-2 text-right font-mono font-black text-slate-800 dark:text-white">
                     {documento?.codigo || 'N/A'}
-                    <span className="ml-2 text-[10px] font-bold text-slate-400">{documento?.estado || 'SIN_REGISTRO'}</span>
+                    <InsigniaEstado estado={documento?.estado} />
                   </span>
                 </div>
               ))}
               <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-cyan-50 px-3 py-2 dark:bg-cyan-950/30">
-                <span className="font-bold text-slate-600 dark:text-slate-300">CERTICAV / Inspección técnica</span>
-                <span className="text-right font-mono font-black text-slate-800 dark:text-white">
+                <span className="font-bold text-slate-600 dark:text-slate-300">CERTICAV</span>
+                <span className="flex items-center gap-2 text-right font-mono font-black text-slate-800 dark:text-white">
                   {selectedVehiculo.certicav?.numeroSerieCerticav || selectedVehiculo.certicav?.numeroRegistro || 'N/A'}
-                  <span className="ml-2 text-[10px] font-bold text-slate-400">
-                    {selectedVehiculo.certicav?.resultado || selectedVehiculo.certicav?.estado || 'SIN_REGISTRO'}
-                  </span>
+                  <InsigniaEstado estado={selectedVehiculo.certicav?.resultado || selectedVehiculo.certicav?.estado} />
                 </span>
               </div>
             </div>
@@ -185,7 +200,7 @@ export function VehiculoDetalleModal({
 
                 if (historial.length === 0) {
                   return (
-                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[var(--bg-surface)] dark:text-slate-400">
+                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[#1C2438] dark:text-slate-400">
                       Sin papeletas registradas.
                     </div>
                   )
@@ -194,7 +209,7 @@ export function VehiculoDetalleModal({
                 return (
                   <div className="mt-3 space-y-3">
                     <div className="grid gap-2 sm:grid-cols-4">
-                      <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-[var(--bg-surface)]">
+                      <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-[#1C2438]">
                         <p className="text-[10px] font-black uppercase text-slate-400">Total</p>
                         <p className="font-mono text-base font-black text-slate-900 dark:text-white">{historial.length}</p>
                       </div>
@@ -206,7 +221,7 @@ export function VehiculoDetalleModal({
                         <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-300">Pagado</p>
                         <p className="font-mono text-base font-black text-emerald-700 dark:text-emerald-300">S/ {pagado.toFixed(2)}</p>
                       </div>
-                      <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-[var(--bg-surface)]">
+                      <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-[#1C2438]">
                         <p className="text-[10px] font-black uppercase text-slate-400">Anuladas</p>
                         <p className="font-mono text-base font-black text-slate-700 dark:text-slate-300">{anuladas.length}</p>
                       </div>
@@ -247,7 +262,7 @@ export function VehiculoDetalleModal({
 
                 if (internamientos.length === 0) {
                   return (
-                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[var(--bg-surface)] dark:text-slate-400">
+                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[#1C2438] dark:text-slate-400">
                       Sin internamientos registrados.
                     </div>
                   )
@@ -290,7 +305,7 @@ export function VehiculoDetalleModal({
 
                 if (historial.length === 0) {
                   return (
-                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[var(--bg-surface)] dark:text-slate-400">
+                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-bold text-slate-500 dark:bg-[#1C2438] dark:text-slate-400">
                       Sin historial de propietarios registrado.
                     </div>
                   )

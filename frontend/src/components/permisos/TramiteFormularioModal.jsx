@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
+import { normalizarPlaca } from '../../utils/formatters'
 import { Icon } from '../ui/Icon'
 import { FloatingInput } from '../ui/FormInputs'
 import { sanitizarMensaje, apiFetch } from '../../config/api'
 import { showError, showToast } from '../../utils/SwalUtil'
 import { BuscadorAdministrados } from './BuscadorAdministrados'
 import { generarPlantillaCuerpo } from '../../utils/permisosPlantilla'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
 
 export function TramiteFormularioModal({
   isOpen,
@@ -288,10 +290,10 @@ export function TramiteFormularioModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter overflow-y-auto" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") onClose(); e.currentTarget.dataset.downOnOverlay = "" }}>
-      <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)] my-auto w-full max-w-4xl max-h-[92vh] transition-all duration-200">
+      <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] my-auto w-full max-w-4xl max-h-[92vh] transition-all duration-200">
         
         {/* Cabecera del Modal Estilo /personas */}
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
               <Icon name="routePermit" className="size-4" />
@@ -312,14 +314,7 @@ export function TramiteFormularioModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              title="Cerrar ventana"
-              className="grid size-8 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-            >
-              <Icon name="close" className="size-4" />
-            </button>
+            <BotonCerrarModal onClick={onClose} title="Cerrar ventana" />
           </div>
         </div>
 
@@ -332,7 +327,7 @@ export function TramiteFormularioModal({
                 Vincular con Trámite / Mesa de Partes Existente (Opcional)
               </label>
               <select
-                className="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
+                className="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
                 onChange={(e) => {
                   const tId = Number(e.target.value)
                   if (!tId) return
@@ -365,12 +360,12 @@ export function TramiteFormularioModal({
           )}
 
           {/* 1. BUSCADOR INTELIGENTE EN BASE DE DATOS */}
-          <div className="rounded-2xl border border-indigo-200 bg-white p-3 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] shadow-2xs">
+          <div className="rounded-2xl border border-indigo-200 bg-white p-3 dark:border-[var(--border)] dark:bg-[#1C2438] shadow-2xs">
             <BuscadorAdministrados onSelect={handleSelectAdministrado} />
           </div>
 
           {/* 2. CLASIFICACIÓN / SELECTOR DE TIPO */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] space-y-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs dark:border-[var(--border)] dark:bg-[#1C2438] space-y-2">
             <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
               Clasificación / Tipo de Permiso *
             </label>
@@ -381,7 +376,7 @@ export function TramiteFormularioModal({
                 className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'CONTROL_VEHICULAR' || formData.tipoPermiso === 'OPERACION'
                     ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-200 shadow-xs ring-1 ring-indigo-500/20'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -401,7 +396,7 @@ export function TramiteFormularioModal({
                 className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'CARGA_DESCARGA'
                     ? 'border-sky-500 bg-sky-50/80 dark:bg-sky-950/40 text-sky-950 dark:text-sky-200 shadow-xs ring-1 ring-sky-500/20'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -421,7 +416,7 @@ export function TramiteFormularioModal({
                 className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'USO_VIAS'
                     ? 'border-amber-500 bg-amber-50/80 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 shadow-xs ring-1 ring-amber-500/20'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -441,7 +436,7 @@ export function TramiteFormularioModal({
                 className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                   formData.tipoPermiso === 'ZONAS_RESERVADAS' || formData.tipoPermiso === 'ZONA_RESERVADA'
                     ? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200 shadow-xs ring-1 ring-emerald-500/20'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[var(--bg-surface)] dark:text-slate-400 hover:border-slate-300'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -506,7 +501,7 @@ export function TramiteFormularioModal({
                   id="perm_vehiculo_placa"
                   label="Vehículo / Placa"
                   value={formData.vehiculoPlaca}
-                  onChange={(e) => setFormData({ ...formData, vehiculoPlaca: e.target.value.toUpperCase() })}
+                  onChange={(e) => setFormData({ ...formData, vehiculoPlaca: normalizarPlaca(e.target.value) })}
                   inputClassName="font-mono font-bold uppercase"
                 />
               </div>
@@ -601,35 +596,22 @@ export function TramiteFormularioModal({
 
           {/* Barra de Navegación Inferior */}
           <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-[var(--border)]">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 transition cursor-pointer"
-              style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
-            >
-              Cancelar
-            </button>
+            <BotonCancelar onClick={onClose} />
 
             <div className="flex items-center gap-2">
-              <button
+              <BotonGuardar
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 transition cursor-pointer disabled:opacity-50"
-                style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
-                title="Guardar directamente con la plantilla predeterminada"
+                className="hidden sm:inline-flex items-center gap-1.5"
               >
                 <span>Guardar directamente</span>
-              </button>
+              </BotonGuardar>
 
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2 text-xs font-black text-white shadow-md shadow-indigo-600/25 transition active:scale-95 cursor-pointer hover:from-indigo-500 hover:to-violet-500"
-                title="Abrir editor de resolución en una segunda ventana emergente amplia"
-              >
+              <BotonGuardar className="inline-flex items-center justify-center gap-2">
                 <span>Continuar a Redacción de Resolución (Cuerpo Oficial)</span>
                 <span className="text-sm font-bold">↗</span>
-              </button>
+              </BotonGuardar>
             </div>
           </div>
         </form>

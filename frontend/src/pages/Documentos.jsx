@@ -8,9 +8,14 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
 import { PlantillaImpresionTUC } from '../components/documentos/PlantillaImpresionTUC'
+import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleModal'
+import { EstadoDocumentosVehiculo, documentoVigenteDelTipo } from '../components/documentos/EstadoDocumentosVehiculo'
+import { isVehiculoFormal, getVehiculoDocumento, buildVehiculoQrValue } from '../utils/vehiculos'
 import { exportToExcel } from '../utils/exportToExcel'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
-import { formatFecha, formatNumeroTarjeta } from '../utils/formatters'
+import { formatFecha, formatNumeroTarjeta, normalizarPlaca } from '../utils/formatters'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 
 const TIPO_DOC_OPTIONS = [
   { value: 'TARJETA_OPERATIVIDAD', label: 'Tarjeta de Operatividad (TUC)' },
@@ -24,13 +29,10 @@ const TIPO_DOC_OPTIONS = [
 const TIPO_DOC_LABEL_EXTERNO = {
   CITV: 'CITV (Inspección Técnica)',
   INSPECCION_TECNICA: 'Inspección Técnica',
-  REVISION_TECNICA: 'Revisión Técnica (CertiCAV) — legado',
   CERTICAV: 'CertiCAV (Inspección Técnica) — legado',
-  PERMISO_OPERACION: 'Tarjeta de Operatividad — legado',
-  TARJETA_CIRCULACION: 'Tarjeta de Propiedad — legado',
 }
 
-const TIPOS_SIN_VIGENCIA = ['TARJETA_PROPIEDAD', 'TARJETA_CIRCULACION']
+const TIPOS_SIN_VIGENCIA = ['TARJETA_PROPIEDAD']
 
 const ESTADO_OPTIONS = [
   { value: 'VIGENTE', label: 'VIGENTE' },
@@ -67,7 +69,6 @@ function getCodigoLabel(tipoDocumento) {
     case 'TARJETA_OPERATIVIDAD':
       return 'Número Res. Municipal'
     case 'TARJETA_PROPIEDAD':
-    case 'TARJETA_CIRCULACION':
       return 'Número de Partida Registral'
     default:
       return 'Código / Número de documento'
@@ -119,7 +120,12 @@ function getDocTypeBadge(tipo) {
 export function Documentos() {
   const cached = getCachedData('/documentos')
   const [documentos, setDocumentos] = useState(cached || [])
-  const [vehiculos, setVehiculos] = useState([])
+  const [resultadosPlaca, setResultadosPlaca] = useState([])
+  const [isBuscandoPlaca, setIsBuscandoPlaca] = useState(false)
+  const [vehiculoSeleccionadoId, setVehiculoSeleccionadoId] = useState(null)
+  const [resumenDocs, setResumenDocs] = useState([])
+  const [isLoadingResumen, setIsLoadingResumen] = useState(false)
+  const [refrescoResumen, setRefrescoResumen] = useState(0)
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -149,6 +155,23 @@ export function Documentos() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState(null)
+  const [vehiculoDetalle, setVehiculoDetalle] = useState(null)
+
+  const abrirVehiculo = async (doc) => {
+    if (!doc.vehiculoId) {
+      showError('Vehículo no disponible', 'Este documento no está vinculado a un vehículo registrado.')
+      return
+    }
+    try {
+      const res = await apiFetch(`/vehiculos/${doc.vehiculoId}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const payload = await res.json()
+      setVehiculoDetalle(payload.data)
+    } catch (err) {
+      console.warn('No se pudo cargar el vehículo del documento:', err)
+      showError('Error', 'No se pudo cargar la información del vehículo.')
+    }
+  }
   const [isEditing, setIsEditing] = useState(false)
 
   // Search dropdown for vehicle plate inside modal
@@ -214,17 +237,100 @@ export function Documentos() {
     loadStats()
   }, [])
 
+  // Las placas se buscan en el servidor mientras se escribe: no se descarga el padrón de vehículos.
   useEffect(() => {
-    apiFetch('/vehiculos?porPagina=100')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((vehPayload) => {
-        if (vehPayload?.data) {
-          setVehiculos(vehPayload.data)
-          setCachedData('/vehiculos', vehPayload.data)
-        }
+    const texto = formData.vehiculoPlaca || ''
+    if (!isPlacaDropdownOpen || vehiculoSeleccionadoId || texto.length < 2) {
+      setResultadosPlaca([])
+      return undefined
+    }
+    let cancelado = false
+    const timer = window.setTimeout(async () => {
+      setIsBuscandoPlaca(true)
+      try {
+        const res = await apiFetch(`/vehiculos?page=1&porPagina=25&buscar=${encodeURIComponent(texto)}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const payload = await res.json()
+        if (cancelado) return
+        // La búsqueda del servidor también coincide por propietario o marca; aquí solo interesan placas.
+        const lista = (Array.isArray(payload?.data) ? payload.data : [])
+          .filter((v) => (v.placa || '').toUpperCase().includes(texto))
+          .slice(0, 8)
+        setResultadosPlaca(lista)
+        const exacto = texto.length === 6 ? lista.find((v) => v.placa === texto) : null
+        if (exacto) seleccionarVehiculo(exacto)
+      } catch (err) {
+        if (!cancelado) console.warn('No se pudo buscar la placa:', err)
+      } finally {
+        if (!cancelado) setIsBuscandoPlaca(false)
+      }
+    }, 250)
+    return () => {
+      cancelado = true
+      window.clearTimeout(timer)
+    }
+  }, [formData.vehiculoPlaca, isPlacaDropdownOpen, vehiculoSeleccionadoId])
+
+  // Estado de los tres documentos del vehículo elegido (vigente / vencido / no registrado).
+  useEffect(() => {
+    if (!isModalOpen || !vehiculoSeleccionadoId) {
+      setResumenDocs([])
+      return undefined
+    }
+    let cancelado = false
+    setIsLoadingResumen(true)
+    apiFetch(`/documentos/vehiculo/${vehiculoSeleccionadoId}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((payload) => {
+        if (!cancelado) setResumenDocs(payload.data || [])
       })
-      .catch(() => {})
-  }, [])
+      .catch((err) => {
+        console.warn('No se pudo consultar los documentos del vehículo:', err)
+        if (!cancelado) setResumenDocs([])
+      })
+      .finally(() => {
+        if (!cancelado) setIsLoadingResumen(false)
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [vehiculoSeleccionadoId, isModalOpen, refrescoResumen])
+
+  // Si el vehículo ya tiene un documento (vigente o vencido) del tipo elegido, el formulario pasa a
+  // "actualizar": se rellena con sus datos y al guardar se actualiza ese mismo documento.
+  const docExistenteDelTipo = !isEditing && vehiculoSeleccionadoId
+    ? resumenDocs.find((r) => r.tipoDocumento === formData.tipoDocumento && r.id && ['VIGENTE', 'VENCIDO'].includes(r.estado)) || null
+    : null
+  const renovandoVencido = docExistenteDelTipo?.estado === 'VENCIDO'
+  const prerellenadoId = useRef(null)
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      prerellenadoId.current = null
+      return
+    }
+    if (docExistenteDelTipo) {
+      if (prerellenadoId.current === docExistenteDelTipo.id) return
+      prerellenadoId.current = docExistenteDelTipo.id
+      setFormData((prev) => ({
+        ...prev,
+        codigo: docExistenteDelTipo.codigo || '',
+        fechaExpedicion: docExistenteDelTipo.fechaExpedicion || prev.fechaExpedicion,
+        fechaExpiracion: docExistenteDelTipo.fechaExpiracion || prev.fechaExpiracion,
+        estado: 'VIGENTE',
+      }))
+    } else if (prerellenadoId.current !== null) {
+      prerellenadoId.current = null
+      setFormData((prev) => ({
+        ...prev,
+        codigo: '',
+        fechaExpedicion: new Date().toISOString().slice(0, 10),
+        fechaExpiracion: TIPOS_SIN_VIGENCIA.includes(prev.tipoDocumento)
+          ? ''
+          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      }))
+    }
+  }, [docExistenteDelTipo?.id, isModalOpen])
 
   // Close plate dropdown on outside click
   useEffect(() => {
@@ -241,6 +347,7 @@ export function Documentos() {
   const totalDocs = stats.total ?? 0
   const tucDocs = stats.tucDocs ?? 0
   const soatDocs = stats.soatDocs ?? 0
+  const propiedadDocs = stats.propiedadDocs ?? 0
   const vigentes = stats.vigentes ?? 0
   const inactivosOVencidos = stats.inactivosOVencidos ?? 0
 
@@ -252,19 +359,39 @@ export function Documentos() {
 
   const paginatedDocs = documentos
 
-  const filteredPlacas = vehiculos.filter((v) =>
-    (v.placa || '').toLowerCase().includes((formData.vehiculoPlaca || '').toLowerCase())
-  )
-
-  const handleVehicleChange = (placa) => {
-    const veh = vehiculos.find((v) => v.placa === placa)
+  const handleEscribirPlaca = (placa) => {
+    setVehiculoSeleccionadoId(null)
     setFormData((prev) => ({
       ...prev,
       vehiculoPlaca: placa,
-      propietario: veh?.propietario || '',
-      propietarioDni: veh?.propietarioDni || '',
-      asociacion: veh?.asociacion || '',
+      propietario: '',
+      propietarioDni: '',
+      asociacion: '',
     }))
+  }
+
+  // Cambiar el tipo (desde el selector o al pulsar un documento del cuadro del vehículo).
+  const cambiarTipo = (nuevoTipo) => {
+    if (nuevoTipo === formData.tipoDocumento) return
+    const sinVigencia = TIPOS_SIN_VIGENCIA.includes(nuevoTipo)
+    setFormData((prev) => ({
+      ...prev,
+      tipoDocumento: nuevoTipo,
+      fechaExpiracion: sinVigencia ? '' : prev.fechaExpiracion,
+      estado: sinVigencia && !['VIGENTE', 'ANULADO'].includes(prev.estado) ? 'VIGENTE' : prev.estado,
+    }))
+  }
+
+  const seleccionarVehiculo = (veh) => {
+    setVehiculoSeleccionadoId(veh.id)
+    setFormData((prev) => ({
+      ...prev,
+      vehiculoPlaca: veh.placa,
+      propietario: veh.propietario || '',
+      propietarioDni: veh.propietarioDni || '',
+      asociacion: veh.asociacion || '',
+    }))
+    setIsPlacaDropdownOpen(false)
   }
 
   const handleOpenCreateModal = () => {
@@ -280,6 +407,37 @@ export function Documentos() {
       asociacion: '',
     })
     setIsEditing(false)
+    setVehiculoSeleccionadoId(null)
+    setResultadosPlaca([])
+    setIsPlacaDropdownOpen(false)
+    setIsModalOpen(true)
+  }
+
+  // Desde la tabla: abre "Emitir documento" con el vehículo y el tipo del documento pulsado.
+  // Si ese documento está vencido el formulario pasa solo a "Actualizar" con sus datos.
+  const abrirEmitirDesdeDocumento = (doc) => {
+    if (!doc.vehiculoId) {
+      showError('Vehículo no disponible', 'Este documento no está vinculado a un vehículo registrado.')
+      return
+    }
+    const tipoValido = TIPO_DOC_OPTIONS.some((o) => o.value === doc.tipoDocumento)
+    const sinVigencia = TIPOS_SIN_VIGENCIA.includes(doc.tipoDocumento)
+    setFormData({
+      vehiculoPlaca: doc.vehiculoPlaca || '',
+      tipoDocumento: tipoValido ? doc.tipoDocumento : 'TARJETA_OPERATIVIDAD',
+      codigo: '',
+      fechaExpedicion: new Date().toISOString().slice(0, 10),
+      fechaExpiracion: tipoValido && sinVigencia
+        ? ''
+        : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      estado: 'VIGENTE',
+      propietario: doc.propietario || '',
+      propietarioDni: doc.propietarioDni || '',
+      asociacion: doc.asociacion || '',
+    })
+    setIsEditing(false)
+    setVehiculoSeleccionadoId(doc.vehiculoId)
+    setResultadosPlaca([])
     setIsPlacaDropdownOpen(false)
     setIsModalOpen(true)
   }
@@ -298,6 +456,7 @@ export function Documentos() {
       asociacion: doc.asociacion || '',
     })
     setIsEditing(true)
+    setVehiculoSeleccionadoId(doc.vehiculoId || null)
     setIsPlacaDropdownOpen(false)
     setIsModalOpen(true)
   }
@@ -335,16 +494,68 @@ export function Documentos() {
     }
   }
 
+  // Vacía un documento desde el cuadro del vehículo: lo elimina para poder registrar uno nuevo
+  // y deja el modal abierto (el cuadro y el formulario se actualizan solos).
+  const vaciarDocumento = async (doc) => {
+    const result = await showConfirm(
+      '¿Vaciar documento?',
+      `Se eliminará ${doc.etiqueta} N° ${doc.codigo} de este vehículo y quedará como "No registrado". Después podrá registrar uno nuevo.`,
+      'Sí, vaciar',
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
+    )
+    if (!result.isConfirmed) return
+    try {
+      const res = await apiFetch(`/documentos/${doc.id}`, { method: 'DELETE' })
+      if (!res.ok) throw res
+      setRefrescoResumen((n) => n + 1)
+      loadData()
+      loadStats()
+      showToast(`${doc.etiqueta}: documento eliminado, quedó vacío`)
+    } catch (err) {
+      console.warn('No se pudo vaciar el documento:', err)
+      showError('Error', 'No se pudo vaciar el documento.')
+    }
+  }
+
   const handleFormSubmit = async (e) => {
     e.preventDefault()
 
     if (!formData.codigo.trim() || !formData.vehiculoPlaca.trim() || !formData.tipoDocumento) {
-      alert('Por favor completa los campos requeridos (Placa, Tipo y Número de Documento).')
+      showError('Atención', 'Por favor completa los campos requeridos (Placa, Tipo y Número de Documento).')
       return
     }
 
     if (formData.fechaExpedicion && formData.fechaExpiracion && new Date(formData.fechaExpiracion) < new Date(formData.fechaExpedicion)) {
-      alert('La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
+      showError('Atención', 'La fecha de vencimiento no puede ser anterior a la fecha de expedición.')
+      return
+    }
+
+    // Si el formulario está actualizando el documento existente no hay duplicado que avisar.
+    const vigenteExistente = !docExistenteDelTipo && (formData.estado || 'VIGENTE') === 'VIGENTE'
+      ? documentoVigenteDelTipo(resumenDocs, formData.tipoDocumento, isEditing ? selectedDoc?.id : null)
+      : null
+    if (vigenteExistente) {
+      showError(
+        'Documento duplicado',
+        `Este vehículo ya tiene ${vigenteExistente.etiqueta} vigente (N° ${vigenteExistente.codigo}). Anúlelo o espere a que venza antes de emitir otro.`
+      )
+      return
+    }
+
+    const hoy = new Date().toISOString().slice(0, 10)
+    if (
+      (formData.estado || 'VIGENTE') === 'VIGENTE' &&
+      !TIPOS_SIN_VIGENCIA.includes(formData.tipoDocumento) &&
+      formData.fechaExpiracion &&
+      formData.fechaExpiracion < hoy
+    ) {
+      showError(
+        'Fecha de vencimiento',
+        renovandoVencido
+          ? 'El documento anterior ya venció. Ingrese la nueva fecha de vencimiento para actualizarlo.'
+          : 'La fecha de vencimiento ya pasó. Un documento vigente necesita una fecha de vencimiento futura.'
+      )
       return
     }
 
@@ -356,38 +567,46 @@ export function Documentos() {
     }
 
     try {
-      if (isEditing) {
+      if (docExistenteDelTipo) {
+        const res = await apiFetch(`/documentos/${docExistenteDelTipo.id}`, {
+          method: 'PUT',
+          body: dataToSubmit,
+        })
+        if (!res.ok) throw res
+        // El modal se queda abierto; el cuadro se recarga y el formulario sigue en modo "actualizar".
+        setRefrescoResumen((n) => n + 1)
+        loadData()
+        loadStats()
+        showToast(renovandoVencido
+          ? `${docExistenteDelTipo.etiqueta} actualizado: el documento vencido se renovó`
+          : `${docExistenteDelTipo.etiqueta} actualizado`)
+        return
+      } else if (isEditing) {
         const res = await apiFetch(`/documentos/${selectedDoc.id}`, {
           method: 'PUT',
           body: dataToSubmit,
         })
         if (!res.ok) throw res
-        const resData = await res.json()
-        const updatedDoc = resData.data || { ...selectedDoc, ...dataToSubmit }
-        const nextDocs = documentos.map((d) => (d.id === selectedDoc.id ? updatedDoc : d))
-        setDocumentos(nextDocs)
-        setCachedData('/documentos', nextDocs)
+        setRefrescoResumen((n) => n + 1)
+        loadData()
         loadStats()
         showToast('Documento actualizado')
+        return
       } else {
         const res = await apiFetch('/documentos', {
           method: 'POST',
           body: dataToSubmit,
         })
         if (!res.ok) throw res
-        const resData = await res.json()
-        const newDoc = resData.data || {
-          ...dataToSubmit,
-          id: Date.now(),
-        }
-        const nextDocs = [newDoc, ...documentos]
-        setDocumentos(nextDocs)
-        setCachedData('/documentos', nextDocs)
+        // El modal se queda abierto: al recargar el cuadro, el documento recién emitido
+        // pasa a ser el "existente" y el formulario cambia solo a modo "actualizar".
+        setRefrescoResumen((n) => n + 1)
         setCurrentPage(1)
+        loadData()
         loadStats()
         showToast('Documento emitido con éxito')
+        return
       }
-      setIsModalOpen(false)
     } catch (err) {
       let message = 'Error de comunicación con el servidor al registrar el documento.'
       if (err?.json) {
@@ -398,20 +617,18 @@ export function Documentos() {
           message = err.statusText || message
         }
       }
-      alert(message)
+      showError('Atención', message)
     }
   }
 
-  const fetchTodoElFiltro = async () => {
-    const params = new URLSearchParams()
-    if (searchTerm) params.set('buscar', searchTerm)
-    if (filterTipo !== 'TODOS') params.set('tipoDocumento', filterTipo)
-    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
-    const res = await apiFetch(`/documentos?${params.toString()}`)
-    if (!res.ok) return filteredDocs
-    const payload = await res.json()
-    return payload.data ?? []
-  }
+  const fetchTodoElFiltro = () =>
+    fetchTodasLasFilas('/documentos', {
+      buscar: debouncedSearch || searchTerm,
+      tipoDocumento: filterTipo === 'TODOS' ? '' : filterTipo,
+      estado: filterEstado === 'TODOS' ? '' : filterEstado,
+      sortBy,
+      sortDir: sortBy ? sortDir : '',
+    }, { mensaje: 'Preparando la descarga de documentos...' })
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
@@ -432,9 +649,23 @@ export function Documentos() {
               { header: 'TIPO DOCUMENTO', key: 'tipoDocumento', width: 180 },
               { header: 'N° / CÓDIGO', key: 'codigo', isText: true, width: 140, align: 'center' },
               { header: 'EXPEDICIÓN', key: 'fechaExpedicion', width: 110, align: 'center' },
-              { header: 'VENCIMIENTO', key: 'fechaExpiracion', width: 110, align: 'center' },
+              { header: 'VENCIMIENTO', render: (v) => v || 'Sin vencimiento', key: 'fechaExpiracion', width: 110, align: 'center' },
+              { header: 'N° RES. MUNICIPAL', key: 'resMunicipal', isText: true, width: 140, align: 'center' },
+              { header: 'MARCA', key: 'vehiculoMarca', width: 110 },
+              { header: 'MODELO', key: 'vehiculoModelo', width: 110 },
+              { header: 'COLOR', key: 'vehiculoColor', width: 100 },
+              { header: 'AÑO', key: 'vehiculoAnio', width: 70, align: 'center' },
+              { header: 'SERIE DEL MOTOR', key: 'vehiculoMotor', isText: true, width: 140 },
+              { header: 'SERIE / CHASIS', key: 'vehiculoSerie', isText: true, width: 150 },
+              { header: 'CARROCERÍA', key: 'vehiculoCarroceria', width: 120 },
+              { header: 'PARTIDA REGISTRAL', key: 'vehiculoPartidaRegistral', isText: true, width: 140 },
+              { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 150 },
               { header: 'PROPIETARIO / TITULAR', key: 'propietario', width: 190 },
               { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
+              { header: 'CELULAR', key: 'propietarioCelular', isText: true, width: 110, align: 'center' },
+              { header: 'CORREO', key: 'propietarioEmail', width: 190 },
+              { header: 'DIRECCIÓN', key: 'direccion', width: 220 },
+              { header: 'LICENCIA', key: 'numeroLicencia', isText: true, width: 120, align: 'center' },
               { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 200 },
               { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
             ],
@@ -450,13 +681,13 @@ export function Documentos() {
     try {
       const listToExport = await fetchTodoElFiltro()
           if (listToExport.length === 0) {
-            alert('No hay registros para exportar.')
+            showError('Atención', 'No hay registros para exportar.')
             return
           }
       
           const printWin = window.open('', '_blank', 'width=1100,height=750')
           if (!printWin) {
-            alert('El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
+            showError('Atención', 'El navegador bloqueó la ventana emergente. Por favor, habilite los popups.')
             return
           }
       
@@ -541,7 +772,7 @@ export function Documentos() {
                 <div class="header">
                   <div>
                     <div class="title">Municipalidad Distrital José Leonardo Ortiz</div>
-                    <div class="subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Documentos Vehiculares (TUC / SOAT / CertiCAV)</div>
+                    <div class="subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Documentos Vehiculares (Tarjeta de Operatividad / SOAT / Tarjeta de Propiedad)</div>
                   </div>
                   <div class="meta">
                     <div><strong>Fecha de emisión:</strong> ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</div>
@@ -552,7 +783,7 @@ export function Documentos() {
                   <div>Total en padrón: <strong>${totalDocs}</strong></div>
                   <div>· Exportando: <strong>${listToExport.length}</strong> documentos</div>
                   <div>· Vigentes: <strong>${vigentes}</strong></div>
-                  <div>· Vencidos / Trámite: <strong>${inactivosOVencidos}</strong></div>
+                  <div>· Vencidos: <strong>${inactivosOVencidos}</strong></div>
                 </div>
                 <table>
                   <thead>
@@ -608,20 +839,20 @@ export function Documentos() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                Emisión de Documentos
+                Documentos del Vehículo
               </h1>
             </div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Control oficial y emisión de Tarjetas de Operatividad (TUC), SOAT, CertiCAV e inspecciones vehiculares.
+              Control y emisión de la Tarjeta de Operatividad, el SOAT y la Tarjeta de Propiedad de cada vehículo.
             </p>
           </div>
         </div>
       </div>
 
       {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas compactas (Estilo exacto Personas) */}
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="kpi-grid">
         {/* 1. Total documentos */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Total registros
@@ -638,10 +869,10 @@ export function Documentos() {
         </div>
 
         {/* 2. Tarjetas Operatividad (TUC) */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              Tarjetas TUC
+              Tarjeta de Operatividad
             </span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
               <Icon name="permit" className="size-3.5" />
@@ -655,10 +886,10 @@ export function Documentos() {
         </div>
 
         {/* 3. SOAT y CertiCAV */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
-              SOAT / CertiCAV
+              SOAT
             </span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
               <Icon name="vehicle" className="size-3.5" />
@@ -671,8 +902,25 @@ export function Documentos() {
           </div>
         </div>
 
+        {/* 3b. Tarjeta de Propiedad */}
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              Tarjeta de Propiedad
+            </span>
+            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+              <Icon name="vehicle" className="size-3.5" />
+            </span>
+          </div>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {formatNumeroTarjeta(propiedadDocs)}
+            </p>
+          </div>
+        </div>
+
         {/* 4. Vigentes */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Vigentes
@@ -689,10 +937,10 @@ export function Documentos() {
         </div>
 
         {/* 5. Vencidos / Otros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-              Vencidos / Trámite
+              Vencidos
             </span>
             <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
               ✕
@@ -707,7 +955,7 @@ export function Documentos() {
       </div>
 
       {/* Contenedor de la Tabla */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon
@@ -803,10 +1051,10 @@ export function Documentos() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs">
+          <table className="w-full min-w-[960px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[22%]" />
-              <col className="w-[13%]" />
+              <col className="w-[130px]" />
               <col className="w-[24%]" />
               <col className="w-[12%]" />
               <col className="w-[12%]" />
@@ -816,7 +1064,7 @@ export function Documentos() {
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 "><SortableHeader column="tipoDocumento" label="Documento / Código" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="px-4 py-3 "><SortableHeader column="vehiculoPlaca" label="Placa Vehicular" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 "><SortableHeader column="vehiculoPlaca" label="Placa" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 ">Titular / Propietario</th>
                 <th className="px-4 py-3 ">Expedición</th>
                 <th className="px-4 py-3 "><SortableHeader column="fechaExpiracion" label="Vencimiento" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
@@ -870,25 +1118,30 @@ export function Documentos() {
                     className="group transition-colors hover:bg-[var(--brand-soft)] dark:hover:bg-[var(--bg-subtle)]"
                   >
                     <td className="px-4 py-3 ">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+                      <button
+                        type="button"
+                        onClick={() => abrirEmitirDesdeDocumento(d)}
+                        title="Emitir o actualizar un documento de este vehículo"
+                        className="block max-w-full cursor-pointer space-y-1 rounded-lg text-left transition hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-slate-900 underline-offset-2 group-hover:underline dark:text-white text-xs">
                             {d.codigo}
                           </span>
-                        </div>
-                        <div>{getDocTypeBadge(d.tipoDocumento)}</div>
-                      </div>
+                        </span>
+                        <span className="block">{getDocTypeBadge(d.tipoDocumento)}</span>
+                      </button>
                     </td>
 
                     <td className="px-4 py-3 ">
-                      <div className="space-y-0.5">
-                        <PlacaBadge placa={d.vehiculoPlaca} />
-                        {(d.vehiculoMarca || d.vehiculoModelo) && (
-                          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                            {d.vehiculoMarca} {d.vehiculoModelo}
-                          </p>
-                        )}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => abrirVehiculo(d)}
+                        title="Ver datos del vehículo"
+                        className="cursor-pointer rounded-lg transition hover:scale-105 hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                      >
+                        <PlacaBadge placa={d.vehiculoPlaca} className="whitespace-nowrap" />
+                      </button>
                     </td>
 
                     <td className="px-4 py-3 max-w-[200px]">
@@ -902,11 +1155,6 @@ export function Documentos() {
                         <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                           {d.propietarioDni && (
                             <span className="font-mono font-semibold">DNI: {d.propietarioDni}</span>
-                          )}
-                          {d.asociacion && (
-                            <span className="truncate" title={d.asociacion}>
-                              {d.propietarioDni ? '· ' : ''}{d.asociacion}
-                            </span>
                           )}
                         </div>
                       </div>
@@ -965,25 +1213,7 @@ export function Documentos() {
                           type="button"
                           onClick={() => handlePrint(d)}
                           title="Imprimir formato oficial / TUC"
-                          className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
-                          style={{
-                            backgroundColor: '#f3e8ff',
-                            borderColor: '#c084fc',
-                            color: '#7e22ce',
-                            borderWidth: '1.5px',
-                            borderStyle: 'solid',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#7e22ce'
-                            e.currentTarget.style.borderColor = '#7e22ce'
-                            e.currentTarget.style.color = '#ffffff'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f3e8ff'
-                            e.currentTarget.style.borderColor = '#c084fc'
-                            e.currentTarget.style.color = '#7e22ce'
-                          }}
-                        >
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white">
                           <Icon name="print" className="size-4" />
                         </button>
 
@@ -1065,32 +1295,25 @@ export function Documentos() {
       {/* Modal Emitir / Editar Documento */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
-          <div className="w-full max-w-3xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+          <div className="w-full max-w-3xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="document" className="size-4" />
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  {isEditing ? 'Editar documento vehicular' : 'Emitir nuevo documento'}
+                  {isEditing ? 'Editar documento vehicular' : docExistenteDelTipo ? (renovandoVencido ? 'Actualizar documento vencido' : 'Actualizar documento') : 'Emitir nuevo documento'}
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                title="Cerrar"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsModalOpen(false)} title="Cerrar" />
             </div>
 
             <form onSubmit={handleFormSubmit} autoComplete="off" className="flex flex-col">
-              <div className="p-4 sm:p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+              <div className="p-3 sm:p-4 space-y-2.5 max-h-[85vh] overflow-y-auto">
                 {/* 1. Sección: Vehículo y Titular */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-1 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                     Vehículo y Titular
                   </h4>
@@ -1106,27 +1329,29 @@ export function Documentos() {
                         inputClassName="font-mono font-bold tracking-wider uppercase"
                         onFocus={() => setIsPlacaDropdownOpen(true)}
                         onChange={(e) => {
-                          const val = e.target.value.toUpperCase().trim()
-                          handleVehicleChange(val)
+                          handleEscribirPlaca(normalizarPlaca(e.target.value))
                           setIsPlacaDropdownOpen(true)
                         }}
                       />
 
-                      {isPlacaDropdownOpen && (
-                        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
-                          {filteredPlacas.length === 0 ? (
+                      {isPlacaDropdownOpen && !vehiculoSeleccionadoId && (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
+                          {(formData.vehiculoPlaca || '').length < 2 ? (
+                            <div className="px-3 py-2 text-center text-xs text-slate-400">
+                              Escriba al menos 2 caracteres de la placa
+                            </div>
+                          ) : isBuscandoPlaca && resultadosPlaca.length === 0 ? (
+                            <div className="px-3 py-2 text-center text-xs text-slate-400">Buscando...</div>
+                          ) : resultadosPlaca.length === 0 ? (
                             <div className="px-3 py-2 text-center text-xs text-slate-400">
                               No hay vehículos con esa placa
                             </div>
                           ) : (
-                            filteredPlacas.map((v) => (
+                            resultadosPlaca.map((v) => (
                               <button
                                 key={v.id}
                                 type="button"
-                                onClick={() => {
-                                  handleVehicleChange(v.placa)
-                                  setIsPlacaDropdownOpen(false)
-                                }}
+                                onClick={() => seleccionarVehiculo(v)}
                                 className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition cursor-pointer ${
                                   formData.vehiculoPlaca === v.placa
                                     ? 'bg-blue-50 text-blue-700 font-bold dark:bg-blue-950/60 dark:text-blue-300'
@@ -1151,16 +1376,7 @@ export function Documentos() {
                           id="doc_tipo"
                           label="Tipo de documento"
                           value={formData.tipoDocumento}
-                          onChange={(e) => {
-                            const nuevoTipo = e.target.value
-                            const sinVigencia = TIPOS_SIN_VIGENCIA.includes(nuevoTipo)
-                            setFormData((prev) => ({
-                              ...prev,
-                              tipoDocumento: nuevoTipo,
-                              fechaExpiracion: sinVigencia ? '' : prev.fechaExpiracion,
-                              estado: sinVigencia && !['VIGENTE', 'ANULADO'].includes(prev.estado) ? 'VIGENTE' : prev.estado,
-                            }))
-                          }}
+                          onChange={(e) => cambiarTipo(e.target.value)}
                           options={TIPO_DOC_OPTIONS}
                         />
                       ) : (
@@ -1177,12 +1393,12 @@ export function Documentos() {
 
                   {/* Resumen del Propietario / Vehículo cargado desde la BD */}
                   {formData.vehiculoPlaca && (
-                    <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 dark:border-[var(--border-strong)] dark:bg-slate-800/80 flex items-center justify-between gap-3 text-xs">
+                    <div className="rounded-xl border border-slate-200/80 bg-white px-2.5 py-1.5 dark:border-[var(--border-strong)] dark:bg-slate-800/80 flex items-center justify-between gap-3 text-xs">
                       <div className="min-w-0">
-                        <span className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-wider block">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block leading-tight">
                           Propietario en Padrón
                         </span>
-                        <span className="font-bold text-slate-800 dark:text-white truncate block">
+                        <span className="font-bold text-slate-800 dark:text-white truncate block leading-tight">
                           {formData.propietario || 'Sin Propietario Asignado en BD'}
                         </span>
                       </div>
@@ -1200,33 +1416,50 @@ export function Documentos() {
                       </div>
                     </div>
                   )}
+
+                  {vehiculoSeleccionadoId && (
+                    <EstadoDocumentosVehiculo
+                      resumen={resumenDocs}
+                      isLoading={isLoadingResumen}
+                      tipoSeleccionado={formData.tipoDocumento}
+                      documentoEditandoId={isEditing ? selectedDoc?.id : null}
+                      documentoExistente={docExistenteDelTipo}
+                      onSeleccionarTipo={isEditing ? null : cambiarTipo}
+                      onVaciar={isEditing ? null : vaciarDocumento}
+                    />
+                  )}
                 </div>
 
-                {/* 2. Sección: Datos del Documento */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                {/* 2. Sección: Datos, vigencia y estado del documento */}
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 space-y-2 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-1 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                     Datos del Documento
                   </h4>
 
-                  <FloatingInput
-                    id="doc_codigo"
-                    label={getCodigoLabel(formData.tipoDocumento)}
-                    required
-                    value={formData.codigo}
-                    inputClassName="font-mono font-bold uppercase"
-                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
-                  />
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                    <div className="sm:col-span-7">
+                      <FloatingInput
+                        id="doc_codigo"
+                        label={getCodigoLabel(formData.tipoDocumento)}
+                        required
+                        value={formData.codigo}
+                        inputClassName="font-mono font-bold uppercase"
+                        onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
+                      />
+                    </div>
+                    <div className="sm:col-span-5">
+                      <FloatingSelect
+                        id="doc_estado"
+                        label="Estado del documento"
+                        value={formData.estado}
+                        onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                        options={TIPOS_SIN_VIGENCIA.includes(formData.tipoDocumento) ? ESTADO_OPTIONS_SIN_VIGENCIA : ESTADO_OPTIONS}
+                      />
+                    </div>
+                  </div>
 
-                {/* 3. Sección: Vigencia y Estado */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
-                    Vigencia y Estado
-                  </h4>
-
-                  <div className={`grid grid-cols-1 gap-2.5 ${TIPOS_SIN_VIGENCIA.includes(formData.tipoDocumento) ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+                  <div className={`grid grid-cols-1 gap-2.5 ${TIPOS_SIN_VIGENCIA.includes(formData.tipoDocumento) ? '' : 'sm:grid-cols-2'}`}>
                     <FloatingInput
                       id="doc_expedicion"
                       label="Fecha de expedición"
@@ -1246,35 +1479,16 @@ export function Documentos() {
                         onChange={(e) => setFormData({ ...formData, fechaExpiracion: e.target.value })}
                       />
                     )}
-
-                    <FloatingSelect
-                      id="doc_estado"
-                      label="Estado del documento"
-                      value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                      options={TIPOS_SIN_VIGENCIA.includes(formData.tipoDocumento) ? ESTADO_OPTIONS_SIN_VIGENCIA : ESTADO_OPTIONS}
-                    />
                   </div>
                 </div>
               </div>
 
               {/* Modal Footer */}
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-[var(--border)] dark:bg-slate-900/80">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl px-4 py-1.5 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
-                  style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl px-5 py-1.5 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
-                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
-                >
-                  {isEditing ? 'Actualizar documento' : 'Emitir documento'}
-                </button>
+                <BotonCancelar onClick={() => setIsModalOpen(false)} />
+                <BotonGuardar>
+                  {isEditing || docExistenteDelTipo ? 'Actualizar documento' : 'Emitir documento'}
+                </BotonGuardar>
               </div>
             </form>
           </div>
@@ -1284,9 +1498,9 @@ export function Documentos() {
       {/* Ficha de Detalle (Diccionario Visual - Estilo Exacto Personas) */}
       {isDetailModalOpen && selectedDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+          <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="document" className="size-4" />
@@ -1295,14 +1509,7 @@ export function Documentos() {
                   Ficha del Documento Vehicular
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                title="Cerrar ficha"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar ficha" />
             </div>
 
             {/* Modal Body */}
@@ -1484,6 +1691,14 @@ export function Documentos() {
           onClose={() => setIsPreviewModalOpen(false)}
         />
       )}
+
+      <VehiculoDetalleModal
+        selectedVehiculo={vehiculoDetalle}
+        onClose={() => setVehiculoDetalle(null)}
+        isVehiculoFormal={isVehiculoFormal}
+        buildVehiculoQrValue={buildVehiculoQrValue}
+        getVehiculoDocumento={getVehiculoDocumento}
+      />
     </div>
   )
 }

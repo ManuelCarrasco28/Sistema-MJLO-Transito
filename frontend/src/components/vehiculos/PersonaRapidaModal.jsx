@@ -4,6 +4,7 @@ import { FloatingInput } from '../ui/FormInputs'
 import { apiFetch, leerMensajeError } from '../../config/api'
 import { showError, showToast } from '../../utils/SwalUtil'
 import { toTitleCase } from '../../utils/formatters'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
 
 export function PersonaRapidaModal({
   isOpen,
@@ -174,11 +175,11 @@ export function PersonaRapidaModal({
 
   return (
     <div className="fixed inset-0 z-60 overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-enter">
-      <div className="relative w-full max-w-xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200 dark:border-[var(--border)] overflow-hidden">
+      <div className="relative w-full max-w-xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200 dark:border-[var(--border)] overflow-hidden">
         {/* Cabecera */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25">
+            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md">
               <Icon name="people" className="size-4.5" />
             </span>
             <div>
@@ -190,14 +191,7 @@ export function PersonaRapidaModal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            title="Cerrar ventana"
-            className="grid size-8 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-          >
-            <Icon name="close" className="size-4" />
-          </button>
+          <BotonCerrarModal onClick={onClose} title="Cerrar ventana" />
         </div>
 
         {/* Formulario */}
@@ -351,31 +345,20 @@ export function PersonaRapidaModal({
 
           {/* Botones de acción */}
           <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-[var(--border)]">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold shadow-md shadow-blue-500/25 active:scale-95 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-            >
+            <BotonCancelar onClick={onClose} disabled={isSubmitting} />
+            <BotonGuardar disabled={isSubmitting}>
               {isSubmitting ? (
-                <>
-                  <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Guardando...</span>
-                </>
+              <>
+              <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span>Guardando...</span>
+              </>
               ) : (
-                <>
-                  <Icon name="check" className="size-4" />
-                  <span>Guardar y Vincular como Propietario</span>
-                </>
+              <>
+              <Icon name="check" className="size-4" />
+              <span>Guardar y Vincular como Propietario</span>
+              </>
               )}
-            </button>
+            </BotonGuardar>
           </div>
         </form>
       </div>

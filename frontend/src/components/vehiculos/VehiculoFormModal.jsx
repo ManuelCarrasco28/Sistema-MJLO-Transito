@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '../ui/Icon'
 import { FloatingInput, FloatingSelect } from '../ui/FormInputs'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
 
 export function VehiculoFormModal({
   isEditing,
@@ -88,8 +89,8 @@ export function VehiculoFormModal({
   }, [setShowPropietarioResults, setShowAsociacionResults])
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") onClose(); e.currentTarget.dataset.downOnOverlay = "" }}>
-      <div className="relative flex max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-2.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+      <div className="relative flex max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-2.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-2">
             <span className="grid size-7.5 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
               <Icon name="vehicle" className="size-4" />
@@ -98,14 +99,7 @@ export function VehiculoFormModal({
               {isEditing ? 'Editar Vehículo' : 'Registrar Vehículo'}
             </h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            title="Cerrar"
-            className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-          >
-            <Icon name="close" className="size-5" />
-          </button>
+          <BotonCerrarModal onClick={onClose} title="Cerrar" />
         </div>
 
         <form
@@ -136,7 +130,6 @@ export function VehiculoFormModal({
                         id="veh_placa"
                         label="Placa de Rodaje"
                         required
-                        maxLength={6}
                         minLength={6}
                         pattern="[A-Z0-9]{6}"
                         title="La placa debe tener exactamente 6 caracteres (letras y números)."
@@ -372,7 +365,7 @@ export function VehiculoFormModal({
                     <div
                       data-dropdown="propietario"
                       style={{ position: 'fixed', top: propietarioDropdownPos.top, left: propietarioDropdownPos.left, width: propietarioDropdownPos.width }}
-                      className="z-[100] max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]"
+                      className="z-[100] max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]"
                     >
                       {propietarioResults.length ? (
                         propietarioResults.map((persona) => {
@@ -433,7 +426,7 @@ export function VehiculoFormModal({
                     <div
                       data-dropdown="asociacion"
                       style={{ position: 'fixed', top: asociacionDropdownPos.top, left: asociacionDropdownPos.left, width: asociacionDropdownPos.width }}
-                      className="z-[100] max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]"
+                      className="z-[100] max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]"
                     >
                       {asociacionResults.length ? (
                         asociacionResults.map((org) => (
@@ -476,21 +469,10 @@ export function VehiculoFormModal({
 
           {/* Footer Modal */}
           <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-5 py-2.5 dark:border-[var(--border)] dark:bg-slate-900/80">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl px-5 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
-              style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="rounded-xl px-6 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
-              style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
-            >
+            <BotonCancelar onClick={onClose} />
+            <BotonGuardar>
               {isEditing ? 'Guardar Cambios' : 'Registrar Vehículo'}
-            </button>
+            </BotonGuardar>
           </div>
         </form>
       </div>

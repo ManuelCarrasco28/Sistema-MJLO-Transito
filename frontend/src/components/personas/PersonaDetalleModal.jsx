@@ -2,6 +2,7 @@ import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
 import { PlacaBadge } from '../ui/PlacaBadge'
 import { formatFecha } from '../../utils/formatters'
+import { BotonCerrarModal } from '../ui/ModalControls'
 
 function calcularEdad(fechaNacStr) {
   if (!fechaNacStr) return null
@@ -29,8 +30,8 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-      <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+      <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-2.5">
             <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
               <Icon name="user" className="size-4" />
@@ -39,14 +40,7 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
               Ficha del Administrado
             </h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            title="Cerrar ficha"
-            className="group grid size-8 shrink-0 place-items-center rounded-xl border border-slate-200/80 bg-slate-100/70 text-slate-400 hover:bg-[oklch(71.2%_0.194_13.428)] hover:border-[oklch(71.2%_0.194_13.428)] hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 transition-all duration-200 active:scale-95 cursor-pointer"
-          >
-            <Icon name="close" className="size-4 transition-transform duration-200 group-hover:rotate-90" />
-          </button>
+          <BotonCerrarModal onClick={onClose} title="Cerrar ficha" />
         </div>
 
         <div className="p-5 pb-6 space-y-3">
@@ -194,7 +188,7 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
                     <div key={i} className="bg-white dark:bg-[var(--bg-subtle)] p-2 rounded-xl border border-slate-200 dark:border-[var(--border-strong)] text-xs">
                       <div className="flex justify-between items-center mb-1">
                         <strong className="text-rose-600 dark:text-rose-400 font-mono">{pap.numero_papeleta}</strong>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[var(--bg-surface)] text-slate-600 dark:text-slate-400">{pap.estado}</span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#1C2438] text-slate-600 dark:text-slate-400">{pap.estado}</span>
                       </div>
                       <div className="flex items-center gap-1.5 my-1">
                         <span className="text-slate-600 dark:text-slate-300 font-semibold text-xs">Placa:</span>
@@ -222,7 +216,7 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ml-2 whitespace-nowrap ${
                           cur.estado === 'APROBADO' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400' :
                           cur.estado === 'DESAPROBADO' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400' :
-                          'bg-slate-100 text-slate-600 dark:bg-[var(--bg-surface)] dark:text-slate-400'
+                          'bg-slate-100 text-slate-600 dark:bg-[#1C2438] dark:text-slate-400'
                         }`}>{cur.estado}</span>
                       </div>
                       <p className="text-slate-500 dark:text-slate-400 text-[10px]">Inscrito: {formatFecha(cur.fecha_inscripcion)}</p>

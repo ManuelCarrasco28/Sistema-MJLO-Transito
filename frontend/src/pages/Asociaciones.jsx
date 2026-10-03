@@ -7,7 +7,8 @@ from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
-import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
+import { sanitizarMensaje, leerMensajeError, apiFetch } from '../config/api'
+import { useListaServidor, armarConsulta } from '../hooks/useListaServidor'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
@@ -15,6 +16,7 @@ import { formatNumeroTarjeta } from '../utils/formatters'
 import { FloatingInput, FloatingSelect, FloatingTextarea, RoundedSelect } from '../components/ui/FormInputs'
 import { MapaCoordenadasPicker } from '../components/ui/MapaCoordenadasPicker'
 import { MapaInline, MapaPreviewModal } from '../components/ui/MapaVisualizador'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -28,39 +30,32 @@ const FILTER_ESTADO_OPTIONS = [
   { value: 'SUSPENDIDO', label: 'Suspendidas' },
 ]
 
-const normalizeSocio = (s) => {
-  const cleanPlacas = `${s.placas || ''} ${String(s.placas || '').replace(/[^a-zA-Z0-9]/g, '')}`
-  return {
-    ...s,
-    _search: `${s.nombre || ''} ${s.documento || ''} ${cleanPlacas} ${s.asociacionNombre || ''} ${s.telefono || ''} ${s.email || ''}`.toLowerCase(),
-  }
-}
-
 const normalizeOrg = (o) => ({
   ...o,
   _search: `${o.razonSocial || ''} ${o.ruc || ''} ${o.partidaRegistral || ''} ${o.direccion || ''} ${o.numeroLicencia || ''} ${o.resolucionAlcaldia || ''} ${o.representanteNombre || ''} ${o.representanteDni || ''}`.toLowerCase(),
 })
 
 export function Asociaciones() {
-  const cached = getCachedData('/asociaciones')
-  const cachedSocios = getCachedData('/asociaciones/socios')
-  const [asociaciones, setAsociaciones] = useState(() => (Array.isArray(cached) ? cached.map(normalizeOrg) : []))
-  const [isLoading, setIsLoading] = useState(!cached)
+  const [stats, setStats] = useState({ total: 0, particulares: 0, asociaciones: 0, flotaAcumulada: 0 })
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
+  const [orgSortBy, setOrgSortBy] = useState('')
+  const [orgSortDir, setOrgSortDir] = useState('DESC')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
 
   const [activeTab, setActiveTab] = useState('REGISTRO')
-  const [sociosList, setSociosList] = useState(() => (Array.isArray(cachedSocios) ? cachedSocios.map(normalizeSocio) : []))
+  const [orgOptionsRaw, setOrgOptionsRaw] = useState([])
   const [sociosPage, setSociosPage] = useState(1)
   const [sociosPerPage, setSociosPerPage] = useState(5)
   const [sociosSortBy, setSociosSortBy] = useState('nombre')
   const [sociosSortDir, setSociosSortDir] = useState('ASC')
   const [sociosSearch, setSociosSearch] = useState('')
+  const [debouncedSociosSearch, setDebouncedSociosSearch] = useState('')
   const [socioOrgFilter, setSocioOrgFilter] = useState('TODOS')
-  const [isSociosLoading, setIsSociosLoading] = useState(!cachedSocios)
+  const [socioTipoFilter, setSocioTipoFilter] = useState('TODOS')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -69,7 +64,6 @@ export function Asociaciones() {
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [mapPreview, setMapPreview] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [loadError, setLoadError] = useState('')
 
   const [repSearch, setRepSearch] = useState('')
   const [showRepResults, setShowRepResults] = useState(false)
@@ -79,14 +73,23 @@ export function Asociaciones() {
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const repDropdownRef = useRef(null)
 
-  // Reset de página inmediato al cambiar filtros o términos de búsqueda
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 300)
+    return () => window.clearTimeout(timer)
+  }, [searchTerm])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSociosSearch(sociosSearch), 300)
+    return () => window.clearTimeout(timer)
+  }, [sociosSearch])
+
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterTipo, filterEstado])
+  }, [debouncedSearch, filterTipo, filterEstado])
 
   useEffect(() => {
     setSociosPage(1)
-  }, [sociosSearch, socioOrgFilter])
+  }, [debouncedSociosSearch, socioOrgFilter, socioTipoFilter])
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -120,33 +123,72 @@ export function Asociaciones() {
 
   const [formData, setFormData] = useState(emptyForm)
 
+  const handleOrgSort = (column, dir) => {
+    setOrgSortBy(column)
+    setOrgSortDir(dir)
+    setCurrentPage(1)
+  }
+
+  const filtrosOrgs = {
+    buscar: debouncedSearch,
+    tipo: filterTipo === 'TODOS' ? '' : filterTipo,
+    estado: filterEstado === 'TODOS' ? '' : filterEstado,
+    sortBy: orgSortBy,
+    sortDir: orgSortBy ? orgSortDir : '',
+  }
+
+  const filtrosSocios = {
+    buscar: debouncedSociosSearch,
+    idAsociacion: socioOrgFilter === 'TODOS' ? '' : socioOrgFilter,
+    tipo: socioTipoFilter === 'TODOS' ? '' : socioTipoFilter,
+    sortBy: sociosSortBy,
+    sortDir: sociosSortDir,
+  }
+
+  const { filas: asociaciones, total: totalOrgs, isLoading, error: loadError, recargar: loadOrgs } = useListaServidor({
+    endpoint: '/asociaciones',
+    params: filtrosOrgs,
+    page: currentPage,
+    porPagina: itemsPerPage,
+    mapear: normalizeOrg,
+    descripcion: 'el padrón de asociaciones',
+  })
+
+  // Los socios (miles de filas) solo se consultan con la pestaña abierta.
+  const { filas: sociosList, total: sociosTotal, isLoading: isSociosLoading, recargar: loadSocios } = useListaServidor({
+    endpoint: '/asociaciones/socios',
+    params: filtrosSocios,
+    page: sociosPage,
+    porPagina: sociosPerPage,
+    activo: activeTab === 'SOCIOS',
+    descripcion: 'el padrón de socios',
+  })
+
+  const loadStats = () => {
+    apiFetch('/asociaciones/estadisticas')
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((payload) => setStats((prev) => ({ ...prev, ...(payload.data ?? {}) })))
+      .catch((err) => console.warn('No se pudieron cargar las estadísticas de asociaciones:', err))
+  }
+
   useEffect(() => {
-    setLoadError('')
-    
-    setIsSociosLoading(true)
-    apiFetch('/asociaciones/socios')
-      .then((res) => res.ok ? res.json() : Promise.reject(res))
-      .then((payload) => {
-        const raw = payload.data || []
-        const normalized = raw.map(normalizeSocio)
-        setSociosList(normalized)
-        setCachedData('/asociaciones/socios', normalized)
-      })
-      .catch(() => setSociosList([]))
-      .finally(() => setIsSociosLoading(false))
-
-    apiFetch('/asociaciones')
-      .then((response) => response.ok ? response.json() : Promise.reject(response))
-      .then((payload) => {
-        const raw = payload.data ?? []
-        const normalized = raw.map(normalizeOrg)
-        setAsociaciones(normalized)
-        setCachedData('/asociaciones', normalized)
-      })
-      .catch(() => setLoadError('No se pudo cargar el padrón de asociaciones.'))
-      .finally(() => setIsLoading(false))
-
+    loadStats()
   }, [])
+
+  // Los socios (miles de filas) y el catálogo del filtro solo se consultan con la pestaña abierta.
+  useEffect(() => {
+    if (activeTab !== 'SOCIOS' || orgOptionsRaw.length > 0) return
+    apiFetch('/asociaciones/opciones')
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((payload) => setOrgOptionsRaw(payload.data ?? []))
+      .catch((err) => console.warn('No se pudieron cargar las opciones de asociaciones:', err))
+  }, [activeTab])
+
+  const recargarTrasCambio = () => {
+    loadOrgs()
+    loadStats()
+    if (activeTab === 'SOCIOS') loadSocios()
+  }
 
   // Búsqueda dinámica y debounced de representantes (evita descargar 30,000 personas en memoria)
   useEffect(() => {
@@ -196,16 +238,30 @@ export function Asociaciones() {
     setShowRepResults(false)
   }
 
-  const totalOrgs = asociaciones.length
-  const particulares = asociaciones.filter((o) => o.tipo === 'PARTICULAR').length
-  const asociacionesCount = asociaciones.filter((o) => o.tipo === 'ASOCIACION').length
-  const flotaAcumulada = asociaciones.reduce((sum, o) => sum + Number(o.flotaTotal || 0), 0)
+  const particulares = stats.particulares ?? 0
+  const asociacionesCount = stats.asociaciones ?? 0
+  const flotaAcumulada = stats.flotaAcumulada ?? 0
+
+  // Exportar descarga todo el resultado filtrado (sin paginar), no solo la página visible.
+  const fetchTodasOrgs = async () => {
+    const res = await apiFetch(`/asociaciones?${armarConsulta(filtrosOrgs).toString()}`)
+    if (!res.ok) return asociaciones
+    const payload = await res.json()
+    return payload.data ?? []
+  }
+
+  const fetchTodosSocios = async () => {
+    const res = await apiFetch(`/asociaciones/socios?${armarConsulta(filtrosSocios).toString()}`)
+    if (!res.ok) return sociosList
+    const payload = await res.json()
+    return payload.data ?? []
+  }
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
-      const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
+      const listToExport = await fetchTodasOrgs()
           exportToExcel({
             filename: `Padron_Asociaciones_${new Date().getFullYear()}.xls`,
             sheetName: 'Asociaciones',
@@ -222,11 +278,22 @@ export function Asociaciones() {
               { header: 'Razón Social / Organización', key: 'razonSocial', width: 260 },
               { header: 'RUC', key: 'ruc', width: 120, align: 'center', isText: true },
               { header: 'Partida Registral', key: 'partidaRegistral', width: 130, align: 'center', isText: true },
+              { header: 'Fecha de Creación', key: 'fechaCreacion', width: 120, align: 'center' },
               { header: 'Resolución Alcaldía', key: 'resolucionAlcaldia', width: 160, align: 'center' },
+              { header: 'N° Licencia', key: 'numeroLicencia', width: 120, align: 'center', isText: true },
+              { header: 'Tipo de Ambiente', key: 'tipoAmbiente', width: 130 },
+              { header: 'Representante Legal', key: 'representanteNombre', width: 200 },
+              { header: 'DNI Representante', key: 'representanteDni', width: 120, align: 'center', isText: true },
+              { header: 'Teléfono Representante', key: 'representanteTelefono', width: 130, align: 'center', isText: true },
+              { header: 'Flota Autorizada', key: 'flotaAutorizada', width: 110, align: 'center' },
               { header: 'Flota Registrada', key: 'flotaTotal', width: 110, align: 'center' },
+              { header: 'Cupos Disponibles', key: 'cuposDisponibles', width: 110, align: 'center' },
+              { header: 'Ocupación (%)', key: 'porcentajeOcupacion', width: 100, align: 'center' },
+              { header: 'Estado del Cupo', key: 'estadoCupo', width: 110, align: 'center' },
               { header: 'Teléfono', key: 'telefono', width: 110, align: 'center', isText: true },
               { header: 'Correo Electrónico', key: 'email', width: 180 },
               { header: 'Dirección', key: 'direccion', width: 220 },
+              { header: 'Coordenadas', key: 'coordenadas', width: 150 },
               { header: 'Estado', key: 'estado', width: 90, align: 'center' },
             ],
             data: listToExport,
@@ -239,12 +306,12 @@ export function Asociaciones() {
   const handleExportPdf = async () => {
     setIsExportingPdf(true)
     try {
-      const listToExport = filteredOrgs.length > 0 ? filteredOrgs : asociaciones
+      const listToExport = await fetchTodasOrgs()
           await exportToPdf({
             filename: `Padron_Asociaciones_${new Date().getFullYear()}`,
             subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
             summaryItems: [
-              { label: 'Total registros', value: totalOrgs },
+              { label: "Total registros", value: stats.total },
               { label: 'Exportando', value: `${listToExport.length} registros` },
               { label: 'Asociaciones', value: asociacionesCount },
               { label: 'Particulares', value: particulares },
@@ -257,7 +324,7 @@ export function Asociaciones() {
               { header: 'DNI REP.', key: 'representanteDni', width: 90, align: 'center' },
               { header: 'TIPO', key: 'tipo', width: 110, align: 'center' },
               { header: 'FLOTA', key: 'flotaTotal', width: 60, align: 'center' },
-              { header: 'EXPEDIENTE', key: 'expediente', width: 110, align: 'center' },
+              { header: 'RESOLUCIÓN', key: 'resolucionAlcaldia', width: 110, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 90, align: 'center' },
             ],
             data: listToExport
@@ -271,24 +338,37 @@ export function Asociaciones() {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
-      const listToExport = filteredSocios.length > 0 ? filteredSocios : sociosList
+      const socios = await fetchTodosSocios()
+      const listToExport = socios.flatMap((socio) => (socio.vinculos?.length ? socio.vinculos : [null]).map((v) => ({
+        nombre: socio.nombre,
+        documento: socio.documento,
+        asociacionNombre: v?.asociacionNombre || '-',
+        tipo: v ? (v.tipo === 'PARTICULAR' ? 'Particular' : 'Asociación') : '-',
+        vehiculosTotal: v ? v.vehiculos : 0,
+        placas: v ? v.placas.join(', ') : '',
+        telefono: socio.telefono,
+        email: socio.email,
+      })))
       exportToExcel({
         filename: `Padron_Socios_${new Date().getFullYear()}.xls`,
         sheetName: 'Socios',
         title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
         subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Socios',
         metadata: [
-          { label: 'Filtro Asociación', value: socioOrgFilter },
-          { label: 'Total Registros', value: `${listToExport.length} socios` },
+          { label: 'Filtro Asociación', value: socioOrgFilter === 'TODOS' ? 'Todas' : (orgOptionsRaw.find((o) => String(o.id) === String(socioOrgFilter))?.razonSocial || socioOrgFilter) },
+          { label: 'Filtro Tipo', value: socioTipoFilter === 'TODOS' ? 'Todos' : (socioTipoFilter === 'PARTICULAR' ? 'Particular' : 'Asociación') },
+          { label: 'Total Registros', value: `${socios.length} socios · ${listToExport.length} vínculos` },
         ],
         columns: [
           { header: 'N°', align: 'center', width: 45, render: (_, __, i) => i + 1 },
           { header: 'Socio / Propietario', key: 'nombre', width: 260 },
           { header: 'Documento', key: 'documento', width: 120, align: 'center', isText: true },
           { header: 'Asociación / Empresa', key: 'asociacionNombre', width: 260 },
-          { header: 'Vehículos', key: 'vehiculosTotal', width: 90, align: 'center' },
+          { header: 'Tipo', key: 'tipo', width: 100, align: 'center' },
+          { header: 'Vehículos en ella', key: 'vehiculosTotal', width: 110, align: 'center' },
           { header: 'Placas', key: 'placas', width: 200 },
           { header: 'Teléfono', key: 'telefono', width: 120, align: 'center', isText: true },
+          { header: 'Correo Electrónico', key: 'email', width: 200 },
         ],
         data: listToExport,
       })
@@ -296,22 +376,6 @@ export function Asociaciones() {
       setIsExportingExcel(false)
     }
   }
-
-  const filteredOrgs = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase()
-    return asociaciones.filter((o) => {
-      const matchesSearch = !term || (o._search ? o._search.includes(term) : `${o.razonSocial || ''} ${o.ruc || ''}`.toLowerCase().includes(term))
-      const matchesTipo = filterTipo === 'TODOS' || o.tipo === filterTipo
-      const matchesEstado = filterEstado === 'TODOS' || o.estado === filterEstado
-
-      return matchesSearch && matchesTipo && matchesEstado
-    })
-  }, [asociaciones, searchTerm, filterTipo, filterEstado])
-
-  const paginatedOrgs = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage
-    return filteredOrgs.slice(start, start + itemsPerPage)
-  }, [filteredOrgs, currentPage, itemsPerPage])
 
   // Bloquea el scroll de la página de fondo mientras hay un modal abierto,
   // para que no arrastre visualmente la cabecera del modal al desplazarse.
@@ -325,54 +389,11 @@ export function Asociaciones() {
     }
   }, [isModalOpen, isDetailModalOpen])
 
-  // Opciones de organizaciones para el filtro en pestaña Socios (memoizado para no regenerar en cada render)
-  const uniqueOrgOptions = useMemo(() => {
-    const set = new Set()
-    for (let i = 0; i < sociosList.length; i++) {
-      if (sociosList[i].asociacionNombre) {
-        set.add(sociosList[i].asociacionNombre)
-      }
-    }
-    const orgs = Array.from(set).sort()
-    return [
-      { value: 'TODOS', label: 'Todas las Asociaciones' },
-      ...orgs.map(org => ({ value: org, label: org }))
-    ]
-  }, [sociosList])
-
-  const esCollator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base', numeric: true }), [])
-
-  // --- LOGICA DE SOCIOS (Ultra optimizada con useMemo y búsqueda directa sub-milisegundo) ---
-  const filteredSocios = useMemo(() => {
-    const term = sociosSearch.trim().toLowerCase()
-    const hasOrgFilter = socioOrgFilter !== 'TODOS'
-
-    const result = sociosList.filter(s => {
-      const matchesSearch = !term || (s._search ? s._search.includes(term) : `${s.nombre || ''} ${s.documento || ''} ${s.placas || ''} ${s.asociacionNombre || ''}`.toLowerCase().includes(term))
-      const matchesOrg = !hasOrgFilter || s.asociacionNombre === socioOrgFilter
-      return matchesSearch && matchesOrg
-    })
-
-    if (sociosSortBy && sociosSortDir) {
-      const dirMul = sociosSortDir === 'ASC' ? 1 : -1
-      if (sociosSortBy === 'vehiculosTotal') {
-        result.sort((a, b) => ((Number(a.vehiculosTotal) || 0) - (Number(b.vehiculosTotal) || 0)) * dirMul)
-      } else {
-        result.sort((a, b) => {
-          const valA = String(a[sociosSortBy] || '')
-          const valB = String(b[sociosSortBy] || '')
-          return esCollator.compare(valA, valB) * dirMul
-        })
-      }
-    }
-
-    return result
-  }, [sociosList, sociosSearch, socioOrgFilter, sociosSortBy, sociosSortDir, esCollator])
-
-  const paginatedSocios = useMemo(() => {
-    const start = (sociosPage - 1) * sociosPerPage
-    return filteredSocios.slice(start, start + sociosPerPage)
-  }, [filteredSocios, sociosPage, sociosPerPage])
+  // Opciones del filtro de la pestaña Socios (id + nombre, vienen de un endpoint liviano)
+  const uniqueOrgOptions = useMemo(() => [
+    { value: 'TODOS', label: 'Todas las Asociaciones' },
+    ...orgOptionsRaw.map((o) => ({ value: String(o.id), label: o.razonSocial })),
+  ], [orgOptionsRaw])
 
   const handleOpenCreateModal = () => {
     setFormData(emptyForm)
@@ -423,13 +444,12 @@ export function Asociaciones() {
     )
     if (result.isConfirmed) {
       try {
-        await apiFetch(`/asociaciones/${id}`, { method: 'DELETE' })
-        const nextList = asociaciones.filter((o) => o.id !== id)
-        setAsociaciones(nextList)
-        setCachedData('/asociaciones', nextList)
+        const res = await apiFetch(`/asociaciones/${id}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error(await leerMensajeError(res, 'No se pudo eliminar la asociación.'))
+        recargarTrasCambio()
         showToast('Asociación eliminada correctamente', 'eliminar')
       } catch (err) {
-        showError('Error', 'No se pudo eliminar la asociación.')
+        showError('Error', sanitizarMensaje(err.message, 'No se pudo eliminar la asociación.'))
       }
     }
   }
@@ -453,42 +473,22 @@ export function Asociaciones() {
     }
 
     try {
-      const buildSearchStr = (o) => `${o.razonSocial || ''} ${o.ruc || ''} ${o.partidaRegistral || ''} ${o.direccion || ''} ${o.numeroLicencia || ''} ${o.resolucionAlcaldia || ''} ${o.representanteNombre || ''} ${o.representanteDni || ''}`.toLowerCase()
       if (isEditing) {
         const res = await apiFetch(`/asociaciones/${selectedOrg.id}`, {
           method: 'PUT',
           body: formData,
         })
-        const updated = {
-          ...selectedOrg,
-          ...formData,
-          id: selectedOrg.id,
-          _search: buildSearchStr({ ...selectedOrg, ...formData }),
-        }
-        const nextList = asociaciones.map((o) => (o.id === selectedOrg.id ? updated : o))
-        setAsociaciones(nextList)
-        setCachedData('/asociaciones', nextList)
+        if (!res.ok) throw new Error(await leerMensajeError(res, 'No se pudo actualizar la asociación.'))
+        recargarTrasCambio()
         showToast('Asociación actualizada correctamente', 'editar')
       } else {
         const res = await apiFetch('/asociaciones', {
           method: 'POST',
           body: formData,
         })
-        const resData = await res.json()
-        if (!res.ok) throw new Error(resData.messages?.error || 'Error al crear')
-        
-        const rawNew = resData.data || {
-          ...formData,
-          id: Date.now(),
-        }
-        const newOrg = {
-          ...rawNew,
-          _search: buildSearchStr(rawNew),
-        }
-        const nextList = [newOrg, ...asociaciones]
-        setAsociaciones(nextList)
-        setCachedData('/asociaciones', nextList)
+        if (!res.ok) throw new Error(await leerMensajeError(res, 'Error al crear la asociación.'))
         setCurrentPage(1)
+        recargarTrasCambio()
         showToast('Asociación registrada exitosamente')
       }
       setIsModalOpen(false)
@@ -534,10 +534,10 @@ export function Asociaciones() {
 
 
       {/* Tarjetas KPI con Bordes de Colores */}
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="kpi-grid">
 
         {/* 1. Total registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registros</span>
             <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
@@ -545,13 +545,13 @@ export function Asociaciones() {
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(totalOrgs)}</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(stats.total)}</p>
             <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">Padrón 2026</span>
           </div>
         </div>
 
         {/* 2. Asociaciones */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Asociaciones</span>
             <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
@@ -565,7 +565,7 @@ export function Asociaciones() {
         </div>
 
         {/* 3. Particulares */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Particulares</span>
             <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
@@ -579,7 +579,7 @@ export function Asociaciones() {
         </div>
 
         {/* 4. Flota Registrada */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Flota Registrada</span>
             <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
@@ -627,7 +627,7 @@ export function Asociaciones() {
 
       {activeTab === 'REGISTRO' && (
       <>
-<div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+<div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon
@@ -719,16 +719,17 @@ export function Asociaciones() {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
               <tr>
-                <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[220px]">Asociación / Particular</th>
-                <th className="px-3 py-2.5 whitespace-nowrap min-w-[125px]">RUC</th>
+                <th className="px-3.5 py-2.5 whitespace-nowrap min-w-[220px]"><SortableHeader column="razonSocial" label="Asociación / Particular" sortBy={orgSortBy} sortDir={orgSortDir} onSort={handleOrgSort} /></th>
+                <th className="px-3 py-2.5 whitespace-nowrap min-w-[125px]"><SortableHeader column="ruc" label="RUC" sortBy={orgSortBy} sortDir={orgSortDir} onSort={handleOrgSort} /></th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[170px]">Representante Legal</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[150px]">Contacto</th>
                 <th className="px-3 py-2.5 whitespace-nowrap min-w-[200px]">Ubicación</th>
-                <th className="px-4 py-2.5 whitespace-nowrap min-w-[140px] text-center">Estado</th>
+                <th className="px-4 py-2.5 whitespace-nowrap min-w-[140px] text-center"><SortableHeader column="estado" label="Estado" sortBy={orgSortBy} sortDir={orgSortDir} onSort={handleOrgSort}
+                    align="center" /></th>
                 <th className="sticky right-0 z-10 bg-slate-50 dark:bg-[var(--bg-subtle)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-2.5 whitespace-nowrap min-w-[130px] text-center shadow-[-4px_0_8px_rgba(0,0,0,0.04)]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+            <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && asociaciones.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && asociaciones.length === 0 ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
@@ -760,7 +761,7 @@ export function Asociaciones() {
                     <td className="px-4 py-3 min-w-[140px] text-center">
                       <div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                     </td>
-                    <td className="sticky right-0 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3 text-center min-w-[130px]">
+                    <td className="sticky right-0 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3 text-center min-w-[130px]">
                       <div className="flex items-center justify-center gap-1.5">
                         <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
                         <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
@@ -768,7 +769,7 @@ export function Asociaciones() {
                     </td>
                   </tr>
                 ))
-              ) : filteredOrgs.length === 0 ? (
+              ) : asociaciones.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-12 text-center align-middle">
                     <div className="flex flex-col items-center justify-center">
@@ -778,7 +779,7 @@ export function Asociaciones() {
                   </td>
                 </tr>
               ) : (
-                paginatedOrgs.map((o) => (
+                asociaciones.map((o) => (
                   <tr key={o.id} className="group transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]">
                     <td className="px-3.5 py-3 align-middle min-w-[220px]">
                       <div>
@@ -860,7 +861,7 @@ export function Asociaciones() {
                         <StatusBadge status={o.estado} />
                       </div>
                     </td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[var(--bg-surface)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3 align-middle text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.04)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 min-w-[130px]">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3 align-middle text-center whitespace-nowrap shadow-[-4px_0_8px_rgba(0,0,0,0.04)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 min-w-[130px]">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
@@ -897,13 +898,14 @@ export function Asociaciones() {
 
         <Pagination
           currentPage={currentPage}
-          totalItems={filteredOrgs.length}
+          totalItems={totalOrgs}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
           onItemsPerPageChange={(size) => {
             setItemsPerPage(size)
             setCurrentPage(1)
           }}
+          disabled={isLoading}
         />
       </div>
       </>
@@ -911,8 +913,8 @@ export function Asociaciones() {
 
 
       {activeTab === 'SOCIOS' && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
-          <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
+          <div className="sticky top-0 z-20 flex flex-col gap-2.5 rounded-t-2xl border-b border-slate-100 bg-white px-4 py-2.5 dark:border-[var(--border)] dark:bg-[#1C2438] sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-1 flex-col sm:flex-row gap-2.5">
               <div className="relative flex-1 sm:max-w-xs">
                 <Icon
@@ -921,7 +923,7 @@ export function Asociaciones() {
                 />
                 <input
                   type="text"
-                  placeholder="Buscar socio por nombre, doc o placa..."
+                  placeholder="Buscar socio por nombre, doc, placa o asociación..."
                   value={sociosSearch}
                   onChange={(e) => setSociosSearch(e.target.value)}
                   className="w-full rounded-xl border-0 bg-slate-100/70 py-2 pl-9 pr-8 text-xs font-medium text-slate-900 outline-none ring-1 ring-inset ring-slate-200/80 transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-600 dark:bg-slate-900/50 dark:text-white dark:ring-slate-700/50 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 dark:focus:ring-indigo-500"
@@ -937,15 +939,21 @@ export function Asociaciones() {
                 )}
               </div>
               <RoundedSelect
+                value={socioTipoFilter}
+                onChange={setSocioTipoFilter}
+                options={FILTER_TIPO_OPTIONS}
+              />
+              <RoundedSelect
                 value={socioOrgFilter}
                 onChange={setSocioOrgFilter}
                 options={uniqueOrgOptions}
               />
-              {(socioOrgFilter !== 'TODOS' || sociosSearch !== '') && (
+              {(socioOrgFilter !== 'TODOS' || socioTipoFilter !== 'TODOS' || sociosSearch !== '') && (
                 <button
                   type="button"
                   onClick={() => {
                     setSocioOrgFilter('TODOS')
+                    setSocioTipoFilter('TODOS')
                     setSociosSearch('')
                   }}
                   title="Limpiar filtros de socios"
@@ -979,76 +987,85 @@ export function Asociaciones() {
                   <th className="px-4 py-3 whitespace-nowrap">
                     <SortableHeader
                       column="nombre"
-                      label="Socio Vinculado"
+                      label="Socio"
                       sortBy={sociosSortBy}
                       sortDir={sociosSortDir}
                       onSort={(col, dir) => { setSociosSortBy(col); setSociosSortDir(dir) }}
                     />
                   </th>
                   <th className="px-4 py-3 whitespace-nowrap">
-                    <SortableHeader
-                      column="asociacionNombre"
-                      label="Asociación / Particular"
-                      sortBy={sociosSortBy}
-                      sortDir={sociosSortDir}
-                      onSort={(col, dir) => { setSociosSortBy(col); setSociosSortDir(dir) }}
-                    />
+                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(150px,230px)] items-center gap-4">
+                      <SortableHeader
+                        column="asociacionNombre"
+                        label="Asociación / Particular"
+                        sortBy={sociosSortBy}
+                        sortDir={sociosSortDir}
+                        onSort={(col, dir) => { setSociosSortBy(col); setSociosSortDir(dir) }}
+                      />
+                      <span>Sus vehículos ahí</span>
+                    </div>
                   </th>
                   <th className="px-4 py-3 whitespace-nowrap text-center">
                     <SortableHeader
                       column="vehiculosTotal"
-                      label="Vehículos"
+                      label="Total vehículos"
                       sortBy={sociosSortBy}
                       sortDir={sociosSortDir}
                       align="center"
                       onSort={(col, dir) => { setSociosSortBy(col); setSociosSortDir(dir) }}
                     />
                   </th>
-                  <th className="px-4 py-3 whitespace-nowrap text-center">Placas</th>
                   <th className="px-4 py-3 whitespace-nowrap text-center">Contacto</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-                {isSociosLoading ? (
+              <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isSociosLoading && sociosList.length > 0 ? 'opacity-50' : ''}`}>
+                {isSociosLoading && sociosList.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="p-12 text-center">
+                    <td colSpan="4" className="p-12 text-center">
                       <Icon name="refresh" className="mx-auto size-8 animate-spin text-slate-300" />
                       <p className="mt-2 text-sm font-semibold text-slate-500">Cargando socios...</p>
                     </td>
                   </tr>
-                ) : paginatedSocios.length === 0 ? (
+                ) : sociosList.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="p-12 text-center">
+                    <td colSpan="4" className="p-12 text-center">
                       <Icon name="idCard" className="mx-auto size-8 text-slate-300" />
                       <p className="mt-2 text-sm font-semibold text-slate-500">No se encontraron socios</p>
                     </td>
                   </tr>
                 ) : (
-                  paginatedSocios.map((socio, idx) => (
-                    <tr key={`${socio.idPersona}-${socio.idAsociacion || '0'}-${idx}`} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-900/30">
-                      <td className="px-4 py-3">
+                  sociosList.map((socio, idx) => (
+                    <tr key={socio.idPersona} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-900/30">
+                      <td className="px-4 py-3 align-top">
                         <p className="text-xs font-bold text-slate-900 dark:text-white">{socio.nombre}</p>
                         <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{socio.tipoDocumento || 'DNI'}: {socio.documento}</p>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2 py-1 text-[11px] font-black text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-                          <Icon name="building" className="size-3" />
-                          {socio.asociacionNombre}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                          {socio.vehiculosTotal || 0}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex flex-wrap items-center justify-center gap-1">
-                          {(socio.placas ? socio.placas.split(',') : []).map((placa, i) => (
-                            <PlacaBadge key={i} placa={placa.trim()} size="sm" />
+                      <td className="px-4 py-2">
+                        <div className="divide-y divide-slate-100 dark:divide-white/5">
+                          {(socio.vinculos || []).map((v) => (
+                            <div key={v.idAsociacion} className="grid grid-cols-[minmax(0,1fr)_minmax(150px,230px)] items-center gap-4 py-2 first:pt-1 last:pb-1">
+                              <div className="min-w-0">
+                                <p className="line-clamp-2 text-xs font-bold leading-snug text-slate-800 dark:text-slate-100" title={v.asociacionNombre}>{v.asociacionNombre}</p>
+                                <p className={`mt-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide ${v.tipo === 'PARTICULAR' ? 'text-cyan-600 dark:text-cyan-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                                  <span className={`size-1.5 rounded-full ${v.tipo === 'PARTICULAR' ? 'bg-cyan-500' : 'bg-indigo-500'}`} />
+                                  {v.tipo === 'PARTICULAR' ? 'Particular' : 'Asociación'}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1">
+                                {v.placas.map((placa) => (
+                                  <PlacaBadge key={placa} placa={placa.trim()} size="sm" />
+                                ))}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400">
+                      <td className="px-4 py-3 text-center align-top">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-700 dark:bg-slate-800 dark:text-slate-300" title={`${socio.vehiculosTotal || 0} vehículo(s) en ${socio.asociacionesTotal || 0} organización(es)`}>
+                          {socio.vehiculosTotal || 0}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center align-top text-xs font-medium text-slate-600 dark:text-slate-400">
                         {socio.telefono || '-'}
                       </td>
                     </tr>
@@ -1058,16 +1075,19 @@ export function Asociaciones() {
             </table>
           </div>
 
+          <div className="sticky bottom-0 z-20 rounded-b-2xl border-t border-slate-100 bg-white dark:border-[var(--border)] dark:bg-[#1C2438]">
           <Pagination
             currentPage={sociosPage}
-            totalItems={filteredSocios.length}
+            totalItems={sociosTotal}
             itemsPerPage={sociosPerPage}
             onPageChange={setSociosPage}
             onItemsPerPageChange={(size) => {
               setSociosPerPage(size)
               setSociosPage(1)
             }}
+            disabled={isSociosLoading}
           />
+          </div>
         </div>
       )}
 
@@ -1075,9 +1095,9 @@ export function Asociaciones() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Cabecera del Modal */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="building" className="size-4" />
@@ -1086,14 +1106,7 @@ export function Asociaciones() {
                   {isEditing ? 'Editar Registro' : 'Registrar Asociación / Particular'}
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                title="Cerrar"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsModalOpen(false)} title="Cerrar" />
             </div>
 
             <form onSubmit={handleFormSubmit} autoComplete="off" className="flex min-h-0 flex-1 flex-col">
@@ -1214,12 +1227,12 @@ export function Asociaciones() {
                               setRepSearch(e.target.value)
                               setShowRepResults(true)
                             }}
-                            className="w-full h-[42px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white"
+                            className="w-full h-[42px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
                           />
                         </div>
 
                         {showRepResults && (
-                          <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)]">
+                          <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
                             <div className="flex items-center justify-between px-2.5 py-1 border-b border-slate-100 dark:border-[var(--border)] text-[10px] font-bold text-slate-400 uppercase">
                               <span>Padrón de Ciudadanos ({repResults.length})</span>
                               <button
@@ -1434,21 +1447,10 @@ export function Asociaciones() {
               )}
               </div>
               <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 px-4 py-3 sm:px-5 dark:border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl px-5 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
-                  style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl px-6 py-2 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
-                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
-                >
+                <BotonCancelar onClick={() => setIsModalOpen(false)} />
+                <BotonGuardar>
                   {isEditing ? 'Guardar Cambios' : `Registrar ${formData.tipo === 'PARTICULAR' ? 'Particular' : 'Asociación'}`}
-                </button>
+                </BotonGuardar>
               </div>
             </form>
           </div>
@@ -1468,9 +1470,9 @@ export function Asociaciones() {
 
       {isDetailModalOpen && selectedOrg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200 dark:border-[var(--border)]">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200 dark:border-[var(--border)]">
             {/* Header estilo /personas */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="building" className="size-4" />
@@ -1496,14 +1498,7 @@ export function Asociaciones() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                title="Cerrar ficha"
-                className="group grid size-8 shrink-0 place-items-center rounded-xl border border-slate-200/80 bg-slate-100/70 text-slate-400 hover:bg-[oklch(71.2%_0.194_13.428)] hover:border-[oklch(71.2%_0.194_13.428)] hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 transition-all duration-200 active:scale-95 cursor-pointer"
-              >
-                <Icon name="close" className="size-4 transition-transform duration-200 group-hover:rotate-90" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar ficha" />
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 text-xs">
@@ -1572,7 +1567,7 @@ export function Asociaciones() {
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 dark:border-[var(--border)] dark:bg-[#1C2438]">
                   <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-[var(--border)] dark:bg-slate-950">
                     <div>
                       <p className="text-sm font-black text-slate-900 dark:text-white">Ubicación</p>
@@ -1601,7 +1596,7 @@ export function Asociaciones() {
                 </div>
               </div>
 
-              <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur dark:border-[var(--border)] dark:bg-[var(--bg-surface)]/95">
+              <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur dark:border-[var(--border)] dark:bg-[#1C2438]/95">
                 <button
                   type="button"
                   onClick={() => setIsDetailModalOpen(false)}

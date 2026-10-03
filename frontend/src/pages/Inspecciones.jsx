@@ -12,8 +12,10 @@ import { showError } from '../utils/SwalUtil'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { VistaPreviaEscalada } from '../components/ui/VistaPreviaEscalada'
 import { ActionToast, TOAST_DURACION_MS } from '../components/ui/ActionToast'
-import { formatFecha, formatNumeroTarjeta } from '../utils/formatters'
+import { formatFecha, formatNumeroTarjeta, normalizarPlaca } from '../utils/formatters'
 import { imprimirInspeccionesPdf } from '../utils/exportInspeccionesPdf'
+import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 
 const FILTER_RESULTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los resultados' },
@@ -611,13 +613,13 @@ export function Inspecciones() {
   }
 
   const fetchTodoElFiltro = async () => {
-    const params = new URLSearchParams()
-    if (searchTerm) params.set('buscar', searchTerm)
-    if (filterResultado !== 'TODOS') params.set('resultado', filterResultado)
-    const res = await apiFetch(`/inspecciones?${params.toString()}`)
-    if (!res.ok) return filteredInspecciones
-    const payload = await res.json()
-    return (payload.data || []).map((i) => ({
+    const filas = await fetchTodasLasFilas('/inspecciones', {
+      buscar: searchTerm,
+      resultado: filterResultado === 'TODOS' ? '' : filterResultado,
+      sortBy,
+      sortDir: sortBy ? sortDir : '',
+    }, { mensaje: 'Preparando la descarga de inspecciones...' })
+    return filas.map((i) => ({
       ...i,
       detalles: typeof i.detalles === 'string' ? JSON.parse(i.detalles) : i.detalles || [],
     }))
@@ -640,13 +642,31 @@ export function Inspecciones() {
             columns: [
               { header: 'N° REGISTRO', key: 'numeroRegistro', isText: true, width: 120, align: 'center' },
               { header: 'SERIE CERTICAV', render: (_, i) => i.numeroSerieCerticav || ('CCV-2026-' + String(i.id || '').padStart(6, '0')), isText: true, width: 140, align: 'center' },
+              { header: 'N° INSPECCIÓN', key: 'numeroInspeccion', isText: true, width: 120, align: 'center' },
               { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+              { header: 'MARCA', key: 'vehiculoMarca', width: 110 },
+              { header: 'MODELO', key: 'vehiculoModelo', width: 110 },
+              { header: 'COLOR', key: 'vehiculoColor', width: 100 },
+              { header: 'AÑO', key: 'vehiculoAnio', width: 70, align: 'center' },
+              { header: 'SERIE DEL MOTOR', key: 'vehiculoMotor', isText: true, width: 140 },
+              { header: 'PROPIETARIO', key: 'propietario', width: 180 },
+              { header: 'DNI PROPIETARIO', key: 'propietarioDni', isText: true, width: 120, align: 'center' },
+              { header: 'TRANSPORTADOR', key: 'transportador', width: 180 },
               { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
               { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
               { header: 'LICENCIA', key: 'conductorLicencia', isText: true, width: 120, align: 'center' },
               { header: 'INSPECTOR', key: 'inspector', width: 180 },
               { header: 'FECHA INSPECCIÓN', key: 'fecha', width: 120, align: 'center' },
-              { header: 'RESULTADO', key: 'resultado', width: 120, align: 'center' }
+              { header: '1ª EVALUACIÓN', key: 'primeraEvaluacion', width: 110, align: 'center' },
+              { header: '2ª EVALUACIÓN', key: 'segundaEvaluacion', width: 110, align: 'center' },
+              { header: 'FECHA 2ª EVALUACIÓN', key: 'fechaSegundaEvaluacion', width: 120, align: 'center' },
+              { header: 'RESULTADO', key: 'resultado', width: 120, align: 'center' },
+              { header: 'OBSERVACIONES', key: 'observaciones', width: 260 },
+              { header: 'VIGENCIA (MESES)', key: 'vigenciaMeses', width: 100, align: 'center' },
+              { header: 'FECHA VENCIMIENTO', key: 'fechaVencimiento', width: 120, align: 'center' },
+              { header: 'DÍAS RESTANTES', key: 'diasRestantes', width: 100, align: 'center' },
+              { header: 'ESTADO VIGENCIA', key: 'estadoVigencia', width: 120, align: 'center' },
+              { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
             ],
             data
           })
@@ -697,7 +717,7 @@ export function Inspecciones() {
             aria-modal="true"
             aria-labelledby="titulo-eliminar"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]"
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]"
             style={{ animation: 'modal-pop 0.25s ease-out' }}
           >
             <div className="flex flex-col items-center gap-3 px-6 pt-6 pb-4 text-center">
@@ -717,15 +737,7 @@ export function Inspecciones() {
               </p>
             </div>
             <div className="flex gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-3 dark:border-[var(--border)] dark:bg-slate-900/80">
-              <button
-                type="button"
-                disabled={eliminando}
-                onClick={() => setInspeccionAEliminar(null)}
-                className="flex-1 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-50 cursor-pointer"
-                style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
-              >
-                Cancelar
-              </button>
+              <BotonCancelar onClick={() => setInspeccionAEliminar(null)} disabled={eliminando} className="flex-1" />
               <button
                 type="button"
                 autoFocus
@@ -752,20 +764,20 @@ export function Inspecciones() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                Certificado de Constatación de Características Vehicular
+                Certicav
               </h1>
             </div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Constatación de características técnicas, estado operativo y seguridad de la flota vehicular.
+              Certificado de Constatación de Características Vehiculares: estado técnico y seguridad de la flota.
             </p>
           </div>
         </div>
       </div>
 
       {/* Tarjetas KPI con Bordes de Colores: 5 tarjetas compactas (Estilo exacto Personas) */}
-      <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="kpi-grid">
         {/* 1. Total registros */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Total registros
@@ -782,7 +794,7 @@ export function Inspecciones() {
         </div>
 
         {/* 2. Aprobados */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Aprobados
@@ -799,7 +811,7 @@ export function Inspecciones() {
         </div>
 
         {/* 3. Observados */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
               Observados
@@ -816,7 +828,7 @@ export function Inspecciones() {
         </div>
 
         {/* 4. Desaprobados */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
               Desaprobados
@@ -833,7 +845,7 @@ export function Inspecciones() {
         </div>
 
         {/* 5. Aptitud Técnica */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
               Aptitud Técnica
@@ -851,7 +863,7 @@ export function Inspecciones() {
       </div>
 
       {/* Contenedor de la Tabla */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)] overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon
@@ -938,7 +950,7 @@ export function Inspecciones() {
 
         {/* TABLA: EN CERTICAV EN LA TABLA VISIBLE NO SE MUESTRA INSPECTOR ASIGNADO */}
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs">
+          <table className="w-full min-w-[1050px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[18%]" />
               <col className="w-[14%]" />
@@ -1101,25 +1113,8 @@ export function Inspecciones() {
                             type="button"
                             onClick={() => handleOpenPreview(i)}
                             title="Imprimir Acta Oficial CertiCAV"
-                            className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
-                            style={{
-                              backgroundColor: '#f3e8ff',
-                              borderColor: '#c084fc',
-                              color: '#7e22ce',
-                              borderWidth: '1.5px',
-                              borderStyle: 'solid',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#7e22ce'
-                              e.currentTarget.style.borderColor = '#7e22ce'
-                              e.currentTarget.style.color = '#ffffff'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f3e8ff'
-                              e.currentTarget.style.borderColor = '#c084fc'
-                              e.currentTarget.style.color = '#7e22ce'
-                            }}
-                          >
+                            className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white"
+                        >
                             <Icon name="print" className="size-4" />
                           </button>
 
@@ -1202,9 +1197,9 @@ export function Inspecciones() {
       {/* Modal Registrar / Editar Inspección Técnica */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
-          <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+          <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="inspection" className="size-4" />
@@ -1213,14 +1208,7 @@ export function Inspecciones() {
                   {selectedInspeccion ? 'Editar inspección CERTICAV' : 'Nueva inspección CERTICAV'}
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                title="Cerrar"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsModalOpen(false)} title="Cerrar" />
             </div>
 
             <form onSubmit={handleFormSubmit} autoComplete="off" className="flex flex-col">
@@ -1243,7 +1231,7 @@ export function Inspecciones() {
                         inputClassName="font-mono font-black tracking-widest uppercase text-slate-900 dark:text-white"
                         onFocus={() => setIsPlacaDropdownOpen(true)}
                         onChange={(e) => {
-                          handlePlacaChange(e.target.value)
+                          handlePlacaChange(normalizarPlaca(e.target.value))
                           setIsPlacaDropdownOpen(true)
                         }}
                       />
@@ -1286,7 +1274,7 @@ export function Inspecciones() {
                         readOnly
                         tabIndex={-1}
                         value={(selectedInspeccion ? formData.numeroRegistro : correlativoPreview.numeroRegistro) || '…'}
-                        inputClassName="font-mono font-bold uppercase cursor-not-allowed bg-slate-100 text-slate-600 dark:bg-[var(--bg-surface)] dark:text-slate-300"
+                        inputClassName="font-mono font-bold uppercase cursor-not-allowed bg-slate-100 text-slate-600 dark:bg-[#1C2438] dark:text-slate-300"
                       />
                     </div>
 
@@ -1297,7 +1285,7 @@ export function Inspecciones() {
                         readOnly
                         tabIndex={-1}
                         value={(selectedInspeccion ? formData.numeroSerieCerticav : correlativoPreview.numeroSerieCerticav) || '…'}
-                        inputClassName="font-mono font-black text-sm tracking-wider cursor-not-allowed bg-slate-100 text-rose-600 dark:bg-[var(--bg-surface)] dark:text-rose-400"
+                        inputClassName="font-mono font-black text-sm tracking-wider cursor-not-allowed bg-slate-100 text-rose-600 dark:bg-[#1C2438] dark:text-rose-400"
                       />
                     </div>
 
@@ -1443,7 +1431,7 @@ export function Inspecciones() {
                         required
                         disabled={conductorMismoPropietario}
                         value={formData.conductorNombre}
-                        inputClassName={`font-bold uppercase text-slate-800 dark:text-white ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-[var(--bg-surface)]' : ''}`}
+                        inputClassName={`font-bold uppercase text-slate-800 dark:text-white ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-[#1C2438]' : ''}`}
                         onFocus={() => setIsConductorDropdownOpen(true)}
                         onChange={(e) => {
                           setFormData({ ...formData, conductorNombre: e.target.value.toUpperCase() })
@@ -1478,7 +1466,7 @@ export function Inspecciones() {
                         maxLength={8}
                         disabled={conductorMismoPropietario}
                         value={formData.conductorDni}
-                        inputClassName={`font-mono font-bold ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-[var(--bg-surface)]' : ''}`}
+                        inputClassName={`font-mono font-bold ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-[#1C2438]' : ''}`}
                         onChange={(e) => handleConductorDniChange(e.target.value)}
                       />
                     </div>
@@ -1491,7 +1479,7 @@ export function Inspecciones() {
                         required
                         disabled={conductorMismoPropietario}
                         value={formData.conductorLicencia}
-                        inputClassName={`font-mono font-bold uppercase ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-[var(--bg-surface)]' : ''}`}
+                        inputClassName={`font-mono font-bold uppercase ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-[#1C2438]' : ''}`}
                         onChange={(e) => setFormData({ ...formData, conductorLicencia: e.target.value.toUpperCase() })}
                       />
                     </div>
@@ -1704,21 +1692,10 @@ export function Inspecciones() {
 
               {/* Modal Footer */}
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-[var(--border)] dark:bg-slate-900/80">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl px-4 py-1.5 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
-                  style={{ backgroundColor: 'oklch(71.2% 0.194 13.428)' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl px-5 py-1.5 text-xs font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer"
-                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
-                >
+                <BotonCancelar onClick={() => setIsModalOpen(false)} />
+                <BotonGuardar>
                   {selectedInspeccion ? 'Actualizar inspección' : 'Guardar inspección'}
-                </button>
+                </BotonGuardar>
               </div>
             </form>
           </div>
@@ -1728,9 +1705,9 @@ export function Inspecciones() {
       {/* Ficha de Detalle (Diccionario Visual - Estilo Exacto Personas y Ficha Oficial Digitalizada) */}
       {isDetailModalOpen && selectedInspeccion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)]">
+          <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="inspection" className="size-4" />
@@ -1744,14 +1721,7 @@ export function Inspecciones() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(false)}
-                title="Cerrar ficha"
-                className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-              >
-                <Icon name="close" className="size-5" />
-              </button>
+              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar ficha" />
             </div>
 
             {/* Modal Body */}
@@ -2039,13 +2009,7 @@ export function Inspecciones() {
                 Editar Inspección
               </button>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsDetailModalOpen(false)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 active:scale-95 cursor-pointer"
-                >
-                  Cerrar
-                </button>
+                <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
                 <button
                   type="button"
                   onClick={() => {
@@ -2102,9 +2066,9 @@ export function Inspecciones() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-enter">
-            <div className="w-full max-w-5xl h-[calc(100vh-2rem)] flex flex-col bg-white dark:bg-[var(--bg-surface)] rounded-3xl shadow-2xl border border-slate-200 dark:border-[var(--border)] overflow-hidden">
+            <div className="w-full max-w-5xl h-[calc(100vh-2rem)] flex flex-col bg-white dark:bg-[#1C2438] rounded-3xl shadow-2xl border border-slate-200 dark:border-[var(--border)] overflow-hidden">
               {/* Header estilo /personas */}
-              <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
                 <div className="flex items-center gap-2.5">
                   <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                     <Icon name="print" className="size-4" />
@@ -2135,14 +2099,7 @@ export function Inspecciones() {
                     <Icon name="print" className="size-4" />
                     <span>Imprimir Ficha A4</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsPreviewModalOpen(false)}
-                    title="Cerrar previsualización"
-                    className="grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-all active:scale-95 cursor-pointer shadow-xs"
-                  >
-                    <Icon name="close" className="size-5" />
-                  </button>
+                  <BotonCerrarModal onClick={() => setIsPreviewModalOpen(false)} title="Cerrar previsualización" />
                 </div>
               </div>
 

@@ -1,6 +1,7 @@
 import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
 import { PlacaBadge } from '../ui/PlacaBadge'
+import { BotonCancelar, BotonCerrarModal } from '../ui/ModalControls'
 
 export function PapeletaDetalleModal({
   selectedPapeleta,
@@ -35,12 +36,12 @@ export function PapeletaDetalleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-      <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+      <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
         <div className="flex items-center justify-between border-b border-rose-600/20 bg-rose-50 p-5 rounded-t-3xl dark:bg-rose-950/30">
           <div>
             <h3 className="text-xl font-black text-rose-700 dark:text-rose-400">{selectedPapeleta.numeroPapeleta}</h3>
           </div>
-          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-white cursor-pointer">✕</button>
+          <BotonCerrarModal onClick={onClose} title="Cerrar" />
         </div>
         <div className="p-6 overflow-y-auto max-h-[80vh]">
 
@@ -241,7 +242,7 @@ export function PapeletaDetalleModal({
 
           <div className="flex justify-end gap-2 pt-4 mt-2 border-t border-slate-100 dark:border-[var(--border)]">
             <button onClick={onImprimir} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white cursor-pointer hover:bg-slate-800 transition">Imprimir Boleta</button>
-            <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-50 transition">Cerrar</button>
+            <BotonCancelar onClick={onClose}>Cerrar</BotonCancelar>
           </div>
         </div>
       </div>
