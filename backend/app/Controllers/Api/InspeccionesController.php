@@ -118,7 +118,7 @@ class InspeccionesController extends ResourceController
                 $builder->groupStart()
                     ->like('i.numero_registro', $buscar)
                     ->orLike('i.numero_serie_certicav', $buscar)
-                    ->orLike('v.placa', $buscar)
+                    ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                     ->orLike('pc.numero', $buscar)
                     ->orLike('cc.nombres', $buscar)
                     ->orLike('cc.apellido_paterno', $buscar)
@@ -227,7 +227,7 @@ class InspeccionesController extends ResourceController
             return $this->failValidationErrors($this->validator->getErrors());
         }
 
-        $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
+        $placa = \App\Libraries\Placa::normalizar($input['vehiculoPlaca'] ?? '');
         $resultado = trim($input['resultado'] ?? 'APROBADO');
         $observaciones = trim($input['observaciones'] ?? '');
         $detalles = $input['detalles'] ?? [];
@@ -511,6 +511,9 @@ class InspeccionesController extends ResourceController
         }
 
         try {
+            if (!$db->table('certicav')->where('id', $id)->countAllResults()) {
+                return $this->failNotFound('Inspección técnica no encontrada.');
+            }
             $db->table('certicav')->where('id', $id)->update(['estado' => 'ANULADA']);
             return $this->respondDeleted(['status' => 200, 'message' => 'Inspección técnica anulada con éxito']);
         } catch (\Exception $e) {

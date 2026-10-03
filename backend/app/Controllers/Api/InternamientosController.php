@@ -91,7 +91,7 @@ class InternamientosController extends ResourceController
             if ($buscar !== '') {
                 $builder->groupStart()
                     ->like('oi.numero_boleta', $buscar)
-                    ->orLike('v.placa', $buscar)
+                    ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                     ->orLike('p.numero_papeleta', $buscar)
                     ->orLike('inte.numero', $buscar)
                     ->orLike('inte_c.nombres', $buscar)

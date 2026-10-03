@@ -124,11 +124,9 @@ class PagosController extends ResourceController
                 'estado' => 'pt.estado',
                 'fecha' => 'pt.fecha_pago',
             ];
-            $sortBy = trim((string) $this->request->getGet('sortBy'));
-            $sortDir = strtoupper(trim((string) $this->request->getGet('sortDir'))) === 'ASC' ? 'ASC' : 'DESC';
-            $orderCol = $columnasOrden[$sortBy] ?? 'pt.id';
+            \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrden, 'pt.id');
 
-            $rows = $builder->orderBy($orderCol, $sortDir)
+            $rows = $builder
                 ->limit($porPagina, ($page - 1) * $porPagina)
                 ->get()
                 ->getResultArray();
@@ -313,25 +311,34 @@ class PagosController extends ResourceController
         // una sola consulta SQL, así que el orden pedido por el cliente se
         // aplica aquí con usort en vez de con QuerySort (que necesita un query builder).
         $columnasOrdenablesPago = ['numeroRecibo', 'referenciaPago', 'metodoPago', 'montoTotal', 'estado', 'fecha'];
-        $sortBy = trim((string) $this->request->getGet('sortBy'));
-        $sortDir = strtoupper(trim((string) $this->request->getGet('sortDir'))) === 'ASC' ? 'ASC' : 'DESC';
+        // Admite varias columnas ("a,b" con "ASC,DESC"); solo cuentan las de la lista blanca.
+        $claves = array_values(array_filter(
+            array_map('trim', explode(',', (string) $this->request->getGet('sortBy'))),
+            static fn($c) => in_array($c, $columnasOrdenablesPago, true)
+        ));
+        $direcciones = array_map('strtoupper', array_map('trim', explode(',', (string) $this->request->getGet('sortDir'))));
 
-        if (in_array($sortBy, $columnasOrdenablesPago, true)) {
-            usort($pagos, function ($a, $b) use ($sortBy, $sortDir) {
-                $valA = $a[$sortBy] ?? '';
-                $valB = $b[$sortBy] ?? '';
-                if ($sortBy === 'fecha') {
-                    $valA = $valA ? strtotime($valA) : 0;
-                    $valB = $valB ? strtotime($valB) : 0;
-                } elseif ($sortBy === 'montoTotal') {
-                    $valA = (float) $valA;
-                    $valB = (float) $valB;
-                } else {
-                    $valA = strtolower((string) $valA);
-                    $valB = strtolower((string) $valB);
+        if ($claves !== []) {
+            usort($pagos, function ($a, $b) use ($claves, $direcciones) {
+                foreach ($claves as $i => $sortBy) {
+                    $valA = $a[$sortBy] ?? '';
+                    $valB = $b[$sortBy] ?? '';
+                    if ($sortBy === 'fecha') {
+                        $valA = $valA ? strtotime($valA) : 0;
+                        $valB = $valB ? strtotime($valB) : 0;
+                    } elseif ($sortBy === 'montoTotal') {
+                        $valA = (float) $valA;
+                        $valB = (float) $valB;
+                    } else {
+                        $valA = strtolower((string) $valA);
+                        $valB = strtolower((string) $valB);
+                    }
+                    $cmp = $valA <=> $valB;
+                    if ($cmp !== 0) {
+                        return ($direcciones[$i] ?? 'DESC') === 'ASC' ? $cmp : -$cmp;
+                    }
                 }
-                $cmp = $valA <=> $valB;
-                return $sortDir === 'ASC' ? $cmp : -$cmp;
+                return 0;
             });
         } else {
             usort($pagos, function($a, $b) {

@@ -238,7 +238,7 @@ class VehiculosController extends ResourceController
         $buscar = trim((string) $this->request->getGet('buscar'));
         if ($buscar !== '') {
             $builder->groupStart()
-                ->like('v.placa', $buscar)
+                ->like('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                 ->orLike('v.marca', $buscar)
                 ->orLike('v.modelo', $buscar)
                 ->orLike('c.nombres', $buscar)
@@ -437,6 +437,9 @@ class VehiculosController extends ResourceController
     {
         $db = \Config\Database::connect();
         $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        if (isset($input['placa'])) {
+            $input['placa'] = \App\Libraries\Placa::normalizar($input['placa']);
+        }
 
         $rules = [
             'placa' => [
@@ -469,7 +472,7 @@ class VehiculosController extends ResourceController
             return $this->failValidationErrors($this->validator->getErrors());
         }
 
-        $placa = strtoupper(trim($input['placa']));
+        $placa = \App\Libraries\Placa::normalizar($input['placa']);
         if ($db->table('vehiculos')->where('placa', $placa)->countAllResults() > 0) {
             return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
         }
@@ -580,7 +583,7 @@ class VehiculosController extends ResourceController
 
         $record = [];
         if (isset($input['placa'])) {
-            $placa = strtoupper(trim($input['placa']));
+            $placa = \App\Libraries\Placa::normalizar($input['placa']);
             if ($placa !== '') {
                 if (!preg_match('/^[A-Z0-9]{6}$/', $placa)) {
                     return $this->failValidationErrors('La placa de rodaje debe tener exactamente 6 caracteres alfanuméricos.');
@@ -681,6 +684,9 @@ class VehiculosController extends ResourceController
         }
 
         $veh = $db->table('vehiculos')->where('id', $id)->get()->getRowArray();
+        if (!$veh) {
+            return $this->failNotFound('Vehículo no encontrado.');
+        }
         $placa = $veh['placa'] ?? "ID $id";
 
         $db->table('vehiculo_propietarios')->where('id_vehiculo', $id)->delete();

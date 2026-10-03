@@ -199,8 +199,7 @@ class OperativosController extends ResourceController
                 'fecha' => 'o.fecha',
                 'estado' => 'o.estado',
             ];
-            $sortBy = trim((string) $this->request->getGet('sortBy'));
-            if ($sortBy !== '' && isset($columnasOrdenables[$sortBy])) {
+            if (trim((string) $this->request->getGet('sortBy')) !== '') {
                 \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'o.fecha');
             } else {
                 $builder->orderBy('o.fecha', 'DESC')->orderBy('o.hora_inicio', 'DESC');

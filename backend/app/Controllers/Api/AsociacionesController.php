@@ -121,13 +121,8 @@ class AsociacionesController extends ResourceController
         ];
 
         if ($page > 0) {
-            // Conteo total para paginación optimizado sin subconsulta pesada
-            $countBuilder = clone $builder;
-            $countRow = $countBuilder->select('COUNT(DISTINCT o.id) AS total_count', false)
-                ->groupBy(null)
-                ->get()
-                ->getRowArray();
-            $total = (int) ($countRow['total_count'] ?? 0);
+            // Con groupBy activo, CodeIgniter cuenta las filas agrupadas envolviendo la consulta.
+            $total = (clone $builder)->countAllResults(false);
 
             $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'o.id')
                 ->limit($porPagina, ($page - 1) * $porPagina)
@@ -230,34 +225,142 @@ class AsociacionesController extends ResourceController
      * cualquier asociación, junto con el nombre de la asociación a la que
      * pertenecen. Usado por la pestaña "Socios" del padrón.
      */
+    public function opciones()
+    {
+        $db = \Config\Database::connect();
+        $filas = $db->table('asociaciones')
+            ->select('id, razon_social AS razonSocial')
+            ->orderBy('razon_social', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        return $this->respond(['data' => $filas]);
+    }
+
+    /**
+     * Padrón de socios: UNA fila por persona. Una persona puede ser socia de varias
+     * asociaciones o empresas particulares y tener varios vehículos en cada una, así que
+     * cada fila trae sus "vinculos" (organización + los vehículos que tiene en ella).
+     * Los filtros de organización y de tipo también recortan los vínculos y los totales,
+     * para que lo que se ve y lo que se descarga siempre sea coherente con el filtro.
+     */
     public function socios()
     {
         $db = \Config\Database::connect();
 
-        $socios = $db->table('vehiculo_propietarios vp')
+        $base = static function ($db) {
+            return $db->table('vehiculo_propietarios vp')
+                ->join('vehiculos v', 'v.id = vp.id_vehiculo', 'inner')
+                ->join('asociaciones o', 'o.id = v.id_asociacion', 'inner')
+                ->where('vp.estado', 'ACTIVO');
+        };
+        $aplicarFiltros = function ($builder) {
+            $idAsociacion = (int) $this->request->getGet('idAsociacion');
+            if ($idAsociacion > 0) {
+                $builder->where('o.id', $idAsociacion);
+            }
+            $tipo = strtoupper(trim((string) $this->request->getGet('tipo')));
+            if (in_array($tipo, ['ASOCIACION', 'PARTICULAR'], true)) {
+                $builder->where('o.tipo', $tipo);
+            }
+            return $builder;
+        };
+
+        $socios = $aplicarFiltros($base($db))
             ->select("
                 p.id AS idPersona,
                 COALESCE(p.numero, '') AS documento,
                 TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) AS nombre,
                 COALESCE(NULLIF(p.telefono, ''), NULLIF(p.celular, ''), '') AS telefono,
                 COALESCE(p.email, '') AS email,
-                o.id AS idAsociacion,
-                o.razon_social AS asociacionNombre,
+                COUNT(DISTINCT o.id) AS asociacionesTotal,
                 COUNT(DISTINCT vp.id_vehiculo) AS vehiculosTotal,
-                GROUP_CONCAT(DISTINCT v.placa ORDER BY v.placa SEPARATOR ', ') AS placas
+                MIN(o.razon_social) AS asociacionNombre,
+                GROUP_CONCAT(DISTINCT v.placa SEPARATOR ',') AS placasBusqueda,
+                GROUP_CONCAT(DISTINCT o.razon_social SEPARATOR '|') AS organizacionesBusqueda
             ", false)
             ->join('personas p', 'p.id = vp.id_persona', 'inner')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-            ->join('vehiculos v', 'v.id = vp.id_vehiculo', 'inner')
-            ->join('asociaciones o', 'o.id = v.id_asociacion', 'inner')
-            ->where('vp.estado', 'ACTIVO')
-            ->groupBy('p.id, o.id')
-            ->orderBy('asociacionNombre', 'ASC')
-            ->orderBy('nombre', 'ASC')
-            ->get()
-            ->getResultArray();
+            ->groupBy('p.id');
 
-        return $this->respond(['data' => $socios]);
+        $buscar = trim((string) $this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $like = $db->escapeLikeString($buscar);
+            $socios->having(
+                "(nombre LIKE '%{$like}%' OR documento LIKE '%{$like}%' OR placasBusqueda LIKE '%{$like}%' "
+                . "OR organizacionesBusqueda LIKE '%{$like}%' OR telefono LIKE '%{$like}%' OR email LIKE '%{$like}%')",
+                null,
+                false
+            );
+        }
+
+        $page = (int) $this->request->getGet('page');
+        $meta = null;
+        if ($page > 0) {
+            $porPagina = max(1, min(200, (int) ($this->request->getGet('porPagina') ?: 20)));
+            $total = (clone $socios)->countAllResults(false);
+
+            $columnasOrdenables = [
+                'nombre' => 'nombre',
+                'documento' => 'documento',
+                'asociacionNombre' => 'asociacionNombre',
+                'asociacionesTotal' => 'asociacionesTotal',
+                'vehiculosTotal' => 'vehiculosTotal',
+            ];
+
+            $filas = \App\Libraries\QuerySort::aplicar($socios, $this->request, $columnasOrdenables, 'nombre', 'ASC')
+                ->orderBy('idPersona', 'ASC')
+                ->limit($porPagina, ($page - 1) * $porPagina)
+                ->get()
+                ->getResultArray();
+
+            $meta = [
+                'total' => $total,
+                'page' => $page,
+                'porPagina' => $porPagina,
+                'totalPaginas' => (int) ceil($total / $porPagina),
+            ];
+        } else {
+            $filas = $socios->orderBy('nombre', 'ASC')->orderBy('idPersona', 'ASC')->get()->getResultArray();
+        }
+
+        // Vínculos de las personas de esta página: organización + vehículos que tiene en ella
+        $ids = array_map('intval', array_column($filas, 'idPersona'));
+        $vinculos = [];
+        foreach (array_chunk($ids, 1000) as $lote) {
+            $q = $aplicarFiltros($base($db))
+                ->select("
+                    vp.id_persona AS idPersona,
+                    o.id AS idAsociacion,
+                    o.razon_social AS asociacionNombre,
+                    o.tipo AS tipo,
+                    COUNT(DISTINCT v.id) AS vehiculos,
+                    GROUP_CONCAT(DISTINCT v.placa ORDER BY v.placa SEPARATOR ',') AS placas
+                ", false)
+                ->whereIn('vp.id_persona', $lote)
+                ->groupBy('vp.id_persona, o.id')
+                ->orderBy('o.razon_social', 'ASC');
+            foreach ($q->get()->getResultArray() as $v) {
+                $vinculos[(int) $v['idPersona']][] = [
+                    'idAsociacion' => (int) $v['idAsociacion'],
+                    'asociacionNombre' => $v['asociacionNombre'],
+                    'tipo' => $v['tipo'],
+                    'vehiculos' => (int) $v['vehiculos'],
+                    'placas' => $v['placas'] !== null && $v['placas'] !== '' ? explode(',', $v['placas']) : [],
+                ];
+            }
+        }
+
+        foreach ($filas as &$fila) {
+            $fila['idPersona'] = (int) $fila['idPersona'];
+            $fila['asociacionesTotal'] = (int) $fila['asociacionesTotal'];
+            $fila['vehiculosTotal'] = (int) $fila['vehiculosTotal'];
+            $fila['vinculos'] = $vinculos[$fila['idPersona']] ?? [];
+            unset($fila['placasBusqueda'], $fila['organizacionesBusqueda']);
+        }
+        unset($fila);
+
+        return $this->respond($meta !== null ? ['data' => $filas, 'meta' => $meta] : ['data' => $filas]);
     }
 
     public function create()

@@ -111,7 +111,7 @@ class PermisosController extends ResourceController
         $data = [];
 
         if ($esCreacion || array_key_exists('vehiculoPlaca', $payload)) {
-            $placa = strtoupper(trim((string)($payload['vehiculoPlaca'] ?? '')));
+            $placa = \App\Libraries\Placa::normalizar((string)($payload['vehiculoPlaca'] ?? ''));
             $data['id_vehiculo'] = null;
             if ($placa !== '') {
                 $vehiculo = $db->table('vehiculos')->select('id')->where('placa', $placa)->get()->getRowArray();
@@ -165,18 +165,28 @@ class PermisosController extends ResourceController
             if ($buscar !== '') {
                 $builder->groupStart()
                     ->like('pc.numero_autorizacion', $buscar)
-                    ->orLike('v.placa', $buscar)
-                    ->orLike('pc.flota_placas', $buscar)
+                    ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
+                    ->orLike('pc.flota_placas', \App\Libraries\Placa::paraBusqueda($buscar))
                     ->orLike('o.razon_social', $buscar)
                     ->orLike('p.numero', $buscar)
                     ->orLike('c.nombres', $buscar)
                     ->orLike('c.apellido_paterno', $buscar)
                     ->orLike('pc.referencia_sisgedo', $buscar)
+                    ->orLike('pc.zona_circulacion', $buscar)
+                    ->orLike('pt.numero_recibo', $buscar)
                     ->groupEnd();
             }
 
             $tipoPermiso = strtoupper(trim((string)$this->request->getGet('tipoPermiso')));
-            if ($tipoPermiso !== '' && $tipoPermiso !== 'TODOS') {
+            if ($tipoPermiso === 'CONTROL_VEHICULAR') {
+                // Categoría por defecto: todo lo que no es Carga/Descarga, Uso de Vías ni Zonas Reservadas.
+                $builder->groupStart()
+                    ->whereNotIn('pc.tipo_permiso', ['CARGA_DESCARGA', 'USO_VIAS', 'ZONAS_RESERVADAS', 'ZONA_RESERVADA'])
+                    ->orWhere('pc.tipo_permiso IS NULL', null, false)
+                    ->groupEnd();
+            } elseif ($tipoPermiso === 'ZONAS_RESERVADAS') {
+                $builder->whereIn('pc.tipo_permiso', ['ZONAS_RESERVADAS', 'ZONA_RESERVADA']);
+            } elseif ($tipoPermiso !== '' && $tipoPermiso !== 'TODOS') {
                 $builder->where('pc.tipo_permiso', $tipoPermiso);
             }
 
@@ -191,6 +201,7 @@ class PermisosController extends ResourceController
             $columnasOrdenables = [
                 'tipoPermiso' => 'pc.tipo_permiso',
                 'numeroAutorizacion' => 'pc.numero_autorizacion',
+                'solicitanteNombre' => 'solicitanteNombre',
                 'estado' => 'pc.estado',
             ];
 
@@ -222,7 +233,8 @@ class PermisosController extends ResourceController
 
             return $this->respond(['data' => $data]);
         } catch (\Throwable $e) {
-            return $this->failServerError('Error consultando permisos: ' . $e->getMessage());
+            log_message('error', 'Error consultando permisos: ' . $e->getMessage());
+            return $this->failServerError('Error consultando permisos. Intente nuevamente.');
         }
     }
 
@@ -240,7 +252,8 @@ class PermisosController extends ResourceController
 
             return $this->respond(['data' => $this->normalizarFila($row)]);
         } catch (\Throwable $e) {
-            return $this->failServerError('Error consultando detalle del permiso: ' . $e->getMessage());
+            log_message('error', 'Error consultando detalle del permiso: ' . $e->getMessage());
+            return $this->failServerError('Error consultando detalle del permiso. Intente nuevamente.');
         }
     }
 
@@ -354,7 +367,8 @@ class PermisosController extends ResourceController
             if (stripos($msg, 'Duplicate entry') !== false) {
                 return $this->failValidationErrors('El número de autorización ya se encuentra registrado. Se generó un nuevo registro o verifique el correlativo.');
             }
-            return $this->failServerError('Error registrando permiso: ' . $msg);
+            log_message('error', 'Error registrando permiso: ' . $msg);
+            return $this->failServerError('Error registrando permiso. Intente nuevamente.');
         }
     }
 
@@ -435,7 +449,8 @@ class PermisosController extends ResourceController
             if (stripos($msg, 'Duplicate entry') !== false) {
                 return $this->failValidationErrors('El número de autorización ya está registrado en otro permiso.');
             }
-            return $this->failServerError('Error actualizando permiso: ' . $msg);
+            log_message('error', 'Error actualizando permiso: ' . $msg);
+            return $this->failServerError('Error actualizando permiso. Intente nuevamente.');
         }
     }
 
@@ -454,7 +469,8 @@ class PermisosController extends ResourceController
                 'message' => 'Autorización eliminada correctamente.'
             ]);
         } catch (\Throwable $e) {
-            return $this->failServerError('Error eliminando permiso: ' . $e->getMessage());
+            log_message('error', 'Error eliminando permiso: ' . $e->getMessage());
+            return $this->failServerError('Error eliminando permiso. Intente nuevamente.');
         }
     }
 
@@ -500,7 +516,8 @@ class PermisosController extends ResourceController
 
             return $this->respond(['data' => $rows]);
         } catch (\Throwable $e) {
-            return $this->failServerError('Error consultando trámites: ' . $e->getMessage());
+            log_message('error', 'Error consultando trámites: ' . $e->getMessage());
+            return $this->failServerError('Error consultando trámites. Intente nuevamente.');
         }
     }
 
@@ -598,7 +615,7 @@ class PermisosController extends ResourceController
             if ($q !== '') {
                 $builderTram->groupStart()
                     ->like('td.numero_expediente', $q)
-                    ->orLike('v.placa', $q)
+                    ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($q))
                     ->orLike('o.razon_social', $q)
                     ->orLike('o.ruc', $q)
                     ->orLike('p.numero', $q)
@@ -637,7 +654,8 @@ class PermisosController extends ResourceController
 
             return $this->respond(['data' => array_slice($unique, 0, 15)]);
         } catch (\Throwable $e) {
-            return $this->failServerError('Error buscando administrados: ' . $e->getMessage());
+            log_message('error', 'Error buscando administrados: ' . $e->getMessage());
+            return $this->failServerError('Error buscando administrados. Intente nuevamente.');
         }
     }
 
@@ -686,7 +704,8 @@ class PermisosController extends ResourceController
                 ->getResultArray();
             return $this->respond(['data' => $rows]);
         } catch (\Throwable $e) {
-            return $this->failServerError('Error consultando procedimientos: ' . $e->getMessage());
+            log_message('error', 'Error consultando procedimientos: ' . $e->getMessage());
+            return $this->failServerError('Error consultando procedimientos. Intente nuevamente.');
         }
     }
 }

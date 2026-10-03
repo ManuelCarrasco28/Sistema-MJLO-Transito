@@ -47,7 +47,7 @@ class ReportesIntervencionController extends ResourceController
 
         $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
         $dni = $this->request->getGet('dni');
-        $placa = $this->request->getGet('placa');
+        $placa = \App\Libraries\Placa::normalizar($this->request->getGet('placa'));
 
         if ($inspectorId > 0) {
             $query->where('r.id_inspector', $inspectorId);
@@ -115,7 +115,7 @@ class ReportesIntervencionController extends ResourceController
 
         $input = $this->request->getJSON(true) ?: $this->request->getPost() ?: [];
         $inspectorId = (int)($input['inspectorId'] ?? $input['id_inspector'] ?? 0);
-        $placa = strtoupper(trim((string)($input['placa'] ?? $input['vehiculoPlaca'] ?? '')));
+        $placa = \App\Libraries\Placa::normalizar((string)($input['placa'] ?? $input['vehiculoPlaca'] ?? ''));
         $lugar = trim((string)($input['lugar'] ?? ''));
         $observaciones = trim((string)($input['observaciones'] ?? $input['observacionesAutoridad'] ?? ''));
         $coordenadas = trim((string)($input['coordenadas'] ?? ''));
@@ -255,7 +255,8 @@ class ReportesIntervencionController extends ResourceController
             return $this->respondCreated(['message' => 'Reporte registrado para revisión administrativa.', 'data' => ['id' => $id]]);
         } catch (\Throwable $e) {
             $db->transRollback();
-            return $this->failServerError('No se pudo registrar el reporte: ' . $e->getMessage());
+            log_message('error', 'No se pudo registrar el reporte: ' . $e->getMessage());
+            return $this->failServerError('No se pudo registrar el reporte. Intente nuevamente.');
         }
     }
 
@@ -384,7 +385,8 @@ class ReportesIntervencionController extends ResourceController
             return $this->failValidationErrors($e->getMessage());
         } catch (\Throwable $e) {
             $db->transRollback();
-            return $this->failServerError('No se pudo convertir el reporte: ' . $e->getMessage());
+            log_message('error', 'No se pudo convertir el reporte: ' . $e->getMessage());
+            return $this->failServerError('No se pudo convertir el reporte. Intente nuevamente.');
         }
     }
 

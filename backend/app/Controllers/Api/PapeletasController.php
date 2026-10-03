@@ -31,7 +31,8 @@ class PapeletasController extends ResourceController
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
-            return $this->failServerError('Error al cargar tipos de infracción: ' . $e->getMessage());
+            log_message('error', 'Error al cargar tipos de infracción: ' . $e->getMessage());
+            return $this->failServerError('Error al cargar tipos de infracción. Intente nuevamente.');
         }
     }
 
@@ -137,7 +138,7 @@ class PapeletasController extends ResourceController
 
             $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
             $dni = $this->request->getGet('dni');
-            $placa = $this->request->getGet('placa');
+            $placa = \App\Libraries\Placa::normalizar($this->request->getGet('placa'));
             $buscar = trim((string)$this->request->getGet('buscar'));
             $estado = strtoupper(trim((string)$this->request->getGet('estado')));
             $origen = strtoupper(trim((string)$this->request->getGet('origen')));
@@ -187,7 +188,7 @@ class PapeletasController extends ResourceController
             if ($buscar !== '') {
                 $builder->groupStart()
                     ->like('p.numero_papeleta', $buscar)
-                    ->orLike('v.placa', $buscar)
+                    ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                     ->orLike('per.numero', $buscar)
                     ->orLike('c_per.nombres', $buscar)
                     ->orLike('c_per.apellido_paterno', $buscar)
@@ -295,7 +296,8 @@ class PapeletasController extends ResourceController
 
             return $this->respond(['data' => $data]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error consultando papeletas: ' . $e->getMessage());
+            log_message('error', 'Error consultando papeletas: ' . $e->getMessage());
+            return $this->failServerError('Error consultando papeletas. Intente nuevamente.');
         }
     }
 
@@ -333,7 +335,7 @@ class PapeletasController extends ResourceController
             return $this->failValidationErrors($this->validator->getErrors());
         }
 
-        $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
+        $placa = \App\Libraries\Placa::normalizar($input['vehiculoPlaca'] ?? '');
         $infractor = trim($input['infractor'] ?? '');
         $conductorDni = trim($input['conductorDni'] ?? '');
         $conductorNombres = trim($input['conductorNombres'] ?? '');
@@ -473,7 +475,8 @@ class PapeletasController extends ResourceController
             if ($txStarted) {
                 $db->transRollback();
             }
-            return $this->failServerError('Error creando la papeleta: ' . $e->getMessage());
+            log_message('error', 'Error creando la papeleta: ' . $e->getMessage());
+            return $this->failServerError('Error creando la papeleta. Intente nuevamente.');
         }
     }
 
@@ -583,7 +586,8 @@ class PapeletasController extends ResourceController
                 ],
             ]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error registrando firma: ' . $e->getMessage());
+            log_message('error', 'Error registrando firma: ' . $e->getMessage());
+            return $this->failServerError('Error registrando firma. Intente nuevamente.');
         }
     }
 
@@ -613,7 +617,8 @@ class PapeletasController extends ResourceController
 
             return $this->respond(['data' => $fotos]);
         } catch (\Exception $e) {
-            return $this->failServerError('Error al obtener fotos: ' . $e->getMessage());
+            log_message('error', 'Error al obtener fotos: ' . $e->getMessage());
+            return $this->failServerError('Error al obtener fotos. Intente nuevamente.');
         }
     }
 

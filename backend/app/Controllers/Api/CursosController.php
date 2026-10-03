@@ -312,6 +312,9 @@ class CursosController extends ResourceController
     {
         $db = \Config\Database::connect();
         try {
+            if (!$id || !$db->table('cursos_seguridad_vial')->where('id', $id)->countAllResults()) {
+                return $this->failNotFound('Curso no encontrado.');
+            }
             $db->table('cursos_seguridad_vial')->where('id', $id)->delete();
             return $this->respondDeleted(['status' => 200, 'message' => 'Curso eliminado correctamente']);
         } catch (\Exception $e) {

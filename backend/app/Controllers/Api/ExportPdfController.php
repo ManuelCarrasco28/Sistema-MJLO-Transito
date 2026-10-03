@@ -10,6 +10,9 @@ class ExportPdfController extends ResourceController
 {
     protected $format = 'json';
 
+    private const MAXIMO_FILAS = 10000;
+    private const FILAS_POR_BLOQUE = 40;
+
     /**
      * Genera un PDF real (no una captura de pantalla) a partir de la misma
      * estructura {title, subtitle, summaryItems, columns, data} que ya arma
@@ -32,9 +35,17 @@ class ExportPdfController extends ResourceController
             return $this->failValidationErrors('No hay registros para exportar a PDF.');
         }
 
-        // Límite defensivo: evita que un padrón desmedido cuelgue el render.
-        if (count($data) > 5000) {
-            $data = array_slice($data, 0, 5000);
+        // Los PDF grandes necesitan más memoria y tiempo que una petición normal.
+        @ini_set('memory_limit', '2048M');
+        @set_time_limit(0);
+
+        // Nunca se recorta en silencio: si el reporte excede lo que el render soporta, se avisa.
+        if (count($data) > self::MAXIMO_FILAS) {
+            return $this->failValidationErrors(
+                'El PDF admite hasta ' . number_format(self::MAXIMO_FILAS, 0, ',', '.')
+                . ' registros (se pidieron ' . number_format(count($data), 0, ',', '.')
+                . '). Aplique filtros o descargue el Excel con todos los datos.'
+            );
         }
 
         $html = $this->construirHtml($title, $subtitle, $summaryItems, $columns, $data, $filename);
@@ -117,7 +128,11 @@ class ExportPdfController extends ResourceController
             $headersHtml .= "<th style=\"text-align:{$align};{$width}\">{$this->e($col['header'] ?? '')}</th>";
         }
 
-        $rowsHtml = '';
+        // dompdf consume memoria de forma desproporcionada con una sola tabla enorme (3.000 filas
+        // superan los 2 GB). Partir el reporte en tablas de pocas filas mantiene el consumo estable.
+        $bloquesHtml = '';
+        $filasBloque = '';
+        $enBloque = 0;
         foreach ($data as $index => $row) {
             $bg = $index % 2 === 0 ? '#ffffff' : '#f8fafc';
             $cells = '<td class="col-n">' . ($index + 1) . '</td>';
@@ -132,7 +147,16 @@ class ExportPdfController extends ResourceController
                 $align = $col['align'] ?? 'left';
                 $cells .= "<td style=\"text-align:{$align};\">{$val}</td>";
             }
-            $rowsHtml .= "<tr style=\"background-color:{$bg};\">{$cells}</tr>";
+            $filasBloque .= "<tr style=\"background-color:{$bg};\">{$cells}</tr>";
+            $enBloque++;
+            if ($enBloque >= self::FILAS_POR_BLOQUE) {
+                $bloquesHtml .= "<table class=\"data-table\"><thead><tr>{$headersHtml}</tr></thead><tbody>{$filasBloque}</tbody></table>";
+                $filasBloque = '';
+                $enBloque = 0;
+            }
+        }
+        if ($filasBloque !== '') {
+            $bloquesHtml .= "<table class=\"data-table\"><thead><tr>{$headersHtml}</tr></thead><tbody>{$filasBloque}</tbody></table>";
         }
 
         $logo = $this->logoBase64();
@@ -182,10 +206,7 @@ class ExportPdfController extends ResourceController
                 </table>
             </div>
             {$summaryHtml}
-            <table class="data-table">
-                <thead><tr>{$headersHtml}</tr></thead>
-                <tbody>{$rowsHtml}</tbody>
-            </table>
+            {$bloquesHtml}
             <div class="footer">
                 Documento oficial generado para fines administrativos y fiscalización del transporte en José Leonardo Ortiz. &mdash; {$this->e($filename)}
             </div>

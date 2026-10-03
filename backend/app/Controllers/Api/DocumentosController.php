@@ -11,22 +11,143 @@ class DocumentosController extends ResourceController
     // Columnas reales de documentos_vehiculo: cualquier otro dato del formulario se descarta.
     private const COLUMNAS = ['id_vehiculo', 'fecha_expedicion', 'fecha_expiracion', 'tipo_documento', 'codigo', 'estado'];
 
+    private const ETIQUETAS_TIPO = [
+        'TARJETA_OPERATIVIDAD' => 'Tarjeta de Operatividad',
+        'SOAT' => 'SOAT',
+        'TARJETA_PROPIEDAD' => 'Tarjeta de Propiedad',
+    ];
+
     private function soloColumnasReales(array $record): array
     {
         return array_intersect_key($record, array_flip(self::COLUMNAS));
     }
 
     /**
-     * Sinónimos de tipo_documento: el catálogo vigente del módulo es
-     * TARJETA_OPERATIVIDAD / SOAT / TARJETA_PROPIEDAD, pero datos antiguos
-     * (o el seeder) usan nombres previos para el mismo concepto. Se agrupan
-     * aquí para que filtros y estadísticas los traten como uno solo.
+     * Estado real de un documento hoy: el campo estado puede quedar desfasado
+     * (VIGENTE con fecha ya vencida), así que se contrasta con la fecha.
+     * La Tarjeta de Propiedad no vence: solo puede estar vigente o anulada.
      */
-    private const SINONIMOS_TIPO = [
-        'TARJETA_OPERATIVIDAD' => ['TARJETA_OPERATIVIDAD', 'PERMISO_OPERACION'],
-        'TARJETA_PROPIEDAD' => ['TARJETA_PROPIEDAD', 'TARJETA_CIRCULACION'],
-        'SOAT' => ['SOAT'],
-    ];
+    private function estadoEfectivo(array $doc): string
+    {
+        $estado = strtoupper((string) ($doc['estado'] ?? ''));
+        if ($estado === 'ANULADO') {
+            return 'ANULADO';
+        }
+        if (($doc['tipo_documento'] ?? '') === 'TARJETA_PROPIEDAD') {
+            return 'VIGENTE';
+        }
+        if ($estado === 'VENCIDO') {
+            return 'VENCIDO';
+        }
+        $vence = $doc['fecha_expiracion'] ?? null;
+
+        return ($vence && $vence < date('Y-m-d')) ? 'VENCIDO' : 'VIGENTE';
+    }
+
+    /** Un documento marcado VIGENTE no puede traer una fecha de vencimiento que ya pasó. */
+    private function vigenteConFechaPasada(array $doc): bool
+    {
+        if (($doc['tipo_documento'] ?? '') === 'TARJETA_PROPIEDAD') {
+            return false;
+        }
+        $vence = $doc['fecha_expiracion'] ?? null;
+
+        return strtoupper((string) ($doc['estado'] ?? '')) === 'VIGENTE' && $vence && $vence < date('Y-m-d');
+    }
+
+    /**
+     * Devuelve el motivo por el que el documento sería un duplicado, o null si
+     * se puede guardar: (1) el mismo número ya existe para ese tipo; (2) el
+     * vehículo ya tiene un documento vigente del mismo tipo.
+     */
+    private function mensajeDuplicado($db, int $vehiculoId, string $placa, array $doc, ?int $excluirId, bool $validarVigencia = true): ?string
+    {
+        $tipo = $doc['tipo_documento'];
+        $etiqueta = self::ETIQUETAS_TIPO[$tipo] ?? $tipo;
+        $codigo = trim((string) $doc['codigo']);
+
+        $repetido = $db->table('documentos_vehiculo d')
+            ->select('v.placa')
+            ->join('vehiculos v', 'v.id = d.id_vehiculo', 'left')
+            ->where('d.tipo_documento', $tipo)
+            ->where('d.codigo', $codigo);
+        if ($excluirId) {
+            $repetido->where('d.id !=', $excluirId);
+        }
+        $fila = $repetido->get()->getRowArray();
+        if ($fila) {
+            $donde = !empty($fila['placa']) ? " (vehículo {$fila['placa']})" : '';
+
+            return "Ya existe un {$etiqueta} con el número {$codigo}{$donde}. El número del documento no se puede repetir.";
+        }
+
+        if (!$validarVigencia || $this->estadoEfectivo($doc) !== 'VIGENTE') {
+            return null;
+        }
+
+        $vigentes = $db->table('documentos_vehiculo')
+            ->where('id_vehiculo', $vehiculoId)
+            ->where('tipo_documento', $tipo)
+            ->where('estado !=', 'ANULADO');
+        if ($excluirId) {
+            $vigentes->where('id !=', $excluirId);
+        }
+        foreach ($vigentes->get()->getResultArray() as $otro) {
+            if ($this->estadoEfectivo($otro) === 'VIGENTE') {
+                $vence = !empty($otro['fecha_expiracion']) ? ', vence el ' . date('d/m/Y', strtotime($otro['fecha_expiracion'])) : '';
+
+                return "El vehículo {$placa} ya tiene {$etiqueta} vigente (N° {$otro['codigo']}{$vence}). Anúlelo o espere a que venza antes de emitir otro.";
+            }
+        }
+
+        return null;
+    }
+
+    /** Estado de los tres documentos de un vehículo, para el cuadro del formulario. */
+    public function resumenVehiculo($vehiculoId = null)
+    {
+        $db = \Config\Database::connect();
+        $vehiculoId = (int) $vehiculoId;
+        if ($vehiculoId <= 0 || !$db->table('vehiculos')->where('id', $vehiculoId)->countAllResults()) {
+            return $this->failNotFound('Vehículo no encontrado.');
+        }
+
+        $docs = $db->table('documentos_vehiculo')
+            ->select('id, tipo_documento, codigo, fecha_expedicion, fecha_expiracion, estado')
+            ->where('id_vehiculo', $vehiculoId)
+            ->whereIn('tipo_documento', array_keys(self::ETIQUETAS_TIPO))
+            ->orderBy('fecha_expedicion', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->get()
+            ->getResultArray();
+
+        $resumen = [];
+        foreach (self::ETIQUETAS_TIPO as $tipo => $etiqueta) {
+            $delTipo = array_values(array_filter($docs, static fn ($d) => $d['tipo_documento'] === $tipo));
+            $elegido = null;
+            // Se muestra el vigente si lo hay; si no, el más reciente que no esté anulado; si no, el más reciente.
+            foreach ([['VIGENTE'], ['VENCIDO'], ['ANULADO']] as $prioridad) {
+                foreach ($delTipo as $d) {
+                    if (in_array($this->estadoEfectivo($d), $prioridad, true)) {
+                        $elegido = $d;
+                        break 2;
+                    }
+                }
+            }
+
+            $resumen[] = [
+                'tipoDocumento' => $tipo,
+                'etiqueta' => $etiqueta,
+                'estado' => $elegido ? $this->estadoEfectivo($elegido) : 'NO_REGISTRADO',
+                'id' => $elegido ? (int) $elegido['id'] : null,
+                'codigo' => $elegido['codigo'] ?? null,
+                'fechaExpedicion' => $elegido['fecha_expedicion'] ?? null,
+                'fechaExpiracion' => $elegido['fecha_expiracion'] ?? null,
+            ];
+        }
+
+        return $this->respond(['data' => $resumen]);
+    }
 
     public function estadisticas()
     {
@@ -34,9 +155,9 @@ class DocumentosController extends ResourceController
         $row = $db->table('documentos_vehiculo')
             ->select("
                 COUNT(*) as total,
-                SUM(CASE WHEN tipo_documento IN ('TARJETA_OPERATIVIDAD', 'PERMISO_OPERACION') THEN 1 ELSE 0 END) as tuc,
+                SUM(CASE WHEN tipo_documento = 'TARJETA_OPERATIVIDAD' THEN 1 ELSE 0 END) as tuc,
                 SUM(CASE WHEN tipo_documento = 'SOAT' THEN 1 ELSE 0 END) as soat,
-                SUM(CASE WHEN tipo_documento IN ('TARJETA_PROPIEDAD', 'TARJETA_CIRCULACION') THEN 1 ELSE 0 END) as propiedad,
+                SUM(CASE WHEN tipo_documento = 'TARJETA_PROPIEDAD' THEN 1 ELSE 0 END) as propiedad,
                 SUM(CASE WHEN estado = 'VIGENTE' THEN 1 ELSE 0 END) as vigentes,
                 SUM(CASE WHEN estado != 'VIGENTE' THEN 1 ELSE 0 END) as vencidos
             ", false)
@@ -98,7 +219,7 @@ class DocumentosController extends ResourceController
         if ($buscar !== '') {
             $builder->groupStart()
                 ->like('d.codigo', $buscar)
-                ->orLike('v.placa', $buscar)
+                ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                 ->orLike('p.numero', $buscar)
                 ->orLike('c.nombres', $buscar)
                 ->orLike('c.apellido_paterno', $buscar)
@@ -108,7 +229,7 @@ class DocumentosController extends ResourceController
 
         $tipoDoc = strtoupper(trim((string)$this->request->getGet('tipoDocumento')));
         if ($tipoDoc !== '' && $tipoDoc !== 'TODOS') {
-            $builder->whereIn('d.tipo_documento', self::SINONIMOS_TIPO[$tipoDoc] ?? [$tipoDoc]);
+            $builder->where('d.tipo_documento', $tipoDoc);
         }
 
         $estado = strtoupper(trim((string)$this->request->getGet('estado')));
@@ -215,7 +336,7 @@ class DocumentosController extends ResourceController
             return $this->failValidationErrors('Tipo de documento vehicular no válido. Solo se permite Tarjeta de Operatividad, SOAT y Tarjeta de Propiedad.');
         }
 
-        $placa = strtoupper(trim($input['vehiculoPlaca'] ?? ''));
+        $placa = \App\Libraries\Placa::normalizar($input['vehiculoPlaca'] ?? '');
         $vehiculoRow = null;
 
         if ($placa !== '') {
@@ -276,7 +397,23 @@ class DocumentosController extends ResourceController
             'estado'             => strtoupper($input['estado'] ?? 'VIGENTE'),
         ];
 
-        $db->table('documentos_vehiculo')->insert($record);
+        if ($this->vigenteConFechaPasada($record)) {
+            return $this->failValidationErrors('La fecha de vencimiento ya pasó. Un documento vigente necesita una fecha de vencimiento futura.');
+        }
+
+        $duplicado = $this->mensajeDuplicado($db, $vehiculoId, $placa, $record, null);
+        if ($duplicado) {
+            return $this->failValidationErrors($duplicado);
+        }
+
+        try {
+            $db->table('documentos_vehiculo')->insert($record);
+        } catch (Throwable $e) {
+            if (stripos($e->getMessage(), 'Duplicate entry') !== false) {
+                return $this->failValidationErrors('Ya existe un documento de ese tipo con ese número. El número del documento no se puede repetir.');
+            }
+            throw $e;
+        }
         $insertId = (int)$db->insertID();
 
         // Fetch asociación
@@ -333,7 +470,7 @@ class DocumentosController extends ResourceController
             return $this->failNotFound('ID de documento no especificado.');
         }
 
-        $actual = $db->table('documentos_vehiculo')->select('tipo_documento')->where('id', $id)->get()->getRowArray();
+        $actual = $db->table('documentos_vehiculo')->select('id_vehiculo, tipo_documento, codigo, estado, fecha_expiracion')->where('id', $id)->get()->getRowArray();
         if (!$actual) {
             return $this->failNotFound('Documento no encontrado.');
         }
@@ -358,7 +495,7 @@ class DocumentosController extends ResourceController
         if (isset($input['fechaExpedicion'])) $record['fecha_expedicion'] = $input['fechaExpedicion'] ?: null;
         if (isset($input['fechaExpiracion'])) {
             // La Tarjeta de Propiedad no tiene fecha de vencimiento.
-            $record['fecha_expiracion'] = in_array($tipoEfectivo, ['TARJETA_PROPIEDAD', 'TARJETA_CIRCULACION'], true)
+            $record['fecha_expiracion'] = $tipoEfectivo === 'TARJETA_PROPIEDAD'
                 ? null
                 : ($input['fechaExpiracion'] ?: null);
         }
@@ -366,7 +503,29 @@ class DocumentosController extends ResourceController
         $record = $this->soloColumnasReales($record);
 
         if (!empty($record)) {
-            $db->table('documentos_vehiculo')->where('id', $id)->update($record);
+            $despues = array_merge($actual, $record);
+            if (isset($record['fecha_expiracion']) && $this->vigenteConFechaPasada($despues)) {
+                return $this->failValidationErrors('La fecha de vencimiento ya pasó. Un documento vigente necesita una fecha de vencimiento futura.');
+            }
+            $cambiaIdentidad = isset($record['codigo']) || isset($record['tipo_documento']);
+            $pasaAVigente = $this->estadoEfectivo($despues) === 'VIGENTE'
+                && ($this->estadoEfectivo($actual) !== 'VIGENTE' || isset($record['tipo_documento']));
+            if ($cambiaIdentidad || $pasaAVigente) {
+                $placaActual = (string) ($db->table('vehiculos')->select('placa')->where('id', $actual['id_vehiculo'])->get()->getRowArray()['placa'] ?? '');
+                $duplicado = $this->mensajeDuplicado($db, (int) $actual['id_vehiculo'], $placaActual, $despues, (int) $id, $pasaAVigente || isset($record['tipo_documento']));
+                if ($duplicado) {
+                    return $this->failValidationErrors($duplicado);
+                }
+            }
+
+            try {
+                $db->table('documentos_vehiculo')->where('id', $id)->update($record);
+            } catch (\Throwable $e) {
+                if (stripos($e->getMessage(), 'Duplicate entry') !== false) {
+                    return $this->failValidationErrors('Ya existe un documento de ese tipo con ese número. El número del documento no se puede repetir.');
+                }
+                throw $e;
+            }
         }
 
         return $this->respond(['status' => true, 'message' => 'Documento actualizado con éxito']);
@@ -378,6 +537,10 @@ class DocumentosController extends ResourceController
 
         if (!$id) {
             return $this->failNotFound('ID de documento no especificado.');
+        }
+
+        if (!$db->table('documentos_vehiculo')->where('id', $id)->countAllResults()) {
+            return $this->failNotFound('Documento no encontrado.');
         }
 
         $db->table('documentos_vehiculo')->where('id', $id)->delete();

@@ -297,7 +297,8 @@ class UsuariosController extends ResourceController
 
             return $this->respondDeleted($this->formatResponse(true, 'Usuario eliminado correctamente.'));
         } catch (\Exception $e) {
-            return $this->failServerError('Error al eliminar el usuario: ' . $e->getMessage());
+            log_message('error', 'Error al eliminar el usuario: ' . $e->getMessage());
+            return $this->failServerError('Error al eliminar el usuario. Intente nuevamente.');
         }
     }
 }
