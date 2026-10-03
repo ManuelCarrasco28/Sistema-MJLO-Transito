@@ -7,7 +7,7 @@ services:
     restart: always
     env_file: .env
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - db_data:/var/lib/mysql
       - ./init-db:/docker-entrypoint-initdb.d
@@ -52,7 +52,7 @@ services:
     container_name: mjlo_phpmyadmin
     restart: always
     ports:
-      - "8081:80"
+      - "127.0.0.1:8081:80"
     env_file: .env
     environment:
       PMA_HOST: db

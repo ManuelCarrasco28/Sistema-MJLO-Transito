@@ -11,14 +11,14 @@ class FileStorageService
         'image/webp' => 'webp',
     ];
 
+    private const TAMANO_MAXIMO_BYTES = 8 * 1024 * 1024; // 8 MB
+
     /**
      * Decodifica una imagen en base64 (con o sin prefijo data:image/...) y la
      * guarda en writable/uploads/{subcarpeta}/. Devuelve la ruta relativa
      * (ej. "papeletas/6f1a....jpg") que se debe persistir en la base de datos,
      * en vez del base64 completo.
      */
-    private const TAMANO_MAXIMO_BYTES = 8 * 1024 * 1024; // 8 MB
-
     public function guardarImagenBase64(string $base64, string $subcarpeta): ?string
     {
         $base64 = trim($base64);

@@ -31,7 +31,8 @@ class Filters extends BaseFilters
         'invalidchars'  => InvalidChars::class,
         'secureheaders' => SecureHeaders::class,
         'cors'          => \App\Filters\CorsFilter::class,
-        'sessionauth'   => \App\Filters\SessionAuthFilter::class,
+        'csrforigin'    => \App\Filters\CsrfOriginFilter::class,
+        'sessionauth'  => \App\Filters\SessionAuthFilter::class,
         'forcehttps'    => ForceHTTPS::class,
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
@@ -74,14 +75,15 @@ class Filters extends BaseFilters
     public array $globals = [
         'before' => [
             'cors',
+            'csrforigin',
             // 'honeypot',
             // 'csrf',
             // 'invalidchars',
         ],
         'after' => [
             'cors',
+            'secureheaders',
             // 'honeypot',
-            // 'secureheaders',
         ],
     ];
 

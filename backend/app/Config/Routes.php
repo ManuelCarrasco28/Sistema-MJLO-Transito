@@ -9,8 +9,30 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->post('login', 'AuthController::login');
     $routes->get('status', 'StatusController::index');
 
+    // Eliminaciones: solo personal de oficina. El frontend ya oculta estas acciones al rol
+    // Trabajador y la app móvil no elimina registros; aquí se exige también en el servidor.
+    // Va antes del grupo general para que estas rutas DELETE se resuelvan primero.
+    $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA'], static function ($routes): void {
+        $recursosEliminables = [
+            'vehiculos' => 'VehiculosController',
+            'personas' => 'PersonasController',
+            'asociaciones' => 'AsociacionesController',
+            'documentos' => 'DocumentosController',
+            'papeletas' => 'PapeletasController',
+            'operativos' => 'OperativosController',
+            'pagos' => 'PagosController',
+            'cursos' => 'CursosController',
+            'inspecciones' => 'InspeccionesController',
+            'internamientos' => 'InternamientosController',
+            'permisos' => 'PermisosController',
+        ];
+        foreach ($recursosEliminables as $recurso => $controlador) {
+            $routes->delete("{$recurso}/(:segment)", "{$controlador}::delete/$1");
+        }
+    });
+
     $routes->group('', ['filter' => 'sessionauth'], static function ($routes): void {
-        $routes->get('mobile/config', 'MunicipalidadController::mobileConfig');
+        $routes->get('mobile/config','MunicipalidadController::mobileConfig');
         $routes->get('municipalidad/config-mobile', 'MunicipalidadController::mobileConfig');
         $routes->get('mobile/dashboard', 'MunicipalidadController::mobileDashboard');
         $routes->get('mobile/vehiculos/buscar', 'VehiculosController::buscarMobile');
@@ -34,10 +56,12 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('personal/catalogos', 'PersonalController::catalogos');
         $routes->get('personal/estadisticas', 'PersonalController::estadisticas');
         $routes->resource('personal', ['controller' => 'PersonalController', 'only' => ['index', 'create', 'update']]);
+        $routes->get('asociaciones/opciones', 'AsociacionesController::opciones');
         $routes->get('asociaciones/socios', 'AsociacionesController::socios');
         $routes->get('asociaciones/estadisticas', 'AsociacionesController::estadisticas');
         $routes->resource('asociaciones', ['controller' => 'AsociacionesController']);
         $routes->get('documentos/estadisticas', 'DocumentosController::estadisticas');
+        $routes->get('documentos/vehiculo/(:num)', 'DocumentosController::resumenVehiculo/$1');
         $routes->resource('documentos', ['controller' => 'DocumentosController']);
         $routes->get('papeletas/estadisticas', 'PapeletasController::estadisticas');
         $routes->resource('papeletas', ['controller' => 'PapeletasController']);

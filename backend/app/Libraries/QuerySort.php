@@ -18,12 +18,34 @@ class QuerySort
      */
     public static function aplicar($builder, $request, array $columnas, string $columnaDefecto, string $direccionDefecto = 'DESC')
     {
-        $sortBy = trim((string) $request->getGet('sortBy'));
-        $sortDirRaw = strtoupper(trim((string) $request->getGet('sortDir')));
-        $sortDir = in_array($sortDirRaw, ['ASC', 'DESC'], true) ? $sortDirRaw : strtoupper($direccionDefecto);
+        $direccionDefecto = strtoupper($direccionDefecto);
+        $claves = array_map('trim', explode(',', (string) $request->getGet('sortBy')));
+        $direcciones = array_map(
+            static fn($d) => strtoupper(trim($d)),
+            explode(',', (string) $request->getGet('sortDir'))
+        );
 
-        $columnaSql = $columnas[$sortBy] ?? $columnaDefecto;
+        // Admite varias columnas a la vez ("a,b" con "ASC,DESC"); cada una se valida contra la lista blanca.
+        $aplicadas = [];
+        foreach ($claves as $i => $clave) {
+            if ($clave === '' || !isset($columnas[$clave]) || in_array($columnas[$clave], $aplicadas, true)) {
+                continue;
+            }
+            $dir = in_array($direcciones[$i] ?? '', ['ASC', 'DESC'], true) ? $direcciones[$i] : $direccionDefecto;
+            $builder->orderBy($columnas[$clave], $dir);
+            $aplicadas[] = $columnas[$clave];
+        }
 
-        return $builder->orderBy($columnaSql, $sortDir);
+        // Desempate estable por la columna por defecto (normalmente el id): mismo orden en cada consulta y entre páginas.
+        if ($aplicadas !== [] && !in_array($columnaDefecto, $aplicadas, true)) {
+            $builder->orderBy($columnaDefecto, $direccionDefecto);
+        }
+
+        if ($aplicadas === []) {
+            $dir = in_array($direcciones[0] ?? '', ['ASC', 'DESC'], true) ? $direcciones[0] : $direccionDefecto;
+            $builder->orderBy($columnaDefecto, $dir);
+        }
+
+        return $builder;
     }
 }

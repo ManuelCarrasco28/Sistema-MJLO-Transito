@@ -47,3 +47,13 @@ Options -Indexes
 # Disable server signature start
 ServerSignature Off
 # Disable server signature end
+
+# ----------------------------------------------------------------------
+# Exportaciones (PDF/Excel) con decenas de miles de filas
+# El JSON que el frontend envía para generar un PDF puede superar los 8 MB por defecto.
+# ----------------------------------------------------------------------
+<IfModule mod_php.c>
+	php_value post_max_size 64M
+	php_value memory_limit 1024M
+	php_value max_execution_time 300
+</IfModule>
