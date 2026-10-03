@@ -78,7 +78,7 @@ export function SearchableMultiSelect({ options, selectedIds, onChange, placehol
           }}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-surface)] dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-400/10"
+          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-400/10"
         />
       </div>
         

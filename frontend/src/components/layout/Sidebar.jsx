@@ -105,8 +105,8 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
     'Super Admin': { icon: 'shieldCheck', color: 'text-cyan-500 dark:text-cyan-400', bg: '' },
     'Administración': { icon: 'settings', color: 'text-emerald-500 dark:text-emerald-400', bg: '' },
     'Mantenimiento': { icon: 'lock', color: NEUTRAL_ICON, bg: '' },
-    'Principal': { icon: 'dashboard', color: 'text-[#4318FF] dark:text-indigo-400', bg: '' },
-    'Padrón municipal': { icon: 'people', color: 'text-[#4318FF] dark:text-indigo-400', bg: '' },
+    'Principal': { icon: 'dashboard', color: 'text-[#5B6EE1] dark:text-indigo-400', bg: '' },
+    'Padrón municipal': { icon: 'people', color: 'text-[#5B6EE1] dark:text-indigo-400', bg: '' },
     'Trámites': { icon: 'document', color: 'text-amber-500 dark:text-amber-400', bg: '' },
     'Inspecciones Técnicas': { icon: 'certificate', color: 'text-purple-600 dark:text-purple-400', bg: '' },
     'Fiscalización': { icon: 'ticket', color: 'text-rose-500 dark:text-rose-400', bg: '' },
@@ -179,7 +179,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
       )}
       <aside
         style={{ height: '100%', maxHeight: '100dvh' }}
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen max-h-screen h-dvh max-h-dvh flex-col overflow-hidden bg-white dark:bg-[#111C44] text-slate-800 dark:text-slate-100 border-r border-slate-200/80 dark:border-white/10 shadow-2xl transition-all duration-300 lg:relative lg:z-auto lg:h-full lg:max-h-full lg:translate-x-0 lg:shadow-none shrink-0 select-none ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen max-h-screen h-dvh max-h-dvh flex-col overflow-hidden bg-white dark:bg-[#1C2438] text-slate-800 dark:text-slate-100 border-r border-slate-200/80 dark:border-white/10 shadow-2xl transition-all duration-300 lg:relative lg:z-auto lg:h-full lg:max-h-full lg:translate-x-0 lg:shadow-none shrink-0 select-none ${
           collapsedOnDesktop ? 'w-20' : 'w-64'
         } ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
@@ -269,12 +269,12 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                     className={`group flex size-10 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
                       groupSelected || activeFlyoutGroup?.name === group.name
                         ? ''
-                        : 'hover:bg-slate-50 dark:hover:bg-[#111C44]'
+                        : 'hover:bg-slate-50 dark:hover:bg-[#1C2438]'
                     }`}
                   >
                     <span className={`grid size-[32px] place-items-center rounded-[10px] transition-all duration-200 ${
                       groupSelected
-                        ? 'bg-[#4318FF] text-white shadow-md'
+                        ? 'bg-[#5B6EE1] text-white shadow-md'
                         : activeFlyoutGroup?.name === group.name
                           ? `ring-2 ring-offset-1 ring-slate-200 dark:ring-slate-700 bg-slate-100 dark:bg-white/5 ${grpCfg.color}`
                           : `bg-slate-100 dark:bg-white/5 ${grpCfg.color} hover:brightness-95 dark:hover:brightness-110`
@@ -303,7 +303,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                   }}
                   className={`relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 cursor-pointer ${
                     selected
-                      ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#4318FF] dark:text-indigo-300'
+                      ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#5B6EE1] dark:text-indigo-300'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
@@ -320,7 +320,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                   onClick={() => toggleGroup(group.name)}
                   className={`relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 cursor-pointer ${
                     groupSelected && !expandedGroups[group.name]
-                      ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#4318FF] dark:text-indigo-300'
+                      ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#5B6EE1] dark:text-indigo-300'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
@@ -348,11 +348,11 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                           }}
                           className={`flex w-full items-center gap-2.5 rounded-lg py-1.5 pl-6 pr-2.5 text-left transition-colors duration-150 cursor-pointer ${
                             selected
-                              ? 'text-[#4318FF] dark:text-indigo-300 font-semibold'
+                              ? 'text-[#5B6EE1] dark:text-indigo-300 font-semibold'
                               : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                           }`}
                         >
-                          <span className={`size-1.5 rounded-full shrink-0 ${selected ? 'bg-[#4318FF] dark:bg-indigo-300' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                          <Icon name={item.icon} className={`size-4 shrink-0 ${selected ? 'text-[#5B6EE1] dark:text-indigo-300' : 'text-slate-400 dark:text-slate-500'}`} />
                           <span className="text-[12.5px] tracking-tight truncate flex-1">{item.label}</span>
                         </button>
                       )
@@ -364,7 +364,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           })}
         </nav>
 
-        <div className="mt-auto shrink-0 border-t border-slate-100 dark:border-white/10 px-2.5 py-2 bg-white dark:bg-[#111C44]">
+        <div className="mt-auto shrink-0 border-t border-slate-100 dark:border-white/10 px-2.5 py-2 bg-white dark:bg-[#1C2438]">
           <button
             type="button"
             onClick={onLogout}
@@ -391,7 +391,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
         <div
           ref={flyoutRef}
           style={{ position: 'fixed', top: flyoutPos.top, left: flyoutPos.left, zIndex: 9999 }}
-          className="min-w-[13rem] rounded-[16px] border border-[#E9EDF7]/60 dark:border-white/10 bg-white dark:bg-[#111C44] p-2.5 shadow-[0_20px_60px_rgba(112,144,176,0.15)] dark:shadow-none animate-enter"
+          className="min-w-[13rem] rounded-[16px] border border-[#E9EDF7]/60 dark:border-white/10 bg-white dark:bg-[#1C2438] p-2.5 shadow-[0_20px_60px_rgba(112,144,176,0.15)] dark:shadow-none animate-enter"
         >
           <p className="px-2 pb-2 pt-0.5 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/60">
             {activeFlyoutGroup.name}
@@ -411,7 +411,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                   }}
                   className={`flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-left text-[13px] font-bold transition-all duration-200 cursor-pointer ${
                     selected
-                      ? 'bg-[#4318FF] text-white shadow-md'
+                      ? 'bg-[#5B6EE1] text-white shadow-md'
                       : 'text-slate-800 dark:text-white/80 hover:bg-[#F4F7FE] dark:hover:bg-white/5 hover:text-black dark:hover:text-white'
                   }`}
                 >

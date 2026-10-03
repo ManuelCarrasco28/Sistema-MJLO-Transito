@@ -42,14 +42,14 @@ function ModuleFallback() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+          <div key={i} className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">
             <div className="h-3 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
             <div className="mt-3 h-6 w-12 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
           </div>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[var(--bg-surface)]">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
         <div className="flex items-center gap-3 border-b border-slate-100 p-4 dark:border-[var(--border)]">
           <div className="h-10 flex-1 rounded-xl bg-slate-100 dark:bg-[var(--bg-subtle)]" />
           <div className="h-10 w-28 rounded-xl bg-slate-200 dark:bg-[var(--bg-subtle)]" />
@@ -91,7 +91,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (p.startsWith('/inspecciones'))             return 'Certicav'
     if (p.startsWith('/papeletas'))                return 'Papeletas'
     if (p.startsWith('/operativos'))               return 'Operativos'
-    if (p.startsWith('/cursos'))                   return 'Curso de Seguridad Vial'
+    if (p.startsWith('/cursos'))                   return 'Cursos de Seguridad Vial'
     if (p.startsWith('/pagos'))                    return 'Pagos'
     if (p.startsWith('/internamientos') || p.startsWith('/retenciones')) return 'Internamientos'
     if (p.startsWith('/permisos'))                 return 'Permisos y Autorizaciones'
@@ -195,7 +195,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
   return (
     <main
-      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#0b1120] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white ${sidebarCollapsed ? 'lg:grid-cols-[5rem_minmax(0,1fr)]' : 'lg:grid-cols-[16rem_minmax(0,1fr)]'
+      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#151A2D] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white ${sidebarCollapsed ? 'lg:grid-cols-[5rem_minmax(0,1fr)]' : 'lg:grid-cols-[16rem_minmax(0,1fr)]'
         }`}
     >
       <div className="print:hidden">
@@ -257,7 +257,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
               <Route path="/retenciones" element={onlyNormalUser(<Navigate to="/internamientos" replace />)} />
               <Route path="/permisos" element={onlyOfficeUser(<Permisos />)} />
               <Route path="*" element={
-                <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-white dark:bg-[var(--bg-surface)] border border-slate-200/80 dark:border-[var(--border)] shadow-xs">
+                <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-white dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)] shadow-xs">
                   <div className="size-16 rounded-2xl bg-slate-100 dark:bg-[var(--bg-subtle)] flex items-center justify-center text-slate-500 mb-4">
                     <span className="text-2xl font-black">404</span>
                   </div>

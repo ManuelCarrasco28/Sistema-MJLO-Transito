@@ -18,7 +18,7 @@ export function PlacaBadge({ placa, className = '', size = 'md' }) {
 
   return (
     <span
-      className={`inline-flex items-center justify-center break-all text-center max-w-full rounded-lg border-2 border-slate-900 bg-amber-300 ${sizeClasses} font-mono font-black tracking-widest text-slate-950 shadow-xs dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950 ${className}`}
+      className={`inline-flex items-center justify-center whitespace-nowrap text-center rounded-lg border-2 border-slate-900 bg-amber-300 ${sizeClasses} font-mono font-black tracking-widest text-slate-950 shadow-xs dark:border-[var(--border)] dark:bg-amber-400 dark:text-slate-950 ${className}`}
     >
       {upperPlaca}
     </span>
