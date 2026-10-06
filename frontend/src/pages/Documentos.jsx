@@ -67,7 +67,7 @@ function getCodigoLabel(tipoDocumento) {
     case 'SOAT':
       return 'Número de Póliza'
     case 'TARJETA_OPERATIVIDAD':
-      return 'Número Res. Municipal'
+      return 'N° Resolución de Alcaldía'
     case 'TARJETA_PROPIEDAD':
       return 'Número de Partida Registral'
     default:
@@ -188,6 +188,7 @@ export function Documentos() {
     propietario: '',
     propietarioDni: '',
     asociacion: '',
+    asociacionResolucionAlcaldia: '',
   })
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
@@ -323,7 +324,10 @@ export function Documentos() {
       prerellenadoId.current = null
       setFormData((prev) => ({
         ...prev,
-        codigo: '',
+        // Al salir de un tipo con documento existente (p. ej. SOAT) y volver a uno sin documento,
+        // no se borra a ciegas: si ese tipo es Tarjeta de Operatividad y el vehículo tiene asociación
+        // con resolución registrada, se vuelve a heredar en vez de dejar el campo vacío.
+        ...resolverCodigoYHerencia(prev.tipoDocumento, prev.asociacionResolucionAlcaldia),
         fechaExpedicion: new Date().toISOString().slice(0, 10),
         fechaExpiracion: TIPOS_SIN_VIGENCIA.includes(prev.tipoDocumento)
           ? ''
@@ -367,8 +371,32 @@ export function Documentos() {
       propietario: '',
       propietarioDni: '',
       asociacion: '',
+      asociacionResolucionAlcaldia: '',
+      // El código de un documento (resolución heredada, código de SOAT, partida registral...) es
+      // propio de un vehículo y un tipo de documento concretos: al borrar la placa, se pierde el
+      // vehículo del que venía, así que no tiene sentido conservarlo.
+      codigo: '',
     }))
   }
+
+  // La Tarjeta de Operatividad se emite bajo la resolución de alcaldía de la asociación/empresa
+  // del vehículo (no una por vehículo): si el titular pertenece a una y esta tiene su resolución
+  // registrada, se completa sola y se bloquea para no escribir un número distinto por error; se
+  // sigue viendo siempre, y si el vehículo es independiente (o la asociación no la tiene cargada
+  // todavía) el campo queda editable como antes. Solo aplica al crear: un documento ya emitido
+  // conserva su número tal como se registró, aunque la resolución de la asociación cambie después.
+  const codigoHeredaResolucion = (tipoDocumento, asociacionResolucionAlcaldia) =>
+    !isEditing && tipoDocumento === 'TARJETA_OPERATIVIDAD' && !!asociacionResolucionAlcaldia
+
+  // Decide el código que corresponde tras un cambio de tipo o de vehículo: lo hereda si aplica
+  // (Tarjeta de Operatividad con asociación); si no, se limpia. El código de un SOAT o de una
+  // Tarjeta de Propiedad es propio de ESE tipo y de ESE vehículo, así que nunca debe arrastrarse
+  // a otro tipo o a otro vehículo; si el nuevo tipo/vehículo ya tiene un documento registrado, el
+  // efecto que vigila "documento existente" lo vuelve a completar un instante después con su dato real.
+  const resolverCodigoYHerencia = (tipoDocumento, asociacionResolucionAlcaldia) =>
+    codigoHeredaResolucion(tipoDocumento, asociacionResolucionAlcaldia)
+      ? { codigo: asociacionResolucionAlcaldia }
+      : { codigo: '' }
 
   // Cambiar el tipo (desde el selector o al pulsar un documento del cuadro del vehículo).
   const cambiarTipo = (nuevoTipo) => {
@@ -377,6 +405,7 @@ export function Documentos() {
     setFormData((prev) => ({
       ...prev,
       tipoDocumento: nuevoTipo,
+      ...resolverCodigoYHerencia(nuevoTipo, prev.asociacionResolucionAlcaldia),
       fechaExpiracion: sinVigencia ? '' : prev.fechaExpiracion,
       estado: sinVigencia && !['VIGENTE', 'ANULADO'].includes(prev.estado) ? 'VIGENTE' : prev.estado,
     }))
@@ -390,6 +419,8 @@ export function Documentos() {
       propietario: veh.propietario || '',
       propietarioDni: veh.propietarioDni || '',
       asociacion: veh.asociacion || '',
+      asociacionResolucionAlcaldia: veh.asociacionResolucionAlcaldia || '',
+      ...resolverCodigoYHerencia(prev.tipoDocumento, veh.asociacionResolucionAlcaldia || ''),
     }))
     setIsPlacaDropdownOpen(false)
   }
@@ -405,6 +436,7 @@ export function Documentos() {
       propietario: '',
       propietarioDni: '',
       asociacion: '',
+      asociacionResolucionAlcaldia: '',
     })
     setIsEditing(false)
     setVehiculoSeleccionadoId(null)
@@ -650,7 +682,7 @@ export function Documentos() {
               { header: 'N° / CÓDIGO', key: 'codigo', isText: true, width: 140, align: 'center' },
               { header: 'EXPEDICIÓN', key: 'fechaExpedicion', width: 110, align: 'center' },
               { header: 'VENCIMIENTO', render: (v) => v || 'Sin vencimiento', key: 'fechaExpiracion', width: 110, align: 'center' },
-              { header: 'N° RES. MUNICIPAL', key: 'resMunicipal', isText: true, width: 140, align: 'center' },
+              { header: 'N° RESOLUCIÓN DE ALCALDÍA', key: 'resMunicipal', isText: true, width: 140, align: 'center' },
               { header: 'MARCA', key: 'vehiculoMarca', width: 110 },
               { header: 'MODELO', key: 'vehiculoModelo', width: 110 },
               { header: 'COLOR', key: 'vehiculoColor', width: 100 },
@@ -1444,9 +1476,16 @@ export function Documentos() {
                         label={getCodigoLabel(formData.tipoDocumento)}
                         required
                         value={formData.codigo}
-                        inputClassName="font-mono font-bold uppercase"
+                        disabled={codigoHeredaResolucion(formData.tipoDocumento, formData.asociacionResolucionAlcaldia)}
+                        inputClassName={`font-mono font-bold uppercase ${codigoHeredaResolucion(formData.tipoDocumento, formData.asociacionResolucionAlcaldia) ? 'disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed dark:disabled:bg-white/5 dark:disabled:text-slate-300' : ''}`}
                         onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
                       />
+                      {codigoHeredaResolucion(formData.tipoDocumento, formData.asociacionResolucionAlcaldia) && (
+                        <p className="mt-1 text-[10.5px] font-semibold text-slate-400 flex items-center gap-1">
+                          <Icon name="lock" className="size-3" />
+                          Tomado de la resolución de alcaldía de {formData.asociacion || 'la asociación'}.
+                        </p>
+                      )}
                     </div>
                     <div className="sm:col-span-5">
                       <FloatingSelect
@@ -1659,7 +1698,7 @@ export function Documentos() {
                       <StatusBadge status={selectedDoc.estado} />
                     </div>
                     <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
-                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Resolución / Reg. Municipal</span>
+                      <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">N° Resolución de Alcaldía</span>
                       <span className="font-mono text-slate-800 dark:text-white text-right">
                         {selectedDoc.resMunicipal || '—'}
                       </span>

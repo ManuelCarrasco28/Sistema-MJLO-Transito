@@ -79,7 +79,7 @@ export function PapeletaDetalleModal({
                       <div className="text-right">
                         <span className="text-[10px] text-slate-400 block leading-tight">Monto</span>
                         <span className="font-mono font-black text-xs text-slate-800 dark:text-white">
-                          S/ {parseFloat(det.monto || 0).toFixed(2)}
+                          S/ {parseFloat(det.monto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                         </span>
                       </div>
                     </div>
@@ -155,11 +155,11 @@ export function PapeletaDetalleModal({
               <div className="grid grid-cols-2 gap-3 text-xs mb-2">
                 <div>
                   <p className="text-slate-400">Monto Base Total</p>
-                  <p className="font-bold text-slate-800 dark:text-white">S/ {montoBaseTotal.toFixed(2)}</p>
+                  <p className="font-bold text-slate-800 dark:text-white">S/ {montoBaseTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div>
                   <p className="text-slate-400">Descuento Total</p>
-                  <p className="font-bold text-emerald-600">S/ {descuentoTotal.toFixed(2)}</p>
+                  <p className="font-bold text-emerald-600">S/ {descuentoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div>
                   <p className="text-slate-400">Estado de Pago</p>
@@ -167,7 +167,7 @@ export function PapeletaDetalleModal({
                 </div>
                 <div>
                   <p className="text-slate-400">Total a Pagar</p>
-                  <p className="font-mono font-black text-base text-rose-600 dark:text-rose-400">S/ {selectedPapeleta.montoTotal.toFixed(2)}</p>
+                  <p className="font-mono font-black text-base text-rose-600 dark:text-rose-400">S/ {selectedPapeleta.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>

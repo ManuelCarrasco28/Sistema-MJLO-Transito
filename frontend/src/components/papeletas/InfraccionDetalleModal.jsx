@@ -67,7 +67,7 @@ export function InfraccionDetalleModal({ selectedInfraccion, onClose }) {
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Monto Multa</span>
                 <p className="text-base font-black font-mono text-slate-900 dark:text-white">
-                  S/ {Number(selectedInfraccion.monto).toFixed(2)}
+                  S/ {Number(selectedInfraccion.monto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </p>
               </div>
             )}

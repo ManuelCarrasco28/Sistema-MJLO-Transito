@@ -178,15 +178,14 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
         />
       )}
       <aside
-        style={{ height: '100%', maxHeight: '100dvh' }}
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen max-h-screen h-dvh max-h-dvh flex-col overflow-hidden bg-white dark:bg-[#1C2438] text-slate-800 dark:text-slate-100 border-r border-slate-200/80 dark:border-white/10 shadow-2xl transition-all duration-300 lg:relative lg:z-auto lg:h-full lg:max-h-full lg:translate-x-0 lg:shadow-none shrink-0 select-none ${
+        className={`app-viewport fixed inset-y-0 left-0 z-50 flex flex-col overflow-hidden bg-white dark:bg-[#1C2438] text-slate-800 dark:text-slate-100 border-r border-slate-200/80 dark:border-white/10 shadow-2xl transition-all duration-300 lg:relative lg:inset-auto lg:z-auto lg:h-full lg:min-h-0 lg:translate-x-0 lg:shadow-none shrink-0 select-none ${
           collapsedOnDesktop ? 'w-20' : 'w-64'
         } ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
         data-purpose="sidebar-navigation"
       >
-        <div className="flex h-[72px] shrink-0 items-center justify-center border-b border-slate-100 dark:border-white/10 px-3 relative group/header">
+        <div className="flex h-[68px] shrink-0 items-center justify-center border-b border-slate-100 dark:border-white/10 px-3 relative group/header">
           {/* Logo Container */}
           <div className={`flex items-center justify-center transition-opacity duration-200 ${
             collapsedOnDesktop 
@@ -200,13 +199,13 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 <img
                   src="/img/logo-mjlo.png"
                   alt="Logo Municipalidad JLO"
-                  className="h-[54px] max-w-[12.5rem] object-contain dark:hidden block"
+                  className="h-[50px] max-w-[12rem] object-contain dark:hidden block"
                   onError={(event) => { event.currentTarget.src = '/escudo-jlo.png' }}
                 />
                 <img
                   src="/img/logo-mjlo-blanco.png"
                   alt="Logo Municipalidad JLO"
-                  className="h-[54px] max-w-[12.5rem] object-contain dark:block hidden"
+                  className="h-[50px] max-w-[12rem] object-contain dark:block hidden"
                   onError={(event) => { event.currentTarget.src = '/escudo-jlo.png' }}
                 />
               </>
@@ -239,7 +238,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           </button>
         </div>
 
-        <nav className={`no-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1.5 py-2 px-2.5 ${collapsedOnDesktop ? 'lg:px-2 px-2.5' : 'px-2.5'}`} aria-label="Navegación principal">
+        <nav className={`no-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1 px-2.5 py-2 ${collapsedOnDesktop ? 'lg:px-2 px-2.5' : 'px-2.5'}`} aria-label="Navegación principal">
           {visibleNavigationGroups.map((group) => {
             const grpCfg = groupIconConfig[group.name] || { icon: 'dashboard', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30' }
             const isSingle = group.items.length === 1
@@ -301,14 +300,14 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                     navigate(mainItem.path)
                     if (mobileOpen) onClose()
                   }}
-                  className={`relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 cursor-pointer ${
+                  className={`relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors duration-150 cursor-pointer ${
                     selected
                       ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#5B6EE1] dark:text-indigo-300'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
                   <Icon name={mainItem.icon} className={`size-4 shrink-0 ${selected ? '' : grpCfg.color}`} />
-                  <span className="text-[13px] font-semibold uppercase tracking-tight truncate flex-1">{mainItem.label}</span>
+                  <span className="text-[12.5px] font-semibold uppercase tracking-tight truncate flex-1">{mainItem.label}</span>
                 </button>
               )
             }
@@ -318,14 +317,14 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.name)}
-                  className={`relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 cursor-pointer ${
+                  className={`relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors duration-150 cursor-pointer ${
                     groupSelected && !expandedGroups[group.name]
                       ? 'bg-[#F4F7FE] dark:bg-white/5 text-[#5B6EE1] dark:text-indigo-300'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
                   <Icon name={grpCfg.icon} className={`size-4 shrink-0 ${groupSelected && !expandedGroups[group.name] ? '' : grpCfg.color}`} />
-                  <span className="text-[13px] font-semibold uppercase tracking-tight truncate flex-1">{group.name}</span>
+                  <span className="text-[12.5px] font-semibold uppercase tracking-tight truncate flex-1">{group.name}</span>
                   <Icon
                     name="chevronDown"
                     className={`size-3.5 shrink-0 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${expandedGroups[group.name] ? 'rotate-180' : ''}`}
@@ -333,7 +332,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                 </button>
 
                 <div className={`grid transition-all duration-150 ease-in-out ${expandedGroups[group.name] ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                  <div className="overflow-hidden space-y-0.5 pt-0.5 pb-1">
+                  <div className="overflow-hidden space-y-0.5 pt-0.5 pb-0.5">
                     {group.items.map((item) => {
                       const selected = isItemSelected(item)
                       return (
@@ -364,7 +363,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
           })}
         </nav>
 
-        <div className="mt-auto shrink-0 border-t border-slate-100 dark:border-white/10 px-2.5 py-2 bg-white dark:bg-[#1C2438]">
+        <div className="shrink-0 border-t border-slate-100 bg-white px-2.5 py-2 dark:border-white/10 dark:bg-[#1C2438]">
           <button
             type="button"
             onClick={onLogout}

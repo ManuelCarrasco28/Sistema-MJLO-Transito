@@ -229,7 +229,8 @@ class AsociacionesController extends ResourceController
     {
         $db = \Config\Database::connect();
         $filas = $db->table('asociaciones')
-            ->select('id, razon_social AS razonSocial')
+            ->select('MIN(id) AS id, razon_social AS razonSocial, GROUP_CONCAT(id ORDER BY id SEPARATOR ",") AS ids', false)
+            ->groupBy('razon_social')
             ->orderBy('razon_social', 'ASC')
             ->get()
             ->getResultArray();
@@ -252,12 +253,21 @@ class AsociacionesController extends ResourceController
             return $db->table('vehiculo_propietarios vp')
                 ->join('vehiculos v', 'v.id = vp.id_vehiculo', 'inner')
                 ->join('asociaciones o', 'o.id = v.id_asociacion', 'inner')
+                ->join('documentos_vehiculo d', 'd.id_vehiculo = v.id', 'left')
                 ->where('vp.estado', 'ACTIVO');
         };
         $aplicarFiltros = function ($builder) {
-            $idAsociacion = (int) $this->request->getGet('idAsociacion');
-            if ($idAsociacion > 0) {
-                $builder->where('o.id', $idAsociacion);
+            $idAsociacion = trim((string) $this->request->getGet('idAsociacion'));
+            if ($idAsociacion !== '') {
+                $ids = array_values(array_filter(array_map(
+                    static fn ($id) => (int) trim($id),
+                    explode(',', $idAsociacion)
+                ), static fn ($id) => $id > 0));
+                if (count($ids) === 1) {
+                    $builder->where('o.id', $ids[0]);
+                } elseif (count($ids) > 1) {
+                    $builder->whereIn('o.id', $ids);
+                }
             }
             $tipo = strtoupper(trim((string) $this->request->getGet('tipo')));
             if (in_array($tipo, ['ASOCIACION', 'PARTICULAR'], true)) {
@@ -275,6 +285,7 @@ class AsociacionesController extends ResourceController
                 COALESCE(p.email, '') AS email,
                 COUNT(DISTINCT o.id) AS asociacionesTotal,
                 COUNT(DISTINCT vp.id_vehiculo) AS vehiculosTotal,
+                COUNT(DISTINCT CASE WHEN d.estado = 'VENCIDO' OR (d.fecha_expiracion IS NOT NULL AND d.fecha_expiracion < CURDATE()) THEN d.id END) AS documentosVencidos,
                 MIN(o.razon_social) AS asociacionNombre,
                 GROUP_CONCAT(DISTINCT v.placa SEPARATOR ',') AS placasBusqueda,
                 GROUP_CONCAT(DISTINCT o.razon_social SEPARATOR '|') AS organizacionesBusqueda
@@ -294,6 +305,16 @@ class AsociacionesController extends ResourceController
             );
         }
 
+        $vehiculosFiltro = strtoupper(trim((string) $this->request->getGet('vehiculos')));
+        if ($vehiculosFiltro === 'UNO') {
+            $socios->having('vehiculosTotal', 1);
+        } elseif ($vehiculosFiltro === 'DOS_TRES') {
+            $socios->having('vehiculosTotal >=', 2);
+            $socios->having('vehiculosTotal <=', 3);
+        } elseif ($vehiculosFiltro === 'MAS_TRES') {
+            $socios->having('vehiculosTotal >', 3);
+        }
+
         $page = (int) $this->request->getGet('page');
         $meta = null;
         if ($page > 0) {
@@ -306,6 +327,7 @@ class AsociacionesController extends ResourceController
                 'asociacionNombre' => 'asociacionNombre',
                 'asociacionesTotal' => 'asociacionesTotal',
                 'vehiculosTotal' => 'vehiculosTotal',
+                'documentosVencidos' => 'documentosVencidos',
             ];
 
             $filas = \App\Libraries\QuerySort::aplicar($socios, $this->request, $columnasOrdenables, 'nombre', 'ASC')
@@ -355,6 +377,7 @@ class AsociacionesController extends ResourceController
             $fila['idPersona'] = (int) $fila['idPersona'];
             $fila['asociacionesTotal'] = (int) $fila['asociacionesTotal'];
             $fila['vehiculosTotal'] = (int) $fila['vehiculosTotal'];
+            $fila['documentosVencidos'] = (int) ($fila['documentosVencidos'] ?? 0);
             $fila['vinculos'] = $vinculos[$fila['idPersona']] ?? [];
             unset($fila['placasBusqueda'], $fila['organizacionesBusqueda']);
         }

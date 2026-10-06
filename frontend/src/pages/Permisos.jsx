@@ -262,7 +262,7 @@ export function Permisos() {
               { header: 'INICIO VIGENCIA', key: 'fechaInicioVigencia', width: 120, align: 'center' },
               { header: 'FIN VIGENCIA', key: 'fechaFinVigencia', width: 120, align: 'center' },
               { header: 'RECIBO INGRESO', key: 'reciboIngresoNumero', isText: true, width: 130, align: 'center' },
-              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toFixed(2)}`, align: 'right', width: 110 },
+              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 110 },
               { header: 'FECHA DE PAGO', key: 'reciboIngresoFecha', width: 120, align: 'center' },
               { header: 'OBSERVACIONES', key: 'observaciones', width: 240 },
               { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
@@ -808,7 +808,7 @@ export function Permisos() {
               <div className="mt-4 border-t border-slate-100 pt-3 dark:border-[var(--border)] flex items-center justify-between">
                 <span className="text-[11px] font-medium text-slate-400">Derecho de trámite</span>
                 <span className="text-sm font-black text-slate-900 dark:text-white">
-                  S/ {Number(proc.costo || 0).toFixed(2)}
+                  S/ {Number(proc.costo || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>

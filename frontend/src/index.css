@@ -261,6 +261,25 @@ button {
   display: none;
 }
 
+.app-viewport {
+  min-height: 100vh;
+  height: 100vh;
+}
+
+@supports (height: 100svh) {
+  .app-viewport {
+    min-height: 100svh;
+    height: 100svh;
+  }
+}
+
+@supports (height: 100dvh) {
+  .app-viewport {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+}
+
 .overflow-x-auto {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 rgba(0, 0, 0, 0.04);
@@ -637,6 +656,16 @@ body.is-printing-ticket,
   /* 1. Cuando hay un documento oficial inyectado en document.body (Permisos, TUC, SOAT, Certicav, Boletas)
      se oculta TODO el árbol de React en #root para aislar el documento */
   body:has(> #seccion-impresion, > .seccion-impresion-portal) > #root {
+    display: none !important;
+  }
+
+  /* Un diálogo de confirmación (SweetAlert2) o un toast nunca deben salir en una impresión: si la
+     impresión se dispara justo mientras uno sigue en pantalla (p. ej. por su animación de cierre),
+     que no quede como una página de más en el PDF. Vive fuera de #root, así que se oculta aparte. */
+  .swal2-container,
+  .swal2-backdrop-show,
+  #toast-container,
+  .toast-container {
     display: none !important;
   }
 

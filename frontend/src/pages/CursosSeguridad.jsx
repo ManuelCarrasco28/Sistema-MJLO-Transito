@@ -7,12 +7,56 @@ import { crearComparador } from '../utils/ordenMultiple'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
-import { CarnetCursoVialPrint, CarnetCursoVialLotePrint } from '../components/documentos/TarjetaOperatividadPrint'
+import { CarnetCursoVialPrint, CarnetCursoVialLotePrint, precargarPlantillasCarnet, recomprimirImagen } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+
+// Las fotos de los conductores se sirven desde un endpoint que exige la sesión (cookie) del usuario.
+// La ventana de impresión del navegador (window.print) se renderiza en un proceso aparte que a veces
+// no reenvía esa cookie, así que la foto cargaba bien en pantalla pero salía en blanco al imprimir.
+// Para evitarlo, antes de imprimir se descarga cada foto con la sesión incluida y se convierte en un
+// data URI (la imagen va embebida en el propio carnet, sin depender de ninguna petición de red al imprimir).
+// Se cachea por URL para no volver a descargar la misma foto en impresiones siguientes.
+const cacheFotosCarnet = new Map()
+
+async function resolverFotoParaCarnet(fotoUrl) {
+  const url = String(fotoUrl || '').trim()
+  if (!url || url.startsWith('data:')) return url
+  if (cacheFotosCarnet.has(url)) return cacheFotosCarnet.get(url)
+
+  const promesa = (async () => {
+    try {
+      const respuesta = await apiFetch(url, { timeoutMs: 8000 })
+      if (!respuesta.ok) return ''
+      const blob = await respuesta.blob()
+      const dataUri = await new Promise((resolve) => {
+        const lector = new FileReader()
+        lector.onload = () => resolve(String(lector.result || ''))
+        lector.onerror = () => resolve('')
+        lector.readAsDataURL(blob)
+      })
+      if (!dataUri) return ''
+      // La casilla de foto del carnet es pequeña; algunas fotos (p. ej. de SUNARP) llegan mucho más
+      // grandes de lo que hace falta ahí, así que se reducen antes de embeberlas para que imprimir
+      // un lote con varias fotos no sea más lento de lo necesario.
+      return (await recomprimirImagen(dataUri, 500)) || dataUri
+    } catch {
+      return ''
+    }
+  })()
+
+  cacheFotosCarnet.set(url, promesa)
+  return promesa
+}
+
+async function resolverFotosDeParticipantes(participantes) {
+  return Promise.all(
+    (participantes || []).map(async (p) => ({ ...p, fotoUrl: await resolverFotoParaCarnet(p.fotoUrl) }))
+  )
+}
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -41,6 +85,8 @@ export function CursosSeguridad() {
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
   const [searchAprobados, setSearchAprobados] = useState('')
+  const [filtroEntrega, setFiltroEntrega] = useState('TODOS')
+  const [entregandoCarnetId, setEntregandoCarnetId] = useState(null)
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
@@ -73,12 +119,80 @@ export function CursosSeguridad() {
     setIsModalOpen(true)
   }
 
+  // Deja las plantillas listas (como data URI) desde que se entra a la pantalla, para que al
+  // imprimir casi siempre ya estén resueltas y no haya que esperar.
+  useEffect(() => {
+    precargarPlantillasCarnet()
+  }, [])
+
   const [printCurso, setPrintCurso] = useState(null)
+  const [isResolviendoFotos, setIsResolviendoFotos] = useState(false)
   const [printAprobado, setPrintAprobado] = useState(null)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
 
-  const handlePrintBatch = (curso) => {
+  const abrirImpresionCuandoEsteListo = (limpiar) => {
+    const raf = typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame
+      : (callback) => setTimeout(callback, 16)
+
+    const ejecutar = () => {
+      window.print();
+      const cleanup = () => {
+        limpiar();
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup, { once: true });
+      setTimeout(cleanup, 2500);
+    }
+
+    // Las plantillas del carnet pesan ~1.5 MB cada una: si se imprime antes de que carguen, salen en blanco.
+    // Las fotos de cada participante, en cambio, se descargan una por una desde el servidor: con un lote
+    // grande eso puede tardar mucho, así que a ellas se les da un presupuesto corto y, si no llegan a
+    // tiempo, se imprime igual (la casilla queda vacía) en vez de bloquear todo el lote por una sola foto lenta.
+    const esperarImagenes = async (limiteMs = 15000) => {
+      const esPlantilla = (img) => img.classList.contains('cv-plantilla')
+      const inicio = Date.now()
+      while (Date.now() - inicio < limiteMs) {
+        const plantillas = [...document.querySelectorAll('.seccion-impresion-portal img.cv-plantilla')]
+        if (plantillas.length === 0 || plantillas.every((img) => img.complete && img.naturalWidth > 0)) break
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+
+      const fotos = [...document.querySelectorAll('.seccion-impresion-portal img')].filter((img) => !esPlantilla(img))
+      const presupuestoFotos = Math.min(5000, Math.max(0, limiteMs - (Date.now() - inicio)))
+      await Promise.race([
+        Promise.all(fotos.map((img) => (img.complete ? null : new Promise((resolve) => {
+          img.addEventListener('load', resolve, { once: true })
+          img.addEventListener('error', resolve, { once: true })
+        })))),
+        new Promise((resolve) => setTimeout(resolve, presupuestoFotos)),
+      ])
+
+      const todas = [...document.querySelectorAll('.seccion-impresion-portal img')].filter((img) => img.complete && img.naturalWidth > 0)
+      await Promise.all(todas.map((img) => (img.decode ? img.decode().catch(() => {}) : null)))
+    }
+
+    // Si el diálogo de confirmación ("Imprimir lote grande") todavía está en pantalla (p. ej. su
+    // animación de cierre no terminó), que no se quede como una página extra del PDF: se espera un
+    // poco a que desaparezca antes de abrir la impresión.
+    const esperarSinDialogoAbierto = async (limiteMs = 1500) => {
+      const inicio = Date.now()
+      while (document.querySelector('.swal2-container') && Date.now() - inicio < limiteMs) {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+    }
+
+    const esperarFuentes = document.fonts?.ready || Promise.resolve()
+    esperarFuentes
+      .then(() => esperarImagenes())
+      .then(() => esperarSinDialogoAbierto())
+      .finally(() => {
+        raf(() => raf(ejecutar))
+      })
+  }
+
+  const handlePrintBatch = async (curso) => {
     if (!curso.participantes || curso.participantes.length === 0) {
       showError('Error de Impresión', 'No hay participantes inscritos en este curso para imprimir.');
       return;
@@ -88,29 +202,39 @@ export function CursosSeguridad() {
       showError('Error de Impresión', 'No hay participantes con asistencia o aprobados para generar los carnets.');
       return;
     }
-    setPrintCurso(curso);
-    setTimeout(() => {
-      window.print();
-      const cleanup = () => {
-        setPrintCurso(null);
-        window.removeEventListener('afterprint', cleanup);
-      };
-      window.addEventListener('afterprint', cleanup, { once: true });
-      setTimeout(cleanup, 2500);
-    }, 350);
+
+    if (aprobados.length > 40) {
+      const hojas = Math.ceil(aprobados.length / 4);
+      const result = await showConfirm(
+        'Imprimir lote grande',
+        `Se van a generar ${aprobados.length} carnets en ${hojas} hojas. Puede tardar un poco.`,
+        'Sí, imprimir lote',
+        'Cancelar'
+      );
+      if (!result.isConfirmed) return;
+    }
+
+    setIsResolviendoFotos(true);
+    const [participantesConFoto] = await Promise.all([
+      resolverFotosDeParticipantes(curso.participantes),
+      precargarPlantillasCarnet(),
+    ]);
+    setIsResolviendoFotos(false);
+
+    setPrintCurso({ ...curso, participantes: participantesConFoto });
+    abrirImpresionCuandoEsteListo(() => setPrintCurso(null));
   }
 
-  const handlePrintSingle = (aprobado) => {
-    setPrintAprobado(aprobado);
-    setTimeout(() => {
-      window.print();
-      const cleanup = () => {
-        setPrintAprobado(null);
-        window.removeEventListener('afterprint', cleanup);
-      };
-      window.addEventListener('afterprint', cleanup, { once: true });
-      setTimeout(cleanup, 2500);
-    }, 350);
+  const handlePrintSingle = async (aprobado) => {
+    setIsResolviendoFotos(true);
+    const [fotoUrl] = await Promise.all([
+      resolverFotoParaCarnet(aprobado.fotoUrl),
+      precargarPlantillasCarnet(),
+    ]);
+    setIsResolviendoFotos(false);
+
+    setPrintAprobado({ ...aprobado, fotoUrl });
+    abrirImpresionCuandoEsteListo(() => setPrintAprobado(null));
   }
 
   const handleOpenEditModal = (curso) => {
@@ -278,7 +402,7 @@ export function CursosSeguridad() {
               { header: 'HORARIO', key: 'horario', width: 140, align: 'center' },
               { header: 'INSTRUCTOR', key: 'instructor', width: 180 },
               { header: 'LUGAR', key: 'lugar', width: 200 },
-              { header: 'COSTO (S/)', render: (_, c) => `S/ ${Number(c.costo || 0).toFixed(2)}`, align: 'right', width: 100 },
+              { header: 'COSTO (S/)', render: (_, c) => `S/ ${Number(c.costo || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 100 },
               { header: 'CUPOS TOTALES', key: 'capacidad', width: 100, align: 'center' },
               { header: 'INSCRITOS', render: (_, c) => String(c.inscritos ?? c.participantes?.length ?? 0), width: 90, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
@@ -397,15 +521,50 @@ export function CursosSeguridad() {
       : []
   )
 
-  const filteredAprobados = searchAprobados 
-    ? aprobados.filter(p => 
-        (p.dni && p.dni.includes(searchAprobados)) || 
+  const aprobadosBuscados = searchAprobados
+    ? aprobados.filter(p =>
+        (p.dni && p.dni.includes(searchAprobados)) ||
         (p.nombres && p.nombres.toLowerCase().includes(searchAprobados.toLowerCase())) ||
         (p.apellido_paterno && p.apellido_paterno.toLowerCase().includes(searchAprobados.toLowerCase()))
       )
     : aprobados
 
+  const totalEntregados = aprobadosBuscados.filter(p => p.carnetEntregado).length
+
+  const filteredAprobados = filtroEntrega === 'TODOS'
+    ? aprobadosBuscados
+    : aprobadosBuscados.filter(p => (filtroEntrega === 'ENTREGADOS' ? p.carnetEntregado : !p.carnetEntregado))
+
   const paginatedAprobados = filteredAprobados.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  // Marca (o desmarca) la entrega física del carnet: distingue "ya se imprimió" de "ya lo recogió el
+  // conductor". Actualiza en el servidor y refleja el cambio en el padrón sin recargar toda la lista.
+  const handleToggleEntrega = async (participante) => {
+    if (!participante.idInscripcion) return
+    const nuevoValor = !participante.carnetEntregado
+    setEntregandoCarnetId(participante.idInscripcion)
+    try {
+      const response = await apiFetch(`/cursos/inscripciones/${participante.idInscripcion}/entrega`, {
+        method: 'PUT',
+        body: { entregado: nuevoValor },
+      })
+      if (!response.ok) throw new Error('No se pudo actualizar la entrega del carnet.')
+      const payload = await response.json()
+      setCursos(prev => prev.map(c => ({
+        ...c,
+        participantes: (c.participantes || []).map(p => (
+          p.idInscripcion === participante.idInscripcion
+            ? { ...p, carnetEntregado: nuevoValor, carnetFechaEntrega: payload.data?.carnet_fecha_entrega ?? null, carnetEntregadoPor: payload.data?.carnet_entregado_por ?? null }
+            : p
+        )),
+      })))
+      showToast(nuevoValor ? 'Carnet marcado como entregado' : 'Entrega del carnet revertida')
+    } catch {
+      showError('Error', 'No se pudo actualizar la entrega del carnet.')
+    } finally {
+      setEntregandoCarnetId(null)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -673,8 +832,8 @@ export function CursosSeguridad() {
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-purple-50/40 dark:bg-[#1C2438] dark:group-hover:bg-slate-800/60 px-3 py-3 text-center border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                       <div className="flex items-center justify-center gap-1">
                         {c.estado === 'FINALIZADO' && (
-                          <button onClick={(e) => { e.stopPropagation(); handlePrintBatch(c); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white" title="Descargar Carnets (Lote)">
-                            <Icon name="print" className="size-4" />
+                          <button onClick={(e) => { e.stopPropagation(); handlePrintBatch(c); }} disabled={isResolviendoFotos} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title="Descargar Carnets (Lote)">
+                            <Icon name={isResolviendoFotos ? 'refresh' : 'print'} className={`size-4 ${isResolviendoFotos ? 'animate-spin' : ''}`} />
                           </button>
                         )}
                         
@@ -720,6 +879,20 @@ export function CursosSeguridad() {
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-emerald-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
               />
             </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 dark:bg-white/5 dark:text-slate-300 whitespace-nowrap">
+                Entregados: {totalEntregados} / {aprobadosBuscados.length}
+              </span>
+              <RoundedSelect
+                value={filtroEntrega}
+                onChange={(val) => { setFiltroEntrega(val); setCurrentPage(1) }}
+                options={[
+                  { value: 'TODOS', label: 'Todos' },
+                  { value: 'PENDIENTES', label: 'Pendientes de entrega' },
+                  { value: 'ENTREGADOS', label: 'Ya entregados' },
+                ]}
+              />
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -729,13 +902,14 @@ export function CursosSeguridad() {
                   <th className="px-5 py-4">DNI / Licencia</th>
                   <th className="px-5 py-4">Curso Válido</th>
                   <th className="px-5 py-4">Expedición / Venc.</th>
+                  <th className="px-5 py-4 text-center">Entrega</th>
                   <th className="px-5 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                 {paginatedAprobados.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-5 py-12 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan="6" className="px-5 py-12 text-center text-slate-500 dark:text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <div className="rounded-full bg-slate-100 p-4 dark:bg-[var(--bg-subtle)]">
                           <Icon name="file-check" className="size-8 text-slate-400 dark:text-slate-500" />
@@ -767,10 +941,20 @@ export function CursosSeguridad() {
                           <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.curso.fecha}</p>
                           <p className="text-[10px] font-semibold text-slate-500">Vence: {fechaVencimiento}</p>
                         </td>
+                        <td className="px-5 py-4 text-center">
+                          <button
+                            onClick={() => handleToggleEntrega(p)}
+                            disabled={entregandoCarnetId === p.idInscripcion}
+                            title={p.carnetEntregado ? `Entregado${p.carnetFechaEntrega ? ' el ' + new Date(p.carnetFechaEntrega).toLocaleDateString('es-PE') : ''}${p.carnetEntregadoPor ? ' por ' + p.carnetEntregadoPor : ''}. Clic para revertir.` : 'Clic para marcar como entregado'}
+                            className="inline-flex cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <StatusBadge status={p.carnetEntregado ? 'ENTREGADO' : 'PENDIENTE'} />
+                          </button>
+                        </td>
                         <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#1C2438] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                           <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => handlePrintSingle(p)} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer" title="Descargar Carnet Individual">
-                              <Icon name="print" className="size-4" />
+                            <button onClick={() => handlePrintSingle(p)} disabled={isResolviendoFotos} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" title="Descargar Carnet Individual">
+                              <Icon name={isResolviendoFotos ? 'refresh' : 'print'} className={`size-4 ${isResolviendoFotos ? 'animate-spin' : ''}`} />
                             </button>
                           </div>
                         </td>

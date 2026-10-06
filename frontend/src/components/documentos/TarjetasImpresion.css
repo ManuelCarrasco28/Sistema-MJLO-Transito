@@ -349,10 +349,8 @@
    CARNET DE SEGURIDAD VIAL (CURSO VIAL)
    =================================================== */
 .carnet-box.curso-vial-anverso {
-  background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
-  color: #fff;
-  display: flex;
-  flex-direction: column;
+  background: #d8e3ea;
+  color: #111827;
 }
 
 .banner-curso {
@@ -364,6 +362,235 @@
   padding: 2px 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* ===================================================
+   CARNET DE CURSO DE SEGURIDAD VIAL (plantillas PNG oficiales)
+   Todo se mide en % del carnet y las letras en cqw (% de su ancho),
+   así los datos caen sobre las casillas de la plantilla a cualquier tamaño.
+   Plantillas: public/img/img-carnet-curso/curso-adelante.png (1414x871)
+               public/img/img-carnet-curso/curso-atras.png (1375x828)
+   =================================================== */
+.carnet-box.cv-carnet {
+  container-type: inline-size;
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: none;
+  color: #111111;
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.cv-carnet > * {
+  position: absolute;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.cv-carnet .cv-plantilla {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+  pointer-events: none;
+}
+
+/* ---------- Anverso ---------- */
+.cv-anverso .cv-logo {
+  left: 3.6%;
+  top: 3.2%;
+  width: 26%;
+  height: 21%;
+  object-fit: contain;
+  object-position: left top;
+}
+
+.cv-anverso .cv-cabecera {
+  left: 32.7%;
+  top: 0.6%;
+  width: 65.9%;
+  height: 25.6%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4%;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #ffffff;
+}
+
+.cv-anverso .cv-cabecera span {
+  font-size: 1.85cqw;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+  /* Línea de la subgerencia: dorado, igual que en el carnet oficial de muestra */
+  color: #f5c842;
+}
+
+.cv-anverso .cv-cabecera strong {
+  font-size: 2.3cqw;
+  font-weight: 900;
+  letter-spacing: 0.015em;
+  color: #ffffff;
+}
+
+.cv-anverso .cv-foto {
+  /* Medidas tomadas del recuadro blanco de la plantilla (curso-adelante.png) */
+  left: 4.2%;
+  top: 28.6%;
+  width: 25.6%;
+  height: 51.1%;
+  overflow: hidden;
+}
+
+.cv-anverso .cv-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cv-anverso .cv-conductor {
+  left: 4.2%;
+  top: 79.8%;
+  width: 25.4%;
+  height: 11.8%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 2.05cqw;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.cv-anverso .cv-fila {
+  left: 32.5%;
+  width: 63.7%;
+  height: 9.8%;
+  display: grid;
+  grid-template-columns: 34.3% minmax(0, 1fr);
+  align-items: center;
+}
+
+.cv-fila-1 { top: 31.2%; }
+.cv-fila-2 { top: 43.9%; }
+.cv-fila-3 { top: 56.7%; }
+.cv-fila-4 { top: 70%; }
+
+/* Etiquetas sobre las píldoras azules (letra blanca) */
+.cv-carnet .cv-etiqueta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 2.05cqw;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Valores sobre las casillas blancas (letra negra en negrita) */
+.cv-carnet .cv-valor {
+  display: block;
+  min-width: 0;
+  padding: 0 3%;
+  color: #0a0a0a;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cv-anverso .cv-resolucion {
+  left: 45%;
+  top: 90%;
+  width: 41%;
+  height: 10%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Mismo dorado que la cabecera (SUB GERENCIA...), como en el carnet oficial */
+  color: #f5c842;
+  font-size: 1.5cqw;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+/* ---------- Reverso ---------- */
+.cv-reverso .cv-qr {
+  left: 37%;
+  top: 4%;
+  width: 10.8%;
+  aspect-ratio: 1 / 1;
+  padding: 0.55cqw;
+  background: #ffffff;
+  border: 0.35cqw solid #16324a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cv-reverso .cv-qr svg,
+.cv-reverso .cv-qr img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cv-reverso .cv-fecha-etiqueta {
+  left: 58.5%;
+  width: 29.6%;
+  height: 9.5%;
+  font-size: 1.85cqw;
+}
+
+.cv-reverso .cv-fecha-etiqueta-1 { top: 9.4%; }
+.cv-reverso .cv-fecha-etiqueta-2 { top: 34.9%; }
+
+.cv-reverso .cv-fecha-valor {
+  left: 53%;
+  width: 40.3%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.3cqw;
+  letter-spacing: 0.02em;
+}
+
+.cv-reverso .cv-fecha-valor-1 { top: 17.9%; height: 11.7%; }
+.cv-reverso .cv-fecha-valor-2 { top: 42.8%; height: 12.7%; }
+
+.cv-reverso .cv-codigo {
+  left: 9.9%;
+  top: 85.4%;
+  width: 31.4%;
+  height: 8.4%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a0a0a;
+  font-size: 3.9cqw;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+/* El carnet ya trae su marco en la plantilla: sin borde extra al imprimir */
+@media print {
+  .carnet-box.cv-carnet {
+    border: 0 !important;
+  }
 }
 
 /* ===================================================

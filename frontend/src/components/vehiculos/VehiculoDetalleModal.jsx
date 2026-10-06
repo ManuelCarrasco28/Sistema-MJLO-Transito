@@ -215,11 +215,11 @@ export function VehiculoDetalleModal({
                       </div>
                       <div className="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-950/40">
                         <p className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-300">Debe</p>
-                        <p className="font-mono text-base font-black text-amber-700 dark:text-amber-300">S/ {deuda.toFixed(2)}</p>
+                        <p className="font-mono text-base font-black text-amber-700 dark:text-amber-300">S/ {deuda.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                       </div>
                       <div className="rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/40">
                         <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-300">Pagado</p>
-                        <p className="font-mono text-base font-black text-emerald-700 dark:text-emerald-300">S/ {pagado.toFixed(2)}</p>
+                        <p className="font-mono text-base font-black text-emerald-700 dark:text-emerald-300">S/ {pagado.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                       </div>
                       <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-[#1C2438]">
                         <p className="text-[10px] font-black uppercase text-slate-400">Anuladas</p>
@@ -241,7 +241,7 @@ export function VehiculoDetalleModal({
                               <p className="text-xs font-black text-slate-800 dark:text-slate-100">{papeleta.codigoInfraccion || 'SIN CODIGO'} · {papeleta.gravedad || 'SIN GRAVEDAD'}</p>
                               <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400" title={papeleta.tipoInfraccion}>{papeleta.tipoInfraccion || papeleta.lugar || 'Infracción no especificada'}</p>
                             </div>
-                            <p className="font-mono text-xs font-black text-slate-800 dark:text-slate-100">S/ {Number(papeleta.montoTotal || 0).toFixed(2)}</p>
+                            <p className="font-mono text-xs font-black text-slate-800 dark:text-slate-100">S/ {Number(papeleta.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                             <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${pagada ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : anulada ? 'bg-slate-200 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'}`}>
                               <span className="size-1.5 rounded-full bg-current" />
                               {pagada ? 'PAGADA' : anulada ? 'ANULADA' : 'DEBE'}

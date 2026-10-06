@@ -149,7 +149,7 @@ export function ConvertirReporteModal({
                     }} className="flex-1 min-w-0 overflow-hidden text-ellipsis rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:bg-[var(--bg-subtle)]">
                       <option value="">Selecciona infracción</option>
                       {tiposInfraccion.map((tipo) => (
-                        <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion.length > 85 ? tipo.descripcion.substring(0, 85) + '...' : tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
+                        <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion.length > 85 ? tipo.descripcion.substring(0, 85) + '...' : tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</option>
                       ))}
                     </select>
                     {convertForm.infraccionesIds.length > 1 && (

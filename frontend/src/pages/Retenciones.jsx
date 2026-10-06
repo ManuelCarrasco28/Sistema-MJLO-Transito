@@ -213,7 +213,7 @@ export function Retenciones({ user }) {
               { header: 'FORMALIDAD', key: 'vehiculoFormalidad', width: 110, align: 'center' },
               { header: 'ASOCIACIÓN', render: (_, i) => i.vehiculoAsociacion || 'PARTICULAR / SIN ASOC.', width: 200 },
               { header: 'PAPELETA ASOCIADA', render: (_, i) => i.numeroPapeleta || '—', isText: true, width: 130, align: 'center' },
-              { header: 'MONTO PAPELETA (S/)', render: (_, i) => `S/ ${Number(i.montoPapeleta || 0).toFixed(2)}`, align: 'right', width: 130 },
+              { header: 'MONTO PAPELETA (S/)', render: (_, i) => `S/ ${Number(i.montoPapeleta || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 130 },
               { header: 'MOTIVO INTERNAMIENTO', key: 'motivo', width: 220 },
               { header: 'AUTORIDAD QUE DISPONE', key: 'autoridadQueDispone', width: 180 },
               { header: 'DOCUMENTO DE REFERENCIA', key: 'documentoReferencia', width: 160 },
@@ -230,12 +230,12 @@ export function Retenciones({ user }) {
               { header: 'N° ORDEN DE LIBERTAD', key: 'numeroOrdenLibertad', isText: true, width: 140, align: 'center' },
               { header: 'FECHA LIBERACIÓN', render: (_, i) => i.fechaLiberacion || 'EN CUSTODIA', width: 130, align: 'center' },
               { header: 'RECIBO PAPELETA', key: 'reciboPapeleta', isText: true, width: 120, align: 'center' },
-              { header: 'MONTO PAPELETA COBRADO (S/)', render: (_, i) => `S/ ${Number(i.montoPapeletaCobrada || 0).toFixed(2)}`, align: 'right', width: 150 },
+              { header: 'MONTO PAPELETA COBRADO (S/)', render: (_, i) => `S/ ${Number(i.montoPapeletaCobrada || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 150 },
               { header: 'RECIBO GUARDIANÍA', key: 'reciboGuardiania', isText: true, width: 120, align: 'center' },
-              { header: 'MONTO GUARDIANÍA (S/)', render: (_, i) => `S/ ${Number(i.montoGuardiania || 0).toFixed(2)}`, align: 'right', width: 140 },
+              { header: 'MONTO GUARDIANÍA (S/)', render: (_, i) => `S/ ${Number(i.montoGuardiania || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 140 },
               { header: 'RECIBO REMOLQUE', key: 'reciboRemolque', isText: true, width: 120, align: 'center' },
-              { header: 'MONTO REMOLQUE (S/)', render: (_, i) => `S/ ${Number(i.montoRemolque || 0).toFixed(2)}`, align: 'right', width: 140 },
-              { header: 'TOTAL LIBERACIÓN (S/)', render: (_, i) => `S/ ${Number(i.montoTotalLiberacion || 0).toFixed(2)}`, align: 'right', width: 140 },
+              { header: 'MONTO REMOLQUE (S/)', render: (_, i) => `S/ ${Number(i.montoRemolque || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 140 },
+              { header: 'TOTAL LIBERACIÓN (S/)', render: (_, i) => `S/ ${Number(i.montoTotalLiberacion || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 140 },
               { header: 'OBSERVACIONES', key: 'observaciones', width: 240 },
               { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
             ],
@@ -520,7 +520,7 @@ export function Retenciones({ user }) {
                         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-rose-600 dark:text-rose-400 print:text-black">
                           <Icon name="ticket" className="size-3.5 print:hidden" />
                           <span>{item.numeroPapeleta}</span>
-                          <span className="font-bold">S/ {Number(item.montoPapeleta).toFixed(2)}</span>
+                          <span className="font-bold">S/ {Number(item.montoPapeleta).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                         </div>
                       )}
                     </td>
@@ -721,7 +721,7 @@ export function Retenciones({ user }) {
                     </p>
                     {selectedItem.numeroPapeleta && (
                       <p className="text-xs font-bold text-rose-600 dark:text-rose-400">
-                        Papeleta: {selectedItem.numeroPapeleta} <span className="font-black">(S/ {Number(selectedItem.montoPapeleta).toFixed(2)})</span>
+                        Papeleta: {selectedItem.numeroPapeleta} <span className="font-black">(S/ {Number(selectedItem.montoPapeleta).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})</span>
                       </p>
                     )}
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -762,7 +762,7 @@ export function Retenciones({ user }) {
                       <span className="text-emerald-700 dark:text-emerald-400 font-bold">Fecha Salida:</span> {selectedItem.fechaLiberacion ? new Date(selectedItem.fechaLiberacion).toLocaleDateString('es-PE') : 'Registrado'}
                     </p>
                     <p>
-                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">Liquidación Pagada:</span> S/ {Number(selectedItem.montoTotalLiberacion || 0).toFixed(2)}
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">Liquidación Pagada:</span> S/ {Number(selectedItem.montoTotalLiberacion || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>

@@ -30,6 +30,13 @@ const FILTER_ESTADO_OPTIONS = [
   { value: 'SUSPENDIDO', label: 'Suspendidas' },
 ]
 
+const FILTER_SOCIO_VEHICULOS_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los vehículos' },
+  { value: 'UNO', label: '1 vehículo' },
+  { value: 'DOS_TRES', label: '2 a 3 vehículos' },
+  { value: 'MAS_TRES', label: 'Más de 3 vehículos' },
+]
+
 const normalizeOrg = (o) => ({
   ...o,
   _search: `${o.razonSocial || ''} ${o.ruc || ''} ${o.partidaRegistral || ''} ${o.direccion || ''} ${o.numeroLicencia || ''} ${o.resolucionAlcaldia || ''} ${o.representanteNombre || ''} ${o.representanteDni || ''}`.toLowerCase(),
@@ -56,6 +63,7 @@ export function Asociaciones() {
   const [debouncedSociosSearch, setDebouncedSociosSearch] = useState('')
   const [socioOrgFilter, setSocioOrgFilter] = useState('TODOS')
   const [socioTipoFilter, setSocioTipoFilter] = useState('TODOS')
+  const [socioVehiculosFilter, setSocioVehiculosFilter] = useState('TODOS')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -89,7 +97,7 @@ export function Asociaciones() {
 
   useEffect(() => {
     setSociosPage(1)
-  }, [debouncedSociosSearch, socioOrgFilter, socioTipoFilter])
+  }, [debouncedSociosSearch, socioOrgFilter, socioTipoFilter, socioVehiculosFilter])
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -141,6 +149,7 @@ export function Asociaciones() {
     buscar: debouncedSociosSearch,
     idAsociacion: socioOrgFilter === 'TODOS' ? '' : socioOrgFilter,
     tipo: socioTipoFilter === 'TODOS' ? '' : socioTipoFilter,
+    vehiculos: socioVehiculosFilter === 'TODOS' ? '' : socioVehiculosFilter,
     sortBy: sociosSortBy,
     sortDir: sociosSortDir,
   }
@@ -357,6 +366,7 @@ export function Asociaciones() {
         metadata: [
           { label: 'Filtro Asociación', value: socioOrgFilter === 'TODOS' ? 'Todas' : (orgOptionsRaw.find((o) => String(o.id) === String(socioOrgFilter))?.razonSocial || socioOrgFilter) },
           { label: 'Filtro Tipo', value: socioTipoFilter === 'TODOS' ? 'Todos' : (socioTipoFilter === 'PARTICULAR' ? 'Particular' : 'Asociación') },
+          { label: 'Filtro Vehículos', value: FILTER_SOCIO_VEHICULOS_OPTIONS.find((o) => o.value === socioVehiculosFilter)?.label || 'Todos' },
           { label: 'Total Registros', value: `${socios.length} socios · ${listToExport.length} vínculos` },
         ],
         columns: [
@@ -392,7 +402,7 @@ export function Asociaciones() {
   // Opciones del filtro de la pestaña Socios (id + nombre, vienen de un endpoint liviano)
   const uniqueOrgOptions = useMemo(() => [
     { value: 'TODOS', label: 'Todas las Asociaciones' },
-    ...orgOptionsRaw.map((o) => ({ value: String(o.id), label: o.razonSocial })),
+    ...orgOptionsRaw.map((o) => ({ value: String(o.ids || o.id), label: o.razonSocial })),
   ], [orgOptionsRaw])
 
   const handleOpenCreateModal = () => {
@@ -914,9 +924,9 @@ export function Asociaciones() {
 
       {activeTab === 'SOCIOS' && (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
-          <div className="sticky top-0 z-20 flex flex-col gap-2.5 rounded-t-2xl border-b border-slate-100 bg-white px-4 py-2.5 dark:border-[var(--border)] dark:bg-[#1C2438] sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-1 flex-col sm:flex-row gap-2.5">
-              <div className="relative flex-1 sm:max-w-xs">
+          <div className="sticky top-0 z-20 flex flex-col gap-2.5 rounded-t-2xl border-b border-slate-100 bg-white px-4 py-2.5 dark:border-[var(--border)] dark:bg-[#1C2438] lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex flex-1 flex-wrap items-center gap-2.5">
+              <div className="relative min-w-[240px] flex-1 lg:max-w-sm">
                 <Icon
                   name="search"
                   className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
@@ -942,18 +952,30 @@ export function Asociaciones() {
                 value={socioTipoFilter}
                 onChange={setSocioTipoFilter}
                 options={FILTER_TIPO_OPTIONS}
+                className="min-w-[150px]"
+                buttonClassName="w-full"
               />
               <RoundedSelect
                 value={socioOrgFilter}
                 onChange={setSocioOrgFilter}
                 options={uniqueOrgOptions}
+                className="min-w-[210px]"
+                buttonClassName="w-full"
               />
-              {(socioOrgFilter !== 'TODOS' || socioTipoFilter !== 'TODOS' || sociosSearch !== '') && (
+              <RoundedSelect
+                value={socioVehiculosFilter}
+                onChange={setSocioVehiculosFilter}
+                options={FILTER_SOCIO_VEHICULOS_OPTIONS}
+                className="min-w-[170px]"
+                buttonClassName="w-full"
+              />
+              {(socioOrgFilter !== 'TODOS' || socioTipoFilter !== 'TODOS' || socioVehiculosFilter !== 'TODOS' || sociosSearch !== '') && (
                 <button
                   type="button"
                   onClick={() => {
                     setSocioOrgFilter('TODOS')
                     setSocioTipoFilter('TODOS')
+                    setSocioVehiculosFilter('TODOS')
                     setSociosSearch('')
                   }}
                   title="Limpiar filtros de socios"
@@ -1061,9 +1083,16 @@ export function Asociaciones() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center align-top">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-700 dark:bg-slate-800 dark:text-slate-300" title={`${socio.vehiculosTotal || 0} vehículo(s) en ${socio.asociacionesTotal || 0} organización(es)`}>
-                          {socio.vehiculosTotal || 0}
-                        </span>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-700 dark:bg-slate-800 dark:text-slate-300" title={`${socio.vehiculosTotal || 0} vehículo(s) en ${socio.asociacionesTotal || 0} organización(es)`}>
+                            {socio.vehiculosTotal || 0}
+                          </span>
+                          {Number(socio.documentosVencidos || 0) > 0 && (
+                            <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-black text-rose-600 dark:bg-rose-950/40 dark:text-rose-300" title="Vehículos con documentos vencidos">
+                              {socio.documentosVencidos} venc.
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-center align-top text-xs font-medium text-slate-600 dark:text-slate-400">
                         {socio.telefono || '-'}

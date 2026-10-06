@@ -397,7 +397,7 @@ export function Operativos({ user }) {
     dni: p.conductor_dni || 'S/D',
     placa: p.placa || 'SIN PLACA',
     infraccion: p.infracciones || '—',
-    monto: Number(p.monto_total || 0).toFixed(2),
+    monto: Number(p.monto_total || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
     estado: p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : (p.estado || ''),
   }))
 

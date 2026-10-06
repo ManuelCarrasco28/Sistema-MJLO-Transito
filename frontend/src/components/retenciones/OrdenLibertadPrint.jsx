@@ -111,26 +111,26 @@ export const OrdenLibertadPrint = ({ item }) => {
           <span className="mr-2">N° de recibo de la M.J.L.O.</span>
           <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.reciboPapeleta || ''}</div>
           <span className="mx-2 font-bold">Monto S/.</span>
-          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoPapeletaCobrada ? Number(item.montoPapeletaCobrada).toFixed(2) : ''}</div>
+          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoPapeletaCobrada ? Number(item.montoPapeletaCobrada).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
         </div>
         
         <div className="flex items-end text-sm">
           <span className="mr-2">Guardianía N° de Recibo</span>
           <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.reciboGuardiania || ''}</div>
           <span className="mx-2 font-bold">Monto S/.</span>
-          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoGuardiania ? Number(item.montoGuardiania).toFixed(2) : ''}</div>
+          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoGuardiania ? Number(item.montoGuardiania).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
         </div>
 
         <div className="flex items-end text-sm">
           <span className="mr-2">Remolque N° de Recibo</span>
           <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.reciboRemolque || ''}</div>
           <span className="mx-2 font-bold">Monto S/.</span>
-          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoRemolque ? Number(item.montoRemolque).toFixed(2) : ''}</div>
+          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoRemolque ? Number(item.montoRemolque).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
         </div>
 
         <div className="flex items-end justify-end text-sm mt-1">
           <span className="font-bold mr-2 text-base">TOTAL S/.</span>
-          <div className="border-b border-black w-40 font-serif uppercase px-2 text-right font-bold text-base">{item?.montoTotalLiberacion ? Number(item.montoTotalLiberacion).toFixed(2) : ''}</div>
+          <div className="border-b border-black w-40 font-serif uppercase px-2 text-right font-bold text-base">{item?.montoTotalLiberacion ? Number(item.montoTotalLiberacion).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
         </div>
       </div>
 

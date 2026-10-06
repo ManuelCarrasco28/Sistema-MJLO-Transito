@@ -273,7 +273,7 @@ export function Papeletas({ user }) {
               { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 80, align: 'center' },
               { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 60, align: 'center' },
               { header: 'INFRACCIÓN', key: 'tipoInfraccionCodigo', isText: true, width: 70, align: 'center' },
-              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 80 },
+              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 80 },
               { header: 'CONDUCTOR', key: 'conductorNombre', width: 120 },
               { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 120 },
               { header: 'FECHA', key: 'fechaHora', render: (_, p) => (p.fechaHora ? new Date(String(p.fechaHora).replace(' ', 'T')).toLocaleDateString('es-PE') : '—'), width: 80, align: 'center' },
@@ -313,7 +313,7 @@ export function Papeletas({ user }) {
               { header: 'CÓDIGO INFRACCIÓN', key: 'tipoInfraccionCodigo', isText: true, width: 140, align: 'center' },
               { header: 'DESCRIPCIÓN INFRACCIÓN', key: 'tipoInfraccionDescripcion', width: 260 },
               { header: 'GRAVEDAD', key: 'tipoInfraccionGravedad', width: 110, align: 'center' },
-              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toFixed(2)}`, align: 'right', width: 120 },
+              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 120 },
               { header: 'TIPO DE INFRACTOR', key: 'tipoInfractor', width: 120, align: 'center' },
               { header: 'CONDUCTOR / INFRACTOR', render: (_, p) => p.conductorNombre || p.infractor || '—', width: 180 },
               { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
@@ -1336,7 +1336,7 @@ export function Papeletas({ user }) {
                         <p className="text-[11px] text-slate-400">{new Date(p.fechaHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </td>
                       <td className="px-3.5 py-3.5 text-center ">
-                        <span className="font-mono font-black text-slate-800 dark:text-white text-xs">S/ {p.montoTotal.toFixed(2)}</span>
+                        <span className="font-mono font-black text-slate-800 dark:text-white text-xs">S/ {p.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                       </td>
                       <td className="px-3 py-3.5 text-center">
                         <StatusBadge status={p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado} />

@@ -53,7 +53,7 @@ export function PagoPapeletaModal({
             </div>
             <div className="border-t border-emerald-200 dark:border-emerald-800/60 pt-2 flex justify-between items-center">
               <span className="font-black text-slate-700 dark:text-slate-300 uppercase">Monto a Cancelar:</span>
-              <span className="font-mono font-black text-xl text-emerald-600 dark:text-emerald-400">S/ {papeletaToAction.montoTotal.toFixed(2)}</span>
+              <span className="font-mono font-black text-xl text-emerald-600 dark:text-emerald-400">S/ {papeletaToAction.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
 

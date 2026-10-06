@@ -238,7 +238,7 @@ export function Pagos() {
             metadata: [
               { label: 'Estado', value: filterEstado },
               { label: 'Tipo', value: filterTipoPago },
-              { label: 'Total Recaudado', value: `S/ ${totalMonto.toFixed(2)}` }
+              { label: 'Total Recaudado', value: `S/ ${totalMonto.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` }
             ],
             columns: [
               { header: 'N° RECIBO', key: 'numeroRecibo' },
@@ -246,7 +246,7 @@ export function Pagos() {
               { header: 'TIPO PAGO', key: 'tipoPago' },
               { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—' },
               { header: 'MÉTODO DE PAGO', key: 'metodo' },
-              { header: 'MONTO', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}` },
+              { header: 'MONTO', render: (_, r) => `S/ ${(r.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
               { header: 'ESTADO', key: 'estado' }
             ],
             data
@@ -269,7 +269,7 @@ export function Pagos() {
             metadata: [
               { label: 'Estado', value: filterEstado },
               { label: 'Tipo', value: filterTipoPago },
-              { label: 'Total Recaudado', value: `S/ ${totalMonto.toFixed(2)}` }
+              { label: 'Total Recaudado', value: `S/ ${totalMonto.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` }
             ],
             columns: [
               { header: 'N° RECIBO', key: 'numeroRecibo', isText: true, width: 140 },
@@ -279,7 +279,7 @@ export function Pagos() {
               { header: 'N° VOUCHER', key: 'numeroVoucher', isText: true, width: 140 },
               { header: 'REFERENCIA', key: 'referenciaPago', width: 160 },
               { header: 'MÉTODO DE PAGO', key: 'metodo', width: 120 },
-              { header: 'MONTO (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}`, align: 'right', width: 120 },
+              { header: 'MONTO (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 120 },
               { header: 'ESTADO', key: 'estado', align: 'center', width: 110 }
             ],
             data
@@ -301,10 +301,10 @@ export function Pagos() {
       subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Subgerencia de Tránsito',
       metadata: [
         { label: 'Fecha Cierre', value: arqueoData.fecha },
-        { label: 'Total Recaudado', value: `S/ ${arqueoData.totalRecaudado.toFixed(2)}` },
-        { label: 'Efectivo', value: `S/ ${(arqueoData.porMetodo?.efectivo || 0).toFixed(2)}` },
-        { label: 'Tarjeta', value: `S/ ${(arqueoData.porMetodo?.tarjeta || 0).toFixed(2)}` },
-        { label: 'Transferencia', value: `S/ ${(arqueoData.porMetodo?.transferencia || 0).toFixed(2)}` },
+        { label: 'Total Recaudado', value: `S/ ${arqueoData.totalRecaudado.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
+        { label: 'Efectivo', value: `S/ ${(arqueoData.porMetodo?.efectivo || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
+        { label: 'Tarjeta', value: `S/ ${(arqueoData.porMetodo?.tarjeta || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
+        { label: 'Transferencia', value: `S/ ${(arqueoData.porMetodo?.transferencia || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
         { label: 'Total Operaciones', value: String(arqueoData.totalOperaciones || 0) }
       ],
       columns: [
@@ -314,7 +314,7 @@ export function Pagos() {
         { header: 'VOUCHER', key: 'numeroVoucher', isText: true, width: 130 },
         { header: 'MÉTODO DE PAGO', key: 'metodo', width: 120 },
         { header: 'CAJERO / OPERADOR', key: 'cajero', width: 180 },
-        { header: 'IMPORTE (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toFixed(2)}`, align: 'right', width: 120 }
+        { header: 'IMPORTE (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 120 }
       ],
       data: arqueoData.pagos
     })
@@ -444,7 +444,7 @@ export function Pagos() {
           </div>
           <div className="mt-1 flex items-baseline justify-between gap-2">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight tracking-tight">
-              S/ {Number(totalMonto || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              S/ {Number(totalMonto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </p>
             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md shrink-0">
               Caja Total
@@ -674,7 +674,7 @@ export function Pagos() {
                     </td>
                     <td className="px-4 py-3.5 text-center whitespace-nowrap">
                       <p className="font-black text-xs text-slate-900 dark:text-white">
-                        S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                       </p>
                       <p className={`text-[10px] font-bold uppercase tracking-wider ${
                         p.estado === 'PAGADO'
@@ -763,7 +763,7 @@ export function Pagos() {
                 <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
                   <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">DETALLES DEL RECIBO</legend>
                   <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                    <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">Monto: S/ {pagoToConfirm.montoTotal.toFixed(2)}</p>
+                    <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">Monto: S/ {pagoToConfirm.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                     <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{pagoToConfirm.referenciaPago}</p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -852,7 +852,7 @@ export function Pagos() {
                               </span>
                             </div>
                             <span className="shrink-0 text-xs font-black text-emerald-700 dark:text-emerald-400">
-                              {d.monto != null ? `S/ ${Number(d.monto).toFixed(2)}` : '—'}
+                              {d.monto != null ? `S/ ${Number(d.monto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}
                             </span>
                           </button>
                         )
@@ -864,7 +864,7 @@ export function Pagos() {
                     <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Registro a cobrar</p>
                       <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{origenPreseleccionado.nombre}</p>
-                      <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">S/ {Number(origenPreseleccionado.monto || 0).toFixed(2)}</p>
+                      <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">S/ {Number(origenPreseleccionado.monto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                     </div>
                   )}
                 </fieldset>
@@ -915,7 +915,7 @@ export function Pagos() {
               <p><strong>Método de Pago:</strong> {selectedPago.metodo}</p>
               <p><strong>N° Voucher:</strong> {selectedPago.numeroVoucher || 'Sin voucher'}</p>
               <p><strong>Referencia:</strong> {selectedPago.referenciaPago || 'Sin referencia'}</p>
-              <p className="text-emerald-600 font-bold dark:text-emerald-400"><strong>Monto ({selectedPago.estado}):</strong> S/ {selectedPago.montoTotal?.toFixed(2)}</p>
+              <p className="text-emerald-600 font-bold dark:text-emerald-400"><strong>Monto ({selectedPago.estado}):</strong> S/ {selectedPago.montoTotal?.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
             </div>
             <div className="mt-8 flex justify-end gap-2">
               <button disabled={selectedPago.estado !== 'PAGADO'} onClick={() => { setIsDetailModalOpen(false); setIsPreviewModalOpen(true); }} className="rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-sky-700 cursor-pointer inline-flex items-center gap-1.5"><Icon name="print" className="size-4" /> Imprimir</button>
@@ -939,7 +939,7 @@ export function Pagos() {
               <p>MÉTODO: {selectedPago.metodo}</p>
             </div>
             <div className="text-right text-sm">
-              <p><strong>TOTAL: S/ {selectedPago.montoTotal?.toFixed(2)}</strong></p>
+              <p><strong>TOTAL: S/ {selectedPago.montoTotal?.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong></p>
             </div>
             <div className="mt-8 pt-4 border-t border-slate-300 flex justify-between print:hidden">
               <button onClick={handlePrintTicket} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-sans font-bold hover:bg-emerald-700 cursor-pointer">Imprimir Ticket</button>
@@ -1012,7 +1012,7 @@ export function Pagos() {
                         <Icon name="payment" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
-                        S/ {Number(arqueoData.totalRecaudado || 0).toFixed(2)}
+                        S/ {Number(arqueoData.totalRecaudado || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                       </p>
                       <span className="mt-1 inline-block rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900 dark:text-purple-300 print:bg-transparent print:p-0 print:text-black font-mono">
                         {arqueoData.totalOperaciones} operaciones
@@ -1025,7 +1025,7 @@ export function Pagos() {
                         <Icon name="payment" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
-                        S/ {Number(arqueoData.porMetodo?.efectivo || 0).toFixed(2)}
+                        S/ {Number(arqueoData.porMetodo?.efectivo || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                       </p>
                       <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 print:text-black font-mono">
                         Caja física para custodia
@@ -1038,7 +1038,7 @@ export function Pagos() {
                         <Icon name="creditCard" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
-                        S/ {Number(arqueoData.porMetodo?.tarjeta || 0).toFixed(2)}
+                        S/ {Number(arqueoData.porMetodo?.tarjeta || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                       </p>
                       <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 print:text-black font-mono">
                         Liquidación electrónica
@@ -1051,7 +1051,7 @@ export function Pagos() {
                         <Icon name="building" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
-                        S/ {Number(arqueoData.porMetodo?.transferencia || 0).toFixed(2)}
+                        S/ {Number(arqueoData.porMetodo?.transferencia || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                       </p>
                       <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 print:text-black font-mono">
                         Banco de la Nación / Cta Cte
@@ -1086,7 +1086,7 @@ export function Pagos() {
                                   <td className="py-2 font-bold text-slate-800 dark:text-slate-200 print:text-black">{c.tipoPago}</td>
                                   <td className="py-2 text-center text-slate-600 dark:text-slate-400 print:text-black">{c.cantidad}</td>
                                   <td className="py-2 text-right font-black text-slate-900 dark:text-white print:text-black">
-                                    S/ {Number(c.total || 0).toFixed(2)}
+                                    S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                               ))
@@ -1121,7 +1121,7 @@ export function Pagos() {
                                   <td className="py-2 font-bold text-slate-800 dark:text-slate-200 print:text-black">{c.usuario}</td>
                                   <td className="py-2 text-center text-slate-600 dark:text-slate-400 print:text-black">{c.cantidad}</td>
                                   <td className="py-2 text-right font-black text-emerald-600 dark:text-emerald-400 print:text-black">
-                                    S/ {Number(c.total || 0).toFixed(2)}
+                                    S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                               ))
@@ -1183,7 +1183,7 @@ export function Pagos() {
                                   {p.cajero}
                                 </td>
                                 <td className="py-2 text-right font-black text-slate-900 dark:text-white print:text-black print:py-1">
-                                  S/ {Number(p.montoTotal || 0).toFixed(2)}
+                                  S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                 </td>
                               </tr>
                             ))

@@ -137,21 +137,21 @@ export function TramiteFormularioModal({
 
   const handleTipoChange = (newTipo) => {
     let asunto = 'AUTORIZACIÓN MUNICIPAL OFICIAL'
-    let monto = '450.00'
+    let monto = '450'
 
     if (newTipo === 'CARGA_DESCARGA') {
       asunto = 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA'
-      monto = '1030.00'
+      monto = '1030'
     } else if (newTipo === 'USO_VIAS') {
       asunto = 'AUTORIZACION PROVISIONAL DE USO DE VIAS'
-      monto = '850.00'
+      monto = '850'
     } else if (newTipo === 'ZONAS_RESERVADAS' || newTipo === 'ZONA_RESERVADA') {
       asunto = 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
-      monto = '920.00'
+      monto = '920'
     } else {
       // CONTROL_VEHICULAR / OPERACION
       asunto = 'AUTORIZACIÓN MUNICIPAL DE CONTROL VEHICULAR Y CIRCULACIÓN'
-      monto = '450.00'
+      monto = '450'
     }
 
     const updated = {

@@ -22,7 +22,7 @@ export function generarPlantillaControlVehicular(data = {}) {
   const zona = data.zonaCirculacion || 'Anillo Vial y Cuadrantes Autorizados - Distrito de José Leonardo Ortiz'
   const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : '06:00:00 - 22:00:00'
   const recibo = data.reciboIngresoNumero || 'S/N'
-  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toFixed(2)}` : 'S/ 450.00'
+  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 450'
 
   return `
 <p><strong>SUBGERENCIA DE TRÁNSITO, TRANSPORTE Y SEGURIDAD VIAL</strong></p>
@@ -74,7 +74,7 @@ export function generarPlantillaCargaDescarga(data = {}) {
   const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : '16:00:00 - 05:00:00'
   const tonelaje = data.tonelaje || 'Hasta 15 Tn'
   const recibo = data.reciboIngresoNumero || 'S/N'
-  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toFixed(2)}` : 'S/ 1030.00'
+  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 1030'
 
   return `
 <p><strong>SUBGERENCIA DE TRÁNSITO, TRANSPORTE Y SEGURIDAD VIAL</strong></p>
@@ -126,7 +126,7 @@ export function generarPlantillaUsoVias(data = {}) {
   const ubicacion = data.ubicacion || data.zonaCirculacion || 'Vía pública solicitada - José Leonardo Ortiz'
   const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : '08:00:00 - 18:00:00'
   const recibo = data.reciboIngresoNumero || 'S/N'
-  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toFixed(2)}` : 'S/ 850.00'
+  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 850'
 
   return `
 <p><strong>SUBGERENCIA DE TRÁNSITO, TRANSPORTE Y SEGURIDAD VIAL</strong></p>
@@ -176,7 +176,7 @@ export function generarPlantillaZonasReservadas(data = {}) {
   const ubicacion = data.ubicacion || data.zonaCirculacion || 'Frontis del establecimiento solicitante - José Leonardo Ortiz'
   const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : '07:00:00 - 20:00:00'
   const recibo = data.reciboIngresoNumero || 'S/N'
-  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toFixed(2)}` : 'S/ 920.00'
+  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 920'
 
   return `
 <p><strong>SUBGERENCIA DE TRÁNSITO, TRANSPORTE Y SEGURIDAD VIAL</strong></p>

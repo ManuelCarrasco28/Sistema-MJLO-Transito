@@ -31,7 +31,7 @@ export const buildVehiculoQrValue = (vehiculo) => {
   const papeletas = vehiculo.historialPapeletas || []
   const papeletasQr = papeletas.length > 0
     ? papeletas.slice(0, 8).map((papeleta, index) => (
-      `${index + 1}. ${papeleta.numeroPapeleta || 'SIN NUMERO'} | ${papeleta.estado || 'SIN ESTADO'} | S/ ${Number(papeleta.montoTotal || 0).toFixed(2)} | ${papeleta.fechaHora || 'SIN FECHA'}`
+      `${index + 1}. ${papeleta.numeroPapeleta || 'SIN NUMERO'} | ${papeleta.estado || 'SIN ESTADO'} | S/ ${Number(papeleta.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} | ${papeleta.fechaHora || 'SIN FECHA'}`
     )).join('\n')
     : 'SIN PAPELETAS REGISTRADAS'
 

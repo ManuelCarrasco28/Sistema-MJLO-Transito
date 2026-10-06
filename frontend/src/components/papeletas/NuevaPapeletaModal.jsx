@@ -206,7 +206,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
                     >
                       <option value="">Selecciona infracción</option>
                       {tiposInfraccion.map((tipo) => (
-                        <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion.length > 85 ? tipo.descripcion.substring(0, 85) + '...' : tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toFixed(2)}</option>
+                        <option key={tipo.id} value={tipo.id}>{tipo.codigo} — {tipo.descripcion.length > 85 ? tipo.descripcion.substring(0, 85) + '...' : tipo.descripcion} · S/ {Number(tipo.montoBase || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</option>
                       ))}
                     </select>
                     {nuevaForm.infraccionesIds.length > 1 && (

@@ -66,16 +66,21 @@ class CursosController extends ResourceController
 
             if (!empty($cursoIds)) {
                 $inscripciones = $db->table('inscripciones_curso ic')
-                    ->select('ic.id_curso, c.nombres, c.apellido_paterno, c.apellido_materno, ic.estado, ic.estado_pago, ic.asistio, p.numero AS dni, c.numero_licencia AS licencia, c.foto AS fotoUrl')
+                    ->select('ic.id AS idInscripcion, ic.id_curso, c.nombres, c.apellido_paterno, c.apellido_materno, ic.estado, ic.estado_pago, ic.asistio, p.numero AS dni, c.numero_licencia AS licencia, c.foto AS fotoUrl, ic.carnet_entregado AS carnetEntregado, ic.carnet_fecha_entrega AS carnetFechaEntrega, ic.carnet_entregado_por AS carnetEntregadoPor')
                     ->join('personas p', 'p.id = ic.id_persona', 'left')
                     ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
                     ->whereIn('ic.id_curso', $cursoIds)
                     ->get()
                     ->getResultArray();
 
+                $fileStorage = new \App\Services\FileStorageService();
                 foreach ($inscripciones as $ic) {
                     $cid = (int)$ic['id_curso'];
                     unset($ic['id_curso']);
+                    // La foto se guarda como ruta relativa (p.ej. "personas/xxx.jpg") o como URL externa (SUNARP/PIDE);
+                    // urlPublica() la convierte a una URL absoluta que el navegador sí puede cargar en el carnet.
+                    $ic['fotoUrl'] = $fileStorage->urlPublica($ic['fotoUrl'] ?? null) ?? '';
+                    $ic['carnetEntregado'] = (bool) ($ic['carnetEntregado'] ?? false);
                     $participantesPorCurso[$cid][] = $ic;
                     $conteoPorCurso[$cid] = ($conteoPorCurso[$cid] ?? 0) + 1;
                 }
@@ -486,6 +491,43 @@ class CursosController extends ResourceController
             return $this->respond(['status' => 200, 'message' => 'Nota/asistencia registrada correctamente.']);
         } catch (\Exception $e) {
             return $this->failServerError('Error al registrar nota.');
+        }
+    }
+
+    /**
+     * Marca (o desmarca) la entrega física del carnet de un participante: distingue "ya se
+     * imprimió" de "ya lo recogió el conductor". Queda quién lo marcó y cuándo, para el padrón.
+     */
+    public function marcarEntregaCarnet($idInscripcion)
+    {
+        $db = \Config\Database::connect();
+        $input = $this->parseInput();
+
+        $entregado = !empty($input['entregado']);
+
+        $inscripcion = $db->table('inscripciones_curso')->where('id', $idInscripcion)->get()->getRowArray();
+        if (!$inscripcion) {
+            return $this->failNotFound('No se encontró la inscripción indicada.');
+        }
+
+        $user = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
+
+        $data = [
+            'carnet_entregado' => $entregado ? 1 : 0,
+            'carnet_fecha_entrega' => $entregado ? date('Y-m-d H:i:s') : null,
+            'carnet_entregado_por' => $entregado ? ($user['usuario'] ?? null) : null,
+        ];
+
+        try {
+            $db->table('inscripciones_curso')->where('id', $idInscripcion)->update($data);
+
+            return $this->respond([
+                'status' => 200,
+                'message' => $entregado ? 'Carnet marcado como entregado.' : 'Entrega del carnet revertida.',
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            return $this->failServerError('No se pudo actualizar la entrega del carnet.');
         }
     }
 }

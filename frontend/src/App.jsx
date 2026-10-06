@@ -195,10 +195,10 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
   return (
     <main
-      className={`min-h-dvh bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#151A2D] dark:text-slate-100 lg:grid lg:h-dvh lg:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white ${sidebarCollapsed ? 'lg:grid-cols-[5rem_minmax(0,1fr)]' : 'lg:grid-cols-[16rem_minmax(0,1fr)]'
+      className={`app-viewport bg-[#eef6fb] text-slate-900 transition-[grid-template-columns] duration-300 ease-in-out dark:bg-[#151A2D] dark:text-slate-100 lg:grid lg:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white ${sidebarCollapsed ? 'lg:grid-cols-[5rem_minmax(0,1fr)]' : 'lg:grid-cols-[16rem_minmax(0,1fr)]'
         }`}
     >
-      <div className="print:hidden">
+      <div className="min-h-0 print:hidden lg:h-full">
         <Sidebar
           activeItem={activeItem}
           onSelect={() => {}}
@@ -210,7 +210,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
           onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
         />
       </div>
-      <div className="no-scrollbar min-w-0 lg:h-dvh lg:overflow-y-auto flex flex-col print:block print:h-auto print:overflow-visible">
+      <div className="no-scrollbar min-h-0 min-w-0 flex flex-col lg:h-full lg:overflow-y-auto print:block print:h-auto print:overflow-visible">
         <div className="print:hidden sticky top-0 z-40 border-b border-transparent">
           <Header
             onOpenMobile={() => setMobileOpen(true)}

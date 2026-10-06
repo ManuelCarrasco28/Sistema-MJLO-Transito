@@ -80,7 +80,7 @@ export function PreviewTicketModal({ selectedPapeleta, onClose }) {
                 <div key={i} className="pl-1 border-b border-dotted border-slate-300 pb-1.5 last:border-b-0 last:pb-0">
                   <div className="flex justify-between font-bold">
                     <span>{d.codigo} ({d.gravedad || 'LEVE'})</span>
-                    <span>S/ {parseFloat(d.monto || 0).toFixed(2)}</span>
+                    <span>S/ {parseFloat(d.monto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                   </div>
                   {d.descripcion && (
                     <p className="text-[10px] text-slate-700 leading-tight mt-0.5 break-words">
@@ -93,7 +93,7 @@ export function PreviewTicketModal({ selectedPapeleta, onClose }) {
               <div className="pl-1">
                 <div className="flex justify-between font-bold">
                   <span>{selectedPapeleta.tipoInfraccionCodigo || 'N/A'} ({selectedPapeleta.tipoInfraccionGravedad || 'LEVE'})</span>
-                  <span>S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
+                  <span>S/ {selectedPapeleta.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                 </div>
                 {selectedPapeleta.tipoInfraccionDescripcion && (
                   <p className="text-[10px] text-slate-700 leading-tight mt-0.5 break-words">
@@ -128,15 +128,15 @@ export function PreviewTicketModal({ selectedPapeleta, onClose }) {
           <div className="space-y-1 mb-2">
             <div className="flex justify-between">
               <span>Monto Base:</span>
-              <span>S/ {montoBaseTotal.toFixed(2)}</span>
+              <span>S/ {montoBaseTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between">
               <span>Descuento:</span>
-              <span>- S/ {descuentoTotal.toFixed(2)}</span>
+              <span>- S/ {descuentoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between">
               <span>Gastos/Int:</span>
-              <span>+ S/ 0.00</span>
+              <span>+ S/ 0</span>
             </div>
           </div>
 
@@ -144,7 +144,7 @@ export function PreviewTicketModal({ selectedPapeleta, onClose }) {
 
           <div className="flex justify-between items-center my-2">
             <span className="font-black text-sm uppercase">Total a Pagar:</span>
-            <span className="font-black text-sm">S/ {selectedPapeleta.montoTotal.toFixed(2)}</span>
+            <span className="font-black text-sm">S/ {selectedPapeleta.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
           </div>
 
           <div className="text-center mt-1">

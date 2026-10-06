@@ -12,6 +12,74 @@ const sanitizarHtml = (html) => DOMPurify.sanitize(html, {
   ALLOWED_ATTR: ['style', 'href', 'target', 'rel'],
 })
 
+// Las plantillas del carnet de curso (curso-adelante.png / curso-atras.png) son archivos públicos,
+// sin sesión de por medio, pero igual se quedaban en blanco al imprimir: la ventana de impresión del
+// navegador se renderiza en un proceso aparte que no siempre llega a cargar imágenes por su ruta de
+// red a tiempo (es el mismo problema que tenían las fotos de los conductores). La solución es la misma:
+// descargarlas una vez y dejarlas como "data:" embebido, para que imprimir no dependa de ninguna petición.
+const RUTAS_PLANTILLA_CARNET = {
+  adelante: '/img/img-carnet-curso/curso-adelante.png',
+  atras: '/img/img-carnet-curso/curso-atras.png',
+}
+const plantillasCarnetDataUri = { adelante: null, atras: null }
+let precargaPlantillasCarnetPromesa = null
+
+function descargarComoDataUri(url) {
+  return fetch(url)
+    .then((respuesta) => (respuesta.ok ? respuesta.blob() : null))
+    .then((blob) => blob && new Promise((resolve) => {
+      const lector = new FileReader()
+      lector.onload = () => resolve(String(lector.result || ''))
+      lector.onerror = () => resolve(null)
+      lector.readAsDataURL(blob)
+    }))
+    .catch(() => null)
+}
+
+// Las plantillas pesan ~1.5 MB cada una porque son PNG (sin pérdida) a mayor resolución de la que
+// necesita una impresión a 300dpi del tamaño real del carnet (85.6×53.98mm). Con un lote de ~200
+// carnets, esos ~3 MB se repiten 194 veces en el documento a imprimir y el navegador tarda bastante
+// en preparar e imprimir las 49 hojas. Al volver a codificarlas una sola vez como JPEG y a un tamaño
+// ajustado al de impresión, el documento final pesa una fracción de eso y se prepara mucho más rápido,
+// sin que se note la diferencia de calidad en un carnet de bolsillo.
+export function recomprimirImagen(dataUriOriginal, anchoMaximo, calidad = 0.85) {
+  return new Promise((resolve) => {
+    if (!dataUriOriginal) return resolve(null)
+    const img = new window.Image()
+    img.onload = () => {
+      const escala = Math.min(1, anchoMaximo / img.naturalWidth)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.naturalWidth * escala)
+      canvas.height = Math.round(img.naturalHeight * escala)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return resolve(dataUriOriginal)
+      // El fondo blanco cubre el canal alfa del PNG original antes de pasar a JPEG (que no admite transparencia).
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', calidad))
+    }
+    img.onerror = () => resolve(dataUriOriginal)
+    img.src = dataUriOriginal
+  })
+}
+
+// Se llama antes de imprimir (y de paso al entrar a la pantalla, para adelantar trabajo) y deja el
+// resultado en plantillasCarnetDataUri; los componentes de abajo lo leen de forma síncrona al renderizar.
+// 1100px de ancho sigue por encima de los ~1011px que pide una impresión nítida a 300dpi del carnet.
+export function precargarPlantillasCarnet() {
+  if (!precargaPlantillasCarnetPromesa) {
+    const prepararUna = (url, key) => descargarComoDataUri(url)
+      .then((uri) => recomprimirImagen(uri, 1100))
+      .then((uri) => { if (uri) plantillasCarnetDataUri[key] = uri })
+    precargaPlantillasCarnetPromesa = Promise.all([
+      prepararUna(RUTAS_PLANTILLA_CARNET.adelante, 'adelante'),
+      prepararUna(RUTAS_PLANTILLA_CARNET.atras, 'atras'),
+    ])
+  }
+  return precargaPlantillasCarnetPromesa
+}
+
 export function PrintWrapper({ children, className = '', orientation = 'portrait' }) {
   React.useEffect(() => {
     const handleBeforePrint = () => {
@@ -158,104 +226,99 @@ export function TarjetaOperatividadPrint({ data }) {
   )
 }
 
+// Fecha en formato dd/mm/aaaa (como en el carnet oficial) sin importar si llega como aaaa-mm-dd
+const formatoFechaCarnet = (valor) => {
+  const texto = String(valor || '').trim()
+  const iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`
+  return texto || '—'
+}
+
+// Tamaño de letra (en % del ancho del carnet) que cabe en la casilla blanca según el largo del texto
+const tamanoValorCarnet = (texto) => {
+  const largo = String(texto || '').length
+  if (largo > 28) return 1.75
+  if (largo > 24) return 2.0
+  if (largo > 19) return 2.35
+  if (largo > 15) return 2.8
+  if (largo > 12) return 3.2
+  return 3.5
+}
+
 /**
- * Cara Frontal (Anverso): CARNET DE SEGURIDAD VIAL
+ * Cara frontal (anverso): CARNET DE SEGURIDAD VIAL.
+ * La plantilla oficial (public/img/img-carnet-curso/curso-adelante.png) trae todo el diseño;
+ * aquí solo se colocan los datos sobre las casillas de la plantilla.
  */
 export function CarnetCursoVialAnverso({ data }) {
+  const licencia = data.licencia || data.numeroLicencia || (data.dni ? `BS${data.dni}` : '—')
+  const resolucion = data.resMunicipal || data.resolucion || 'RESOLUCIÓN N° 016-2022-MDJLO/GM'
+  const anio = data.anioCurso || String(data.fechaExpedicion || '').slice(0, 4).replace(/\D/g, '') || new Date().getFullYear()
+  const foto = data.fotoUrl || data.fotoConductor
+
+  const filas = [
+    ['APELLIDOS', data.apellidos || '—'],
+    ['NOMBRES', data.nombres || data.conductorNombres || '—'],
+    ['DNI N°', data.dni || data.conductorDni || '—'],
+    ['LICENCIA', licencia],
+  ]
+
   return (
-    <div className="carnet-box curso-vial-anverso">
-      <div className="header-carnet" style={{ borderBottomColor: '#34d399' }}>
-        <img src="/escudo-jlo.png" alt="MDJLO" className="escudo" />
-        <div className="header-text">
-          <h2>Municipalidad Distrital de José Leonardo Ortiz</h2>
-          <h1 style={{ fontSize: '7.5pt' }}>CARNET DE SEGURIDAD VIAL</h1>
-        </div>
+    <div className="carnet-box cv-carnet cv-anverso">
+      <img className="cv-plantilla" src={plantillasCarnetDataUri.adelante || RUTAS_PLANTILLA_CARNET.adelante} alt="" aria-hidden="true" />
+
+      <img src="/img/logo-mjlo.png" alt="Municipalidad José Leonardo Ortiz" className="cv-logo" />
+
+      <div className="cv-cabecera">
+        <span>SUB GERENCIA DE TRÁNSITO, TRANSPORTE Y SEGURIDAD VIAL</span>
+        <strong>CURSO DE EDUCACIÓN Y SEGURIDAD VIAL {anio}</strong>
       </div>
 
-      <div className="banner-curso">
-        CURSO ANUAL DE EDUCACIÓN Y SEGURIDAD VIAL
+      <div className="cv-foto">
+        {foto && <img src={foto} alt="Conductor" />}
       </div>
+      <span className="cv-conductor">CONDUCTOR</span>
 
-      <div className="body-carnet">
-        <div className="foto-container" style={{ borderColor: '#34d399' }}>
-          <img src={data.fotoUrl || data.fotoConductor || '/placeholder-user.png'} alt="Conductor" />
+      {filas.map(([etiqueta, valor], i) => (
+        <div key={etiqueta} className={`cv-fila cv-fila-${i + 1}`}>
+          <span className="cv-etiqueta">{etiqueta}</span>
+          <strong className="cv-valor" style={{ fontSize: `${tamanoValorCarnet(valor)}cqw` }}>{valor}</strong>
         </div>
-        <div className="datos-container">
-          <div className="row-flex">
-            <div>
-              <span className="label" style={{ color: '#a7f3d0' }}>D.N.I.: </span>
-              <span className="val-yellow">{data.dni || data.conductorDni || '—'}</span>
-            </div>
-            <div>
-              <span className="label" style={{ color: '#a7f3d0' }}>N° Licencia: </span>
-              <span className="val-yellow">{data.licencia || data.numeroLicencia || 'B-IIc'}</span>
-            </div>
-          </div>
-          <div className="row-single">
-            <span className="label" style={{ color: '#a7f3d0' }}>Res. Gerencia: </span>
-            <span className="val-text">{data.resMunicipal || 'R.G. N° 018-2025-MDJLO/GSCyT'}</span>
-          </div>
-          <div className="row-single nombres-box" style={{ borderTopColor: 'rgba(255,255,255,0.2)' }}>
-            <span className="val-nombres">{data.apellidos || data.conductorNombres || 'CONDUCTOR AUTORIZADO'}</span>
-            {data.nombres && <span className="val-nombres">{data.nombres}</span>}
-          </div>
-        </div>
-      </div>
+      ))}
 
-      <div className="footer-carnet-anverso">
-        <span className="tuc-numero" style={{ color: '#6ee7b7' }}>{data.tucNumero || data.codigo}</span>
-      </div>
+      <div className="cv-resolucion">{resolucion}</div>
     </div>
   )
 }
 
 /**
- * Cara Trasera (Reverso): CARNET DE SEGURIDAD VIAL
+ * Cara trasera (reverso): CARNET DE SEGURIDAD VIAL.
+ * Plantilla: public/img/img-carnet-curso/curso-atras.png
  */
 export function CarnetCursoVialReverso({ data }) {
   const qrRaw = data.qrUrl || `https://munijlo.gob.pe/transito/validar?tipo=CURSO_VIAL&carnet=${encodeURIComponent(data.tucNumero || data.codigo || '')}&dni=${encodeURIComponent(data.dni || '')}`
   const isImageQr = Boolean(data.qrUrl && (data.qrUrl.startsWith('data:image') || data.qrUrl.endsWith('.png') || data.qrUrl.endsWith('.jpg')))
+  const codigo = data.tucNumero || data.codigo || 'CSV-0000'
 
   return (
-    <div className="carnet-box reverso">
-      <div className="reverso-grid">
-        <div className="reverso-info">
-          <div className="field-block">
-            <label>MODALIDAD AUTORIZADA:</label>
-            <div className="box-val">SERVICIO ESPECIAL TRIMÓVIL</div>
-          </div>
-          <div className="field-block">
-            <label>EMPRESA / ASOCIACIÓN:</label>
-            <div className="box-val-sm">{data.asociacion || 'INDEPENDIENTE'}</div>
-          </div>
-          <div className="field-block">
-            <label>FECHA DE EXPEDICIÓN:</label>
-            <div className="box-val">{data.fechaExpedicion || '—'}</div>
-          </div>
-          <div className="field-block">
-            <label>FECHA DE VENCIMIENTO:</label>
-            <div className="box-val highlight-red">{data.fechaVencimiento || data.fechaExpiracion || '—'}</div>
-          </div>
-          <div className="field-block">
-            <label>CONDICIÓN:</label>
-            <div className="box-val-sm" style={{ color: '#047857', fontWeight: 800 }}>CAPACITADO Y APTO</div>
-          </div>
-        </div>
+    <div className="carnet-box cv-carnet cv-reverso">
+      <img className="cv-plantilla" src={plantillasCarnetDataUri.atras || RUTAS_PLANTILLA_CARNET.atras} alt="" aria-hidden="true" />
 
-        <div className="reverso-lateral">
-          <div className="qr-container">
-            {isImageQr ? (
-              <img src={data.qrUrl} alt="QR Validación" />
-            ) : (
-              <QRCodeSVG value={qrRaw} size={68} level="M" includeMargin={false} />
-            )}
-          </div>
-          <div className="firma-container">
-            <div className="linea-firma"></div>
-            <span>SUB GERENCIA DE TRÁNSITO</span>
-          </div>
-        </div>
+      <div className="cv-qr">
+        {isImageQr ? (
+          <img src={data.qrUrl} alt="QR de validación" />
+        ) : (
+          <QRCodeSVG value={qrRaw} size={128} level="M" includeMargin={false} />
+        )}
       </div>
+
+      <span className="cv-etiqueta cv-fecha-etiqueta cv-fecha-etiqueta-1">FECHA DE EXPEDICIÓN</span>
+      <strong className="cv-valor cv-fecha-valor cv-fecha-valor-1">{formatoFechaCarnet(data.fechaExpedicion)}</strong>
+
+      <span className="cv-etiqueta cv-fecha-etiqueta cv-fecha-etiqueta-2">FECHA DE VENCIMIENTO</span>
+      <strong className="cv-valor cv-fecha-valor cv-fecha-valor-2">{formatoFechaCarnet(data.fechaVencimiento || data.fechaExpiracion)}</strong>
+
+      <div className="cv-codigo">{codigo}</div>
     </div>
   )
 }
@@ -1040,7 +1103,7 @@ export function AutorizacionCargaDescargaPrint({ data }) {
           </div>
 
           <div style={{ fontSize: '7.5pt', fontWeight: 800, marginTop: '3px', color: '#0f172a' }}>
-            CIRCULAR DENTRO DEL ANILLO VIAL: <span style={{ textDecoration: 'underline' }}>{data.horarioInicio && data.horarioFin ? `${data.horarioInicio.slice(0, 5)} - ${data.horarioFin.slice(0, 5)} hrs (del día siguiente)` : '4.00 PM - 05.00 AM (del día siguiente)'}</span>
+            CIRCULAR DENTRO DEL ANILLO VIAL: <span style={{ textDecoration: 'underline' }}>{data.horarioInicio && data.horarioFin ? `${data.horarioInicio.slice(0, 5)} - ${data.horarioFin.slice(0, 5)} hrs (del día siguiente)` : '4:00 PM - 05:00 AM (del día siguiente)'}</span>
           </div>
         </div>
 
@@ -1098,7 +1161,7 @@ export function AutorizacionCargaDescargaPrint({ data }) {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1px' }}>
             <span>
-              RECIBO DE INGRESO N° <strong style={{ fontFamily: 'monospace' }}>{data.reciboIngresoNumero || '202400028830'}</strong> — POR EL MONTO DE <strong>S/ {Number(data.reciboIngresoMonto || 1030).toFixed(2)}</strong> — FECHA: <strong>{data.reciboIngresoFecha ? formatShortDate(data.reciboIngresoFecha) : formatShortDate(data.fechaEmision)}</strong>
+              RECIBO DE INGRESO N° <strong style={{ fontFamily: 'monospace' }}>{data.reciboIngresoNumero || '202400028830'}</strong> — POR EL MONTO DE <strong>S/ {Number(data.reciboIngresoMonto || 1030).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong> — FECHA: <strong>{data.reciboIngresoFecha ? formatShortDate(data.reciboIngresoFecha) : formatShortDate(data.fechaEmision)}</strong>
             </span>
             <span>
               Tonelaje: <strong style={{ textDecoration: 'underline' }}>{data.tonelaje || '03 A 07-TM'}</strong>
@@ -1243,7 +1306,7 @@ export function AutorizacionUsoViasPrint({ data }) {
             <strong>OBSERVACION:</strong> {data.observaciones || 'Se otorga de manera provisional sujeta a fiscalización continua.'}
           </div>
           <div style={{ marginTop: '3px', fontWeight: 'bold' }}>
-            LA EMPRESA EN MENCION HA CANCELADO CON RECIBO DE INGRESO N° <span style={{ fontFamily: 'monospace' }}>{data.reciboIngresoNumero || '202400031120'}</span> LA CANTIDAD DE S/ {Number(data.reciboIngresoMonto || 850).toFixed(2)}, sumando en total S/ {Number(data.reciboIngresoMonto || 850).toFixed(2)}
+            LA EMPRESA EN MENCION HA CANCELADO CON RECIBO DE INGRESO N° <span style={{ fontFamily: 'monospace' }}>{data.reciboIngresoNumero || '202400031120'}</span> LA CANTIDAD DE S/ {Number(data.reciboIngresoMonto || 850).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}, sumando en total S/ {Number(data.reciboIngresoMonto || 850).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
           </div>
         </div>
 
@@ -1371,7 +1434,7 @@ export function AutorizacionControlVehicularPrint({ data }) {
           <div>
             <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>RECIBO DE DERECHO TUPA:</strong>
             <span style={{ fontWeight: 800, color: '#16a34a' }}>
-              REC. {data.reciboIngresoNumero || 'S/N'} ({data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toFixed(2)}` : 'S/ 450.00'})
+              REC. {data.reciboIngresoNumero || 'S/N'} ({data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 450'})
             </span>
           </div>
 
@@ -1540,7 +1603,7 @@ export function AutorizacionZonasReservadasPrint({ data }) {
           <div>
             <strong style={{ color: '#64748b', display: 'block', fontSize: '6.5pt' }}>DERECHO TUPA ANUAL:</strong>
             <span style={{ fontWeight: 800, color: '#16a34a' }}>
-              REC. {data.reciboIngresoNumero || 'S/N'} ({data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toFixed(2)}` : 'S/ 920.00'})
+              REC. {data.reciboIngresoNumero || 'S/N'} ({data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 920'})
             </span>
           </div>
         </div>

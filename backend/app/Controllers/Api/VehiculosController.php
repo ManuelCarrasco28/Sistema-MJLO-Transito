@@ -66,6 +66,7 @@ class VehiculosController extends ResourceController
                 v.id_asociacion AS asociacionId,
                 o.razon_social AS asociacion,
                 COALESCE(o.ruc, '') AS asociacionRuc,
+                COALESCE(o.resolucion_alcaldia, '') AS asociacionResolucionAlcaldia,
                 COALESCE(td.nombre, 'DNI') AS propietarioTipoDocumento,
                 COALESCE(c.nombres, '') AS propietarioNombres,
                 COALESCE(c.apellido_paterno, '') AS propietarioPaterno,

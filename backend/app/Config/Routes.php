@@ -80,6 +80,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('cursos/personas-vigentes', 'CursosController::personasConCursoVigente');
         $routes->post('cursos/(:num)/participantes', 'CursosController::inscribirParticipante/$1');
         $routes->put('cursos/(:num)/participantes/(:num)', 'CursosController::registrarNota/$1/$2');
+        $routes->put('cursos/inscripciones/(:num)/entrega', 'CursosController::marcarEntregaCarnet/$1');
         $routes->resource('cursos', ['controller' => 'CursosController']);
         $routes->get('inspecciones/siguiente-correlativo', 'InspeccionesController::siguienteCorrelativo');
         $routes->get('inspecciones/estadisticas', 'InspeccionesController::estadisticas');

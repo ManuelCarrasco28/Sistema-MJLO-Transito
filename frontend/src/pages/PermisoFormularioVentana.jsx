@@ -115,7 +115,7 @@ export function PermisoFormularioVentana() {
               fechaInicioVigencia: p.fechaInicioVigencia || new Date().toISOString().slice(0, 10),
               fechaFinVigencia: p.fechaFinVigencia || '',
               reciboIngresoNumero: p.reciboIngresoNumero || '',
-              reciboIngresoMonto: p.reciboIngresoMonto ? String(p.reciboIngresoMonto) : '1030.00',
+              reciboIngresoMonto: p.reciboIngresoMonto ? String(p.reciboIngresoMonto) : '1030',
               reciboIngresoFecha: p.reciboIngresoFecha || '',
               tonelaje: p.tonelaje || '03 A 07-TM',
               numeroSeguridad: p.numeroSeguridad || String(Math.floor(10000 + Math.random() * 90000)),
@@ -174,21 +174,21 @@ export function PermisoFormularioVentana() {
   // Cambio de clasificación / tipo
   const handleTipoChange = (newTipo) => {
     let asunto = 'AUTORIZACIÓN MUNICIPAL OFICIAL'
-    let monto = '450.00'
+    let monto = '450'
 
     if (newTipo === 'CARGA_DESCARGA') {
       asunto = 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA'
-      monto = '1030.00'
+      monto = '1030'
     } else if (newTipo === 'USO_VIAS') {
       asunto = 'AUTORIZACION PROVISIONAL DE USO DE VIAS'
-      monto = '850.00'
+      monto = '850'
     } else if (newTipo === 'ZONAS_RESERVADAS' || newTipo === 'ZONA_RESERVADA') {
       asunto = 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
-      monto = '920.00'
+      monto = '920'
     } else {
       // CONTROL_VEHICULAR / OPERACION
       asunto = 'AUTORIZACIÓN MUNICIPAL DE CONTROL VEHICULAR Y CIRCULACIÓN'
-      monto = '450.00'
+      monto = '450'
     }
 
     const updated = {
@@ -444,7 +444,7 @@ export function PermisoFormularioVentana() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-black text-xs">Control Vehicular</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
-                      S/ 450.00
+                      S/ 450
                     </span>
                   </div>
                   <p className="text-[11px] opacity-80">
@@ -464,7 +464,7 @@ export function PermisoFormularioVentana() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-black text-xs">Carga y Descarga</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200">
-                      S/ 1030.00
+                      S/ 1030
                     </span>
                   </div>
                   <p className="text-[11px] opacity-80">
@@ -484,7 +484,7 @@ export function PermisoFormularioVentana() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-black text-xs">Uso de Vías</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
-                      S/ 850.00
+                      S/ 850
                     </span>
                   </div>
                   <p className="text-[11px] opacity-80">
@@ -504,7 +504,7 @@ export function PermisoFormularioVentana() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-black text-xs">Zonas Reservadas</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
-                      S/ 920.00
+                      S/ 920
                     </span>
                   </div>
                   <p className="text-[11px] opacity-80">

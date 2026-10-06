@@ -233,7 +233,7 @@ export function ConfiguracionReadOnly({
                   <td className="px-4 py-3 text-center text-xs font-bold text-slate-800 dark:text-slate-200">{item.anio}</td>
                   <td className="px-4 py-3 text-xs font-medium text-slate-700 dark:text-slate-300">{item.nombre}</td>
                   <td className="px-4 py-3 text-center font-mono text-xs font-black text-slate-800 dark:text-white">
-                    S/ {Number(item.uit || 0).toFixed(2)}
+                    S/ {Number(item.uit || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {item.tokenConfigurado ? (
