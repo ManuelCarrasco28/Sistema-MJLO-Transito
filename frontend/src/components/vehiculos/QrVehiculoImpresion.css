@@ -1,0 +1,90 @@
+.qrv-hoja {
+  position: relative;
+  width: 100%;
+  container-type: inline-size;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* En pantalla las plantillas se leen de /public; al imprimir se reemplazan por data URI (ver el componente). */
+.qrv-fondo {
+  position: absolute;
+  inset: 0;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.qrv-bg-mototaxi { background-image: url('/img/img-qr-vehiculo/bg-mototaxi-seguro.jpeg'); }
+.qrv-bg-motocarguera { background-image: url('/img/img-qr-vehiculo/new-bg-motocarguera-seguro.jpg'); }
+
+.qrv-qr {
+  position: absolute;
+  aspect-ratio: 1 / 1;
+  background: #fff;
+}
+
+.qrv-placa {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4cqw;
+  font-family: 'Arial Black', 'Arial', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.qrv-asoc {
+  max-width: 78%;
+  text-align: center;
+  font-size: 3.6cqw;
+  line-height: 1.1;
+  color: #111;
+}
+
+.qrv-placa-num {
+  font-size: 9.5cqw;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: #d10000;
+}
+
+@media print {
+  body > .seccion-impresion-portal.qrv-portal {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hoja A4 con cuatro cuadrantes (2 x 2) de 105 x 148 mm. */
+  .qrv-pagina {
+    display: grid;
+    grid-template-columns: 105mm 105mm;
+    grid-template-rows: 148mm 148mm;
+    height: 296mm;
+    overflow: hidden;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .qrv-pagina:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .qrv-celda {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  body > .seccion-impresion-portal.qrv-portal .qrv-hoja {
+    width: min(105mm, calc(148mm * var(--qrv-ratio))) !important;
+    margin: 0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

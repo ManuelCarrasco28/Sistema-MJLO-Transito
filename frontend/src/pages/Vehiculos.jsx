@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useOficinaRegistral } from '../hooks/useOficinaRegistral'
 import { OficinaRegistralSelect } from '../components/vehiculos/OficinaRegistralSelect'
+import { QrVehiculoImpresion, plantillaDeVehiculo } from '../components/vehiculos/QrVehiculoImpresion'
+import { ImpresionQrVehiculos } from '../components/vehiculos/ImpresionQrVehiculos'
 import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -337,6 +339,8 @@ export function Vehiculos({ user }) {
   }
 
   const oficinaReg = useOficinaRegistral()
+  const [vehiculoQrImpresion, setVehiculoQrImpresion] = useState(null)
+  const [activeTab, setActiveTab] = useState('VEHICULOS')
   const [consultaPlaca, setConsultaPlaca] = useState('')
   const [consultaResult, setConsultaResult] = useState(null)
   const [consultaError, setConsultaError] = useState('')
@@ -386,6 +390,7 @@ export function Vehiculos({ user }) {
       const carr = (sunarpData.carroceria || '').toUpperCase().trim()
       let inferredTipo = 'Vehículo'
       if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) inferredTipo = 'Moto Lineal'
+      else if (cat === 'L5' && /CARG/.test(carr)) inferredTipo = 'Motocarguera'
       else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredTipo = 'Mototaxi'
       else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV')) inferredTipo = 'Automóvil'
       else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS')) inferredTipo = 'Camioneta Rural'
@@ -596,6 +601,7 @@ export function Vehiculos({ user }) {
       const carr = (sunarpData.carroceria || '').toUpperCase().trim()
       let inferredTipo = formData.tipo
       if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) inferredTipo = 'Moto Lineal'
+      else if (cat === 'L5' && /CARG/.test(carr)) inferredTipo = 'Motocarguera'
       else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredTipo = 'Mototaxi'
       else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV')) inferredTipo = 'Automóvil'
       else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS')) inferredTipo = 'Camioneta Rural'
@@ -1156,6 +1162,33 @@ export function Vehiculos({ user }) {
         </div>
       </div>
 
+
+      {/* Pestañas: Vehículos / Impresión de QR */}
+      <div className="flex items-center gap-1.5 border-b border-slate-200 dark:border-[var(--border)]">
+        {[
+          { id: 'VEHICULOS', label: 'Vehículos', icono: 'vehicle' },
+          { id: 'QR', label: 'Impresión de QR', icono: 'print' },
+        ].map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setActiveTab(t.id)}
+            className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+              activeTab === t.id
+                ? 'border-indigo-600 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+          >
+            <Icon name={t.icono} className="size-3.5" />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'QR' && <ImpresionQrVehiculos asociaciones={asociaciones} />}
+
+      {activeTab === 'VEHICULOS' && (
+      <>
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
 
@@ -1209,6 +1242,7 @@ export function Vehiculos({ user }) {
               options={[
                 { value: 'TODOS', label: 'Todos los tipos' },
                 { value: 'Mototaxi', label: 'Mototaxi' },
+                { value: 'Motocarguera', label: 'Motocarguera' },
                 { value: 'Automóvil', label: 'Automóvil' },
                 { value: 'Camioneta Rural', label: 'Camioneta Rural' },
                 { value: 'Moto Lineal', label: 'Moto Lineal' }
@@ -1304,7 +1338,7 @@ export function Vehiculos({ user }) {
                 <th className="px-3.5 py-2.5 ">Vehículo y modelo</th>
                 <th className="px-3.5 py-2.5 ">Serie Chasis / Motor</th>
                 <th className="px-4 py-2.5 min-w-[130px] text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3.5 text-center min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]">Acciones</th>
+                <th className="sticky right-0 z-10 bg-slate-50/75 dark:bg-[var(--bg-subtle)] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3.5 text-center min-w-[165px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]">Acciones</th>
               </tr>
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity duration-150 ${isLoading && vehiculos.length > 0 ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
@@ -1322,7 +1356,7 @@ export function Vehiculos({ user }) {
                     <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3.5 py-2.5"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-4 py-2.5 min-w-[130px] text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-4 min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-4 min-w-[165px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : vehiculos.length === 0 ? (
@@ -1410,7 +1444,7 @@ export function Vehiculos({ user }) {
                     </td>
 
 
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3.5 min-w-[125px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
+                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3.5 min-w-[165px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)] transition-colors group-hover:bg-cyan-50/30 dark:group-hover:bg-slate-800/40 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
@@ -1420,6 +1454,16 @@ export function Vehiculos({ user }) {
                         >
                           <Icon name="eye" className="size-4" />
                         </button>
+                        {plantillaDeVehiculo(v) && (
+                        <button
+                          type="button"
+                          onClick={() => setVehiculoQrImpresion(v)}
+                          title="Imprimir QR"
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
+                        >
+                          <Icon name="print" className="size-4" />
+                        </button>
+                        )}
                         {isOffice && (
                           <>
                             <button
@@ -1462,6 +1506,9 @@ export function Vehiculos({ user }) {
         />
       </div>
 
+      </>
+      )}
+
       {isModalOpen && (
         <VehiculoFormModal
           isEditing={isEditing}
@@ -1490,6 +1537,10 @@ export function Vehiculos({ user }) {
           titularDetectado={titularDetectado}
           onOpenPersonaRapida={handleOpenPersonaRapida}
         />
+      )}
+
+      {vehiculoQrImpresion && (
+        <QrVehiculoImpresion vehiculo={vehiculoQrImpresion} onClose={() => setVehiculoQrImpresion(null)} />
       )}
 
       {isPersonaModalOpen && (

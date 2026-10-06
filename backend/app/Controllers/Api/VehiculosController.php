@@ -228,6 +228,54 @@ class VehiculosController extends ResourceController
         return $data;
     }
 
+    /**
+     * Listado liviano para la impresión de QR: solo lo que lleva la plantilla (placa, tipo, asociación y
+     * código QR), sin propietario ni historial, para que paginar sea instantáneo incluso con 14,000 unidades.
+     */
+    public function listarParaQr()
+    {
+        $db = \Config\Database::connect();
+        $builder = $db->table('vehiculos v')
+            ->select("v.id, v.placa, COALESCE(tv.nombre, 'Mototaxi') AS tipo, COALESCE(v.codigo_qr, '') AS codigoQr, v.id_asociacion AS asociacionId, o.razon_social AS asociacion", false)
+            ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
+            ->join('asociaciones o', 'o.id = v.id_asociacion', 'left');
+
+        $tipos = array_filter(array_map('trim', explode(',', (string) $this->request->getGet('tipo'))));
+        if ($tipos) {
+            $builder->groupStart();
+            foreach ($tipos as $tipo) {
+                $builder->orLike('tv.nombre', $tipo);
+            }
+            $builder->groupEnd();
+        }
+
+        $asociacionId = (int) $this->request->getGet('asociacionId');
+        if ($asociacionId > 0) {
+            $builder->where('v.id_asociacion', $asociacionId);
+        }
+
+        $buscar = trim((string) $this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $builder->groupStart()
+                ->like('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
+                ->orLike('o.razon_social', $buscar)
+                ->groupEnd();
+        }
+
+        $page = max(1, (int) $this->request->getGet('page'));
+        $porPagina = max(1, min(1000, (int) ($this->request->getGet('porPagina') ?: 20)));
+
+        $total = (clone $builder)->countAllResults(false);
+        $rows = $builder->orderBy('v.placa', 'ASC')->orderBy('v.id', 'ASC')
+            ->limit($porPagina, ($page - 1) * $porPagina)
+            ->get()->getResultArray();
+
+        return $this->respond([
+            'data' => $rows,
+            'meta' => ['total' => $total, 'page' => $page, 'porPagina' => $porPagina, 'totalPaginas' => (int) ceil($total / $porPagina)],
+        ]);
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
@@ -265,7 +313,18 @@ class VehiculosController extends ResourceController
 
         $tipoFiltro = trim((string) $this->request->getGet('tipo'));
         if ($tipoFiltro !== '' && strtoupper($tipoFiltro) !== 'TODOS') {
-            $builder->like('tv.nombre', $tipoFiltro);
+            // Admite varios tipos separados por coma (p. ej. "Mototaxi,Motocarguera").
+            $tipos = array_filter(array_map('trim', explode(',', $tipoFiltro)));
+            $builder->groupStart();
+            foreach ($tipos as $tipoItem) {
+                $builder->orLike('tv.nombre', $tipoItem);
+            }
+            $builder->groupEnd();
+        }
+
+        $asociacionFiltro = (int) $this->request->getGet('asociacionId');
+        if ($asociacionFiltro > 0) {
+            $builder->where('v.id_asociacion', $asociacionFiltro);
         }
 
         $page = (int) $this->request->getGet('page');
@@ -378,6 +437,8 @@ class VehiculosController extends ResourceController
                     
                     if (in_array($cat, ['L1', 'L2', 'L3']) || strpos($carr, 'LINEAL') !== false) {
                         $inferredTipo = 'Moto Lineal';
+                    } elseif ($cat === 'L5' && strpos($carr, 'CARG') !== false) {
+                        $inferredTipo = 'Motocarguera';
                     } elseif ($cat === 'L5' || strpos($carr, 'TRIMOVIL') !== false || strpos($carr, 'MOTOTAXI') !== false || strpos($carr, 'MOTOKAR') !== false) {
                         $inferredTipo = 'Mototaxi';
                     } elseif ($cat === 'M1' || strpos($carr, 'SEDAN') !== false || strpos($carr, 'HATCHBACK') !== false || strpos($carr, 'SUV') !== false) {

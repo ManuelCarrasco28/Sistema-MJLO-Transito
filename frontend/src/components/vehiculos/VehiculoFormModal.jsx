@@ -185,6 +185,7 @@ export function VehiculoFormModal({
                       options={[
                         { value: '', label: 'Seleccionar tipo' },
                         { value: 'Mototaxi', label: 'Mototaxi' },
+                        { value: 'Motocarguera', label: 'Motocarguera' },
                         { value: 'Automóvil', label: 'Automóvil' },
                         { value: 'Camioneta Rural', label: 'Camioneta Rural' },
                         { value: 'Moto Lineal', label: 'Moto Lineal' },

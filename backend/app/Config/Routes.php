@@ -50,6 +50,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
 
         $routes->get('vehiculos/persona/dni', 'VehiculosController::getVehiculosByPersonaDni');
         $routes->get('vehiculos/estadisticas', 'VehiculosController::estadisticas');
+        $routes->get('vehiculos/qr', 'VehiculosController::listarParaQr');
         $routes->resource('vehiculos', ['controller' => 'VehiculosController']);
         $routes->get('tipo-documentos', 'PersonasController::tiposDocumento');
         $routes->get('personas/estadisticas', 'PersonasController::estadisticas');
