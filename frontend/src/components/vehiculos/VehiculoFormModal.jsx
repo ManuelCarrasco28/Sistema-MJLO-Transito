@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Icon } from '../ui/Icon'
 import { FloatingInput, FloatingSelect } from '../ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
+import { OficinaRegistralSelect } from './OficinaRegistralSelect'
 
 export function VehiculoFormModal({
   isEditing,
@@ -26,10 +27,13 @@ export function VehiculoFormModal({
   selectAsociacion,
   clearAsociacion,
   onBuscarSunarp,
+  oficinaRegistral,
   isBuscandoSunarp,
   titularDetectado,
   onOpenPersonaRapida,
 }) {
+  // Cada vez que se abre el formulario la búsqueda parte de Chiclayo.
+  useEffect(() => { oficinaRegistral?.reiniciar?.() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const propietarioRef = useRef(null)
   const asociacionRef = useRef(null)
   const modalBodyRef = useRef(null)
@@ -122,6 +126,13 @@ export function VehiculoFormModal({
                 Identificación & Datos Técnicos de la Unidad
               </legend>
               <div className="space-y-2">
+                {onBuscarSunarp && oficinaRegistral && (
+                  <OficinaRegistralSelect
+                    oficinas={oficinaRegistral.oficinas}
+                    valor={oficinaRegistral.valor}
+                    onChange={oficinaRegistral.setValor}
+                  />
+                )}
                 {/* Fila 1: Placa, Tipo, Marca */}
                 <div className="grid gap-2 sm:grid-cols-12">
                   <div className="sm:col-span-4 flex items-end gap-1.5">

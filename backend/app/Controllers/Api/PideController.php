@@ -99,6 +99,18 @@ class PideController extends ResourceController
         return $this->response->setStatusCode($httpCode)->setJSON(json_decode($response));
     }
 
+    public function oficinasRegistrales()
+    {
+        $rows = \Config\Database::connect()
+            ->table('oficina_registral')
+            ->select('cod_zona AS codeZona, cod_oficina AS codeOficina, descripcion')
+            ->orderBy('descripcion', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        return $this->respond(['status' => 200, 'data' => $rows]);
+    }
+
     public function sunarp()
     {
         $input = $this->request->getJSON(true) ?: [];
@@ -122,43 +134,78 @@ class PideController extends ResourceController
             return $this->failServerError("El token de la API PIDE no esta configurado para el anio actual.");
         }
 
-        $data = [
-            "placa" => $placa,
-            "codeZona" => $codeZona,
-            "codeOficina" => $codeOficina
-        ];
-
         $sslVerify = filter_var(env('app.pideSslVerify', true), FILTER_VALIDATE_BOOLEAN);
 
-        $curl = curl_init();
-        curl_setopt_array($curl, [
-            CURLOPT_URL => "https://pide.munijlo.gob.pe/api/v1/services/sunarp/placa",
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_ENCODING => "",
-            CURLOPT_MAXREDIRS => 5,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_TIMEOUT => 8,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => "POST",
-            CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_SSL_VERIFYPEER => $sslVerify,
-            CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0,
-            CURLOPT_HTTPHEADER => [
-                "Authorization: Bearer " . $token,
-                "Content-Type: application/json",
-                "Accept: application/json"
-            ],
-        ]);
-
-        $response = curl_exec($curl);
-        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($curl);
-        curl_close($curl);
-
-        if ($response === false || !empty($curlError)) {
-            return $this->failServerError("El servicio de consulta SUNARP no responde en este momento. Ingrese los datos manualmente.");
+        // La placa solo se encuentra en la oficina donde fue registrada: se prueba primero la
+        // oficina indicada y luego el resto de oficinas de la misma zona.
+        $candidatas = [[$codeZona, $codeOficina]];
+        if ($codeZona !== '') {
+            $otras = \Config\Database::connect()
+                ->table('oficina_registral')
+                ->select('cod_oficina')
+                ->where('cod_zona', $codeZona)
+                ->where('cod_oficina !=', $codeOficina)
+                ->orderBy('cod_oficina', 'ASC')
+                ->get()
+                ->getResultArray();
+            foreach ($otras as $o) {
+                $candidatas[] = [$codeZona, $o['cod_oficina']];
+            }
         }
 
-        return $this->response->setStatusCode($httpCode)->setJSON(json_decode($response));
+        $ultimo = null;
+        $ultimoHttp = 200;
+        foreach ($candidatas as [$zona, $oficina]) {
+            $curl = curl_init();
+            curl_setopt_array($curl, [
+                CURLOPT_URL => "https://pide.munijlo.gob.pe/api/v1/services/sunarp/placa",
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_ENCODING => "",
+                CURLOPT_MAXREDIRS => 5,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 8,
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_CUSTOMREQUEST => "POST",
+                CURLOPT_POSTFIELDS => json_encode(["placa" => $placa, "codeZona" => $zona, "codeOficina" => $oficina]),
+                CURLOPT_SSL_VERIFYPEER => $sslVerify,
+                CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0,
+                CURLOPT_HTTPHEADER => [
+                    "Authorization: Bearer " . $token,
+                    "Content-Type: application/json",
+                    "Accept: application/json"
+                ],
+            ]);
+
+            $response = curl_exec($curl);
+            $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($curl);
+            curl_close($curl);
+
+            if ($response === false || !empty($curlError)) {
+                return $this->failServerError("El servicio de consulta SUNARP no responde en este momento. Ingrese los datos manualmente.");
+            }
+
+            $decoded = json_decode($response, true);
+            if (is_array($decoded) && !empty($decoded['success']) && !empty($decoded['data'])) {
+                $decoded['data']['oficina_consultada'] = ['codeZona' => $zona, 'codeOficina' => $oficina];
+                return $this->response->setStatusCode($httpCode)->setJSON($decoded);
+            }
+
+            $ultimo = $decoded;
+            $ultimoHttp = $httpCode;
+            // Un error distinto de "sin registros" (token, validación, etc.) no mejora probando otras oficinas.
+            if (!is_array($decoded) || ($ultimoHttp >= 400 && $ultimoHttp !== 404)) {
+                break;
+            }
+        }
+
+        if (is_array($ultimo)) {
+            unset($ultimo['raw_xml']);
+            if ($codeZona !== '' && !empty($ultimo) && array_key_exists('data', $ultimo) && $ultimo['data'] === null) {
+                $ultimo['message'] = "No se encontró la placa en ninguna oficina registral de la zona {$codeZona}. Puede buscar en otra zona o ingresar los datos manualmente.";
+            }
+        }
+
+        return $this->response->setStatusCode($ultimoHttp)->setJSON($ultimo);
     }
 }

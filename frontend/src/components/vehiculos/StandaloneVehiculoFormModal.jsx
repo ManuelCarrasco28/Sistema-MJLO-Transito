@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { apiFetch, leerMensajeError } from '../../config/api'
 import { showError, showToast } from '../../utils/SwalUtil'
 import { VehiculoFormModal } from './VehiculoFormModal'
+import { useOficinaRegistral } from '../../hooks/useOficinaRegistral'
 
 export function StandaloneVehiculoFormModal({ onClose, onSuccess }) {
   const [formData, setFormData] = useState({
@@ -17,6 +18,7 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess }) {
   const [asociacionSearch, setAsociacionSearch] = useState('')
   const [showAsociacionResults, setShowAsociacionResults] = useState(false)
   const [asociacionesList, setAsociacionesList] = useState([])
+  const oficinaReg = useOficinaRegistral()
   const [isBuscandoSunarp, setIsBuscandoSunarp] = useState(false)
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess }) {
       const response = await apiFetch('/pide/sunarp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ placa: plate, codeZona: '11', codeOficina: '01' })
+        body: JSON.stringify({ placa: plate, codeZona: oficinaReg.codeZona, codeOficina: oficinaReg.codeOficina })
       })
       
       if (!response.ok) {
@@ -201,6 +203,7 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess }) {
       selectAsociacion={selectAsociacion}
       clearAsociacion={clearAsociacion}
       onBuscarSunarp={handleBuscarSunarp}
+      oficinaRegistral={oficinaReg}
       isBuscandoSunarp={isBuscandoSunarp}
       titularDetectado={null}
       onOpenPersonaRapida={() => {}}

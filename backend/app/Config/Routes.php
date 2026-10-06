@@ -40,6 +40,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('files/(:segment)/(:segment)', 'FilesController::ver/$1/$2');
 
         $routes->get('pide/reniec/(:segment)', 'PideController::reniec/$1');
+        $routes->get('pide/oficinas-registrales', 'PideController::oficinasRegistrales');
         $routes->post('pide/sunarp', 'PideController::sunarp');
         $routes->get('me', 'AuthController::me');
         $routes->post('logout', 'AuthController::logout');

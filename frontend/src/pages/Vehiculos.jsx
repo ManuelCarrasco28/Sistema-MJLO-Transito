@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
+import { useOficinaRegistral } from '../hooks/useOficinaRegistral'
+import { OficinaRegistralSelect } from '../components/vehiculos/OficinaRegistralSelect'
 import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -334,6 +336,7 @@ export function Vehiculos({ user }) {
     }
   }
 
+  const oficinaReg = useOficinaRegistral()
   const [consultaPlaca, setConsultaPlaca] = useState('')
   const [consultaResult, setConsultaResult] = useState(null)
   const [consultaError, setConsultaError] = useState('')
@@ -357,7 +360,7 @@ export function Vehiculos({ user }) {
       const response = await apiFetch('/pide/sunarp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ placa: plate, codeZona: '11', codeOficina: '01' })
+        body: JSON.stringify({ placa: plate, codeZona: oficinaReg.codeZona, codeOficina: oficinaReg.codeOficina })
       })
 
       if (!response.ok) {
@@ -575,7 +578,7 @@ export function Vehiculos({ user }) {
       const response = await apiFetch('/pide/sunarp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ placa: plate, codeZona: '11', codeOficina: '01' })
+        body: JSON.stringify({ placa: plate, codeZona: oficinaReg.codeZona, codeOficina: oficinaReg.codeOficina })
       })
 
       if (!response.ok) {
@@ -971,6 +974,12 @@ export function Vehiculos({ user }) {
                 autoFocus
               />
             </div>
+            <OficinaRegistralSelect
+              oficinas={oficinaReg.oficinas}
+              valor={oficinaReg.valor}
+              onChange={oficinaReg.setValor}
+              className="sm:w-64 sm:self-stretch"
+            />
             <button
               type="submit"
               disabled={isSearchingSunarp}
@@ -1476,6 +1485,7 @@ export function Vehiculos({ user }) {
           selectAsociacion={selectAsociacion}
           clearAsociacion={clearAsociacion}
           onBuscarSunarp={handleBuscarSunarpModal}
+          oficinaRegistral={oficinaReg}
           isBuscandoSunarp={isBuscandoSunarpModal}
           titularDetectado={titularDetectado}
           onOpenPersonaRapida={handleOpenPersonaRapida}
