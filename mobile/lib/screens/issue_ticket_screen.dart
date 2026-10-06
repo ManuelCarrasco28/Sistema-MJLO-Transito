@@ -60,6 +60,13 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
 
   bool _isSearching = false;
 
+
+
+  bool get _tieneDuenoIdentificado {
+    final nombre = _nombresDueno.text.trim();
+    return nombre.isNotEmpty && nombre != 'Sin Propietario Asignado' && nombre != 'No Registrado' && nombre != 'Sin Propietario';
+  }
+
   Future<void> _searchPersona(TextEditingController dniCtrl, TextEditingController nomCtrl, TextEditingController apeCtrl) async {
     final dni = dniCtrl.text.trim();
     if (dni.isEmpty) {
@@ -93,8 +100,20 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
     
     // Initialize Dueño fields if data exists
     _dniDueno.text = widget.vehicleData['propietarioDni']?.toString() ?? '';
-    _nombresDueno.text = widget.vehicleData['propietarioNombre']?.toString() ?? widget.vehicleData['propietario']?.toString() ?? '';
-    _apellidosDueno.text = widget.vehicleData['propietarioApellidos']?.toString() ?? '';
+    
+    String rawPropietario = widget.vehicleData['propietarioNombre']?.toString() ?? widget.vehicleData['propietario']?.toString() ?? '';
+    if (widget.vehicleData['propietarioApellidos']?.toString().isNotEmpty == true) {
+      _nombresDueno.text = rawPropietario;
+      _apellidosDueno.text = widget.vehicleData['propietarioApellidos'].toString();
+    } else {
+      if (rawPropietario.isNotEmpty && rawPropietario != 'Sin Propietario Asignado' && rawPropietario != 'No Registrado' && rawPropietario != 'Sin Propietario') {
+        _nombresDueno.text = rawPropietario;
+        _apellidosDueno.text = '';
+      } else {
+        _nombresDueno.text = rawPropietario;
+        _apellidosDueno.text = '';
+      }
+    }
 
     _loadTiposInfraccion();
   }
@@ -169,19 +188,18 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
     }
   }
 
-  /// Datos del conductor a reportar: si el dueño está conduciendo, se toman
-  /// del vehículo; si no, de los campos capturados en el formulario.
   Map<String, String> _resolverDatosConductor() {
-    final String nombre = _conductorEsDueno
+    final conductorEsD = _tieneDuenoIdentificado && _conductorEsDueno;
+    final String nombre = conductorEsD
         ? '${_nombresDueno.text.trim()} ${_apellidosDueno.text.trim()}'
         : '${_nombresConductor.text.trim()} ${_apellidosConductor.text.trim()}';
-    final String dni = _conductorEsDueno
+    final String dni = conductorEsD
         ? _dniDueno.text.trim()
         : _dniConductor.text.trim();
-    final String nombres = _conductorEsDueno
+    final String nombres = conductorEsD
         ? _nombresDueno.text.trim()
         : _nombresConductor.text.trim();
-    final String apellidos = _conductorEsDueno
+    final String apellidos = conductorEsD
         ? _apellidosDueno.text.trim()
         : _apellidosConductor.text.trim();
 
@@ -236,7 +254,8 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       return;
     }
 
-    if (!_conductorEsDueno && (_dniConductor.text.isEmpty || _nombresConductor.text.isEmpty)) {
+    final conductorEsD = _tieneDuenoIdentificado && _conductorEsDueno;
+    if (!conductorEsD && (_dniConductor.text.isEmpty || _nombresConductor.text.isEmpty)) {
       _showError('Complete los datos del conductor');
       return;
     }
@@ -419,44 +438,33 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                   const SizedBox(height: 24),
                   
                   _buildSectionTitle('Identificación del Conductor'),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(12)),
-                    child: SwitchListTile(
-                      title: const Text('El dueño está conduciendo', style: TextStyle(fontWeight: FontWeight.bold)),
-                      value: _conductorEsDueno,
-                      activeColor: Colors.orange.shade700,
-                      onChanged: (val) => setState(() => _conductorEsDueno = val),
+                  if (_tieneDuenoIdentificado)
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(12)),
+                      child: SwitchListTile(
+                        title: const Text('El dueño está conduciendo', style: TextStyle(fontWeight: FontWeight.bold)),
+                        value: _conductorEsDueno,
+                        activeColor: Colors.orange.shade700,
+                        onChanged: (val) => setState(() => _conductorEsDueno = val),
+                      ),
                     ),
-                  ),
-                  if (!_conductorEsDueno) ...[
-                    const SizedBox(height: 16),
-                    _buildTextField(_dniConductor, 'N° Doc. del Conductor actual', Icons.badge, TextInputType.number, hasSearch: true, maxLength: 15, onSearch: () => _searchPersona(_dniConductor, _nombresConductor, _apellidosConductor)),
-                    const SizedBox(height: 12),
-                    _buildTextField(_nombresConductor, 'Nombres', Icons.person, TextInputType.name),
-                    const SizedBox(height: 12),
-                    _buildTextField(_apellidosConductor, 'Apellidos', Icons.person_outline, TextInputType.name),
-                  ],
 
-                  if (widget.vehicleData['propietarioDni'] == null || widget.vehicleData['propietarioDni'].toString().trim().isEmpty || widget.vehicleData['propietarioDni'] == 'S/D') ...[
-                    const SizedBox(height: 24),
-                    _buildSectionTitle('Identificación del Titular/Dueño (Opcional)'),
+                  if (!_tieneDuenoIdentificado || !_conductorEsDueno)
                     Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(12)),
                       child: Column(
                         children: [
-                          const Text('Complete estos datos si los conoce o desea buscarlos.', style: TextStyle(fontSize: 12, color: Colors.blueGrey)),
+                          _buildTextField(_dniConductor, 'N° Doc. del Conductor', Icons.badge, TextInputType.number, hasSearch: true, maxLength: 15, onSearch: () => _searchPersona(_dniConductor, _nombresConductor, _apellidosConductor)),
                           const SizedBox(height: 12),
-                          _buildTextField(_dniDueno, 'N° Doc. del Dueño', Icons.badge, TextInputType.number, hasSearch: true, maxLength: 15, onSearch: () => _searchPersona(_dniDueno, _nombresDueno, _apellidosDueno)),
+                          _buildTextField(_nombresConductor, 'Nombres', Icons.person, TextInputType.name),
                           const SizedBox(height: 12),
-                          _buildTextField(_nombresDueno, 'Nombres', Icons.person, TextInputType.name),
-                          const SizedBox(height: 12),
-                          _buildTextField(_apellidosDueno, 'Apellidos', Icons.person_outline, TextInputType.name),
+                          _buildTextField(_apellidosConductor, 'Apellidos', Icons.person_outline, TextInputType.name),
                         ],
                       ),
                     ),
-                  ],
 
                   const SizedBox(height: 24),
                   if (permitePapeleta) ...[

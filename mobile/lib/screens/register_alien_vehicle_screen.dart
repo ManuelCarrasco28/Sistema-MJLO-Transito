@@ -944,6 +944,32 @@ class _RegisterAlienVehicleScreenState
               ],
             ),
             const SizedBox(height: 16),
+            if (!isFormal)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Vehículo no registrado en la municipalidad de JLO',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             _buildSummaryRow(
               'MARCA',
               _marcaController.text,
@@ -973,13 +999,15 @@ class _RegisterAlienVehicleScreenState
                 fontSize: 15,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'N° Doc/RUC: ${_duenioDniController.text.isNotEmpty ? _duenioDniController.text : "N/A"}',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
+            if (_duenioDniController.text.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'N° Doc/RUC: ${_duenioDniController.text}',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ],
 
-            if (documentos.isNotEmpty) ...[
+            if (isFormal) ...[
               const Divider(color: Colors.white24, height: 24),
               const Text(
                 'DOCUMENTOS REGISTRADOS',
@@ -990,7 +1018,20 @@ class _RegisterAlienVehicleScreenState
                 ),
               ),
               const SizedBox(height: 8),
-              ...documentos.map((doc) {
+              if (documentos.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6.0),
+                  child: Text(
+                    'No se encontraron documentos vigentes en el sistema',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              if (documentos.isNotEmpty)
+                ...documentos.map((doc) {
                 final bool isVigente = doc['estado'] == 'VIGENTE';
                 final docColor = isVigente
                     ? Colors.greenAccent

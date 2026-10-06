@@ -322,7 +322,7 @@ export function VehiculoFormModal({
             <fieldset className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-2.5 sm:p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
               <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white px-1 mb-1.5 flex items-center gap-1.5">
                 <span className="size-1.5 rounded-full bg-slate-900 dark:bg-white" />
-                Titular & Asociación Autorizada
+                {formData.placa?.includes('SIN-PLACA') ? 'Supuesto Dueño' : 'Titular'} & Asociación Autorizada
               </legend>
 
               {/* Banner solo si hay que registrar persona o aviso inline */}
@@ -334,7 +334,7 @@ export function VehiculoFormModal({
                         <Icon name="alert" className="size-3.5" />
                       </span>
                       <p className="text-xs text-amber-900 dark:text-amber-200 truncate">
-                        Titular detectado: <strong>{titularDetectado.nombre}</strong> (No registrado en Personas)
+                        {formData.placa?.includes('SIN-PLACA') ? 'Supuesto dueño' : 'Titular'} detectado: <strong>{titularDetectado.nombre}</strong> (No registrado en Personas)
                       </p>
                     </div>
                     <button
@@ -354,7 +354,7 @@ export function VehiculoFormModal({
                 <div className="relative" ref={propietarioRef}>
                   <FloatingInput
                     id="veh_propietario"
-                    label="Propietario Legal"
+                    label={formData.placa?.includes('SIN-PLACA') ? 'Supuesto Dueño' : 'Propietario Legal'}
                     required
                     value={propietarioSearch}
                     onFocus={() => {

@@ -262,57 +262,64 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
 
           const SizedBox(height: 24),
           _buildSectionTitle('TITULAR / PROPIETARIO', Icons.person),
-          GestureDetector(
-            onTap: () {
-              if (_vehicleData!['propietarioDni'] != null && _vehicleData!['propietarioDni'].toString().isNotEmpty) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PersonDetailsScreen(dni: _vehicleData!['propietarioDni'].toString()),
+          ...(_vehicleData!['propietario'] ?? 'Sin Propietario Asignado').toString().split(',').map((dueno) {
+            final duenoLimpio = dueno.trim();
+            if (duenoLimpio.isEmpty) return const SizedBox();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: GestureDetector(
+                onTap: () {
+                  if (_vehicleData!['propietarioDni'] != null && _vehicleData!['propietarioDni'].toString().isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PersonDetailsScreen(dni: _vehicleData!['propietarioDni'].toString()),
+                      ),
+                    );
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.3)),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
                   ),
-                );
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.3)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: AppTheme.primaryBlue.withOpacity(0.1), shape: BoxShape.circle),
-                    child: const Icon(Icons.person, color: AppTheme.primaryBlue),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _vehicleData!['propietario'] ?? 'Sin Propietario Asignado',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: AppTheme.primaryBlue.withOpacity(0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.person, color: AppTheme.primaryBlue),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              duenoLimpio,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                            ),
+                            if (_vehicleData!['propietarioDni'] != null && _vehicleData!['propietarioDni'].toString().isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'N° Doc: ${_vehicleData!['propietarioDni']}',
+                                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                              ),
+                            ]
+                          ],
                         ),
-                        if (_vehicleData!['propietarioDni'] != null && _vehicleData!['propietarioDni'].toString().isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'N° Doc: ${_vehicleData!['propietarioDni']}',
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                          ),
-                        ]
-                      ],
-                    ),
+                      ),
+                      if (_vehicleData!['propietarioDni'] != null && _vehicleData!['propietarioDni'].toString().isNotEmpty)
+                        const Icon(Icons.chevron_right, color: Colors.grey),
+                    ],
                   ),
-                  if (_vehicleData!['propietarioDni'] != null && _vehicleData!['propietarioDni'].toString().isNotEmpty)
-                    const Icon(Icons.chevron_right, color: Colors.grey),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          }),
 
           if (_vehicleData!['asociacion'] != null && _vehicleData!['asociacion'].toString().isNotEmpty) ...[
             const SizedBox(height: 24),
@@ -344,7 +351,13 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                 children: [
                   Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 48),
                   const SizedBox(height: 12),
-                  Text('No tiene documentos registrados', style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(
+                    (_vehicleData!['id'] == 0 || _vehicleData!['id'] == '0' || _vehicleData!['formalidad'] == 'INFORMAL')
+                        ? 'Vehículo no registrado en la municipalidad de JLO'
+                        : 'No tiene documentos registrados',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ],
               ),
             )

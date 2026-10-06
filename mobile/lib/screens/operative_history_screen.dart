@@ -223,9 +223,17 @@ class OperativeHistoryScreen extends StatelessWidget {
             ),
           ),
           actions: [
-            TextButton(
+            ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cerrar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: esSinIdentificar ? Colors.orange.shade800 : (isFormal ? Colors.blue.shade800 : Colors.red.shade800),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text('Cerrar', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -235,17 +243,25 @@ class OperativeHistoryScreen extends StatelessWidget {
 
   Widget _buildDetailRow(String label, String value, {bool isBold = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
+          Container(
+            width: 115,
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black54, fontSize: 13)),
           ),
           Expanded(
-            flex: 3,
-            child: Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: Colors.black87)),
+            child: Text(
+              value, 
+              style: TextStyle(
+                fontWeight: isBold ? FontWeight.w700 : FontWeight.w500, 
+                color: isBold ? Colors.black : Colors.black87, 
+                fontSize: 14,
+                height: 1.3,
+              )
+            ),
           ),
         ],
       ),

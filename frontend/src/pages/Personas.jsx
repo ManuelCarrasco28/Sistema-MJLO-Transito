@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -223,6 +224,18 @@ export function Personas({ user, onUserUpdate }) {
   useEffect(() => {
     setCurrentPage(1)
   }, [debouncedSearchTerm, filterEstado])
+
+  const hasAutoOpened = useRef(false)
+  const location = useLocation()
+  useEffect(() => {
+    if (!isLoading && !hasAutoOpened.current) {
+      const params = new URLSearchParams(location.search)
+      if (params.get('new') === 'true') {
+        hasAutoOpened.current = true
+        handleOpenCreateModal()
+      }
+    }
+  }, [isLoading, location.search])
 
   useQuickCreate(() => handleOpenCreateModal(), !isLoading)
 

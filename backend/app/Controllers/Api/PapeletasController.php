@@ -60,6 +60,8 @@ class PapeletasController extends ResourceController
     {
         $db = \Config\Database::connect();
         
+        $this->ensureColumnasExtra($db);
+        
         try {
             $builder = $db->table('papeletas p')
                 ->select("
@@ -72,7 +74,7 @@ class PapeletasController extends ResourceController
                     COALESCE(op.lugar, '') as operativoLugar,
                     COALESCE(op.fecha, '') as operativoFecha,
                     v.id as vehiculoId,
-                    COALESCE(v.placa, 'SIN PLACA') as vehiculoPlaca,
+                    COALESCE(v.placa, p.placa, 'SIN PLACA') as vehiculoPlaca,
                     COALESCE(v.marca, '') as vehiculoMarca,
                     COALESCE(v.modelo, '') as vehiculoModelo,
                     COALESCE(v.color, '') as vehiculoColor,
@@ -81,14 +83,15 @@ class PapeletasController extends ResourceController
                     v.id_asociacion as vehiculoAsociacionId,
                     aso.razon_social as vehiculoAsociacion,
                     
-                    COALESCE(per.numero, 'S/D') as conductorDni,
-                    COALESCE(NULLIF(TRIM(CONCAT(c_per.nombres, ' ', c_per.apellido_paterno, ' ', COALESCE(c_per.apellido_materno, ''))), ''), p.nombre_autoridad, 'Infractor No Identificado') as conductorNombre,
+                    COALESCE(per.numero, p.conductor_informal_dni, 'S/D') as conductorDni,
+                    COALESCE(NULLIF(TRIM(CONCAT(c_per.nombres, ' ', c_per.apellido_paterno, ' ', COALESCE(c_per.apellido_materno, ''))), ''), p.conductor_informal_nombres, p.nombre_autoridad, 'Infractor No Identificado') as conductorNombre,
                     COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(c_per.nombres, ' ', c_per.apellido_paterno), 'Infractor No Identificado') as infractor,
                     
-                    COALESCE(prop_per.numero, aso.ruc, 'S/D') as propietarioDni,
+                    COALESCE(prop_per.numero, aso.ruc, p.dueño_informal_dni, 'S/D') as propietarioDni,
                     COALESCE(
                         NULLIF(TRIM(CONCAT(c_prop.nombres, ' ', c_prop.apellido_paterno, ' ', COALESCE(c_prop.apellido_materno, ''))), ''),
                         aso.razon_social,
+                        p.dueño_informal_nombres,
                         'No Registrado'
                     ) as propietarioNombre,
                     
@@ -394,18 +397,19 @@ class PapeletasController extends ResourceController
             $db->transException(true)->transBegin();
             $txStarted = true;
 
-            ['vehiculoId' => $vehiculoId, 'placa' => $placa, 'duenoId' => $duenoId] = $this->resolverVehiculo(
+            ['vehiculoId' => $vehiculoId, 'placa' => $placa, 'duenoId' => $duenoId, 'duenoNombresInformal' => $duenoNombresInformal, 'duenoDniInformal' => $duenoDniInformal] = $this->resolverVehiculo(
                 $db, $placa, $marcaVehiculo, $colorVehiculo, $claseVehiculo, $motorVehiculo, $input
             );
 
             $fuga = $input['fuga'] ?? false;
-            $personaId = $this->resolverInfractor($db, $fuga, $duenoId, $conductorDni, $conductorNombres, $conductorApellidos, $infractor);
+            ['personaId' => $personaId, 'conductorNombresInformal' => $conductorNombresInformal, 'conductorDniInformal' => $conductorDniInformal] = $this->resolverInfractor($db, $fuga, $duenoId, $conductorDni, $conductorNombres, $conductorApellidos, $infractor, $duenoNombresInformal, $duenoDniInformal);
 
-            $numeroPapeleta = 'PAP-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            // Generar un número temporal para la inserción
+            $tempNumero = 'TEMP-' . uniqid('', true);
             $inspectorNombre = trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? ''));
 
             $papeletaData = [
-                'numero_papeleta' => $numeroPapeleta,
+                'numero_papeleta' => $tempNumero,
                 'id_operativo' => !empty($input['id_operativo']) ? (int)$input['id_operativo'] : null,
                 'id_vehiculo' => $vehiculoId,
                 'id_persona_infractor' => $personaId,
@@ -418,9 +422,18 @@ class PapeletasController extends ResourceController
                 'firma_conductor_estado' => 'PENDIENTE',
                 'monto_total' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
+                'placa' => $placa !== '' ? $placa : null,
+                'dueño_informal_nombres' => $duenoNombresInformal,
+                'dueño_informal_dni' => $duenoDniInformal,
+                'conductor_informal_nombres' => $conductorNombresInformal,
+                'conductor_informal_dni' => $conductorDniInformal,
             ];
             $db->table('papeletas')->insert($papeletaData);
             $papeletaId = (int)$db->insertID();
+
+            // Actualizar el número de papeleta basado en el ID para asegurar unicidad absoluta
+            $numeroPapeletaDefinitivo = 'PAP-' . date('Y') . '-' . str_pad((string)$papeletaId, 6, '0', STR_PAD_LEFT);
+            $db->table('papeletas')->where('id', $papeletaId)->update(['numero_papeleta' => $numeroPapeletaDefinitivo]);
 
             foreach ($detallesToInsert as $detalle) {
                 $detalle['id_papeleta'] = $papeletaId;
@@ -453,7 +466,7 @@ class PapeletasController extends ResourceController
 
             $response = [
                 'id' => $papeletaId,
-                'numeroPapeleta' => $numeroPapeleta,
+                'numeroPapeleta' => $numeroPapeletaDefinitivo,
                 'vehiculoPlaca' => $placa,
                 'infractor' => $infractor,
                 'inspector' => $inspectorNombre,
@@ -663,96 +676,82 @@ class PapeletasController extends ResourceController
     private function resolverVehiculo($db, string $placa, string $marca, string $color, string $clase, string $motor, array $input): array
     {
         $vehiculoId = null;
+        $duenoId = null;
+        $duenoNombresInformal = null;
+        $duenoDniInformal = null;
+
         if ($placa !== '' && $placa !== 'SIN_PLACA') {
             $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
             if ($vehiculo) {
                 $vehiculoId = (int)$vehiculo['id'];
-            }
-        }
-
-        $duenoId = null;
-        if (!$vehiculoId) {
-            $placaRegistro = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . strtoupper(substr(uniqid(), -6)) . random_int(10, 99);
-            $db->table('vehiculos')->insert([
-                'placa' => $placaRegistro,
-                'id_tipo_vehiculo' => null,
-                'marca' => $marca ?: null,
-                'color' => $color ?: null,
-                'modelo' => $clase ?: null,
-                'serie_motor' => $motor ?: null,
-            ]);
-            $vehiculoId = (int)$db->insertID();
-            $placa = $placaRegistro;
-
-            // Si se proporcionaron datos del dueño, vincularlo al vehículo
-            $duenoDni = trim($input['duenoDni'] ?? '');
-            if ($duenoDni !== '') {
-                $duenoPersona = $db->table('personas')->where('numero', $duenoDni)->limit(1)->get()->getRowArray();
-                if ($duenoPersona) {
-                    $duenoId = (int)$duenoPersona['id'];
-                } else {
-                    $duenoApellidos = preg_split('/\s+/', trim($input['duenoApellidos'] ?? '')) ?: [];
-                    $db->table('personas')->insert([
-                        'id_tipo_documento' => 1,
-                        'numero' => $duenoDni,
-                        'estado' => 'ACTIVO',
-                    ]);
-                    $duenoId = (int)$db->insertID();
-                    $db->table('ciudadanos')->insert([
-                        'id_persona' => $duenoId,
-                        'nombres' => trim($input['duenoNombres'] ?? 'NO REGISTRADO'),
-                        'apellido_paterno' => $duenoApellidos[0] ?? 'NO REGISTRADO',
-                        'apellido_materno' => isset($duenoApellidos[1]) ? implode(' ', array_slice($duenoApellidos, 1)) : null,
-                    ]);
-                    $db->table('administrados')->ignore(true)->insert(['id_persona' => $duenoId]);
+                // Check if it already has a PROPIETARIO
+                $propietarioActual = $db->table('vehiculo_propietarios')
+                    ->where('id_vehiculo', $vehiculoId)
+                    ->where('estado', 'ACTIVO')
+                    ->limit(1)->get()->getRowArray();
+                if ($propietarioActual) {
+                    $duenoId = (int)$propietarioActual['id_persona'];
                 }
-                $db->table('vehiculo_propietarios')->insert([
-                    'id_vehiculo'  => $vehiculoId,
-                    'id_persona'   => $duenoId,
-                    'fecha_inicio' => date('Y-m-d'),
-                    'estado'       => 'ACTIVO',
-                ]);
             }
         }
 
-        return ['vehiculoId' => $vehiculoId, 'placa' => $placa, 'duenoId' => $duenoId];
+        if (!$vehiculoId) {
+            $placa = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . strtoupper(substr(uniqid(), -6)) . random_int(10, 99);
+        }
+
+        $duenoDni = trim($input['duenoDni'] ?? '');
+        $duenoNombres = trim($input['duenoNombres'] ?? '');
+        $duenoApellidos = trim($input['duenoApellidos'] ?? '');
+        
+        if ($duenoDni !== '' || $duenoNombres !== '' || $duenoApellidos !== '') {
+            $duenoNombresInformal = trim("$duenoNombres $duenoApellidos");
+            if ($duenoDni !== '' && $duenoDni !== 'S/D' && !str_starts_with($duenoDni, 'S/D')) {
+                $duenoDniInformal = $duenoDni;
+            }
+        }
+
+        return ['vehiculoId' => $vehiculoId, 'placa' => $placa, 'duenoId' => $duenoId, 'duenoNombresInformal' => $duenoNombresInformal, 'duenoDniInformal' => $duenoDniInformal];
     }
 
     /**
      * Resuelve la persona infractora: si hubo fuga, el dueño registrado del
      * vehículo; si no, busca/crea al conductor por DNI.
      */
-    private function resolverInfractor($db, $fuga, ?int $duenoId, string $conductorDni, string $conductorNombres, string $conductorApellidos, string $infractor): ?int
+    private function resolverInfractor($db, $fuga, ?int $duenoId, string $conductorDni, string $conductorNombres, string $conductorApellidos, string $infractor, ?string $duenoNombresInformal, ?string $duenoDniInformal): array
     {
         if ($fuga) {
             // Si hubo fuga, el infractor pasa a ser el dueño (si se registró)
-            return $duenoId;
+            return ['personaId' => $duenoId, 'conductorNombresInformal' => $duenoNombresInformal, 'conductorDniInformal' => $duenoDniInformal];
         }
 
         if ($conductorDni === '') {
-            return null;
+            return ['personaId' => null, 'conductorNombresInformal' => trim("$conductorNombres $conductorApellidos"), 'conductorDniInformal' => null];
         }
 
         $persona = $db->table('personas')->where('numero', $conductorDni)->limit(1)->get()->getRowArray();
         if ($persona) {
-            return (int)$persona['id'];
+            return ['personaId' => (int)$persona['id'], 'conductorNombresInformal' => null, 'conductorDniInformal' => null];
         }
 
-        $apellidos = preg_split('/\s+/', trim($conductorApellidos)) ?: [];
-        $db->table('personas')->insert([
-            'id_tipo_documento' => 1,
-            'numero' => $conductorDni,
-            'estado' => 'ACTIVO',
-        ]);
-        $personaId = (int)$db->insertID();
-        $db->table('ciudadanos')->insert([
-            'id_persona' => $personaId,
-            'nombres' => $conductorNombres ?: ($infractor ?: 'INFRACTOR'),
-            'apellido_paterno' => $apellidos[0] ?? 'NO REGISTRADO',
-            'apellido_materno' => isset($apellidos[1]) ? implode(' ', array_slice($apellidos, 1)) : null,
-        ]);
-        $db->table('administrados')->ignore(true)->insert(['id_persona' => $personaId]);
+        return ['personaId' => null, 'conductorNombresInformal' => trim("$conductorNombres $conductorApellidos") ?: $infractor, 'conductorDniInformal' => $conductorDni];
+    }
 
-        return $personaId;
+    private function ensureColumnasExtra($db): void
+    {
+        if (!$db->fieldExists('placa', 'papeletas')) {
+            $db->query('ALTER TABLE papeletas ADD COLUMN placa VARCHAR(20) NULL AFTER id_vehiculo');
+        }
+        if (!$db->fieldExists('dueño_informal_nombres', 'papeletas')) {
+            $db->query('ALTER TABLE papeletas ADD COLUMN dueño_informal_nombres VARCHAR(255) NULL AFTER placa');
+        }
+        if (!$db->fieldExists('dueño_informal_dni', 'papeletas')) {
+            $db->query('ALTER TABLE papeletas ADD COLUMN dueño_informal_dni VARCHAR(20) NULL AFTER dueño_informal_nombres');
+        }
+        if (!$db->fieldExists('conductor_informal_nombres', 'papeletas')) {
+            $db->query('ALTER TABLE papeletas ADD COLUMN conductor_informal_nombres VARCHAR(255) NULL AFTER dueño_informal_dni');
+        }
+        if (!$db->fieldExists('conductor_informal_dni', 'papeletas')) {
+            $db->query('ALTER TABLE papeletas ADD COLUMN conductor_informal_dni VARCHAR(20) NULL AFTER conductor_informal_nombres');
+        }
     }
 }

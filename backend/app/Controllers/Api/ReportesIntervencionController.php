@@ -28,10 +28,10 @@ class ReportesIntervencionController extends ResourceController
                 COALESCE(CONCAT(ci.nombres, ' ', ci.apellido_paterno, ' ', COALESCE(ci.apellido_materno, '')), 'Inspector Municipal') AS inspector_nombre,
                 p.numero_papeleta,
                 CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END as tipoInfractor,
-                COALESCE(prop_per.numero, 'S/D') as propietarioDni,
-                COALESCE(NULLIF(TRIM(CONCAT(c_prop.nombres, ' ', c_prop.apellido_paterno, ' ', COALESCE(c_prop.apellido_materno, ''))), ''), 'No Registrado') as propietarioNombre,
-                COALESCE(cond_per.numero, 'S/D') as conductorDni,
-                COALESCE(NULLIF(TRIM(CONCAT(c_cond.nombres, ' ', c_cond.apellido_paterno, ' ', COALESCE(c_cond.apellido_materno, ''))), ''), 'No identificado') as conductorNombre,
+                COALESCE(prop_per.numero, r.dueno_informal_dni, 'S/D') as propietarioDni,
+                COALESCE(NULLIF(TRIM(CONCAT(c_prop.nombres, ' ', c_prop.apellido_paterno, ' ', COALESCE(c_prop.apellido_materno, ''))), ''), r.dueno_informal_nombres, 'No Registrado') as propietarioNombre,
+                COALESCE(cond_per.numero, r.conductor_informal_dni, 'S/D') as conductorDni,
+                COALESCE(NULLIF(TRIM(CONCAT(c_cond.nombres, ' ', c_cond.apellido_paterno, ' ', COALESCE(c_cond.apellido_materno, ''))), ''), r.conductor_informal_nombres, 'No identificado') as conductorNombre,
                 r.id_operativo as operativoId, COALESCE(op.nombre, '') as operativoNombre
             ", false)
             ->join('vehiculos v', 'v.id = r.id_vehiculo', 'left')
@@ -159,26 +159,24 @@ class ReportesIntervencionController extends ResourceController
 
         $db->transException(true)->transBegin();
         try {
+            // No registrar el vehículo ni los dueños en las tablas maestras desde la app móvil
+            $duenoNombresInformal = null;
+            $conductorNombresInformal = null;
+            $duenoDniInformal = null;
+            $conductorDniInformal = null;
+
             if (!$vehiculoId) {
-                // No registramos el vehículo en la base de datos de vehículos formales
-                // Solo guardamos la placa en el texto del reporte.
-                $placa = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . strtoupper(substr(uniqid(), -6)) . random_int(10, 99);
-                
-                $obs_extra = "\n[DATOS REPORTADOS]";
-                $marca = trim((string)($input['marcaVehiculo'] ?? ''));
-                $color = trim((string)($input['colorVehiculo'] ?? ''));
-                if ($marca) $obs_extra .= " Marca: $marca.";
-                if ($color) $obs_extra .= " Color: $color.";
-                
-                $duenoDni = trim((string)($input['dni_dueño'] ?? ''));
-                $duenoNombres = trim((string)($input['nombres_dueño'] ?? ''));
-                $duenoApellidos = trim((string)($input['apellidos_dueño'] ?? ''));
-                if ($duenoDni !== '') {
-                    $obs_extra .= " Supuesto Dueño: $duenoNombres $duenoApellidos (N° Doc: $duenoDni).";
-                }
-                
-                if ($obs_extra !== "\n[DATOS REPORTADOS]") {
-                    $observaciones .= $obs_extra;
+                $placaRegistro = ($placa && $placa !== 'SIN_PLACA') ? $placa : 'SIN-PLACA-' . strtoupper(substr(uniqid(), -6)) . random_int(10, 99);
+                $placa = $placaRegistro;
+            }
+
+            $duenoDni = trim((string)($input['dni_dueño'] ?? ''));
+            $duenoNombres = trim((string)($input['nombres_dueño'] ?? ''));
+            $duenoApellidos = trim((string)($input['apellidos_dueño'] ?? ''));
+            if ($duenoDni !== '' || $duenoNombres !== '' || $duenoApellidos !== '') {
+                $duenoNombresInformal = trim("$duenoNombres $duenoApellidos");
+                if ($duenoDni !== '' && $duenoDni !== 'S/D' && !str_starts_with($duenoDni, 'S/D')) {
+                    $duenoDniInformal = $duenoDni;
                 }
             }
 
@@ -191,20 +189,9 @@ class ReportesIntervencionController extends ResourceController
                     $conductorId = (int)$conductorPersona['id'];
                 } else {
                     $conductorNombres = trim((string)($input['nombres_conductor'] ?? 'NO REGISTRADO'));
-                    $conductorApellidosStr = trim((string)($input['apellidos_conductor'] ?? 'NO REGISTRADO'));
-                    $conductorApellidos = preg_split('/\s+/', $conductorApellidosStr) ?: [];
-                    $db->table('personas')->insert([
-                        'id_tipo_documento' => 1,
-                        'numero' => $conductorDni,
-                        'estado' => 'ACTIVO',
-                    ]);
-                    $conductorId = (int)$db->insertID();
-                    $db->table('ciudadanos')->insert([
-                        'id_persona' => $conductorId,
-                        'nombres' => $conductorNombres,
-                        'apellido_paterno' => $conductorApellidos[0] ?? 'NO REGISTRADO',
-                        'apellido_materno' => isset($conductorApellidos[1]) ? implode(' ', array_slice($conductorApellidos, 1)) : null,
-                    ]);
+                    $conductorApellidos = trim((string)($input['apellidos_conductor'] ?? ''));
+                    $conductorNombresInformal = trim("$conductorNombres $conductorApellidos");
+                    $conductorDniInformal = $conductorDni;
                 }
             }
 
@@ -214,6 +201,10 @@ class ReportesIntervencionController extends ResourceController
                 'id_vehiculo' => $vehiculoId,
                 'id_conductor' => $conductorId,
                 'placa' => $placa !== '' ? $placa : null,
+                'dueno_informal_nombres' => $duenoNombresInformal,
+                'dueno_informal_dni' => $duenoDniInformal,
+                'conductor_informal_nombres' => $conductorNombresInformal,
+                'conductor_informal_dni' => $conductorDniInformal,
                 'fecha_hora' => $fechaHora,
                 'lugar' => $lugar,
                 'coordenadas' => $coordenadas !== '' ? $coordenadas : null,
@@ -426,6 +417,18 @@ class ReportesIntervencionController extends ResourceController
         }
         if (!$db->fieldExists('id_conductor', 'reportes_intervencion')) {
             $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_conductor INT NULL AFTER id_vehiculo');
+        }
+        if (!$db->fieldExists('dueno_informal_nombres', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN dueno_informal_nombres VARCHAR(255) NULL AFTER placa');
+        }
+        if (!$db->fieldExists('dueno_informal_dni', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN dueno_informal_dni VARCHAR(20) NULL AFTER dueno_informal_nombres');
+        }
+        if (!$db->fieldExists('conductor_informal_nombres', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN conductor_informal_nombres VARCHAR(255) NULL AFTER dueno_informal_dni');
+        }
+        if (!$db->fieldExists('conductor_informal_dni', 'reportes_intervencion')) {
+            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN conductor_informal_dni VARCHAR(20) NULL AFTER conductor_informal_nombres');
         }
     }
 }

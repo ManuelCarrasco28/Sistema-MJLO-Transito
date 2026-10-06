@@ -555,26 +555,7 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                 ],
                 _buildDetailRow('Estado:', (data['estado'] ?? (esReporte ? 'PENDIENTE' : 'PENDIENTE_PAGO')).toString().replaceAll('_', ' ')),
                 const SizedBox(height: 12),
-                if (data['firmaConductorImg'] != null) ...[
-                  const Text('Firma del Conductor:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300)),
-                    child: data['firmaConductorImg'].toString().startsWith('data:image')
-                        ? Image.memory(
-                            base64Decode(data['firmaConductorImg'].toString().split(',').last),
-                            height: 100,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
-                          )
-                        : Image.network(
-                            data['firmaConductorImg'].toString(),
-                            height: 100,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
-                          ),
-                  ),
-                ],
+
                 if (data['fotos'] != null) ...() {
                   List<dynamic> fotosList = [];
                   if (data['fotos'] is List) {
@@ -627,9 +608,17 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
             ),
           ),
           actions: [
-            TextButton(
+            ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cerrar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: esSinIdentificar ? Colors.orange.shade800 : (isFormal ? Colors.blue.shade800 : Colors.red.shade800),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text('Cerrar', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -639,17 +628,25 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
 
   Widget _buildDetailRow(String label, String value, {bool isBold = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
+          Container(
+            width: 115,
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black54, fontSize: 13)),
           ),
           Expanded(
-            flex: 3,
-            child: Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: Colors.black87)),
+            child: Text(
+              value, 
+              style: TextStyle(
+                fontWeight: isBold ? FontWeight.w700 : FontWeight.w500, 
+                color: isBold ? Colors.black : Colors.black87, 
+                fontSize: 14,
+                height: 1.3,
+              )
+            ),
           ),
         ],
       ),

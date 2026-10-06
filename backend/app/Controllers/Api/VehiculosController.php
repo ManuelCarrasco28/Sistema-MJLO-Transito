@@ -485,7 +485,29 @@ class VehiculosController extends ResourceController
             return $this->failNotFound('No se encontró vehículo con el dato ingresado.');
         }
 
-        return $this->respond(['data' => $this->appendVehiculoRelations($rows)[0]]);
+        $data = $this->appendVehiculoRelations($rows)[0];
+
+        // Si existe en BD pero no tiene dueño asignado, intentamos consultar a Sunarp para mostrarlo visualmente
+        if ($tipo === 'PLACA' && ($data['formalidad'] ?? '') === 'INFORMAL' && (empty($data['propietario']) || $data['propietario'] === 'Sin Propietario Asignado' || $data['propietario'] === 'No Registrado' || $data['propietario'] === 'Sin Propietario')) {
+            $sunarpData = \App\Services\PideService::sunarp($normalizado);
+            if ($sunarpData && !isset($sunarpData['error'])) {
+                $rawProps = $sunarpData['propietarios'] ?? [];
+                $propNames = array_filter(array_map(function($p) {
+                    return is_string($p) ? trim($p) : trim($p['nombre'] ?? $p['razon_social'] ?? $p['apellidos_nombres'] ?? '');
+                }, is_array($rawProps) ? $rawProps : []));
+                
+                if (!empty($propNames)) {
+                    $data['propietario'] = implode(', ', $propNames);
+                }
+                
+                // Rellenar datos técnicos si están vacíos
+                $data['marca'] = $data['marca'] ?: ($sunarpData['marca'] ?? '');
+                $data['modelo'] = $data['modelo'] ?: ($sunarpData['modelo'] ?? '');
+                $data['color'] = $data['color'] ?: ($sunarpData['color'] ?? '');
+            }
+        }
+
+        return $this->respond(['data' => $data]);
     }
 
     public function getVehiculosByPersonaDni()

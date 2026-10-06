@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Icon } from '../ui/Icon'
 import { PlacaBadge } from '../ui/PlacaBadge'
 import { FloatingInput, FloatingSelect } from '../ui/FormInputs'
@@ -56,6 +57,8 @@ export function PagoPapeletaModal({
               <span className="font-mono font-black text-xl text-emerald-600 dark:text-emerald-400">S/ {papeletaToAction.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
+
+
 
           <div className="grid grid-cols-2 gap-3">
             <FloatingInput id="recibo_real" label="Recibo real" maxLength={50} value={numeroRecibo} onChange={e => setNumeroRecibo(e.target.value)} />
