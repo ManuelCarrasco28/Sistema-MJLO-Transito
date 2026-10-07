@@ -291,13 +291,25 @@ class ReportesIntervencionController extends ResourceController
             }
 
             $personaId = null;
+            $conductorInformalDni = null;
+            $conductorInformalNombres = null;
+            
             $conductorDni = trim((string)($input['conductorDni'] ?? ''));
             if ($conductorDni !== '') {
                 $persona = $db->table('personas')->where('numero', $conductorDni)->get()->getRowArray();
-                if (!$persona) {
-                    throw new \DomainException('El infractor/intervenido no existe en Personas. Regístrelo primero o deje el campo vacío si el conductor no estuvo presente.');
+                if ($persona) {
+                    $personaId = (int)$persona['id'];
+                } else {
+                    $conductorInformalDni = $conductorDni;
+                    if ($conductorDni === $reporte['conductor_informal_dni']) {
+                        $conductorInformalNombres = $reporte['conductor_informal_nombres'];
+                    } else {
+                        $conductorInformalNombres = 'INFRACTOR INFORMAL';
+                    }
                 }
-                $personaId = (int)$persona['id'];
+            } elseif (!empty($reporte['conductor_informal_nombres'])) {
+                $conductorInformalDni = $reporte['conductor_informal_dni'];
+                $conductorInformalNombres = $reporte['conductor_informal_nombres'];
             }
 
             $multas = new \App\Services\Multas($db);
@@ -319,10 +331,7 @@ class ReportesIntervencionController extends ResourceController
                 ];
             }
 
-            $numeroPapeleta = 'PAP-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
-            while ($db->table('papeletas')->where('numero_papeleta', $numeroPapeleta)->countAllResults() > 0) {
-                $numeroPapeleta = 'PAP-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
-            }
+            $tempNumero = 'TEMP-' . uniqid('', true);
 
             $nombreAutoridad = $personaId
                 ? trim((string)($input['infractor'] ?? ''))
@@ -340,7 +349,7 @@ class ReportesIntervencionController extends ResourceController
             }
 
             $db->table('papeletas')->insert([
-                'numero_papeleta' => $numeroPapeleta,
+                'numero_papeleta' => $tempNumero,
                 'id_vehiculo' => $vehiculoId,
                 'id_persona_infractor' => $personaId,
                 'id_inspector' => (int)$reporte['id_inspector'],
@@ -353,8 +362,16 @@ class ReportesIntervencionController extends ResourceController
                 'firma_conductor_observacion' => $personaId ? null : 'Papeleta generada desde reporte de evidencia.',
                 'monto_total' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
+                'dueño_informal_nombres' => $reporte['dueno_informal_nombres'] ?? null,
+                'dueño_informal_dni' => $reporte['dueno_informal_dni'] ?? null,
+                'conductor_informal_nombres' => $conductorInformalNombres,
+                'conductor_informal_dni' => $conductorInformalDni,
+                'placa' => $reporte['placa'],
             ]);
             $papeletaId = (int)$db->insertID();
+
+            $numeroPapeletaDefinitivo = 'PAP-' . date('Y') . '-' . str_pad((string)$papeletaId, 6, '0', STR_PAD_LEFT);
+            $db->table('papeletas')->where('id', $papeletaId)->update(['numero_papeleta' => $numeroPapeletaDefinitivo]);
 
             foreach ($detalles as $detalle) {
                 $detalle['id_papeleta'] = $papeletaId;
