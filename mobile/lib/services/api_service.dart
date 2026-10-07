@@ -18,7 +18,9 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://192.168.101.47:8080/api';
+  static const String _defaultUrl = 'http://10.0.2.2:8080/api'; // Por defecto: Emulador Android
+  // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
+  static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
   static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
 
   static const String baseUrl = kIsWeb
@@ -52,6 +54,7 @@ class ApiService {
     final cookie = await _secureStorage.read(key: _sessionCookieKey);
     final headers = <String, String>{
       'X-Mobile-App': 'MJLO-TRANSITO',
+      if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
       if (isJson) 'Content-Type': 'application/json',
       if (cookie != null && cookie.isNotEmpty) 'Cookie': cookie,
     };
@@ -64,6 +67,7 @@ class ApiService {
           headers: {
             'Content-Type': 'application/json',
             'X-Mobile-App': 'MJLO-TRANSITO',
+            if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
           },
           body: jsonEncode({
             'usuario': username,

@@ -6,6 +6,12 @@ use CodeIgniter\RESTful\ResourceController;
 
 class PersonasController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'personas';
+    protected array $tablasUuidPorMetodo = [];
+    protected array $soloUuidEnEstricto = [];
+
     protected $format = 'json';
 
     /**
@@ -87,6 +93,7 @@ class PersonasController extends ResourceController
         return $db->table('personas p')
             ->select("
                 p.id,
+                p.uuid,
                 p.id_tipo_documento AS idTipoDocumento,
                 COALESCE(td.codigo, td.nombre, 'DNI') AS tipoDocumento,
                 COALESCE(td.nombre, 'DOCUMENTO NACIONAL DE IDENTIDAD') AS tipoDocumentoNombre,
@@ -195,6 +202,12 @@ class PersonasController extends ResourceController
 
     public function index()
     {
+        // Fuera de oficina (inspector) solo se admite la consulta exacta por documento; no hay listado ni búsqueda por texto.
+        if (!\App\Libraries\Acceso::esOficina() && trim((string) $this->request->getGet('numeroDocumento')) === '') {
+            return $this->failForbidden('Solo se permite consultar por número de documento.');
+        }
+        \App\Libraries\Acceso::limitarListadoCompleto($this->request, ['numeroDocumento']);
+
         $db = \Config\Database::connect();
 
         $user = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
@@ -220,6 +233,8 @@ class PersonasController extends ResourceController
                 ->orLike('c.nombres', $buscar)
                 ->orLike('c.apellido_paterno', $buscar)
                 ->orLike('c.apellido_materno', $buscar)
+                ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c.nombres', 'c.apellido_paterno', 'c.apellido_materno'), null, false)
+                ->orLike('c.apellido_materno', $buscar)
                 ->orLike('c.numero_licencia', $buscar)
                 ->groupEnd();
         }
@@ -231,9 +246,13 @@ class PersonasController extends ResourceController
 
         // Paginación real: si el cliente pide una página, solo se trae esa
         // porción y NO se calcula el historial (eso queda para show($id)).
-        // Sin "page" se mantiene el comportamiento anterior (usado por las
-        // exportaciones a Excel/PDF, que necesitan el padrón completo).
+        // Un tamaño explícito también pagina. El modo sin ambos parámetros
+        // se conserva para clientes antiguos; las exportaciones web usan páginas.
         $page = (int) $this->request->getGet('page');
+        // Un tamaño explícito siempre implica paginación, también en autocompletados antiguos.
+        if ($this->request->getGet('porPagina') !== null) {
+            $page = max(1, $page);
+        }
         $porPagina = max(1, min(200, (int) ($this->request->getGet('porPagina') ?: 20)));
 
         $columnasOrdenables = [
@@ -312,6 +331,12 @@ class PersonasController extends ResourceController
             return $this->aplicarFotoPublica($r);
         }, $rows);
 
+        // ?ligero=1: solo lo que usan los autocompletados de los formularios (el padrón completo pesaba decenas de MB).
+        if ($this->request->getGet('ligero')) {
+            $campos = array_flip(['id', 'uuid', 'tipoDocumento', 'numeroDocumento', 'nombres', 'apellidoPaterno', 'apellidoMaterno', 'numeroLicencia', 'direccion', 'celular', 'estado']);
+            $data = array_map(static fn (array $r) => array_intersect_key($r, $campos), $data);
+        }
+
         return $this->respond(['data' => $data]);
     }
 
@@ -323,6 +348,9 @@ class PersonasController extends ResourceController
      */
     public function show($id = null)
     {
+        if (!\App\Libraries\Acceso::esOficina()) {
+            return $this->failForbidden('Acceso restringido al personal de oficina.');
+        }
         $db = \Config\Database::connect();
         $id = (int) $id;
         if ($id <= 0) {
@@ -407,6 +435,7 @@ class PersonasController extends ResourceController
             'email'             => trim($input['email'] ?? ''),
             'estado'            => strtoupper($input['estado'] ?? 'ACTIVO'),
         ];
+        $pData['uuid'] = \App\Libraries\Identificador::nuevo();
         $db->table('personas')->insert($pData);
         $insertId = $db->insertID();
 

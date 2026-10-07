@@ -80,6 +80,28 @@ export function precargarPlantillasCarnet() {
   return precargaPlantillasCarnetPromesa
 }
 
+// Plantillas de la TARJETA DE OPERATIVIDAD (public/img/img-carnet-operatividad). Igual que las del carnet de curso:
+// se descargan una vez y se embeben como data: para que imprimir no dependa de peticiones de red.
+const RUTAS_PLANTILLA_OPERATIVIDAD = {
+  adelante: '/img/img-carnet-operatividad/operatividad-adelante.png',
+  atras: '/img/img-carnet-operatividad/operatividad-atras.png',
+}
+const plantillasOperatividadDataUri = { adelante: null, atras: null }
+let precargaPlantillasOperatividadPromesa = null
+
+export function precargarPlantillasOperatividad() {
+  if (!precargaPlantillasOperatividadPromesa) {
+    const prepararUna = (url, key) => descargarComoDataUri(url)
+      .then((uri) => recomprimirImagen(uri, 1100))
+      .then((uri) => { if (uri) plantillasOperatividadDataUri[key] = uri })
+    precargaPlantillasOperatividadPromesa = Promise.all([
+      prepararUna(RUTAS_PLANTILLA_OPERATIVIDAD.adelante, 'adelante'),
+      prepararUna(RUTAS_PLANTILLA_OPERATIVIDAD.atras, 'atras'),
+    ])
+  }
+  return precargaPlantillasOperatividadPromesa
+}
+
 export function PrintWrapper({ children, className = '', orientation = 'portrait' }) {
   React.useEffect(() => {
     const handleBeforePrint = () => {
@@ -128,101 +150,151 @@ export function PrintWrapper({ children, className = '', orientation = 'portrait
  * Componente oficial de impresión: TARJETA DE OPERATIVIDAD (TUC)
  * Dimensiones: 85.6 mm x 53.98 mm a 2 caras (Anverso y Reverso)
  */
-export function TarjetaOperatividadPrint({ data }) {
+const qrTarjetaOperatividad = (data) => {
   const qrRaw = data.qrUrl || `https://munijlo.gob.pe/transito/validar?doc=${encodeURIComponent(data.tucNumero || '')}&placa=${encodeURIComponent(data.placa || '')}`
   const isImageQr = Boolean(data.qrUrl && (data.qrUrl.startsWith('data:image') || data.qrUrl.endsWith('.png') || data.qrUrl.endsWith('.jpg')))
+  return { qrRaw, isImageQr }
+}
 
+// Tamaño de letra (en % del ancho de la tarjeta) para que el texto quepa en la casilla blanca de la plantilla
+const tamanoValorOperatividad = (texto, base = 4.2) => {
+  const largo = String(texto || '').length
+  if (largo > 38) return base * 0.5
+  if (largo > 30) return base * 0.6
+  if (largo > 24) return base * 0.72
+  if (largo > 18) return base * 0.86
+  return base
+}
+
+/**
+ * Cara frontal (anverso) de la TARJETA DE OPERATIVIDAD (TUC).
+ * La plantilla (public/img/img-carnet-operatividad/operatividad-adelante.png) trae el diseño; aquí solo
+ * se colocan los textos y la foto sobre sus casillas.
+ */
+export function TarjetaOperatividadAnverso({ data }) {
+  const apellidos = data.apellidos || '—'
+  const nombres = data.nombres || (!data.apellidos ? 'CONDUCTOR AUTORIZADO' : '—')
+  const asociacion = data.asociacion || 'ASOCIACIÓN INDEPENDIENTE'
+  const resolucion = data.resMunicipal || ''
+  const { qrRaw, isImageQr } = qrTarjetaOperatividad(data)
+  const foto = data.fotoUrl || data.fotoConductor
+
+  return (
+    <div className="carnet-box op-carnet op-anverso">
+      <img className="op-plantilla" src={plantillasOperatividadDataUri.adelante || RUTAS_PLANTILLA_OPERATIVIDAD.adelante} alt="" aria-hidden="true" />
+
+      <img src="/escudo-jlo.png" alt="MDJLO" className="op-logo" />
+      <div className="op-municipalidad"><span>MUNICIPALIDAD DISTRITAL DE</span><span>JOSÉ LEONARDO ORTIZ</span></div>
+      <div className="op-titulo">TARJETA DE OPERATIVIDAD</div>
+      <div className="op-numero" style={{ fontSize: `${Math.min(5.6, 36 / Math.max(String(data.tucNumero || '').length * 0.62, 1))}cqw` }}>{data.tucNumero || ''}</div>
+
+      <div className="op-foto">{foto && <img src={foto} alt="Conductor" />}</div>
+
+      <div className="op-tipo">ASOCIACIÓN DE MOTOTAXISTAS</div>
+      <div className="op-asociacion" style={{ fontSize: `${tamanoValorOperatividad(asociacion, 3.6)}cqw` }}>"{asociacion}"</div>
+
+      <span className="op-etiqueta op-et-1">APELLIDOS:</span>
+      <strong className="op-valor op-val-1" style={{ fontSize: `${tamanoValorOperatividad(apellidos, 3.5)}cqw` }}>{apellidos}</strong>
+      <span className="op-etiqueta op-et-2">NOMBRES:</span>
+      <strong className="op-valor op-val-2" style={{ fontSize: `${tamanoValorOperatividad(nombres, 3.2)}cqw` }}>{nombres}</strong>
+      <span className="op-etiqueta op-et-3">DNI N°:</span>
+      <strong className="op-valor op-val-3">{data.dni || '—'}</strong>
+
+      <span className="op-res-etiqueta">RESOLUCIÓN DE ALCALDÍA:</span>
+      <strong className="op-res-valor" style={{ fontSize: `${tamanoValorOperatividad(resolucion, 2.5)}cqw` }}>{resolucion}</strong>
+
+      <div className="op-qr">
+        {isImageQr ? <img src={data.qrUrl} alt="QR Validación" /> : <QRCodeSVG value={qrRaw} size={128} level="M" includeMargin={false} />}
+      </div>
+    </div>
+  )
+}
+
+/** Cara posterior (reverso) de la TARJETA DE OPERATIVIDAD (TUC). Plantilla: operatividad-atras.png */
+export function TarjetaOperatividadReverso({ data }) {
+  const direccion = data.direccion || 'JOSÉ LEONARDO ORTIZ'
+  const placa = data.placa || '—'
+  const motor = data.numeroMotor || '—'
+
+  return (
+    <div className="carnet-box op-carnet op-reverso">
+      <img className="op-plantilla" src={plantillasOperatividadDataUri.atras || RUTAS_PLANTILLA_OPERATIVIDAD.atras} alt="" aria-hidden="true" />
+
+      <span className="op-lbl op-lbl-placa">PLACA DE RODAJE:</span>
+      <strong className="op-valor op-r-placa" style={{ fontSize: `${tamanoValorOperatividad(placa, 3.6)}cqw` }}>{placa}</strong>
+
+      <span className="op-lbl op-lbl-exp">FECHA DE EXPEDICIÓN:</span>
+      <strong className="op-valor op-r-exp">{formatoFechaCarnet(data.fechaExpedicion)}</strong>
+
+      <span className="op-lbl op-lbl-motor">N° MOTOR:</span>
+      <strong className="op-valor op-r-motor" style={{ fontSize: `${tamanoValorOperatividad(motor, 3.2)}cqw` }}>{motor}</strong>
+
+      <span className="op-lbl op-lbl-venc op-rojo">FECHA DE VENCIMIENTO:</span>
+      <strong className="op-valor op-r-venc op-rojo">{formatoFechaCarnet(data.fechaVencimiento || data.fechaExpiracion)}</strong>
+
+      <span className="op-etiqueta op-et-ubic">UBICACIÓN:</span>
+      <strong className="op-valor op-r-ubic" style={{ fontSize: `${tamanoValorOperatividad(direccion, 2.8)}cqw` }}>{direccion}</strong>
+
+      <div className="op-firma">
+        <div className="op-firma-linea"></div>
+        <span>SUB GERENCIA DE TRÁNSITO</span>
+      </div>
+    </div>
+  )
+}
+
+/** Par anverso + reverso de una tarjeta alineado verticalmente (impresión en lote). */
+export function TarjetaOperatividadItem({ data }) {
+  return (
+    <div className="carnet-item-par">
+      <TarjetaOperatividadAnverso data={data} />
+      <TarjetaOperatividadReverso data={data} />
+    </div>
+  )
+}
+
+export function TarjetaOperatividadPrint({ data }) {
+  const [, setPlantillasListas] = React.useState(false)
+  React.useEffect(() => {
+    precargarPlantillasOperatividad().then(() => setPlantillasListas(true))
+  }, [])
   return (
     <PrintWrapper className="carnet-preview-wrap">
       <div className="carnet-wrapper">
-        {/* --- CARA ANVERSO --- */}
-        <div className="carnet-box anverso">
-          <div className="header-carnet">
-            <img src="/escudo-jlo.png" alt="MDJLO" className="escudo" />
-            <div className="header-text">
-              <h2>Municipalidad Distrital de José Leonardo Ortiz</h2>
-              <h1>TARJETA DE OPERATIVIDAD</h1>
-            </div>
-          </div>
-
-          <div className="asociacion-banner">
-            {data.asociacion || 'ASOCIACIÓN INDEPENDIENTE'}
-          </div>
-
-          <div className="body-carnet">
-            <div className="foto-container">
-              <img src={data.fotoUrl || '/placeholder-user.png'} alt="Conductor" />
-            </div>
-            <div className="datos-container">
-              <div className="row-flex">
-                <div>
-                  <span className="label">D.N.I.: </span>
-                  <span className="val-yellow">{data.dni || '—'}</span>
-                </div>
-                <div>
-                  <span className="label">Res. Municipal: </span>
-                  <span className="val-yellow">{data.resMunicipal || 'R.M. VIGENTE'}</span>
-                </div>
-              </div>
-              <div className="row-single">
-                <span className="label">Dirección: </span>
-                <span className="val-text">{data.direccion || 'JOSÉ LEONARDO ORTIZ'}</span>
-              </div>
-              <div className="row-single nombres-box">
-                <span className="val-nombres">{data.apellidos || ''}</span>
-                <span className="val-nombres">{data.nombres || (!data.apellidos ? 'CONDUCTOR AUTORIZADO' : '')}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="footer-carnet-anverso">
-            <span className="tuc-numero">{data.tucNumero}</span>
-          </div>
-        </div>
-
-        {/* --- CARA REVERSO --- */}
-        <div className="carnet-box reverso">
-          <div className="reverso-grid">
-            <div className="reverso-info">
-              <div className="field-block">
-                <label>PLACA DE RODAJE:</label>
-                <div className="box-val">{data.placa || '—'}</div>
-              </div>
-              <div className="field-block">
-                <label>N° MOTOR:</label>
-                <div className="box-val">{data.numeroMotor || '—'}</div>
-              </div>
-              <div className="field-block">
-                <label>FECHA DE EXPEDICIÓN:</label>
-                <div className="box-val">{data.fechaExpedicion || '—'}</div>
-              </div>
-              <div className="field-block">
-                <label>FECHA DE VENCIMIENTO:</label>
-                <div className="box-val highlight-red">{data.fechaVencimiento || '—'}</div>
-              </div>
-              <div className="field-block">
-                <label>DIRECCIÓN:</label>
-                <div className="box-val-sm">{data.direccion || 'JOSÉ LEONARDO ORTIZ'}</div>
-              </div>
-            </div>
-
-            <div className="reverso-lateral">
-              <div className="qr-container">
-                {isImageQr ? (
-                  <img src={data.qrUrl} alt="QR Validación" />
-                ) : (
-                  <QRCodeSVG value={qrRaw} size={68} level="M" includeMargin={false} />
-                )}
-              </div>
-              <div className="firma-container">
-                <div className="linea-firma"></div>
-                <span>SUB GERENCIA DE TRÁNSITO</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <TarjetaOperatividadAnverso data={data} />
+        <TarjetaOperatividadReverso data={data} />
       </div>
     </PrintWrapper>
+  )
+}
+
+/**
+ * Impresión en lote de TARJETAS DE OPERATIVIDAD: 4 tarjetas completas por hoja A4
+ * (2 columnas x 2 filas, cada una con su anverso y su reverso), igual que los carnets de curso.
+ */
+export function TarjetaOperatividadLotePrint({ items = [] }) {
+  if (!items || items.length === 0) return null
+
+  const chunks = []
+  for (let i = 0; i < items.length; i += 4) {
+    chunks.push(items.slice(i, i + 4))
+  }
+
+  return (
+    typeof document !== 'undefined' && createPortal(
+      <div id="seccion-impresion" className="seccion-impresion-portal seccion-lote-carnets">
+        {chunks.map((chunk, pageIndex) => (
+          <div key={pageIndex} className="hoja-carnets-lote-a4">
+            <div className="grid-carnets-4">
+              {chunk.map((item, itemIndex) => (
+                <TarjetaOperatividadItem key={itemIndex} data={item} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>,
+      document.body
+    )
   )
 }
 

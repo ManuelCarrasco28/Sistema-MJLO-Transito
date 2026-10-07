@@ -6,6 +6,12 @@ use CodeIgniter\RESTful\ResourceController;
 
 class DocumentosController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'documentos_vehiculo';
+    protected array $tablasUuidPorMetodo = ['resumenVehiculo' => 'vehiculos'];
+    protected array $soloUuidEnEstricto = [];
+
     protected $format = 'json';
 
     // Columnas reales de documentos_vehiculo: cualquier otro dato del formulario se descarta.
@@ -202,6 +208,7 @@ class DocumentosController extends ResourceController
                 COALESCE(c.nombres, '') AS propietarioNombres,
                 COALESCE(c.apellido_paterno, '') AS propietarioPaterno,
                 COALESCE(c.apellido_materno, '') AS propietarioMaterno,
+                d.uuid AS uuid,
                 COALESCE(c.foto, '') AS fotoConductor,
                 COALESCE(c.numero_licencia, '') AS conductorLicencia,
                 COALESCE(p.numero, '') AS propietarioDni,
@@ -223,6 +230,8 @@ class DocumentosController extends ResourceController
                 ->orLike('p.numero', $buscar)
                 ->orLike('c.nombres', $buscar)
                 ->orLike('c.apellido_paterno', $buscar)
+                ->orLike('c.apellido_materno', $buscar)
+                ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c.nombres', 'c.apellido_paterno', 'c.apellido_materno'), null, false)
                 ->orLike('o.razon_social', $buscar)
                 ->groupEnd();
         }
@@ -407,6 +416,7 @@ class DocumentosController extends ResourceController
         }
 
         try {
+            $record['uuid'] = \App\Libraries\Identificador::nuevo();
             $db->table('documentos_vehiculo')->insert($record);
         } catch (Throwable $e) {
             if (stripos($e->getMessage(), 'Duplicate entry') !== false) {
@@ -427,6 +437,7 @@ class DocumentosController extends ResourceController
 
         $newDoc = [
             'id'                       => $insertId,
+            'uuid'                     => $record['uuid'],
             'vehiculoId'               => $vehiculoId,
             'vehiculoPlaca'            => $placa,
             'vehiculoMarca'            => $vehiculoRow['marca'] ?? '',

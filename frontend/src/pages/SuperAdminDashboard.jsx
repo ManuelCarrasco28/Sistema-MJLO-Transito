@@ -171,7 +171,7 @@ export function SuperAdminDashboard({ user }) {
     } finally {
       setExportandoExcel(false)
     }
-    exportToExcel({
+    await exportToExcel({
       filename: `Auditoria_Sistema_${new Date().getFullYear()}.xls`,
       sheetName: 'Auditoria',
       title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
@@ -364,7 +364,7 @@ export function SuperAdminDashboard({ user }) {
     const q = searchTerm.trim().toLowerCase()
     if (!q) return usuarios
     return usuarios.filter((item) =>
-      [item.nombre_usuario, item.nombre_completo, item.cargo, item.usuario_estado]
+      [item.nombre_usuario, item.nombre_completo, item.numero_documento, item.rol, item.cargo, item.usuario_estado]
         .some((value) => String(value || '').toLowerCase().includes(q))
     )
   }, [usuarios, searchTerm])

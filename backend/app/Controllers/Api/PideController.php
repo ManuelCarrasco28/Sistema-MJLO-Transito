@@ -20,7 +20,8 @@ class PideController extends ResourceController
             return null;
         }
         
-        return $anio["token"];
+        // El token se guarda cifrado en la base: se descifra solo aquí, para la llamada a PIDE.
+        return \App\Libraries\SecretoCifrado::descifrar($anio["token"]);
     }
 
     private function rateLimited(): bool
@@ -37,6 +38,9 @@ class PideController extends ResourceController
         if (!preg_match("/^\d{8}$/", $dni)) {
             return $this->failValidationErrors("El DNI debe tener exactamente 8 digitos.");
         }
+
+        // Quién consulta datos personales de RENIEC queda registrado (el DNI va parcialmente oculto).
+        \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_RENIEC', 'Consulta de DNI en RENIEC: ' . substr($dni, 0, 2) . '****' . substr($dni, -2), ['dni' => substr($dni, 0, 2) . '****' . substr($dni, -2)]);
 
         if ($this->rateLimited()) {
             return service('response')->setStatusCode(429)->setJSON([
@@ -121,6 +125,14 @@ class PideController extends ResourceController
         if (empty($placa)) {
             return $this->failValidationErrors("La placa es requerida.");
         }
+        if (!preg_match('/^[A-Z0-9]{5,7}$/', $placa)) {
+            return $this->failValidationErrors("La placa no tiene un formato válido.");
+        }
+        if (($codeZona !== '' && !preg_match('/^\d{2}$/', $codeZona)) || ($codeOficina !== '' && !preg_match('/^\d{2}$/', $codeOficina))) {
+            return $this->failValidationErrors("La zona u oficina registral no es válida.");
+        }
+
+        \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_SUNARP', "Consulta de placa en SUNARP: {$placa}", ['placa' => $placa, 'zona' => $codeZona, 'oficina' => $codeOficina]);
 
         if ($this->rateLimited()) {
             return service('response')->setStatusCode(429)->setJSON([

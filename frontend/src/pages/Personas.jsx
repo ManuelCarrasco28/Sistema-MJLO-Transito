@@ -423,24 +423,22 @@ export function Personas({ user, onUserUpdate }) {
 
   // Los exports piden el dataset completo que coincide con el filtro actual
   // (sin "page"), no solo la página visible en pantalla.
-  const fetchTodoElFiltro = () =>
+  const fetchTodoElFiltro = (maxFilas = Infinity) =>
     fetchTodasLasFilas('/personas', {
       buscar: debouncedSearchTerm,
       estado: filterEstado === 'TODOS' ? '' : filterEstado,
       sortBy,
       sortDir: sortBy ? sortDir : '',
-    }, { mensaje: 'Preparando la descarga de personas...' })
+    }, { mensaje: 'Preparando la descarga de personas...', maxFilas })
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
-      const listToExport = await fetchTodoElFiltro()
-          if (listToExport.length === 0) {
-            showError('Atención', 'No hay registros de personas para exportar.')
-            return
-          }
-          exportPersonasExcel({ listToExport, filterEstado })
+      await exportPersonasExcel({ listToExport: { endpoint: '/personas', params: {
+        buscar: debouncedSearchTerm, estado: filterEstado === 'TODOS' ? '' : filterEstado,
+        sortBy, sortDir: sortBy ? sortDir : '',
+      } }, filterEstado })
     } finally {
       setIsExportingExcel(false)
     }
@@ -449,12 +447,14 @@ export function Personas({ user, onUserUpdate }) {
   const handleExportPdf = async () => {
     setIsExportingPdf(true)
     try {
-      const listToExport = await fetchTodoElFiltro()
+      const listToExport = await fetchTodoElFiltro(10000)
           if (listToExport.length === 0) {
             showError('Atención', 'No hay registros de personas para exportar.')
             return
           }
           await exportPersonasPdf({ listToExport, totalPersonas, conductores, propietarios, activos })
+    } catch (err) {
+      showError('Descarga no completada', err.message || 'No se pudo preparar el PDF.')
     } finally {
       setIsExportingPdf(false)
     }

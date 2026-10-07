@@ -8,6 +8,12 @@ use CodeIgniter\RESTful\ResourceController;
 
 class PagosController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'pagos_transito';
+    protected array $tablasUuidPorMetodo = [];
+    protected array $soloUuidEnEstricto = [];
+
     protected $format = 'json';
 
     public function estadisticas()
@@ -15,6 +21,7 @@ class PagosController extends ResourceController
         $db = \Config\Database::connect();
 
         $recibos = $db->table('pagos_transito')
+            ->where(\App\Libraries\PagosListado::condicionReciboVisible('pagos_transito'), null, false)
             ->select("
                 COUNT(*) as total,
                 SUM(CASE WHEN estado = 'PAGADO' THEN total ELSE 0 END) as monto_pagado,
@@ -71,90 +78,12 @@ class PagosController extends ResourceController
         $tipoFiltro = strtoupper(trim((string)$this->request->getGet('tipoPago')));
         $estadoFiltro = strtoupper(trim((string)$this->request->getGet('estado')));
 
-        // Optimización de alto rendimiento: cuando se consulta una página específica y no es solo PENDIENTE,
-        // paginar directamente en SQL sobre pagos_transito (evita cargar 30,000 registros en RAM por cada tecla).
-        if ($page > 0 && $estadoFiltro !== 'PENDIENTE') {
-            $builder = $db->table('pagos_transito pt')
-                ->select("
-                    pt.id,
-                    pt.id_papeleta,
-                    pt.id_tramite,
-                    pt.id_inscripcion,
-                    pt.fecha_pago,
-                    pt.hora_pago,
-                    pt.tipo_pago,
-                    pt.numero_recibo,
-                    pt.numero_voucher,
-                    pt.medio_pago,
-                    pt.referencia_pago,
-                    pt.total,
-                    pt.estado
-                ");
-
-            if ($tipoFiltro !== '' && $tipoFiltro !== 'TODOS') {
-                $builder->where('pt.tipo_pago', $tipoFiltro);
-            }
-
-            if ($estadoFiltro === 'PAGADO') {
-                $builder->where('pt.estado', 'PAGADO');
-            }
-
-            if ($buscar !== '') {
-                $builder->join('papeletas pap', 'pap.id = pt.id_papeleta', 'left')
-                    ->join('personas per_pap', 'per_pap.id = pap.id_persona_infractor', 'left')
-                    ->join('ciudadanos c_pap', 'c_pap.id_persona = per_pap.id', 'left')
-                    ->groupStart()
-                        ->like('pt.numero_recibo', $buscar)
-                        ->orLike('pt.numero_voucher', $buscar)
-                        ->orLike('pt.referencia_pago', $buscar)
-                        ->orLike('pt.medio_pago', $buscar)
-                        ->orLike('per_pap.numero', $buscar)
-                        ->orLike('c_pap.nombres', $buscar)
-                        ->orLike('c_pap.apellido_paterno', $buscar)
-                    ->groupEnd();
-            }
-
-            $total = (clone $builder)->countAllResults(false);
-
-            $columnasOrden = [
-                'numeroRecibo' => 'pt.numero_recibo',
-                'referenciaPago' => 'pt.referencia_pago',
-                'metodoPago' => 'pt.medio_pago',
-                'montoTotal' => 'pt.total',
-                'estado' => 'pt.estado',
-                'fecha' => 'pt.fecha_pago',
-            ];
-            \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrden, 'pt.id');
-
-            $rows = $builder
-                ->limit($porPagina, ($page - 1) * $porPagina)
-                ->get()
-                ->getResultArray();
-
-            $idsPapeleta = [];
-            $idsTramite = [];
-            $idsCurso = [];
-            foreach ($rows as $r) {
-                if (!empty($r['id_papeleta'])) $idsPapeleta[] = (int)$r['id_papeleta'];
-                if (!empty($r['id_tramite'])) $idsTramite[] = (int)$r['id_tramite'];
-                if (!empty($r['id_inscripcion'])) $idsCurso[] = (int)$r['id_inscripcion'];
-            }
-
-            $mapasPagador = $this->resolverPagadoresEnBloque($db, $idsPapeleta, $idsTramite, $idsCurso, []);
-            $data = array_map(fn ($row) => $this->present($row, $mapasPagador), $rows);
-
-            return $this->respond([
-                'data' => $data,
-                'meta' => [
-                    'total' => $total,
-                    'page' => $page,
-                    'porPagina' => $porPagina,
-                    'totalPaginas' => (int) ceil($total / $porPagina),
-                ],
-            ]);
+        // Todos los orígenes se filtran y paginan en SQL, sin cargar el listado completo.
+        if ($page > 0) {
+            return $this->listarPagina($db, $page, $porPagina, $buscar, $tipoFiltro, $estadoFiltro);
         }
 
-        $rows = $db->table('pagos_transito')->orderBy('id', 'DESC')->get()->getResultArray();
+        $rows = $db->table('pagos_transito')->where(\App\Libraries\PagosListado::condicionReciboVisible('pagos_transito'), null, false)->orderBy('id', 'DESC')->get()->getResultArray();
 
         $pendientes = $db->table('ordenes_internamiento oi')
             ->select("oi.id, 'INTERNAMIENTO' as tipo_pago, NULL as numero_recibo, NULL as numero_voucher, 'SIN CONFIRMAR' as medio_pago, CONCAT('Boleta #', oi.numero_boleta) as referencia_pago, 0 as total, NULL as fecha_pago, 'PENDIENTE' as estado")
@@ -371,6 +300,50 @@ class PagosController extends ResourceController
      * tienen un recibo generado en pagos_transito, para excluirlos de las
      * listas de "pendientes sin recibo".
      */
+    private function listarPagina($db, int $page, int $porPagina, string $buscar, string $tipo, string $estado)
+    {
+        $builder = \App\Libraries\PagosListado::builder($db);
+        if ($tipo !== '' && $tipo !== 'TODOS') $builder->where('listado.tipo_pago', $tipo);
+        if ($estado !== '' && $estado !== 'TODOS') $builder->where('listado.estado', $estado);
+        if ($buscar !== '') {
+            // La búsqueda usa los mismos pagadores que se muestran en la tabla.
+            $nombre = "TRIM(CONCAT(COALESCE(c.nombres,''), ' ', COALESCE(c.apellido_paterno,''), ' ', COALESCE(c.apellido_materno,'')))";
+            $patron = $db->escape('%' . $db->escapeLikeString($buscar) . '%');
+            $coincide = "($nombre LIKE $patron ESCAPE '!' OR per.numero LIKE $patron ESCAPE '!')";
+            $builder->groupStart()->like('listado.numero_recibo', $buscar)
+                ->orLike('listado.numero_voucher', $buscar)->orLike('listado.referencia_pago', $buscar)
+                ->orLike('listado.medio_pago', $buscar)
+                ->orWhere("EXISTS (SELECT 1 FROM papeletas p LEFT JOIN personas per ON per.id=p.id_persona_infractor LEFT JOIN ciudadanos c ON c.id_persona=per.id WHERE p.id=listado.id_papeleta AND $coincide)", null, false)
+                ->orWhere("EXISTS (SELECT 1 FROM inscripciones_curso i LEFT JOIN personas per ON per.id=i.id_persona LEFT JOIN ciudadanos c ON c.id_persona=per.id WHERE i.id=listado.id_inscripcion AND $coincide)", null, false)
+                ->orWhere("EXISTS (SELECT 1 FROM tramites_documentarios t LEFT JOIN personas per ON per.id=t.id_persona LEFT JOIN ciudadanos c ON c.id_persona=per.id LEFT JOIN asociaciones a ON a.id=t.id_asociacion WHERE t.id=listado.id_tramite AND ($coincide OR a.razon_social LIKE $patron ESCAPE '!'))", null, false)
+                ->orWhere("EXISTS (SELECT 1 FROM ordenes_internamiento oi JOIN vehiculo_propietarios vp ON vp.id_vehiculo=oi.id_vehiculo AND vp.estado='ACTIVO' LEFT JOIN personas per ON per.id=vp.id_persona LEFT JOIN ciudadanos c ON c.id_persona=per.id WHERE oi.id=listado.id_internamiento AND $coincide)", null, false)
+                ->groupEnd();
+        }
+        $total = (clone $builder)->countAllResults();
+        \App\Libraries\QuerySort::aplicar($builder, $this->request, [
+            'numeroRecibo'=>'listado.numero_recibo', 'referenciaPago'=>'listado.referencia_pago',
+            'metodoPago'=>'listado.medio_pago', 'montoTotal'=>'listado.total',
+            'estado'=>'listado.estado', 'fecha'=>'listado.fecha_pago',
+        ], 'listado.fecha_pago');
+        $rows = $builder->orderBy('listado.prefijo', 'ASC')->orderBy('listado.id', 'DESC')
+            ->limit($porPagina, ($page - 1) * $porPagina)->get()->getResultArray();
+        $mapas = $this->resolverPagadoresEnBloque($db,
+            array_filter(array_column($rows, 'id_papeleta')), array_filter(array_column($rows, 'id_tramite')),
+            array_filter(array_column($rows, 'id_inscripcion')), array_filter(array_column($rows, 'id_internamiento')));
+        $data = array_map(function ($row) use ($mapas) {
+            if ($row['tipo_pago'] === 'INTERNAMIENTO') return $this->formatearPagoInternamiento($row, $row['prefijo'], $mapas);
+            $pago = $this->present($row, $mapas);
+            if ($row['prefijo'] !== '') {
+                $pago['id'] = $row['prefijo'] . $row['id'];
+                $pago['origenId'] = (int)$row['id'];
+            }
+            return $pago;
+        }, $rows);
+        return $this->respond(['data'=>$data, 'meta'=>[
+            'total'=>$total, 'page'=>$page, 'porPagina'=>$porPagina, 'totalPaginas'=>(int)ceil($total/$porPagina),
+        ]]);
+    }
+
     private const COLUMNAS_REFERENCIA_PAGO = ['id_papeleta', 'id_tramite', 'id_inscripcion'];
 
     private function idsConRecibo($db, string $columna): array
@@ -378,7 +351,7 @@ class PagosController extends ResourceController
         if (!in_array($columna, self::COLUMNAS_REFERENCIA_PAGO, true)) {
             throw new \InvalidArgumentException('Columna de referencia de pago no permitida.');
         }
-        $rows = $db->table('pagos_transito')->select($columna)->where($columna . ' IS NOT NULL')->get()->getResultArray();
+        $rows = $db->table('pagos_transito')->select($columna)->where($columna . ' IS NOT NULL')->where('estado !=', 'ANULADO')->get()->getResultArray();
         return array_map(static fn($r) => (int)$r[$columna], $rows);
     }
 
@@ -425,7 +398,7 @@ class PagosController extends ResourceController
         };
 
         return [
-            'id' => (int)$row['id'], 'tipoPago' => $row['tipo_pago'],
+            'id' => (int)$row['id'], 'uuid' => $row['uuid'] ?? null, 'tipoPago' => $row['tipo_pago'],
             'papeletaId' => $row['id_papeleta'], 'tramiteId' => $row['id_tramite'], 'inscripcionId' => $row['id_inscripcion'],
             'numeroRecibo' => $row['numero_recibo'], 'numeroVoucher' => $row['numero_voucher'],
             'metodo' => $row['medio_pago'], 'metodoPago' => $row['medio_pago'],
@@ -617,6 +590,7 @@ class PagosController extends ResourceController
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
         } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
             return $this->failServerError('No se pudo anular el pago.');
         }
     }

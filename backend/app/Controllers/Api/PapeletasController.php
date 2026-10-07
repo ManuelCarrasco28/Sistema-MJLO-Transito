@@ -6,6 +6,12 @@ use CodeIgniter\RESTful\ResourceController;
 
 class PapeletasController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'papeletas';
+    protected array $tablasUuidPorMetodo = [];
+    protected array $soloUuidEnEstricto = ['fotos', 'firma', 'pagar'];
+
     protected $format = 'json';
 
     public function tipos()
@@ -60,12 +66,12 @@ class PapeletasController extends ResourceController
     {
         $db = \Config\Database::connect();
         
-        $this->ensureColumnasExtra($db);
         
         try {
             $builder = $db->table('papeletas p')
                 ->select("
                     p.id,
+                    p.uuid,
                     p.numero_papeleta as numeroPapeleta,
                     p.id_operativo,
                     p.id_operativo as operativoId,
@@ -140,6 +146,11 @@ class PapeletasController extends ResourceController
                 ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left');
 
             $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
+            // El inspector solo ve las papeletas que él emitió; el filtro del cliente no puede ampliarlo.
+            $sesion = \App\Libraries\Acceso::usuario();
+            if (!\App\Libraries\Acceso::esOficina($sesion)) {
+                $inspectorId = (int) ($sesion['id_persona'] ?? -1);
+            }
             $dni = $this->request->getGet('dni');
             $placa = \App\Libraries\Placa::normalizar($this->request->getGet('placa'));
             $buscar = trim((string)$this->request->getGet('buscar'));
@@ -195,6 +206,8 @@ class PapeletasController extends ResourceController
                     ->orLike('per.numero', $buscar)
                     ->orLike('c_per.nombres', $buscar)
                     ->orLike('c_per.apellido_paterno', $buscar)
+                    ->orLike('c_per.apellido_materno', $buscar)
+                    ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c_per.nombres', 'c_per.apellido_paterno', 'c_per.apellido_materno'), null, false)
                     ->orLike('p.lugar', $buscar)
                     ->groupEnd();
             }
@@ -306,6 +319,16 @@ class PapeletasController extends ResourceController
 
     public function create()
     {
+        // Interruptor "Permiso móvil": con "solo reportes/evidencias" la app móvil no emite papeletas. Antes solo la app
+        // lo respetaba (ocultaba el botón); ahora el servidor también lo exige. La oficina y la web no se ven afectadas.
+        $usuarioSesion = \App\Libraries\Acceso::usuario();
+        // El inspector (rol Trabajador) solo opera desde la app móvil, así que el interruptor se aplica por rol y no
+        // por cabeceras del cliente (que se pueden falsificar).
+        if (!\App\Libraries\Acceso::esOficina($usuarioSesion)
+            && !\App\Libraries\Acceso::movilPuedeAplicarPapeletas()) {
+            return $this->failForbidden('La aplicación móvil está en modo "solo reportes/evidencias": no puede emitir papeletas.');
+        }
+
         $db = \Config\Database::connect();
         $txStarted = false;
         try {
@@ -347,6 +370,10 @@ class PapeletasController extends ResourceController
         $obsAutoridad = trim($input['observacionesAutoridad'] ?? '');
         $obsConductor = trim($input['observacionesConductor'] ?? '');
         $inputInspectorId = (int)($input['inspectorId'] ?? 0);
+        // El inspector siempre firma con su propia identidad (no se puede emitir a nombre de otro).
+        if (!\App\Libraries\Acceso::esOficina($usuarioSesion)) {
+            $inputInspectorId = (int) ($usuarioSesion['id_persona'] ?? 0);
+        }
         
         $claseVehiculo = strtoupper(trim($input['claseVehiculo'] ?? ''));
         $marcaVehiculo = strtoupper(trim($input['marcaVehiculo'] ?? ''));
@@ -358,12 +385,7 @@ class PapeletasController extends ResourceController
 
         try {
             if ($inputInspectorId <= 0) {
-                // Keep backward compatibility for test script auto-creation
-                $inspectorFallback = $db->table('trabajadores')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
-                $inputInspectorId = $inspectorFallback ? (int)$inspectorFallback['id_persona'] : 0;
-                if ($inputInspectorId <= 0) {
-                    throw new \DomainException('Debe iniciar sesión como inspector antes de emitir una papeleta.');
-                }
+                throw new \DomainException('Debe indicar el inspector que emite la papeleta.');
             }
 
             $inspector = $db->table('trabajadores pe')
@@ -383,13 +405,7 @@ class PapeletasController extends ResourceController
             }
             $infraccionesIds = array_values(array_unique(array_filter(array_map('intval', $infraccionesIds), static fn ($id) => $id > 0)));
             if (empty($infraccionesIds)) {
-                // Fallback for tests
-                $firstInfr = $db->table('tipos_infraccion')->limit(1)->get()->getRowArray();
-                if ($firstInfr) {
-                    $infraccionesIds = [(int)$firstInfr['id']];
-                } else {
-                    throw new \DomainException('Seleccione al menos una infracción válida.');
-                }
+                throw new \DomainException('Seleccione al menos una infracción válida.');
             }
 
             ['montoTotal' => $montoTotal, 'detalles' => $detallesToInsert] = $this->calcularInfracciones($db, $infraccionesIds, $fechaHora);
@@ -428,6 +444,7 @@ class PapeletasController extends ResourceController
                 'conductor_informal_nombres' => $conductorNombresInformal,
                 'conductor_informal_dni' => $conductorDniInformal,
             ];
+            $papeletaData['uuid'] = \App\Libraries\Identificador::nuevo();
             $db->table('papeletas')->insert($papeletaData);
             $papeletaId = (int)$db->insertID();
 
@@ -466,6 +483,7 @@ class PapeletasController extends ResourceController
 
             $response = [
                 'id' => $papeletaId,
+                'uuid' => $papeletaData['uuid'],
                 'numeroPapeleta' => $numeroPapeletaDefinitivo,
                 'vehiculoPlaca' => $placa,
                 'infractor' => $infractor,
@@ -519,6 +537,7 @@ class PapeletasController extends ResourceController
             $db->transRollback();
             return $this->failValidationErrors($e->getMessage());
         } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
             $db->transRollback();
             return $this->failServerError('No se pudo actualizar la papeleta.');
         }
@@ -532,6 +551,7 @@ class PapeletasController extends ResourceController
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
         } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
             return $this->failServerError('No se pudo anular la papeleta.');
         }
     }
@@ -548,6 +568,7 @@ class PapeletasController extends ResourceController
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
         } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
             return $this->failServerError('No se pudo confirmar el pago. Verifique el recibo.');
         }
     }
@@ -561,6 +582,13 @@ class PapeletasController extends ResourceController
             $papeleta = $db->table('papeletas')->where('id', $id)->get()->getRowArray();
             if (!$papeleta) {
                 return $this->failNotFound('Papeleta no encontrada');
+            }
+
+            // La firma del conductor la registra el inspector que emitió la papeleta (o el personal de oficina):
+            // antes cualquier usuario con sesión podía firmar o cambiar la firma de cualquier papeleta.
+            $usuarioSesion = \App\Libraries\Acceso::usuario();
+            if (!\App\Libraries\Acceso::esOficina($usuarioSesion) && (int) ($papeleta['id_inspector'] ?? 0) !== (int) ($usuarioSesion['id_persona'] ?? -1)) {
+                return $this->failForbidden('Solo el inspector que emitió la papeleta puede registrar la firma.');
             }
 
             $estado = strtoupper(trim($input['estado'] ?? $input['firmaConductorEstado'] ?? 'FIRMADO'));
@@ -608,6 +636,13 @@ class PapeletasController extends ResourceController
     {
         try {
             $db = \Config\Database::connect();
+            $sesion = \App\Libraries\Acceso::usuario();
+            if (!\App\Libraries\Acceso::esOficina($sesion)) {
+                $dueno = $db->table('papeletas')->select('id_inspector')->where('id', $id)->get()->getRowArray();
+                if (!$dueno || (int) $dueno['id_inspector'] !== (int) ($sesion['id_persona'] ?? -1)) {
+                    return $this->failNotFound('Papeleta no encontrada.');
+                }
+            }
             $fotosReporte = $db->table('reporte_intervencion_fotos f')
                 ->select('f.id, f.foto')
                 ->join('reportes_intervencion ri', 'ri.id = f.id_reporte')
@@ -734,24 +769,5 @@ class PapeletasController extends ResourceController
         }
 
         return ['personaId' => null, 'conductorNombresInformal' => trim("$conductorNombres $conductorApellidos") ?: $infractor, 'conductorDniInformal' => $conductorDni];
-    }
-
-    private function ensureColumnasExtra($db): void
-    {
-        if (!$db->fieldExists('placa', 'papeletas')) {
-            $db->query('ALTER TABLE papeletas ADD COLUMN placa VARCHAR(20) NULL AFTER id_vehiculo');
-        }
-        if (!$db->fieldExists('dueño_informal_nombres', 'papeletas')) {
-            $db->query('ALTER TABLE papeletas ADD COLUMN dueño_informal_nombres VARCHAR(255) NULL AFTER placa');
-        }
-        if (!$db->fieldExists('dueño_informal_dni', 'papeletas')) {
-            $db->query('ALTER TABLE papeletas ADD COLUMN dueño_informal_dni VARCHAR(20) NULL AFTER dueño_informal_nombres');
-        }
-        if (!$db->fieldExists('conductor_informal_nombres', 'papeletas')) {
-            $db->query('ALTER TABLE papeletas ADD COLUMN conductor_informal_nombres VARCHAR(255) NULL AFTER dueño_informal_dni');
-        }
-        if (!$db->fieldExists('conductor_informal_dni', 'papeletas')) {
-            $db->query('ALTER TABLE papeletas ADD COLUMN conductor_informal_dni VARCHAR(20) NULL AFTER conductor_informal_nombres');
-        }
     }
 }

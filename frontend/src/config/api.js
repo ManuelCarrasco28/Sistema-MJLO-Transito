@@ -1,8 +1,17 @@
+import { limpiarDatosLocales } from '../utils/sesionLocal'
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const DEFAULT_TIMEOUT_MS = 25000
 
 const memoryCache = new Map()
 const pendingReads = new Map()
+const peticionesActivas = new Set()
+
+window.addEventListener('mjlo:limpiar-sesion', () => {
+  memoryCache.clear()
+  pendingReads.clear()
+  for (const controller of peticionesActivas) controller.abort()
+  peticionesActivas.clear()
+})
 
 export function getCachedData(key) {
   const item = memoryCache.get(key)
@@ -61,6 +70,7 @@ export async function leerMensajeError(response, fallback = 'Ocurrió un error e
 function redirigirSiSesionExpirada(response, url) {
   if (response.status !== 401 || url.includes('/api/login') || url.includes('/api/me')) return
   if (window.location.pathname.endsWith('/login')) return
+  limpiarDatosLocales()
   window.setTimeout(() => {
     if (!window.location.pathname.endsWith('/login')) {
       window.location.href = '/login?expired=1'
@@ -87,6 +97,11 @@ export async function apiFetch(endpoint, options = {}) {
 
   const method = (fetchOptions.method || 'GET').toUpperCase()
   const controller = new AbortController()
+  peticionesActivas.add(controller)
+  const externalSignal = fetchOptions.signal
+  const cancelar = () => controller.abort(externalSignal?.reason)
+  if (externalSignal?.aborted) cancelar()
+  else externalSignal?.addEventListener('abort', cancelar, { once: true })
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
 
   const config = {
@@ -95,7 +110,7 @@ export async function apiFetch(endpoint, options = {}) {
     method,
     headers,
     body,
-    signal: fetchOptions.signal || controller.signal,
+    signal: controller.signal,
   }
 
   // Share only default reads while they are in flight. Each caller gets its
@@ -120,7 +135,10 @@ export async function apiFetch(endpoint, options = {}) {
 
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && response.ok) {
       const cleanEndpoint = endpoint.split('?')[0].replace(/^\//, '').split('/')[0]
-      if (cleanEndpoint) {
+      if (cleanEndpoint === 'login' || cleanEndpoint === 'logout') {
+        peticionesActivas.delete(controller)
+        limpiarDatosLocales()
+      } else if (cleanEndpoint) {
         invalidateCache(`/${cleanEndpoint}`)
       }
     }
@@ -128,10 +146,13 @@ export async function apiFetch(endpoint, options = {}) {
     return response
   } catch (err) {
     if (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort')) {
+      if (externalSignal?.aborted) throw new DOMException('Consulta cancelada', 'AbortError')
       throw new Error('El servicio tardó demasiado tiempo en responder o la conexión fue cancelada.')
     }
     throw err
   } finally {
+    peticionesActivas.delete(controller)
     window.clearTimeout(timeoutId)
+    externalSignal?.removeEventListener('abort', cancelar)
   }
 }

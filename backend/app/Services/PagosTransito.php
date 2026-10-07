@@ -59,7 +59,8 @@ class PagosTransito
                 $total = $course['costo_inscripcion'];
             }
             if (!is_numeric($total) || (float)$total < 0) throw new DomainException('El monto de origen no es válido.');
-            $this->db->table('pagos_transito')->insert(['tipo_pago' => $tipo, $fk => $id, 'total' => $total, 'estado' => 'PENDIENTE']);
+            $this->db->table('pagos_transito')->insert([
+                'uuid' => \App\Libraries\Identificador::nuevo(), 'tipo_pago' => $tipo, $fk => $id, 'total' => $total, 'estado' => 'PENDIENTE']);
             return $this->db->table('pagos_transito')->where('id', $this->db->insertID())->get()->getRowArray();
         });
     }
@@ -72,11 +73,15 @@ class PagosTransito
     private function generarNumeroRecibo(): string
     {
         $anio = date('Y');
-        do {
-            $siguiente = $this->db->table('pagos_transito')->like('numero_recibo', "REC-{$anio}-", 'after')->countAllResults() + 1;
-            $numero = 'REC-' . $anio . '-' . str_pad((string)$siguiente, 5, '0', STR_PAD_LEFT);
-        } while ($this->db->table('pagos_transito')->where('numero_recibo', $numero)->countAllResults() > 0);
-        return $numero;
+        $prefijo = "REC-{$anio}-";
+        // Siguiente = mayor correlativo existente + 1 (contar filas repetía números cuando había huecos).
+        $fila = $this->db->query(
+            'SELECT MAX(CAST(SUBSTRING(numero_recibo, ?) AS UNSIGNED)) AS ultimo FROM pagos_transito WHERE numero_recibo LIKE ?',
+            [strlen($prefijo) + 1, $prefijo . '%']
+        )->getRowArray();
+        $siguiente = ((int) ($fila['ultimo'] ?? 0)) + 1;
+
+        return $prefijo . str_pad((string) $siguiente, 5, '0', STR_PAD_LEFT);
     }
 
     public function confirmar(int $id, array $input): array
@@ -86,8 +91,23 @@ class PagosTransito
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $fecha);
         if ($recibo !== '' && strlen($recibo) > 50) throw new DomainException('El número de recibo no puede exceder los 50 caracteres.');
         if (!$date || $date->format('Y-m-d') !== $fecha || $fecha > date('Y-m-d')) throw new DomainException('Ingrese una fecha de pago válida, no futura.');
-        if ($recibo === '') $recibo = $this->generarNumeroRecibo();
-        return $this->atomic(function () use ($id, $input, $recibo, $fecha) {
+        $automatico = $recibo === '';
+        // El candado serializa a los cajeros: dos cobros simultáneos no calculan el mismo número. Se suelta después del commit.
+        if ($automatico) {
+            $candado = (int) ($this->db->query("SELECT GET_LOCK('mjlo_numero_recibo', 10) AS ok")->getRowArray()['ok'] ?? 0);
+            if ($candado !== 1) throw new DomainException('El sistema está generando otro recibo. Intente nuevamente.');
+        }
+        try {
+            return $this->confirmarEnTransaccion($id, $input, $recibo, $fecha, $automatico);
+        } finally {
+            if ($automatico) $this->db->query("SELECT RELEASE_LOCK('mjlo_numero_recibo')");
+        }
+    }
+
+    private function confirmarEnTransaccion(int $id, array $input, string $recibo, string $fecha, bool $automatico): array
+    {
+        return $this->atomic(function () use ($id, $input, $recibo, $fecha, $automatico) {
+            if ($automatico) $recibo = $this->generarNumeroRecibo();
             $pago = $this->db->table('pagos_transito')->where('id', $id)->get()->getRowArray();
             if (!$pago) throw new DomainException('Pago no encontrado.');
             [$origin] = $this->origin($pago['tipo_pago'], $this->originId($pago));

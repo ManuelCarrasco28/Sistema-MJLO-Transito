@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../ui/Icon'
 import { BotonCerrarModal } from '../ui/ModalControls'
-import { buildVehiculoQrValue } from '../../utils/vehiculos'
+import { buildVehiculoQrValue, isVehiculoFormal } from '../../utils/vehiculos'
 import './QrVehiculoImpresion.css'
 
 // Posiciones (en % de la imagen) del recuadro blanco y de la franja amarilla de cada plantilla.
@@ -27,7 +27,9 @@ export const PLANTILLAS = {
 }
 
 // La plantilla sale del tipo de vehículo registrado: solo existen para Mototaxi y Motocarguera.
+// Un vehículo informal (sin asociación) no genera QR: devuelve null igual que un tipo sin plantilla.
 export const plantillaDeVehiculo = (vehiculo) => {
+  if (!isVehiculoFormal(vehiculo)) return null
   const tipo = String(vehiculo?.tipo || '').toUpperCase()
   if (tipo.includes('CARGUERA')) return 'motocarguera'
   if (tipo.includes('MOTOTAXI')) return 'mototaxi'
@@ -47,10 +49,12 @@ export const nombreAsociacion = (asociacion) => {
 // El QR impreso lleva solo lo necesario para identificar el vehículo: es corto, se escanea bien aunque
 // salga pequeño, y la app móvil lee de él la línea "Codigo QR:" para abrir la ficha completa.
 export const valorQrVehiculo = (vehiculo) => {
-  if (!vehiculo?.codigoQr) return buildVehiculoQrValue(vehiculo)
+  // El código QR es el uuid del vehículo; si por algún motivo la lista no trae codigoQr se usa el uuid.
+  const codigo = vehiculo?.codigoQr || vehiculo?.uuid
+  if (!codigo) return buildVehiculoQrValue(vehiculo)
   return [
     'MDJLO - Sistema de Gestion de Transito Municipal',
-    `Codigo QR: ${vehiculo.codigoQr}`,
+    `Codigo QR: ${codigo}`,
     `Placa del vehiculo: ${vehiculo.placa || 'SIN PLACA'}`,
   ].join('\n')
 }
@@ -121,14 +125,21 @@ export function ImpresionQrPortal({ vehiculos, copias = 1, onFin }) {
   useEffect(() => {
     if (estilos === null) return
     let cancelado = false
-    const limpiar = () => { if (!cancelado) onFin?.() }
+    let terminado = false
+    // "afterprint" se dispara dentro de window.print() (que bloquea): el oyente va antes de imprimir.
+    const limpiar = () => {
+      if (cancelado || terminado) return
+      terminado = true
+      window.removeEventListener('afterprint', limpiar)
+      onFin?.()
+    }
     const raf = requestAnimationFrame(() => requestAnimationFrame(() => {
       if (cancelado) return
-      window.print()
       window.addEventListener('afterprint', limpiar, { once: true })
-      setTimeout(limpiar, 2500)
+      window.print()
+      setTimeout(limpiar, 300)
     }))
-    return () => { cancelado = true; cancelAnimationFrame(raf) }
+    return () => { cancelado = true; window.removeEventListener('afterprint', limpiar); cancelAnimationFrame(raf) }
   }, [estilos]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (estilos === null) return null
@@ -148,7 +159,7 @@ export function ImpresionQrPortal({ vehiculos, copias = 1, onFin }) {
   )
 }
 
-// Impresión de un solo vehículo (desde la columna Acciones): una hoja con 4 copias.
+// Impresión de un solo vehículo (desde la columna Acciones): una hoja con sus 3 QR.
 export function QrVehiculoImpresion({ vehiculo, onClose }) {
   const [imprimiendo, setImprimiendo] = useState(false)
   const clave = plantillaDeVehiculo(vehiculo)
@@ -175,13 +186,15 @@ export function QrVehiculoImpresion({ vehiculo, onClose }) {
               <div className="w-full max-w-[280px] shadow-lg"><HojaQr vehiculo={vehiculo} /></div>
             ) : (
               <p className="self-center text-center text-sm text-slate-500">
-                Solo los mototaxis y las motocargueras tienen plantilla de QR. Cambie el tipo del vehículo si corresponde.
+                {isVehiculoFormal(vehiculo)
+                  ? 'Solo los mototaxis y las motocargueras tienen plantilla de QR. Cambie el tipo del vehículo si corresponde.'
+                  : 'Este vehículo es informal (no pertenece a ninguna asociación), por eso no genera QR. Asígnele una asociación para poder imprimirlo.'}
               </p>
             )}
           </div>
 
           <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-5 py-3 dark:border-[var(--border)]">
-            <span className="text-xs text-slate-500">Se imprimen 4 copias en una hoja A4.</span>
+            <span className="text-xs text-slate-500">Se imprimen 3 QR del vehículo en una hoja A4.</span>
             <button
               type="button"
               onClick={() => setImprimiendo(true)}
@@ -196,7 +209,7 @@ export function QrVehiculoImpresion({ vehiculo, onClose }) {
         </div>
       </div>
 
-      {imprimiendo && <ImpresionQrPortal vehiculos={[vehiculo]} copias={4} onFin={() => setImprimiendo(false)} />}
+      {imprimiendo && <ImpresionQrPortal vehiculos={[vehiculo]} copias={3} onFin={() => setImprimiendo(false)} />}
     </>
   )
 }

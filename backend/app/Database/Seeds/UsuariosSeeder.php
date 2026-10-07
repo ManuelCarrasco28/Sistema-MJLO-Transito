@@ -13,6 +13,7 @@ class UsuariosSeeder extends Seeder
         foreach ($usersData as $u) {
             // 1. Crear en `personas`
             $this->db->table('personas')->insert([
+                'uuid' => \App\Libraries\Identificador::nuevo(),
                 'id_tipo_documento' => 1, // Asumimos 1 = DNI
                 'numero' => $u['numero'],
                 'estado' => 'ACTIVO'

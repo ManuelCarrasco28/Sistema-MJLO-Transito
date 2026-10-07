@@ -12,6 +12,7 @@ class FileStorageService
     ];
 
     private const TAMANO_MAXIMO_BYTES = 8 * 1024 * 1024; // 8 MB
+    private const LADO_MAXIMO_PX = 8000;
 
     /**
      * Decodifica una imagen en base64 (con o sin prefijo data:image/...) y la
@@ -39,17 +40,38 @@ class FileStorageService
             $base64 = $m[2];
         }
 
-        $extension = self::MIME_EXT[$mime] ?? 'jpg';
         $binario = base64_decode($base64, true);
         if ($binario === false || $binario === '' || strlen($binario) > self::TAMANO_MAXIMO_BYTES) {
             return null;
         }
 
-        // Verifica que el contenido decodificado sea realmente una imagen
-        // válida (no un archivo arbitrario disfrazado con extensión de imagen).
-        if (@getimagesizefromstring($binario) === false) {
+        // El tipo se decide por el contenido real (no por lo que declare el cliente) y la imagen se vuelve a
+        // codificar: así se descartan EXIF/GPS y cualquier carga extra escondida en el archivo.
+        $info = @getimagesizefromstring($binario);
+        if ($info === false || !isset(self::MIME_EXT[$info['mime'] ?? ''])) {
             return null;
         }
+        if ($info[0] > self::LADO_MAXIMO_PX || $info[1] > self::LADO_MAXIMO_PX) {
+            return null;
+        }
+        $extension = self::MIME_EXT[$info['mime']];
+
+        $imagen = @imagecreatefromstring($binario);
+        if ($imagen === false) {
+            return null;
+        }
+        ob_start();
+        $ok = match ($extension) {
+            'png' => imagepng($imagen),
+            'webp' => imagewebp($imagen, null, 85),
+            default => imagejpeg($imagen, null, 88),
+        };
+        $recodificado = (string) ob_get_clean();
+        imagedestroy($imagen);
+        if (!$ok || $recodificado === '') {
+            return null;
+        }
+        $binario = $recodificado;
 
         $directorio = WRITEPATH . 'uploads/' . $subcarpeta . '/';
         if (!is_dir($directorio) && !mkdir($directorio, 0755, true) && !is_dir($directorio)) {

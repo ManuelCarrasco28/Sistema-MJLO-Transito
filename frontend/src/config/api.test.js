@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiFetch, leerMensajeError, sanitizarMensaje } from './api'
+import { apiFetch, getCachedData, setCachedData, leerMensajeError, sanitizarMensaje } from './api'
+import { limpiarDatosLocales } from '../utils/sesionLocal'
 
 describe('sanitizarMensaje', () => {
   it('deja pasar mensajes de negocio legibles', () => {
@@ -83,5 +84,65 @@ describe('apiFetch y sesión expirada', () => {
     vi.advanceTimersByTime(150)
 
     expect(asignar).not.toHaveBeenCalled()
+  })
+})
+
+describe('apiFetch: cancelación y tiempo máximo', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
+
+  const fetchPendiente = () => {
+    const fetchMock = vi.fn((_, config) => new Promise((resolve, reject) => {
+      if (config.signal.aborted) reject(new DOMException('aborted', 'AbortError'))
+      else config.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true })
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('mantiene el timeout aunque el consumidor aporte su propia señal', async () => {
+    fetchPendiente()
+    const controller = new AbortController()
+    const resultado = apiFetch('/prueba-timeout', { signal: controller.signal, timeoutMs: 100 }).catch(e => e)
+    await vi.advanceTimersByTimeAsync(101)
+    expect((await resultado).message).toContain('tardó demasiado')
+    expect(controller.signal.aborted).toBe(false)
+  })
+
+  it('distingue una cancelación voluntaria de un fallo de conexión', async () => {
+    fetchPendiente()
+    const controller = new AbortController()
+    const resultado = apiFetch('/prueba-cancelar', { signal: controller.signal }).catch(e => e)
+    controller.abort()
+    expect((await resultado).name).toBe('AbortError')
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('respeta señales que ya estaban canceladas', async () => {
+    fetchPendiente()
+    const controller = new AbortController()
+    controller.abort()
+    await expect(apiFetch('/prueba-pre-cancelada', { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  it('cancela las consultas de la sesión anterior al cerrarla', async () => {
+    const fetchMock = fetchPendiente()
+    const resultado = apiFetch('/datos-sesion-anterior').catch(e => e)
+    limpiarDatosLocales()
+    await resultado
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true)
+  })
+
+  it('al iniciar otra sesión borra la caché sin cancelar el cuerpo del login', async () => {
+    setCachedData('/asociaciones', [{ id: 123 }])
+    let signal
+    vi.stubGlobal('fetch', vi.fn(async (_, config) => {
+      signal = config.signal
+      return new Response(JSON.stringify({ data: { id: 2 } }), { status: 200 })
+    }))
+    const respuesta = await apiFetch('/login', { method: 'POST', body: {} })
+    expect(signal.aborted).toBe(false)
+    expect(await respuesta.json()).toEqual({ data: { id: 2 } })
+    expect(getCachedData('/asociaciones')).toBeNull()
   })
 })

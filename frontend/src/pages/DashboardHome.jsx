@@ -12,9 +12,13 @@ export function DashboardHome({ user }) {
 
   useEffect(() => {
     let active = true
+    let pending = false
+    const controller = new AbortController()
 
     const cargar = () => {
-      apiFetch('/dashboard')
+      if (!active || pending || document.visibilityState === 'hidden') return
+      pending = true
+      apiFetch('/dashboard', { signal: controller.signal })
         .then((response) => {
           if (!response.ok) throw new Error('No se pudo cargar el resumen del dashboard.')
           return response.json()
@@ -29,6 +33,7 @@ export function DashboardHome({ user }) {
         .catch(() => {
           if (active && !cached) setError('No se pudo cargar la información del panel principal.')
         })
+        .finally(() => { pending = false })
     }
 
     cargar()
@@ -39,6 +44,7 @@ export function DashboardHome({ user }) {
 
     return () => {
       active = false
+      controller.abort()
       clearInterval(timer)
       document.removeEventListener('visibilitychange', alVolver)
     }

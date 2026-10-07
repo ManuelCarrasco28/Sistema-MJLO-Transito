@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react'
 import { useOficinaRegistral } from '../hooks/useOficinaRegistral'
 import { OficinaRegistralSelect } from '../components/vehiculos/OficinaRegistralSelect'
 import { QrVehiculoImpresion, plantillaDeVehiculo } from '../components/vehiculos/QrVehiculoImpresion'
-import { ImpresionQrVehiculos } from '../components/vehiculos/ImpresionQrVehiculos'
 import { QRCodeSVG } from 'qrcode.react'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -87,15 +86,17 @@ export function Vehiculos({ user }) {
   useEffect(() => {
     const rawQuery = (propietarioSearch || '').trim()
     if (!rawQuery || rawQuery.includes('—') || rawQuery.length < 2) {
+      setPropietarioResults([])
       return
     }
+    const controller = new AbortController()
     const timer = setTimeout(() => {
-      apiFetch(`/personas?buscar=${encodeURIComponent(rawQuery)}&porPagina=10`)
+      apiFetch(`/personas?page=1&buscar=${encodeURIComponent(rawQuery)}&porPagina=10`, { signal: controller.signal })
         .then((r) => r.ok ? r.json() : { data: [] })
-        .then((payload) => setPropietarioResults(payload.data || []))
+        .then((payload) => { if (!controller.signal.aborted) setPropietarioResults(payload.data || []) })
         .catch(() => {})
     }, 250)
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); controller.abort() }
   }, [propietarioSearch])
 
 
@@ -340,7 +341,6 @@ export function Vehiculos({ user }) {
 
   const oficinaReg = useOficinaRegistral()
   const [vehiculoQrImpresion, setVehiculoQrImpresion] = useState(null)
-  const [activeTab, setActiveTab] = useState('VEHICULOS')
   const [consultaPlaca, setConsultaPlaca] = useState('')
   const [consultaResult, setConsultaResult] = useState(null)
   const [consultaError, setConsultaError] = useState('')
@@ -479,7 +479,11 @@ export function Vehiculos({ user }) {
       .catch(() => {})
   }
 
+  const cargaVehiculos = useRef(null)
   const loadVehiculos = async () => {
+    cargaVehiculos.current?.abort()
+    const controller = new AbortController()
+    cargaVehiculos.current = controller
     setIsLoading(true)
     setLoadError('')
     try {
@@ -496,15 +500,17 @@ export function Vehiculos({ user }) {
         params.set('sortDir', sortDir)
       }
 
-      const res = await apiFetch(`/vehiculos?${params.toString()}`)
+      const res = await apiFetch(`/vehiculos?${params.toString()}`, { signal: controller.signal })
       if (!res.ok) throw res
       const payload = await res.json()
+      if (controller.signal.aborted) return
       setVehiculos(payload.data ?? [])
       setTotalFiltrado(payload.meta?.total ?? payload.data?.length ?? 0)
     } catch {
+      if (controller.signal.aborted) return
       setLoadError('No se pudo cargar el padrón vehicular.')
     } finally {
-      setIsLoading(false)
+      if (!controller.signal.aborted) setIsLoading(false)
     }
   }
 
@@ -523,6 +529,7 @@ export function Vehiculos({ user }) {
 
   useEffect(() => {
     loadVehiculos()
+    return () => cargaVehiculos.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearchTerm, filterTipo, filterEstado, filterActivo, sortBy, sortDir])
 
   const getPersonaNombre = (persona) => (
@@ -625,7 +632,7 @@ export function Vehiculos({ user }) {
           matched = (personas || []).find(p => (p.numeroDocumento || '').trim() === legalOwner.documento.trim())
           if (!matched) {
             try {
-              const resP = await apiFetch(`/personas?buscar=${encodeURIComponent(legalOwner.documento.trim())}&porPagina=5`)
+              const resP = await apiFetch(`/personas?page=1&buscar=${encodeURIComponent(legalOwner.documento.trim())}&porPagina=5`)
               if (resP.ok) {
                 const payloadP = await resP.json()
                 matched = (payloadP.data || []).find(p => (p.numeroDocumento || '').trim() === legalOwner.documento.trim()) || null
@@ -641,7 +648,7 @@ export function Vehiculos({ user }) {
           })
           if (!matched) {
             try {
-              const resP = await apiFetch(`/personas?buscar=${encodeURIComponent(legalOwner.nombre.trim())}&porPagina=5`)
+              const resP = await apiFetch(`/personas?page=1&buscar=${encodeURIComponent(legalOwner.nombre.trim())}&porPagina=5`)
               if (resP.ok) {
                 const payloadP = await resP.json()
                 matched = (payloadP.data || []).find(p => {
@@ -726,7 +733,7 @@ export function Vehiculos({ user }) {
   const paginatedVehiculos = vehiculos
   const filteredVehiculos = vehiculos
 
-  const fetchTodoElFiltro = () =>
+  const fetchTodoElFiltro = (maxFilas = Infinity) =>
     fetchTodasLasFilas('/vehiculos', {
       buscar: debouncedSearchTerm,
       tipo: filterTipo === 'TODOS' ? '' : filterTipo,
@@ -734,14 +741,18 @@ export function Vehiculos({ user }) {
       estado: filterActivo === 'TODOS' ? '' : filterActivo,
       sortBy,
       sortDir: sortBy ? sortDir : '',
-    }, { mensaje: 'Preparando la descarga de vehículos...' })
+    }, { mensaje: 'Preparando la descarga de vehículos...', maxFilas })
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
-      const dataToExport = await fetchTodoElFiltro()
-      exportToExcel({
+      const dataToExport = { endpoint: '/vehiculos', params: {
+        buscar: debouncedSearchTerm, tipo: filterTipo === 'TODOS' ? '' : filterTipo,
+        formalidad: filterEstado === 'TODOS' ? '' : filterEstado,
+        estado: filterActivo === 'TODOS' ? '' : filterActivo, sortBy, sortDir,
+      } }
+      await exportToExcel({
             filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.xls`,
             sheetName: 'Vehículos',
             title: 'PADRÓN VEHICULAR MUNICIPAL',
@@ -766,7 +777,7 @@ export function Vehiculos({ user }) {
               { header: 'SERIE DEL MOTOR', key: 'serieMotor', isText: true, width: 150 },
               { header: 'PARTIDA REGISTRAL', key: 'partidaRegistral', isText: true, width: 140 },
               { header: 'N° TUC', key: 'tucNumero', isText: true, width: 130 },
-              { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 150 },
+              { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 270 },
               { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
               { header: 'RUC ASOCIACIÓN', key: 'asociacionRuc', isText: true, width: 120, align: 'center' },
               { header: 'PROPIETARIO', key: 'propietario', width: 180 },
@@ -785,7 +796,7 @@ export function Vehiculos({ user }) {
   const handleExportPdf = async () => {
     setIsExportingPdf(true)
     try {
-      const dataToExport = await fetchTodoElFiltro()
+      const dataToExport = await fetchTodoElFiltro(10000)
       await exportToPdf({
             filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}`,
             subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial Vehicular',
@@ -806,6 +817,8 @@ export function Vehiculos({ user }) {
             ],
             data: dataToExport
           })
+    } catch (err) {
+      showError('Descarga no completada', sanitizarMensaje(err.message, 'No se pudo preparar el PDF.'))
     } finally {
       setIsExportingPdf(false)
     }
@@ -878,7 +891,7 @@ export function Vehiculos({ user }) {
     setSelectedVehiculo(vehiculo)
     setIsDetailModalOpen(true)
     try {
-      const res = await apiFetch(`/vehiculos/${vehiculo.id}`)
+      const res = await apiFetch(`/vehiculos/${vehiculo.uuid || vehiculo.id}`)
       if (res.ok) {
         const full = await res.json()
         if (full?.data) setSelectedVehiculo(full.data)
@@ -1163,32 +1176,6 @@ export function Vehiculos({ user }) {
       </div>
 
 
-      {/* Pestañas: Vehículos / Impresión de QR */}
-      <div className="flex items-center gap-1.5 border-b border-slate-200 dark:border-[var(--border)]">
-        {[
-          { id: 'VEHICULOS', label: 'Vehículos', icono: 'vehicle' },
-          { id: 'QR', label: 'Impresión de QR', icono: 'print' },
-        ].map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setActiveTab(t.id)}
-            className={`inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
-              activeTab === t.id
-                ? 'border-indigo-600 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300'
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-            }`}
-          >
-            <Icon name={t.icono} className="size-3.5" />
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'QR' && <ImpresionQrVehiculos asociaciones={asociaciones} />}
-
-      {activeTab === 'VEHICULOS' && (
-      <>
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
 
@@ -1199,7 +1186,7 @@ export function Vehiculos({ user }) {
             />
             <input
               type="text"
-              placeholder="Buscar por placa, marca, modelo, DNI o propietario..."
+              placeholder="Buscar por placa, marca, modelo, DNI, propietario o código QR..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-9 pr-8 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400"
@@ -1505,9 +1492,6 @@ export function Vehiculos({ user }) {
           disabled={isLoading}
         />
       </div>
-
-      </>
-      )}
 
       {isModalOpen && (
         <VehiculoFormModal

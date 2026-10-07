@@ -145,6 +145,7 @@ export function Permisos() {
     })
 
     const handleMessage = (e) => {
+      if (e.origin !== window.location.origin) return
       if (e.data?.type === 'PERMISO_GUARDADO') {
         invalidateCache('/permisos')
         loadDataRef.current()
@@ -229,7 +230,7 @@ export function Permisos() {
     await new Promise(r => setTimeout(r, 50))
     try {
       const data = await fetchTodoElFiltro()
-          exportToExcel({
+          await exportToExcel({
             filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.xls`,
             sheetName: 'Autorizaciones',
             title: 'PADRÓN OFICIAL DE AUTORIZACIONES DE CARGA, DESCARGA Y USO DE VÍAS',

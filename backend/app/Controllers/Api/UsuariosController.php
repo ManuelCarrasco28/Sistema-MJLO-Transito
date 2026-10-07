@@ -15,6 +15,33 @@ class UsuariosController extends ResourceController
      */
     private const USUARIO_PROTEGIDO = 'superadmin';
 
+    /**
+     * Jerarquía de roles: un usuario que no es SuperAdmin solo puede crear, modificar, restablecer la
+     * contraseña o eliminar cuentas con un rol MÁS BAJO que el suyo, y solo asignar roles más bajos.
+     * Antes un Gerente o SubGerente podía darse (o dar a otro) el rol SuperAdmin, o cambiarle la
+     * contraseña a un SuperAdmin cualquiera, saltándose todos los permisos.
+     */
+    private function sinJerarquia(array $actor, string $rolAfectado): bool
+    {
+        $rolActor = \App\Libraries\Acceso::rol($actor);
+        if ($rolActor === 'SUPERADMIN') {
+            return false;
+        }
+
+        return \App\Libraries\Acceso::rango($rolAfectado) <= \App\Libraries\Acceso::rango($rolActor);
+    }
+
+    private function rolDeUsuario($db, $id): string
+    {
+        $fila = $db->table('usuarios u')
+            ->select('r.nombre')
+            ->join('roles r', 'r.id = u.id_rol', 'left')
+            ->where('u.id', (int) $id)
+            ->get()->getRowArray();
+
+        return (string) ($fila['nombre'] ?? '');
+    }
+
     public function index()
     {
         $model = new \App\Models\UsuarioModel();
@@ -113,6 +140,34 @@ class UsuariosController extends ResourceController
             return $this->failValidationErrors('El rol seleccionado no es válido o no está activo.');
         }
 
+        $actor = \App\Libraries\Acceso::usuario();
+        if ($actor && $this->sinJerarquia($actor, $rolRow['nombre'])) {
+            return $this->fail('No puede asignar un rol igual o superior al suyo.', 403);
+        }
+
+        $errorPassword = \App\Libraries\Acceso::errorDePassword((string) $password, $nombreUsuario);
+        if ($errorPassword) {
+            return $this->failValidationErrors($errorPassword);
+        }
+
+        $personaExiste = $db->table('ciudadanos')->where('id_persona', $idPersona)->countAllResults() > 0;
+        if (!$personaExiste) {
+            return $this->failValidationErrors('La persona seleccionada no existe en el padrón. Regístrela primero en Personas.');
+        }
+
+        $db->transStart();
+
+        // Una persona del padrón que aún no es trabajador se registra como tal al crearle la cuenta
+        // (el cargo y la unidad se completan después en Trabajadores; los cargos no son lo mismo que los roles).
+        if (!$db->table('trabajadores')->where('id_persona', $idPersona)->countAllResults()) {
+            $db->table('trabajadores')->insert([
+                'id_persona'   => $idPersona,
+                'tipo'         => 'INTERNO',
+                'tiene_cuenta' => 0,
+                'estado'       => 'ACTIVO',
+            ]);
+        }
+
         $trabajador = $db->table('trabajadores t')
             ->select('t.*, c.nombres, c.apellido_paterno, c.apellido_materno', false)
             ->join('ciudadanos c', 'c.id_persona = t.id_persona', 'inner')
@@ -120,16 +175,11 @@ class UsuariosController extends ResourceController
             ->get()
             ->getRowArray();
 
-        if (!$trabajador) {
-            return $this->failValidationErrors('El trabajador seleccionado no existe. Regístrelo primero en Trabajadores.');
-        }
-
         $existUserPersona = $db->table('usuarios')->where('id_persona', $idPersona)->countAllResults();
         if ($existUserPersona > 0) {
-            return $this->failValidationErrors('El trabajador seleccionado ya cuenta con un usuario registrado.');
+            $db->transRollback();
+            return $this->failValidationErrors('La persona seleccionada ya cuenta con un usuario registrado.');
         }
-
-        $db->transStart();
 
         $db->table('usuarios')->insert([
             'id_persona' => $idPersona,
@@ -184,7 +234,10 @@ class UsuariosController extends ResourceController
         }
 
         $idRol = (int)$input['id_rol'];
-        $estado = trim($input['estado']);
+        $estado = strtoupper(trim((string) $input['estado']));
+        if (!in_array($estado, ['ACTIVO', 'INACTIVO'], true)) {
+            return $this->failValidationErrors('El estado debe ser ACTIVO o INACTIVO.');
+        }
 
         $db = \Config\Database::connect();
 
@@ -199,9 +252,18 @@ class UsuariosController extends ResourceController
             return $this->fail('Solo un SuperAdmin puede modificar la cuenta superadmin principal.', 403);
         }
 
+        // Nadie cambia su propio rol ni su estado (evita auto-ascensos y quedarse sin acceso).
+        if ($actor && (int) ($actor['id'] ?? 0) === (int) $id) {
+            return $this->fail('No puede cambiar su propio rol ni su estado.', 403);
+        }
+
         $rolRow = $db->table('roles')->where('id', $idRol)->where('estado', 'ACTIVO')->get()->getRowArray();
         if (!$rolRow) {
             return $this->failValidationErrors('El rol seleccionado no es válido.');
+        }
+
+        if ($actor && ($this->sinJerarquia($actor, $this->rolDeUsuario($db, $id)) || $this->sinJerarquia($actor, $rolRow['nombre']))) {
+            return $this->fail('No tiene jerarquía para modificar esta cuenta ni para asignar ese rol.', 403);
         }
 
         $db->transStart();
@@ -238,10 +300,6 @@ class UsuariosController extends ResourceController
     {
         $input = $this->request->getJSON(true) ?: [];
 
-        if (!isset($input['password']) || strlen(trim($input['password'])) < 8) {
-            return $this->failValidationErrors('La contraseña debe tener al menos 8 caracteres.');
-        }
-
         $db = \Config\Database::connect();
 
         $usuario = $db->table('usuarios')->where('id', $id)->get()->getRowArray();
@@ -249,10 +307,20 @@ class UsuariosController extends ResourceController
             return $this->failNotFound('Usuario no encontrado.');
         }
 
+        $errorPassword = \App\Libraries\Acceso::errorDePassword((string) ($input['password'] ?? ''), (string) $usuario['usuario']);
+        if ($errorPassword) {
+            return $this->failValidationErrors($errorPassword);
+        }
+
         $actor = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
         $actorRol = strtoupper((string)($actor['rol'] ?? ''));
         if ($usuario['usuario'] === self::USUARIO_PROTEGIDO && $actorRol !== 'SUPERADMIN') {
             return $this->fail('Solo un SuperAdmin puede restablecer la contraseña de la cuenta superadmin principal.', 403);
+        }
+
+        $esMismaCuenta = $actor && (int) ($actor['id'] ?? 0) === (int) $id;
+        if ($actor && !$esMismaCuenta && $this->sinJerarquia($actor, $this->rolDeUsuario($db, $id))) {
+            return $this->fail('No tiene jerarquía para restablecer la contraseña de esta cuenta.', 403);
         }
 
         $db->table('usuarios')->where('id', $id)->update([
@@ -283,6 +351,14 @@ class UsuariosController extends ResourceController
 
         if ($usuario['usuario'] === self::USUARIO_PROTEGIDO) {
             return $this->fail('No se puede eliminar al usuario superadmin principal.', 403);
+        }
+
+        $actor = \App\Libraries\Acceso::usuario();
+        if ($actor && (int) ($actor['id'] ?? 0) === (int) $id) {
+            return $this->fail('No puede eliminar su propia cuenta.', 403);
+        }
+        if ($actor && $this->sinJerarquia($actor, $this->rolDeUsuario(\Config\Database::connect(), $id))) {
+            return $this->fail('No tiene jerarquía para eliminar esta cuenta.', 403);
         }
 
         try {

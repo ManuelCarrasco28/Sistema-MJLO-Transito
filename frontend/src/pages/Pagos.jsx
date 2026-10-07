@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -8,6 +8,7 @@ import { SortableHeader } from '../components/ui/SortableHeader'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
@@ -150,7 +151,7 @@ export function Pagos() {
       try {
         const response = await apiFetch(`/pagos/${id}`, { method: 'DELETE' })
         if (!response.ok) throw new Error('No se pudo anular el pago')
-        setPagos(pagos.map(p => p.id === id ? { ...p, estado: 'ANULADO' } : p))
+        loadPagos()
         loadStats()
         showToast('Pago anulado exitosamente')
       } catch (err) {
@@ -188,7 +189,7 @@ export function Pagos() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(Object.values(result.messages || {}).join(' ') || result.message || 'No se pudo guardar el pago.')
-      setPagos(prev => [result.data, ...prev.filter(p => p.id !== result.data.id)])
+      loadPagos()
       loadStats()
       setIsModalOpen(false)
       showToast('Pago registrado exitosamente')
@@ -221,10 +222,7 @@ export function Pagos() {
     if (filterTipoPago !== 'TODOS') params.set('tipoPago', filterTipoPago)
     if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
-    const res = await apiFetch(`/pagos?${params.toString()}`)
-    if (!res.ok) return filteredPagos
-    const payload = await res.json()
-    return payload.data || []
+    return fetchTodasLasFilas('/pagos', Object.fromEntries(params))
   }
 
   const handleExportPdf = async () => {
@@ -260,8 +258,11 @@ export function Pagos() {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
-      const data = await fetchTodoElFiltroPagos()
-          exportToExcel({
+      const data = { endpoint: '/pagos', params: {
+        buscar: debouncedSearch, tipoPago: filterTipoPago === 'TODOS' ? '' : filterTipoPago,
+        estado: filterEstado === 'TODOS' ? '' : filterEstado, sortBy, sortDir,
+      } }
+          await exportToExcel({
             filename: `Pagos_${new Date().toISOString().slice(0, 10)}.xls`,
             sheetName: 'Pagos',
             title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
@@ -289,12 +290,12 @@ export function Pagos() {
     }
   }
 
-  const handleExportArqueoExcel = () => {
+  const handleExportArqueoExcel = async () => {
     if (!arqueoData || !arqueoData.pagos || arqueoData.pagos.length === 0) {
       showError('Atención', 'No hay movimientos registrados en la fecha seleccionada para exportar.')
       return
     }
-    exportToExcel({
+    await exportToExcel({
       filename: `Arqueo_Caja_${arqueoData.fecha}.xls`,
       sheetName: 'Arqueo',
       title: `ARQUEO Y CIERRE DE CAJA DIARIA - ${arqueoData.fecha}`,
@@ -355,7 +356,11 @@ export function Pagos() {
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [totalFiltrado, setTotalFiltrado] = useState(0)
 
+  const cargaPagos = useRef(null)
   const loadPagos = () => {
+    cargaPagos.current?.abort()
+    const controller = new AbortController()
+    cargaPagos.current = controller
     setIsLoading(true)
     setLoadError('')
     const params = new URLSearchParams({
@@ -367,19 +372,21 @@ export function Pagos() {
     if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
-    apiFetch(`/pagos?${params.toString()}`)
+    apiFetch(`/pagos?${params.toString()}`, { signal: controller.signal })
       .then(res => res.ok ? res.json() : Promise.reject(res))
       .then(data => {
+        if (controller.signal.aborted) return
         const pData = data.data || []
         setPagos(pData)
         setTotalFiltrado(data.meta?.total ?? pData.length)
       })
-      .catch(() => setLoadError('No se pudo cargar el registro de pagos.'))
-      .finally(() => setIsLoading(false))
+      .catch(() => { if (!controller.signal.aborted) setLoadError('No se pudo cargar el registro de pagos.') })
+      .finally(() => { if (!controller.signal.aborted) setIsLoading(false) })
   }
 
   useEffect(() => {
     loadPagos()
+    return () => cargaPagos.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterTipoPago, filterEstado, sortBy, sortDir])
 
   const loadStats = () => {
@@ -397,7 +404,7 @@ export function Pagos() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterTipoPago, filterEstado])
+  }, [filterTipoPago, filterEstado])
 
   const paginatedPagos = pagos
 

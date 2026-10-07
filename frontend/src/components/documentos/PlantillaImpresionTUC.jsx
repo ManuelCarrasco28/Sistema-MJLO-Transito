@@ -4,14 +4,8 @@ import { TarjetaOperatividadPrint, CarnetCursoVialPrint, CerticavFichaPrint, Soa
 import './TarjetasImpresion.css'
 import { BotonCerrarModal } from '../ui/ModalControls'
 
-export function PlantillaImpresionTUC({ documento, onClose }) {
-  if (!documento) return null
-
-  const isTuc = documento.tipoDocumento === 'TARJETA_OPERATIVIDAD'
-  const isCursoVial = documento.tipoDocumento === 'CURSO_VIAL'
-  const isCerticav = documento.tipoDocumento === 'CERTICAV'
-  const isSoat = documento.tipoDocumento === 'SOAT'
-
+// Datos que usan las plantillas de impresión (tarjeta, carnet, CertiCAV, SOAT) a partir de un documento del vehículo.
+export function datosImpresionDocumento(documento) {
   const propietarioParts = (documento.propietario || '').trim().split(/\s+/).filter(Boolean)
   const fallbackApellidos = propietarioParts.length > 2 ? propietarioParts.slice(-2).join(' ') : documento.propietario || ''
   const fallbackNombres = propietarioParts.length > 2 ? propietarioParts.slice(0, -2).join(' ') : ''
@@ -59,6 +53,18 @@ export function PlantillaImpresionTUC({ documento, onClose }) {
     detalles: documento.detalles || [],
     qrUrl: `https://munijlo.gob.pe/transito/validar?doc=${encodeURIComponent(documento.codigo || '')}&placa=${encodeURIComponent(documento.vehiculoPlaca || '')}`
   }
+  return printData
+}
+
+export function PlantillaImpresionTUC({ documento, onClose }) {
+  if (!documento) return null
+
+  const isTuc = documento.tipoDocumento === 'TARJETA_OPERATIVIDAD'
+  const isCursoVial = documento.tipoDocumento === 'CURSO_VIAL'
+  const isCerticav = documento.tipoDocumento === 'CERTICAV'
+  const isSoat = documento.tipoDocumento === 'SOAT'
+
+  const printData = datosImpresionDocumento(documento)
 
   const previewContainerRef = React.useRef(null)
 

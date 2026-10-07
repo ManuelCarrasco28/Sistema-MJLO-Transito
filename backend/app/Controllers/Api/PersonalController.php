@@ -76,6 +76,7 @@ class PersonalController extends ResourceController
                 ->orLike('c.nombres', $buscar)
                 ->orLike('c.apellido_paterno', $buscar)
                 ->orLike('c.apellido_materno', $buscar)
+                ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c.nombres', 'c.apellido_paterno', 'c.apellido_materno'), null, false)
                 ->orLike('ca.nombre', $buscar)
                 ->orLike('uo.nombre', $buscar)
                 ->groupEnd();

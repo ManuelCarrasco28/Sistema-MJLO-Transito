@@ -25,6 +25,7 @@ export function useListaServidor({ endpoint, params = {}, page, porPagina, activ
   const [isLoading, setIsLoading] = useState(activo)
   const [error, setError] = useState('')
   const ultimaPeticion = useRef(0)
+  const peticionActiva = useRef(null)
   const mapearRef = useRef(mapear)
   mapearRef.current = mapear
 
@@ -35,17 +36,20 @@ export function useListaServidor({ endpoint, params = {}, page, porPagina, activ
 
   const recargar = useCallback(async () => {
     const idPeticion = ++ultimaPeticion.current
+    peticionActiva.current?.abort()
+    const controller = new AbortController()
+    peticionActiva.current = controller
     setIsLoading(true)
     setError('')
     try {
-      const respuesta = await apiFetch(`${endpoint}?${queryString}`)
+      const respuesta = await apiFetch(`${endpoint}?${queryString}`, { signal: controller.signal })
       if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`)
       const cuerpo = await respuesta.json()
       if (idPeticion !== ultimaPeticion.current) return
       setFilas((Array.isArray(cuerpo?.data) ? cuerpo.data : []).map((fila) => mapearRef.current(fila)))
       setTotal(Number(cuerpo?.meta?.total) || 0)
     } catch (err) {
-      if (idPeticion !== ultimaPeticion.current) return
+      if (idPeticion !== ultimaPeticion.current || controller.signal.aborted) return
       console.warn(`No se pudo cargar ${descripcion}:`, err)
       setFilas([])
       setTotal(0)
@@ -57,6 +61,11 @@ export function useListaServidor({ endpoint, params = {}, page, porPagina, activ
 
   useEffect(() => {
     if (activo) recargar()
+    else setIsLoading(false)
+    return () => {
+      ++ultimaPeticion.current
+      peticionActiva.current?.abort()
+    }
   }, [activo, recargar])
 
   return { filas, total, isLoading, error, recargar }

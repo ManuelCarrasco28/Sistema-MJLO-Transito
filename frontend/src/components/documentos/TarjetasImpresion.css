@@ -586,6 +586,168 @@
   white-space: nowrap;
 }
 
+/* ===================================================
+   TARJETA DE OPERATIVIDAD (plantillas PNG: img-carnet-operatividad)
+   Posiciones en % de la plantilla (adelante 1439x1063, atrás 1431x1075); letras en cqw (% del ancho).
+   La tarjeta toma la proporción de la plantilla, así nada se deforma.
+   =================================================== */
+.carnet-box.op-carnet {
+  container-type: inline-size;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: none;
+  color: #0a0a0a;
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.carnet-box.op-anverso { aspect-ratio: 1439 / 1063; }
+.carnet-box.op-reverso { aspect-ratio: 1431 / 1075; }
+
+.op-carnet > * {
+  position: absolute;
+  margin: 0;
+  box-sizing: border-box;
+}
+.op-carnet .op-plantilla {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+  pointer-events: none;
+}
+
+/* Casillas con una sola línea de texto centrada */
+.op-carnet .op-valor,
+.op-carnet .op-etiqueta,
+.op-carnet .op-lbl,
+.op-carnet .op-res-etiqueta,
+.op-carnet .op-res-valor,
+.op-anverso .op-asociacion,
+.op-anverso .op-tipo,
+.op-anverso .op-titulo,
+.op-anverso .op-numero,
+.op-anverso .op-municipalidad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  line-height: 1;
+}
+.op-carnet .op-valor {
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 3.2cqw;
+  padding: 0 2%;
+}
+.op-carnet .op-etiqueta {
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 1.6cqw;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- Anverso ---------- */
+.op-anverso .op-logo {
+  /* escudo-jlo.png trae el escudo y el nombre en oscuro: se muestra solo el escudo, sobre un círculo blanco */
+  left: 3%; top: 3.2%; width: 7.4%; aspect-ratio: 0.82 / 1;
+  object-fit: cover; object-position: 2% center;
+  background: #ffffff; border-radius: 14%; padding: 0.3%;
+}
+.op-anverso .op-municipalidad {
+  left: 12%; top: 2.2%; width: 26.4%; height: 15%;
+  flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.5cqw;
+  text-align: left;
+  color: #ffffff;
+  font-size: 1.6cqw; font-weight: 900; letter-spacing: 0; line-height: 1.2;
+}
+.op-anverso .op-municipalidad span { display: block; white-space: nowrap; }
+.op-anverso .op-titulo {
+  left: 0; top: 18.7%; width: 38.9%; height: 6.9%;
+  color: #ffffff; font-size: 2.1cqw; font-weight: 900; letter-spacing: 0.02em;
+}
+.op-anverso .op-numero {
+  left: 0; top: 27%; width: 38.9%; height: 10%;
+  color: #ffffff; font-size: 5cqw; font-weight: 900; letter-spacing: 0.04em;
+}
+.op-anverso .op-foto {
+  /* Casilla blanca de la plantilla (dentro del borde rojo) */
+  left: 3.9%; top: 39%; width: 30.4%; height: 51.8%;
+  overflow: hidden; border-radius: 3.5%/2.6%;
+}
+.op-anverso .op-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.op-anverso .op-tipo {
+  left: 57%; top: 1%; width: 39%; height: 9.6%;
+  color: #ffffff; font-size: 1.95cqw; font-weight: 900; letter-spacing: 0;
+}
+.op-anverso .op-asociacion {
+  left: 42%; top: 12.2%; width: 56%; height: 12.5%;
+  color: #111111; font-weight: 900; text-transform: uppercase;
+}
+
+.op-anverso .op-et-1 { left: 38.9%; top: 26.6%; width: 12.7%; height: 15.5%; }
+.op-anverso .op-et-2 { left: 38.9%; top: 46.1%; width: 12.7%; height: 8.7%; }
+.op-anverso .op-et-3 { left: 38.9%; top: 58.5%; width: 12.7%; height: 8.7%; }
+.op-anverso .op-val-1 { left: 52%; top: 27%; width: 46%; height: 15%; }
+.op-anverso .op-val-2 { left: 52%; top: 46.3%; width: 46%; height: 8.4%; }
+.op-anverso .op-val-3 { left: 52%; top: 58.7%; width: 46%; height: 8.4%; letter-spacing: 0.05em; }
+
+.op-anverso .op-res-etiqueta {
+  left: 40.6%; top: 72.1%; width: 41.2%; height: 8.6%;
+  color: #ffffff; font-size: 1.8cqw; font-weight: 900; letter-spacing: 0.02em;
+}
+.op-anverso .op-res-valor {
+  left: 40.9%; top: 81.2%; width: 40.6%; height: 9.7%;
+  color: #0a0a0a; font-weight: 900; text-transform: uppercase; padding: 0 2%;
+}
+.op-anverso .op-qr {
+  left: 83.6%; top: 72.2%; width: 14.3%; aspect-ratio: 1 / 1;
+  background: #ffffff; padding: 0.4cqw;
+  display: flex; align-items: center; justify-content: center;
+}
+.op-anverso .op-qr svg, .op-anverso .op-qr img { width: 100%; height: 100%; display: block; }
+
+/* ---------- Reverso ---------- */
+.op-reverso .op-lbl {
+  justify-content: flex-start;
+  color: #111111; font-size: 2.1cqw; font-weight: 900; letter-spacing: 0.01em;
+  text-shadow: 0 0 0.5cqw #ffffff, 0 0 0.5cqw #ffffff;
+}
+.op-reverso .op-lbl.op-rojo, .op-reverso .op-valor.op-rojo { color: #c8102e; }
+.op-reverso .op-r-ubic { justify-content: flex-start; padding-left: 2%; }
+.op-reverso .op-lbl-placa { left: 4.4%; top: 9.2%; width: 43%; height: 5%; }
+.op-reverso .op-lbl-exp   { left: 57.7%; top: 9.2%; width: 38%; height: 5%; }
+.op-reverso .op-lbl-motor { left: 4.4%; top: 30%; width: 43%; height: 5%; }
+.op-reverso .op-lbl-venc  { left: 57.7%; top: 30%; width: 38%; height: 5%; }
+.op-reverso .op-r-placa { left: 4.4%; top: 15.1%; width: 43.4%; height: 7.6%; }
+.op-reverso .op-r-exp   { left: 57.9%; top: 15.1%; width: 37.6%; height: 7.6%; }
+.op-reverso .op-r-motor { left: 4.4%; top: 35.8%; width: 43.4%; height: 7.4%; }
+.op-reverso .op-r-venc  { left: 58%; top: 35.8%; width: 37.6%; height: 7.4%; }
+.op-reverso .op-et-ubic { left: 4%; top: 48.2%; width: 15.6%; height: 8.8%; }
+.op-reverso .op-r-ubic  { left: 20%; top: 48.2%; width: 75.6%; height: 8.8%; }
+
+.op-reverso .op-firma {
+  left: 36%; top: 80%; width: 28%;
+  display: flex; flex-direction: column; align-items: center; gap: 1.2cqw;
+}
+.op-reverso .op-firma-linea { width: 100%; border-top: 0.3cqw solid #111111; }
+.op-reverso .op-firma span {
+  color: #111111; font-size: 1.7cqw; font-weight: 900; letter-spacing: 0.02em;
+  text-shadow: 0 0 0.6cqw #ffffff, 0 0 0.6cqw #ffffff;
+}
+
+@media print {
+  .carnet-box.op-carnet { border: 0 !important; }
+}
+
 /* El carnet ya trae su marco en la plantilla: sin borde extra al imprimir */
 @media print {
   .carnet-box.cv-carnet {

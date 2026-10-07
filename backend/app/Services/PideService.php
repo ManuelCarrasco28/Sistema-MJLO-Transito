@@ -18,7 +18,8 @@ class PideService
             return null;
         }
         
-        return $anio["token"];
+        // El token se guarda cifrado en la base: se descifra solo aquí, para la llamada a PIDE.
+        return \App\Libraries\SecretoCifrado::descifrar($anio["token"]);
     }
 
     public static function reniec($dni)

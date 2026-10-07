@@ -266,7 +266,7 @@ export function ChartsSection({ data, loading = false, user }) {
     let active = true
     Promise.allSettled([
       apiFetch('/operativos').then((r) => (r.ok ? r.json() : { data: [] })),
-      apiFetch('/cursos').then((r) => (r.ok ? r.json() : { data: [] })),
+      apiFetch('/cursos?resumen=1').then((r) => (r.ok ? r.json() : { data: [] })),
     ])
       .then(([opRes, curRes]) => {
         if (!active) return

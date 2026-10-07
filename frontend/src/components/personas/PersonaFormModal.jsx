@@ -38,7 +38,7 @@ export function PersonaFormModal({
         <form onSubmit={onSubmit} autoComplete="off" className="flex flex-col">
           <div className="p-4 sm:p-4.5 space-y-2.5">
             <div className="flex flex-col sm:flex-row gap-3 items-stretch">
-              <div className="w-full sm:w-[102px] shrink-0 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-2.5 flex flex-col items-center justify-center gap-2 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-xs">
+              <div className="w-full sm:w-[110px] shrink-0 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-2.5 flex flex-col items-center justify-center gap-2 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-xs">
                 {formData.fotoImg ? (
                   <img
                     src={formData.fotoImg}
@@ -85,15 +85,15 @@ export function PersonaFormModal({
                     type="button"
                     onClick={handleUsarFotoReniec}
                     disabled={isFetchingFotoReniec}
-                    title="Usar la foto registrada en RENIEC para esta persona (solo si no trae foto propia)"
-                    className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white dark:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] px-2 py-1 text-[10px] font-bold text-slate-600 dark:text-slate-300 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                    title="Cargar la foto registrada para este documento (solo si la persona no trae foto propia)"
+                    aria-label="Cargar foto del documento"
+                    className="grid size-7 place-items-center rounded-lg border border-slate-200 bg-white dark:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] text-slate-600 dark:text-slate-300 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
                   >
                     {isFetchingFotoReniec ? (
-                      <span className="size-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                      <span className="size-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
                     ) : (
-                      <Icon name="search" className="size-3" />
+                      <Icon name="image" className="size-4" />
                     )}
-                    <span>Usar foto RENIEC</span>
                   </button>
                 )}
               </div>

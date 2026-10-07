@@ -23,12 +23,6 @@ const ESTILOS_ESTADO = {
   },
 }
 
-function formatoFecha(fecha) {
-  if (!fecha) return ''
-  const [anio, mes, dia] = String(fecha).slice(0, 10).split('-')
-  return anio && mes && dia ? `${dia}/${mes}/${anio}` : fecha
-}
-
 // Documento vigente del tipo indicado (si lo hay), para avisar antes de emitir un duplicado.
 export function documentoVigenteDelTipo(resumen, tipoDocumento, excluirId = null) {
   const doc = resumen.find((r) => r.tipoDocumento === tipoDocumento)
@@ -59,7 +53,6 @@ export function EstadoDocumentosVehiculo({
     <div className="rounded-xl border border-slate-200/80 bg-white p-2 dark:border-[var(--border-strong)] dark:bg-slate-800/80 text-xs">
       <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400 leading-tight">
         Documentos del vehículo
-        {onSeleccionarTipo && <span className="ml-1 normal-case tracking-normal text-slate-300 dark:text-slate-500">· pulse uno para elegirlo</span>}
       </span>
 
       {isLoading && resumen.length === 0 ? (
@@ -83,9 +76,6 @@ export function EstadoDocumentosVehiculo({
                 <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[9.5px] font-bold uppercase ${estilo.clases}`}>
                   <span className={`size-1.5 rounded-full ${estilo.punto}`} />
                   {estilo.etiqueta}
-                </span>
-                <span className={`w-full truncate font-mono text-[10px] leading-tight text-slate-400 ${onVaciar && doc.id ? 'pr-7' : ''}`}>
-                  {doc.codigo ? `${doc.codigo}${doc.fechaExpiracion ? ` · ${formatoFecha(doc.fechaExpiracion)}` : ''}` : ' '}
                 </span>
               </>
             )

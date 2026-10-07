@@ -10,9 +10,8 @@ import { BuscadorAdministrados } from '../components/permisos/BuscadorAdministra
 import { generarPlantillaCuerpo } from '../utils/permisosPlantilla'
 import { BotonCancelar, BotonGuardar } from '../components/ui/ModalControls'
 
-const TINYMCE_API_KEY =
-  import.meta.env.VITE_TINYMCE_API_KEY ||
-  'unmcqzdx4e88wfy3gqtlbelk1w21unqt3sl8hlcltd49u0o8'
+// La clave de TinyMCE va en el .env del frontend (VITE_TINYMCE_API_KEY); no se deja escrita en el código.
+const TINYMCE_API_KEY = import.meta.env.VITE_TINYMCE_API_KEY || 'no-api-key'
 
 export function PermisoFormularioVentana() {
   const [searchParams] = useState(() => new URLSearchParams(window.location.search))
@@ -239,7 +238,7 @@ export function PermisoFormularioVentana() {
 
     // Notificar a la ventana principal / modal opener
     if (window.opener && !window.opener.closed) {
-      window.opener.postMessage({ type: 'VOLVER_A_DATOS_MODAL', draft: dataToSave }, '*')
+      window.opener.postMessage({ type: 'VOLVER_A_DATOS_MODAL', draft: dataToSave }, window.location.origin)
       window.opener.focus()
       window.close()
     } else {
@@ -303,7 +302,7 @@ export function PermisoFormularioVentana() {
 
       // Notificar a la ventana principal / pestaña padre
       if (window.opener) {
-        window.opener.postMessage({ type: 'PERMISO_GUARDADO', id: resData.id || effectiveId }, '*')
+        window.opener.postMessage({ type: 'PERMISO_GUARDADO', id: resData.id || effectiveId }, window.location.origin)
       }
       avisarPermisoActualizado()
 

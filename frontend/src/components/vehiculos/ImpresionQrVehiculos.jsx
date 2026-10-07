@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from '../ui/Icon'
 import { Pagination } from '../ui/Pagination'
 import { PlacaBadge } from '../ui/PlacaBadge'
 import { RoundedSelect } from '../ui/FormInputs'
+import { BotonCancelar, BotonCerrarModal } from '../ui/ModalControls'
 import { apiFetch } from '../../config/api'
-import { showError, showToast } from '../../utils/SwalUtil'
+import { showConfirm, showError, showToast } from '../../utils/SwalUtil'
 import { fetchTodasLasFilas } from '../../utils/descargaCompleta'
-import { ImpresionQrPortal, PLANTILLAS, nombreAsociacion, plantillaDeVehiculo } from './QrVehiculoImpresion'
+import { ImpresionQrPortal, nombreAsociacion, plantillaDeVehiculo } from './QrVehiculoImpresion'
+import { ResumenImpresion, ProgresoLotes } from '../impresion/ListaImpresion'
 
 const TIPOS_CON_PLANTILLA = [
   { value: 'Mototaxi,Motocarguera', label: 'Mototaxi y motocarguera' },
@@ -14,11 +17,47 @@ const TIPOS_CON_PLANTILLA = [
   { value: 'Motocarguera', label: 'Solo motocarguera' },
 ]
 
+// Cada vehículo lleva 3 QR (uno por imagen) y las hojas se llenan de a 4, sin dejar espacios entre vehículos.
 const COPIAS = [
-  { value: '1', label: '1 por vehículo (4 vehículos por hoja)' },
-  { value: '2', label: '2 por vehículo' },
-  { value: '4', label: '4 por vehículo (1 vehículo por hoja)' },
+  { value: '3', label: '3 QR por vehículo' },
+  { value: '1', label: '1 QR por vehículo' },
+  { value: '2', label: '2 QR por vehículo' },
+  { value: '4', label: '4 QR por vehículo' },
 ]
+
+const TAMANOS_LOTE = [
+  { value: '20', label: 'Lotes de 20 vehículos' },
+  { value: '40', label: 'Lotes de 40 vehículos' },
+  { value: '100', label: 'Lotes de 100 vehículos' },
+  { value: '200', label: 'Lotes de 200 vehículos' },
+]
+
+const COLOR_PRIMARIO = 'oklch(62.3% 0.214 259.815)'
+// _v2: el código QR de los vehículos pasó a ser su uuid. Lo que quedó guardado con la clave anterior traía códigos
+// que ya no existen (QR-VEH-2026-920…) y habría impreso etiquetas que la app móvil no encuentra.
+const CLAVE_CARRITO = 'qr_carrito_vehiculos_v2'
+const CLAVES_ANTERIORES = ['qr_carrito_vehiculos']
+
+// Del vehículo solo se guarda lo que usa la plantilla y la lista: el carrito sobrevive a recargar la página.
+const compactar = (v) => ({
+  id: v.id,
+  placa: v.placa,
+  tipo: v.tipo,
+  asociacion: v.asociacion,
+  uuid: v.uuid,
+  codigoQr: v.codigoQr,
+  propietario: v.propietario,
+})
+
+const leerCarrito = () => {
+  try {
+    CLAVES_ANTERIORES.forEach((clave) => localStorage.removeItem(clave))
+    const guardado = JSON.parse(localStorage.getItem(CLAVE_CARRITO) || '{}')
+    return guardado && typeof guardado === 'object' ? guardado : {}
+  } catch {
+    return {}
+  }
+}
 
 // Páginas ya pedidas al servidor (clave = filtros + página): volver a una página o ir a la siguiente
 // es instantáneo. Se descarta cuando cambian los datos de otra pestaña recargando el módulo.
@@ -27,18 +66,218 @@ const claveConsulta = (filtros, pagina, porPagina) => JSON.stringify([filtros, p
 
 const pedirPagina = async (filtros, pagina, porPagina) => {
   const clave = claveConsulta(filtros, pagina, porPagina)
-  if (cachePaginas.has(clave)) return cachePaginas.get(clave)
+  const guardada = cachePaginas.get(clave)
+  if (guardada && Date.now() - guardada.en < 180000) return guardada.datos
   const params = new URLSearchParams({ ...filtros, page: String(pagina), porPagina: String(porPagina) })
   const res = await apiFetch(`/vehiculos/qr?${params.toString()}`)
   if (!res.ok) throw new Error('No se pudo cargar')
   const json = await res.json()
   const resultado = { filas: json.data ?? [], total: json.meta?.total ?? json.data?.length ?? 0 }
-  cachePaginas.set(clave, resultado)
+  cachePaginas.set(clave, { datos: resultado, en: Date.now() })
   if (cachePaginas.size > 60) cachePaginas.delete(cachePaginas.keys().next().value)
   return resultado
 }
 
-// Pestaña "Impresión de QR": elegir vehículos (por asociación, tipo o búsqueda) e imprimir sus QR en lote.
+const plural = (n, singular, pluralTexto) => `${n.toLocaleString('es-PE')} ${n === 1 ? singular : pluralTexto}`
+
+function EtiquetaCampo({ texto, children }) {
+  return (
+    <div className="min-w-0">
+      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{texto}</p>
+      {children}
+    </div>
+  )
+}
+
+// Carrito de impresión: lista lo reunido, permite quitar vehículos e imprimir todo o por lotes.
+function CarritoQrModal({ carrito, onQuitar, onVaciar, onClose, onImprimir, onImprimirTodo }) {
+  const [copias, setCopias] = useState('3')
+  const [tamanoLote, setTamanoLote] = useState('40')
+  const [impresos, setImpresos] = useState([]) // índices de lote ya enviados a imprimir
+
+  const items = useMemo(() => Object.values(carrito).filter(plantillaDeVehiculo), [carrito])
+  const lotes = useMemo(() => {
+    const t = Number(tamanoLote)
+    const resultado = []
+    for (let i = 0; i < items.length; i += t) resultado.push(items.slice(i, i + t))
+    return resultado
+  }, [items, tamanoLote])
+
+  // Si cambia el carrito o el tamaño del lote, los lotes ya no son los mismos: se reinicia el avance.
+  useEffect(() => { setImpresos([]) }, [items.length, tamanoLote])
+
+  const qrDe = (cantidad) => cantidad * Number(copias)
+  const hojasDe = (cantidad) => Math.ceil(qrDe(cantidad) / 4)
+  const imprimirLote = (indice) => {
+    onImprimir(lotes[indice], Number(copias), () => setImpresos((prev) => (prev.includes(indice) ? prev : [...prev, indice])))
+  }
+
+  return createPortal(
+    <div
+      className="qrv-no-print fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl dark:bg-[#1C2438]">
+        {/* Cabecera */}
+        <div className="flex items-center justify-between gap-3 rounded-t-2xl border-b border-slate-200 px-5 py-3.5 dark:border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300">
+              <Icon name="print" className="size-5" />
+            </span>
+            <div>
+              <h3 className="text-base font-black leading-tight text-slate-900 dark:text-white">Carrito de impresión de QR</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Plantillas de mototaxi y motocarguera en hojas A4 de 4 cuadrantes</p>
+            </div>
+          </div>
+          <BotonCerrarModal onClick={onClose} />
+        </div>
+
+        {items.length === 0 ? (
+          <div className="px-5 py-14 text-center">
+            <Icon name="vehicle" className="mx-auto mb-2 size-10 text-slate-300 dark:text-slate-600" />
+            <p className="font-bold text-slate-600 dark:text-slate-300">El carrito está vacío</p>
+            <p className="mt-1 text-xs text-slate-400">Agregue vehículos desde la lista para imprimir sus QR.</p>
+          </div>
+        ) : (
+          <>
+            {/* Resumen */}
+            <div className="grid grid-cols-3 gap-2.5 border-b border-slate-100 px-5 py-3 dark:border-[var(--border)]">
+              {[
+                { valor: items.length, texto: items.length === 1 ? 'Vehículo' : 'Vehículos', color: 'text-indigo-600 dark:text-indigo-300' },
+                { valor: qrDe(items.length), texto: 'QR a imprimir', color: 'text-emerald-600 dark:text-emerald-300' },
+                { valor: hojasDe(items.length), texto: hojasDe(items.length) === 1 ? 'Hoja A4' : 'Hojas A4', color: 'text-amber-600 dark:text-amber-300' },
+              ].map((k) => (
+                <div key={k.texto} className="rounded-xl border border-slate-200 px-3 py-2 dark:border-[var(--border)]">
+                  <p className={`text-xl font-black leading-tight ${k.color}`}>{k.valor.toLocaleString('es-PE')}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{k.texto}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Opciones */}
+            <div className="grid gap-3 border-b border-slate-100 bg-slate-50/60 px-5 py-3 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] sm:grid-cols-2">
+              <EtiquetaCampo texto="QR por vehículo">
+                <RoundedSelect value={copias} onChange={setCopias} options={COPIAS} className="w-full" buttonClassName="w-full" />
+              </EtiquetaCampo>
+              <EtiquetaCampo texto="Tamaño de cada lote">
+                <RoundedSelect value={tamanoLote} onChange={setTamanoLote} options={TAMANOS_LOTE} className="w-full" buttonClassName="w-full" />
+              </EtiquetaCampo>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {/* Lotes */}
+              {lotes.length > 1 && (
+                <div className="px-5 pt-4">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Imprimir por lotes ({impresos.length} de {lotes.length} impresos)
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {lotes.map((lote, i) => {
+                      const hecho = impresos.includes(i)
+                      const desde = i * Number(tamanoLote) + 1
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => imprimirLote(i)}
+                          className={`flex cursor-pointer items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition hover:border-indigo-400 ${hecho ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40' : 'border-slate-200 dark:border-[var(--border)]'}`}
+                        >
+                          <span className="min-w-0">
+                            <strong className="block font-bold text-slate-800 dark:text-slate-100">Lote {i + 1}</strong>
+                            <span className="block truncate text-[11px] text-slate-500">
+                              Vehículos {desde}–{desde + lote.length - 1} · {plural(hojasDe(lote.length), 'hoja', 'hojas')}
+                            </span>
+                          </span>
+                          <span className={`inline-flex shrink-0 items-center gap-1 font-bold ${hecho ? 'text-emerald-600 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                            <Icon name={hecho ? 'check' : 'print'} className="size-3.5" />
+                            {hecho ? 'Impreso' : 'Imprimir'}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Vehículos */}
+              <div className="px-5 py-4">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {plural(items.length, 'vehículo en el carrito', 'vehículos en el carrito')}
+                </p>
+                <div className="max-h-[34vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-[var(--border)]">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:bg-[var(--bg-subtle)] dark:text-slate-400">
+                      <tr>
+                        <th className="px-3.5 py-2">Placa</th>
+                        <th className="px-3.5 py-2">Propietario</th>
+                        <th className="px-3.5 py-2">Asociación</th>
+                        <th className="w-10 px-3.5 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+                      {items.slice(0, 300).map((v) => (
+                        <tr key={v.id} className="transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]">
+                          <td className="px-3.5 py-2"><PlacaBadge placa={v.placa} /></td>
+                          <td className="px-3.5 py-2 font-semibold text-slate-800 dark:text-slate-100">{v.propietario || <span className="text-slate-400">Sin propietario</span>}</td>
+                          <td className="px-3.5 py-2 text-slate-600 dark:text-slate-300">{nombreAsociacion(v.asociacion) || <span className="text-slate-400">Sin asociación</span>}</td>
+                          <td className="px-3.5 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => onQuitar(v.id)}
+                              title="Quitar del carrito"
+                              className="grid size-7 cursor-pointer place-items-center rounded-lg border border-transparent text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:hover:border-rose-900/60 dark:hover:bg-rose-950/40"
+                            >
+                              <Icon name="x" className="size-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {items.length > 300 && (
+                  <p className="mt-2 text-center text-xs text-slate-400">
+                    Se muestran los primeros 300 de {items.length.toLocaleString('es-PE')}. Todos se imprimen igual.
+                  </p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Pie */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-2xl border-t border-slate-200 px-5 py-3 dark:border-[var(--border)]">
+          <button
+            type="button"
+            onClick={onVaciar}
+            disabled={items.length === 0}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50"
+          >
+            <Icon name="trash" className="size-3.5" />
+            Vaciar carrito
+          </button>
+          <div className="flex items-center gap-2">
+            <BotonCancelar onClick={onClose}>Cerrar</BotonCancelar>
+            <button
+              type="button"
+              onClick={() => onImprimirTodo(lotes, Number(copias), (i) => setImpresos((prev) => (prev.includes(i) ? prev : [...prev, i])))}
+              disabled={items.length === 0}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-1.5 font-bold text-white transition hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ backgroundColor: COLOR_PRIMARIO, fontSize: '12px' }}
+            >
+              <Icon name="print" className="size-4" />
+              Imprimir todo ({items.length.toLocaleString('es-PE')})
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+// Pestaña "Impresión de QR": elegir vehículos (por asociación, tipo o búsqueda), guardarlos en un carrito
+// e imprimir sus QR de una vez o por lotes.
 export function ImpresionQrVehiculos({ asociaciones }) {
   const [filas, setFilas] = useState([])
   const [total, setTotal] = useState(0)
@@ -49,13 +288,19 @@ export function ImpresionQrVehiculos({ asociaciones }) {
   const [asociacionId, setAsociacionId] = useState('TODAS')
   const [pagina, setPagina] = useState(1)
   const [porPagina, setPorPagina] = useState(5)
-  const [seleccion, setSeleccion] = useState({}) // id -> vehículo, se conserva entre páginas y filtros
-  const [copias, setCopias] = useState('1')
-  const [imprimiendo, setImprimiendo] = useState(false)
-  const [seleccionandoTodo, setSeleccionandoTodo] = useState(false)
+  const [carrito, setCarrito] = useState(leerCarrito) // id -> vehículo; se conserva entre páginas, filtros y recargas
+  const [carritoAbierto, setCarritoAbierto] = useState(false)
+  const [trabajo, setTrabajo] = useState(null) // { vehiculos, copias, alTerminar } mientras se imprime
+  const [agregandoTodo, setAgregandoTodo] = useState(false)
+  const [progreso, setProgreso] = useState(null) // { actual, total } mientras se imprimen varios lotes
+  const detenerRef = useRef(false)
 
   // Al abrir la pestaña se parte de datos frescos (pudo cambiarse un tipo o una asociación en la otra).
   useEffect(() => { cachePaginas.clear() }, [])
+
+  useEffect(() => {
+    try { localStorage.setItem(CLAVE_CARRITO, JSON.stringify(carrito)) } catch { /* sin almacenamiento */ }
+  }, [carrito])
 
   useEffect(() => {
     const timer = setTimeout(() => setBuscarDebounced(buscar.trim()), 300)
@@ -101,135 +346,283 @@ export function ImpresionQrVehiculos({ asociaciones }) {
     ...asociaciones.map((a) => ({ value: String(a.id), label: a.razonSocial })),
   ]), [asociaciones])
 
-  const seleccionados = Object.values(seleccion)
-  const imprimibles = seleccionados.filter(plantillaDeVehiculo)
-  const hojas = Math.ceil((imprimibles.length * Number(copias)) / 4)
-  const paginaCompletaMarcada = filas.length > 0 && filas.every((v) => seleccion[v.id])
+  const enCarrito = Object.keys(carrito).length
 
-  const alternar = (v) => setSeleccion((prev) => {
+  const alternar = (v) => setCarrito((prev) => {
     const sig = { ...prev }
     if (sig[v.id]) delete sig[v.id]
-    else sig[v.id] = v
+    else sig[v.id] = compactar(v)
     return sig
   })
 
-  const alternarPagina = () => setSeleccion((prev) => {
-    const sig = { ...prev }
-    if (paginaCompletaMarcada) filas.forEach((v) => { delete sig[v.id] })
-    else filas.forEach((v) => { sig[v.id] = v })
-    return sig
-  })
-
-  const seleccionarTodosLosResultados = async () => {
-    setSeleccionandoTodo(true)
+  const agregarTodosLosResultados = async () => {
+    setAgregandoTodo(true)
     try {
-      const todas = await fetchTodasLasFilas('/vehiculos/qr', { ...filtros }, { mensaje: 'Seleccionando vehículos...', porPagina: 1000 })
-      setSeleccion((prev) => {
+      const todas = await fetchTodasLasFilas('/vehiculos/qr', { ...filtros }, { silencioso: true, porPagina: 1000 })
+      setCarrito((prev) => {
         const sig = { ...prev }
-        todas.forEach((v) => { sig[v.id] = v })
+        todas.forEach((v) => { sig[v.id] = compactar(v) })
         return sig
       })
-      showToast(`${todas.length.toLocaleString('es-PE')} vehículos seleccionados`)
+      showToast(`${todas.length.toLocaleString('es-PE')} vehículos agregados al carrito`)
     } catch {
-      showError('Error', 'No se pudieron seleccionar todos los vehículos.')
+      showError('Error', 'No se pudieron agregar todos los vehículos.')
     } finally {
-      setSeleccionandoTodo(false)
+      setAgregandoTodo(false)
     }
   }
 
-  const imprimir = () => {
-    if (imprimibles.length === 0) {
-      showError('Sin vehículos', 'Seleccione al menos un mototaxi o motocarguera para imprimir.')
+  const vaciarCarrito = async () => {
+    const resultado = await showConfirm(
+      '¿Vaciar el carrito?',
+      `Se quitarán los ${enCarrito.toLocaleString('es-PE')} vehículos del carrito de impresión.`,
+      'Sí, vaciar',
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' },
+    )
+    if (resultado.isConfirmed) {
+      setCarrito({})
+      showToast('Carrito vaciado')
+    }
+  }
+
+  const quitarDelCarrito = (id) => setCarrito((prev) => {
+    const sig = { ...prev }
+    delete sig[id]
+    return sig
+  })
+
+  // Devuelve una promesa que se cumple cuando se cierra el diálogo de impresión (se imprimió o se canceló).
+  const imprimirUnLote = (vehiculos, copias) => new Promise((resolve) => {
+    setTrabajo({ vehiculos, copias, alTerminar: resolve })
+  })
+
+  const imprimir = async (vehiculos, copias, alTerminar) => {
+    if (vehiculos.length === 0) {
+      showError('Sin vehículos', 'Agregue al menos un mototaxi o motocarguera al carrito.')
       return
     }
-    setImprimiendo(true)
+    if (trabajo || progreso) return
+    await imprimirUnLote(vehiculos, copias)
+    alTerminar?.()
+  }
+
+  // Imprime varios lotes seguidos sin tener que pulsar nada entre uno y otro.
+  const imprimirLotes = async (lotes, copias, alTerminarLote) => {
+    if (lotes.length === 0) {
+      showError('Sin vehículos', 'Agregue al menos un mototaxi o motocarguera al carrito.')
+      return
+    }
+    if (trabajo || progreso) return
+    detenerRef.current = false
+    for (let i = 0; i < lotes.length; i += 1) {
+      if (detenerRef.current) break
+      setProgreso({ actual: i + 1, total: lotes.length })
+      await imprimirUnLote(lotes[i], copias)
+      alTerminarLote?.(i)
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+    setProgreso(null)
+  }
+
+  const hayFiltros = tipo !== TIPOS_CON_PLANTILLA[0].value || asociacionId !== 'TODAS' || buscar !== ''
+  const limpiarFiltros = () => {
+    setTipo(TIPOS_CON_PLANTILLA[0].value)
+    setAsociacionId('TODAS')
+    setBuscar('')
   }
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
-      <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] lg:flex-row lg:items-center lg:justify-between">
-        <div className="relative flex-1">
-          <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+      {/* Filtros */}
+      <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] lg:flex-row lg:items-center">
+        <div className="relative min-w-0 flex-1">
+          <Icon
+            name={cargando ? 'refresh' : 'search'}
+            className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${cargando ? 'animate-spin text-blue-500' : 'text-slate-400'}`}
+          />
           <input
             type="text"
-            placeholder="Buscar por placa o asociación..."
+            placeholder="Buscar por placa, propietario o asociación..."
             value={buscar}
             onChange={(e) => setBuscar(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-9 pr-3 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-9 pr-8 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-100"
           />
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <RoundedSelect value={tipo} onChange={setTipo} options={TIPOS_CON_PLANTILLA} />
-          <RoundedSelect value={asociacionId} onChange={setAsociacionId} options={opcionesAsociacion} />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2 text-xs dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-        <div className="flex flex-wrap items-center gap-3 text-slate-600 dark:text-slate-300">
-          <span>
-            <strong className="font-bold text-slate-900 dark:text-white">{seleccionados.length.toLocaleString('es-PE')}</strong> seleccionados
-            {seleccionados.length > 0 && <> · {hojas.toLocaleString('es-PE')} hoja(s) A4</>}
-          </span>
-          <button
-            type="button"
-            onClick={seleccionarTodosLosResultados}
-            disabled={seleccionandoTodo || total === 0}
-            className="cursor-pointer font-bold text-indigo-600 hover:underline disabled:cursor-wait disabled:opacity-50 dark:text-indigo-400"
-          >
-            Seleccionar los {total.toLocaleString('es-PE')} resultados
-          </button>
-          {seleccionados.length > 0 && (
-            <button type="button" onClick={() => setSeleccion({})} className="cursor-pointer font-bold text-rose-600 hover:underline dark:text-rose-400">
-              Quitar selección
+          {buscar && (
+            <button
+              type="button"
+              onClick={() => setBuscar('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              ✕
             </button>
           )}
         </div>
+
         <div className="flex flex-wrap items-center gap-2.5">
-          <RoundedSelect value={copias} onChange={setCopias} options={COPIAS} />
+          <RoundedSelect value={tipo} onChange={setTipo} options={TIPOS_CON_PLANTILLA} />
+          <RoundedSelect value={asociacionId} onChange={setAsociacionId} options={opcionesAsociacion} />
+
+          {hayFiltros && (
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              title="Limpiar filtros"
+              className="grid size-8.5 cursor-pointer place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50"
+            >
+              <Icon name="filterX" className="size-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Carrito: agregar o quitar resultados e imprimir */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 bg-slate-50/60 px-4 py-2 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+        <ResumenImpresion total={total} enCarrito={enCarrito} />
+
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={imprimir}
-            disabled={imprimiendo || imprimibles.length === 0}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 font-bold text-white transition hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)', fontSize: '12px' }}
+            onClick={agregarTodosLosResultados}
+            disabled={agregandoTodo || total === 0}
+            title="Agregar al carrito todos los vehículos que cumplen los filtros"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-indigo-200/80 bg-indigo-50/70 px-2.5 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-50 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
           >
-            <Icon name="print" className="size-4" />
-            {imprimiendo ? 'Preparando…' : `Imprimir QR (${imprimibles.length})`}
+            <Icon name={agregandoTodo ? 'refresh' : 'add'} className={`size-3.5 ${agregandoTodo ? 'animate-spin' : ''}`} />
+            <span>Agregar resultados</span>
+          </button>
+
+          {enCarrito > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={vaciarCarrito}
+                title="Vaciar todo el carrito"
+                className="grid size-8.5 cursor-pointer place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50"
+              >
+                <Icon name="trash" className="size-4" />
+              </button>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setCarritoAbierto(true)}
+            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95"
+            style={{ backgroundColor: COLOR_PRIMARIO }}
+          >
+            <Icon name="print" className="size-3.5" />
+            <span>Carrito de impresión</span>
+            <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[11px] leading-none">{enCarrito.toLocaleString('es-PE')}</span>
           </button>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
+      <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Vehículos para imprimir su QR" tabIndex={0}>
+        <table className="w-full min-w-[820px] table-fixed text-left text-xs">
+          <colgroup>
+            <col className="w-[13%]" />
+            <col className="w-[30%]" />
+            <col className="w-[28%]" />
+            <col className="w-[16%]" />
+            <col className="w-[19%]" />
+          </colgroup>
           <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
             <tr>
-              <th className="w-10 px-3.5 py-2.5">
-                <input type="checkbox" checked={paginaCompletaMarcada} onChange={alternarPagina} aria-label="Seleccionar la página" className="size-4 cursor-pointer accent-indigo-600" />
-              </th>
               <th className="px-3.5 py-2.5">Placa</th>
-              <th className="px-3.5 py-2.5">Tipo</th>
+              <th className="px-3.5 py-2.5">Propietario y titular</th>
               <th className="px-3.5 py-2.5">Asociación / Empresa</th>
               <th className="px-3.5 py-2.5">Código QR</th>
+              <th className="sticky right-0 z-10 border-l border-slate-200 bg-slate-50/75 px-4 py-2.5 text-center shadow-[-4px_0_8px_rgba(0,0,0,0.04)] dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">Acciones</th>
             </tr>
           </thead>
-          <tbody className={`divide-y divide-slate-100 transition-opacity dark:divide-[var(--border)] ${cargando ? 'opacity-50' : ''}`}>
-            {filas.length === 0 && cargando ? (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Cargando vehículos…</td></tr>
+          <tbody className={`divide-y divide-slate-100 transition-opacity duration-150 dark:divide-[var(--border)] ${cargando && filas.length > 0 ? 'pointer-events-none opacity-60' : 'opacity-100'}`}>
+            {cargando && filas.length === 0 ? (
+              Array.from({ length: 5 }).map((_, idx) => (
+                <tr key={idx} className="animate-pulse">
+                  <td className="px-3.5 py-2.5"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                  <td className="px-3.5 py-2.5">
+                    <div className="space-y-1.5">
+                      <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
+                      <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
+                    </div>
+                  </td>
+                  <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                  <td className="px-3.5 py-2.5"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                  <td className="sticky right-0 z-10 border-l border-slate-200 bg-white px-4 py-4 shadow-[-4px_0_8px_rgba(0,0,0,0.04)] dark:border-[var(--border)] dark:bg-[#1C2438]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                </tr>
+              ))
             ) : filas.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">No hay vehículos con esos filtros.</td></tr>
-            ) : filas.map((v) => (
-              <tr key={v.id} onClick={() => alternar(v)} className="cursor-pointer transition-colors hover:bg-cyan-50/30 dark:hover:bg-slate-800/40">
-                <td className="px-3.5 py-2.5">
-                  <input type="checkbox" checked={Boolean(seleccion[v.id])} onChange={() => alternar(v)} onClick={(e) => e.stopPropagation()} aria-label={`Seleccionar ${v.placa}`} className="size-4 cursor-pointer accent-indigo-600" />
+              <tr>
+                <td colSpan="5" className="p-12 text-center">
+                  <Icon name="vehicle" className="mx-auto mb-2 size-10 text-slate-300 dark:text-slate-600" />
+                  <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron vehículos</p>
                 </td>
-                <td className="px-3.5 py-2.5"><PlacaBadge placa={v.placa} /></td>
-                <td className="px-3.5 py-2.5 font-semibold text-slate-700 dark:text-slate-200">
-                  {PLANTILLAS[plantillaDeVehiculo(v)]?.nombre || v.tipo}
-                </td>
-                <td className="px-3.5 py-2.5 text-slate-600 dark:text-slate-300">{nombreAsociacion(v.asociacion) || <span className="text-slate-400">Sin asociación</span>}</td>
-                <td className="px-3.5 py-2.5 font-mono text-[11px] text-slate-500">{v.codigoQr || '—'}</td>
               </tr>
-            ))}
+            ) : filas.map((v) => {
+              const agregado = Boolean(carrito[v.id])
+              return (
+                <tr key={v.id} onClick={() => alternar(v)} className="group cursor-pointer transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]">
+                  <td className="px-3.5 py-2.5"><PlacaBadge placa={v.placa} /></td>
+
+                  <td className="px-3.5 py-2.5">
+                    <p className="text-xs font-semibold leading-snug text-slate-900 dark:text-white" title={v.propietario}>
+                      {v.propietario || 'Sin Propietario'}
+                    </p>
+                    {v.propietarioDni ? (
+                      <p className="mt-0.5 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">DNI: {v.propietarioDni}</p>
+                    ) : (
+                      <p className="mt-0.5 font-mono text-[11px] text-slate-400">Sin DNI</p>
+                    )}
+                  </td>
+
+                  <td className="px-3.5 py-2.5">
+                    {v.asociacionId ? (
+                      <>
+                        <p className="text-xs font-bold leading-tight text-slate-700 dark:text-slate-200" title={v.asociacion}>{v.asociacion}</p>
+                        <span className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">MDJLO-AUTORIZADO</span>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Sin Asociación</p>
+                        <span className="font-mono text-[10px] font-bold text-amber-600 dark:text-amber-400">INFORMAL</span>
+                      </>
+                    )}
+                  </td>
+
+                  <td className="px-3.5 py-2.5">
+                    <p className="break-all font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200">{v.codigoQr || 'N/A'}</p>
+                  </td>
+
+                  <td className="sticky right-0 z-10 border-l border-slate-200 bg-white px-4 py-3 text-center shadow-[-4px_0_8px_rgba(0,0,0,0.04)] transition-colors group-hover:bg-cyan-50/30 dark:border-[var(--border)] dark:bg-[#1C2438] dark:group-hover:bg-slate-800/40">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); alternar(v) }}
+                        title={agregado ? 'Quitar del carrito' : 'Añadir al carrito'}
+                        className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border-[1.5px] px-2.5 text-[11px] font-bold shadow-xs transition-all active:scale-95 ${
+                          agregado
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            : 'border-[var(--action-eye-border)] bg-[var(--action-eye-bg)] text-[var(--action-eye-text)] hover:border-[var(--action-eye-hover)] hover:bg-[var(--action-eye-hover)] hover:text-white'
+                        }`}
+                      >
+                        <Icon name={agregado ? 'check' : 'add'} className="size-3.5" />
+                        {agregado ? 'En carrito' : 'Añadir'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); imprimir([v], 3) }}
+                        title="Imprimir solo este"
+                        className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border-[1.5px] border-[var(--action-print-border)] bg-[var(--action-print-bg)] px-2.5 text-[11px] font-bold text-[var(--action-print-text)] shadow-xs transition-all hover:border-[var(--action-print-hover)] hover:bg-[var(--action-print-hover)] hover:text-white active:scale-95"
+                      >
+                        <Icon name="print" className="size-3.5" />
+                        Imprimir
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -243,7 +636,26 @@ export function ImpresionQrVehiculos({ asociaciones }) {
         disabled={cargando}
       />
 
-      {imprimiendo && <ImpresionQrPortal vehiculos={imprimibles} copias={Number(copias)} onFin={() => setImprimiendo(false)} />}
+      {carritoAbierto && (
+        <CarritoQrModal
+          carrito={carrito}
+          onQuitar={quitarDelCarrito}
+          onVaciar={vaciarCarrito}
+          onClose={() => setCarritoAbierto(false)}
+          onImprimir={imprimir}
+          onImprimirTodo={imprimirLotes}
+        />
+      )}
+
+      <ProgresoLotes progreso={progreso} onDetener={() => { detenerRef.current = true }} />
+
+      {trabajo && (
+        <ImpresionQrPortal
+          vehiculos={trabajo.vehiculos}
+          copias={trabajo.copias}
+          onFin={() => { trabajo.alTerminar?.(); setTrabajo((actual) => (actual === trabajo ? null : actual)) }}
+        />
+      )}
     </div>
   )
 }

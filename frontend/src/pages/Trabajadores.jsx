@@ -232,7 +232,7 @@ export function Trabajadores() {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
-      exportToExcel({
+      await exportToExcel({
             filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}.xls`,
             sheetName: 'Personal',
             title: 'PADRÓN INSTITUCIONAL DE TRABAJADORES Y FISCALIZADORES',

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -7,7 +8,6 @@ import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { apiFetch, getCachedData, setCachedData, invalidateCache } from '../config/api'
-import { PlantillaImpresionTUC } from '../components/documentos/PlantillaImpresionTUC'
 import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleModal'
 import { EstadoDocumentosVehiculo, documentoVigenteDelTipo } from '../components/documentos/EstadoDocumentosVehiculo'
 import { isVehiculoFormal, getVehiculoDocumento, buildVehiculoQrValue } from '../utils/vehiculos'
@@ -118,6 +118,7 @@ function getDocTypeBadge(tipo) {
 }
 
 export function Documentos() {
+  const navigate = useNavigate()
   const cached = getCachedData('/documentos')
   const [documentos, setDocumentos] = useState(cached || [])
   const [resultadosPlaca, setResultadosPlaca] = useState([])
@@ -153,7 +154,6 @@ export function Documentos() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState(null)
   const [vehiculoDetalle, setVehiculoDetalle] = useState(null)
 
@@ -246,10 +246,11 @@ export function Documentos() {
       return undefined
     }
     let cancelado = false
+    const controller = new AbortController()
     const timer = window.setTimeout(async () => {
       setIsBuscandoPlaca(true)
       try {
-        const res = await apiFetch(`/vehiculos?page=1&porPagina=25&buscar=${encodeURIComponent(texto)}`)
+        const res = await apiFetch(`/vehiculos?page=1&porPagina=25&buscar=${encodeURIComponent(texto)}`, { signal: controller.signal })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const payload = await res.json()
         if (cancelado) return
@@ -268,6 +269,7 @@ export function Documentos() {
     }, 250)
     return () => {
       cancelado = true
+      controller.abort()
       window.clearTimeout(timer)
     }
   }, [formData.vehiculoPlaca, isPlacaDropdownOpen, vehiculoSeleccionadoId])
@@ -498,11 +500,6 @@ export function Documentos() {
     setIsDetailModalOpen(true)
   }
 
-  const handlePrint = (doc) => {
-    setSelectedDoc(doc)
-    setIsPreviewModalOpen(true)
-  }
-
   const handleDelete = async (id) => {
     const result = await showConfirm(
       '¿Anular documento?',
@@ -667,7 +664,7 @@ export function Documentos() {
     await new Promise(r => setTimeout(r, 50))
     try {
       const data = await fetchTodoElFiltro()
-          exportToExcel({
+          await exportToExcel({
             filename: `Documentos_Transito_${new Date().toISOString().slice(0, 10)}.xls`,
             sheetName: 'Documentos',
             title: 'PADRÓN OFICIAL DE DOCUMENTOS DE TRANSPORTE Y VIALIDAD',
@@ -691,7 +688,7 @@ export function Documentos() {
               { header: 'SERIE / CHASIS', key: 'vehiculoSerie', isText: true, width: 150 },
               { header: 'CARROCERÍA', key: 'vehiculoCarroceria', width: 120 },
               { header: 'PARTIDA REGISTRAL', key: 'vehiculoPartidaRegistral', isText: true, width: 140 },
-              { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 150 },
+              { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 270 },
               { header: 'PROPIETARIO / TITULAR', key: 'propietario', width: 190 },
               { header: 'DNI / RUC', key: 'propietarioDni', isText: true, width: 110, align: 'center' },
               { header: 'CELULAR', key: 'propietarioCelular', isText: true, width: 110, align: 'center' },
@@ -1240,15 +1237,6 @@ export function Documentos() {
                           <Icon name="eye" className="size-4" />
                         </button>
 
-                        {/* IMPRIMIR: Morado / Púrpura */}
-                        <button
-                          type="button"
-                          onClick={() => handlePrint(d)}
-                          title="Imprimir formato oficial / TUC"
-                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white">
-                          <Icon name="print" className="size-4" />
-                        </button>
-
                         {/* EDITAR: Amarillo */}
                         <button
                           type="button"
@@ -1574,17 +1562,20 @@ export function Documentos() {
 
                 <div className="flex items-center gap-2">
                   <StatusBadge status={selectedDoc.estado} />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsDetailModalOpen(false)
-                      handlePrint(selectedDoc)
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
-                  >
-                    <Icon name="print" className="size-3.5" />
-                    <span>Imprimir</span>
-                  </button>
+                  {selectedDoc.tipoDocumento === 'TARJETA_OPERATIVIDAD' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDetailModalOpen(false)
+                        navigate(`/impresion?pestana=TARJETAS&buscar=${encodeURIComponent(selectedDoc.vehiculoPlaca || selectedDoc.codigo || '')}&estado=TODOS`)
+                      }}
+                      title="Abrir el Centro de impresión con esta tarjeta ya filtrada"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-purple-700 active:scale-95"
+                    >
+                      <Icon name="print" className="size-3.5" />
+                      <span>Ir a imprimir carnet</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1705,13 +1696,13 @@ export function Documentos() {
                     </div>
                     <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                       <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Dirección del Titular</span>
-                      <span className="font-medium text-slate-800 dark:text-white text-right truncate max-w-[200px]" title={selectedDoc.direccion}>
+                      <span className="font-medium text-slate-800 dark:text-white text-right break-words min-w-0">
                         {selectedDoc.direccion || '—'}
                       </span>
                     </div>
                     <div className="flex justify-between items-center py-0.5">
                       <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Código QR</span>
-                      <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                      <span className="break-all text-right font-mono text-[11px] text-slate-600 dark:text-slate-300">
                         {selectedDoc.codigoQr || '—'}
                       </span>
                     </div>
@@ -1721,14 +1712,6 @@ export function Documentos() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* PLANTILLA OFICIAL DE IMPRESIÓN Y CARNET DEDICADA (#seccion-impresion) */}
-      {isPreviewModalOpen && selectedDoc && (
-        <PlantillaImpresionTUC
-          documento={selectedDoc}
-          onClose={() => setIsPreviewModalOpen(false)}
-        />
       )}
 
       <VehiculoDetalleModal

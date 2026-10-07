@@ -7,6 +7,12 @@ use App\Services\AuditoriaService;
 
 class AsociacionesController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'asociaciones';
+    protected array $tablasUuidPorMetodo = [];
+    protected array $soloUuidEnEstricto = [];
+
     protected $format = 'json';
 
     /**
@@ -16,7 +22,7 @@ class AsociacionesController extends ResourceController
     private function asociacionSelectQuery($db)
     {
         return $db->table('asociaciones o')
-            ->select("
+            ->select("o.uuid AS uuid, 
                 o.id,
                 o.tipo,
                 o.razon_social AS razonSocial,
@@ -96,6 +102,8 @@ class AsociacionesController extends ResourceController
                 ->orLike('p_rep.numero', $buscar)
                 ->orLike('c_rep.nombres', $buscar)
                 ->orLike('c_rep.apellido_paterno', $buscar)
+                ->orLike('c_rep.apellido_materno', $buscar)
+                ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c_rep.nombres', 'c_rep.apellido_paterno', 'c_rep.apellido_materno'), null, false)
                 ->groupEnd();
         }
 
@@ -253,7 +261,6 @@ class AsociacionesController extends ResourceController
             return $db->table('vehiculo_propietarios vp')
                 ->join('vehiculos v', 'v.id = vp.id_vehiculo', 'inner')
                 ->join('asociaciones o', 'o.id = v.id_asociacion', 'inner')
-                ->join('documentos_vehiculo d', 'd.id_vehiculo = v.id', 'left')
                 ->where('vp.estado', 'ACTIVO');
         };
         $aplicarFiltros = function ($builder) {
@@ -276,7 +283,13 @@ class AsociacionesController extends ResourceController
             return $builder;
         };
 
-        $socios = $aplicarFiltros($base($db))
+        $sociosBase = $aplicarFiltros($base($db));
+        $expresionVencidos = '0';
+        if (in_array('documentosVencidos', array_map('trim', explode(',', (string) $this->request->getGet('sortBy'))), true)) {
+            $sociosBase->join('documentos_vehiculo d', 'd.id_vehiculo = v.id', 'left');
+            $expresionVencidos = "COUNT(DISTINCT CASE WHEN d.estado = 'VENCIDO' OR (d.fecha_expiracion IS NOT NULL AND d.fecha_expiracion < CURDATE()) THEN d.id END)";
+        }
+        $socios = $sociosBase
             ->select("
                 p.id AS idPersona,
                 COALESCE(p.numero, '') AS documento,
@@ -285,24 +298,26 @@ class AsociacionesController extends ResourceController
                 COALESCE(p.email, '') AS email,
                 COUNT(DISTINCT o.id) AS asociacionesTotal,
                 COUNT(DISTINCT vp.id_vehiculo) AS vehiculosTotal,
-                COUNT(DISTINCT CASE WHEN d.estado = 'VENCIDO' OR (d.fecha_expiracion IS NOT NULL AND d.fecha_expiracion < CURDATE()) THEN d.id END) AS documentosVencidos,
-                MIN(o.razon_social) AS asociacionNombre,
-                GROUP_CONCAT(DISTINCT v.placa SEPARATOR ',') AS placasBusqueda,
-                GROUP_CONCAT(DISTINCT o.razon_social SEPARATOR '|') AS organizacionesBusqueda
+                {$expresionVencidos} AS documentosVencidos,
+                MIN(o.razon_social) AS asociacionNombre
             ", false)
             ->join('personas p', 'p.id = vp.id_persona', 'inner')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
             ->groupBy('p.id');
 
         $buscar = trim((string) $this->request->getGet('buscar'));
+        $condicionBusqueda = null;
         if ($buscar !== '') {
             $like = $db->escapeLikeString($buscar);
-            $socios->having(
-                "(nombre LIKE '%{$like}%' OR documento LIKE '%{$like}%' OR placasBusqueda LIKE '%{$like}%' "
-                . "OR organizacionesBusqueda LIKE '%{$like}%' OR telefono LIKE '%{$like}%' OR email LIKE '%{$like}%')",
-                null,
-                false
-            );
+            // Filtra personas con EXISTS sin recortar su flota ni agrupar todas las placas para buscar.
+            $organizacionesBusqueda = $aplicarFiltros($base($db))
+                ->select('vp.id_persona')->groupStart()->like('v.placa', $buscar)->orLike('o.razon_social', $buscar)->groupEnd()
+                ->getCompiledSelect();
+            $nombreSql = \App\Libraries\Busqueda::nombreCompleto($buscar, 'c.nombres', 'c.apellido_paterno', 'c.apellido_materno');
+            $condicionBusqueda = "({$nombreSql} OR p.numero LIKE '%{$like}%' ESCAPE '!' OR p.telefono LIKE '%{$like}%' ESCAPE '!' "
+                . "OR p.celular LIKE '%{$like}%' ESCAPE '!' OR p.email LIKE '%{$like}%' ESCAPE '!' "
+                . "OR p.id IN ({$organizacionesBusqueda}))";
+            $socios->where($condicionBusqueda, null, false);
         }
 
         $vehiculosFiltro = strtoupper(trim((string) $this->request->getGet('vehiculos')));
@@ -319,7 +334,14 @@ class AsociacionesController extends ResourceController
         $meta = null;
         if ($page > 0) {
             $porPagina = max(1, min(200, (int) ($this->request->getGet('porPagina') ?: 20)));
-            $total = (clone $socios)->countAllResults(false);
+            if (in_array($vehiculosFiltro, ['UNO', 'DOS_TRES', 'MAS_TRES'], true)) {
+                $total = (clone $socios)->countAllResults(false);
+            } else {
+                $contador = $aplicarFiltros($base($db))->select('COUNT(DISTINCT vp.id_persona) AS total', false)
+                    ->join('personas p', 'p.id = vp.id_persona', 'inner')->join('ciudadanos c', 'c.id_persona = p.id', 'left');
+                if ($condicionBusqueda !== null) $contador->where($condicionBusqueda, null, false);
+                $total = (int) ($contador->get()->getRowArray()['total'] ?? 0);
+            }
 
             $columnasOrdenables = [
                 'nombre' => 'nombre',
@@ -373,11 +395,22 @@ class AsociacionesController extends ResourceController
             }
         }
 
+        // Solo contar documentos vencidos de las personas visibles, sin multiplicar el JOIN principal.
+        $vencidos = [];
+        foreach (array_chunk($ids, 1000) as $lote) {
+            $q = $aplicarFiltros($base($db))->join('documentos_vehiculo d', 'd.id_vehiculo = v.id', 'inner')
+                ->select('vp.id_persona, COUNT(DISTINCT d.id) AS total', false)
+                ->whereIn('vp.id_persona', $lote)->groupStart()->where('d.estado', 'VENCIDO')
+                ->orGroupStart()->where('d.fecha_expiracion IS NOT NULL', null, false)->where('d.fecha_expiracion < CURDATE()', null, false)->groupEnd()
+                ->groupEnd()->groupBy('vp.id_persona');
+            foreach ($q->get()->getResultArray() as $conteo) $vencidos[(int) $conteo['id_persona']] = (int) $conteo['total'];
+        }
+
         foreach ($filas as &$fila) {
             $fila['idPersona'] = (int) $fila['idPersona'];
             $fila['asociacionesTotal'] = (int) $fila['asociacionesTotal'];
             $fila['vehiculosTotal'] = (int) $fila['vehiculosTotal'];
-            $fila['documentosVencidos'] = (int) ($fila['documentosVencidos'] ?? 0);
+            $fila['documentosVencidos'] = $vencidos[$fila['idPersona']] ?? 0;
             $fila['vinculos'] = $vinculos[$fila['idPersona']] ?? [];
             unset($fila['placasBusqueda'], $fila['organizacionesBusqueda']);
         }
@@ -448,6 +481,7 @@ class AsociacionesController extends ResourceController
             'estado'                 => strtoupper($input['estado'] ?? 'ACTIVO'),
         ];
 
+        $record['uuid'] = \App\Libraries\Identificador::nuevo();
         $db->table('asociaciones')->insert($record);
         $insertId = $db->insertID();
 
@@ -473,6 +507,7 @@ class AsociacionesController extends ResourceController
 
         $newOrg = [
             'id'                   => (int)$insertId,
+            'uuid'                 => $record['uuid'],
             'tipo'                 => $record['tipo'],
             'razonSocial'          => $record['razon_social'],
             'idRepresentanteLegal' => $record['id_representante_legal'],

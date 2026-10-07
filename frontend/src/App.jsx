@@ -1,15 +1,18 @@
 import { lazy, Suspense, useState, useRef, useEffect, useMemo } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Login } from './components/auth/Login'
 import { Sidebar } from './components/layout/Sidebar'
 import { Header } from './components/layout/Header'
+import { NotFound } from './pages/NotFound'
 import { PREFETCH_MAP } from './config/navigation'
 import { apiFetch } from './config/api'
+import { limpiarDatosLocales } from './utils/sesionLocal'
 
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000
 
 const DashboardHome = lazy(() => import('./pages/DashboardHome').then((module) => ({ default: module.DashboardHome })))
 const Vehiculos = lazy(() => import('./pages/Vehiculos').then((module) => ({ default: module.Vehiculos })))
+const CentroImpresion = lazy(() => import('./pages/CentroImpresion').then((module) => ({ default: module.CentroImpresion })))
 const Personas = lazy(() => import('./pages/Personas').then((module) => ({ default: module.Personas })))
 const Trabajadores = lazy(() => import('./pages/Trabajadores').then((module) => ({ default: module.Trabajadores })))
 const Asociaciones = lazy(() => import('./pages/Asociaciones').then((module) => ({ default: module.Asociaciones })))
@@ -28,6 +31,10 @@ const CursoDetalleVentana = lazy(() => import('./pages/CursoDetalleVentana'))
 
 
 const isSuperAdminUser = (user) => (user?.rol || '').toUpperCase() === 'SUPERADMIN'
+const isOfficeUser = (user) => ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes((user?.rol || '').toUpperCase())
+
+const onlyNormalUser = (user, element) => isSuperAdminUser(user) ? <Navigate to="/superadmin" replace /> : element
+const onlyOfficeUser = (user, element) => isSuperAdminUser(user) ? <Navigate to="/superadmin" replace /> : (!isOfficeUser(user) ? <Navigate to="/dashboard" replace /> : element)
 
 function ModuleFallback() {
   return (
@@ -88,6 +95,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (p.startsWith('/trabajadores'))             return 'Trabajadores'
     if (p.startsWith('/asociaciones'))             return 'Asociaciones'
     if (p.startsWith('/documentos'))               return 'Documentos del Vehículo'
+    if (p.startsWith('/impresion'))                return 'Centro de impresión'
     if (p.startsWith('/inspecciones'))             return 'Certicav'
     if (p.startsWith('/papeletas'))                return 'Papeletas'
     if (p.startsWith('/operativos'))               return 'Operativos'
@@ -116,9 +124,13 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController()
+    let pending = false
     const fetchNotifications = async () => {
+      if (document.visibilityState === 'hidden' || pending || cancelled) return
+      pending = true
       try {
-        const response = await apiFetch('/notificaciones/resumen')
+        const response = await apiFetch('/notificaciones/resumen', { signal: controller.signal })
         if (response.ok) {
           const payload = await response.json()
           if (!cancelled && payload.data) {
@@ -127,15 +139,18 @@ function Layout({ onLogout, user, onUserUpdate }) {
         }
       } catch {
         // Silencioso: es un sondeo periódico en segundo plano, se reintentará en el próximo ciclo.
-      }
+      } finally { pending = false }
     }
 
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000); // Poll every minute
+    document.addEventListener('visibilitychange', fetchNotifications)
     
     return () => {
       cancelled = true;
+      controller.abort()
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', fetchNotifications)
     }
   }, [])
 
@@ -164,34 +179,40 @@ function Layout({ onLogout, user, onUserUpdate }) {
     }
   }, [])
 
-  // Prefetch de todos los módulos visibles para este rol en segundo plano.
-  // Se ejecuta 1.5s después del montaje del layout (cuando el dashboard ya se ve)
-  // para no competir con el render inicial. Los imports() se cachean: si el
-  // usuario ya visitó un módulo, este effect simplemente reutiliza la caché.
+  // Precargar solo los módulos frecuentes, uno por turno libre del navegador.
+  // El resto se mantiene lazy y se anticipa al pasar por el menú.
   useEffect(() => {
     const rolNorm = (user?.rol || '').toUpperCase()
     const isSA = rolNorm === 'SUPERADMIN'
     const isOff = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNorm)
 
-    const timer = setTimeout(() => {
-      Object.entries(PREFETCH_MAP).forEach(([path, fn]) => {
+    let cancelled = false
+    let idleId
+    const connection = navigator.connection
+    if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return
+    const frecuentes = new Set(isSA ? ['/superadmin/usuarios'] : ['/personas', '/vehiculos', '/papeletas'])
+    const pendientes = Object.entries(PREFETCH_MAP).filter(([path]) => frecuentes.has(path))
+    const precargar = () => {
+      if (cancelled || document.visibilityState === 'hidden') return
+      const siguiente = pendientes.shift()
+      if (!siguiente) return
+      const [path, fn] = siguiente
         // Filtrar rutas superadmin si no aplica, y rutas de office si no aplica
-        if (path.startsWith('/superadmin') && !isSA) return
-        if (!path.startsWith('/superadmin') && isSA) return
-        const needsOffice = ['/personas','/trabajadores','/asociaciones','/documentos','/permisos','/cursos','/pagos'].includes(path)
-        if (needsOffice && !isOff) return
-        fn().catch(() => {})
-      })
-    }, 1500)
+        const needsOffice = ['/personas','/trabajadores','/asociaciones','/documentos','/permisos','/cursos','/pagos','/impresion'].includes(path)
+      if (needsOffice && !isOff) { programar(); return }
+      fn().catch(() => {}).finally(() => { if (!cancelled) programar() })
+    }
+    const programar = () => {
+      idleId = window.requestIdleCallback ? window.requestIdleCallback(precargar) : window.setTimeout(precargar, 1500)
+    }
+    programar()
 
-    return () => clearTimeout(timer)
+    return () => {
+      cancelled = true
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idleId)
+      else clearTimeout(idleId)
+    }
   }, [user])
-
-  const isSuperAdmin = isSuperAdminUser(user)
-  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes((user?.rol || '').toUpperCase())
-
-  const onlyNormalUser = (element) => isSuperAdmin ? <Navigate to="/superadmin" replace /> : element
-  const onlyOfficeUser = (element) => isSuperAdmin ? <Navigate to="/superadmin" replace /> : (!isOffice ? <Navigate to="/dashboard" replace /> : element)
 
   return (
     <main
@@ -233,42 +254,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
 
         <div className="app-content mx-auto w-full max-w-[96rem] flex-1 space-y-4 px-3.5 sm:px-5 lg:px-6 pt-1.5 pb-6 print:block print:p-0 print:space-y-0 print:m-0 print:max-w-none">
           <Suspense fallback={<ModuleFallback />}>
-            <Routes>
-              <Route path="/" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
-              <Route path="/superadmin" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
-              <Route path="/superadmin/personas" element={isSuperAdmin ? <Personas user={user} onUserUpdate={onUserUpdate} /> : <Navigate to="/dashboard" replace />} />
-              <Route path="/superadmin/trabajadores" element={isSuperAdmin ? <Trabajadores /> : <Navigate to="/dashboard" replace />} />
-              <Route path="/superadmin/usuarios" element={isSuperAdmin ? <Usuarios user={user} /> : <Navigate to="/dashboard" replace />} />
-              <Route path="/superadmin/:moduleId" element={isSuperAdmin ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
-              <Route path="/admin" element={<Navigate to={isSuperAdmin ? "/superadmin" : "/dashboard"} replace />} />
-              <Route path="/dashboard" element={onlyNormalUser(<DashboardHome user={user} />)} />
-              <Route path="/vehiculos" element={onlyNormalUser(<Vehiculos user={user} />)} />
-              <Route path="/personas" element={onlyOfficeUser(<Personas user={user} onUserUpdate={onUserUpdate} />)} />
-              <Route path="/trabajadores" element={onlyOfficeUser(<Trabajadores />)} />
-              <Route path="/asociaciones" element={onlyOfficeUser(<Asociaciones />)} />
-              <Route path="/documentos" element={onlyOfficeUser(<Documentos />)} />
-              <Route path="/inspecciones" element={onlyNormalUser(<Inspecciones />)} />
-              <Route path="/papeletas" element={onlyNormalUser(<Papeletas user={user} />)} />
-              <Route path="/operativos" element={onlyNormalUser(<Operativos user={user} />)} />
-              <Route path="/cursos" element={onlyOfficeUser(<CursosSeguridad />)} />
-              <Route path="/cursos-seguridad" element={onlyOfficeUser(<CursosSeguridad />)} />
-              <Route path="/pagos" element={onlyOfficeUser(<Pagos />)} />
-              <Route path="/internamientos" element={onlyNormalUser(<Retenciones user={user} />)} />
-              <Route path="/retenciones" element={onlyNormalUser(<Navigate to="/internamientos" replace />)} />
-              <Route path="/permisos" element={onlyOfficeUser(<Permisos />)} />
-              <Route path="*" element={
-                <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-white dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)] shadow-xs">
-                  <div className="size-16 rounded-2xl bg-slate-100 dark:bg-[var(--bg-subtle)] flex items-center justify-center text-slate-500 mb-4">
-                    <span className="text-2xl font-black">404</span>
-                  </div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">Página no encontrada</h2>
-                  <p className="mt-2 text-sm text-slate-500 max-w-md">La dirección a la que intenta acceder no existe o fue movida a otra ubicación.</p>
-                  <a href="/dashboard" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700">
-                    Volver al Dashboard
-                  </a>
-                </div>
-              } />
-            </Routes>
+            <Outlet />
           </Suspense>
         </div>
       </div>
@@ -344,8 +330,7 @@ function App() {
     } catch (_) {
       // Si el servidor ya no tiene sesión, limpiamos igualmente el cliente.
     }
-    localStorage.removeItem('user')
-    sessionStorage.removeItem('user')
+    limpiarDatosLocales()
     setUser(null)
   }
 
@@ -426,10 +411,37 @@ function App() {
               </Suspense>
             ) : <Navigate to="/login" replace />}
           />
-          <Route
-            path="/*"
-            element={<ProtectedApp user={user} onLogout={handleLogout} onUserUpdate={handleUserUpdate} />}
-          />
+          {/* Rutas autenticadas dentro del Layout (Sidebar + Header) */}
+          <Route element={<ProtectedApp user={user} onLogout={handleLogout} onUserUpdate={handleUserUpdate} />}>
+            <Route path="/" element={<Navigate to={isSuperAdminUser(user) ? "/superadmin" : "/dashboard"} replace />} />
+            <Route path="/admin" element={<Navigate to={isSuperAdminUser(user) ? "/superadmin" : "/dashboard"} replace />} />
+            <Route path="/superadmin" element={isSuperAdminUser(user) ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/superadmin/personas" element={isSuperAdminUser(user) ? <Personas user={user} onUserUpdate={handleUserUpdate} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/superadmin/trabajadores" element={isSuperAdminUser(user) ? <Trabajadores /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/superadmin/usuarios" element={isSuperAdminUser(user) ? <Usuarios user={user} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/superadmin/:moduleId" element={isSuperAdminUser(user) ? <SuperAdminDashboard user={user} /> : <Navigate to="/dashboard" replace />} />
+
+            <Route path="/dashboard" element={onlyNormalUser(user, <DashboardHome user={user} />)} />
+            <Route path="/vehiculos" element={onlyNormalUser(user, <Vehiculos user={user} />)} />
+            <Route path="/impresion" element={onlyOfficeUser(user, <CentroImpresion />)} />
+            <Route path="/personas" element={onlyOfficeUser(user, <Personas user={user} onUserUpdate={handleUserUpdate} />)} />
+            <Route path="/trabajadores" element={onlyOfficeUser(user, <Trabajadores />)} />
+            <Route path="/asociaciones" element={onlyOfficeUser(user, <Asociaciones />)} />
+            <Route path="/documentos" element={onlyOfficeUser(user, <Documentos />)} />
+            <Route path="/inspecciones" element={onlyNormalUser(user, <Inspecciones />)} />
+            <Route path="/papeletas" element={onlyNormalUser(user, <Papeletas user={user} />)} />
+            <Route path="/operativos" element={onlyNormalUser(user, <Operativos user={user} />)} />
+            <Route path="/cursos" element={onlyOfficeUser(user, <CursosSeguridad />)} />
+            <Route path="/cursos-seguridad" element={onlyOfficeUser(user, <CursosSeguridad />)} />
+            <Route path="/pagos" element={onlyOfficeUser(user, <Pagos />)} />
+            <Route path="/internamientos" element={onlyNormalUser(user, <Retenciones user={user} />)} />
+            <Route path="/retenciones" element={onlyNormalUser(user, <Navigate to="/internamientos" replace />)} />
+            <Route path="/permisos" element={onlyOfficeUser(user, <Permisos />)} />
+          </Route>
+
+          {/* Página 404 independiente y completa para cualquier ruta desconocida */}
+          <Route path="/404" element={<NotFound user={user} />} />
+          <Route path="*" element={<NotFound user={user} />} />
         </Routes>
       )}
     </BrowserRouter>

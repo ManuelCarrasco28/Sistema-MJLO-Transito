@@ -6,6 +6,12 @@ use CodeIgniter\RESTful\ResourceController;
 
 class InspeccionesController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'certicav';
+    protected array $tablasUuidPorMetodo = [];
+    protected array $soloUuidEnEstricto = [];
+
     protected $format = 'json';
 
     public function estadisticas()
@@ -122,6 +128,8 @@ class InspeccionesController extends ResourceController
                     ->orLike('pc.numero', $buscar)
                     ->orLike('cc.nombres', $buscar)
                     ->orLike('cc.apellido_paterno', $buscar)
+                    ->orLike('cc.apellido_materno', $buscar)
+                    ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'cc.nombres', 'cc.apellido_paterno', 'cc.apellido_materno'), null, false)
                     ->orLike('a.razon_social', $buscar)
                     ->groupEnd();
             }
@@ -297,6 +305,7 @@ class InspeccionesController extends ResourceController
                 'observaciones'         => $observaciones,
                 'estado'                => 'ACTIVO',
             ];
+            $inspData['uuid'] = \App\Libraries\Identificador::nuevo();
             $db->table('certicav')->insert($inspData);
             $inspeccionId = (int)$db->insertID();
 
@@ -560,6 +569,7 @@ class InspeccionesController extends ResourceController
         }
 
         $db->table('personas')->insert([
+            'uuid' => \App\Libraries\Identificador::nuevo(),
             'id_tipo_documento' => 1,
             'numero'            => $dni,
             'estado'            => 'ACTIVO',
@@ -584,7 +594,7 @@ class InspeccionesController extends ResourceController
     private function consultaInspeccion($db)
     {
         return $db->table('certicav i')
-            ->select("
+            ->select("i.uuid AS uuid, 
                 i.id,
                 i.id_tecnico as tecnicoId,
                 i.id_conductor as conductorId,

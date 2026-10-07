@@ -6,11 +6,18 @@ use CodeIgniter\RESTful\ResourceController;
 
 class VehiculosController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'vehiculos';
+    protected array $tablasUuidPorMetodo = [];
+    protected array $soloUuidEnEstricto = [];
+
     protected $format = 'json';
 
     private function normalizeSearchValue(string $value): string
     {
-        return strtoupper(preg_replace('/[^A-Z0-9]/', '', trim($value)) ?? '');
+        // Primero se pasa a mayúsculas: antes se quitaban las letras minúsculas (un UUID o una placa en minúsculas quedaba sin letras).
+        return preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($value))) ?? '';
     }
 
     /** Contadores agregados vía COUNT() en SQL (ver PersonasController::estadisticas para el motivo). */
@@ -49,6 +56,7 @@ class VehiculosController extends ResourceController
         return $db->table('vehiculos v')
             ->select("
                 v.id,
+                v.uuid,
                 v.placa,
                 COALESCE(tv.nombre, 'Mototaxi') AS tipo,
                 COALESCE(v.marca, '') AS marca,
@@ -236,9 +244,12 @@ class VehiculosController extends ResourceController
     {
         $db = \Config\Database::connect();
         $builder = $db->table('vehiculos v')
-            ->select("v.id, v.placa, COALESCE(tv.nombre, 'Mototaxi') AS tipo, COALESCE(v.codigo_qr, '') AS codigoQr, v.id_asociacion AS asociacionId, o.razon_social AS asociacion", false)
+            ->select("v.id, v.placa, COALESCE(tv.nombre, 'Mototaxi') AS tipo, COALESCE(v.codigo_qr, '') AS codigoQr, v.id_asociacion AS asociacionId, o.razon_social AS asociacion, COALESCE(v.marca, '') AS marca, COALESCE(v.modelo, '') AS modelo, COALESCE(p.numero, '') AS propietarioDni, TRIM(CONCAT_WS(' ', c.nombres, c.apellido_paterno, c.apellido_materno)) AS propietario", false)
             ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
-            ->join('asociaciones o', 'o.id = v.id_asociacion', 'left');
+            ->join('asociaciones o', 'o.id = v.id_asociacion', 'left')
+            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
+            ->join('personas p', 'p.id = vp.id_persona', 'left')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left');
 
         $tipos = array_filter(array_map('trim', explode(',', (string) $this->request->getGet('tipo'))));
         if ($tipos) {
@@ -249,6 +260,9 @@ class VehiculosController extends ResourceController
             $builder->groupEnd();
         }
 
+        // Los vehículos informales (sin asociación) no generan QR.
+        $builder->where('v.id_asociacion IS NOT NULL', null, false);
+
         $asociacionId = (int) $this->request->getGet('asociacionId');
         if ($asociacionId > 0) {
             $builder->where('v.id_asociacion', $asociacionId);
@@ -257,8 +271,15 @@ class VehiculosController extends ResourceController
         $buscar = trim((string) $this->request->getGet('buscar'));
         if ($buscar !== '') {
             $builder->groupStart()
-                ->like('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
+                ->where('v.uuid', \App\Libraries\Identificador::esValido($buscar) ? strtolower($buscar) : '__no_es_uuid__')
+                ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                 ->orLike('o.razon_social', $buscar)
+                ->orLike('p.numero', $buscar)
+                ->orLike('c.nombres', $buscar)
+                ->orLike('c.apellido_paterno', $buscar)
+                ->orLike('c.apellido_materno', $buscar)
+                ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c.nombres', 'c.apellido_paterno', 'c.apellido_materno'), null, false)
+                ->orLike('c.apellido_materno', $buscar)
                 ->groupEnd();
         }
 
@@ -278,6 +299,8 @@ class VehiculosController extends ResourceController
 
     public function index()
     {
+        \App\Libraries\Acceso::limitarListadoCompleto($this->request);
+
         $db = \Config\Database::connect();
         $builder = $this->vehiculosBaseQuery($db);
 
@@ -287,11 +310,15 @@ class VehiculosController extends ResourceController
         $buscar = trim((string) $this->request->getGet('buscar'));
         if ($buscar !== '') {
             $builder->groupStart()
-                ->like('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
+                // Un uuid pegado completo (el código QR del vehículo) se busca exacto, con el índice único.
+                ->where('v.uuid', \App\Libraries\Identificador::esValido($buscar) ? strtolower($buscar) : '__no_es_uuid__')
+                ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                 ->orLike('v.marca', $buscar)
                 ->orLike('v.modelo', $buscar)
                 ->orLike('c.nombres', $buscar)
                 ->orLike('c.apellido_paterno', $buscar)
+                ->orLike('c.apellido_materno', $buscar)
+                ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c.nombres', 'c.apellido_paterno', 'c.apellido_materno'), null, false)
                 ->orLike('p.numero', $buscar)
                 ->orLike('v.numero_serie', $buscar)
                 ->orLike('o.razon_social', $buscar)
@@ -372,6 +399,12 @@ class VehiculosController extends ResourceController
             return $row + ['propietario' => $propietario ?: 'Sin Propietario Asignado'];
         }, $rows);
 
+        // ?ligero=1: solo lo que usan los autocompletados de placa de los formularios.
+        if ($this->request->getGet('ligero')) {
+            $campos = array_flip(['id', 'uuid', 'placa', 'tipo', 'marca', 'modelo', 'color', 'anio', 'serieMotor', 'asociacionId', 'asociacion', 'propietarioDni', 'propietario', 'estado', 'formalidad', 'tucNumero']);
+            $data = array_map(static fn (array $r) => array_intersect_key($r, $campos), $data);
+        }
+
         return $this->respond(['data' => $data]);
     }
 
@@ -379,6 +412,18 @@ class VehiculosController extends ResourceController
     public function show($id = null)
     {
         $db = \Config\Database::connect();
+
+        // Se acepta el uuid público (/vehiculos/{uuid}) además del id numérico interno.
+        if (\App\Libraries\Identificador::esValido($id)) {
+            $rows = $this->vehiculosBaseQuery($db)->where('v.uuid', strtolower((string) $id))->get()->getResultArray();
+            if (empty($rows)) {
+                return $this->failNotFound('Vehículo no encontrado.');
+            }
+
+            $data = $this->appendVehiculoRelations($rows);
+            return $this->respond(['data' => $data[0]]);
+        }
+
         $id = (int) $id;
         if ($id <= 0) {
             return $this->failNotFound('Vehículo no encontrado.');
@@ -411,7 +456,10 @@ class VehiculosController extends ResourceController
         } elseif ($tipo === 'DNI') {
             $builder->where("REPLACE(REPLACE(UPPER(p.numero), '-', ''), ' ', '') =", $normalizado);
         } else {
-            $builder->where("REPLACE(REPLACE(UPPER(v.codigo_qr), '-', ''), ' ', '') =", $normalizado);
+            // El código QR es un uuid: búsqueda exacta con el índice único (antes se normalizaba la columna con REPLACE/UPPER
+            // y se recorría toda la tabla en cada escaneo). Un valor que no sea un uuid no puede coincidir.
+            $uuidBuscado = strtolower(trim($valor));
+            $builder->where('v.codigo_qr', \App\Libraries\Identificador::esValido($uuidBuscado) ? $uuidBuscado : '__no_es_uuid__');
         }
 
         $rows = $builder
@@ -422,6 +470,8 @@ class VehiculosController extends ResourceController
 
         if (empty($rows)) {
             if ($tipo === 'PLACA') {
+                // Consulta externa hecha por el sistema: queda registrada igual que las consultas directas a SUNARP.
+                \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_SUNARP', "Consulta de placa en SUNARP (búsqueda móvil): {$normalizado}", ['placa' => $normalizado, 'origen' => 'buscarMobile']);
                 $sunarpData = \App\Services\PideService::sunarp($normalizado);
                 if ($sunarpData && !isset($sunarpData['error'])) {
                     $rawProps = $sunarpData['propietarios'] ?? [];
@@ -489,6 +539,8 @@ class VehiculosController extends ResourceController
 
         // Si existe en BD pero no tiene dueño asignado, intentamos consultar a Sunarp para mostrarlo visualmente
         if ($tipo === 'PLACA' && ($data['formalidad'] ?? '') === 'INFORMAL' && (empty($data['propietario']) || $data['propietario'] === 'Sin Propietario Asignado' || $data['propietario'] === 'No Registrado' || $data['propietario'] === 'Sin Propietario')) {
+            // Consulta externa hecha por el sistema: queda registrada igual que las consultas directas a SUNARP.
+            \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_SUNARP', "Consulta de placa en SUNARP (búsqueda móvil): {$normalizado}", ['placa' => $normalizado, 'origen' => 'buscarMobile']);
             $sunarpData = \App\Services\PideService::sunarp($normalizado);
             if ($sunarpData && !isset($sunarpData['error'])) {
                 $rawProps = $sunarpData['propietarios'] ?? [];
@@ -589,7 +641,8 @@ class VehiculosController extends ResourceController
         $orgName = trim($input['asociacion'] ?? '');
         $asociacionId = $this->resolverAsociacionId($db, $orgName);
 
-        $qrCode = $input['codigoQr'] ?? ('QR-VEH-' . date('Y') . '-' . str_pad(random_int(100, 999), 3, '0', STR_PAD_LEFT));
+        // El código QR es siempre el uuid del vehículo y lo genera el servidor: el codigoQr que mande el cliente se ignora.
+        $qrCode = \App\Libraries\Identificador::nuevo();
 
         $estadoInput = strtoupper(trim($input['estado'] ?? 'ACTIVO'));
         if (!in_array($estadoInput, ['ACTIVO', 'INACTIVO'], true)) {
@@ -624,6 +677,8 @@ class VehiculosController extends ResourceController
         }
         $personaId = (int)$personaRow['id'];
 
+        // Si el código QR es un UUID, el vehículo usa ese mismo valor como su uuid público.
+        $record['uuid'] = $qrCode;
         $db->table('vehiculos')->insert($record);
         $vehiculoId = (int)$db->insertID();
 
@@ -643,6 +698,7 @@ class VehiculosController extends ResourceController
 
         $newVehiculo = [
             'id'               => $vehiculoId,
+            'uuid'             => $record['uuid'],
             'placa'            => $record['placa'],
             'tipo'             => $tipoNombre,
             'marca'            => $record['marca'],

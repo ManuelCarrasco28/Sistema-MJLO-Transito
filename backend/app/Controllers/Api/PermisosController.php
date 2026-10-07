@@ -6,6 +6,12 @@ use CodeIgniter\RESTful\ResourceController;
 
 class PermisosController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'permisos_circulacion';
+    protected array $tablasUuidPorMetodo = [];
+    protected array $soloUuidEnEstricto = [];
+
     protected $format = 'json';
 
     public function estadisticas()
@@ -49,7 +55,7 @@ class PermisosController extends ResourceController
         $nombreCiudadano = "TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')))";
 
         return $db->table('permisos_circulacion pc')
-            ->select("
+            ->select("pc.uuid AS uuid, 
                 pc.id,
                 pc.id_tramite as tramiteId,
                 pc.id_persona as personaId,
@@ -171,6 +177,8 @@ class PermisosController extends ResourceController
                     ->orLike('p.numero', $buscar)
                     ->orLike('c.nombres', $buscar)
                     ->orLike('c.apellido_paterno', $buscar)
+                    ->orLike('c.apellido_materno', $buscar)
+                    ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c.nombres', 'c.apellido_paterno', 'c.apellido_materno'), null, false)
                     ->orLike('pc.referencia_sisgedo', $buscar)
                     ->orLike('pc.zona_circulacion', $buscar)
                     ->orLike('pt.numero_recibo', $buscar)
@@ -349,6 +357,7 @@ class PermisosController extends ResourceController
                 'estado'                 => !empty($payload['estado']) ? strtoupper(trim($payload['estado'])) : 'VIGENTE',
             ], $this->resolverRelaciones($db, $payload, true));
 
+            $data['uuid'] = \App\Libraries\Identificador::nuevo();
             $db->table('permisos_circulacion')->insert($data);
             $newId = (int)$db->insertID();
 

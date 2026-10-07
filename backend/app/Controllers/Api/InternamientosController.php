@@ -6,6 +6,12 @@ use CodeIgniter\RESTful\ResourceController;
 
 class InternamientosController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'ordenes_internamiento';
+    protected array $tablasUuidPorMetodo = [];
+    protected array $soloUuidEnEstricto = [];
+
     protected $format = 'json';
 
     public function estadisticas()
@@ -34,7 +40,7 @@ class InternamientosController extends ResourceController
 
         try {
             $builder = $db->table('ordenes_internamiento oi')
-                ->select("
+                ->select("oi.uuid AS uuid, 
                     oi.id,
                     oi.id_papeleta as papeletaId,
                     oi.id_vehiculo as vehiculoId,
@@ -96,6 +102,8 @@ class InternamientosController extends ResourceController
                     ->orLike('inte.numero', $buscar)
                     ->orLike('inte_c.nombres', $buscar)
                     ->orLike('inte_c.apellido_paterno', $buscar)
+                    ->orLike('inte_c.apellido_materno', $buscar)
+                    ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'inte_c.nombres', 'inte_c.apellido_paterno', 'inte_c.apellido_materno'), null, false)
                     ->groupEnd();
             }
 
@@ -272,6 +280,7 @@ class InternamientosController extends ResourceController
                 'estado' => 'RETENIDO',
             ];
 
+            $record['uuid'] = \App\Libraries\Identificador::nuevo();
             $db->table('ordenes_internamiento')->insert($record);
             $insertId = $db->insertID();
 

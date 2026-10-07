@@ -8,9 +8,10 @@ import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { sanitizarMensaje, leerMensajeError, apiFetch } from '../config/api'
-import { useListaServidor, armarConsulta } from '../hooks/useListaServidor'
+import { useListaServidor } from '../hooks/useListaServidor'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { formatNumeroTarjeta } from '../utils/formatters'
 
 import { FloatingInput, FloatingSelect, FloatingTextarea, RoundedSelect } from '../components/ui/FormInputs'
@@ -203,17 +204,20 @@ export function Asociaciones() {
   useEffect(() => {
     const rawQuery = (repSearch || '').trim()
     if (!rawQuery || rawQuery.length < 2) {
+      setRepResults([])
+      setIsSearchingRep(false)
       return
     }
+    const controller = new AbortController()
     const timer = setTimeout(() => {
       setIsSearchingRep(true)
-      apiFetch(`/personas?buscar=${encodeURIComponent(rawQuery)}&porPagina=10`)
+      apiFetch(`/personas?page=1&buscar=${encodeURIComponent(rawQuery)}&porPagina=10`, { signal: controller.signal })
         .then((response) => response.ok ? response.json() : { data: [] })
-        .then((payload) => setRepResults(payload.data || []))
+        .then((payload) => { if (!controller.signal.aborted) setRepResults(payload.data || []) })
         .catch(() => {})
-        .finally(() => setIsSearchingRep(false))
+        .finally(() => { if (!controller.signal.aborted) setIsSearchingRep(false) })
     }, 250)
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); controller.abort() }
   }, [repSearch])
 
   const getPersonaNombre = (p) => {
@@ -253,17 +257,11 @@ export function Asociaciones() {
 
   // Exportar descarga todo el resultado filtrado (sin paginar), no solo la página visible.
   const fetchTodasOrgs = async () => {
-    const res = await apiFetch(`/asociaciones?${armarConsulta(filtrosOrgs).toString()}`)
-    if (!res.ok) return asociaciones
-    const payload = await res.json()
-    return payload.data ?? []
+    return fetchTodasLasFilas('/asociaciones', filtrosOrgs)
   }
 
   const fetchTodosSocios = async () => {
-    const res = await apiFetch(`/asociaciones/socios?${armarConsulta(filtrosSocios).toString()}`)
-    if (!res.ok) return sociosList
-    const payload = await res.json()
-    return payload.data ?? []
+    return fetchTodasLasFilas('/asociaciones/socios', filtrosSocios)
   }
 
   const handleExportExcel = async () => {
@@ -271,7 +269,7 @@ export function Asociaciones() {
     await new Promise(r => setTimeout(r, 50))
     try {
       const listToExport = await fetchTodasOrgs()
-          exportToExcel({
+          await exportToExcel({
             filename: `Padron_Asociaciones_${new Date().getFullYear()}.xls`,
             sheetName: 'Asociaciones',
             title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
@@ -347,8 +345,8 @@ export function Asociaciones() {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
-      const socios = await fetchTodosSocios()
-      const listToExport = socios.flatMap((socio) => (socio.vinculos?.length ? socio.vinculos : [null]).map((v) => ({
+      const listToExport = { endpoint: '/asociaciones/socios', params: filtrosSocios,
+        transformar: socios => socios.flatMap((socio) => (socio.vinculos?.length ? socio.vinculos : [null]).map((v) => ({
         nombre: socio.nombre,
         documento: socio.documento,
         asociacionNombre: v?.asociacionNombre || '-',
@@ -357,8 +355,8 @@ export function Asociaciones() {
         placas: v ? v.placas.join(', ') : '',
         telefono: socio.telefono,
         email: socio.email,
-      })))
-      exportToExcel({
+      }))) }
+      await exportToExcel({
         filename: `Padron_Socios_${new Date().getFullYear()}.xls`,
         sheetName: 'Socios',
         title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
@@ -367,7 +365,7 @@ export function Asociaciones() {
           { label: 'Filtro Asociación', value: socioOrgFilter === 'TODOS' ? 'Todas' : (orgOptionsRaw.find((o) => String(o.id) === String(socioOrgFilter))?.razonSocial || socioOrgFilter) },
           { label: 'Filtro Tipo', value: socioTipoFilter === 'TODOS' ? 'Todos' : (socioTipoFilter === 'PARTICULAR' ? 'Particular' : 'Asociación') },
           { label: 'Filtro Vehículos', value: FILTER_SOCIO_VEHICULOS_OPTIONS.find((o) => o.value === socioVehiculosFilter)?.label || 'Todos' },
-          { label: 'Total Registros', value: `${socios.length} socios · ${listToExport.length} vínculos` },
+          { label: 'Registros', value: 'Todos los vínculos que coinciden con los filtros' },
         ],
         columns: [
           { header: 'N°', align: 'center', width: 45, render: (_, __, i) => i + 1 },
@@ -1246,7 +1244,7 @@ export function Asociaciones() {
                             onFocus={() => {
                               setShowRepResults(true)
                               if (repResults.length === 0 && !repSearch) {
-                                apiFetch('/personas?porPagina=10')
+                                apiFetch('/personas?page=1&porPagina=10')
                                   .then((res) => (res.ok ? res.json() : { data: [] }))
                                   .then((payload) => setRepResults(payload.data || []))
                                   .catch(() => {})

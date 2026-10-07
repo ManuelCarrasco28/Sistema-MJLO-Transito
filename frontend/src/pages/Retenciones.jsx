@@ -191,7 +191,7 @@ export function Retenciones({ user }) {
     await new Promise(r => setTimeout(r, 50))
     try {
       const data = await fetchTodoElFiltro()
-          exportToExcel({
+          await exportToExcel({
             filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.xls`,
             sheetName: 'Internamientos',
             title: 'REGISTRO DE INTERNAMIENTOS EN DEPÓSITO MUNICIPAL DE VEHÍCULOS',

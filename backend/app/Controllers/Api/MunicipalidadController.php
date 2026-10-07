@@ -70,7 +70,12 @@ class MunicipalidadController extends ResourceController
         $config = $this->configuracionSistema($db);
         $permitePapeleta = ($config['mobile_permite_aplicar_papeleta']['valor'] ?? '0') === '1';
 
-        $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
+        // El inspector sale de la sesión: antes cualquier usuario podía ver el conteo de otro enviando su
+        // inspector_id. Solo el personal de oficina puede consultar a otro inspector.
+        $usuarioSesion = \App\Libraries\Acceso::usuario();
+        $inspectorId = \App\Libraries\Acceso::esOficina($usuarioSesion)
+            ? (int) ($this->request->getGet('inspector_id') ?: ($usuarioSesion['id_persona'] ?? 0))
+            : (int) ($usuarioSesion['id_persona'] ?? 0);
         $hoy = date('Y-m-d');
 
         $papeletasHoy = 0;
@@ -164,6 +169,11 @@ class MunicipalidadController extends ResourceController
         $uit = (float)($input['uit'] ?? 0);
         $token = trim((string)($input['token'] ?? ''));
 
+        // El token de PIDE es un secreto: solo el SuperAdmin puede ponerlo o cambiarlo.
+        if ($token !== '' && \App\Libraries\Acceso::rol() !== 'SUPERADMIN') {
+            return $this->fail('Solo un SuperAdmin puede registrar o cambiar el token de PIDE.', 403);
+        }
+
         if ($idMunicipalidad <= 0 || !preg_match('/^\d{4}$/', $anio) || $uit <= 0) {
             return $this->failValidationErrors('Indique municipalidad, año válido y UIT mayor a cero.');
         }
@@ -201,7 +211,8 @@ class MunicipalidadController extends ResourceController
         // una edición, se conserva el token que ya estaba guardado en vez de
         // borrarlo sin querer.
         if ($token !== '' || !$existing) {
-            $data['token'] = $token === '' ? null : $token;
+            // Se guarda cifrado (AES-256 con encryption.key del .env): nunca en texto plano.
+            $data['token'] = $token === '' ? null : \App\Libraries\SecretoCifrado::cifrar($token);
         }
 
         if ($existing) {
@@ -214,10 +225,34 @@ class MunicipalidadController extends ResourceController
             $tokenConfigurado = $token !== '';
         }
 
+        if ($token !== '') {
+            \App\Services\AuditoriaService::registrar('CONFIGURACION', 'CAMBIAR_TOKEN_PIDE', "Se registró o cambió el token de PIDE del año {$anio}", ['anio' => $anio]);
+        }
+
+        // Nunca se devuelve el token (ni siquiera cifrado).
+        unset($data['token']);
+
         return $this->respond([
             'message' => 'UIT del año guardada correctamente.',
             'data' => array_merge($data, ['id' => $id, 'tokenConfigurado' => $tokenConfigurado]),
         ]);
+    }
+
+    /** Quita el token de PIDE de un año fiscal (lo deja vacío) sin borrar el año ni su UIT. */
+    public function quitarTokenAnio($id = null)
+    {
+        $db = \Config\Database::connect();
+
+        $anio = $db->table('municipalidad_anio')->select('id, anio')->where('id', (int) $id)->get()->getRowArray();
+        if (!$anio) {
+            return $this->failNotFound('Año fiscal no encontrado.');
+        }
+
+        $db->table('municipalidad_anio')->where('id', $anio['id'])->update(['token' => null]);
+
+        \App\Services\AuditoriaService::registrar('CONFIGURACION', 'QUITAR_TOKEN_PIDE', "Se quitó el token de PIDE del año {$anio['anio']}", ['anio' => $anio['anio']]);
+
+        return $this->respond(['message' => 'Token de PIDE quitado correctamente.']);
     }
 
     public function deleteAnio($id = null)

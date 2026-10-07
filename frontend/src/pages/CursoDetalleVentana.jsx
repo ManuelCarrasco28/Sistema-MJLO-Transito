@@ -1,11 +1,37 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { estadoParticipante, actualizarParticipante } from '../utils/participantesCurso'
+import { inscripcionCursoAbierta, fechaLocalActual } from '../utils/calendarioCurso'
 import { useParams, useNavigate } from 'react-router-dom'
 import { apiFetch, getCachedData } from '../config/api'
 import { showError, showToast } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
+import './CursoDetalleVentana.css'
+import { retirarInscripcion } from '../utils/retirarInscripcion'
 
+// Foto redonda de la persona; sin foto (o si no carga) se muestra un avatar con la silueta de una persona.
+const CLASES_FOTO_PARTICIPANTE = 'size-11 shrink-0 rounded-full border border-slate-200 bg-white object-cover dark:border-[var(--border-strong)]'
+
+function AvatarParticipante({ fotoUrl }) {
+  const [fallo, setFallo] = React.useState(false)
+  if (fotoUrl && !fallo) {
+    return <img src={fotoUrl} alt="" loading="lazy" onError={() => setFallo(true)} className={CLASES_FOTO_PARTICIPANTE} />
+  }
+  return (
+    <span className="grid size-11 shrink-0 place-items-center rounded-full border border-slate-200 bg-slate-100 text-slate-400 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-500" aria-hidden="true">
+      <Icon name="user" className="size-5" />
+    </span>
+  )
+}
+
+function fechaLegible(valor) {
+  const fecha = /^\d{4}-\d{2}-\d{2}$/.test(valor || '') ? new Date(valor + 'T12:00:00Z') : null
+  return fecha && !Number.isNaN(fecha.getTime())
+    ? new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(fecha)
+    : 'Sin registrar'
+}
 
 function sanitizarMensaje(msg, defaultMsg) {
   if (typeof msg !== 'string') return defaultMsg
@@ -26,7 +52,7 @@ export default function CursoDetalleVentana() {
   const navigate = useNavigate()
   const [curso, setCurso] = useState(() => {
     const cached = getCachedData('/cursos')
-    if (cached) return cached.find(x => x.id == id) || null
+    if (cached) return cached.find(x => x.id == id || x.uuid === id) || null
     return null
   })
   const [loading, setLoading] = useState(!getCachedData('/cursos'))
@@ -38,6 +64,58 @@ export default function CursoDetalleVentana() {
   const [participanteResults, setParticipanteResults] = useState([])
   const [isSearchingParticipante, setIsSearchingParticipante] = useState(false)
   const [inscribiendo, setInscribiendo] = useState(false)
+  const buscadorRef = useRef(null)
+  const resultadosRef = useRef(null)
+  const [posicionResultados, setPosicionResultados] = useState(null)
+
+  useLayoutEffect(() => {
+    if (!showParticipanteResults || participanteSearch.trim().length < 2) {
+      setPosicionResultados(null)
+      return
+    }
+    const colocar = () => {
+      const input = buscadorRef.current
+      if (!input) return
+      const rect = input.getBoundingClientRect()
+      const espacioAbajo = window.innerHeight - rect.bottom - 16
+      const espacioArriba = rect.top - 16
+      const arriba = espacioAbajo < 220 && espacioArriba > espacioAbajo
+      const maxHeight = Math.max(0, Math.min(280, arriba ? espacioArriba : espacioAbajo))
+      const left = Math.max(12, rect.left)
+      setPosicionResultados({
+        left, width: Math.max(0, Math.min(rect.width, document.documentElement.clientWidth - left - 12)),
+        maxHeight, ...(arriba ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 })
+      })
+    }
+    const cerrarFuera = event => {
+      if (!buscadorRef.current?.contains(event.target) && !resultadosRef.current?.contains(event.target)) setShowParticipanteResults(false)
+    }
+    colocar()
+    window.addEventListener('resize', colocar)
+    window.addEventListener('scroll', colocar, true)
+    document.addEventListener('pointerdown', cerrarFuera)
+    return () => {
+      window.removeEventListener('resize', colocar)
+      window.removeEventListener('scroll', colocar, true)
+      document.removeEventListener('pointerdown', cerrarFuera)
+    }
+  }, [showParticipanteResults, participanteSearch])
+  const [retirando, setRetirando] = useState(null)
+
+  const handleRetirar = async (participante) => {
+    const clave = participante.uuid || participante.idInscripcion || participante.dni
+    setRetirando(clave)
+    try {
+      const resultado = await retirarInscripcion(participante)
+      if (!resultado) return
+      setCurso(actual => {
+        const participantes = actual.participantes.filter(p => (p.uuid || p.idInscripcion || p.dni) !== clave)
+        return { ...actual, participantes, inscritos: participantes.length, cuposInscritos: resultado.cuposInscritos }
+      })
+    } finally {
+      setRetirando(null)
+    }
+  }
 
   // Persona Form states
   const [isPersonaModalOpen, setPersonaModalOpen] = useState(false)
@@ -115,7 +193,7 @@ export default function CursoDetalleVentana() {
           const resInsData = await resIns.json()
           if (resIns.ok) {
             const updatedParticipantes = [...(curso.participantes || []), resInsData.data]
-            setCurso({ ...curso, participantes: updatedParticipantes, inscritos: updatedParticipantes.length })
+            setCurso({ ...curso, participantes: updatedParticipantes, inscritos: updatedParticipantes.length, cuposInscritos: (curso.cuposInscritos ?? 0) + 1 })
             showToast('Persona inscrita en el curso automáticamente')
           } else {
             showError('Inscripción pendiente', resInsData?.messages?.error || resInsData?.message || 'La persona se registró, pero no se pudo inscribir en el curso. Inscríbala manualmente.')
@@ -132,12 +210,17 @@ export default function CursoDetalleVentana() {
 
   // Cargar el curso
   useEffect(() => {
+    const controller = new AbortController()
+    setLoading(true)
+    setError('')
     async function load() {
       try {
-        const res = await apiFetch('/cursos')
+        const res = await apiFetch(`/cursos/${encodeURIComponent(id)}`, { signal: controller.signal })
+        if (!res.ok) throw new Error('Curso no encontrado.')
         const data = await res.json()
+        if (controller.signal.aborted) return
         if (data.data) {
-          const c = data.data.find(x => x.id == id)
+          const c = data.data
           if (c) {
             setCurso(c)
             document.title = `Curso ${c.codigo} - Detalles`
@@ -146,12 +229,13 @@ export default function CursoDetalleVentana() {
           }
         }
       } catch (e) {
-        setError('Error al cargar datos.')
+        if (!controller.signal.aborted) setError('No se pudo cargar el curso.')
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     }
     load()
+    return () => controller.abort()
   }, [id])
 
   // Broadcast channel for notifying parent window
@@ -171,11 +255,13 @@ export default function CursoDetalleVentana() {
       return
     }
     const rawQuery = participanteSearch.trim()
+    const controller = new AbortController()
     const timer = setTimeout(() => {
       setIsSearchingParticipante(true)
-      apiFetch(`/personas?buscar=${encodeURIComponent(rawQuery)}&porPagina=12`)
+      apiFetch(`/personas?page=1&buscar=${encodeURIComponent(rawQuery)}&porPagina=12`, { signal: controller.signal })
         .then((res) => (res.ok ? res.json() : { data: [] }))
         .then((payload) => {
+          if (controller.signal.aborted) return
           const list = (payload.data || []).filter((p) => {
             if (getPersonaNombre(p).toUpperCase().includes('SIN PROPIETARIO')) return false
             return true
@@ -183,87 +269,103 @@ export default function CursoDetalleVentana() {
           setParticipanteResults(list.slice(0, 8))
         })
         .catch(() => {})
-        .finally(() => setIsSearchingParticipante(false))
+        .finally(() => { if (!controller.signal.aborted) setIsSearchingParticipante(false) })
     }, 250)
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); controller.abort() }
   }, [participanteSearch, curso])
 
   if (loading) return <div className="p-10 text-center font-bold text-slate-500">Cargando curso...</div>
   if (error || !curso) return <div className="p-10 text-center font-bold text-rose-500">{error || 'Curso no encontrado.'}</div>
 
+  const inscritos = Number(curso.cuposInscritos ?? curso.participantes?.length ?? 0)
+  const capacidad = Number(curso.cuposTotales || 0)
+  const disponibles = Math.max(0, capacidad - inscritos)
+  const ocupacion = capacidad > 0 ? Math.min(100, inscritos / capacidad * 100) : 0
+  const inscripcionAbierta = inscripcionCursoAbierta(curso)
+  const cursoIniciado = fechaLocalActual() >= (curso.fecha || curso.fecha_inicio || '')
+
   return (
-    <div className="h-screen w-full bg-white dark:bg-[#1C2438] flex flex-col font-sans overflow-hidden">
-      <div className="w-full flex flex-col flex-1 h-full">
-        
-        {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-5 dark:border-[var(--border)] dark:bg-[#1C2438]">
-          <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate('/cursos')}
-                className="mr-1 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition dark:bg-[var(--bg-subtle)] dark:hover:bg-slate-700 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer shadow-xs active:scale-95"
-                title="Volver a la lista de cursos"
-              >
-                <Icon name="arrowLeft" className="size-5" />
-              </button>
-            <span className="grid size-10 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
-              <Icon name="course" className="size-5" />
-            </span>
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">{curso.titulo}</h3>
-              <p className="text-sm font-mono text-slate-500">{curso.codigo}</p>
+    <div className="curso-detalle">
+      <div className="curso-detalle__scroll">
+        <div className="curso-detalle__container">
+          <div className="curso-detalle__hero">
+            <button onClick={() => navigate('/cursos')} className="curso-detalle__back" type="button">
+              <Icon name="arrowLeft" className="size-4" /> Volver a cursos
+            </button>
+            <div className="curso-detalle__heading">
+              <span className="curso-detalle__symbol"><Icon name="course" className="size-7" /></span>
+              <div className="curso-detalle__title">
+                <p className="curso-detalle__eyebrow">SEGURIDAD VIAL · DETALLE DEL CURSO</p>
+                <h1>{curso.titulo}</h1>
+                <span className="curso-detalle__code">{curso.codigo}</span>
+              </div>
+              <StatusBadge status={curso.estado} />
             </div>
-          </div>
-          <StatusBadge status={curso.estado} />
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          
-          {/* Detalles info */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-[var(--bg-subtle)] p-5 rounded-2xl border border-slate-100 dark:border-slate-800/60">
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha</p>
-              <p className="font-semibold">{curso.fecha}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Horario</p>
-              <p className="font-semibold">{curso.horario}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Inscritos</p>
-              <p className="font-semibold">{curso.inscritos || (curso.participantes?.length || 0)} / {curso.cuposTotales}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Instructor</p>
-              <p className="font-semibold truncate" title={curso.instructor}>{curso.instructor || 'Por asignar'}</p>
+            <div className="curso-detalle__metadata">
+              <span><Icon name="user" className="size-4" /><span><small>Instructor</small>{curso.instructor || 'Por asignar'}</span></span>
+              <span><Icon name="building" className="size-4" /><span><small>Lugar</small>{curso.lugar || 'Por confirmar'}</span></span>
             </div>
           </div>
 
-          <div className="border-t border-slate-100 dark:border-[var(--border)] pt-8">
-            <h4 className="text-base font-extrabold text-slate-800 dark:text-slate-200 mb-5 flex items-center gap-2">
-              <Icon name="users" className="size-4" />
-              Participantes del Curso
-            </h4>
+          <div className="curso-detalle__overview">
+            <div className="curso-detalle__card">
+              <div className="curso-detalle__card-title"><Icon name="permit" className="size-5" /><h2>Fechas del curso</h2></div>
+              <div className="curso-detalle__dates">
+                <div><small>Inicio</small><strong>{fechaLegible(curso.fecha)}</strong></div>
+                <div><small>Finalización</small><strong>{fechaLegible(curso.fechaFin || curso.fecha_fin)}</strong></div>
+              </div>
+              <p className="curso-detalle__card-footer">Horario: <strong>{curso.horario || 'Por confirmar'}</strong></p>
+            </div>
+            <div className="curso-detalle__card">
+              <div className="curso-detalle__card-title"><Icon name="idCard" className="size-5" /><h2>Inscripciones</h2></div>
+              <div className="curso-detalle__dates">
+                <div><small>Apertura</small><strong>{fechaLegible(curso.fechaInscripcionInicio)}</strong></div>
+                <div><small>Cierre</small><strong>{fechaLegible(curso.fechaInscripcionFin)}</strong></div>
+              </div>
+              <p className="curso-detalle__card-footer"><span className={inscripcionAbierta ? 'curso-detalle__open' : ''}>{inscripcionAbierta ? 'Inscripciones abiertas' : 'Inscripciones no disponibles'}</span></p>
+            </div>
+            <div className="curso-detalle__card">
+              <div className="curso-detalle__card-title"><Icon name="people" className="size-5" /><h2>Capacidad del curso</h2></div>
+              <div className="curso-detalle__capacity"><strong>{inscritos}<span> / {capacidad}</span></strong><span>{disponibles} {disponibles === 1 ? 'cupo disponible' : 'cupos disponibles'}</span></div>
+              <div className="curso-detalle__progress" role="progressbar" aria-label="Ocupación del curso" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ocupacion)}><span style={{ width: ocupacion + '%' }} /></div>
+              <p className="curso-detalle__card-footer">Participantes inscritos</p>
+            </div>
+          </div>
+
+          <div className="curso-detalle__participants">
+            <div className="curso-detalle__participants-heading">
+              <div><h2>Participantes <span>{curso.participantes?.length || 0}</span></h2><p>Gestiona las inscripciones, la asistencia y los resultados del curso.</p></div>
+              <span className="curso-detalle__list-label">LISTA DEL CURSO</span>
+            </div>
 
             {/* Buscador de inscripción */}
             {(() => {
-              const cupoLleno = curso.cuposTotales > 0 && (curso.participantes?.length || 0) >= curso.cuposTotales
+              if (!inscripcionCursoAbierta(curso)) return <p className="text-sm text-slate-500">Las inscripciones no están abiertas para este curso.</p>
+              const cupoLleno = curso.cuposTotales > 0 && (curso.cuposInscritos ?? curso.participantes?.length ?? 0) >= curso.cuposTotales
               return cupoLleno ? (
                 <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
                   Este curso ya alcanzó su cupo máximo ({curso.cuposTotales} participantes).
                 </div>
               ) : (
-                <div className="relative mb-6">
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <div className="relative flex-1">
+                <div className="relative mb-6 curso-detalle__search">
+                    <label htmlFor="buscar-participante">Inscribir participante</label>
+                    <div className="curso-detalle__search-row">
+                      <div className="curso-detalle__search-field">
                     <Icon name="search" className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     <input
                       type="text"
-                      placeholder="Buscar persona por DNI o nombres para inscribirla..."
+                      id="buscar-participante"
+                      ref={buscadorRef}
+                      aria-expanded={showParticipanteResults && participanteSearch.trim().length >= 2}
+                      aria-controls="resultados-participante"
+                      autoComplete="off"
+                      onKeyDown={e => { if (e.key === 'Escape') setShowParticipanteResults(false) }}
+                      placeholder="Busca por DNI o nombres"
                       value={participanteSearch}
                       onFocus={() => setShowParticipanteResults(true)}
                       onChange={(e) => {
                         setParticipanteSearch(e.target.value)
+                        setIsSearchingParticipante(e.target.value.trim().length >= 2)
                         setShowParticipanteResults(true)
                       }}
                       className="w-full h-[46px] pl-11 pr-4 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-800 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
@@ -280,13 +382,16 @@ export default function CursoDetalleVentana() {
                         className="inline-flex h-[46px] items-center justify-center gap-2 rounded-xl bg-purple-600 px-6 text-sm font-bold text-white hover:bg-purple-700 transition shadow-xs cursor-pointer active:scale-95 shrink-0"
                       >
                         <Icon name="idCard" className="size-4" />
-                        Nueva Persona
+                        Registrar persona
                       </button>
                     </div>
 
-                    {showParticipanteResults && participanteSearch.trim() && (
-                    <div className="absolute left-0 right-0 top-full mt-2 z-50 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
-                      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-[var(--border)] text-xs font-bold text-slate-400 uppercase">
+                    {showParticipanteResults && participanteSearch.trim().length >= 2 && posicionResultados && createPortal(
+                    <div ref={resultadosRef} id="resultados-participante" role="region" aria-label="Resultados de personas"
+                      style={posicionResultados}
+                      onKeyDown={e => { if (e.key === 'Escape') { setShowParticipanteResults(false); buscadorRef.current?.focus() } }}
+                      className="curso-detalle__results rounded-xl border border-slate-200 bg-white shadow-xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
+                      <div className="curso-detalle__results-header flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-[var(--border)] text-xs font-bold text-slate-400 uppercase">
                         <span>Resultados ({participanteResults.length})</span>
                         <button type="button" onClick={() => setShowParticipanteResults(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">✕ Cerrar</button>
                       </div>
@@ -295,7 +400,7 @@ export default function CursoDetalleVentana() {
                           Buscando en padrón de ciudadanos...
                         </div>
                       )}
-                      {!isSearchingParticipante && participanteResults.length === 0 ? (
+                      {isSearchingParticipante ? null : participanteResults.length === 0 ? (
                         <div className="p-4 text-center text-sm text-slate-500 font-medium space-y-3">
                           <p>No se encontró ninguna persona.</p>
                           <a
@@ -331,14 +436,14 @@ export default function CursoDetalleVentana() {
                                   setShowParticipanteResults(false)
 
                                   const updatedParticipantes = [...(curso.participantes || []), result.data];
-                                  setCurso({ ...curso, participantes: updatedParticipantes, inscritos: updatedParticipantes.length });
+                                  setCurso({ ...curso, participantes: updatedParticipantes, inscritos: updatedParticipantes.length, cuposInscritos: (curso.cuposInscritos ?? 0) + 1 });
                                 } catch (err) {
                                   showError('Error', sanitizarMensaje(err.message, 'No se pudo registrar la inscripción.'));
                                 } finally {
                                   setInscribiendo(false)
                                 }
                               }}
-                              className="w-full text-left px-4 py-3 mt-1 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-950/30 flex items-center justify-between gap-3 transition-colors cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="curso-detalle__result w-full text-left px-3 py-2 hover:bg-purple-50 dark:hover:bg-purple-950/30 flex items-center justify-between gap-3 transition-colors cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <div className="min-w-0">
                                 <p className="font-bold text-sm text-slate-800 dark:text-slate-100 group-hover:text-purple-700 dark:group-hover:text-purple-400">
@@ -353,7 +458,7 @@ export default function CursoDetalleVentana() {
                           )
                         })
                       )}
-                    </div>
+                    </div>, document.body
                   )}
                 </div>
               )
@@ -361,9 +466,10 @@ export default function CursoDetalleVentana() {
 
             {/* Listado de inscritos */}
             {(!curso.participantes || curso.participantes.length === 0) ? (
-              <div className="text-center py-10 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
-                <Icon name="users" className="size-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                <p className="text-sm font-medium text-slate-500">Aún no hay participantes inscritos.</p>
+              <div className="curso-detalle__empty">
+                <span><Icon name="people" className="size-7" /></span>
+                <h3>Aún no hay participantes</h3>
+                <p>{inscripcionAbierta && disponibles > 0 ? 'Busca una persona por DNI o nombre para registrar la primera inscripción.' : 'Las personas inscritas aparecerán aquí.'}</p>
               </div>
             ) : (
               <ul className="space-y-3">
@@ -372,80 +478,106 @@ export default function CursoDetalleVentana() {
                   const nameB = `${b.apellido_paterno || b.apellidoPaterno || ''} ${b.apellido_materno || b.apellidoMaterno || ''} ${b.nombres || ''}`.trim().toLowerCase();
                   return nameA.localeCompare(nameB);
                 }).map((p, i) => {
-                  const estadoReal = curso.estado === 'FINALIZADO' 
-                    ? (p.asistio ? 'APROBADO' : 'DESAPROBADO') 
-                    : (p.estado || 'PENDIENTE');
+                  const estadoReal = estadoParticipante(p, curso.estado);
                     
                   return (
-                  <li key={i} className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white dark:bg-[var(--bg-subtle)] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-xs hover:shadow-md transition-shadow gap-3">
-                    <div>
+                  <li key={p.uuid || p.idInscripcion || p.dni || p.numero || i} className="curso-detalle__participant flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white dark:bg-[var(--bg-subtle)] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-xs hover:shadow-md transition-shadow gap-3">
+                    <div className="curso-detalle__person flex items-center gap-3">
+                      <AvatarParticipante fotoUrl={p.fotoUrl} />
+                      <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-start gap-2">
                         <span className="text-slate-400 font-mono text-xs mt-0.5">{i + 1}.</span>
                         <span>{p.apellido_paterno || p.apellidoPaterno} {p.apellido_materno || p.apellidoMaterno}, {p.nombres}</span>
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <p className="text-xs text-slate-500 font-mono bg-slate-100 dark:bg-slate-800 px-1.5 rounded">DNI: {p.dni || p.numero}</p>
+                        {p.fechaInscripcion && (
+                          <p className="text-xs text-slate-500">Inscrito el {String(p.fechaInscripcion).slice(0, 10).split('-').reverse().join('/')}</p>
+                        )}
+                        {curso.estado === 'FINALIZADO' && estadoReal === 'APROBADO' && (
+                          <p className={`text-xs font-semibold ${p.carnetEntregado ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                            {p.carnetEntregado
+                              ? `Carnet entregado${p.carnetFechaEntrega ? ` el ${String(p.carnetFechaEntrega).slice(0, 10).split('-').reverse().join('/')}` : ''}${p.carnetEntregadoPor ? ` · ${p.carnetEntregadoPor}` : ''}`
+                              : 'Carnet por entregar'}
+                          </p>
+                        )}
+                      </div>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-3">
+                    <div className="curso-detalle__actions">
                       {/* Controles de Asistencia y Estado */}
-                      <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#1C2438] px-3 py-2 rounded-lg border border-slate-200 dark:border-[var(--border-strong)]">
-                        <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            checked={!!p.asistio}
+                      {/* Asistencia y resultado solo desde que comienza el curso; antes es solo inscripción. */}
+                      {cursoIniciado && (
+                        <div className="curso-detalle__attendance bg-slate-50 dark:bg-[#1C2438] px-3 py-2 rounded-lg border border-slate-200 dark:border-[var(--border-strong)]">
+                          <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={Number(p.asistio) === 1}
+                              onChange={async (e) => {
+                                const asistio = e.target.checked ? 1 : 0;
+                                try {
+                                  const res = await apiFetch(`/cursos/${curso.id}/participantes/${p.dni || p.numero}`, {
+                                    method: 'PUT',
+                                    body: { asistio }
+                                  });
+                                  if (!res.ok) throw new Error('Error al guardar asistencia');
+                                
+                                  setCurso(actual => ({ ...actual, participantes: actualizarParticipante(actual.participantes, p, { asistio }) }));
+                                  showToast(asistio ? 'Marcado como asistente' : 'Desmarcado como asistente');
+                                } catch (err) {
+                                  showError('Error', sanitizarMensaje(err.message, 'No se pudo guardar.'));
+                                }
+                              }}
+                              className="rounded size-4 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                            />
+                            Asistió
+                          </label>
+                        
+                          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700"></div>
+                        
+                          <select 
+                            value={p.estado || 'INSCRITO'}
                             onChange={async (e) => {
-                              const asistio = e.target.checked ? 1 : 0;
+                              const nuevoEstado = e.target.value;
                               try {
                                 const res = await apiFetch(`/cursos/${curso.id}/participantes/${p.dni || p.numero}`, {
                                   method: 'PUT',
-                                  body: { asistio }
+                                  body: { estado: nuevoEstado }
                                 });
-                                if (!res.ok) throw new Error('Error al guardar asistencia');
-                                
-                                const updatedParticipantes = [...curso.participantes];
-                                updatedParticipantes[i] = { ...p, asistio };
-                                setCurso({ ...curso, participantes: updatedParticipantes });
-                                showToast(asistio ? 'Marcado como asistente' : 'Desmarcado como asistente');
+                                if (!res.ok) throw new Error('Error al guardar estado');
+                              
+                                setCurso(actual => ({ ...actual, participantes: actualizarParticipante(actual.participantes, p, { estado: nuevoEstado }) }));
+                                showToast('Estado actualizado', 'editar');
                               } catch (err) {
-                                showError('Error', sanitizarMensaje(err.message, 'No se pudo guardar.'));
+                                showError('Error', 'No se pudo actualizar.');
                               }
                             }}
-                            className="rounded size-4 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                          />
-                          Asistió
-                        </label>
-                        
-                        <div className="w-px h-5 bg-slate-200 dark:bg-slate-700"></div>
-                        
-                        <select 
-                          value={p.estado || 'INSCRITO'}
-                          onChange={async (e) => {
-                            const nuevoEstado = e.target.value;
-                            try {
-                              const res = await apiFetch(`/cursos/${curso.id}/participantes/${p.dni || p.numero}`, {
-                                method: 'PUT',
-                                body: { estado: nuevoEstado }
-                              });
-                              if (!res.ok) throw new Error('Error al guardar estado');
-                              
-                              const updatedParticipantes = [...curso.participantes];
-                              updatedParticipantes[i] = { ...p, estado: nuevoEstado };
-                              setCurso({ ...curso, participantes: updatedParticipantes });
-                              showToast('Estado actualizado', 'editar');
-                            } catch (err) {
-                              showError('Error', 'No se pudo actualizar.');
-                            }
-                          }}
-                          className={`text-xs font-bold bg-transparent outline-none cursor-pointer ${(p.estado === 'APROBADO' || estadoReal === 'APROBADO') ? 'text-emerald-600 dark:text-emerald-400' : (p.estado === 'DESAPROBADO' || estadoReal === 'DESAPROBADO') ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`}
-                        >
-                          <option value="INSCRITO">Inscrito</option>
-                          <option value="CONFIRMADO">Confirmado</option>
-                          <option value="APROBADO">Aprobado</option>
-                          <option value="DESAPROBADO">Desaprobado</option>
-                        </select>
-                      </div>
+                            className={`text-xs font-bold bg-transparent outline-none cursor-pointer ${(p.estado === 'APROBADO' || estadoReal === 'APROBADO') ? 'text-emerald-600 dark:text-emerald-400' : (p.estado === 'DESAPROBADO' || estadoReal === 'DESAPROBADO') ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`}
+                          >
+                            <option value="INSCRITO">Inscrito</option>
+                            <option value="CONFIRMADO">Confirmado</option>
+                            <option value="APROBADO">Aprobado</option>
+                            <option value="DESAPROBADO">Desaprobado</option>
+                          </select>
+                        </div>
+                      )}
+                      {(() => {
+                        // Estado del pago de la inscripción (el cobro se hace en Pagos)
+                        const pagado = String(p.estado_pago || p.estadoPago || '').toUpperCase() === 'PAGADO'
+                        return (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-sm)] border px-2 py-1 text-[11px] font-bold uppercase leading-none"
+                            style={pagado
+                              ? { color: 'var(--ok-fg)', backgroundColor: 'var(--ok-bg)', borderColor: 'var(--border-ok)' }
+                              : { color: 'var(--warn-fg)', backgroundColor: 'var(--warn-bg)', borderColor: 'var(--border-warn)' }}
+                            title={pagado ? 'La inscripción ya está pagada' : 'La inscripción aún no se ha pagado'}
+                          >
+                            <Icon name={pagado ? 'check' : 'clock'} className="size-3" />
+                            {pagado ? 'Pagado' : 'Sin pagar'}
+                          </span>
+                        )
+                      })()}
                       <div className="w-24 shrink-0 flex justify-end">
                         {estadoReal === 'APROBADO' ? (
                           <span className="text-emerald-600 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/50 dark:border-emerald-800/50 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase w-full text-center tracking-wider shadow-xs">Aprobado</span>
@@ -459,6 +591,11 @@ export default function CursoDetalleVentana() {
                           <span className="text-slate-600 bg-slate-50 border border-slate-200 dark:bg-slate-800/50 dark:border-slate-700/50 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase w-full text-center tracking-wider shadow-xs">{estadoReal}</span>
                         )}
                       </div>
+                      <button type="button" onClick={() => handleRetirar(p)} disabled={retirando !== null || inscribiendo}
+                        title="Retirar del curso" aria-label={`Retirar del curso a ${p.nombres || p.dni}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+                        <Icon name="trash" className="size-4" /> {retirando === (p.uuid || p.idInscripcion || p.dni) ? 'Retirando…' : 'Retirar'}
+                      </button>
                     </div>
                   </li>
                   )

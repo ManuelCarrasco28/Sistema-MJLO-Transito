@@ -6,6 +6,12 @@ use CodeIgniter\RESTful\ResourceController;
 
 class ReportesIntervencionController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'reportes_intervencion';
+    protected array $tablasUuidPorMetodo = [];
+    protected array $soloUuidEnEstricto = ['fotos', 'convertir', 'rechazar'];
+
     protected $format = 'json';
 
     public function index()
@@ -16,10 +22,9 @@ class ReportesIntervencionController extends ResourceController
             return $this->respond(['data' => []]);
         }
 
-        $this->ensureColumnasExtra($db);
 
         $query = $db->table('reportes_intervencion r')
-            ->select("
+            ->select("r.uuid AS uuid, 
                 r.*,
                 COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa_visual,
                 COALESCE(v.marca, '') AS vehiculo_marca,
@@ -46,6 +51,10 @@ class ReportesIntervencionController extends ResourceController
             ->join('operativos op', 'op.id = r.id_operativo', 'left');
 
         $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
+        $sesion = \App\Libraries\Acceso::usuario();
+        if (!\App\Libraries\Acceso::esOficina($sesion)) {
+            $inspectorId = (int) ($sesion['id_persona'] ?? -1);
+        }
         $dni = $this->request->getGet('dni');
         $placa = \App\Libraries\Placa::normalizar($this->request->getGet('placa'));
 
@@ -95,6 +104,13 @@ class ReportesIntervencionController extends ResourceController
     public function fotos($id)
     {
         $db = \Config\Database::connect();
+        $sesion = \App\Libraries\Acceso::usuario();
+        if (!\App\Libraries\Acceso::esOficina($sesion)) {
+            $dueno = $db->table('reportes_intervencion')->select('id_inspector')->where('id', $id)->get()->getRowArray();
+            if (!$dueno || (int) $dueno['id_inspector'] !== (int) ($sesion['id_persona'] ?? -1)) {
+                return $this->failNotFound('Reporte no encontrado.');
+            }
+        }
         $fotos = $db->table('reporte_intervencion_fotos')
             ->where('id_reporte', $id)
             ->get()->getResultArray();
@@ -115,6 +131,10 @@ class ReportesIntervencionController extends ResourceController
 
         $input = $this->request->getJSON(true) ?: $this->request->getPost() ?: [];
         $inspectorId = (int)($input['inspectorId'] ?? $input['id_inspector'] ?? 0);
+        $sesion = \App\Libraries\Acceso::usuario();
+        if (!\App\Libraries\Acceso::esOficina($sesion)) {
+            $inspectorId = (int) ($sesion['id_persona'] ?? 0);
+        }
         $placa = \App\Libraries\Placa::normalizar((string)($input['placa'] ?? $input['vehiculoPlaca'] ?? ''));
         $lugar = trim((string)($input['lugar'] ?? ''));
         $observaciones = trim((string)($input['observaciones'] ?? $input['observacionesAutoridad'] ?? ''));
@@ -155,7 +175,6 @@ class ReportesIntervencionController extends ResourceController
             $fechaHora = (new \DateTime('now', new \DateTimeZone('America/Lima')))->format('Y-m-d H:i:s');
         }
 
-        $this->ensureColumnasExtra($db);
 
         $db->transException(true)->transBegin();
         try {
@@ -196,6 +215,7 @@ class ReportesIntervencionController extends ResourceController
             }
 
             $db->table('reportes_intervencion')->insert([
+                'uuid' => \App\Libraries\Identificador::nuevo(),
                 'id_inspector' => $inspectorId,
                 'id_operativo' => $idOperativo,
                 'id_vehiculo' => $vehiculoId,
@@ -349,6 +369,7 @@ class ReportesIntervencionController extends ResourceController
             }
 
             $db->table('papeletas')->insert([
+                'uuid' => \App\Libraries\Identificador::nuevo(),
                 'numero_papeleta' => $tempNumero,
                 'id_vehiculo' => $vehiculoId,
                 'id_persona_infractor' => $personaId,
@@ -421,31 +442,5 @@ class ReportesIntervencionController extends ResourceController
         ]);
 
         return $this->respond(['message' => 'Reporte rechazado correctamente.']);
-    }
-
-    /**
-     * Migración perezosa: agrega id_operativo/id_conductor si la tabla aún
-     * no las tiene (instalaciones creadas antes de que existieran).
-     */
-    private function ensureColumnasExtra($db): void
-    {
-        if (!$db->fieldExists('id_operativo', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_operativo INT NULL AFTER id_papeleta');
-        }
-        if (!$db->fieldExists('id_conductor', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN id_conductor INT NULL AFTER id_vehiculo');
-        }
-        if (!$db->fieldExists('dueno_informal_nombres', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN dueno_informal_nombres VARCHAR(255) NULL AFTER placa');
-        }
-        if (!$db->fieldExists('dueno_informal_dni', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN dueno_informal_dni VARCHAR(20) NULL AFTER dueno_informal_nombres');
-        }
-        if (!$db->fieldExists('conductor_informal_nombres', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN conductor_informal_nombres VARCHAR(255) NULL AFTER dueno_informal_dni');
-        }
-        if (!$db->fieldExists('conductor_informal_dni', 'reportes_intervencion')) {
-            $db->query('ALTER TABLE reportes_intervencion ADD COLUMN conductor_informal_dni VARCHAR(20) NULL AFTER conductor_informal_nombres');
-        }
     }
 }

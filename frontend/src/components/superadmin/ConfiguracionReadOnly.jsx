@@ -100,6 +100,29 @@ export function ConfiguracionReadOnly({
     }
   }
 
+  const handleQuitarToken = async (item) => {
+    const result = await showConfirm(
+      '¿Quitar el token de PIDE?',
+      `Se borrará el token de ${item.anio}. Mientras no registre uno nuevo, las consultas a RENIEC y SUNARP no funcionarán. El año y su UIT no se tocan.`,
+      'Sí, quitar token',
+      'Cancelar'
+    )
+    if (!result.isConfirmed) return
+
+    try {
+      const res = await apiFetch(`/municipalidad/anios/${item.id}/token`, { method: 'DELETE' })
+      if (res.ok) {
+        showToast('Token quitado correctamente', 'eliminar')
+        onReload()
+      } else {
+        const error = await res.json().catch(() => ({}))
+        showError(error.message || error.messages?.error || 'No se pudo quitar el token')
+      }
+    } catch (err) {
+      showError('Error de red al quitar el token')
+    }
+  }
+
   const handleSaveAnio = async (e) => {
     e.preventDefault()
     if (!municipalidad?.id) return
@@ -252,6 +275,16 @@ export function ConfiguracionReadOnly({
                           setAnioModalOpen(true)
                         }}
                       />
+                      {item.tokenConfigurado && (
+                        <button
+                          type="button"
+                          onClick={() => handleQuitarToken(item)}
+                          title="Quitar el token de PIDE"
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:border-amber-500 hover:text-white dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                        >
+                          <Icon name="lock" className="size-4" />
+                        </button>
+                      )}
                       <BotonAccion tipo="del" title="Eliminar año fiscal" onClick={() => handleDeleteAnio(item)} />
                     </div>
                   </td>

@@ -272,6 +272,12 @@ class AuthController extends ResourceController
         $isMobileApp = $this->request->getHeaderLine('X-Mobile-App') === 'MJLO-TRANSITO'
             || str_contains($userAgent, 'Dart/')
             || str_contains($userAgent, 'Dart ');
+        // Si hay app.mobileKey configurada, declararse "móvil" no basta (el encabezado y el agente se falsifican):
+        // solo se omite el captcha con la clave compartida de la app. Sin clave se conserva el comportamiento anterior.
+        $mobileKey = trim((string) env('app.mobileKey', ''));
+        if ($isMobileApp && $mobileKey !== '') {
+            $isMobileApp = hash_equals($mobileKey, $this->request->getHeaderLine('X-Mobile-Key'));
+        }
         $shouldValidateCaptcha = $turnstileSecret !== ''
             && !$isMobileApp
             && ENVIRONMENT === 'production';
@@ -445,8 +451,9 @@ class AuthController extends ResourceController
             return $this->failValidationErrors('Debe proporcionar la contraseña actual y la nueva contraseña.');
         }
 
-        if (strlen($nuevo) < 8) {
-            return $this->failValidationErrors('La nueva contraseña debe tener al menos 8 caracteres.');
+        $errorPassword = \App\Libraries\Acceso::errorDePassword((string) $nuevo, (string) ($cookieUser['usuario'] ?? ''));
+        if ($errorPassword) {
+            return $this->failValidationErrors($errorPassword);
         }
 
         $usuarioModel = new UsuarioModel();

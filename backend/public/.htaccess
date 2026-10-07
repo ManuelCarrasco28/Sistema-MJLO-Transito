@@ -57,3 +57,10 @@ ServerSignature Off
 	php_value memory_limit 1024M
 	php_value max_execution_time 300
 </IfModule>
+
+# ----------------------------------------------------------------------
+# Compresión de respuestas de la API (JSON). Sin esto, listas grandes viajaban sin comprimir (decenas de MB).
+# ----------------------------------------------------------------------
+<IfModule mod_deflate.c>
+	AddOutputFilterByType DEFLATE application/json text/plain text/css application/javascript
+</IfModule>

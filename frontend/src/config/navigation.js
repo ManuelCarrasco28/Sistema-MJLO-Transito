@@ -10,6 +10,7 @@ export const PREFETCH_MAP = {
   '/superadmin/trabajadores': () => import('../pages/Trabajadores'),
   '/asociaciones':            () => import('../pages/Asociaciones'),
   '/documentos':              () => import('../pages/Documentos'),
+  '/impresion':               () => import('../pages/CentroImpresion'),
   '/inspecciones':            () => import('../pages/Inspecciones'),
   '/papeletas':               () => import('../pages/Papeletas'),
   '/cursos':                  () => import('../pages/CursosSeguridad'),
@@ -71,6 +72,7 @@ export const navigationGroups = [
       { id: 'permisos',    label: 'Permisos y Autorizaciones', icon: 'routePermit',  path: '/permisos' },
       { id: 'cursos',      label: 'Cursos de Seguridad Vial',   icon: 'course',       path: '/cursos' },
       { id: 'documentos',  label: 'Documentos del Vehículo',   icon: 'folderShield', path: '/documentos' },
+      { id: 'impresion',   label: 'Centro de impresión',       icon: 'print',        path: '/impresion' },
     ]
   },
   {

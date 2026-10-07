@@ -160,7 +160,7 @@ export function Operativos({ user }) {
     await new Promise(r => setTimeout(r, 50))
     try {
       const data = await fetchTodoElFiltro()
-          exportToExcel({
+          await exportToExcel({
             filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.xls`,
             sheetName: 'Operativos',
             title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',

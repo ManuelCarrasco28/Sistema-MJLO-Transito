@@ -55,6 +55,8 @@ const FILTER_REPORTES_ESTADOS = [
 ];
 
 export function Papeletas({ user }) {
+  // Los inspectores emiten papeletas pero no cobran: el pago es solo del personal de oficina (también se exige en el servidor).
+  const puedeCobrar = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(String(user?.rol || '').toUpperCase())
   const cachedPapeletas = getCachedData('/papeletas')
   const cachedTipos = getCachedData('/tipos-infraccion')
   const cachedVeh = getCachedData('/vehiculos')
@@ -291,7 +293,7 @@ export function Papeletas({ user }) {
     await new Promise(r => setTimeout(r, 50))
     try {
       const data = await fetchTodoElFiltro()
-          exportToExcel({
+          await exportToExcel({
             filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.xls`,
             sheetName: 'Papeletas',
             title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
@@ -364,7 +366,7 @@ export function Papeletas({ user }) {
   const loadCatalogs = () => {
     Promise.all([
       apiFetch('/tipos-infraccion').then((res) => (res.ok ? res.json() : { data: [] })),
-      apiFetch('/vehiculos?porPagina=50').then((res) => (res.ok ? res.json() : { data: [] })),
+      apiFetch('/vehiculos?porPagina=50&ligero=1').then((res) => (res.ok ? res.json() : { data: [] })),
       apiFetch('/asociaciones?porPagina=50').then((res) => (res.ok ? res.json() : { data: [] })),
       apiFetch('/reportes-intervencion').then((res) => (res.ok ? res.json() : { data: [] })),
     ])
@@ -389,7 +391,7 @@ export function Papeletas({ user }) {
   }
 
   const loadVehiculos = () => {
-    apiFetch('/vehiculos?porPagina=50')
+    apiFetch('/vehiculos?porPagina=50&ligero=1')
       .then((res) => (res.ok ? res.json() : { data: [] }))
       .then((vehiculosRes) => {
         setVehiculos(vehiculosRes.data || [])
@@ -1343,7 +1345,7 @@ export function Papeletas({ user }) {
                       </td>
                       <td className="px-3 py-3.5 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          {p.estado === 'ANULADA' ? (
+                          {!puedeCobrar ? null : p.estado === 'ANULADA' ? (
                             <button
                               type="button"
                               disabled

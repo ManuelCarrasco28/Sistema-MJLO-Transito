@@ -105,6 +105,7 @@ export function TramiteFormularioModal({
   useEffect(() => {
     if (!isOpen) return
     const handleMsg = (e) => {
+      if (e.origin !== window.location.origin) return
       if (e.data?.type === 'PERMISO_GUARDADO') {
         if (onSave) onSave()
         onClose()

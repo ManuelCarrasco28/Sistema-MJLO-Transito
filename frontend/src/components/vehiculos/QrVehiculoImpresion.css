@@ -53,6 +53,9 @@
 }
 
 @media print {
+  /* Ventanas flotantes (viven fuera de #root): no deben salir en la impresión. */
+  .qrv-no-print { display: none !important; }
+
   body > .seccion-impresion-portal.qrv-portal {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;

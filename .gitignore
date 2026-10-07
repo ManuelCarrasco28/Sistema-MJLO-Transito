@@ -39,7 +39,18 @@ desktop.ini
 .idea/
 
 Database/
+# Mantener el código de migraciones versionado; la regla anterior evita dumps
+# locales llamados Database, pero no debe ocultar el código de la aplicación.
+!backend/app/Database/
+!backend/app/Database/Migrations/
+!backend/app/Database/Migrations/*.php
+# Seeder de datos de prueba controlado (MassiveSeeder queda excluido: inserta 2M filas).
+!backend/app/Database/Seeds/
+!backend/app/Database/Seeds/PoblarDatosMasivosSeeder.php
 *.sql
 !init-db/transitomunicipal.sql
 
 *.img/
+
+# Evidencias subidas: nunca dentro de public/
+backend/public/uploads/

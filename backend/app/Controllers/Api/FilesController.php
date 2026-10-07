@@ -35,6 +35,24 @@ class FilesController extends ResourceController
             return $this->failNotFound('Archivo no encontrado.');
         }
 
+        // Fotos y firmas de papeletas/reportes: el inspector solo puede ver las suyas. La oficina ve todo.
+        $sesion = \App\Libraries\Acceso::usuario();
+        if (!\App\Libraries\Acceso::esOficina($sesion) && in_array($subcarpeta, ['papeletas', 'reportes', 'firmas'], true)) {
+            $db = \Config\Database::connect();
+            $relativa = $subcarpeta . '/' . $archivo;
+            $miId = (int) ($sesion['id_persona'] ?? -1);
+            $consulta = match ($subcarpeta) {
+                'papeletas' => $db->table('papeleta_fotos f')->join('papeletas p', 'p.id = f.id_papeleta')
+                    ->where('f.foto', $relativa)->where('p.id_inspector', $miId),
+                'reportes' => $db->table('reporte_intervencion_fotos f')->join('reportes_intervencion r', 'r.id = f.id_reporte')
+                    ->where('f.foto', $relativa)->where('r.id_inspector', $miId),
+                default => $db->table('papeletas p')->where('p.firma_conductor_img', $relativa)->where('p.id_inspector', $miId),
+            };
+            if ($consulta->countAllResults() === 0) {
+                return $this->failNotFound('Archivo no encontrado.');
+            }
+        }
+
         $mime = mime_content_type($ruta) ?: 'application/octet-stream';
 
         // Prevenir sniffing y ejecución accidental en navegador

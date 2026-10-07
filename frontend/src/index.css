@@ -665,6 +665,8 @@ body.is-printing-ticket,
   .swal2-container,
   .swal2-backdrop-show,
   #toast-container,
+  #mjlo-toast-container,
+  .mjlo-toast-card,
   .toast-container {
     display: none !important;
   }

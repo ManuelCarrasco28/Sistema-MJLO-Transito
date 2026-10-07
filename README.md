@@ -73,6 +73,15 @@ docker compose up -d
 - `permisos_circulacion`: Resoluciones y autorizaciones de tránsito vehicular.
 - `internamientos` e `inventario_criterios`: Control de vehículos ingresados al depósito.
 
+### Identificadores públicos (UUID)
+Los registros principales llevan una columna `uuid` (UUID versión 7, librería `ramsey/uuid`, helper `App\Libraries\Identificador`): personas, vehículos, asociaciones, documentos, papeletas, inscripciones y cursos, CertiCAV, internamientos, órdenes de libertad, operativos, permisos, trámites, certificados de curso, reportes de intervención y pagos.
+
+- El `id` numérico sigue siendo la llave interna; el `uuid` es lo que se muestra, se pone en enlaces y se codifica en los QR. Es obligatorio (`NOT NULL`, único).
+- **Código QR de los vehículos:** es el mismo `uuid` del vehículo. El QR impreso lleva 3 líneas (`MDJLO - …`, `Codigo QR: <uuid>`, `Placa del vehiculo: <placa>`); la app móvil lee la línea `Codigo QR:`.
+- **Rutas:** las rutas de recursos aceptan el `uuid` además del id numérico (`GET /api/vehiculos/{uuid}`, `/api/papeletas/{uuid}/fotos`…). Con `app.uuidEstricto=true` en el `.env`, las rutas expuestas a roles bajos (fotos, firma y pago de papeletas, reportes de intervención) dejan de aceptar el id numérico. Se activa cuando la app móvil instalada ya use uuid.
+- **Registros nuevos:** todo insert debe pasar `'uuid' => Identificador::nuevo()`. Los seeders ya lo hacen. Si se carga data por otra vía, `php spark uuid:rellenar` asigna uuid a lo que falte (la columna es obligatoria, así que un insert sin uuid falla).
+  - Las migraciones versionadas están en `backend/app/Database/Migrations/`: en un servidor nuevo hay que ejecutar `php spark migrate`, o levantar la base desde `init-db/transitomunicipal.sql`, que ya incluye el esquema completo.
+
 ### Reiniciar y reaplicar base de datos limpia:
 Si necesitas resetear la base de datos a su estado inicial con las migraciones y seeders oficiales:
 
@@ -104,6 +113,14 @@ php spark serve --port 8080
 Asegúrate de configurar las credenciales en `backend/.env` apuntando a tu servidor MySQL/MariaDB local.
 
 ---
+
+### App móvil (Flutter) conectada a tu backend
+La app no lee el `.env` por sí sola: la dirección del backend se le pasa con `--dart-define=API_URL=...`. Para no escribirla cada vez:
+
+1. En el `.env` de la raíz (cada persona tiene el suyo y no se sube a GitHub; hay un modelo en `.env.example`) pon la IP de **tu PC** en la red Wi-Fi: `MOBILE_API_URL=http://192.168.0.10:8080/api`.
+2. Ejecuta el script desde `mobile/`: `.\run-dev.ps1` (Windows) o `./run-dev.sh` (Linux/macOS/Git Bash). Los argumentos extra pasan a `flutter run` (`.\run-dev.ps1 --device-id <dispositivo>`; en PowerShell `-d` no sirve porque es la abreviatura de `-Debug`).
+
+Sin `MOBILE_API_URL` la app usa `10.0.2.2` (emulador de Android). Si tu IP cambia, solo editas el `.env`; no se cambia nada en el código.
 
 ## 📄 Licencia y Derechos
 

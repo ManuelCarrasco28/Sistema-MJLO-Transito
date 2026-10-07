@@ -6,6 +6,12 @@ use CodeIgniter\RESTful\ResourceController;
 
 class OperativosController extends ResourceController
 {
+    use \App\Libraries\ResuelveUuid;
+
+    protected string $tablaUuid = 'operativos';
+    protected array $tablasUuidPorMetodo = ['activo' => 'personas'];
+    protected array $soloUuidEnEstricto = [];
+
     protected $format = 'json';
 
     private function parseInput(): array
@@ -128,7 +134,7 @@ class OperativosController extends ResourceController
         $db = \Config\Database::connect();
         
         $operativo = $db->table('operativos o')
-            ->select('o.id, o.nombre, o.lugar, o.fecha, o.hora_inicio, o.hora_fin, o.estado, ca.nombre as cargo_inspector')
+            ->select('o.uuid AS uuid, o.id, o.nombre, o.lugar, o.fecha, o.hora_inicio, o.hora_fin, o.estado, ca.nombre as cargo_inspector')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id', 'inner')
             ->join('desplazamiento_oficina dof', 'dof.id_trabajador = oi.id_inspector AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
             ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
@@ -268,6 +274,7 @@ class OperativosController extends ResourceController
         $estado = $input['estado'] ?? 'PROGRAMADO';
 
         $db->table('operativos')->insert([
+            'uuid' => \App\Libraries\Identificador::nuevo(),
             'nombre' => trim($input['nombre']),
             'lugar' => trim($input['lugar']),
             'fecha' => $input['fecha'],

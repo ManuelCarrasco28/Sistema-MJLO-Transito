@@ -207,10 +207,10 @@ export function Inspecciones() {
   useEffect(() => {
     Promise.all([
       apiFetch('/inspeccion-criterios').catch(() => ({ ok: false })),
-      apiFetch('/vehiculos?porPagina=100').catch(() => ({ ok: false })),
+      apiFetch('/vehiculos?porPagina=100&ligero=1').catch(() => ({ ok: false })),
       apiFetch('/personal?porPagina=100').catch(() => ({ ok: false })),
       apiFetch('/asociaciones?porPagina=100').catch(() => ({ ok: false })),
-      apiFetch('/personas?porPagina=100').catch(() => ({ ok: false })),
+      apiFetch('/personas?porPagina=100&ligero=1').catch(() => ({ ok: false })),
     ]).then(async ([critRes, vehRes, persRes, asocRes, personasRes]) => {
       if (critRes.ok) {
         const critPayload = await critRes.json()
@@ -630,7 +630,7 @@ export function Inspecciones() {
     await new Promise(r => setTimeout(r, 50))
     try {
       const data = await fetchTodoElFiltro()
-          exportToExcel({
+          await exportToExcel({
             filename: `Inspecciones_Tecnicas_${new Date().toISOString().slice(0, 10)}.xls`,
             sheetName: 'Inspecciones',
             title: 'REGISTRO DE INSPECCIONES TÉCNICAS VEHICULARES - CERTICAV',

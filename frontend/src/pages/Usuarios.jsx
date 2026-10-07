@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useDebounce } from '../hooks/useDebounce'
+import { usePersonaRapida } from '../hooks/usePersonaRapida'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -63,6 +65,9 @@ export function Usuarios({ user }) {
   const [userForm, setUserForm] = useState(DEFAULT_USER_FORM)
   const [trabajadorSearch, setTrabajadorSearch] = useState('')
   const [trabajadorDropdownOpen, setTrabajadorDropdownOpen] = useState(false)
+  const [personaElegida, setPersonaElegida] = useState(null)
+  const [resultadosPadron, setResultadosPadron] = useState([])
+  const [buscandoPadron, setBuscandoPadron] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -162,26 +167,47 @@ export function Usuarios({ user }) {
     return sortedUsuarios.slice(start, start + itemsPerPage)
   }, [sortedUsuarios, currentPage, itemsPerPage])
 
-  // Trabajadores disponibles para asignación (que no tengan usuario ya creado o el seleccionado)
-  const trabajadoresDisponibles = useMemo(() => {
-    const q = trabajadorSearch.trim().toLowerCase()
-    return trabajadores
-      .filter((t) => Number(t.tiene_cuenta) !== 1 || String(t.id_persona || t.id) === String(userForm.id_trabajador))
-      .filter((t) => {
-        if (!q) return true
-        return `${t.numero_documento} ${t.nombres} ${t.apellidos} ${t.cargo}`.toLowerCase().includes(q)
-      })
-      .slice(0, 10)
-  }, [trabajadores, trabajadorSearch, userForm.id_trabajador])
-
-  const selectedTrabajador = trabajadores.find(
-    (t) => String(t.id_persona || t.id) === String(userForm.id_trabajador)
+  // La cuenta se le crea a una persona del PADRÓN (no solo a quien ya es trabajador): si aún no es trabajador,
+  // el servidor lo registra al crear el usuario. La búsqueda se hace en el servidor (el padrón es muy grande).
+  const busquedaPadron = useDebounce(trabajadorSearch.trim(), 300)
+  const personasConCuenta = useMemo(
+    () => new Set(usuarios.map((u) => String(u.id_persona || u.id_trabajador || ''))),
+    [usuarios],
   )
+  const cargoDe = (idPersona) => trabajadores.find((t) => String(t.id_persona || t.id) === String(idPersona))?.cargo || ''
+
+  useEffect(() => {
+    if (!isCreateModalOpen || personaElegida || busquedaPadron.length < 2) {
+      setResultadosPadron([])
+      return undefined
+    }
+    const controlador = new AbortController()
+    setBuscandoPadron(true)
+    apiFetch(`/personas?buscar=${encodeURIComponent(busquedaPadron)}&page=1&porPagina=8`, { signal: controlador.signal })
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((payload) => setResultadosPadron(payload.data || []))
+      .catch(() => {})
+      .finally(() => setBuscandoPadron(false))
+    return () => controlador.abort()
+  }, [busquedaPadron, isCreateModalOpen, personaElegida])
+
+  const elegirPersona = (persona) => {
+    setPersonaElegida(persona)
+    setUserForm((prev) => ({ ...prev, id_trabajador: persona.id }))
+    setTrabajadorSearch(`${persona.numeroDocumento} - ${persona.nombres} ${persona.apellidoPaterno || ''} ${persona.apellidoMaterno || ''}`.replace(/\s+/g, ' ').trim())
+    setTrabajadorDropdownOpen(false)
+  }
+
+  const { abrir: abrirRegistroPersona, modal: modalPersonaRapida } = usePersonaRapida({
+    alCrear: (persona) => elegirPersona(persona),
+  })
 
   // Acciones: Nuevo Usuario
   const handleOpenCreateModal = () => {
     setUserForm(DEFAULT_USER_FORM)
     setTrabajadorSearch('')
+    setPersonaElegida(null)
+    setResultadosPadron([])
     setTrabajadorDropdownOpen(false)
     setIsCreateModalOpen(true)
   }
@@ -189,7 +215,7 @@ export function Usuarios({ user }) {
   const handleCreateUser = async (e) => {
     e.preventDefault()
     if (!userForm.id_trabajador) {
-      showError('Falta información', 'Por favor selecciona un colaborador del padrón municipal.')
+      showError('Falta información', 'Por favor selecciona una persona del padrón (o regístrala con «Registrar nueva persona»).')
       return
     }
     if (!userForm.nombre_usuario || userForm.nombre_usuario.length < 3) {
@@ -1013,7 +1039,7 @@ export function Usuarios({ user }) {
               {/* Buscador de Colaborador */}
               <div className="relative">
                 <label className="block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-1.5">
-                  1. Colaborador Municipal Asignado *
+                  1. Persona del padrón *
                 </label>
                 <div className="relative">
                   <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -1025,6 +1051,8 @@ export function Usuarios({ user }) {
                     onBlur={() => setTimeout(() => setTrabajadorDropdownOpen(false), 200)}
                     onChange={(e) => {
                       setTrabajadorSearch(e.target.value)
+                      setPersonaElegida(null)
+                      setUserForm((prev) => ({ ...prev, id_trabajador: '' }))
                       setTrabajadorDropdownOpen(true)
                     }}
                     placeholder="Escribe DNI o nombres para buscar en el padrón..."
@@ -1032,60 +1060,66 @@ export function Usuarios({ user }) {
                   />
                 </div>
 
-                {selectedTrabajador && (
+                {personaElegida && (
                   <div className="mt-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2 text-xs dark:border-[var(--border)] dark:bg-emerald-950/30">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-emerald-800 dark:text-emerald-300">
-                        ✓ Seleccionado:
+                        ✓ Seleccionada:
                       </span>
                       <span className="font-black text-slate-800 dark:text-white">
-                        {selectedTrabajador.nombres} {selectedTrabajador.apellidos}
+                        {personaElegida.nombres} {personaElegida.apellidoPaterno} {personaElegida.apellidoMaterno}
                       </span>
                       <span className="font-mono text-slate-500">
-                        (DNI: {selectedTrabajador.numero_documento})
+                        (DNI: {personaElegida.numeroDocumento})
                       </span>
                     </div>
                     <span className="text-[10px] font-extrabold uppercase text-emerald-700 dark:text-emerald-400">
-                      {selectedTrabajador.cargo}
+                      {cargoDe(personaElegida.id) || 'Se registrará como trabajador'}
                     </span>
                   </div>
                 )}
 
-                {trabajadorDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
-                    {trabajadoresDisponibles.length ? (
-                      trabajadoresDisponibles.map((t) => (
-                        <button
-                          key={t.id_persona || t.id}
-                          type="button"
-                          onMouseDown={() => {
-                            setUserForm((prev) => ({
-                              ...prev,
-                              id_trabajador: t.id_persona || t.id,
-                            }))
-                            setTrabajadorSearch(`${t.numero_documento} - ${t.nombres} ${t.apellidos}`)
-                            setTrabajadorDropdownOpen(false)
-                          }}
-                          className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-indigo-50 dark:hover:bg-slate-700 transition flex items-center justify-between"
-                        >
-                          <div>
-                            <p className="font-bold text-slate-800 dark:text-white">
-                              {t.nombres} {t.apellidos}
-                            </p>
-                            <p className="font-mono text-[11px] text-slate-500">
-                              DNI: {t.numero_documento}
-                            </p>
-                          </div>
-                          <span className="text-[10px] font-bold text-slate-400">
-                            {t.cargo}
-                          </span>
-                        </button>
-                      ))
+                {trabajadorDropdownOpen && !personaElegida && busquedaPadron.length >= 2 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
+                    {buscandoPadron && !resultadosPadron.length ? (
+                      <p className="p-3 text-center text-xs text-slate-500">Buscando en el padrón...</p>
+                    ) : resultadosPadron.length ? (
+                      resultadosPadron.map((persona) => {
+                        const conCuenta = personasConCuenta.has(String(persona.id))
+                        return (
+                          <button
+                            key={persona.id}
+                            type="button"
+                            disabled={conCuenta}
+                            onMouseDown={() => !conCuenta && elegirPersona(persona)}
+                            className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-indigo-50 dark:hover:bg-slate-700 transition flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                          >
+                            <div>
+                              <p className="font-bold text-slate-800 dark:text-white">
+                                {persona.nombres} {persona.apellidoPaterno} {persona.apellidoMaterno}
+                              </p>
+                              <p className="font-mono text-[11px] text-slate-500">
+                                DNI: {persona.numeroDocumento}
+                              </p>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-400">
+                              {conCuenta ? 'Ya tiene usuario' : (cargoDe(persona.id) || 'Nuevo trabajador')}
+                            </span>
+                          </button>
+                        )
+                      })
                     ) : (
                       <p className="p-3 text-center text-xs text-slate-500">
-                        No se encontraron colaboradores disponibles sin cuenta.
+                        No hay coincidencias en el padrón.
                       </p>
                     )}
+                    <button
+                      type="button"
+                      onMouseDown={() => { setTrabajadorDropdownOpen(false); abrirRegistroPersona(trabajadorSearch) }}
+                      className="mt-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-indigo-300 px-3 py-2 text-left text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-slate-700"
+                    >
+                      <Icon name="plus" className="size-3.5" /> ¿No está en el padrón? Registrar nueva persona
+                    </button>
                   </div>
                 )}
               </div>
@@ -1354,6 +1388,9 @@ export function Usuarios({ user }) {
           </div>
         </div>
       )}
+
+      {/* Alta rápida de una persona del padrón (desde «Nuevo usuario») */}
+      {modalPersonaRapida}
     </div>
   )
 }

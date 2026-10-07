@@ -99,7 +99,7 @@ export function VehiculoDetalleModal({
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-right dark:border-[var(--border)] dark:bg-slate-950">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Código QR</p>
-                  <p className="font-mono text-xs font-black text-slate-700 dark:text-slate-200">{selectedVehiculo.codigoQr || 'N/A'}</p>
+                  <p className="break-all font-mono text-xs font-black text-slate-700 dark:text-slate-200">{selectedVehiculo.codigoQr || 'N/A'}</p>
                 </div>
               </div>
 
