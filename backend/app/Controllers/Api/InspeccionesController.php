@@ -258,14 +258,7 @@ class InspeccionesController extends ResourceController
                 $db->table('vehiculos')->where('id', $vehiculoId)->update($vehUpdate);
             }
 
-            $tecnicoId = (int)($input['tecnicoId'] ?? 0);
-            if ($tecnicoId > 0) {
-                $tecnico = $db->table('trabajadores pe')->where('id_persona', $tecnicoId)->where('estado', 'ACTIVO')->get()->getRowArray();
-                if (!$tecnico) throw new \DomainException('Seleccione el técnico responsable válido.');
-            } else {
-                $tecnico = $db->table('trabajadores')->where('estado', 'ACTIVO')->limit(1)->get()->getRowArray();
-                $tecnicoId = $tecnico ? (int)$tecnico['id_persona'] : null;
-            }
+            [$tecnicoId, $inspectorNombre] = $this->resolverTecnicoInspeccion($db, $input);
 
             $detalles = $this->validarDetalles($db, $detalles);
 
@@ -300,6 +293,7 @@ class InspeccionesController extends ResourceController
                 'id_conductor'          => $conductorId,
                 'id_vehiculo'           => $vehiculoId,
                 'id_tecnico'            => $tecnicoId,
+                'nombre_tecnico'        => $inspectorNombre,
                 'fecha'                 => $fecha,
                 'resultado'             => $resultado,
                 'observaciones'         => $observaciones,
@@ -344,8 +338,6 @@ class InspeccionesController extends ResourceController
                 return $this->failServerError('Error guardando inspección técnica.');
             }
 
-            $inspectorRow = $tecnicoId ? $db->table('ciudadanos')->where('id_persona', $tecnicoId)->get()->getRowArray() : null;
-            $inspectorNombre = $inspectorRow ? trim($inspectorRow['nombres'] . ' ' . $inspectorRow['apellido_paterno'] . ' ' . ($inspectorRow['apellido_materno'] ?? '')) : 'Inspector Técnico Municipal';
 
             $db->transCommit();
             return $this->respondCreated([
@@ -425,8 +417,8 @@ class InspeccionesController extends ResourceController
             if (isset($input['observaciones'])) {
                 $data['observaciones'] = trim($input['observaciones']);
             }
-            if (isset($input['tecnicoId']) && (int)$input['tecnicoId'] > 0) {
-                $data['id_tecnico'] = (int)$input['tecnicoId'];
+            if (array_key_exists('inspector', $input) || array_key_exists('tecnicoId', $input)) {
+                [$data['id_tecnico'], $data['nombre_tecnico']] = $this->resolverTecnicoInspeccion($db, $input);
             }
             if (!empty(trim((string)($input['numeroRegistro'] ?? '')))) {
                 $data['numero_registro'] = trim($input['numeroRegistro']);
@@ -615,7 +607,7 @@ class InspeccionesController extends ResourceController
                 COALESCE(a.razon_social, '') as transportador,
                 COALESCE(CONCAT(cp.nombres, ' ', cp.apellido_paterno, ' ', COALESCE(cp.apellido_materno, '')), '') as propietario,
                 COALESCE(pp.numero, '') as propietarioDni,
-                COALESCE(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')), 'Inspector Técnico Municipal') as inspector,
+                COALESCE(NULLIF(i.nombre_tecnico, ''), CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')), 'Inspector Técnico Municipal') as inspector,
                 i.fecha as fecha,
                 i.fecha_segunda_evaluacion as fechaSegundaEvaluacion,
                 i.resultado,
@@ -704,6 +696,26 @@ class InspeccionesController extends ResourceController
             "SELECT MAX(CAST(numero_serie_certicav AS UNSIGNED)) AS n FROM certicav WHERE numero_serie_certicav REGEXP '^[0-9]+$'"
         )->getRowArray();
         return str_pad((string)(((int)($row['n'] ?? 0)) + 1), 7, '0', STR_PAD_LEFT);
+    }
+
+    private function resolverTecnicoInspeccion($db, array $input): array
+    {
+        $id = (int)($input['tecnicoId'] ?? 0);
+        $nombre = trim((string)($input['inspector'] ?? ''));
+        if ($id > 0) {
+            $tecnico = $db->table('trabajadores t')
+                ->select('c.nombres, c.apellido_paterno, c.apellido_materno')
+                ->join('ciudadanos c', 'c.id_persona = t.id_persona', 'inner')
+                ->where('t.id_persona', $id)->where('t.estado', 'ACTIVO')
+                ->where('t.tipo_inspector', 'TECNICO')
+                ->get()->getRowArray();
+            if (!$tecnico) throw new \DomainException('El responsable debe estar registrado como inspector de inspección técnica activo.');
+            $nombre = trim($tecnico['nombres'] . ' ' . $tecnico['apellido_paterno'] . ' ' . ($tecnico['apellido_materno'] ?? ''));
+        }
+        if ($nombre === '' || mb_strlen($nombre) > 200) {
+            throw new \DomainException('Escriba el nombre del inspector técnico (máximo 200 caracteres).');
+        }
+        return [$id > 0 ? $id : null, $nombre];
     }
 
     private function validarDetalles($db, $detalles): array

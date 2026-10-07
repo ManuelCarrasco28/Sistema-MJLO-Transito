@@ -1,0 +1,68 @@
+.internamientos-listado {
+  min-width: 0;
+  width: 100%;
+}
+
+.internamientos-listado td.internamientos-boleta {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.internamientos-listado th,
+.internamientos-listado td {
+  padding-left: clamp(6px, 0.7vw, 12px);
+  padding-right: clamp(6px, 0.7vw, 12px);
+  overflow-wrap: anywhere;
+}
+
+.internamientos-listado th button,
+.internamientos-listado td > div,
+.internamientos-listado td > span {
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* En ventanas estrechas, cada fila se adapta sin desplazarla horizontalmente. */
+@media screen and (max-width: 1050px) {
+  .internamientos-listado table,
+  .internamientos-listado tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .internamientos-listado colgroup,
+  .internamientos-listado thead {
+    display: none;
+  }
+
+  .internamientos-listado tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 10px;
+  }
+
+  .internamientos-listado td {
+    min-width: 0;
+    padding: 8px;
+    text-align: left;
+  }
+
+  .internamientos-listado td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-muted, #64748b);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .internamientos-listado td[colspan] {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+
+  .internamientos-listado td[data-label="Acciones"] > div {
+    justify-content: flex-start;
+  }
+}

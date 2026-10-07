@@ -1,40 +1,40 @@
 import { createPortal } from 'react-dom';
+import { fechaInternamiento, fechaInternamientoTexto } from '../../utils/fechaInternamiento';
+import { textoInfraccion } from '../../utils/infraccionInternamiento';
 
 export const OrdenLibertadPrint = ({ item }) => {
-  const fecha = item?.fechaRegistro ? new Date(item.fechaRegistro) : new Date();
-  const day = fecha.getDate().toString().padStart(2, '0');
-  const month = (fecha.getMonth() + 1).toString().padStart(2, '0');
-  const year = fecha.getFullYear().toString().slice(-2);
+  const fecha = fechaInternamiento(item?.fechaLiberacion || item?.fechaSalida);
+  const day = fecha ? String(fecha.getDate()).padStart(2, '0') : '';
+  const month = fecha ? String(fecha.getMonth() + 1).padStart(2, '0') : '';
+  const year = fecha ? String(fecha.getFullYear()) : '';
 
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div id="seccion-impresion" className="seccion-impresion-portal orden-libertad-a4 font-sans text-xs box-border">
+    <div id="seccion-impresion" className="seccion-impresion-portal orden-libertad-a4 font-sans text-sm box-border">
       
       {/* Header */}
-      <div className="text-center relative mb-1 pt-2">
-        <h1 className="text-sm font-bold tracking-widest text-blue-800 outline-text" style={{ WebkitTextStroke: '0.3px #1e3a8a', color: 'white' }}>
-          MUNICIPALIDAD DISTRITAL DE JOSÉ LEONARDO ORTIZ
-        </h1>
-        <h2 className="text-lg font-black tracking-widest text-blue-800 outline-text" style={{ WebkitTextStroke: '0.3px #1e3a8a', color: 'white' }}>
+      <div className="text-center relative mb-3 pt-2 pb-5 pl-28 pr-28">
+        <img src="/img/logo-mjlo.png" alt="Municipalidad de José Leonardo Ortiz" className="absolute left-0 top-0 w-28 h-24 object-contain object-left" />
+        <h2 className="text-2xl font-black tracking-widest text-blue-900">
           DIVISIÓN DE TRÁNSITO
         </h2>
-        <h2 className="text-lg font-black tracking-widest text-blue-800 outline-text mb-1" style={{ WebkitTextStroke: '0.3px #1e3a8a', color: 'white' }}>
+        <h2 className="text-2xl font-black tracking-widest text-blue-900 mb-1">
           Y TRANSPORTE
         </h2>
-        <div className="absolute right-0 top-0 text-red-600 font-bold text-lg tracking-widest font-serif">
-          Nº {item?.numeroBoleta || '000000'}
+        <div className="absolute right-0 bottom-0 text-red-600 font-bold text-xl tracking-widest font-serif">
+          Nº {item?.numeroOrdenLibertad || 'S/N'}
         </div>
       </div>
 
-      <div className="text-center mb-1">
-        <h3 className="text-xl font-black tracking-widest text-blue-800" style={{ WebkitTextStroke: '0.3px #1e3a8a', color: 'white' }}>
+      <div className="text-center mb-3">
+        <h3 className="text-2xl font-black tracking-widest text-blue-900">
           ORDEN DE LIBERTAD
         </h3>
       </div>
 
       {/* Date */}
-      <div className="flex items-end mb-1 text-sm">
+      <div className="flex items-end mb-3 text-sm">
         <span className="font-bold w-40 uppercase">JOSÉ L. ORTIZ</span>
         <div className="flex-1 flex gap-2 text-lg font-serif">
           <div className="w-12 text-center">{day}</div>
@@ -46,7 +46,7 @@ export const OrdenLibertadPrint = ({ item }) => {
       </div>
 
       {/* Interesado Details */}
-      <div className="flex flex-col gap-1 mb-1">
+      <div className="flex flex-col gap-3 mb-4">
         <div className="flex items-end text-sm">
           <span className="whitespace-nowrap mr-2">Esta jefatura autoriza al Sr. (a):</span>
           <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.interesadoNombre || ''}</div>
@@ -61,12 +61,12 @@ export const OrdenLibertadPrint = ({ item }) => {
         </div>
       </div>
 
-      <div className="text-center mb-1 mt-2">
-        <h4 className="text-base font-bold text-blue-900 tracking-wider">RETIRAR DEL DEPOSITO OFICIAL DE VEHICULOS</h4>
+      <div className="text-center mb-3 mt-3">
+        <h4 className="text-lg font-bold text-blue-900 tracking-wider">RETIRAR DEL DEPOSITO OFICIAL DE VEHICULOS</h4>
       </div>
 
       {/* Vehicle Details */}
-      <div className="flex flex-col gap-1 mb-1">
+      <div className="flex flex-col gap-3 mb-4">
         <div className="flex items-end text-sm">
           <span className="mr-2">Clase:</span>
           <div className="border-b border-black w-32 font-serif uppercase px-2">{item?.vehiculoTipo || ''}</div>
@@ -77,8 +77,8 @@ export const OrdenLibertadPrint = ({ item }) => {
         </div>
         
         <div className="flex items-end text-sm">
-          <span className="mr-2">Fecha de nacimiento:</span>
-          <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.interesadoFechaNacimiento ? new Date(item.interesadoFechaNacimiento).toLocaleDateString('es-PE') : ''}</div>
+          <span className="mr-2">Fecha de internamiento:</span>
+          <div className="border-b border-black flex-1 font-serif uppercase px-2">{fechaInternamientoTexto(item?.fechaIngreso)}</div>
           <span className="mx-2">Marca</span>
           <div className="border-b border-black w-24 font-serif uppercase px-2">{item?.vehiculoMarca || ''}</div>
           <span className="mx-2">Año</span>
@@ -87,65 +87,58 @@ export const OrdenLibertadPrint = ({ item }) => {
 
         <div className="flex items-end text-sm">
           <span className="mr-2">Boleta N°</span>
-          <div className="border-b border-black w-24 font-serif uppercase px-2">{item?.numeroBoleta || ''}</div>
+          <div className="border-b border-black w-32 font-serif uppercase px-2">{item?.numeroBoleta || ''}</div>
           <span className="mx-2">Motor</span>
           <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.vehiculoMotor || ''}</div>
           <span className="mx-2">Total días:</span>
-          <div className="border-b border-black w-16 font-serif uppercase px-2 text-center">{item?.totalDias || ''}</div>
+          <div className="border-b border-black w-16 font-serif uppercase px-2 text-center">{item?.totalDias ?? ''}</div>
         </div>
 
         <div className="flex items-end text-sm">
           <span className="mr-2">Infracción:</span>
-          <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.motivo || ''}</div>
+          <div className="border-b border-black flex-1 font-serif uppercase px-2 text-xs leading-tight">{textoInfraccion(item)}</div>
         </div>
 
         <div className="flex items-end text-sm">
           <span className="mr-2">N° de Papeleta u Oficio:</span>
-          <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.numeroPapeleta || ''}</div>
+          <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.numeroPapeleta || item?.documentoReferencia || ''}</div>
         </div>
       </div>
 
       {/* Payments */}
-      <div className="flex flex-col gap-1 mb-1">
+      <div className="flex flex-col gap-3 mb-4">
         <div className="flex items-end text-sm">
           <span className="mr-2">N° de recibo de la M.J.L.O.</span>
           <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.reciboPapeleta || ''}</div>
           <span className="mx-2 font-bold">Monto S/.</span>
-          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoPapeletaCobrada ? Number(item.montoPapeletaCobrada).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
+          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoPapeletaCobrada != null ? Number(item.montoPapeletaCobrada).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
         </div>
         
         <div className="flex items-end text-sm">
           <span className="mr-2">Guardianía N° de Recibo</span>
           <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.reciboGuardiania || ''}</div>
           <span className="mx-2 font-bold">Monto S/.</span>
-          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoGuardiania ? Number(item.montoGuardiania).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
+          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoGuardiania != null ? Number(item.montoGuardiania).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
         </div>
 
         <div className="flex items-end text-sm">
           <span className="mr-2">Remolque N° de Recibo</span>
           <div className="border-b border-black flex-1 font-serif uppercase px-2">{item?.reciboRemolque || ''}</div>
           <span className="mx-2 font-bold">Monto S/.</span>
-          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoRemolque ? Number(item.montoRemolque).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
+          <div className="border-b border-black w-32 font-serif uppercase px-2 text-right">{item?.montoRemolque != null ? Number(item.montoRemolque).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
         </div>
 
         <div className="flex items-end justify-end text-sm mt-1">
           <span className="font-bold mr-2 text-base">TOTAL S/.</span>
-          <div className="border-b border-black w-40 font-serif uppercase px-2 text-right font-bold text-base">{item?.montoTotalLiberacion ? Number(item.montoTotalLiberacion).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
+          <div className="border-b border-black w-40 font-serif uppercase px-2 text-right font-bold text-base">{item?.montoTotalLiberacion != null ? Number(item.montoTotalLiberacion).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
         </div>
       </div>
 
       {/* Observaciones and Stamp */}
-      <div className="flex items-start mt-2">
+      <div className="flex items-start mt-3">
         <span className="text-base font-bold mr-4 mt-1">OBSERVACIONES</span>
         
-        {/* Stamp */}
-        <div className="w-16 h-16 border-2 border-black rounded-full flex flex-col items-center justify-center relative rotate-12 mx-4 shrink-0">
-          <div className="absolute inset-1 border-[1.5px] border-black rounded-full flex flex-col items-center justify-center text-[5px] text-center p-0.5 leading-tight font-bold">
-             V° B° <br/> SUB GERENCIA DE <br/> TRÁNSITO <br/> TRANSPORTE <br/> PÚBLICO
-          </div>
-          <div className="text-[5px] font-bold text-center absolute top-1 w-full uppercase">MUNICIPALIDAD</div>
-          <div className="text-[5px] font-bold text-center absolute bottom-1 w-full uppercase">DE JOSÉ L. ORTIZ</div>
-        </div>
+        <div className="w-20 h-20 mx-4 shrink-0" aria-label="Espacio para sello físico" />
 
         <div className="border-b border-black flex-1 self-end mt-8 font-serif uppercase px-2 text-xs">
           {item?.observaciones || ''}
@@ -155,10 +148,23 @@ export const OrdenLibertadPrint = ({ item }) => {
       <div className="border-b border-black w-full mt-1"></div>
 
       {/* Footer note */}
-      <div className="mt-1 text-center text-[10px] font-bold text-blue-900 px-6 leading-tight">
+      <div className="mt-3 text-center text-xs font-bold text-blue-900 px-6 leading-snug">
         Nota: El concesionario del DOV. Está obligado a entregar el vehiculo sin antes el interesado no
         presenta su Tarjeta de Propiedad y Licencia de Conducir, siendo su horario de Lunes a
         viernes, Mañanas de 09:00 a 15:00 hrs
+      </div>
+
+      <div className="mt-8 grid grid-cols-2 gap-10 text-[12px]">
+        <div className="space-y-4">
+          <div className="flex gap-2">REMISOR <span className="flex-1 border-b border-black min-h-5" /></div>
+          <div className="flex gap-2">NOMBRE <span className="flex-1 border-b border-black uppercase">{item?.remisorNombre || ''}</span></div>
+          <div className="flex gap-2">N° DE CARNÉ <span className="flex-1 border-b border-black">{item?.carnetRemisor || ''}</span></div>
+        </div>
+        <div className="space-y-4">
+          <div className="flex gap-2">INTERESADO <span className="flex-1 border-b border-black uppercase">{item?.interesadoNombre || ''}</span></div>
+          <div className="flex gap-2">DOC. ID. <span className="flex-1 border-b border-black">{item?.interesadoDni || ''}</span></div>
+          <div className="mt-6 border-t border-black pt-1 text-center text-[10px]">Firma del interesado</div>
+        </div>
       </div>
 
     </div>,

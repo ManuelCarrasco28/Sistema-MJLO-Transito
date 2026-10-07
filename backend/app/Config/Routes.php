@@ -104,6 +104,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
         $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
         $routes->get('internamientos/estadisticas', 'InternamientosController::estadisticas');
+        $routes->post('internamientos/(:segment)/liberar', 'InternamientosController::liberar/$1');
         $routes->resource('internamientos', ['controller' => 'InternamientosController']);
         $routes->get('inventario-criterios', 'InternamientosController::criterios');
         $routes->post('reportes-intervencion/(:segment)/convertir', 'ReportesIntervencionController::convertir/$1');

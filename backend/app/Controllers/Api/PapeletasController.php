@@ -163,6 +163,12 @@ class PapeletasController extends ResourceController
             if ($inspectorId > 0) {
                 $builder->where('p.id_inspector', $inspectorId);
             }
+            // sinInternamiento=1: solo papeletas con vehículo identificado que aún no generaron un internamiento
+            // (lo usa el buscador del formulario "Nuevo internamiento", que busca en el servidor).
+            if ($this->request->getGet('sinInternamiento')) {
+                $builder->where('p.id_vehiculo IS NOT NULL', null, false)
+                    ->where('NOT EXISTS (SELECT 1 FROM ordenes_internamiento oi_x WHERE oi_x.id_papeleta = p.id)', null, false);
+            }
             if (!empty($dni)) {
                 $builder->groupStart()
                         ->where('per.numero', $dni)

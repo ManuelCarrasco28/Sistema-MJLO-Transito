@@ -10,7 +10,7 @@ import { formatNumeroTarjeta } from '../utils/formatters'
 import { FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 
-const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
+const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_inspector: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -538,6 +538,7 @@ export function Trabajadores() {
                   
                   {/* Asignación */}
                   <td className="px-4 py-3 max-w-[200px]">
+                    {row.tipo_inspector && <p className="mb-1 text-xs font-semibold text-blue-800 dark:text-blue-300">{row.tipo_inspector === 'TECNICO' ? 'Inspección técnica · Sin cuenta' : 'Inspector de tránsito · Móvil'}</p>}
                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.documento || 'Sin doc.'}</p>
                     <p className="text-[11px] font-medium text-slate-500">{row.fecha_documento || '—'}</p>
                     <span className="mt-1 inline-block rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">{row.tipo_funcion}</span>
@@ -806,6 +807,17 @@ export function Trabajadores() {
                       { value: 'Titular', label: 'Titular' },
                       { value: 'Encargado', label: 'Encargado' },
                       { value: 'Operador', label: 'Operador' },
+                    ]}
+                  />
+                  <FloatingSelect
+                    id="tipo_inspector"
+                    label="Tipo de inspector"
+                    value={form.tipo_inspector || ''}
+                    onChange={(e) => setForm({ ...form, tipo_inspector: e.target.value })}
+                    options={[
+                      { value: '', label: 'No corresponde' },
+                      { value: 'TRANSITO', label: 'Tránsito (acceso móvil)' },
+                      { value: 'TECNICO', label: 'Inspección técnica (sin cuenta)' },
                     ]}
                   />
 

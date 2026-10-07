@@ -1,9 +1,11 @@
 import { useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { useDebounce } from '../hooks/useDebounce'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
+import { InfraccionDetalleModal } from '../components/papeletas/InfraccionDetalleModal'
 import { BoletaInternamientoPrint } from '../components/retenciones/BoletaInternamientoPrint'
 import { OrdenLibertadPrint } from '../components/retenciones/OrdenLibertadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
@@ -15,6 +17,7 @@ import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { showToast, showError } from '../utils/SwalUtil'
 import { sanitizarMensaje } from '../config/api'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import './Retenciones.css'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos' },
@@ -23,7 +26,7 @@ const FILTER_ESTADO_OPTIONS = [
 ]
 
 const emptyNuevoInternamiento = {
-  idPapeleta: '', deposito: '', motivo: '', lugarIntervencion: '',
+  idPapeleta: '', motivo: '', lugarIntervencion: '',
   interesadoDni: '', gradoRemisor: '', carnetRemisor: '',
   autoridadQueDispone: '', documentoReferencia: '', estadoCarroceria: '', observaciones: ''
 }
@@ -69,7 +72,21 @@ export function Retenciones({ user }) {
   const [isNuevoModalOpen, setIsNuevoModalOpen] = useState(false)
   const [nuevoInternamiento, setNuevoInternamiento] = useState(emptyNuevoInternamiento)
   const [registrando, setRegistrando] = useState(false)
-  const [papeletas, setPapeletas] = useState([])
+  // Inventario del vehículo al ingresar al depósito: { [idCriterio]: cantidad } y el catálogo de ítems.
+  const [infraccionVista, setInfraccionVista] = useState(null)
+  // Cobro y liberación de un vehículo internado
+  const [pagoItem, setPagoItem] = useState(null)
+  const [pagoForm, setPagoForm] = useState({})
+  const [pagando, setPagando] = useState(false)
+  const [criteriosInventario, setCriteriosInventario] = useState([])
+  const [inventarioMarcado, setInventarioMarcado] = useState({})
+  // Buscador de papeletas del formulario: se consulta en el servidor (hay miles) solo mientras se escribe.
+  const [busquedaPapeleta, setBusquedaPapeleta] = useState('')
+  const [papeletaElegida, setPapeletaElegida] = useState(null)
+  const [resultadosPapeleta, setResultadosPapeleta] = useState([])
+  const [buscandoPapeleta, setBuscandoPapeleta] = useState(false)
+  const [listaPapeletaAbierta, setListaPapeletaAbierta] = useState(false)
+  const textoBusquedaPapeleta = useDebounce(busquedaPapeleta.trim(), 250)
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
 
@@ -113,30 +130,105 @@ export function Retenciones({ user }) {
     loadStats()
   }, [])
 
+  // Papeletas sin internamiento (las más recientes, o las que coincidan con lo escrito) para el buscador.
   useEffect(() => {
-    apiFetch('/papeletas?porPagina=100')
-      .then((res) => res.ok ? res.json() : Promise.reject(res))
-      .then((res) => setPapeletas(res.data || []))
+    if (!isNuevoModalOpen || papeletaElegida || !listaPapeletaAbierta) return undefined
+    const controlador = new AbortController()
+    setBuscandoPapeleta(true)
+    const params = new URLSearchParams({ page: '1', porPagina: '10', sinInternamiento: '1' })
+    if (textoBusquedaPapeleta) params.set('buscar', textoBusquedaPapeleta)
+    apiFetch(`/papeletas?${params.toString()}`, { signal: controlador.signal })
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((payload) => setResultadosPapeleta(payload.data || []))
       .catch(() => {})
-  }, [])
+      .finally(() => setBuscandoPapeleta(false))
+    return () => controlador.abort()
+  }, [textoBusquedaPapeleta, isNuevoModalOpen, papeletaElegida, listaPapeletaAbierta])
 
-  // Papeletas que aún no tienen un internamiento registrado, para el buscador.
-  const idsConInternamiento = new Set(internamientos.map((i) => i.papeletaId).filter(Boolean))
-  const papeletasElegibles = papeletas.filter((p) => p.vehiculoPlaca && !idsConInternamiento.has(p.id))
+  const elegirPapeleta = (p) => {
+    setPapeletaElegida(p)
+    setNuevoInternamiento((prev) => ({ ...prev, idPapeleta: String(p.id) }))
+    setBusquedaPapeleta(`${p.numeroPapeleta} — ${p.vehiculoPlaca}`)
+    setListaPapeletaAbierta(false)
+  }
 
   const handleOpenNuevo = () => {
     setNuevoInternamiento(emptyNuevoInternamiento)
+    setInventarioMarcado({})
+    setBusquedaPapeleta('')
+    setPapeletaElegida(null)
+    setResultadosPapeleta([])
     setIsNuevoModalOpen(true)
+    if (criteriosInventario.length === 0) {
+      apiFetch('/inventario-criterios')
+        .then((res) => (res.ok ? res.json() : { data: [] }))
+        .then((payload) => setCriteriosInventario(payload.data || []))
+        .catch(() => {})
+    }
+  }
+
+  const hoyISO = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  const handleOpenPago = (item) => {
+    setPagoForm({
+      fechaPago: hoyISO(), reciboPapeleta: '', montoGuardiania: '', reciboGuardiania: '',
+      montoRemolque: '', reciboRemolque: '', autorizadoDni: item.interesadoDni && item.interesadoDni !== 'S/D' ? item.interesadoDni : '',
+      observaciones: '',
+    })
+    setPagoItem(item)
+  }
+
+  const papeletaPorCobrar = (item) => Boolean(item?.papeletaId) && item.papeletaEstado !== 'PAGADA'
+  const totalPago = (item, form) => (
+    (papeletaPorCobrar(item) || item?.papeletaEstado === 'PAGADA' ? Number(item?.montoPapeleta || 0) : 0)
+    + Number(form.montoGuardiania || 0) + Number(form.montoRemolque || 0)
+  )
+
+  const handleConfirmarPago = async (e) => {
+    e.preventDefault()
+    if (!pagoItem) return
+    if (papeletaPorCobrar(pagoItem) && !pagoForm.reciboPapeleta.trim()) {
+      showError('Atención', 'Ingresa el N° de recibo del pago de la papeleta.')
+      return
+    }
+    if (Number(pagoForm.montoGuardiania || 0) > 0 && !pagoForm.reciboGuardiania.trim()) {
+      showError('Atención', 'Ingresa el N° de recibo de la guardianía.')
+      return
+    }
+    if (Number(pagoForm.montoRemolque || 0) > 0 && !pagoForm.reciboRemolque.trim()) {
+      showError('Atención', 'Ingresa el N° de recibo del remolque.')
+      return
+    }
+    setPagando(true)
+    try {
+      const res = await apiFetch(`/internamientos/${pagoItem.uuid || pagoItem.id}/liberar`, {
+        method: 'POST',
+        body: {
+          ...pagoForm,
+          montoGuardiania: Number(pagoForm.montoGuardiania || 0),
+          montoRemolque: Number(pagoForm.montoRemolque || 0),
+        },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo registrar el pago.')
+      setPagoItem(null)
+      loadInternamientos()
+      loadStats()
+      showToast(`Pago registrado. Orden de libertad ${data.data?.numeroOrdenLibertad || ''}`.trim())
+    } catch (err) {
+      showError('Error', sanitizarMensaje(err.message, 'No se pudo registrar el pago.'))
+    } finally {
+      setPagando(false)
+    }
   }
 
   const handleRegistrarInternamiento = async (e) => {
     e.preventDefault()
     if (!nuevoInternamiento.idPapeleta) {
       showError('Atención', 'Selecciona la papeleta que origina el internamiento.')
-      return
-    }
-    if (!nuevoInternamiento.deposito.trim()) {
-      showError('Atención', 'Ingresa el depósito municipal donde queda el vehículo.')
       return
     }
     setRegistrando(true)
@@ -147,6 +239,9 @@ export function Retenciones({ user }) {
           ...nuevoInternamiento,
           idPapeleta: Number(nuevoInternamiento.idPapeleta),
           idRemisor: user?.id_persona || null,
+          inventario: Object.entries(inventarioMarcado)
+            .filter(([, cantidad]) => cantidad !== '' && cantidad !== undefined)
+            .map(([idCriterio, cantidad]) => ({ idCriterio: Number(idCriterio), cantidad: Number(cantidad) })),
         }
       })
       const data = await res.json().catch(() => ({}))
@@ -277,11 +372,19 @@ export function Retenciones({ user }) {
     setIsDetailModalOpen(true)
   }
 
-  const handlePrint = (layout) => {
+  const handlePrint = (layout, item = selectedItem) => {
+    if (!item) return
+    setSelectedItem(item)
     setPrintLayout(layout)
     setTimeout(() => {
-      window.print()
-      setPrintLayout('FICHA')
+      const tituloAnterior = document.title
+      document.title = `${layout === 'LIBERTAD' ? 'Orden de libertad' : layout === 'INTERNAMIENTO' ? 'Boleta de internamiento' : 'Ficha de internamiento'} - ${layout === 'LIBERTAD' ? item.numeroOrdenLibertad || 'S-N' : item.numeroBoleta || 'S-N'}`
+      try {
+        window.print()
+      } finally {
+        document.title = tituloAnterior
+        setPrintLayout('FICHA')
+      }
     }, 100)
   }
 
@@ -289,14 +392,14 @@ export function Retenciones({ user }) {
     const norm = String(estado || '').toUpperCase().trim()
     if (norm === 'LIBERADO') {
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/80 bg-emerald-50 px-2.5 py-0.5 text-xs font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 shadow-2xs">
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap! rounded-full border border-emerald-300/80 bg-emerald-50 px-2.5 py-0.5 text-xs font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 shadow-2xs">
           <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
           {estado}
         </span>
       )
     }
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-50 px-2.5 py-0.5 text-xs font-black text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300 shadow-2xs">
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap! rounded-full border border-amber-300/80 bg-amber-50 px-2.5 py-0.5 text-xs font-black text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300 shadow-2xs">
         <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />
         {estado}
       </span>
@@ -446,24 +549,26 @@ export function Retenciones({ user }) {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] table-fixed text-left text-xs">
+        <div className="internamientos-listado">
+          <table className="w-full table-fixed text-left text-xs">
             <colgroup>
-              <col className="w-[15%]" />
-              <col className="w-[15%]" />
+              <col className="w-[9%]" />
+              <col className="w-[14%]" />
+              <col className="w-[8%]" />
               <col className="w-[18%]" />
+              <col className="w-[13%]" />
               <col className="w-[17%]" />
-              <col className="w-[15%]" />
               <col className="w-[10%]" />
-              <col className="w-[10%]" />
+              <col className="w-[11%]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-4 py-3.5"><SortableHeader column="numeroBoleta" label="Boleta / Depósito" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3.5 text-center"><SortableHeader column="numeroBoleta" label="Boleta" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3.5">Vehículo y placa</th>
-                <th className="px-4 py-3.5">Motivo / Infracción</th>
+                <th className="px-4 py-3.5">Infracción</th>
                 <th className="px-4 py-3.5">Interesado / Conductor</th>
                 <th className="px-4 py-3.5"><SortableHeader column="fechaIngreso" label="Ingreso y custodia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-3 py-3.5 text-center print:hidden">Documento</th>
                 <th className="px-4 py-3.5 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3.5 text-center">Acciones</th>
               </tr>
@@ -471,13 +576,13 @@ export function Retenciones({ user }) {
             <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] print:divide-black transition-opacity ${isLoading && internamientos.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && internamientos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     Cargando internamientos...
                   </td>
                 </tr>
               ) : paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center">
+                  <td colSpan={8} className="p-12 text-center">
                     <Icon name="retention" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
                     <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron registros de internamiento</p>
                   </td>
@@ -485,47 +590,50 @@ export function Retenciones({ user }) {
               ) : (
                 paginatedItems.map((item) => (
                   <tr key={item.id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-[var(--bg-subtle)]">
-                    <td className="px-4 py-3.5">
+                    <td data-label="Boleta" className="internamientos-boleta px-4 py-2.5 text-center align-middle">
                       <div className="font-extrabold text-xs text-slate-900 dark:text-white">
                         {item.numeroBoleta || `BOL-DEP-${String(item.id).padStart(4, '0')}`}
                       </div>
-                      <div className="mt-0.5 text-[11px] text-slate-400" title={item.deposito}>
-                        {item.deposito || 'Depósito Municipal'}
-                      </div>
                     </td>
 
-                    <td className="px-4 py-3.5 print:px-1 print:py-1">
+                    <td data-label="Vehículo y placa" className="px-4 py-2.5 print:px-1 print:py-1">
                       <div className="flex items-center gap-2 print:gap-1">
                         <PlacaBadge placa={item.vehiculoPlaca} />
-                        <span
-                          className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold print:border print:border-black print:bg-transparent print:text-black ${
-                            item.vehiculoFormalidad === 'FORMAL'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300'
-                          }`}
-                        >
-                          {item.vehiculoFormalidad}
-                        </span>
                       </div>
                       <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                         {item.vehiculoMarca} {item.vehiculoModelo} ({item.vehiculoColor})
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5">
-                      <div className="font-semibold text-xs text-slate-800 dark:text-slate-200" title={item.motivo}>
-                        {item.motivo}
-                      </div>
-                      {item.numeroPapeleta && (
-                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-rose-600 dark:text-rose-400 print:text-black">
-                          <Icon name="ticket" className="size-3.5 print:hidden" />
-                          <span>{item.numeroPapeleta}</span>
-                          <span className="font-bold">S/ {Number(item.montoPapeleta).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                    <td data-label="Infracción" className="px-4 py-2.5">
+                      {/* Solo el código de la infracción de la papeleta; al hacer clic se abre su detalle (igual que en Papeletas) */}
+                      {item.infracciones?.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {item.infracciones.map((inf) => (
+                            <button
+                              key={inf.codigo}
+                              type="button"
+                              onClick={() => setInfraccionVista({
+                                codigo: inf.codigo,
+                                descripcion: inf.descripcion,
+                                gravedad: inf.gravedad,
+                                monto: inf.monto,
+                                porcentajeUit: inf.porcentajeUit,
+                                numeroPapeleta: item.numeroPapeleta,
+                              })}
+                              title={`Clic para ver detalle de ${inf.codigo}`}
+                              className="inline-flex items-center rounded-md border border-rose-200/70 bg-rose-50 px-2 py-0.5 font-mono text-xs font-black text-rose-700 transition-all hover:scale-105 hover:bg-rose-100 cursor-pointer dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+                            >
+                              {inf.codigo}
+                            </button>
+                          ))}
                         </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
                       )}
                     </td>
 
-                    <td className="px-4 py-3.5 print:px-1 print:py-1">
+                    <td data-label="Interesado / Conductor" className="px-4 py-2.5 print:px-1 print:py-1">
                       <div className="font-semibold text-xs text-slate-800 dark:text-slate-200 print:text-black">
                         {item.interesadoNombre}
                       </div>
@@ -534,7 +642,7 @@ export function Retenciones({ user }) {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5">
+                    <td data-label="Ingreso y custodia" className="px-4 py-2.5">
                       <div className="text-slate-800 dark:text-slate-200 font-medium text-xs">
                         {item.fechaIngreso ? new Date(item.fechaIngreso).toLocaleDateString('es-PE') : 'S/F'}
                       </div>
@@ -544,16 +652,52 @@ export function Retenciones({ user }) {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5 text-center">
+                    <td data-label="Documentos" className="px-3 py-2.5 text-center print:hidden">
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePrint('INTERNAMIENTO', item)}
+                        className="inline-flex items-center whitespace-nowrap justify-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-1 text-[10px] font-bold text-blue-700 transition cursor-pointer hover:bg-blue-100 active:scale-95 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
+                        title="Imprimir orden de internamiento"
+                      >
+                        <Icon name="print" className="size-3 shrink-0" />
+                        <span>Internamiento</span>
+                      </button>
+                      {item.estado === 'LIBERADO' && (
+                        <button
+                          type="button"
+                          onClick={() => handlePrint('LIBERTAD', item)}
+                          className="inline-flex items-center whitespace-nowrap justify-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-[10px] font-bold text-emerald-700 transition cursor-pointer hover:bg-emerald-100 active:scale-95 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          title="Imprimir orden de libertad"
+                        >
+                          <Icon name="print" className="size-3 shrink-0" />
+                          <span>Libertad</span>
+                        </button>
+                      )}
+                      </div>
+                    </td>
+
+                    <td data-label="Estado" className="px-4 py-2.5 text-center">
                       {getStatusBadge(item.estado)}
                     </td>
 
-                    <td className="px-4 py-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td data-label="Acciones" className="px-4 py-2.5 text-center">
+                      <div className="flex flex-nowrap items-center justify-center gap-1.5">
+                        {item.estado === 'RETENIDO' && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPago(item)}
+                            className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border-[1.5px] border-emerald-300 bg-emerald-50 px-2.5 text-[11px] font-bold text-emerald-700 shadow-xs transition-all cursor-pointer hover:bg-emerald-600 hover:border-emerald-600 hover:text-white active:scale-95 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            title="Cobrar y liberar el vehículo"
+                          >
+                            <Icon name="creditCard" className="size-4" />
+                            <span>Pagar</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(item)}
-                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
+                          className="size-8 shrink-0 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
                           title="Ver Ficha e Inventario"
                         >
                           <Icon name="eye" className="size-4" />
@@ -598,26 +742,56 @@ export function Retenciones({ user }) {
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
               <fieldset className="rounded-xl border border-slate-200 p-3.5 dark:border-[var(--border-strong)]">
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Papeleta de Origen</legend>
-                <FloatingSelect
-                  id="int_papeleta"
-                  label="Papeleta"
-                  value={nuevoInternamiento.idPapeleta}
-                  onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, idPapeleta: e.target.value })}
-                  options={[
-                    { value: '', label: 'Selecciona una papeleta...' },
-                    ...papeletasElegibles.map((p) => ({
-                      value: String(p.id),
-                      label: `${p.numeroPapeleta} — ${p.vehiculoPlaca} — ${p.conductorNombre || p.infractor || 'Sin conductor'}`
-                    }))
-                  ]}
-                />
+                <div className="relative">
+                  <FloatingInput
+                    id="int_papeleta"
+                    label="Papeleta (busca por N°, placa o conductor)"
+                    required
+                    autoComplete="off"
+                    value={busquedaPapeleta}
+                    onFocus={() => setListaPapeletaAbierta(true)}
+                    onBlur={() => setTimeout(() => setListaPapeletaAbierta(false), 200)}
+                    onChange={(e) => {
+                      setBusquedaPapeleta(e.target.value)
+                      setPapeletaElegida(null)
+                      setNuevoInternamiento((prev) => ({ ...prev, idPapeleta: '' }))
+                      setListaPapeletaAbierta(true)
+                    }}
+                  />
+                  {listaPapeletaAbierta && !papeletaElegida && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
+                      {buscandoPapeleta && resultadosPapeleta.length === 0 ? (
+                        <p className="p-3 text-center text-xs text-slate-500">Buscando papeletas...</p>
+                      ) : resultadosPapeleta.length === 0 ? (
+                        <p className="p-3 text-center text-xs text-slate-500">No hay papeletas sin internamiento que coincidan.</p>
+                      ) : (
+                        resultadosPapeleta.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onMouseDown={() => elegirPapeleta(p)}
+                            className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition hover:bg-rose-50 dark:hover:bg-slate-700"
+                          >
+                            <span className="min-w-0">
+                              <span className="block font-bold text-slate-800 dark:text-white">{p.numeroPapeleta} — {p.vehiculoPlaca}</span>
+                              <span className="block truncate text-[11px] text-slate-500">{p.conductorNombre || p.infractor || 'Sin conductor'}</span>
+                            </span>
+                            {p.tipoInfraccionCodigo && p.tipoInfraccionCodigo !== 'SIN DETALLE' && (
+                              <span className="shrink-0 rounded-md border border-rose-200/70 bg-rose-50 px-1.5 py-0.5 font-mono text-[11px] font-black text-rose-700">{p.tipoInfraccionCodigo}</span>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
                 <p className="mt-2 text-[10.5px] text-slate-400">Solo aparecen papeletas que aún no tienen un internamiento registrado.</p>
               </fieldset>
 
               <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Datos del Internamiento</legend>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <FloatingInput id="int_deposito" label="Depósito Municipal" required value={nuevoInternamiento.deposito} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, deposito: e.target.value })} />
+                  <FloatingInput id="int_deposito" label="Depósito oficial" value="Depósito Oficial José L. Ortiz" disabled inputClassName="bg-slate-100 text-slate-500 dark:bg-[var(--bg-subtle)]" />
                   <FloatingInput id="int_lugar" label="Lugar de intervención" optional value={nuevoInternamiento.lugarIntervencion} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, lugarIntervencion: e.target.value })} />
                   <div className="sm:col-span-2">
                     <FloatingInput id="int_motivo" label="Motivo del internamiento" optional value={nuevoInternamiento.motivo} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, motivo: e.target.value })} />
@@ -646,6 +820,49 @@ export function Retenciones({ user }) {
                 <p className="mt-2 text-[10.5px] text-slate-400">El remisor queda registrado automáticamente con tu usuario de inspector.</p>
               </fieldset>
 
+              <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Inventario del vehículo</legend>
+                <p className="mb-3 text-[10.5px] text-slate-400">Haz clic en la casilla para marcar (✓) lo que ingresa con el vehículo. Si hay más de uno (p. ej. llantas), sigue haciendo clic: ✓ → 2 → 3 → … → vacío. Se imprime igual en la boleta.</p>
+                {criteriosInventario.length === 0 ? (
+                  <p className="text-xs text-slate-400">Cargando ítems del inventario...</p>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    {['PARTE EXTERIOR', 'PARTE INTERIOR', 'MOTOR'].map((seccion) => (
+                      <div key={seccion}>
+                        <h5 className="mb-2 text-center text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-300">{seccion}</h5>
+                        <div className="space-y-1">
+                          {criteriosInventario.filter((c) => c.seccion === seccion).map((c) => (
+                            <div key={c.id} className="flex items-center justify-between gap-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                              <span className="min-w-0 truncate" title={c.nombre}>{c.nombre}</span>
+                              <button
+                                type="button"
+                                aria-label={`${c.nombre}: ${inventarioMarcado[c.id] ? 'marcado' : 'sin marcar'}`}
+                                title="Clic para marcar (✓); más clics aumentan la cantidad"
+                                onClick={() => setInventarioMarcado((prev) => {
+                                  const actual = Number(prev[c.id] || 0)
+                                  const siguiente = actual >= 9 ? 0 : actual + 1
+                                  const sig = { ...prev }
+                                  if (siguiente === 0) delete sig[c.id]
+                                  else sig[c.id] = String(siguiente)
+                                  return sig
+                                })}
+                                className={`grid h-7 w-14 shrink-0 cursor-pointer place-items-center rounded-md border text-sm font-black transition ${
+                                  inventarioMarcado[c.id]
+                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                    : 'border-slate-300 bg-white text-transparent hover:border-emerald-400 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]'
+                                }`}
+                              >
+                                {inventarioMarcado[c.id] === '1' ? '✓' : (inventarioMarcado[c.id] || '·')}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </fieldset>
+
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1.5">Observaciones</label>
                 <textarea
@@ -661,6 +878,76 @@ export function Retenciones({ user }) {
               <BotonCancelar onClick={() => setIsNuevoModalOpen(false)} />
               <BotonGuardar disabled={registrando}>
                 {registrando ? 'Registrando...' : 'Registrar Internamiento'}
+              </BotonGuardar>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {infraccionVista && (
+        <InfraccionDetalleModal selectedInfraccion={infraccionVista} onClose={() => setInfraccionVista(null)} />
+      )}
+
+      {pagoItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget && !pagando) setPagoItem(null) }}>
+          <form onSubmit={handleConfirmarPago} className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-[var(--border)]">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-9 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <Icon name="creditCard" className="size-4.5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">Cobrar y liberar vehículo</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Boleta {pagoItem.numeroBoleta} · placa {pagoItem.vehiculoPlaca}</p>
+                </div>
+              </div>
+              <BotonCerrarModal onClick={() => !pagando && setPagoItem(null)} title="Cerrar" />
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">Papeleta {pagoItem.numeroPapeleta || '—'}</span>
+                  <span className="font-bold text-slate-900 dark:text-white">S/ {Number(pagoItem.montoPapeleta || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  {pagoItem.papeletaEstado === 'PAGADA'
+                    ? 'La papeleta ya está pagada: solo se cobra la guardianía y el remolque.'
+                    : papeletaPorCobrar(pagoItem)
+                      ? 'La papeleta está pendiente de pago: se cobra junto con la liberación.'
+                      : 'Este internamiento no tiene papeleta asociada.'}
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FloatingInput id="pago_fecha" label="Fecha de pago" type="date" required max={hoyISO()} value={pagoForm.fechaPago} onChange={(e) => setPagoForm({ ...pagoForm, fechaPago: e.target.value })} />
+                {papeletaPorCobrar(pagoItem) && (
+                  <FloatingInput id="pago_rec_pap" label="N° de recibo de la papeleta" required value={pagoForm.reciboPapeleta} onChange={(e) => setPagoForm({ ...pagoForm, reciboPapeleta: e.target.value })} />
+                )}
+                <FloatingInput id="pago_monto_guard" label="Guardianía (S/)" type="number" min="0" step="0.01" optional value={pagoForm.montoGuardiania} onChange={(e) => setPagoForm({ ...pagoForm, montoGuardiania: e.target.value })} />
+                <FloatingInput id="pago_rec_guard" label="N° de recibo de guardianía" optional value={pagoForm.reciboGuardiania} onChange={(e) => setPagoForm({ ...pagoForm, reciboGuardiania: e.target.value })} />
+                <FloatingInput id="pago_monto_rem" label="Remolque (S/)" type="number" min="0" step="0.01" optional value={pagoForm.montoRemolque} onChange={(e) => setPagoForm({ ...pagoForm, montoRemolque: e.target.value })} />
+                <FloatingInput id="pago_rec_rem" label="N° de recibo de remolque" optional value={pagoForm.reciboRemolque} onChange={(e) => setPagoForm({ ...pagoForm, reciboRemolque: e.target.value })} />
+                <div className="sm:col-span-2">
+                  <FloatingInput id="pago_dni" label="DNI de quien retira el vehículo" required maxLength={15} value={pagoForm.autorizadoDni} onChange={(e) => setPagoForm({ ...pagoForm, autorizadoDni: e.target.value.replace(/\D/g, '') })} />
+                </div>
+                <div className="sm:col-span-2">
+                  <FloatingInput id="pago_obs" label="Observaciones" optional value={pagoForm.observaciones} onChange={(e) => setPagoForm({ ...pagoForm, observaciones: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Total a cobrar</span>
+                <span className="text-xl font-black text-emerald-700 dark:text-emerald-300">
+                  S/ {totalPago(pagoItem, pagoForm).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[#1C2438]">
+              <BotonCancelar onClick={() => !pagando && setPagoItem(null)} />
+              <BotonGuardar disabled={pagando}>
+                {pagando ? 'Registrando...' : 'Cobrar y liberar'}
               </BotonGuardar>
             </div>
           </form>
@@ -864,25 +1151,6 @@ export function Retenciones({ user }) {
                   <span>Imprimir Ficha</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => handlePrint('INTERNAMIENTO')}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 text-blue-700 px-3 py-1.5 text-xs font-bold hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300 transition cursor-pointer"
-                >
-                  <Icon name="print" className="size-3.5" />
-                  <span>Orden de Internamiento</span>
-                </button>
-
-                {selectedItem.estado === 'LIBERADO' && (
-                  <button
-                    type="button"
-                    onClick={() => handlePrint('LIBERTAD')}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 text-emerald-700 px-3 py-1.5 text-xs font-bold hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-300 transition cursor-pointer"
-                  >
-                    <Icon name="print" className="size-3.5" />
-                    <span>Orden de Libertad</span>
-                  </button>
-                )}
               </div>
 
               <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
@@ -891,6 +1159,11 @@ export function Retenciones({ user }) {
         </div>
       )}
       
+      {(printLayout === 'INTERNAMIENTO' || printLayout === 'LIBERTAD') && selectedItem && (
+        // Sin margen de página, el navegador no imprime fecha, título, dirección ni "1/1" en los bordes;
+        // el margen institucional (12 mm × 14 mm) pasa a ser relleno de la propia hoja.
+        <style>{`@page { size: A4 portrait; margin: 0; } @media print { body > #seccion-impresion.boleta-internamiento-a4, body > #seccion-impresion.orden-libertad-a4 { padding: 12mm 14mm !important; box-sizing: border-box !important; } }`}</style>
+      )}
       {printLayout === 'INTERNAMIENTO' && selectedItem && (
         <BoletaInternamientoPrint item={selectedItem} />
       )}

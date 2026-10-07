@@ -44,9 +44,9 @@ Database/
 !backend/app/Database/
 !backend/app/Database/Migrations/
 !backend/app/Database/Migrations/*.php
-# Seeder de datos de prueba controlado (MassiveSeeder queda excluido: inserta 2M filas).
+# Los seeders son código fuente; su ejecución se realiza de forma explícita.
 !backend/app/Database/Seeds/
-!backend/app/Database/Seeds/PoblarDatosMasivosSeeder.php
+!backend/app/Database/Seeds/*.php
 *.sql
 !init-db/transitomunicipal.sql
 

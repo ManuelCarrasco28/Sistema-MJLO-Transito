@@ -10,12 +10,13 @@ import { CerticavFichaPrint } from '../components/documentos/TarjetaOperatividad
 import { exportToExcel } from '../utils/exportToExcel'
 import { showError } from '../utils/SwalUtil'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
-import { VistaPreviaEscalada } from '../components/ui/VistaPreviaEscalada'
+import { abrirImpresionCuandoEsteListo } from '../utils/impresionCarnets'
 import { ActionToast, TOAST_DURACION_MS } from '../components/ui/ActionToast'
 import { formatFecha, formatNumeroTarjeta, normalizarPlaca } from '../utils/formatters'
 import { imprimirInspeccionesPdf } from '../utils/exportInspeccionesPdf'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import './Inspecciones.css'
 
 const FILTER_RESULTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los resultados' },
@@ -87,7 +88,6 @@ export function Inspecciones() {
   const [conductorMismoPropietario, setConductorMismoPropietario] = useState(false)
   const [checklistModificado, setChecklistModificado] = useState(false)
   const [inspeccionAEliminar, setInspeccionAEliminar] = useState(null)
-  const [previewAjustada, setPreviewAjustada] = useState(true)
   // Solo para mostrar: el número definitivo lo asigna el servidor al guardar.
   const [correlativoPreview, setCorrelativoPreview] = useState({ numeroRegistro: '', numeroSerieCerticav: '' })
   const [eliminando, setEliminando] = useState(false)
@@ -118,12 +118,10 @@ export function Inspecciones() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+  const [inspeccionAImprimir, setInspeccionAImprimir] = useState(null)
   const [selectedInspeccion, setSelectedInspeccion] = useState(null)
 
-  // Plate dropdown autocompletion
-  const [isPlacaDropdownOpen, setIsPlacaDropdownOpen] = useState(false)
-  const placaDropdownRef = useRef(null)
+  const busquedaPlacaRef = useRef(null)
 
   // Conductor dropdown autocompletion (búsqueda contra el padrón de personas)
   const [isConductorDropdownOpen, setIsConductorDropdownOpen] = useState(false)
@@ -197,7 +195,7 @@ export function Inspecciones() {
     apiFetch('/inspecciones/estadisticas')
       .then((res) => res.ok ? res.json() : Promise.reject(res))
       .then((payload) => setStats(payload.data ?? {}))
-      .catch(() => {})
+      .catch(() => { })
   }
 
   useEffect(() => {
@@ -208,7 +206,7 @@ export function Inspecciones() {
     Promise.all([
       apiFetch('/inspeccion-criterios').catch(() => ({ ok: false })),
       apiFetch('/vehiculos?porPagina=100&ligero=1').catch(() => ({ ok: false })),
-      apiFetch('/personal?porPagina=100').catch(() => ({ ok: false })),
+      apiFetch('/personal?page=1&porPagina=100&estado=ACTIVO&tipoInspector=TECNICO').catch(() => ({ ok: false })),
       apiFetch('/asociaciones?porPagina=100').catch(() => ({ ok: false })),
       apiFetch('/personas?porPagina=100&ligero=1').catch(() => ({ ok: false })),
     ]).then(async ([critRes, vehRes, persRes, asocRes, personasRes]) => {
@@ -234,15 +232,12 @@ export function Inspecciones() {
         const personasPayload = await personasRes.json()
         setPersonas(personasPayload.data || [])
       }
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
-  // Close plate dropdown on outside click
+  // Cerrar la búsqueda de conductor al pulsar fuera.
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (placaDropdownRef.current && !placaDropdownRef.current.contains(event.target)) {
-        setIsPlacaDropdownOpen(false)
-      }
       if (conductorDropdownRef.current && !conductorDropdownRef.current.contains(event.target)) {
         setIsConductorDropdownOpen(false)
       }
@@ -281,10 +276,6 @@ export function Inspecciones() {
 
   const paginatedInspecciones = inspecciones
 
-  const filteredPlacas = vehiculos.filter((v) =>
-    (v.placa || '').toLowerCase().includes((formData.vehiculoPlaca || '').toLowerCase())
-  )
-
   const filteredConductores = (() => {
     const termino = (formData.conductorNombre || '').trim().toLowerCase()
     if (termino.length < 2) return []
@@ -308,9 +299,10 @@ export function Inspecciones() {
     setIsConductorDropdownOpen(false)
   }
 
-  const handlePlacaChange = (val) => {
+  const handlePlacaChange = (val, vehiculo) => {
+    busquedaPlacaRef.current?.abort()
     const placaUpper = val.toUpperCase().trim()
-    const vMatch = vehiculos.find((v) => v.placa.toUpperCase() === placaUpper)
+    const vMatch = vehiculo || vehiculos.find((v) => normalizarPlaca(v.placa || '') === placaUpper)
     setFormData((prev) => ({
       ...prev,
       vehiculoPlaca: placaUpper,
@@ -325,6 +317,29 @@ export function Inspecciones() {
       propietarioDni: vMatch?.propietarioDni || '',
     }))
   }
+
+  const buscarVehiculoPorPlaca = async () => {
+    const placa = normalizarPlaca(formData.vehiculoPlaca || '')
+    if (!placa || vehiculos.some((v) => normalizarPlaca(v.placa || '') === placa)) return
+    busquedaPlacaRef.current?.abort()
+    const controller = new AbortController()
+    busquedaPlacaRef.current = controller
+    try {
+      const res = await apiFetch(`/vehiculos?buscar=${encodeURIComponent(placa)}&porPagina=20&ligero=1`, { signal: controller.signal })
+      if (!res.ok) return
+      const payload = await res.json()
+      if (controller.signal.aborted) return
+      const vehiculo = (payload.data || []).find((v) => normalizarPlaca(v.placa || '') === placa)
+      if (vehiculo) {
+        setVehiculos((prev) => [...prev.filter((v) => v.id !== vehiculo.id), vehiculo])
+        handlePlacaChange(placa, vehiculo)
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') showToast('No se pudo consultar el vehículo. Intenta nuevamente.', 'error')
+    }
+  }
+
+  useEffect(() => () => busquedaPlacaRef.current?.abort(), [])
 
   // La licencia sale del padrón de personas. Nunca se usa el DNI como licencia:
   // al guardar, el backend actualizaría la licencia real de esa persona.
@@ -415,7 +430,6 @@ export function Inspecciones() {
   }
 
   const handleOpenCreateModal = () => {
-    const defaultTecnico = tecnicos.length > 0 ? tecnicos[0] : null
     setFormData({
       vehiculoPlaca: '',
       vehiculoMarca: '',
@@ -434,8 +448,8 @@ export function Inspecciones() {
       numeroRegistro: '',
       numeroSerieCerticav: '',
       fecha: new Date().toISOString().split('T')[0],
-      inspector: defaultTecnico ? `${defaultTecnico.nombres} ${defaultTecnico.apellidos}` : '',
-      tecnicoId: defaultTecnico ? defaultTecnico.id : '',
+      inspector: '',
+      tecnicoId: '',
       primeraEvaluacion: 'APROBADO',
       segundaEvaluacion: '',
       resultado: 'APROBADO',
@@ -443,7 +457,7 @@ export function Inspecciones() {
       detalles: criteriosInspeccion.map((c) => ({ criterioId: c.id, estado: 'BIEN', obs: '' })),
     })
     setSelectedInspeccion(null)
-    setIsPlacaDropdownOpen(false)
+    busquedaPlacaRef.current?.abort()
     setConductorEsRegistrado(false)
     setConductorMismoPropietario(false)
     setChecklistModificado(false)
@@ -451,7 +465,7 @@ export function Inspecciones() {
     apiFetch(`/inspecciones/siguiente-correlativo?anio=${new Date().getFullYear()}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => json?.data && setCorrelativoPreview(json.data))
-      .catch(() => {})
+      .catch(() => { })
     setIsModalOpen(true)
   }
 
@@ -486,7 +500,7 @@ export function Inspecciones() {
       }),
     })
     setSelectedInspeccion(inspeccion)
-    setIsPlacaDropdownOpen(false)
+    busquedaPlacaRef.current?.abort()
     setConductorEsRegistrado(Boolean(inspeccion.conductorDni))
     const dniConductor = (inspeccion.conductorDni || '').trim()
     const dniPropietario = (inspeccion.propietarioDni || vMatch?.propietarioDni || '').trim()
@@ -500,10 +514,56 @@ export function Inspecciones() {
     setIsDetailModalOpen(true)
   }
 
-  const handleOpenPreview = (inspeccion) => {
-    setSelectedInspeccion(inspeccion)
-    setIsPreviewModalOpen(true)
+  // Datos de la ficha oficial CertiCAV de una inspección (los usa la impresión directa).
+  const datosCerticav = (selectedInspeccion) => {
+    const vInfo = vehiculos.find((v) => v.placa === selectedInspeccion.vehiculoPlaca)
+    const certicavData = {
+      codigo: selectedInspeccion.numeroInspeccion,
+      numeroInspeccion: selectedInspeccion.numeroInspeccion,
+      numeroRegistro: selectedInspeccion.numeroRegistro || selectedInspeccion.numeroInspeccion,
+      numeroSerieCerticav: selectedInspeccion.numeroSerieCerticav || '',
+      placa: selectedInspeccion.vehiculoPlaca,
+      vehiculoPlaca: selectedInspeccion.vehiculoPlaca,
+      propietario: selectedInspeccion.propietario || vInfo?.propietario || '—',
+      propietarioDni: selectedInspeccion.propietarioDni || vInfo?.propietarioDni || '—',
+      // El conductor es quien se registró en la inspección; nunca se sustituye por el propietario.
+      conductorNombre: selectedInspeccion.conductorNombre || '—',
+      conductorDni: selectedInspeccion.conductorDni || '—',
+      conductorLicencia: selectedInspeccion.conductorLicencia || '—',
+      transportador: selectedInspeccion.transportador || vInfo?.asociacion || 'Independiente',
+      asociacion: selectedInspeccion.transportador || vInfo?.asociacion || 'Independiente',
+      vehiculoMarca: selectedInspeccion.vehiculoMarca || vInfo?.marca || '—',
+      vehiculoModelo: selectedInspeccion.vehiculoModelo || vInfo?.modelo || '—',
+      vehiculoAnio: selectedInspeccion.vehiculoAnio || vInfo?.anio || '—',
+      anioFabricacion: selectedInspeccion.vehiculoAnio || vInfo?.anio || '—',
+      numeroMotor: selectedInspeccion.vehiculoMotor || vInfo?.serieMotor || '—',
+      fecha: selectedInspeccion.fecha,
+      fechaExpedicion: selectedInspeccion.fecha,
+      fechaVencimiento: selectedInspeccion.fechaVencimiento,
+      vigenciaMeses: 6,
+      estadoVigencia: selectedInspeccion.estadoVigencia,
+      diasRestantes: selectedInspeccion.diasRestantes,
+      primeraEvaluacion: selectedInspeccion.primeraEvaluacion || (selectedInspeccion.resultado === 'DESAPROBADO' ? 'DESAPROBADO' : 'APROBADO'),
+      segundaEvaluacion: selectedInspeccion.segundaEvaluacion || '',
+      resultado: selectedInspeccion.resultado,
+      inspector: selectedInspeccion.inspector || 'Inspector Técnico Municipal',
+      observaciones: selectedInspeccion.observaciones || '',
+      detalles: selectedInspeccion.detalles || [],
+      qrUrl: `https://munijlo.gob.pe/transito/validar?tipo=CERTICAV&reg=${encodeURIComponent(selectedInspeccion.numeroRegistro || selectedInspeccion.numeroInspeccion || '')}&placa=${encodeURIComponent(selectedInspeccion.vehiculoPlaca || '')}`,
+    }
+    return certicavData
   }
+
+  // Imprimir = abrir directamente la ficha para imprimir/guardar como PDF (sin panel intermedio).
+  const handleOpenPreview = (inspeccion) => {
+    if (inspeccionAImprimir) return
+    setInspeccionAImprimir(inspeccion)
+  }
+
+  useEffect(() => {
+    if (!inspeccionAImprimir) return
+    abrirImpresionCuandoEsteListo(() => setInspeccionAImprimir(null))
+  }, [inspeccionAImprimir])
 
   // Abre el modal de confirmación propio (en lugar del confirm() nativo del navegador).
   const handleDelete = (id) => {
@@ -570,6 +630,10 @@ export function Inspecciones() {
     }
 
     const payload = { ...formData }
+    if (!formData.inspector.trim()) {
+      showToast('Escriba el nombre del inspector técnico responsable.', 'error')
+      return
+    }
     // Al editar sin tocar el checklist no se reenvía: así no se reemplaza el
     // historial de una inspección evaluada con el formato anterior.
     if (selectedInspeccion && !checklistModificado) {
@@ -630,46 +694,46 @@ export function Inspecciones() {
     await new Promise(r => setTimeout(r, 50))
     try {
       const data = await fetchTodoElFiltro()
-          await exportToExcel({
-            filename: `Inspecciones_Tecnicas_${new Date().toISOString().slice(0, 10)}.xls`,
-            sheetName: 'Inspecciones',
-            title: 'REGISTRO DE INSPECCIONES TÉCNICAS VEHICULARES - CERTICAV',
-            subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',
-            metadata: [
-              { label: 'Resultado', value: filterResultado },
-              { label: 'Total Registros', value: String(data.length) }
-            ],
-            columns: [
-              { header: 'N° REGISTRO', key: 'numeroRegistro', isText: true, width: 120, align: 'center' },
-              { header: 'SERIE CERTICAV', render: (_, i) => i.numeroSerieCerticav || ('CCV-2026-' + String(i.id || '').padStart(6, '0')), isText: true, width: 140, align: 'center' },
-              { header: 'N° INSPECCIÓN', key: 'numeroInspeccion', isText: true, width: 120, align: 'center' },
-              { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
-              { header: 'MARCA', key: 'vehiculoMarca', width: 110 },
-              { header: 'MODELO', key: 'vehiculoModelo', width: 110 },
-              { header: 'COLOR', key: 'vehiculoColor', width: 100 },
-              { header: 'AÑO', key: 'vehiculoAnio', width: 70, align: 'center' },
-              { header: 'SERIE DEL MOTOR', key: 'vehiculoMotor', isText: true, width: 140 },
-              { header: 'PROPIETARIO', key: 'propietario', width: 180 },
-              { header: 'DNI PROPIETARIO', key: 'propietarioDni', isText: true, width: 120, align: 'center' },
-              { header: 'TRANSPORTADOR', key: 'transportador', width: 180 },
-              { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
-              { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
-              { header: 'LICENCIA', key: 'conductorLicencia', isText: true, width: 120, align: 'center' },
-              { header: 'INSPECTOR', key: 'inspector', width: 180 },
-              { header: 'FECHA INSPECCIÓN', key: 'fecha', width: 120, align: 'center' },
-              { header: '1ª EVALUACIÓN', key: 'primeraEvaluacion', width: 110, align: 'center' },
-              { header: '2ª EVALUACIÓN', key: 'segundaEvaluacion', width: 110, align: 'center' },
-              { header: 'FECHA 2ª EVALUACIÓN', key: 'fechaSegundaEvaluacion', width: 120, align: 'center' },
-              { header: 'RESULTADO', key: 'resultado', width: 120, align: 'center' },
-              { header: 'OBSERVACIONES', key: 'observaciones', width: 260 },
-              { header: 'VIGENCIA (MESES)', key: 'vigenciaMeses', width: 100, align: 'center' },
-              { header: 'FECHA VENCIMIENTO', key: 'fechaVencimiento', width: 120, align: 'center' },
-              { header: 'DÍAS RESTANTES', key: 'diasRestantes', width: 100, align: 'center' },
-              { header: 'ESTADO VIGENCIA', key: 'estadoVigencia', width: 120, align: 'center' },
-              { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
-            ],
-            data
-          })
+      await exportToExcel({
+        filename: `Inspecciones_Tecnicas_${new Date().toISOString().slice(0, 10)}.xls`,
+        sheetName: 'Inspecciones',
+        title: 'REGISTRO DE INSPECCIONES TÉCNICAS VEHICULARES - CERTICAV',
+        subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',
+        metadata: [
+          { label: 'Resultado', value: filterResultado },
+          { label: 'Total Registros', value: String(data.length) }
+        ],
+        columns: [
+          { header: 'N° REGISTRO', key: 'numeroRegistro', isText: true, width: 120, align: 'center' },
+          { header: 'SERIE CERTICAV', render: (_, i) => i.numeroSerieCerticav || ('CCV-2026-' + String(i.id || '').padStart(6, '0')), isText: true, width: 140, align: 'center' },
+          { header: 'N° INSPECCIÓN', key: 'numeroInspeccion', isText: true, width: 120, align: 'center' },
+          { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
+          { header: 'MARCA', key: 'vehiculoMarca', width: 110 },
+          { header: 'MODELO', key: 'vehiculoModelo', width: 110 },
+          { header: 'COLOR', key: 'vehiculoColor', width: 100 },
+          { header: 'AÑO', key: 'vehiculoAnio', width: 70, align: 'center' },
+          { header: 'SERIE DEL MOTOR', key: 'vehiculoMotor', isText: true, width: 140 },
+          { header: 'PROPIETARIO', key: 'propietario', width: 180 },
+          { header: 'DNI PROPIETARIO', key: 'propietarioDni', isText: true, width: 120, align: 'center' },
+          { header: 'TRANSPORTADOR', key: 'transportador', width: 180 },
+          { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
+          { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 120, align: 'center' },
+          { header: 'LICENCIA', key: 'conductorLicencia', isText: true, width: 120, align: 'center' },
+          { header: 'INSPECTOR', key: 'inspector', width: 180 },
+          { header: 'FECHA INSPECCIÓN', key: 'fecha', width: 120, align: 'center' },
+          { header: '1ª EVALUACIÓN', key: 'primeraEvaluacion', width: 110, align: 'center' },
+          { header: '2ª EVALUACIÓN', key: 'segundaEvaluacion', width: 110, align: 'center' },
+          { header: 'FECHA 2ª EVALUACIÓN', key: 'fechaSegundaEvaluacion', width: 120, align: 'center' },
+          { header: 'RESULTADO', key: 'resultado', width: 120, align: 'center' },
+          { header: 'OBSERVACIONES', key: 'observaciones', width: 260 },
+          { header: 'VIGENCIA (MESES)', key: 'vigenciaMeses', width: 100, align: 'center' },
+          { header: 'FECHA VENCIMIENTO', key: 'fechaVencimiento', width: 120, align: 'center' },
+          { header: 'DÍAS RESTANTES', key: 'diasRestantes', width: 100, align: 'center' },
+          { header: 'ESTADO VIGENCIA', key: 'estadoVigencia', width: 120, align: 'center' },
+          { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+        ],
+        data
+      })
     } finally {
       setIsExportingExcel(false)
     }
@@ -679,12 +743,12 @@ export function Inspecciones() {
     setIsExportingPdf(true)
     try {
       const listToExport = await fetchTodoElFiltro()
-          if (listToExport.length === 0) {
-            showError('Atención', 'No hay registros para exportar.')
-            return
-          }
-      
-          await imprimirInspeccionesPdf({ listToExport, vehiculos, totales, aprobados, observados, desaprobados })
+      if (listToExport.length === 0) {
+        showError('Atención', 'No hay registros para exportar.')
+        return
+      }
+
+      await imprimirInspeccionesPdf({ listToExport, vehiculos, totales, aprobados, observados, desaprobados })
     } finally {
       setIsExportingPdf(false)
     }
@@ -764,7 +828,7 @@ export function Inspecciones() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                Certicav
+                Inspección Técnica Vehicular
               </h1>
             </div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -921,7 +985,7 @@ export function Inspecciones() {
               onClick={handleExportExcel}
               title="Descargar padrón en Excel (.xls)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-             disabled={isExportingExcel}>
+              disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
@@ -931,7 +995,7 @@ export function Inspecciones() {
               onClick={handleExportPdf}
               title="Descargar o imprimir padrón en PDF"
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-             disabled={isExportingPdf}>
+              disabled={isExportingPdf}>
               <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
               <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
@@ -1112,9 +1176,9 @@ export function Inspecciones() {
                           <button
                             type="button"
                             onClick={() => handleOpenPreview(i)}
-                            title="Imprimir Acta Oficial CertiCAV"
+                            title="Imprimir / guardar PDF de la ficha CertiCAV"
                             className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white"
-                        >
+                          >
                             <Icon name="print" className="size-4" />
                           </button>
 
@@ -1221,50 +1285,21 @@ export function Inspecciones() {
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                    {/* Placa Vehicular con Autocompletado */}
-                    <div className="sm:col-span-4 relative" ref={placaDropdownRef}>
+                    {/* Consulta puntual por placa, sin cargar un desplegable. */}
+                    <div className="sm:col-span-4">
                       <FloatingInput
                         id="insp_placa"
                         label="N° de Placa del Vehículo"
                         required
                         value={formData.vehiculoPlaca}
                         inputClassName="font-mono font-black tracking-widest uppercase text-slate-900 dark:text-white"
-                        onFocus={() => setIsPlacaDropdownOpen(true)}
+                        autoComplete="off"
+                        onBlur={buscarVehiculoPorPlaca}
                         onChange={(e) => {
                           handlePlacaChange(normalizarPlaca(e.target.value))
-                          setIsPlacaDropdownOpen(true)
                         }}
                       />
 
-                      {isPlacaDropdownOpen && (
-                        <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100">
-                          {filteredPlacas.length === 0 ? (
-                            <div className="px-3 py-2 text-center text-xs text-slate-400">
-                              No hay vehículos registrados con esa placa
-                            </div>
-                          ) : (
-                            filteredPlacas.map((v) => (
-                              <button
-                                key={v.id}
-                                type="button"
-                                onClick={() => {
-                                  handlePlacaChange(v.placa)
-                                  setIsPlacaDropdownOpen(false)
-                                }}
-                                className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition cursor-pointer ${formData.vehiculoPlaca === v.placa
-                                    ? 'bg-blue-50 text-blue-700 font-bold dark:bg-blue-950/60 dark:text-blue-300'
-                                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
-                                  }`}
-                              >
-                                <span className="font-mono font-bold">{v.placa}</span>
-                                <span className="text-[11px] text-slate-400 truncate max-w-[170px]">
-                                  {v.propietario || v.marca || 'Registrado'} · {v.asociacion || 'Independiente'}
-                                </span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
                     </div>
 
                     <div className="sm:col-span-3">
@@ -1485,23 +1520,23 @@ export function Inspecciones() {
                     </div>
 
                     <div className="sm:col-span-8">
-                      <FloatingSelect
+                      <FloatingInput
                         id="insp_tecnico"
-                        label="Técnico Responsable / Inspector Asignado"
-                        value={formData.tecnicoId}
+                        label="Nombre del inspector técnico responsable"
+                        required
+                        maxLength={200}
+                        autoComplete="off"
+                        value={formData.inspector}
                         onChange={(e) => {
-                          const tId = e.target.value
-                          const tObj = tecnicos.find((t) => String(t.id) === String(tId))
+                          const nombre = e.target.value
+                          const normalizar = (texto) => texto.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+                          const tecnico = tecnicos.find((t) => normalizar(`${t.nombres} ${t.apellidos}`) === normalizar(nombre))
                           setFormData({
                             ...formData,
-                            tecnicoId: tId,
-                            inspector: tObj ? `${tObj.nombres} ${tObj.apellidos}` : formData.inspector,
+                            tecnicoId: tecnico?.id || '',
+                            inspector: nombre,
                           })
                         }}
-                        options={[
-                          { value: '', label: 'Seleccionar técnico responsable' },
-                          ...tecnicos.map((t) => ({ value: String(t.id), label: `${t.nombres} ${t.apellidos} · Inspector Tránsito` })),
-                        ]}
                       />
                     </div>
                   </div>
@@ -1592,8 +1627,8 @@ export function Inspecciones() {
                                       onClick={() => handleDetalleChange(crit.id, 'estado', 'BIEN')}
                                       title="Bien (Aprobado)"
                                       className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition cursor-pointer ${det.estado === 'BIEN'
-                                          ? 'bg-emerald-600 text-white shadow-2xs scale-105'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
+                                        ? 'bg-emerald-600 text-white shadow-2xs scale-105'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
                                         }`}
                                     >
                                       B
@@ -1603,8 +1638,8 @@ export function Inspecciones() {
                                       onClick={() => handleDetalleChange(crit.id, 'estado', 'MAL_ESTADO')}
                                       title="Mal Estado"
                                       className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition cursor-pointer ${det.estado === 'MAL_ESTADO'
-                                          ? 'bg-amber-600 text-white shadow-2xs scale-105'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
+                                        ? 'bg-amber-600 text-white shadow-2xs scale-105'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
                                         }`}
                                     >
                                       M.E.
@@ -1614,8 +1649,8 @@ export function Inspecciones() {
                                       onClick={() => handleDetalleChange(crit.id, 'estado', 'NO_TIENE')}
                                       title="No Tiene"
                                       className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition cursor-pointer ${det.estado === 'NO_TIENE'
-                                          ? 'bg-rose-600 text-white shadow-2xs scale-105'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
+                                        ? 'bg-rose-600 text-white shadow-2xs scale-105'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
                                         }`}
                                     >
                                       N.T.
@@ -1705,7 +1740,7 @@ export function Inspecciones() {
       {/* Ficha de Detalle (Diccionario Visual - Estilo Exacto Personas y Ficha Oficial Digitalizada) */}
       {isDetailModalOpen && selectedInspeccion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+          <div className="inspeccion-detalle w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
@@ -1721,7 +1756,7 @@ export function Inspecciones() {
                   </p>
                 </div>
               </div>
-              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar ficha" />
+              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar ficha" className="inspeccion-cerrar" />
             </div>
 
             {/* Modal Body */}
@@ -1737,9 +1772,9 @@ export function Inspecciones() {
                       <span className="font-mono text-lg font-black text-slate-900 dark:text-white">
                         {selectedInspeccion.numeroRegistro || selectedInspeccion.numeroInspeccion}
                       </span>
-                      <PlacaBadge placa={selectedInspeccion.vehiculoPlaca} />
+                      <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 font-mono text-xs font-bold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">{selectedInspeccion.vehiculoPlaca}</span>
                       {selectedInspeccion.numeroSerieCerticav && (
-                        <span className="inline-flex items-center rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 font-mono text-xs font-black tracking-wider text-rose-600 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 shadow-2xs">
+                        <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold tracking-wider text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300">
                           SERIE: {selectedInspeccion.numeroSerieCerticav}
                         </span>
                       )}
@@ -1752,17 +1787,6 @@ export function Inspecciones() {
 
                 <div className="flex items-center gap-2">
                   {getResultadoBadge(selectedInspeccion.resultado)}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsDetailModalOpen(false)
-                      handleOpenPreview(selectedInspeccion)
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
-                  >
-                    <Icon name="print" className="size-3.5" />
-                    <span>Imprimir Acta A4</span>
-                  </button>
                 </div>
               </div>
 
@@ -1867,8 +1891,8 @@ export function Inspecciones() {
                     <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                       <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Primera Evaluación</span>
                       <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${selectedInspeccion.primeraEvaluacion === 'DESAPROBADO'
-                          ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                          : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
                         }`}>
                         {selectedInspeccion.primeraEvaluacion || 'APROBADO'}
                       </span>
@@ -1877,8 +1901,8 @@ export function Inspecciones() {
                       <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                         <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Segunda Evaluación</span>
                         <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${selectedInspeccion.segundaEvaluacion === 'DESAPROBADO'
-                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                          : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
                           }`}>
                           {selectedInspeccion.segundaEvaluacion}
                         </span>
@@ -1935,7 +1959,7 @@ export function Inspecciones() {
                     {Object.entries(
                       selectedInspeccion.detalles.reduce((acc, d) => {
                         const seccion = d.seccion || 'GENERAL'
-                        ;(acc[seccion] = acc[seccion] || []).push(d)
+                          ; (acc[seccion] = acc[seccion] || []).push(d)
                         return acc
                       }, {})
                     ).map(([seccion, items]) => {
@@ -1963,10 +1987,10 @@ export function Inspecciones() {
                                   </div>
                                   <span
                                     className={`shrink-0 px-2 py-0.5 rounded-md text-[9.5px] font-black ${isBien
-                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                        : isMal
-                                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                                          : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                      : isMal
+                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                        : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
                                       }`}
                                   >
                                     {isBien ? '✓ BIEN' : isMal ? '⚠ M.E.' : '✕ N.T.'}
@@ -2004,125 +2028,27 @@ export function Inspecciones() {
                   setIsDetailModalOpen(false)
                   handleOpenEditModal(selectedInspeccion)
                 }}
-                className="rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/40 px-3.5 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 shadow-xs transition hover:bg-amber-100 active:scale-95 cursor-pointer"
+                className="rounded-xl border border-blue-800 bg-blue-800 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-blue-900 active:scale-95 cursor-pointer"
               >
                 Editar Inspección
               </button>
               <div className="flex items-center gap-2">
-                <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsDetailModalOpen(false)
-                    handleOpenPreview(selectedInspeccion)
-                  }}
-                  className="rounded-xl bg-purple-600 hover:bg-purple-700 px-4 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
-                >
-                  Imprimir Acta A4
-                </button>
+                <button type="button" onClick={() => setIsDetailModalOpen(false)} className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-800 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 cursor-pointer">Cerrar</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DE PREVISUALIZACIÓN E IMPRESIÓN OFICIAL (#seccion-impresion) */}
-      {isPreviewModalOpen && selectedInspeccion && (() => {
-        const vInfo = vehiculos.find((v) => v.placa === selectedInspeccion.vehiculoPlaca)
-        const certicavData = {
-          codigo: selectedInspeccion.numeroInspeccion,
-          numeroInspeccion: selectedInspeccion.numeroInspeccion,
-          numeroRegistro: selectedInspeccion.numeroRegistro || selectedInspeccion.numeroInspeccion,
-          numeroSerieCerticav: selectedInspeccion.numeroSerieCerticav || '',
-          placa: selectedInspeccion.vehiculoPlaca,
-          vehiculoPlaca: selectedInspeccion.vehiculoPlaca,
-          propietario: selectedInspeccion.propietario || vInfo?.propietario || '—',
-          propietarioDni: selectedInspeccion.propietarioDni || vInfo?.propietarioDni || '—',
-          // El conductor es quien se registró en la inspección; nunca se sustituye por el propietario.
-          conductorNombre: selectedInspeccion.conductorNombre || '—',
-          conductorDni: selectedInspeccion.conductorDni || '—',
-          conductorLicencia: selectedInspeccion.conductorLicencia || '—',
-          transportador: selectedInspeccion.transportador || vInfo?.asociacion || 'Independiente',
-          asociacion: selectedInspeccion.transportador || vInfo?.asociacion || 'Independiente',
-          vehiculoMarca: selectedInspeccion.vehiculoMarca || vInfo?.marca || '—',
-          vehiculoModelo: selectedInspeccion.vehiculoModelo || vInfo?.modelo || '—',
-          vehiculoAnio: selectedInspeccion.vehiculoAnio || vInfo?.anio || '—',
-          anioFabricacion: selectedInspeccion.vehiculoAnio || vInfo?.anio || '—',
-          numeroMotor: selectedInspeccion.vehiculoMotor || vInfo?.serieMotor || '—',
-          fecha: selectedInspeccion.fecha,
-          fechaExpedicion: selectedInspeccion.fecha,
-          fechaVencimiento: selectedInspeccion.fechaVencimiento,
-          vigenciaMeses: 6,
-          estadoVigencia: selectedInspeccion.estadoVigencia,
-          diasRestantes: selectedInspeccion.diasRestantes,
-          primeraEvaluacion: selectedInspeccion.primeraEvaluacion || (selectedInspeccion.resultado === 'DESAPROBADO' ? 'DESAPROBADO' : 'APROBADO'),
-          segundaEvaluacion: selectedInspeccion.segundaEvaluacion || '',
-          resultado: selectedInspeccion.resultado,
-          inspector: selectedInspeccion.inspector || 'Inspector Técnico Municipal',
-          observaciones: selectedInspeccion.observaciones || '',
-          detalles: selectedInspeccion.detalles || [],
-          qrUrl: `https://munijlo.gob.pe/transito/validar?tipo=CERTICAV&reg=${encodeURIComponent(selectedInspeccion.numeroRegistro || selectedInspeccion.numeroInspeccion || '')}&placa=${encodeURIComponent(selectedInspeccion.vehiculoPlaca || '')}`,
-        }
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-enter">
-            <div className="w-full max-w-5xl h-[calc(100vh-2rem)] flex flex-col bg-white dark:bg-[#1C2438] rounded-3xl shadow-2xl border border-slate-200 dark:border-[var(--border)] overflow-hidden">
-              {/* Header estilo /personas */}
-              <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
-                <div className="flex items-center gap-2.5">
-                  <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                    <Icon name="print" className="size-4" />
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
-                        Ficha Oficial CERTICAV
-                      </h3>
-                      {(selectedInspeccion.numeroRegistro || selectedInspeccion.numeroInspeccion) && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                          {selectedInspeccion.numeroRegistro || selectedInspeccion.numeroInspeccion}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Subgerencia de Tránsito y Transporte • Hoja Formato A4
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer active:scale-95 shadow-xs"
-                  >
-                    <Icon name="print" className="size-4" />
-                    <span>Imprimir Ficha A4</span>
-                  </button>
-                  <BotonCerrarModal onClick={() => setIsPreviewModalOpen(false)} title="Cerrar previsualización" />
-                </div>
-              </div>
-
-              {/* Vista previa y componente oficial para impresión */}
-              <div className="flex-1 min-h-0 p-4 bg-slate-200/70 dark:bg-[var(--bg-subtle)] flex flex-col items-center gap-3">
-                <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                  <span>Vista previa de la hoja A4</span>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewAjustada((v) => !v)}
-                    className="rounded-lg border border-slate-300 bg-white px-2 py-0.5 font-bold text-slate-700 hover:bg-slate-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 cursor-pointer"
-                  >
-                    {previewAjustada ? 'Ver al 100 %' : 'Ajustar a pantalla'}
-                  </button>
-                </div>
-                <VistaPreviaEscalada ajustar={previewAjustada}>
-                  <CerticavFichaPrint data={certicavData} />
-                </VistaPreviaEscalada>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+      {/* IMPRESIÓN DIRECTA DE LA FICHA CERTICAV: no hay panel; se abre el diálogo de impresión (ahí se guarda como PDF) */}
+      {inspeccionAImprimir && (
+        <div hidden>
+          {/* Sin margen de página: así el navegador no imprime fecha, título, dirección ni "1/1" en los bordes.
+              El margen institucional (12 mm × 14 mm) pasa a ser relleno de la propia hoja. */}
+          <style>{`@page { size: A4 portrait; margin: 0; } @media print { .seccion-impresion-portal .ficha-certicav-a4 { padding: 12mm 14mm !important; box-sizing: border-box !important; } }`}</style>
+          <CerticavFichaPrint data={datosCerticav(inspeccionAImprimir)} />
+        </div>
+      )}
     </div>
   )
 }

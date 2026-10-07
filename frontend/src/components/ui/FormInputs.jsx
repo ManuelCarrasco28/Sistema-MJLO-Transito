@@ -323,6 +323,7 @@ export function FloatingSelect({
   onChange,
   options = [],
   className = '',
+  multilineOptions = false,
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPos, setMenuPos] = useState(null)
@@ -424,7 +425,7 @@ export function FloatingSelect({
             position: 'fixed',
             left: menuPos.left,
             // El menú se ajusta al contenido de sus opciones: no se estira al ancho completo del campo.
-            width: 'max-content',
+            width: multilineOptions ? Math.min(menuPos.width, window.innerWidth - 32) : 'max-content',
             minWidth: buscador.buscable
               ? Math.min(Math.max(menuPos.width, 220), window.innerWidth - 32)
               : Math.min(menuPos.width, 150),
@@ -436,7 +437,7 @@ export function FloatingSelect({
           }}
           className="z-[100] rounded-lg border border-slate-200 bg-white p-0.5 shadow-xl shadow-slate-900/15 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100"
         >
-          <div className="max-h-48 overflow-y-auto custom-scrollbar">
+          <div className={`max-h-48 overflow-y-auto ${multilineOptions ? 'sin-scrollbar' : 'custom-scrollbar'}`}>
             {buscador.buscable && (
               <BuscadorOpciones
                 texto={buscador.texto}
@@ -468,7 +469,7 @@ export function FloatingSelect({
                         : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60'
                   }`}
                 >
-                  <span className="truncate">{opt.label}</span>
+                  <span className={multilineOptions ? 'min-w-0 whitespace-normal break-words leading-relaxed' : 'truncate'}>{opt.label}</span>
                   {isSelected && (
                     <svg
                       aria-hidden="true"

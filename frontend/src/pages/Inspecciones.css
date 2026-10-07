@@ -1,0 +1,38 @@
+/* Azul institucional para acentos; verde, ámbar y rojo propios de los estados. */
+.inspeccion-detalle {
+  --ficha-azul: #1e40af;
+  --ficha-azul-fondo: #eff6ff;
+  --ficha-azul-borde: #bfdbfe;
+}
+
+.dark .inspeccion-detalle {
+  --ficha-azul: #93c5fd;
+  --ficha-azul-fondo: #172b49;
+  --ficha-azul-borde: #1e3a8a;
+}
+
+.inspeccion-detalle :is([class*="text-sky-"], [class*="text-indigo-"], [class*="text-purple-"]) {
+  color: var(--ficha-azul);
+}
+
+.inspeccion-detalle :is([class*="bg-sky-"], [class*="bg-indigo-"], [class*="bg-purple-"]) {
+  background-color: var(--ficha-azul-fondo);
+}
+
+.inspeccion-detalle :is([class*="border-sky-"], [class*="border-indigo-"], [class*="border-purple-"]) {
+  border-color: var(--ficha-azul-borde);
+}
+
+.inspeccion-detalle .size-2[class*="bg-indigo-"] {
+  background-color: var(--ficha-azul);
+}
+
+.inspeccion-detalle .inspeccion-cerrar {
+  color: var(--ficha-azul);
+  border-color: var(--ficha-azul-borde);
+  background-color: var(--ficha-azul-fondo);
+}
+
+.inspeccion-detalle .inspeccion-cerrar:hover {
+  opacity: 0.8;
+}
