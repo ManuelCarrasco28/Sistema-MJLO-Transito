@@ -60,6 +60,7 @@
   --on-brand: #ffffff;
 
   --ok-fg: #166534;     --ok-bg: #e3f4e8;
+  --info-fg: #1d4ed8;   --info-bg: #e0eaff;   --border-info: rgba(29, 78, 216, 0.28);
   --warn-fg: #8a5300;   --warn-bg: #fbf0d9;
   --danger-fg: #a12626; --danger-bg: #fbe7e7;
   --neutral-fg: #4a5260; --neutral-bg: #eceef1;
@@ -136,6 +137,7 @@ html.dark {
   --on-brand: #ffffff;
 
   --ok-fg: #6fcf8f;      --ok-bg: rgba(63, 185, 110, 0.12);
+  --info-fg: #7db4ff;    --info-bg: rgba(59, 130, 246, 0.14);   --border-info: rgba(96, 165, 250, 0.3);
   --warn-fg: #e8b04a;    --warn-bg: rgba(232, 176, 74, 0.12);
   --danger-fg: #f08080;  --danger-bg: rgba(240, 110, 110, 0.12);
   --neutral-fg: #b0b7c2; --neutral-bg: rgba(255, 255, 255, 0.05);
@@ -280,6 +282,33 @@ button {
   }
 }
 
+/* Barra de desplazamiento fina y del color del tema (listas internas, notificaciones, selects) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+html.dark .custom-scrollbar {
+  scrollbar-color: #475569 transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
 .overflow-x-auto {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 rgba(0, 0, 0, 0.04);
@@ -318,6 +347,79 @@ html.dark .overflow-x-auto::-webkit-scrollbar-thumb {
 
 html.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
   background: #475569;
+}
+
+/* Buscadores: mismo tamaño, tipografía y colores en todas las pantallas (modo claro y oscuro) */
+input[placeholder^="Buscar"],
+input[placeholder^="Busca "] {
+  height: 38px;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 2.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  color: #1e293b;
+}
+
+input[placeholder^="Buscar"]:not(:focus),
+input[placeholder^="Busca "]:not(:focus) {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+input[placeholder^="Buscar"]::placeholder,
+input[placeholder^="Busca "]::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+html.dark input[placeholder^="Buscar"],
+html.dark input[placeholder^="Busca "] {
+  color: #f1f5f9;
+}
+
+html.dark input[placeholder^="Buscar"]:not(:focus),
+html.dark input[placeholder^="Busca "]:not(:focus) {
+  background-color: var(--bg-subtle);
+  border-color: var(--border-strong);
+}
+
+html.dark input[placeholder^="Buscar"]::placeholder,
+html.dark input[placeholder^="Busca "]::placeholder {
+  color: #94a3b8;
+}
+
+/* El contenedor del buscador nunca se aprieta tanto como para recortar el texto de ayuda */
+div:has(> input[placeholder^="Buscar"]),
+div:has(> input[placeholder^="Busca "]) {
+  min-width: min(100%, 340px);
+}
+
+/* Al hacer clic en un buscador o campo, el texto de ayuda desaparece y queda limpio para escribir */
+input:focus::placeholder,
+textarea:focus::placeholder,
+html.dark input:focus::placeholder,
+html.dark textarea:focus::placeholder {
+  color: transparent;
+}
+
+@keyframes campana-alerta {
+  0%, 60%, 100% { transform: rotate(0); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-12deg); }
+  30% { transform: rotate(9deg); }
+  40% { transform: rotate(-6deg); }
+  50% { transform: rotate(3deg); }
+}
+
+.campana-alerta {
+  transform-origin: 50% 10%;
+  animation: campana-alerta 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campana-alerta { animation: none; }
 }
 
 @keyframes enter-up {
@@ -975,11 +1077,6 @@ table thead th {
   display: grid;
   gap: 0.625rem;
   grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
-}
-
-/* El buscador de las barras de filtros nunca se reduce a un cuadrito */
-div:has(> input[placeholder^="Buscar"]) {
-  min-width: min(100%, 240px);
 }
 
 /* Textos secundarios más legibles sobre fondo oscuro */

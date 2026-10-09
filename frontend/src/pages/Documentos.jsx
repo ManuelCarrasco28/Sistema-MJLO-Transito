@@ -413,6 +413,23 @@ export function Documentos() {
     }))
   }
 
+  // Desde la edición también se puede pasar a otro documento del mismo vehículo: se sale del modo
+  // "editar" y el formulario queda como emisión (o actualización, si ese tipo ya existe).
+  const cambiarTipoDesdeEdicion = (nuevoTipo) => {
+    if (nuevoTipo === formData.tipoDocumento) return
+    setIsEditing(false)
+    setSelectedDoc(null)
+    const sinVigencia = TIPOS_SIN_VIGENCIA.includes(nuevoTipo)
+    setFormData((prev) => ({
+      ...prev,
+      tipoDocumento: nuevoTipo,
+      ...resolverCodigoYHerencia(nuevoTipo, prev.asociacionResolucionAlcaldia),
+      fechaExpedicion: new Date().toISOString().slice(0, 10),
+      fechaExpiracion: sinVigencia ? '' : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      estado: 'VIGENTE',
+    }))
+  }
+
   const seleccionarVehiculo = (veh) => {
     setVehiculoSeleccionadoId(veh.id)
     setFormData((prev) => ({
@@ -871,9 +888,6 @@ export function Documentos() {
                 Documentos del Vehículo
               </h1>
             </div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Control y emisión de la Tarjeta de Operatividad, el SOAT y la Tarjeta de Propiedad de cada vehículo.
-            </p>
           </div>
         </div>
       </div>
@@ -993,7 +1007,7 @@ export function Documentos() {
             />
             <input
               type="text"
-              placeholder="Buscar por código, placa, titular, DNI o asociación..."
+              placeholder="Buscar por código, placa, titular o DNI"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
@@ -1444,7 +1458,7 @@ export function Documentos() {
                       tipoSeleccionado={formData.tipoDocumento}
                       documentoEditandoId={isEditing ? selectedDoc?.id : null}
                       documentoExistente={docExistenteDelTipo}
-                      onSeleccionarTipo={isEditing ? null : cambiarTipo}
+                      onSeleccionarTipo={isEditing ? cambiarTipoDesdeEdicion : cambiarTipo}
                       onVaciar={isEditing ? null : vaciarDocumento}
                     />
                   )}

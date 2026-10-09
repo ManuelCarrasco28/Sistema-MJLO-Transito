@@ -677,7 +677,7 @@ export function Usuarios({ user }) {
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por usuario, nombre completo, DNI o rol..."
+              placeholder="Buscar por usuario, nombre, DNI o rol"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
@@ -1058,7 +1058,7 @@ export function Usuarios({ user }) {
                       setUserForm((prev) => ({ ...prev, id_trabajador: '' }))
                       setTrabajadorDropdownOpen(true)
                     }}
-                    placeholder="Escribe DNI o nombres para buscar en el padrón..."
+                    placeholder="Escribe DNI o nombres para buscar en el padrón"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
                   />
                 </div>

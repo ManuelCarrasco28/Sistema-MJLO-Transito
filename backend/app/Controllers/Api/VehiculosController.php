@@ -485,9 +485,7 @@ class VehiculosController extends ResourceController
                     $carr = strtoupper(trim($sunarpData['carroceria'] ?? ''));
                     $inferredTipo = $sunarpData['clase'] ?? $sunarpData['tipo'] ?? 'Vehículo';
 
-                    if (in_array($cat, ['L1', 'L2', 'L3']) || strpos($carr, 'LINEAL') !== false) {
-                        $inferredTipo = 'Moto Lineal';
-                    } elseif ($cat === 'L5' && strpos($carr, 'CARG') !== false) {
+                    if ($cat === 'L5' && strpos($carr, 'CARG') !== false) {
                         $inferredTipo = 'Motocarguera';
                     } elseif ($cat === 'L5' || strpos($carr, 'TRIMOVIL') !== false || strpos($carr, 'MOTOTAXI') !== false || strpos($carr, 'MOTOKAR') !== false) {
                         $inferredTipo = 'Mototaxi';

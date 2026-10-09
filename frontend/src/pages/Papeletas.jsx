@@ -156,6 +156,7 @@ export function Papeletas({ user }) {
   const [numeroRecibo, setNumeroRecibo] = useState('')
   const [fechaPago, setFechaPago] = useState('')
   const [metodoPago, setMetodoPago] = useState('EFECTIVO')
+  const [numeroOperacion, setNumeroOperacion] = useState('')
   const [isProcessingAction, setIsProcessingAction] = useState(false)
   const [selectedPapeleta, setSelectedPapeleta] = useState(null)
 
@@ -467,9 +468,10 @@ export function Papeletas({ user }) {
     return () => cargaPapeletas.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha, sortBy, sortDir])
 
+  // Se cargan al entrar para que la pestaña muestre desde el inicio cuántos reportes hay pendientes.
   useEffect(() => {
-    if (activeView === 'REPORTES' && !reportesCargados.current) loadReportes()
-  }, [activeView])
+    if (!reportesCargados.current) loadReportes()
+  }, [])
 
   useEffect(() => {
     loadStats()
@@ -519,7 +521,7 @@ export function Papeletas({ user }) {
     setPapeletaToAction(papeleta)
     setNumeroRecibo('')
     setFechaPago('')
-    setMetodoPago('EFECTIVO')
+    setMetodoPago('EFECTIVO'); setNumeroOperacion('')
     setIsPagarModalOpen(true)
   }
 
@@ -540,7 +542,7 @@ export function Papeletas({ user }) {
     try {
       const res = await apiFetch(`/papeletas/${papeletaToAction.id}/pagar`, {
         method: 'POST',
-        body: { metodoPago, numeroRecibo, fechaPago }
+        body: { metodoPago, numeroRecibo, fechaPago, numeroVoucher: metodoPago === 'EFECTIVO' ? '' : numeroOperacion }
       })
       if (res.ok) {
         setPapeletas(prev => prev.map(p => p.id === papeletaToAction.id ? {
@@ -731,9 +733,6 @@ export function Papeletas({ user }) {
                 Control de Papeletas e Infracciones
               </h1>
             </div>
-            <p className="text-xs font-medium text-slate-500">
-              Registro, notificación y gestión de cobro de actas de infracción al tránsito municipal.
-            </p>
           </div>
         </div>
       </div>
@@ -812,11 +811,19 @@ export function Papeletas({ user }) {
         >
           <Icon name="document" className="size-4" />
           <span>Reportes Evidencias</span>
-          <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${
-            activeView === 'REPORTES'
-              ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-              : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-          }`}>{reportesCargados.current ? reportesPendientes : '—'}</span>
+          {reportesCargados.current && reportesPendientes > 0 ? (
+            // Alerta: hay reportes pendientes de revisar
+            <span className="relative ml-1 inline-flex" title={`${reportesPendientes} reportes pendientes de revisar`}>
+              <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/60" />
+              <span className="relative min-w-6 rounded-full bg-amber-400 px-2 py-0.5 text-center text-[11px] font-black text-amber-950 shadow-sm shadow-amber-500/40">
+                {reportesPendientes}
+              </span>
+            </span>
+          ) : (
+            <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              {reportesCargados.current ? reportesPendientes : '—'}
+            </span>
+          )}
         </button>
       </div>
 
@@ -832,7 +839,7 @@ export function Papeletas({ user }) {
                 />
                 <input
                   type="text"
-                  placeholder="Buscar por placa, lugar, inspector, infracción, ID..."
+                  placeholder="Buscar por placa, lugar, inspector o infracción"
                   value={reportesSearch}
                   onChange={(e) => setReportesSearch(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-xs text-slate-800 outline-none transition focus:border-amber-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-amber-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-amber-400"
@@ -1112,7 +1119,7 @@ export function Papeletas({ user }) {
               />
               <input
                 type="text"
-                placeholder="Buscar por código PAP, placa, infractor, DNI..."
+                placeholder="Buscar por PAP, placa, infractor o DNI"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="h-[38px] w-full rounded-xl border border-slate-200 bg-slate-50/70 py-0 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-rose-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-rose-400"
@@ -1302,7 +1309,7 @@ export function Papeletas({ user }) {
                   return (
                     <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-[var(--bg-subtle)]">
                       <td className="px-3.5 py-3.5 text-center ">
-                        <span className="font-mono text-xs font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
+                        <span className="whitespace-nowrap font-mono text-xs font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
                         <div className="mt-0.5">{renderOrigen(p)}</div>
                       </td>
                       <td className="px-3.5 py-3.5">
@@ -1490,7 +1497,7 @@ export function Papeletas({ user }) {
             <div className="space-y-3 p-6">
               <label className="block space-y-1">
                 <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500">Motivo</span>
-                <textarea required value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} rows={4} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" placeholder="Ej. Foto insuficiente, placa ilegible, no procede..." />
+                <textarea required value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} rows={4} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" placeholder="Ej. Foto insuficiente, placa ilegible, no procede" />
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
@@ -1521,6 +1528,8 @@ export function Papeletas({ user }) {
           fechaPago={fechaPago}
           setFechaPago={setFechaPago}
           metodoPago={metodoPago}
+          numeroOperacion={numeroOperacion}
+          setNumeroOperacion={setNumeroOperacion}
           setMetodoPago={setMetodoPago}
           isProcessingAction={isProcessingAction}
           onConfirmar={handleConfirmPagar}

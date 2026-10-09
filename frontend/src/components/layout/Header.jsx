@@ -157,18 +157,19 @@ export function Header({
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>
           <button 
-            className="relative size-8 grid place-items-center rounded-xl text-slate-400 dark:text-white/70 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" 
+            className={`relative size-8 grid place-items-center rounded-xl transition-colors cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 ${unreadCount > 0 ? 'text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300' : 'text-slate-400 dark:text-white/70 hover:text-slate-700 dark:hover:text-white'}`} 
             title="Notificaciones"
             onClick={() => {
               setNotifOpen(!notifOpen)
               setUserMenuOpen(false)
             }}
           >
-            <svg className="size-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className={`size-4.5 ${unreadCount > 0 ? 'campana-alerta fill-amber-400 stroke-slate-900 dark:fill-amber-400 dark:stroke-amber-400' : ''}`} fill={unreadCount > 0 ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" strokeLinecap="round" strokeLinejoin="round"></path>
             </svg>
             {unreadCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center z-10">
+                <span className="absolute inset-0 animate-ping rounded-full bg-[#EE5D50]/60" />
                 <span className="relative inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[#EE5D50] px-[4px] text-[9px] font-black leading-none text-white shadow-2xs">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
@@ -198,7 +199,7 @@ export function Header({
                 )}
               </div>
 
-              <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+              <div className="custom-scrollbar max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-[var(--border)]">
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
                     <div className="size-12 rounded-full bg-slate-50 dark:bg-white/5 flex items-center justify-center mb-3">
@@ -227,8 +228,8 @@ export function Header({
                         }}
                         className={`flex items-start gap-3.5 p-3.5 transition-colors cursor-pointer ${
                           n.unread
-                            ? 'bg-blue-50/40 hover:bg-blue-50/70'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                            ? 'bg-blue-50/60 hover:bg-blue-50 dark:bg-blue-500/10 dark:hover:bg-blue-500/20'
+                            : 'hover:bg-slate-50 dark:hover:bg-white/5'
                         }`}
                       >
                         <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${tones[n.tone]}`}>
@@ -260,9 +261,9 @@ export function Header({
           onClick={() => setDarkMode(!darkMode)}
         >
           {darkMode ? (
-            <Icon name="sun" className="size-4.5" />
+            <Icon name="sun" className="size-4.5 text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.55)]" />
           ) : (
-            <svg className="size-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="size-4.5 fill-indigo-200 stroke-indigo-600" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" strokeLinecap="round" strokeLinejoin="round"></path>
             </svg>
           )}

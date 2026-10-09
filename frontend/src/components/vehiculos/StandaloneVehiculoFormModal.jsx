@@ -12,6 +12,7 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
     tucNumero: `TUC-2026-${Math.floor(100 + Math.random() * 900)}`
   })
   
+  const [erroresForm, setErroresForm] = useState({})
   const [propietarioSearch, setPropietarioSearch] = useState('')
   const [showPropietarioResults, setShowPropietarioResults] = useState(false)
   const [propietarioResults, setPropietarioResults] = useState([])
@@ -126,10 +127,19 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
     e.preventDefault()
     
     const placaClean = formData.placa.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
-    if (!placaClean || !formData.propietarioDni.trim()) {
-      showError('Campos Incompletos', 'Por favor completa los campos requeridos (Placa y Propietario registrado).')
+    const faltan = {
+      placa: placaClean ? '' : 'Ingresa la placa del vehículo',
+      marca: formData.marca?.trim() ? '' : 'Ingresa la marca',
+      modelo: formData.modelo?.trim() ? '' : 'Ingresa el modelo',
+      color: formData.color?.trim() ? '' : 'Ingresa el color',
+      propietario: formData.propietarioDni.trim() ? '' : 'Busca y selecciona al propietario registrado',
+    }
+    if (Object.values(faltan).some(Boolean)) {
+      // Se marcan dentro del formulario los campos que faltan
+      setErroresForm(faltan)
       return
     }
+    setErroresForm({})
     if (placaClean.length !== 6) {
       showError('Placa Inválida', 'La placa debe tener exactamente 6 caracteres (letras y números), sin guion.')
       return
@@ -183,6 +193,8 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
   return (
     <VehiculoFormModal
       isEditing={false}
+      errores={erroresForm}
+      onLimpiarError={(campo) => setErroresForm((prev) => ({ ...prev, [campo]: '' }))}
       formData={formData}
       setFormData={setFormData}
       onSubmit={handleFormSubmit}

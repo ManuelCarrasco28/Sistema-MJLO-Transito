@@ -664,7 +664,7 @@ export function SuperAdminDashboard({ user }) {
                     type="text"
                     value={auditSearch}
                     onChange={(event) => setAuditSearch(event.target.value)}
-                    placeholder="Buscar por descripción, usuario, módulo o IP..."
+                    placeholder="Buscar por descripción, usuario o módulo"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                   />
                   {auditSearch && (
@@ -864,7 +864,7 @@ export function SuperAdminDashboard({ user }) {
                     setTrabajadorDropdownOpen(true)
                     setUserForm({ ...userForm, id_trabajador: '' })
                   }}
-                  placeholder="Busca por DNI, nombre o cargo..."
+                  placeholder="Busca por DNI, nombre o cargo"
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
                 {trabajadorDropdownOpen && !selectedTrabajador && (

@@ -77,10 +77,11 @@ class PagosController extends ResourceController
         $buscar = trim((string)$this->request->getGet('buscar'));
         $tipoFiltro = strtoupper(trim((string)$this->request->getGet('tipoPago')));
         $estadoFiltro = strtoupper(trim((string)$this->request->getGet('estado')));
+        $metodoFiltro = strtoupper(trim((string)$this->request->getGet('metodo'))); // EFECTIVO | TARJETA | SIN_CONFIRMAR
 
         // Todos los orígenes se filtran y paginan en SQL, sin cargar el listado completo.
         if ($page > 0) {
-            return $this->listarPagina($db, $page, $porPagina, $buscar, $tipoFiltro, $estadoFiltro);
+            return $this->listarPagina($db, $page, $porPagina, $buscar, $tipoFiltro, $estadoFiltro, $metodoFiltro);
         }
 
         $rows = $db->table('pagos_transito')->where(\App\Libraries\PagosListado::condicionReciboVisible('pagos_transito'), null, false)->orderBy('id', 'DESC')->get()->getResultArray();
@@ -211,8 +212,11 @@ class PagosController extends ResourceController
         }
 
         // Filtrado en memoria unificado si se solicita búsqueda o filtros
-        if ($buscar !== '' || ($tipoFiltro !== '' && $tipoFiltro !== 'TODOS') || ($estadoFiltro !== '' && $estadoFiltro !== 'TODOS')) {
-            $pagos = array_values(array_filter($pagos, function ($p) use ($buscar, $tipoFiltro, $estadoFiltro) {
+        if ($buscar !== '' || $metodoFiltro !== '' || ($tipoFiltro !== '' && $tipoFiltro !== 'TODOS') || ($estadoFiltro !== '' && $estadoFiltro !== 'TODOS')) {
+            $pagos = array_values(array_filter($pagos, function ($p) use ($buscar, $tipoFiltro, $estadoFiltro, $metodoFiltro) {
+                $medio = strtoupper((string)($p['metodo'] ?? ''));
+                if ($metodoFiltro === 'SIN_CONFIRMAR' && !in_array($medio, ['', 'SIN CONFIRMAR'], true)) return false;
+                if (in_array($metodoFiltro, ['EFECTIVO', 'TARJETA'], true) && $medio !== $metodoFiltro) return false;
                 if ($tipoFiltro !== '' && $tipoFiltro !== 'TODOS' && strtoupper((string)$p['tipoPago']) !== $tipoFiltro) {
                     return false;
                 }
@@ -300,11 +304,16 @@ class PagosController extends ResourceController
      * tienen un recibo generado en pagos_transito, para excluirlos de las
      * listas de "pendientes sin recibo".
      */
-    private function listarPagina($db, int $page, int $porPagina, string $buscar, string $tipo, string $estado)
+    private function listarPagina($db, int $page, int $porPagina, string $buscar, string $tipo, string $estado, string $metodo = '')
     {
         $builder = \App\Libraries\PagosListado::builder($db);
         if ($tipo !== '' && $tipo !== 'TODOS') $builder->where('listado.tipo_pago', $tipo);
         if ($estado !== '' && $estado !== 'TODOS') $builder->where('listado.estado', $estado);
+        if ($metodo === 'SIN_CONFIRMAR') {
+            $builder->groupStart()->where("COALESCE(listado.medio_pago, '') IN ('', 'SIN CONFIRMAR')", null, false)->groupEnd();
+        } elseif (in_array($metodo, ['EFECTIVO', 'TARJETA'], true)) {
+            $builder->where('listado.medio_pago', $metodo);
+        }
         if ($buscar !== '') {
             // La búsqueda usa los mismos pagadores que se muestran en la tabla.
             $nombre = "TRIM(CONCAT(COALESCE(c.nombres,''), ' ', COALESCE(c.apellido_paterno,''), ' ', COALESCE(c.apellido_materno,'')))";
@@ -405,6 +414,7 @@ class PagosController extends ResourceController
             'referenciaPago' => $row['referencia_pago'], 'montoTotal' => (float)$row['total'],
             'fecha' => $row['fecha_pago'], 'fechaHora' => $row['fecha_pago'], 'estado' => $row['estado'],
             'pagadoPor' => $pagadoPor,
+            'operacionRepetida' => (int)($row['operacion_repetida'] ?? 0),
         ];
     }
 

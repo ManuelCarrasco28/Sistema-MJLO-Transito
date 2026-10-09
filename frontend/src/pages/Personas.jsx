@@ -40,10 +40,10 @@ const FILTER_ESTADO_OPTIONS = [
 
 const ESTADO_CIVIL_OPTIONS = [
   { value: '', label: 'Seleccionar...' },
-  { value: 'SOLTERO', label: 'SOLTERO' },
-  { value: 'CASADO', label: 'CASADO' },
-  { value: 'DIVORCIADO', label: 'DIVORCIADO' },
-  { value: 'VIUDO', label: 'VIUDO' },
+  { value: 'SOLTERO', label: 'SOLTERO(A)' },
+  { value: 'CASADO', label: 'CASADO(A)' },
+  { value: 'DIVORCIADO', label: 'DIVORCIADO(A)' },
+  { value: 'VIUDO', label: 'VIUDO(A)' },
 ]
 
 export function Personas({ user, onUserUpdate }) {
@@ -561,9 +561,6 @@ export function Personas({ user, onUserUpdate }) {
                 Gestión de Personas
               </h1>
             </div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Directorio oficial de administrados y ciudadanos registrados en el sistema.
-            </p>
           </div>
         </div>
       </div>
@@ -656,7 +653,7 @@ export function Personas({ user, onUserUpdate }) {
             />
             <input
               type="text"
-              placeholder="Buscar por DNI, nombres, apellidos o licencia..."
+              placeholder="Buscar por DNI, nombres, apellidos o licencia"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"

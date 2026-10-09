@@ -77,9 +77,6 @@ export function CentroImpresion() {
           </span>
           <div>
             <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">Centro de impresión</h1>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Reúna en un carrito carnets, tarjetas y códigos QR e imprímalos de una vez o por lotes.
-            </p>
           </div>
         </div>
       </div>

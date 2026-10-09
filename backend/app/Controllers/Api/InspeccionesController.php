@@ -139,6 +139,18 @@ class InspeccionesController extends ResourceController
                 $builder->where('i.resultado', $resultado);
             }
 
+            // Vigencia del certificado (6 meses desde la fecha de inspección; solo aplica a los aprobados)
+            $vigencia = strtoupper(trim((string)$this->request->getGet('vigencia')));
+            if ($vigencia === 'VIGENTE') {
+                $builder->where('i.resultado', 'APROBADO')->where('DATE_ADD(i.fecha, INTERVAL 6 MONTH) >= CURDATE()', null, false);
+            } elseif ($vigencia === 'POR_VENCER') {
+                $builder->where('i.resultado', 'APROBADO')
+                    ->where('DATE_ADD(i.fecha, INTERVAL 6 MONTH) >= CURDATE()', null, false)
+                    ->where('DATE_ADD(i.fecha, INTERVAL 6 MONTH) <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)', null, false);
+            } elseif ($vigencia === 'VENCIDO') {
+                $builder->where('i.resultado', 'APROBADO')->where('DATE_ADD(i.fecha, INTERVAL 6 MONTH) < CURDATE()', null, false);
+            }
+
             $page = (int)$this->request->getGet('page');
             $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
 

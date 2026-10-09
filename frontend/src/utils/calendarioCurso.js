@@ -20,7 +20,7 @@ export function validarCalendarioCurso(curso) {
 }
 
 export function inscripcionCursoAbierta(curso, hoy = fechaLocalActual()) {
-  return ['PROGRAMADO', 'ACTIVO', 'ABIERTO', 'EN_CURSO'].includes(curso.estado)
+  return ['PROGRAMADO', 'ACTIVO', 'ABIERTO'].includes(curso.estado)
     && (!curso.fechaInscripcionInicio || hoy >= curso.fechaInscripcionInicio)
     && (!curso.fechaInscripcionFin || hoy <= curso.fechaInscripcionFin)
 }

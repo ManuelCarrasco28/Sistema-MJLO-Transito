@@ -8,7 +8,7 @@ final class ReglasCurso
 
     public static function admiteInscripcion(string $estado): bool
     {
-        return in_array(strtoupper(trim($estado)), ['PROGRAMADO', 'ABIERTO', 'ACTIVO', 'EN_CURSO'], true);
+        return in_array(strtoupper(trim($estado)), ['PROGRAMADO', 'ABIERTO', 'ACTIVO'], true);
     }
 
     public static function condicionAprobado(string $alias = 'ic'): string

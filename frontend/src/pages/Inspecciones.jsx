@@ -25,6 +25,13 @@ const FILTER_RESULTADO_OPTIONS = [
   { value: 'DESAPROBADO', label: 'Desaprobados' },
 ]
 
+const FILTER_VIGENCIA_OPTIONS = [
+  { value: 'TODOS', label: 'Toda vigencia' },
+  { value: 'VIGENTE', label: 'Vigentes' },
+  { value: 'POR_VENCER', label: 'Por vencer (30 días)' },
+  { value: 'VENCIDO', label: 'Vencidos' },
+]
+
 // Primera evaluación: se deriva del checklist, no se elige a mano.
 // "No tiene" solo desaprueba en criterios obligatorios: la razón social, por
 // ejemplo, no aplica a unidades independientes.
@@ -104,6 +111,7 @@ export function Inspecciones() {
   }, [searchTerm])
 
   const [filterResultado, setFilterResultado] = useState('TODOS')
+  const [filterVigencia, setFilterVigencia] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
   const [sortBy, setSortBy] = useState('')
@@ -170,6 +178,7 @@ export function Inspecciones() {
       })
       if (debouncedSearch) params.set('buscar', debouncedSearch)
       if (filterResultado !== 'TODOS') params.set('resultado', filterResultado)
+      if (filterVigencia !== 'TODOS') params.set('vigencia', filterVigencia)
       if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
       const inspRes = await apiFetch(`/inspecciones?${params.toString()}`, { signal: controller.signal })
@@ -193,7 +202,7 @@ export function Inspecciones() {
     setLoadError('')
     loadData()
     return () => cargaInspecciones.current?.abort()
-  }, [currentPage, itemsPerPage, debouncedSearch, filterResultado, sortBy, sortDir])
+  }, [currentPage, itemsPerPage, debouncedSearch, filterResultado, filterVigencia, sortBy, sortDir])
 
   const [stats, setStats] = useState({ totales: 0, aprobados: 0, observados: 0, desaprobados: 0 })
 
@@ -278,7 +287,7 @@ export function Inspecciones() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterResultado])
+  }, [searchTerm, filterResultado, filterVigencia])
 
   const paginatedInspecciones = inspecciones
 
@@ -686,6 +695,7 @@ export function Inspecciones() {
     const filas = await fetchTodasLasFilas('/inspecciones', {
       buscar: searchTerm,
       resultado: filterResultado === 'TODOS' ? '' : filterResultado,
+      vigencia: filterVigencia === 'TODOS' ? '' : filterVigencia,
       sortBy,
       sortDir: sortBy ? sortDir : '',
     }, { mensaje: 'Preparando la descarga de inspecciones...' })
@@ -707,6 +717,7 @@ export function Inspecciones() {
         subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',
         metadata: [
           { label: 'Resultado', value: filterResultado },
+          { label: 'Vigencia', value: filterVigencia },
           { label: 'Total Registros', value: String(data.length) }
         ],
         columns: [
@@ -837,9 +848,6 @@ export function Inspecciones() {
                 Inspección Técnica Vehicular
               </h1>
             </div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Certificado de Constatación de Características Vehiculares: estado técnico y seguridad de la flota.
-            </p>
           </div>
         </div>
       </div>
@@ -942,7 +950,7 @@ export function Inspecciones() {
             />
             <input
               type="text"
-              placeholder="Buscar por código, serie CertiCAV, placa, conductor o titular"
+              placeholder="Buscar por código, placa, conductor o titular"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
@@ -971,11 +979,21 @@ export function Inspecciones() {
               options={FILTER_RESULTADO_OPTIONS}
             />
 
-            {(filterResultado !== 'TODOS' || searchTerm !== '') && (
+            <RoundedSelect
+              value={filterVigencia}
+              onChange={(val) => {
+                setFilterVigencia(val)
+                setCurrentPage(1)
+              }}
+              options={FILTER_VIGENCIA_OPTIONS}
+            />
+
+            {(filterResultado !== 'TODOS' || filterVigencia !== 'TODOS' || searchTerm !== '') && (
               <button
                 type="button"
                 onClick={() => {
                   setFilterResultado('TODOS')
+                  setFilterVigencia('TODOS')
                   setSearchTerm('')
                   setCurrentPage(1)
                 }}
@@ -1034,7 +1052,7 @@ export function Inspecciones() {
                 <th className="px-4 py-3 "><SortableHeader column="numeroRegistro" label="N° Registro / Serie" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 "><SortableHeader column="vehiculoPlaca" label="Placa Vehicular" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 ">Vehículo y Titular</th>
-                <th className="px-4 py-3 "><SortableHeader column="fecha" label="Fecha y Vigencia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 "><SortableHeader column="fecha" label="Fechas" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 "><SortableHeader column="resultado" label="Resultado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="sticky right-0 z-20 px-4 py-3 text-right bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                   Acciones
@@ -1133,11 +1151,11 @@ export function Inspecciones() {
 
                       <td className="px-4 py-3 ">
                         <div className="space-y-0.5 font-mono text-xs">
-                          <p className="font-semibold text-slate-700 dark:text-slate-300">
-                            {formatFecha(i.fecha)}
+                          <p className="text-[11px] text-slate-400">
+                            Fecha inspección: <span className="font-bold text-slate-700 dark:text-slate-200">{formatFecha(i.fecha)}</span>
                           </p>
                           <p className="text-[11px] text-slate-400">
-                            Vence: <span className="font-bold text-slate-600 dark:text-slate-300">{formatFecha(i.fechaVencimiento)}</span>
+                            Fecha de vencimiento: <span className="font-bold text-slate-700 dark:text-slate-200">{formatFecha(i.fechaVencimiento)}</span>
                           </p>
                         </div>
                       </td>

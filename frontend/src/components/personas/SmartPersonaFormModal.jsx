@@ -23,10 +23,10 @@ const ESTADO_OPTIONS = [
 
 const ESTADO_CIVIL_OPTIONS = [
   { value: '', label: 'Seleccionar...' },
-  { value: 'SOLTERO', label: 'SOLTERO' },
-  { value: 'CASADO', label: 'CASADO' },
-  { value: 'DIVORCIADO', label: 'DIVORCIADO' },
-  { value: 'VIUDO', label: 'VIUDO' },
+  { value: 'SOLTERO', label: 'SOLTERO(A)' },
+  { value: 'CASADO', label: 'CASADO(A)' },
+  { value: 'DIVORCIADO', label: 'DIVORCIADO(A)' },
+  { value: 'VIUDO', label: 'VIUDO(A)' },
 ]
 
 export function SmartPersonaFormModal({ onClose, onSuccess, initialDni = '', initialNombres = '', initialApellidos = '' }) {

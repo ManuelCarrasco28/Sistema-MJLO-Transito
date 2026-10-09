@@ -63,9 +63,6 @@ export function DashboardHome({ user }) {
                 Panel de Control
               </h1>
             </div>
-            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-              Resumen estadístico y accesos rápidos del sistema de tránsito municipal.
-            </p>
           </div>
         </div>
       </div>

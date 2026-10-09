@@ -538,9 +538,6 @@ export function Retenciones({ user }) {
             <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
               Internamientos Vehiculares
             </h1>
-            <p className="text-xs font-medium text-slate-500">
-              Control de depósito municipal, actas de internamiento, inventario de custodia y órdenes de libertad.
-            </p>
           </div>
         </div>
       </div>
@@ -604,7 +601,7 @@ export function Retenciones({ user }) {
             />
             <input
               type="text"
-              placeholder="Buscar por placa, boleta o conductor..."
+              placeholder="Buscar por placa, boleta o conductor"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-rose-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 dark:placeholder-slate-500"

@@ -11,7 +11,7 @@ import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { sanitizarMensaje, leerMensajeError, apiFetch, getCachedData, setCachedData } from '../config/api'
-import { showError, showConfirm, showToast } from '../utils/SwalUtil'
+import { showError, showWarning, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta, toTitleCase, normalizarPlaca } from '../utils/formatters'
@@ -36,10 +36,10 @@ function formatTipoDocLabel(t) {
 
 const ESTADO_CIVIL_OPTIONS = [
   { value: '', label: 'Seleccionar...' },
-  { value: 'SOLTERO', label: 'SOLTERO' },
-  { value: 'CASADO', label: 'CASADO' },
-  { value: 'DIVORCIADO', label: 'DIVORCIADO' },
-  { value: 'VIUDO', label: 'VIUDO' },
+  { value: 'SOLTERO', label: 'SOLTERO(A)' },
+  { value: 'CASADO', label: 'CASADO(A)' },
+  { value: 'DIVORCIADO', label: 'DIVORCIADO(A)' },
+  { value: 'VIUDO', label: 'VIUDO(A)' },
 ]
 
 const ESTADO_OPTIONS = [
@@ -94,13 +94,14 @@ export function Vehiculos({ user }) {
       apiFetch(`/personas?page=1&buscar=${encodeURIComponent(rawQuery)}&porPagina=10`, { signal: controller.signal })
         .then((r) => r.ok ? r.json() : { data: [] })
         .then((payload) => { if (!controller.signal.aborted) setPropietarioResults(payload.data || []) })
-        .catch(() => {})
+        .catch(() => { })
     }, 250)
     return () => { clearTimeout(timer); controller.abort() }
   }, [propietarioSearch])
 
 
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [erroresForm, setErroresForm] = useState({})
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedVehiculo, setSelectedVehiculo] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -388,8 +389,7 @@ export function Vehiculos({ user }) {
       const cat = (sunarpData.categoria || '').toUpperCase().trim()
       const carr = (sunarpData.carroceria || '').toUpperCase().trim()
       let inferredTipo = 'Vehículo'
-      if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) inferredTipo = 'Moto Lineal'
-      else if (cat === 'L5' && /CARG/.test(carr)) inferredTipo = 'Motocarguera'
+      if (cat === 'L5' && /CARG/.test(carr)) inferredTipo = 'Motocarguera'
       else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredTipo = 'Mototaxi'
       else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV')) inferredTipo = 'Automóvil'
       else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS')) inferredTipo = 'Camioneta Rural'
@@ -475,7 +475,7 @@ export function Vehiculos({ user }) {
       .then((payload) => {
         if (payload?.data) setStats(payload.data)
       })
-      .catch(() => {})
+      .catch(() => { })
   }
 
   const cargaVehiculos = useRef(null)
@@ -523,7 +523,7 @@ export function Vehiculos({ user }) {
           setCachedData('/asociaciones', payload.data)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
   useEffect(() => {
@@ -606,8 +606,7 @@ export function Vehiculos({ user }) {
       const cat = (sunarpData.categoria || '').toUpperCase().trim()
       const carr = (sunarpData.carroceria || '').toUpperCase().trim()
       let inferredTipo = formData.tipo
-      if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) inferredTipo = 'Moto Lineal'
-      else if (cat === 'L5' && /CARG/.test(carr)) inferredTipo = 'Motocarguera'
+      if (cat === 'L5' && /CARG/.test(carr)) inferredTipo = 'Motocarguera'
       else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredTipo = 'Mototaxi'
       else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV')) inferredTipo = 'Automóvil'
       else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS')) inferredTipo = 'Camioneta Rural'
@@ -711,7 +710,7 @@ export function Vehiculos({ user }) {
         partidaRegistral: sunarpData.partida || sunarpData.partida_registral || prev.partidaRegistral,
       }))
     } catch (err) {
-      showError('Error de consulta', sanitizarMensaje(err.message, 'No se pudo consultar la información del vehículo.'))
+      showWarning('Advertencia', sanitizarMensaje(err.message, 'No se pudo consultar la información del vehículo.'))
     } finally {
       setIsBuscandoSunarpModal(false)
     }
@@ -746,47 +745,49 @@ export function Vehiculos({ user }) {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
-      const dataToExport = { endpoint: '/vehiculos', params: {
-        buscar: debouncedSearchTerm, tipo: filterTipo === 'TODOS' ? '' : filterTipo,
-        formalidad: filterEstado === 'TODOS' ? '' : filterEstado,
-        estado: filterActivo === 'TODOS' ? '' : filterActivo, sortBy, sortDir,
-      } }
+      const dataToExport = {
+        endpoint: '/vehiculos', params: {
+          buscar: debouncedSearchTerm, tipo: filterTipo === 'TODOS' ? '' : filterTipo,
+          formalidad: filterEstado === 'TODOS' ? '' : filterEstado,
+          estado: filterActivo === 'TODOS' ? '' : filterActivo, sortBy, sortDir,
+        }
+      }
       await exportToExcel({
-            filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.xls`,
-            sheetName: 'Vehículos',
-            title: 'PADRÓN VEHICULAR MUNICIPAL',
-            subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
-            metadata: [
-              { label: 'Tipo Vehículo', value: filterTipo },
-              { label: 'Formalidad', value: filterEstado },
-              { label: 'Estado', value: filterActivo }
-            ],
-            columns: [
-              { header: 'PLACA', key: 'placa', isText: true, width: 110, align: 'center' },
-              { header: 'TIPO VEHÍCULO', key: 'tipo', width: 140 },
-              { header: 'MARCA', key: 'marca', width: 120 },
-              { header: 'MODELO', key: 'modelo', width: 120 },
-              { header: 'COLOR', key: 'color', width: 110 },
-              { header: 'AÑO', key: 'anio', width: 80, align: 'center' },
-              { header: 'CATEGORÍA', key: 'categoria', width: 90, align: 'center' },
-              { header: 'CARROCERÍA', key: 'carroceria', width: 130 },
-              { header: 'TIPO DE CARROCERÍA', key: 'tipoCarroceria', width: 140 },
-              { header: 'SEDE DE REGISTRO', key: 'sedeRegistro', width: 170 },
-              { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 150 },
-              { header: 'SERIE DEL MOTOR', key: 'serieMotor', isText: true, width: 150 },
-              { header: 'PARTIDA REGISTRAL', key: 'partidaRegistral', isText: true, width: 140 },
-              { header: 'N° TUC', key: 'tucNumero', isText: true, width: 130 },
-              { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 270 },
-              { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
-              { header: 'RUC ASOCIACIÓN', key: 'asociacionRuc', isText: true, width: 120, align: 'center' },
-              { header: 'PROPIETARIO', key: 'propietario', width: 180 },
-              { header: 'TIPO DOC. PROPIETARIO', key: 'propietarioTipoDocumento', width: 120, align: 'center' },
-              { header: 'DNI / RUC PROPIETARIO', key: 'propietarioDni', isText: true, width: 130, align: 'center' },
-              { header: 'FORMALIDAD', key: 'formalidad', width: 110, align: 'center' },
-              { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
-            ],
-            data: dataToExport
-          })
+        filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.xls`,
+        sheetName: 'Vehículos',
+        title: 'PADRÓN VEHICULAR MUNICIPAL',
+        subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
+        metadata: [
+          { label: 'Tipo Vehículo', value: filterTipo },
+          { label: 'Formalidad', value: filterEstado },
+          { label: 'Estado', value: filterActivo }
+        ],
+        columns: [
+          { header: 'PLACA', key: 'placa', isText: true, width: 110, align: 'center' },
+          { header: 'TIPO VEHÍCULO', key: 'tipo', width: 140 },
+          { header: 'MARCA', key: 'marca', width: 120 },
+          { header: 'MODELO', key: 'modelo', width: 120 },
+          { header: 'COLOR', key: 'color', width: 110 },
+          { header: 'AÑO', key: 'anio', width: 80, align: 'center' },
+          { header: 'CATEGORÍA', key: 'categoria', width: 90, align: 'center' },
+          { header: 'CARROCERÍA', key: 'carroceria', width: 130 },
+          { header: 'TIPO DE CARROCERÍA', key: 'tipoCarroceria', width: 140 },
+          { header: 'SEDE DE REGISTRO', key: 'sedeRegistro', width: 170 },
+          { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 150 },
+          { header: 'SERIE DEL MOTOR', key: 'serieMotor', isText: true, width: 150 },
+          { header: 'PARTIDA REGISTRAL', key: 'partidaRegistral', isText: true, width: 140 },
+          { header: 'N° TUC', key: 'tucNumero', isText: true, width: 130 },
+          { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 270 },
+          { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
+          { header: 'RUC ASOCIACIÓN', key: 'asociacionRuc', isText: true, width: 120, align: 'center' },
+          { header: 'PROPIETARIO', key: 'propietario', width: 180 },
+          { header: 'TIPO DOC. PROPIETARIO', key: 'propietarioTipoDocumento', width: 120, align: 'center' },
+          { header: 'DNI / RUC PROPIETARIO', key: 'propietarioDni', isText: true, width: 130, align: 'center' },
+          { header: 'FORMALIDAD', key: 'formalidad', width: 110, align: 'center' },
+          { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+        ],
+        data: dataToExport
+      })
     } finally {
       setIsExportingExcel(false)
     }
@@ -797,25 +798,25 @@ export function Vehiculos({ user }) {
     try {
       const dataToExport = await fetchTodoElFiltro(10000)
       await exportToPdf({
-            filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}`,
-            subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial Vehicular',
-            summaryItems: [
-              { label: 'Total en padrón', value: totalVehiculos },
-              { label: 'Exportando', value: `${dataToExport.length} vehículos` },
-              { label: 'Formales', value: formales },
-              { label: 'Informales', value: informales },
-              { label: 'Inhabilitados', value: suspendidos },
-            ],
-            columns: [
-              { header: 'Placa', key: 'placa' },
-              { header: 'Tipo', key: 'tipo' },
-              { header: 'Marca/Modelo', render: (_, r) => `${r.marca} ${r.modelo}` },
-              { header: 'Asociación', render: (_, r) => r.asociacion || 'Particular' },
-              { header: 'Propietario', key: 'propietario' },
-              { header: 'Estado', key: 'estado' },
-            ],
-            data: dataToExport
-          })
+        filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}`,
+        subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial Vehicular',
+        summaryItems: [
+          { label: 'Total en padrón', value: totalVehiculos },
+          { label: 'Exportando', value: `${dataToExport.length} vehículos` },
+          { label: 'Formales', value: formales },
+          { label: 'Informales', value: informales },
+          { label: 'Inhabilitados', value: suspendidos },
+        ],
+        columns: [
+          { header: 'Placa', key: 'placa' },
+          { header: 'Tipo', key: 'tipo' },
+          { header: 'Marca/Modelo', render: (_, r) => `${r.marca} ${r.modelo}` },
+          { header: 'Asociación', render: (_, r) => r.asociacion || 'Particular' },
+          { header: 'Propietario', key: 'propietario' },
+          { header: 'Estado', key: 'estado' },
+        ],
+        data: dataToExport
+      })
     } catch (err) {
       showError('Descarga no completada', sanitizarMensaje(err.message, 'No se pudo preparar el PDF.'))
     } finally {
@@ -850,7 +851,7 @@ export function Vehiculos({ user }) {
       tucNumero: `TUC-2026-${Math.floor(100 + Math.random() * 900)}`,
     })
     setIsEditing(false)
-    setIsModalOpen(true)
+    setErroresForm({}); setIsModalOpen(true)
   }
 
   useQuickCreate(handleOpenCreateModal, !isLoading)
@@ -883,7 +884,7 @@ export function Vehiculos({ user }) {
       estado: vehiculo.estado === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'
     })
     setIsEditing(true)
-    setIsModalOpen(true)
+    setErroresForm({}); setIsModalOpen(true)
   }
 
   const handleOpenDetail = async (vehiculo) => {
@@ -923,10 +924,19 @@ export function Vehiculos({ user }) {
     e.preventDefault()
     // Validaciones
     const placaClean = formData.placa.trim().toUpperCase()
-    if (!placaClean || !formData.propietarioDni.trim()) {
-      showError('Campos Incompletos', 'Por favor completa los campos requeridos (Placa y Propietario registrado).')
+    const faltan = {
+      placa: placaClean ? '' : 'Ingresa la placa del vehículo',
+      marca: formData.marca?.trim() ? '' : 'Ingresa la marca',
+      modelo: formData.modelo?.trim() ? '' : 'Ingresa el modelo',
+      color: formData.color?.trim() ? '' : 'Ingresa el color',
+      propietario: formData.propietarioDni.trim() ? '' : 'Busca y selecciona al propietario registrado',
+    }
+    if (Object.values(faltan).some(Boolean)) {
+      // Se marcan dentro del formulario los campos que faltan
+      setErroresForm(faltan)
       return
     }
+    setErroresForm({})
     if (!/^[A-Z0-9]{6}$/.test(placaClean)) {
       showError('Placa Inválida', 'La placa debe tener exactamente 6 letras o números, sin guion.')
       return
@@ -1106,17 +1116,14 @@ export function Vehiculos({ user }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="grid size-9 shrink-0 place-items-center text-slate-900 dark:text-white">
-              <Icon name="vehicle" className="size-7 stroke-[2.4]" />
-            </span>
+            <Icon name="vehicle" className="size-7 stroke-[2.4]" />
+          </span>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
                 Gestión de Vehículos
               </h1>
             </div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Registro municipal, control de trimóviles, empresas autorizadas y fiscalización vial.
-            </p>
           </div>
         </div>
       </div>
@@ -1178,16 +1185,16 @@ export function Vehiculos({ user }) {
 
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
-        <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)]">
 
-          <div className="relative flex-1">
+          <div className="relative min-w-[340px] flex-1">
             <Icon
               name={isLoading ? "refresh" : "search"}
               className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-blue-500' : 'text-slate-400'}`}
             />
             <input
               type="text"
-              placeholder="Buscar por placa, marca, modelo, DNI, propietario o código QR..."
+              placeholder="Buscar por placa, marca, propietario o QR"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-9 pr-8 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400"
@@ -1207,7 +1214,43 @@ export function Vehiculos({ user }) {
           </div>
 
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+            {isOffice && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  title="Descargar padrón en Excel (.xls)"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
+                  disabled={isExportingExcel}>
+                  <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
+                  <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  title="Descargar o imprimir padrón en PDF"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
+                  disabled={isExportingPdf}>
+                  <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
+                  <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenCreateModal}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer hover:opacity-90"
+                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
+                >
+                  <span className="text-base leading-none font-black">+</span>
+                  <span>Nuevo Vehículo</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="order-last flex w-full flex-wrap items-center gap-2.5">
             <RoundedSelect
               value={filterEstado}
               onChange={(val) => {
@@ -1232,8 +1275,7 @@ export function Vehiculos({ user }) {
                 { value: 'Mototaxi', label: 'Mototaxi' },
                 { value: 'Motocarguera', label: 'Motocarguera' },
                 { value: 'Automóvil', label: 'Automóvil' },
-                { value: 'Camioneta Rural', label: 'Camioneta Rural' },
-                { value: 'Moto Lineal', label: 'Moto Lineal' }
+                { value: 'Camioneta Rural', label: 'Camioneta Rural' }
               ]}
             />
 
@@ -1267,39 +1309,6 @@ export function Vehiculos({ user }) {
               </button>
             )}
 
-            {isOffice && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleExportExcel}
-                  title="Descargar padrón en Excel (.xls)"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
-                 disabled={isExportingExcel}>
-                  <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
-                  <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleExportPdf}
-                  title="Descargar o imprimir padrón en PDF"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
-                 disabled={isExportingPdf}>
-                  <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-                  <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleOpenCreateModal}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer hover:opacity-90"
-                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
-                >
-                  <span className="text-base leading-none font-black">+</span>
-                  <span>Nuevo Vehículo</span>
-                </button>
-              </>
-            )}
           </div>
         </div>
 
@@ -1443,14 +1452,14 @@ export function Vehiculos({ user }) {
                           <Icon name="eye" className="size-4" />
                         </button>
                         {plantillaDeVehiculo(v) && (
-                        <button
-                          type="button"
-                          onClick={() => setVehiculoQrImpresion(v)}
-                          title="Imprimir QR"
-                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
-                        >
-                          <Icon name="print" className="size-4" />
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => setVehiculoQrImpresion(v)}
+                            title="Imprimir QR"
+                            className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
+                          >
+                            <Icon name="print" className="size-4" />
+                          </button>
                         )}
                         {isOffice && (
                           <>
@@ -1521,6 +1530,8 @@ export function Vehiculos({ user }) {
           isBuscandoSunarp={isBuscandoSunarpModal}
           titularDetectado={titularDetectado}
           onOpenPersonaRapida={handleOpenPersonaRapida}
+          errores={erroresForm}
+          onLimpiarError={(campo) => setErroresForm((prev) => ({ ...prev, [campo]: '' }))}
         />
       )}
 

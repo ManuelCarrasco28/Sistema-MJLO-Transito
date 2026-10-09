@@ -23,10 +23,25 @@ class CursosController extends ResourceController
         return $this->index();
     }
 
+    /**
+     * El estado del curso sigue sus fechas: programado antes del inicio, en curso entre el inicio y el fin,
+     * finalizado al pasar el fin. Si se editan las fechas, el estado se recalcula (también hacia atrás).
+     * No toca los cursos cancelados ni los marcados como finalizados a mano.
+     */
+    private function sincronizarEstadosPorFecha($db): void
+    {
+        $hoy = \App\Libraries\ReglasCurso::hoy();
+        $abiertos = "('PROGRAMADO','ABIERTO','ACTIVO','EN_CURSO')";
+        $db->query("UPDATE cursos_seguridad_vial SET estado = 'FINALIZADO' WHERE fecha_fin < ? AND estado IN $abiertos", [$hoy]);
+        $db->query("UPDATE cursos_seguridad_vial SET estado = 'EN_CURSO' WHERE fecha_inicio <= ? AND fecha_fin >= ? AND estado IN $abiertos AND estado <> 'EN_CURSO'", [$hoy, $hoy]);
+        $db->query("UPDATE cursos_seguridad_vial SET estado = 'PROGRAMADO' WHERE fecha_inicio > ? AND estado IN $abiertos AND estado <> 'PROGRAMADO'", [$hoy]);
+    }
+
     public function index()
     {
         $db = \Config\Database::connect();
-        
+        $this->sincronizarEstadosPorFecha($db);
+
         try {
             $builder = $db->table('cursos_seguridad_vial c')
                 ->select("c.uuid AS uuid, 
@@ -402,16 +417,79 @@ class CursosController extends ResourceController
                 $inscritos = $db->table('inscripciones_curso')->where('id_curso', $id)->whereNotIn('estado', ['ANULADO','CANCELADO'])->countAllResults();
                 if ($data['cupos'] < $inscritos) { $db->transRollback(); return $this->failValidationErrors('La capacidad no puede ser menor que los participantes inscritos.'); }
             }
+            // Al cancelar un curso con participantes inscritos, estos se pasan a otro curso (con sus pagos).
+            $movidos = 0;
+            $yaEstaban = 0;
+            $cancelando = ($data['estado'] ?? null) === 'CANCELADO' && ($cursoActual['estado'] ?? '') !== 'CANCELADO';
+            if ($cancelando) {
+                $inscritosAMover = $db->table('inscripciones_curso')->where('id_curso', $id)->where('estado', 'INSCRITO')->countAllResults();
+                if ($inscritosAMover > 0) {
+                    $destinoId = (int)($input['cursoDestinoId'] ?? 0);
+                    if ($destinoId < 1) {
+                        $db->transRollback();
+                        return $this->respond(['status' => 409, 'requiereDestino' => true, 'inscritos' => $inscritosAMover, 'message' => "Este curso tiene {$inscritosAMover} participante(s) inscrito(s). Indique a qué curso pasarán."], 409);
+                    }
+                    [$movidos, $yaEstaban] = $this->moverInscritos($db, (int)$id, $destinoId);
+                }
+            }
             if (!empty($data)) {
                 if (!$db->table('cursos_seguridad_vial')->where('id', $id)->update($data)) throw new \RuntimeException('No se pudo guardar.');
             }
             if ($db->transStatus() === false) throw new \RuntimeException('No se pudo guardar.');
+            if ($cancelando && ($movidos + $yaEstaban) > 0) {
+                \App\Services\AuditoriaService::registrar('CURSOS', 'CANCELAR', "Se canceló el curso {$cursoActual['codigo']}: {$movidos} inscrito(s) pasaron al curso #" . (int)($input['cursoDestinoId'] ?? 0), ['id' => (int)$id, 'destino' => (int)($input['cursoDestinoId'] ?? 0), 'movidos' => $movidos, 'yaInscritos' => $yaEstaban]);
+            }
             $db->transCommit();
-            return $this->respond(['status' => 200, 'message' => 'Curso actualizado correctamente']);
+            $this->sincronizarEstadosPorFecha($db);
+            $mensaje = 'Curso actualizado correctamente';
+            if ($cancelando && ($movidos + $yaEstaban) > 0) {
+                $mensaje = "Curso cancelado. {$movidos} participante(s) pasaron al nuevo curso" . ($yaEstaban ? " y {$yaEstaban} ya estaba(n) inscrito(s) en él." : '.');
+            }
+            return $this->respond(['status' => 200, 'message' => $mensaje, 'movidos' => $movidos]);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
             $db->transRollback();
             return $this->failServerError('Error actualizando el curso.');
         }
+    }
+
+    /**
+     * Pasa los participantes inscritos de un curso cancelado a otro curso. Sus pagos los acompañan porque
+     * están ligados a la inscripción. Quien ya estuviera inscrito en el curso destino queda cancelado en el origen.
+     *
+     * @return array{0:int,1:int} [movidos, que ya estaban en el destino]
+     */
+    private function moverInscritos($db, int $origenId, int $destinoId): array
+    {
+        if ($destinoId === $origenId) throw new \DomainException('El curso destino debe ser distinto del curso que se cancela.');
+        $destino = $db->query('SELECT id, cupos, estado FROM cursos_seguridad_vial WHERE id = ? FOR UPDATE', [$destinoId])->getRowArray();
+        if (!$destino) throw new \DomainException('El curso destino no existe.');
+        if (!\App\Libraries\ReglasCurso::admiteInscripcion($destino['estado'])) throw new \DomainException('El curso destino no admite inscripciones.');
+
+        $inscritos = $db->table('inscripciones_curso')->where('id_curso', $origenId)->where('estado', 'INSCRITO')->get()->getResultArray();
+        $enDestino = array_column(
+            $db->table('inscripciones_curso')->select('id_persona')->where('id_curso', $destinoId)->get()->getResultArray(),
+            'id_persona'
+        );
+        $enDestino = array_map('intval', $enDestino);
+        $aMover = array_filter($inscritos, static fn($i) => !in_array((int)$i['id_persona'], $enDestino, true));
+        $repetidos = array_filter($inscritos, static fn($i) => in_array((int)$i['id_persona'], $enDestino, true));
+
+        $ocupados = $db->table('inscripciones_curso')->where('id_curso', $destinoId)->whereNotIn('estado', ['ANULADO', 'CANCELADO'])->countAllResults();
+        if (count($aMover) > (int)$destino['cupos'] - $ocupados) {
+            throw new \DomainException('El curso destino no tiene cupos suficientes para ' . count($aMover) . ' participante(s).');
+        }
+
+        foreach ($aMover as $i) {
+            $db->table('inscripciones_curso')->where('id', (int)$i['id'])->update(['id_curso' => $destinoId]);
+        }
+        foreach ($repetidos as $i) {
+            $db->table('inscripciones_curso')->where('id', (int)$i['id'])->update(['estado' => 'CANCELADO']);
+        }
+
+        return [count($aMover), count($repetidos)];
     }
 
     public function delete($id = null)
@@ -731,6 +809,108 @@ class CursosController extends ResourceController
      * Carnets que se pueden imprimir: participantes aprobados (o con asistencia) de cursos finalizados.
      * Listado liviano y paginado para el Centro de impresión (no trae el curso completo con todos sus participantes).
      */
+    /**
+     * Vigencia del carnet de curso de cada persona: la fecha de su último curso aprobado (o asistido) más un año.
+     * Estados: VIGENTE, POR_VENCER (vence en 30 días o menos) y VENCIDO. Una persona que volvió a llevar el curso
+     * se evalúa por el más reciente.
+     */
+    public function listarVigenciaCarnets()
+    {
+        $db = \Config\Database::connect();
+        $hoy = \App\Libraries\ReglasCurso::hoy();
+        $limite = date('Y-m-d', strtotime($hoy . ' -1 year'));
+        $limitePorVencer = date('Y-m-d', strtotime($hoy . ' -1 year +30 days'));
+        $aprobado = \App\Libraries\ReglasCurso::condicionAprobado('ic');
+        $aprobado3 = \App\Libraries\ReglasCurso::condicionAprobado('i3');
+
+        $filtro = '';
+        $params = [];
+        $estado = strtoupper(trim((string) $this->request->getGet('estado')));
+        if ($estado === 'VENCIDO') {
+            $filtro .= ' AND v.ultima_fecha < ?';
+            $params[] = $limite;
+        } elseif ($estado === 'VIGENTE') {
+            $filtro .= ' AND v.ultima_fecha > ?';
+            $params[] = $limitePorVencer;
+        } elseif ($estado === 'POR_VENCER') {
+            $filtro .= ' AND v.ultima_fecha >= ? AND v.ultima_fecha <= ?';
+            array_push($params, $limite, $limitePorVencer);
+        }
+        $buscar = trim((string) $this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $patron = '%' . $db->escapeLikeString($buscar) . '%';
+            $filtro .= " AND (p.numero LIKE ? ESCAPE '!' OR ci.numero_licencia LIKE ? ESCAPE '!'
+                OR CONCAT_WS(' ', ci.nombres, ci.apellido_paterno, ci.apellido_materno) LIKE ? ESCAPE '!')";
+            array_push($params, $patron, $patron, $patron);
+        }
+
+        $base = "FROM (
+                SELECT ic.id_persona, MAX(cu.fecha_inicio) AS ultima_fecha
+                FROM inscripciones_curso ic
+                JOIN cursos_seguridad_vial cu ON cu.id = ic.id_curso
+                WHERE $aprobado
+                GROUP BY ic.id_persona
+            ) v
+            JOIN personas p ON p.id = v.id_persona
+            LEFT JOIN ciudadanos ci ON ci.id_persona = p.id
+            WHERE 1=1 $filtro";
+
+        $page = max(1, (int) $this->request->getGet('page'));
+        $porPagina = max(1, min(200, (int) ($this->request->getGet('porPagina') ?: 5)));
+
+        // Una sola consulta trae la página y el total (COUNT OVER); el curso de cada fila se busca después solo para esas filas
+        $rows = $db->query(
+            "SELECT p.id AS idPersona, p.numero AS dni, ci.nombres, ci.apellido_paterno, ci.apellido_materno,
+                    ci.numero_licencia AS licencia, ci.foto AS fotoUrl, v.ultima_fecha AS ultimoCurso,
+                    DATE_ADD(v.ultima_fecha, INTERVAL 1 YEAR) AS venceEl,
+                    DATEDIFF(DATE_ADD(v.ultima_fecha, INTERVAL 1 YEAR), ?) AS diasRestantes,
+                    COUNT(*) OVER () AS totalFilas
+             $base
+             ORDER BY v.ultima_fecha DESC, ci.apellido_paterno ASC
+             LIMIT ? OFFSET ?",
+            array_merge([$hoy], $params, [$porPagina, ($page - 1) * $porPagina])
+        )->getResultArray();
+
+        if ($rows) {
+            $total = (int) $rows[0]['totalFilas'];
+        } elseif ($page > 1) {
+            $total = (int) ($db->query("SELECT COUNT(*) AS n $base", $params)->getRowArray()['n'] ?? 0);
+        } else {
+            $total = 0;
+        }
+
+        // Último curso de cada persona de la página (más reciente primero)
+        $cursosPorPersona = [];
+        if ($rows) {
+            $ids = array_map(static fn($r) => (int) $r['idPersona'], $rows);
+            $marcas = implode(',', array_fill(0, count($ids), '?'));
+            $cursos = $db->query(
+                "SELECT i3.id_persona, cu3.codigo, cu3.nombre, cu3.fecha_inicio
+                 FROM inscripciones_curso i3 JOIN cursos_seguridad_vial cu3 ON cu3.id = i3.id_curso
+                 WHERE i3.id_persona IN ($marcas) AND $aprobado3
+                 ORDER BY cu3.fecha_inicio DESC",
+                $ids
+            )->getResultArray();
+            foreach ($cursos as $c) {
+                $cursosPorPersona[(int) $c['id_persona']] ??= $c;
+            }
+        }
+
+        $fileStorage = new \App\Services\FileStorageService();
+        foreach ($rows as &$row) {
+            $row['idPersona'] = (int) $row['idPersona'];
+            $row['diasRestantes'] = (int) $row['diasRestantes'];
+            $row['estado'] = $row['diasRestantes'] < 0 ? 'VENCIDO' : ($row['diasRestantes'] <= 30 ? 'POR_VENCER' : 'VIGENTE');
+            $row['cursoCodigo'] = $cursosPorPersona[$row['idPersona']]['codigo'] ?? null;
+            $row['cursoTitulo'] = $cursosPorPersona[$row['idPersona']]['nombre'] ?? null;
+            $row['fotoUrl'] = $fileStorage->urlPublica($row['fotoUrl'] ?? null) ?? '';
+            unset($row['totalFilas']);
+        }
+        unset($row);
+
+        return $this->respond(['data' => $rows, 'meta' => ['total' => $total, 'page' => $page, 'porPagina' => $porPagina]]);
+    }
+
     public function listarCarnets()
     {
         $db = \Config\Database::connect();
