@@ -2,6 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiFetch, getCachedData, setCachedData, leerMensajeError, sanitizarMensaje } from './api'
 import { limpiarDatosLocales } from '../utils/sesionLocal'
 
+describe('mensajes de validación por campo', () => {
+  it('muestra todos los campos duplicados y no el código HTTP', async () => {
+    const response = { json: async () => ({ message: 400, messages: { numeroDocumento: 'Número de documento duplicado.', numeroLicencia: 'Número de licencia duplicado.' } }) }
+    expect(await leerMensajeError(response)).toBe('Número de documento duplicado.\nNúmero de licencia duplicado.')
+  })
+  it('no presenta un código numérico como mensaje al usuario', async () => {
+    expect(await leerMensajeError({ json: async () => ({ message: 400 }) }, 'Revisa los datos.')).toBe('Revisa los datos.')
+  })
+})
+
 describe('sanitizarMensaje', () => {
   it('deja pasar mensajes de negocio legibles', () => {
     expect(sanitizarMensaje('El RUC ya está registrado.')).toBe('El RUC ya está registrado.')

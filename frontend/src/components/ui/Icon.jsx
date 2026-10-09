@@ -168,12 +168,6 @@ const iconPaths = {
     </>
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
-  search: (
-    <>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m21 21-4.3-4.3" />
-    </>
-  ),
   close: <path d="m6 6 12 12M18 6 6 18" />,
   logout: (
     <>
@@ -201,12 +195,6 @@ const iconPaths = {
     </>
   ),
   command: <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z" />,
-  shieldCheck: (
-    <>
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <path d="m9 12 2 2 4-4" />
-    </>
-  ),
   trendUp: (
     <>
       <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
@@ -217,12 +205,6 @@ const iconPaths = {
     <>
       <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" />
       <polyline points="16 17 22 17 22 11" />
-    </>
-  ),
-  mapPin: (
-    <>
-      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-      <circle cx="12" cy="10" r="3" />
     </>
   ),
   external: (

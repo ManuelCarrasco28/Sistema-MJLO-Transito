@@ -261,9 +261,9 @@ export function PermisoFormularioVentana() {
       showError('Validación', 'Por favor ingresa la Razón Social o nombre del Administrado.')
       return
     }
-    if (!formData.solicitanteDocumento?.trim()) {
+    if (!/^(?:\d{8}|\d{11})$/.test(formData.solicitanteDocumento?.trim() || '')) {
       setActiveScreen('DATOS')
-      showError('Validación', 'Por favor ingresa el RUC o DNI del Administrado.')
+      showError('Validación', 'El DNI debe tener 8 dígitos o el RUC 11 dígitos.')
       return
     }
 

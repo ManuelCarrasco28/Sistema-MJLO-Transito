@@ -10,6 +10,7 @@ vi.mock('sweetalert2', () => ({ default: { update: vi.fn() } }))
 describe('Excel por bloques', () => {
   let blob
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     vi.clearAllMocks()
     vi.stubGlobal('Blob', class {
       constructor(parts) { this.texto = parts.map(p => p?.texto ?? String(p)).join('') }
@@ -21,7 +22,13 @@ describe('Excel por bloques', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     blob = null
   })
-  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
+  afterEach(() => {
+    // Ejecutar la liberación del blob antes de retirar el mock de URL.
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
 
   it('descarga todas las páginas en orden y conserva documentos como texto', async () => {
     apiFetch.mockImplementation(async url => {

@@ -39,6 +39,9 @@ class AsociacionesController extends ResourceController
                 COALESCE(o.flota_autorizada, 50) AS flotaAutorizada,
                 o.id_representante_legal AS idRepresentanteLegal,
                 COALESCE(p_rep.numero, '') AS representanteDni,
+                COALESCE(c_rep.nombres, '') AS representanteNombres,
+                COALESCE(c_rep.apellido_paterno, '') AS representanteApellidoPaterno,
+                COALESCE(c_rep.apellido_materno, '') AS representanteApellidoMaterno,
                 TRIM(CONCAT(COALESCE(c_rep.nombres, ''), ' ', COALESCE(c_rep.apellido_paterno, ''), ' ', COALESCE(c_rep.apellido_materno, ''))) AS representanteNombre,
                 COALESCE(NULLIF(p_rep.telefono, ''), NULLIF(p_rep.celular, ''), '') AS representanteTelefono,
                 o.estado,
@@ -423,6 +426,14 @@ class AsociacionesController extends ResourceController
     {
         $db = \Config\Database::connect();
         $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        $input['ruc'] = trim((string)($input['ruc'] ?? ''));
+        $input['tipo'] = strtoupper(trim((string)($input['tipo'] ?? 'ASOCIACION')));
+        $input['estado'] = strtoupper(trim((string)($input['estado'] ?? 'ACTIVO')));
+
+        if (!\App\Services\IdentidadAsociacion::bloquear($db)) return $this->failValidationErrors('Otro registro se está guardando. Intente nuevamente.');
+        try {
+        $errores = \App\Services\IdentidadAsociacion::duplicados($db, $input);
+        if ($errores) return $this->failValidationErrors($errores);
 
         $rules = [
             'razonSocial' => [
@@ -430,13 +441,16 @@ class AsociacionesController extends ResourceController
                 'errors' => ['required' => 'La razón social es obligatoria.']
             ],
             'ruc' => [
-                'rules'  => 'permit_empty|numeric|exact_length[11]|is_unique[asociaciones.ruc]',
+                'rules'  => 'required|numeric|exact_length[11]|is_unique[asociaciones.ruc]',
                 'errors' => [
+                    'required'     => 'El RUC es obligatorio.',
                     'numeric'      => 'El RUC debe tener exactamente 11 dígitos numéricos.',
                     'exact_length' => 'El RUC debe tener exactamente 11 dígitos numéricos.',
                     'is_unique'    => 'El RUC ya se encuentra registrado en otra asociación o empresa.'
                 ]
             ],
+            'tipo' => ['rules' => 'required|in_list[ASOCIACION,PARTICULAR]'],
+            'estado' => ['rules' => 'required|in_list[ACTIVO,INACTIVO,SUSPENDIDO,BAJA]'],
             'email' => [
                 'rules'  => 'permit_empty|valid_email',
                 'errors' => ['valid_email' => 'El correo electrónico no es válido.']
@@ -461,6 +475,9 @@ class AsociacionesController extends ResourceController
             $idRepresentante = (int)$input['idRepresentanteLegal'];
         } elseif (!empty($input['id_representante_legal'])) {
             $idRepresentante = (int)$input['id_representante_legal'];
+        }
+        if ($idRepresentante !== null && ($idRepresentante <= 0 || !$db->table('personas')->where('id', $idRepresentante)->countAllResults())) {
+            return $this->failValidationErrors(['idRepresentanteLegal' => 'Seleccione una persona registrada como representante.']);
         }
 
         $record = [
@@ -497,6 +514,9 @@ class AsociacionesController extends ResourceController
             $repInfo = $db->table('personas p')
                 ->select("
                     p.numero AS representanteDni,
+                    COALESCE(c.nombres, '') AS representanteNombres,
+                    COALESCE(c.apellido_paterno, '') AS representanteApellidoPaterno,
+                    COALESCE(c.apellido_materno, '') AS representanteApellidoMaterno,
                     TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) AS representanteNombre
                 ", false)
                 ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
@@ -512,6 +532,9 @@ class AsociacionesController extends ResourceController
             'razonSocial'          => $record['razon_social'],
             'idRepresentanteLegal' => $record['id_representante_legal'],
             'representanteDni'     => $repInfo['representanteDni'] ?? '',
+            'representanteNombres' => $repInfo['representanteNombres'] ?? '',
+            'representanteApellidoPaterno' => $repInfo['representanteApellidoPaterno'] ?? '',
+            'representanteApellidoMaterno' => $repInfo['representanteApellidoMaterno'] ?? '',
             'representanteNombre'  => $repInfo['representanteNombre'] ?? '',
             'ruc'                  => $record['ruc'],
             'partidaRegistral'     => $record['partida_registral'],
@@ -532,12 +555,18 @@ class AsociacionesController extends ResourceController
         ];
 
         return $this->respondCreated(['status' => true, 'message' => 'Asociación registrada con éxito', 'data' => $newOrg]);
+        } finally {
+            \App\Services\IdentidadAsociacion::liberar($db);
+        }
     }
 
     public function update($id = null)
     {
         $db = \Config\Database::connect();
         $input = $this->request->getJSON(true) ?: $this->request->getRawInput();
+        if (array_key_exists('ruc', $input)) $input['ruc'] = trim((string)$input['ruc']);
+        if (array_key_exists('tipo', $input)) $input['tipo'] = strtoupper(trim((string)$input['tipo']));
+        if (array_key_exists('estado', $input)) $input['estado'] = strtoupper(trim((string)$input['estado']));
 
         if (!$id) {
             return $this->failNotFound('ID de asociación no especificado.');
@@ -548,18 +577,12 @@ class AsociacionesController extends ResourceController
             return $this->failNotFound('Asociación no encontrada.');
         }
 
+        if (!\App\Services\IdentidadAsociacion::bloquear($db)) return $this->failValidationErrors('Otro registro se está guardando. Intente nuevamente.');
+        try {
+        $errores = \App\Services\IdentidadAsociacion::duplicados($db, $input, (int)$id);
+        if ($errores) return $this->failValidationErrors($errores);
+
         $rules = [
-            'razonSocial' => [
-                'rules'  => 'permit_empty',
-            ],
-            'ruc' => [
-                'rules'  => "permit_empty|numeric|exact_length[11]|is_unique[asociaciones.ruc,id,{$id}]",
-                'errors' => [
-                    'numeric'      => 'El RUC debe tener exactamente 11 dígitos numéricos.',
-                    'exact_length' => 'El RUC debe tener exactamente 11 dígitos numéricos.',
-                    'is_unique'    => 'El RUC ya se encuentra registrado en otra asociación o empresa.'
-                ]
-            ],
             'email' => [
                 'rules'  => 'permit_empty|valid_email',
                 'errors' => ['valid_email' => 'El correo electrónico no es válido.']
@@ -569,6 +592,21 @@ class AsociacionesController extends ResourceController
                 'errors' => ['numeric' => 'El teléfono debe contener solo números.']
             ]
         ];
+        if (array_key_exists('razonSocial', $input)) $rules['razonSocial'] = [
+            'rules' => 'required',
+            'errors' => ['required' => 'La razón social es obligatoria.'],
+        ];
+        if (array_key_exists('ruc', $input)) $rules['ruc'] = [
+                'rules'  => "required|numeric|exact_length[11]|is_unique[asociaciones.ruc,id,{$id}]",
+                'errors' => [
+                    'required'     => 'El RUC es obligatorio.',
+                    'numeric'      => 'El RUC debe tener exactamente 11 dígitos numéricos.',
+                    'exact_length' => 'El RUC debe tener exactamente 11 dígitos numéricos.',
+                    'is_unique'    => 'El RUC ya se encuentra registrado en otra asociación o empresa.'
+                ]
+            ];
+        if (array_key_exists('tipo', $input)) $rules['tipo'] = ['rules' => 'required|in_list[ASOCIACION,PARTICULAR]'];
+        if (array_key_exists('estado', $input)) $rules['estado'] = ['rules' => 'required|in_list[ACTIVO,INACTIVO,SUSPENDIDO,BAJA]'];
 
         if (!$this->validateData($input, $rules)) {
             return $this->failValidationErrors($this->validator->getErrors());
@@ -579,6 +617,9 @@ class AsociacionesController extends ResourceController
         if (isset($input['razonSocial'])) $record['razon_social'] = trim($input['razonSocial']);
         if (array_key_exists('idRepresentanteLegal', $input) || array_key_exists('id_representante_legal', $input)) {
             $repVal = $input['idRepresentanteLegal'] ?? $input['id_representante_legal'] ?? null;
+            if (!empty($repVal) && ((int)$repVal <= 0 || !$db->table('personas')->where('id', (int)$repVal)->countAllResults())) {
+                return $this->failValidationErrors(['idRepresentanteLegal' => 'Seleccione una persona registrada como representante.']);
+            }
             $record['id_representante_legal'] = !empty($repVal) ? (int)$repVal : null;
         }
         
@@ -629,6 +670,9 @@ class AsociacionesController extends ResourceController
         }
 
         return $this->respond(['status' => true, 'message' => 'Asociación actualizada con éxito']);
+        } finally {
+            \App\Services\IdentidadAsociacion::liberar($db);
+        }
     }
 
     public function delete($id = null)
@@ -644,7 +688,14 @@ class AsociacionesController extends ResourceController
             return $this->failNotFound('Asociación no encontrada.');
         }
 
-        $db->table('asociaciones')->where('id', $id)->delete();
+        try {
+            \App\Services\EliminacionSegura::eliminar($db, 'asociaciones', (int)$id);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('No se pudo eliminar la asociación. No se ha borrado ningún dato.');
+        }
 
         AuditoriaService::registrar(
             'ASOCIACIONES',

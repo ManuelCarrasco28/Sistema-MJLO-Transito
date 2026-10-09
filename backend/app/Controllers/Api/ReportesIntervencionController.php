@@ -93,8 +93,18 @@ class ReportesIntervencionController extends ResourceController
                 ->where('ri.id_reporte', $row['id'])
                 ->get()
                 ->getResultArray();
+            // Un reporte ya convertido muestra las infracciones que la oficina aplicó en su papeleta.
+            if (empty($infrs) && !empty($row['id_papeleta'])) {
+                $infrs = $db->table('papeleta_detalles pd')
+                    ->select('ti.id, ti.codigo, ti.descripcion')
+                    ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'inner')
+                    ->where('pd.id_papeleta', $row['id_papeleta'])
+                    ->orderBy('pd.id', 'ASC')
+                    ->get()
+                    ->getResultArray();
+            }
             $row['infracciones'] = $infrs;
-            $row['infraccion_visual'] = !empty($infrs) ? implode(', ', array_column($infrs, 'codigo')) : 'Sin Infracción';
+            $row['infraccion_visual'] = !empty($infrs) ? implode(', ', array_column($infrs, 'codigo')) : ($row['estado'] === 'PENDIENTE' ? 'Por definir' : 'Sin Infracción');
             $row['infraccionesIds'] = array_map('intval', array_column($infrs, 'id'));
         }
 
@@ -292,8 +302,14 @@ class ReportesIntervencionController extends ResourceController
             if (!$reporte) {
                 throw new \DomainException('Reporte no encontrado.');
             }
+            if ($reporte['estado'] === 'CONVERTIDO_PAPELETA') {
+                $papeletaPrevia = !empty($reporte['id_papeleta'])
+                    ? $db->table('papeletas')->select('numero_papeleta')->where('id', (int)$reporte['id_papeleta'])->get()->getRowArray()
+                    : null;
+                throw new \DomainException('Este reporte ya se convirtió en la papeleta ' . ($papeletaPrevia['numero_papeleta'] ?? 'registrada') . '.');
+            }
             if ($reporte['estado'] !== 'PENDIENTE') {
-                throw new \DomainException('Solo se pueden convertir reportes pendientes.');
+                throw new \DomainException('Este reporte ya no está pendiente (estado: ' . strtolower((string)$reporte['estado']) . ').');
             }
 
             $vehiculoId = (int)($input['vehiculoId'] ?? $reporte['id_vehiculo'] ?? 0);
@@ -314,7 +330,15 @@ class ReportesIntervencionController extends ResourceController
             $conductorInformalDni = null;
             $conductorInformalNombres = null;
             
-            $conductorDni = trim((string)($input['conductorDni'] ?? ''));
+            // El conductor lo informa el inspector en el reporte: la oficina no lo cambia al convertirlo en papeleta.
+            $conductorDni = '';
+            if (!empty($reporte['id_conductor'])) {
+                $conductorReporte = $db->table('personas')->select('numero')->where('id', (int)$reporte['id_conductor'])->get()->getRowArray();
+                $conductorDni = trim((string)($conductorReporte['numero'] ?? ''));
+            }
+            if ($conductorDni === '') {
+                $conductorDni = trim((string)($reporte['conductor_informal_dni'] ?? ''));
+            }
             if ($conductorDni !== '') {
                 $persona = $db->table('personas')->where('numero', $conductorDni)->get()->getRowArray();
                 if ($persona) {

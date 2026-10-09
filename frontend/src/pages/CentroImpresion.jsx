@@ -7,9 +7,9 @@ import { ImpresionCarnetsCurso } from '../components/impresion/ImpresionCarnetsC
 import { ImpresionTarjetasOperatividad } from '../components/impresion/ImpresionTarjetasOperatividad'
 
 const PESTANAS = [
-  { id: 'CARNETS', label: 'Carnet del curso', icono: 'course', descripcion: 'Carnets de seguridad vial de los participantes aprobados' },
-  { id: 'TARJETAS', label: 'Tarjeta de operatividad', icono: 'folderShield', descripcion: 'Tarjetas de operatividad (TUC) de los vehículos' },
-  { id: 'QR', label: 'QR de vehículos', icono: 'motoTaxi', descripcion: 'Códigos QR de mototaxis y motocargueras de asociaciones' },
+  { id: 'CARNETS', label: 'Carnet del curso', icono: 'course' },
+  { id: 'TARJETAS', label: 'Tarjeta de operatividad', icono: 'folderShield' },
+  { id: 'QR', label: 'QR de vehículos', icono: 'motoTaxi' },
 ]
 
 const CLAVE_PESTANA = 'impresion_pestana_activa'
@@ -55,7 +55,6 @@ export function CentroImpresion() {
       .catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const actual = PESTANAS.find((p) => p.id === pestana)
 
   // El curso que llega desde Cursos se aplica una sola vez: al volver a la pestaña ya no se re-filtra ni se
   // vuelve a llenar el carrito, y recargar la página tampoco lo repite (se limpia de la URL).
@@ -102,8 +101,6 @@ export function CentroImpresion() {
           </button>
         ))}
       </div>
-
-      <p className="text-xs text-slate-500 dark:text-slate-400">{actual.descripcion}.</p>
 
       {pestana === 'CARNETS' && <ImpresionCarnetsCurso cursoInicial={cursoInicial} alUsarCursoInicial={usarCursoInicial} />}
       {pestana === 'TARJETAS' && <ImpresionTarjetasOperatividad inicial={tarjetaInicial} />}

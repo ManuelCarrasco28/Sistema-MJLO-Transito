@@ -25,7 +25,7 @@ class InternamientosController extends ResourceController
                 COUNT(*) as total,
                 SUM(CASE WHEN estado = 'RETENIDO' THEN 1 ELSE 0 END) as en_deposito,
                 SUM(CASE WHEN estado = 'LIBERADO' THEN 1 ELSE 0 END) as liberados,
-                AVG(total_dias) as avg_dias
+                AVG(CASE WHEN estado = 'RETENIDO' THEN GREATEST(1, DATEDIFF(CURDATE(), DATE(fecha_ingreso))) ELSE COALESCE(total_dias, 1) END) as avg_dias
             ", false)
             ->get()->getRowArray();
 
@@ -58,18 +58,16 @@ class InternamientosController extends ResourceController
                     p.numero_papeleta as numeroPapeleta,
                     p.monto_total as montoPapeleta,
                     p.estado as papeletaEstado,
-                    (SELECT GROUP_CONCAT(ti.codigo ORDER BY pd.id SEPARATOR ', ')
-                       FROM papeleta_detalles pd JOIN tipos_infraccion ti ON ti.id = pd.id_tipo_infraccion
-                      WHERE pd.id_papeleta = oi.id_papeleta) as infraccionCodigo,
-                    (SELECT GROUP_CONCAT(ti.descripcion ORDER BY pd.id SEPARATOR '; ')
-                       FROM papeleta_detalles pd JOIN tipos_infraccion ti ON ti.id = pd.id_tipo_infraccion
-                      WHERE pd.id_papeleta = oi.id_papeleta) as infraccionDescripcion,
                     oi.fecha_ingreso as fechaIngreso,
                     oi.fecha_salida as fechaSalida,
                     oi.deposito,
                     oi.motivo,
+                    oi.lugar_intervencion as lugarIntervencion,
                     oi.numero_boleta as numeroBoleta,
-                    oi.total_dias as totalDias,
+                    CASE WHEN oi.estado = 'RETENIDO'
+                         THEN GREATEST(1, DATEDIFF(CURDATE(), DATE(oi.fecha_ingreso)))
+                         ELSE COALESCE(oi.total_dias, GREATEST(1, DATEDIFF(COALESCE(DATE(oi.fecha_salida), CURDATE()), DATE(oi.fecha_ingreso))))
+                    END as totalDias,
                     oi.estado,
                     oi.observaciones,
                     oi.grado_remisor as gradoRemisor,
@@ -80,6 +78,14 @@ class InternamientosController extends ResourceController
                     COALESCE(CONCAT(rem_c.nombres, ' ', rem_c.apellido_paterno, ' ', COALESCE(rem_c.apellido_materno, '')), 'Inspector Remisor') as remisorNombre,
                     COALESCE(CONCAT(inte_c.nombres, ' ', inte_c.apellido_paterno, ' ', COALESCE(inte_c.apellido_materno, '')), 'Conductor / Interesado') as interesadoNombre,
                     COALESCE(inte.numero, 'S/D') as interesadoDni,
+                    COALESCE(inte_c.nombres, '') as interesadoNombres,
+                    TRIM(CONCAT_WS(' ', inte_c.apellido_paterno, inte_c.apellido_materno)) as interesadoApellidos,
+                    COALESCE(
+                        NULLIF(TRIM(CONCAT_WS(' ', con_c.nombres, con_c.apellido_paterno, con_c.apellido_materno)), ''),
+                        NULLIF(p.conductor_informal_nombres, ''),
+                        'Conductor no identificado'
+                    ) as conductorNombre,
+                    COALESCE(con.numero, NULLIF(p.conductor_informal_dni, ''), 'S/D') as conductorDni,
                     COALESCE(inte.direccion, '') as interesadoDireccion,
                     COALESCE(v.anio_fabricacion, '') as vehiculoAnio,
                     COALESCE(inte_c.fecha_nacimiento, '') as interesadoFechaNacimiento,
@@ -100,6 +106,8 @@ class InternamientosController extends ResourceController
                 ->join('papeletas p', 'p.id = oi.id_papeleta', 'left')
                 ->join('personas rem', 'rem.id = oi.id_remisor', 'left')
                 ->join('ciudadanos rem_c', 'rem_c.id_persona = rem.id', 'left')
+                ->join('personas con', 'con.id = p.id_persona_infractor', 'left')
+                ->join('ciudadanos con_c', 'con_c.id_persona = con.id', 'left')
                 ->join('personas inte', 'inte.id = oi.id_interesado', 'left')
                 ->join('ciudadanos inte_c', 'inte_c.id_persona = inte.id', 'left')
                 ->join('ordenes_libertad ol', 'ol.id_internamiento = oi.id', 'left');
@@ -115,6 +123,8 @@ class InternamientosController extends ResourceController
                     ->orLike('inte_c.apellido_paterno', $buscar)
                     ->orLike('inte_c.apellido_materno', $buscar)
                     ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'inte_c.nombres', 'inte_c.apellido_paterno', 'inte_c.apellido_materno'), null, false)
+                    ->orLike('con.numero', $buscar)
+                    ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'con_c.nombres', 'con_c.apellido_paterno', 'con_c.apellido_materno'), null, false)
                     ->groupEnd();
             }
 
@@ -176,6 +186,8 @@ class InternamientosController extends ResourceController
 
             // Infracciones de la papeleta de cada internamiento (código, descripción, gravedad y monto).
             $infraccionesPorPapeleta = [];
+            $codigosPorPapeleta = [];
+            $descripcionesPorPapeleta = [];
             $papeletaIds = array_values(array_unique(array_filter(array_map(static fn (array $r): int => (int)($r['papeletaId'] ?? 0), $rows))));
             if (!empty($papeletaIds)) {
                 $detRows = $db->table('papeleta_detalles pd')
@@ -189,11 +201,13 @@ class InternamientosController extends ResourceController
                     unset($d['papeletaId']);
                     $d['monto'] = (float)$d['monto'];
                     $d['porcentajeUit'] = (float)$d['porcentajeUit'];
+                    $codigosPorPapeleta[$idPap][] = $d['codigo'];
+                    $descripcionesPorPapeleta[$idPap][] = $d['descripcion'];
                     $infraccionesPorPapeleta[$idPap][] = $d;
                 }
             }
 
-            $data = array_map(static function (array $r) use ($inventariosPorOrden, $infraccionesPorPapeleta): array {
+            $data = array_map(static function (array $r) use ($inventariosPorOrden, $infraccionesPorPapeleta, $codigosPorPapeleta, $descripcionesPorPapeleta): array {
                 $r['id'] = (int)$r['id'];
                 $r['papeletaId'] = $r['papeletaId'] ? (int)$r['papeletaId'] : null;
                 $r['vehiculoId'] = (int)$r['vehiculoId'];
@@ -202,6 +216,8 @@ class InternamientosController extends ResourceController
                 $r['montoTotalLiberacion'] = $r['montoTotalLiberacion'] ? (float)$r['montoTotalLiberacion'] : null;
                 $r['inventario'] = $inventariosPorOrden[$r['id']] ?? [];
                 $r['infracciones'] = $infraccionesPorPapeleta[$r['papeletaId'] ?? 0] ?? [];
+                $r['infraccionCodigo'] = isset($codigosPorPapeleta[$r['papeletaId'] ?? 0]) ? implode(', ', $codigosPorPapeleta[$r['papeletaId']]) : null;
+                $r['infraccionDescripcion'] = isset($descripcionesPorPapeleta[$r['papeletaId'] ?? 0]) ? implode('; ', $descripcionesPorPapeleta[$r['papeletaId']]) : null;
                 return $r;
             }, $rows);
 
@@ -298,12 +314,14 @@ class InternamientosController extends ResourceController
                 // El depósito oficial es siempre el de José Leonardo Ortiz (no lo elige el usuario).
                 'deposito' => self::DEPOSITO_OFICIAL,
                 'motivo' => trim($input['motivo'] ?? ''),
-                'lugar_intervencion' => trim($input['lugarIntervencion'] ?? ''),
-                'grado_remisor' => trim($input['gradoRemisor'] ?? ''),
-                'carnet_remisor' => trim($input['carnetRemisor'] ?? ''),
-                'autoridad_que_dispone' => trim($input['autoridadQueDispone'] ?? ''),
+                // Estos datos no se digitan: salen de la papeleta, del vehículo y del inspector que la emitió.
+                'lugar_intervencion' => trim((string)($papeleta['lugar'] ?? '')),
+                'grado_remisor' => $this->cargoDelInspector($db, $papeleta),
+                // El N° de carné no se digita: sale del inspector que emitió la papeleta.
+                'carnet_remisor' => $this->carneDelInspector($db, $papeleta),
+                'autoridad_que_dispone' => $this->cargoDelInspector($db, $papeleta),
                 'documento_referencia' => trim($input['documentoReferencia'] ?? ''),
-                'estado_carroceria' => trim($input['estadoCarroceria'] ?? ''),
+                'estado_carroceria' => $this->carroceriaDelVehiculo($db, (int)$papeleta['id_vehiculo']),
                 'observaciones' => trim($input['observaciones'] ?? ''),
                 'estado' => 'RETENIDO',
             ];
@@ -466,7 +484,8 @@ class InternamientosController extends ResourceController
                 'estado' => 'EMITIDA',
             ]);
 
-            $dias = max(1, (int)(new \DateTime($orden['fecha_ingreso']))->diff(new \DateTime())->days);
+            // Días de custodia = días calendario desde el ingreso (mínimo 1), igual que el contador de la lista.
+            $dias = max(1, (int)(new \DateTime(substr($orden['fecha_ingreso'], 0, 10)))->diff(new \DateTime(date('Y-m-d')))->days);
             $db->table('ordenes_internamiento')->where('id', (int)$orden['id'])->update([
                 'estado' => 'LIBERADO',
                 'fecha_salida' => date('Y-m-d H:i:s'),
@@ -495,6 +514,183 @@ class InternamientosController extends ResourceController
             log_message('error', '{exception}', ['exception' => $e]);
             return $this->failServerError('No se pudo registrar el pago y la liberación.');
         }
+    }
+
+    /**
+     * Corrige los datos de un internamiento (la papeleta, el vehículo y los cobros no se cambian). Si se envía
+     * "inventario", reemplaza el inventario completo por el nuevo.
+     */
+    public function update($id = null)
+    {
+        $db = \Config\Database::connect();
+        $input = $this->request->getJSON(true);
+        if (!is_array($input)) {
+            return $this->failValidationErrors('Datos no válidos.');
+        }
+
+        try {
+            $db->transException(true)->transBegin();
+
+            $orden = $db->query('SELECT * FROM ordenes_internamiento WHERE id = ? FOR UPDATE', [(int)$id])->getRowArray();
+            if (!$orden) {
+                $db->transRollback();
+                return $this->failNotFound('Internamiento no encontrado.');
+            }
+            $cambios = [];
+            $mapa = [
+                'motivo' => 'motivo',
+                'documentoReferencia' => 'documento_referencia',
+                'observaciones' => 'observaciones',
+            ];
+            foreach ($mapa as $clave => $columna) {
+                if (array_key_exists($clave, $input)) {
+                    $cambios[$columna] = trim((string)$input[$clave]);
+                }
+            }
+
+            if (array_key_exists('interesadoDni', $input)) {
+                $dni = trim((string)$input['interesadoDni']);
+                if ($dni === '') {
+                    $cambios['id_interesado'] = null;
+                } else {
+                    $persona = $db->table('personas')->where('numero', $dni)->get()->getRowArray();
+                    if (!$persona) {
+                        throw new \DomainException('No se encontró una persona con el DNI del interesado indicado.');
+                    }
+                    $cambios['id_interesado'] = (int)$persona['id'];
+                }
+            }
+
+            $inventario = null;
+            if (array_key_exists('inventario', $input)) {
+                $inventario = [];
+                foreach ((array)$input['inventario'] as $fila) {
+                    $idCriterio = (int)($fila['idCriterio'] ?? 0);
+                    $cantidad = $fila['cantidad'] ?? null;
+                    if ($idCriterio <= 0 || !is_numeric($cantidad) || (int)$cantidad < 0 || (int)$cantidad > 99) {
+                        throw new \DomainException('El inventario tiene un elemento o una cantidad no válidos.');
+                    }
+                    $inventario[$idCriterio] = (int)$cantidad;
+                }
+                if ($inventario) {
+                    $validos = $db->table('inventario_criterios')->select('id')->whereIn('id', array_keys($inventario))->get()->getResultArray();
+                    if (count($validos) !== count($inventario)) {
+                        throw new \DomainException('El inventario incluye elementos que no existen.');
+                    }
+                }
+            }
+
+            if ($cambios) {
+                $db->table('ordenes_internamiento')->where('id', (int)$orden['id'])->update($cambios);
+            }
+            if ($inventario !== null) {
+                $db->table('orden_internamiento_inventario')->where('id_orden_internamiento', (int)$orden['id'])->delete();
+                foreach ($inventario as $idCriterio => $cantidad) {
+                    $db->table('orden_internamiento_inventario')->insert([
+                        'id_orden_internamiento' => (int)$orden['id'],
+                        'id_criterio' => $idCriterio,
+                        'cantidad' => $cantidad,
+                        'estado' => 'REGISTRADO',
+                    ]);
+                }
+            }
+
+            $db->transCommit();
+
+            \App\Services\AuditoriaService::registrar(
+                'INTERNAMIENTOS',
+                'EDITAR',
+                "Se editó el internamiento {$orden['numero_boleta']}",
+                ['id' => (int)$orden['id'], 'campos' => array_keys($cambios), 'inventario' => $inventario !== null]
+            );
+
+            return $this->respond(['status' => 200, 'message' => 'Internamiento actualizado.']);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('No se pudo actualizar el internamiento.');
+        }
+    }
+
+    /**
+     * Elimina un internamiento junto con su inventario. Si ya fue liberado, también se elimina su orden de libertad
+     * (el pago de la papeleta registrado en Pagos no se toca).
+     */
+    public function delete($id = null)
+    {
+        $db = \Config\Database::connect();
+
+        try {
+            $db->transException(true)->transBegin();
+
+            $orden = $db->query('SELECT * FROM ordenes_internamiento WHERE id = ? FOR UPDATE', [(int)$id])->getRowArray();
+            if (!$orden) {
+                $db->transRollback();
+                return $this->failNotFound('Internamiento no encontrado.');
+            }
+            if ($db->table('ordenes_libertad')->where('id_internamiento', (int)$orden['id'])->countAllResults() > 0) {
+                throw new \DomainException('No se puede eliminar un internamiento con orden de libertad. Debe conservarse su historial y sus cobros.');
+            }
+            $db->table('orden_internamiento_inventario')->where('id_orden_internamiento', (int)$orden['id'])->delete();
+            $db->table('ordenes_internamiento')->where('id', (int)$orden['id'])->delete();
+            $db->transCommit();
+
+            \App\Services\AuditoriaService::registrar(
+                'INTERNAMIENTOS',
+                'ELIMINAR',
+                "Se eliminó el internamiento {$orden['numero_boleta']}",
+                ['id' => (int)$orden['id'], 'numeroBoleta' => $orden['numero_boleta']]
+            );
+
+            return $this->respondDeleted(['status' => 200, 'message' => 'Internamiento eliminado.']);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('No se pudo eliminar el internamiento.');
+        }
+    }
+
+    /** Cargo vigente del inspector que emitió la papeleta (ej. INSPECTOR DE TRÁNSITO MUNICIPAL). */
+    private function cargoDelInspector($db, array $papeleta): string
+    {
+        if (empty($papeleta['id_inspector'])) {
+            return 'Inspector de Tránsito Municipal';
+        }
+        $fila = $db->table('desplazamiento_oficina d')
+            ->select('c.nombre')
+            ->join('cargos c', 'c.id = d.id_cargo', 'inner')
+            ->where('d.id_trabajador', (int)$papeleta['id_inspector'])
+            ->where('d.fecha_termino IS NULL', null, false)
+            ->orderBy('d.id', 'DESC')
+            ->get()->getRowArray();
+
+        return trim((string)($fila['nombre'] ?? '')) ?: 'Inspector de Tránsito Municipal';
+    }
+
+    /** Carrocería registrada del vehículo (tipo y, si lo hay, el tipo de carrocería). */
+    private function carroceriaDelVehiculo($db, int $idVehiculo): string
+    {
+        $v = $db->table('vehiculos')->select('carroceria, tipo_carroceria')->where('id', $idVehiculo)->get()->getRowArray();
+        $partes = array_filter([trim((string)($v['carroceria'] ?? '')), trim((string)($v['tipo_carroceria'] ?? ''))]);
+
+        return implode(' - ', array_unique($partes));
+    }
+
+    /** Documento (carné) del inspector que emitió la papeleta; vacío si la papeleta no tiene inspector. */
+    private function carneDelInspector($db, array $papeleta): string
+    {
+        if (empty($papeleta['id_inspector'])) {
+            return '';
+        }
+        $fila = $db->table('personas')->select('numero')->where('id', (int)$papeleta['id_inspector'])->get()->getRowArray();
+
+        return trim((string)($fila['numero'] ?? ''));
     }
 
     public function criterios()

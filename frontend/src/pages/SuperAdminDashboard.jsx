@@ -6,6 +6,7 @@ import { showConfirm, showSuccess, showError } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
+import { errorPasswordUsuario } from '../utils/passwordPolicy'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { Modal } from '../components/ui/Modal'
 import { RolesTable } from '../components/superadmin/RolesTable'
@@ -386,6 +387,12 @@ export function SuperAdminDashboard({ user }) {
   const saveUser = async (event) => {
     event.preventDefault()
     setMessage('')
+    if (!/^[A-Za-z0-9_-]{3,50}$/.test(userForm.nombre_usuario || '')) {
+      setMessage('El usuario debe tener entre 3 y 50 caracteres: letras, números, guiones o guion bajo.')
+      return
+    }
+    const errorPassword = errorPasswordUsuario(userForm.password, userForm.nombre_usuario)
+    if (errorPassword) { setMessage(errorPassword); return }
     try {
       const res = await apiFetch('/usuarios', { method: 'POST', body: userForm })
       const data = await res.json()
@@ -425,6 +432,8 @@ export function SuperAdminDashboard({ user }) {
     event.preventDefault()
     if (!passwordUser || !newPassword.trim()) return
     setMessage('')
+    const errorPassword = errorPasswordUsuario(newPassword, passwordUser.nombre_usuario)
+    if (errorPassword) { setMessage(errorPassword); return }
     try {
       const res = await apiFetch(`/usuarios/${passwordUser.id}/password`, {
         method: 'PUT',
@@ -899,7 +908,7 @@ export function SuperAdminDashboard({ user }) {
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <input required value={userForm.nombre_usuario} onChange={(e) => setUserForm({ ...userForm, nombre_usuario: e.target.value.toLowerCase().replace(/\s+/g, '') })} placeholder="Usuario" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" />
-              <input required minLength={6} type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Contraseña" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" />
+              <input required minLength={8} maxLength={128} type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Contraseña" className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" />
               <select required value={userForm.id_rol} onChange={(e) => setUserForm({ ...userForm, id_rol: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white sm:col-span-2">
                 <option value="" disabled>Selecciona un rol...</option>
                 {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
@@ -919,7 +928,7 @@ export function SuperAdminDashboard({ user }) {
         <Modal title="Restablecer contraseña" onClose={() => setPasswordUser(null)}>
           <form onSubmit={resetPassword} className="space-y-4">
             <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Usuario: <strong className="text-slate-900 dark:text-white">{passwordUser.nombre_usuario}</strong></p>
-            <FloatingInput id="nueva_password" label="Nueva contraseña" type="password" minLength={6} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            <FloatingInput id="nueva_password" label="Nueva contraseña" type="password" minLength={8} maxLength={128} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
             <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
               <BotonCancelar onClick={() => setPasswordUser(null)} />
               <BotonGuardar>Actualizar contraseña</BotonGuardar>

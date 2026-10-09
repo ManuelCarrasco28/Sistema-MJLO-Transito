@@ -121,6 +121,7 @@ export function FloatingInput({
   autoComplete = 'off',
   className = '',
   inputClassName = '',
+  error = '',
   ...props
 }) {
   const [isFocused, setIsFocused] = useState(false)
@@ -129,9 +130,10 @@ export function FloatingInput({
   // desde el inicio para no superponerse con ese texto nativo del navegador.
   const isFloating = ['date', 'time', 'datetime-local', 'month', 'week'].includes(type)
     || isFocused
+    || Boolean(error)
     || (value !== undefined && value !== null && String(value).trim() !== '')
 
-  const clasesInput = `peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400 ${inputClassName}`
+  const clasesInput = `peer block h-[42px] w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400 ${inputClassName} ${error ? '!border-red-500 focus:!border-red-500 focus:!ring-red-500/20' : ''}`
 
   return (
     <div className={`relative ${className}`}>
@@ -161,6 +163,8 @@ export function FloatingInput({
           autoComplete={autoComplete}
           placeholder=" "
           className={clasesInput}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
           {...props}
         />
       )}
@@ -169,14 +173,15 @@ export function FloatingInput({
         className={`pointer-events-none absolute left-3 select-none transition-all duration-150 ${
           isFloating
             ? 'top-1 text-[9.5px] font-bold text-slate-500 dark:text-slate-400'
-            : 'top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-slate-500'
-        } ${isFocused ? '!text-blue-600 dark:!text-blue-400' : ''}`}
+            : 'top-[21px] -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-slate-500'
+        } ${error ? '!text-red-600 dark:!text-red-400' : isFocused ? '!text-blue-600 dark:!text-blue-400' : ''}`}
       >
         {label}
         {optional && (
           <span className="ml-1 text-[9px] font-normal text-slate-400 dark:text-slate-500">(Opcional)</span>
         )}
       </label>
+      {error && <p id={`${id}-error`} role="alert" className="mt-1 px-1 text-[11px] leading-4 font-medium text-red-600 dark:text-red-400">{error}</p>}
     </div>
   )
 }
@@ -192,12 +197,13 @@ export function FloatingTextarea({
   rows = 1,
   className = '',
   textareaClassName = '',
+  error = '',
   ...props
 }) {
   const [isFocused, setIsFocused] = useState(false)
   const textareaRef = useRef(null)
 
-  const isFloating = isFocused || (value !== undefined && value !== null && String(value).trim() !== '')
+  const isFloating = isFocused || Boolean(error) || (value !== undefined && value !== null && String(value).trim() !== '')
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -225,7 +231,9 @@ export function FloatingTextarea({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholder=" "
-        className={`peer block w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400 resize-none min-h-[42px] overflow-hidden ${textareaClassName}`}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={`peer block w-full rounded-xl border border-slate-200 bg-white px-3 pt-3.5 pb-1 text-xs font-semibold text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-blue-400 resize-none min-h-[42px] overflow-hidden ${textareaClassName} ${error ? '!border-red-500 focus:!border-red-500 focus:!ring-red-500/20' : ''}`}
         {...props}
       />
       <label
@@ -234,13 +242,14 @@ export function FloatingTextarea({
           isFloating
             ? 'top-1 text-[9.5px] font-bold text-slate-500 dark:text-slate-400'
             : 'top-3 text-xs font-medium text-slate-400 dark:text-slate-500'
-        } ${isFocused ? '!text-blue-600 dark:!text-blue-400' : ''}`}
+        } ${error ? '!text-red-600 dark:!text-red-400' : isFocused ? '!text-blue-600 dark:!text-blue-400' : ''}`}
       >
         {label}
         {optional && (
           <span className="ml-1 text-[9px] font-normal text-slate-400 dark:text-slate-500">(Opcional)</span>
         )}
       </label>
+      {error && <p id={`${id}-error`} role="alert" className="mt-1 px-1 text-[11px] leading-4 font-medium text-red-600 dark:text-red-400">{error}</p>}
     </div>
   )
 }
@@ -348,7 +357,12 @@ export function FloatingSelect({
   // el usuario hace scroll, en vez de recalcular la posición en cada frame.
   useEffect(() => {
     if (!isOpen) return undefined
-    const handleScroll = () => setIsOpen(false)
+    // El scroll de la propia lista de opciones NO debe cerrarla (antes, al intentar bajar por las opciones el menú
+    // se cerraba, porque este oyente captura todos los scrolls de la página).
+    const handleScroll = (e) => {
+      if (e?.target?.closest?.('[data-floating-select-menu]')) return
+      setIsOpen(false)
+    }
     window.addEventListener('scroll', handleScroll, true)
     window.addEventListener('resize', handleScroll)
     return () => {
@@ -386,13 +400,13 @@ export function FloatingSelect({
         type="button"
         id={id}
         onClick={handleToggle}
-        className={`flex h-[42px] w-full items-center justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-[var(--bg-subtle)] dark:text-white cursor-pointer ${
+        className={`flex ${multilineOptions ? 'min-h-[42px] items-start' : 'h-[42px] items-center'} w-full justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-[var(--bg-subtle)] dark:text-white cursor-pointer ${
           isOpen
             ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
             : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
         }`}
       >
-        <span className="truncate pr-1">{selectedOption?.label || value}</span>
+        <span className={multilineOptions ? 'min-w-0 whitespace-normal break-words pr-1 leading-snug' : 'truncate pr-1'}>{selectedOption?.label || value}</span>
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -401,7 +415,7 @@ export function FloatingSelect({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${
+          className={`size-3 text-slate-400 transition-transform duration-150 shrink-0 ml-1.5 ${multilineOptions ? 'mt-1' : ''} ${
             isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
           }`}
         >
@@ -437,7 +451,7 @@ export function FloatingSelect({
           }}
           className="z-[100] rounded-lg border border-slate-200 bg-white p-0.5 shadow-xl shadow-slate-900/15 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100"
         >
-          <div className={`max-h-48 overflow-y-auto ${multilineOptions ? 'sin-scrollbar' : 'custom-scrollbar'}`}>
+          <div className="custom-scrollbar max-h-48 overflow-y-auto overscroll-contain">
             {buscador.buscable && (
               <BuscadorOpciones
                 texto={buscador.texto}

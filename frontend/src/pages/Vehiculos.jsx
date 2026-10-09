@@ -282,10 +282,9 @@ export function Vehiculos({ user }) {
       !personaFormData.nombres.trim() ||
       !personaFormData.apellidoPaterno.trim() ||
       !personaFormData.apellidoMaterno.trim() ||
-      !personaFormData.numeroLicencia.trim() ||
       !personaFormData.direccion.trim()
     ) {
-      showError('Validación Fallida', 'Por favor completa todos los campos requeridos (Documento, Nombres, Apellidos, Licencia y Dirección).')
+      showError('Validación Fallida', 'Por favor completa los campos requeridos (Documento, Nombres, Apellidos y Dirección).')
       return
     }
     const isDni = personaFormData.tipoDocumento === 'DNI' || personaFormData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD'
@@ -909,11 +908,13 @@ export function Vehiculos({ user }) {
     )
     if (result.isConfirmed) {
       try {
-        await apiFetch(`/vehiculos/${id}`, { method: 'DELETE' })
-        setVehiculos(vehiculos.filter((v) => v.id !== id))
+        const response = await apiFetch(`/vehiculos/${id}`, { method: 'DELETE' })
+        if (!response.ok) throw new Error(await leerMensajeError(response, 'No se pudo eliminar el vehículo.'))
+        loadVehiculos()
+        loadStats()
         showToast('Vehículo eliminado correctamente')
       } catch (err) {
-        showError('Error', 'No se pudo eliminar el vehículo.')
+        showError('Error', sanitizarMensaje(err.message, 'No se pudo eliminar el vehículo.'))
       }
     }
   }
@@ -926,13 +927,13 @@ export function Vehiculos({ user }) {
       showError('Campos Incompletos', 'Por favor completa los campos requeridos (Placa y Propietario registrado).')
       return
     }
-    if (placaClean.length < 6) {
-      showError('Placa Inválida', 'La placa debe tener al menos 6 caracteres.')
+    if (!/^[A-Z0-9]{6}$/.test(placaClean)) {
+      showError('Placa Inválida', 'La placa debe tener exactamente 6 letras o números, sin guion.')
       return
     }
     const anioActual = new Date().getFullYear()
-    if (formData.anio && (formData.anio < 1950 || formData.anio > anioActual + 1)) {
-      showError('Año Inválido', `El año de fabricación debe ser válido (entre 1950 y ${anioActual + 1}).`)
+    if (formData.anio && (!/^\d{4}$/.test(String(formData.anio)) || Number(formData.anio) < 1900 || Number(formData.anio) > anioActual + 1)) {
+      showError('Año Inválido', `El año de fabricación debe ser válido (entre 1900 y ${anioActual + 1}).`)
       return
     }
 

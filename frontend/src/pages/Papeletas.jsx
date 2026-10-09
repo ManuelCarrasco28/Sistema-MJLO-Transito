@@ -18,6 +18,7 @@ import { PapeletaDetalleModal } from '../components/papeletas/PapeletaDetalleMod
 import { ConvertirReporteModal } from '../components/papeletas/ConvertirReporteModal'
 import { PreviewTicketModal } from '../components/papeletas/PreviewTicketModal'
 import { InfraccionDetalleModal } from '../components/papeletas/InfraccionDetalleModal'
+import { CatalogoInfraccionesModal } from '../components/papeletas/CatalogoInfraccionesModal'
 import { BotonCancelar, BotonCerrarModal } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 
@@ -77,6 +78,8 @@ export function Papeletas({ user }) {
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
   const [asociaciones, setAsociaciones] = useState(cachedOrgs || [])
   const [isLoading, setIsLoading] = useState(!cachedPapeletas)
+  const cargaPapeletas = useRef(null)
+  const reportesCargados = useRef(false)
   const [loadError, setLoadError] = useState('')
   const [searchTerm, setSearchTerm] = useState(() => new URLSearchParams(window.location.search).get('search') || '')
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
@@ -128,6 +131,15 @@ export function Papeletas({ user }) {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [isPagarModalOpen, setIsPagarModalOpen] = useState(false)
   const [selectedInfraccion, setSelectedInfraccion] = useState(null)
+  // Catálogo de infracciones (alta/edición/baja): { codigo } abre directamente la edición de esa infracción
+  const [catalogoInfracciones, setCatalogoInfracciones] = useState(null)
+  const recargarTiposInfraccion = () => {
+    apiFetch('/tipos-infraccion')
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((payload) => { setTiposInfraccion(payload.data || []); setCachedData('/tipos-infraccion', payload.data || []) })
+      .catch(() => {})
+  }
+  const puedeAdministrarInfracciones = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE'].includes(String(user?.rol || '').toUpperCase())
   const [papeletaToAction, setPapeletaToAction] = useState(null)
   const [reporteToConvert, setReporteToConvert] = useState(null)
   const [reporteToReject, setReporteToReject] = useState(null)
@@ -368,13 +380,11 @@ export function Papeletas({ user }) {
       apiFetch('/tipos-infraccion').then((res) => (res.ok ? res.json() : { data: [] })),
       apiFetch('/vehiculos?porPagina=50&ligero=1').then((res) => (res.ok ? res.json() : { data: [] })),
       apiFetch('/asociaciones?porPagina=50').then((res) => (res.ok ? res.json() : { data: [] })),
-      apiFetch('/reportes-intervencion').then((res) => (res.ok ? res.json() : { data: [] })),
     ])
-      .then(([tiposRes, vehiculosRes, orgsRes, reportesRes]) => {
+      .then(([tiposRes, vehiculosRes, orgsRes]) => {
         setTiposInfraccion(tiposRes.data || [])
         setVehiculos(vehiculosRes.data || [])
         setAsociaciones(orgsRes.data || [])
-        setReportes(reportesRes.data || [])
       })
       .catch(() => {})
   }
@@ -385,6 +395,7 @@ export function Papeletas({ user }) {
       .then((res) => (res.ok ? res.json() : { data: [] }))
       .then((reportesRes) => {
         setReportes(reportesRes.data || [])
+        reportesCargados.current = true
       })
       .catch(() => {})
       .finally(() => setLoadingReportes(false))
@@ -417,6 +428,9 @@ export function Papeletas({ user }) {
   }
 
   const loadData = () => {
+    cargaPapeletas.current?.abort()
+    const controller = new AbortController()
+    cargaPapeletas.current = controller
     setIsLoading(true)
     setLoadError('')
     const params = new URLSearchParams({
@@ -431,23 +445,31 @@ export function Papeletas({ user }) {
     if (filterFecha !== 'TODAS') params.set('fecha', filterFecha)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
-    apiFetch(`/papeletas?${params.toString()}`)
+    apiFetch(`/papeletas?${params.toString()}`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((papeletasRes) => {
+        if (controller.signal.aborted) return
         const pData = (papeletasRes.data || []).map(normalizePapeleta)
         setPapeletas(pData)
         setTotalFiltrado(papeletasRes.meta?.total ?? pData.length)
         setIsLoading(false)
       })
       .catch(() => {
-        setLoadError('No se pudo cargar el módulo de papeletas.')
-        setIsLoading(false)
+        if (!controller.signal.aborted) {
+          setLoadError('No se pudo cargar el módulo de papeletas.')
+          setIsLoading(false)
+        }
       })
   }
 
   useEffect(() => {
     loadData()
+    return () => cargaPapeletas.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha, sortBy, sortDir])
+
+  useEffect(() => {
+    if (activeView === 'REPORTES' && !reportesCargados.current) loadReportes()
+  }, [activeView])
 
   useEffect(() => {
     loadStats()
@@ -545,7 +567,8 @@ export function Papeletas({ user }) {
       infraccionesIds: reporte.infraccionesIds?.length ? reporte.infraccionesIds.map(String) : [''],
       vehiculoId: String(reporte.id_vehiculo || matchVehiculo?.id || ''),
       conductorDni: reporte.conductorDni && reporte.conductorDni !== 'S/D' ? reporte.conductorDni : '',
-      observacionesAutoridad: reporte.observaciones || ''
+      // Observaciones de la oficina: empiezan vacías (la del inspector ya se ve en la tarjeta del reporte)
+      observacionesAutoridad: ''
     })
     try {
       const res = await apiFetch(`/reportes-intervencion/${reporte.id}/fotos`)
@@ -592,6 +615,14 @@ export function Papeletas({ user }) {
       showToast(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim(), 'success')
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'Error al convertir reporte.'))
+      // Si el reporte ya fue atendido (convertido o rechazado desde otra pantalla o un envío anterior), la ventana
+      // ya no sirve: se cierra y se refrescan las listas para que se vea su estado real.
+      if (/ya se convirtió|ya no está pendiente/i.test(String(error.message))) {
+        setReporteToConvert(null)
+        loadData()
+        loadStats()
+        loadReportes()
+      }
     } finally {
       setIsProcessingAction(false)
     }
@@ -785,7 +816,7 @@ export function Papeletas({ user }) {
             activeView === 'REPORTES'
               ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
               : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-          }`}>{reportesPendientes}</span>
+          }`}>{reportesCargados.current ? reportesPendientes : '—'}</span>
         </button>
       </div>
 
@@ -1074,7 +1105,7 @@ export function Papeletas({ user }) {
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 dark:border-[var(--border)]">
           {/* Top row: Search and Action Buttons */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:max-w-md">
+            <div className="relative w-full sm:flex-1">
               <Icon
                 name={isLoading ? "refresh" : "search"}
                 className={`absolute left-3.5 top-1/2 size-4 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-rose-500' : 'text-slate-400'}`}
@@ -1084,7 +1115,7 @@ export function Papeletas({ user }) {
                 placeholder="Buscar por código PAP, placa, infractor, DNI..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-rose-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-rose-400"
+                className="h-[38px] w-full rounded-xl border border-slate-200 bg-slate-50/70 py-0 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-rose-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-rose-400"
               />
               {searchTerm && (
                 <button
@@ -1129,10 +1160,22 @@ export function Papeletas({ user }) {
                 <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
               </button>
 
+              {puedeAdministrarInfracciones && (
+                <button
+                  type="button"
+                  onClick={() => setCatalogoInfracciones({ codigo: null })}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 cursor-pointer whitespace-nowrap dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-200"
+                  title="Administrar el catálogo de infracciones y sus multas"
+                >
+                  <Icon name="scale" className="size-3.5 text-rose-600" />
+                  <span>Infracciones</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleOpenNuevaPapeleta}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+                className="inline-flex h-[38px] items-center justify-center gap-1.5 rounded-xl px-3.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
                 style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
               >
                 <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
@@ -1141,20 +1184,26 @@ export function Papeletas({ user }) {
           </div>
 
           {/* Bottom row: Filters */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             <RoundedSelect
+              className="w-full"
+              buttonClassName="w-full"
               value={filterOrigen}
               onChange={setFilterOrigen}
               options={FILTER_ORIGEN_OPTIONS}
             />
 
             <RoundedSelect
+              className="w-full"
+              buttonClassName="w-full"
               value={filterEstado}
               onChange={setFilterEstado}
               options={FILTER_ESTADO_OPTIONS}
             />
 
             <RoundedSelect
+              className="w-full"
+              buttonClassName="w-full"
               value={filterFormalidad}
               onChange={setFilterFormalidad}
               options={FILTER_FORMALIDAD_OPTIONS}
@@ -1162,6 +1211,8 @@ export function Papeletas({ user }) {
 
             {tiposInfraccion.length > 0 && (
               <RoundedSelect
+              className="w-full"
+              buttonClassName="w-full"
                 value={filterTipoInfraccion}
                 onChange={setFilterTipoInfraccion}
                 options={tipoInfraccionOptions}
@@ -1169,6 +1220,8 @@ export function Papeletas({ user }) {
             )}
 
             <RoundedSelect
+              className="w-full"
+              buttonClassName="w-full"
               value={filterFecha}
               onChange={setFilterFecha}
               options={FILTER_FECHA_OPTIONS}
@@ -1345,6 +1398,8 @@ export function Papeletas({ user }) {
                       </td>
                       <td className="px-3 py-3.5 text-center">
                         <div className="flex items-center justify-center gap-1">
+                          {puedeCobrar && p.estado !== 'ANULADA' && <>
+                          </>}
                           {!puedeCobrar ? null : p.estado === 'ANULADA' ? (
                             <button
                               type="button"
@@ -1477,8 +1532,16 @@ export function Papeletas({ user }) {
         <PreviewTicketModal selectedPapeleta={selectedPapeleta} onClose={() => setIsPreviewModalOpen(false)} />
       )}
 
+      {catalogoInfracciones && (
+        <CatalogoInfraccionesModal editarCodigo={catalogoInfracciones.codigo} onClose={() => setCatalogoInfracciones(null)} onChanged={recargarTiposInfraccion} />
+      )}
+
       {selectedInfraccion && (
-        <InfraccionDetalleModal selectedInfraccion={selectedInfraccion} onClose={() => setSelectedInfraccion(null)} />
+        <InfraccionDetalleModal
+          selectedInfraccion={selectedInfraccion}
+          onClose={() => setSelectedInfraccion(null)}
+          onEditar={puedeAdministrarInfracciones ? (codigo) => { setSelectedInfraccion(null); setCatalogoInfracciones({ codigo }) } : null}
+        />
       )}
 
       {fotosModalReporte && (

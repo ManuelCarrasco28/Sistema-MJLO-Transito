@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
@@ -86,10 +86,14 @@ export function Operativos({ user }) {
   const [loadError, setLoadError] = useState('')
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
+  const cargaOperativos = useRef(null)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const loadOperativos = async () => {
+    cargaOperativos.current?.abort()
+    const controller = new AbortController()
+    cargaOperativos.current = controller
     setLoading(true)
     const params = new URLSearchParams({
       page: String(page),
@@ -100,9 +104,10 @@ export function Operativos({ user }) {
     if (fechaFiltro !== 'TODAS') params.set('fechaFiltro', fechaFiltro)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
-    const response = await apiFetch(`/operativos?${params.toString()}`)
+    const response = await apiFetch(`/operativos?${params.toString()}`, { signal: controller.signal })
     if (!response.ok) throw response
     const payload = await response.json()
+    if (controller.signal.aborted) return
     const data = payload.data || []
     setOperativos(data)
     setTotalFiltrado(payload.meta?.total ?? data.length)
@@ -110,9 +115,12 @@ export function Operativos({ user }) {
 
   useEffect(() => {
     setLoadError('')
-    loadOperativos()
-      .catch(() => setLoadError('No se pudo cargar el módulo de operativos.'))
-      .finally(() => setLoading(false))
+    const peticion = loadOperativos()
+    const controller = cargaOperativos.current
+    peticion
+      .catch(() => { if (!controller.signal.aborted) setLoadError('No se pudo cargar el módulo de operativos.') })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
   }, [page, itemsPerPage, debouncedSearch, estado, fechaFiltro, sortBy, sortDir])
 
   useEffect(() => {
@@ -304,17 +312,21 @@ export function Operativos({ user }) {
       { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (!result.isConfirmed) return
-    const response = await apiFetch(`/operativos/${id}`, { method: 'DELETE' })
-    if (response.ok) {
-      setOperativos((actual) => actual.filter((op) => op.id !== id))
-      setCachedData('/operativos', null) // el calendario del dashboard vuelve a pedir su lista
-      loadOperativos().catch(() => {}).finally(() => setLoading(false))
-      loadStats()
-      showToast('Operativo eliminado correctamente')
-      return
+    try {
+      const response = await apiFetch(`/operativos/${id}`, { method: 'DELETE' })
+      if (response.ok) {
+        setOperativos((actual) => actual.filter((op) => op.id !== id))
+        setCachedData('/operativos', null) // el calendario del dashboard vuelve a pedir su lista
+        loadOperativos().catch(() => {}).finally(() => setLoading(false))
+        loadStats()
+        showToast('Operativo eliminado correctamente')
+        return
+      }
+      const data = await response.json().catch(() => ({}))
+      showError('Error', sanitizarMensaje(data.message || data.messages?.error, 'No se pudo eliminar el operativo.'))
+    } catch (err) {
+      showError('Error', sanitizarMensaje(err.message, 'No se pudo conectar con el servidor. Intente nuevamente.'))
     }
-    const data = await response.json().catch(() => ({}))
-    showError('Error', sanitizarMensaje(data.message || data.messages?.error, 'No se pudo eliminar el operativo.'))
   }
 
   const openDetail = async (op) => {

@@ -196,8 +196,20 @@ class OperativosController extends ResourceController
         $builder->groupBy('o.id');
 
         if ($page > 0) {
-            $subquery = (clone $builder)->select('o.id AS sub_id', false);
-            $total = $db->newQuery()->fromSubquery($subquery, 't_count')->countAllResults();
+            // El total solo depende de columnas del operativo: no necesita agrupar
+            // las tablas de inspectores y papeletas usadas para mostrar cada fila.
+            $conteo = $db->table('operativos o');
+            if ($buscar !== '') {
+                $conteo->groupStart()
+                    ->like('o.nombre', $buscar)
+                    ->orLike('o.lugar', $buscar)
+                    ->orLike('o.fecha', $buscar)
+                    ->groupEnd();
+            }
+            if ($estado !== '' && $estado !== 'TODOS') $conteo->where('o.estado', $estado);
+            if ($fechaFiltro === 'HOY') $conteo->where('o.fecha', date('Y-m-d'));
+            elseif ($fechaFiltro === 'SEMANA') $conteo->where('o.fecha >=', date('Y-m-d', strtotime('-7 days')));
+            $total = $conteo->countAllResults();
 
             $columnasOrdenables = [
                 'nombre' => 'o.nombre',
@@ -316,24 +328,21 @@ class OperativosController extends ResourceController
         }
 
         $rules = [
-            'nombre' => [
-                'rules' => 'permit_empty',
-            ],
-            'lugar' => [
-                'rules' => 'permit_empty',
-            ],
             'fecha' => [
                 'rules' => 'permit_empty|valid_date',
                 'errors' => ['valid_date' => 'La fecha del operativo no es válida.']
-            ],
-            'hora_inicio' => [
-                'rules' => 'permit_empty',
             ],
             'estado' => [
                 'rules' => 'permit_empty|in_list[PROGRAMADO,EN CURSO,FINALIZADO,CANCELADO]',
                 'errors' => ['in_list' => 'Estado de operativo no válido.']
             ]
         ];
+        foreach (['nombre', 'lugar', 'hora_inicio'] as $campoObligatorio) {
+            if (array_key_exists($campoObligatorio, $input)) {
+                $rules[$campoObligatorio] = ['rules' => 'required'];
+                $input[$campoObligatorio] = trim((string)$input[$campoObligatorio]);
+            }
+        }
 
         if (!$this->validateData($input, $rules)) {
             return $this->failValidationErrors($this->validator->getErrors());

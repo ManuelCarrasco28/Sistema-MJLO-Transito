@@ -1,19 +1,14 @@
 import { useState, useEffect } from 'react'
-import { estadoParticipante } from '../utils/participantesCurso'
-import { retirarInscripcion } from '../utils/retirarInscripcion'
 import { fechaLocalActual, HORAS_CURSO, validarCalendarioCurso } from '../utils/calendarioCurso'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { useDebounce } from '../hooks/useDebounce'
-import { useListaServidor } from '../hooks/useListaServidor'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { SortableHeader } from '../components/ui/SortableHeader'
-import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
-import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
-import { CarnetCursoVialPrint, CarnetCursoVialLotePrint, precargarPlantillasCarnet } from '../components/documentos/TarjetaOperatividadPrint'
-import { abrirImpresionCuandoEsteListo, resolverFotoParaCarnet, resolverFotosDeParticipantes } from '../utils/impresionCarnets'
+import { sanitizarMensaje, apiFetch, getCachedData, setCachedData, leerMensajeError } from '../config/api'
+import { showToast, showConfirm, showError } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { RoundedSelect, FloatingInput, FloatingSelect, FloatingTextarea } from '../components/ui/FormInputs'
@@ -46,35 +41,17 @@ export function CursosSeguridad() {
   const [cursos, setCursos] = useState(cached || [])
   const [isLoading, setIsLoading] = useState(!cached)
   const [searchTerm, setSearchTerm] = useState('')
-  const [searchAprobados, setSearchAprobados] = useState('')
-  const [filtroEntrega, setFiltroEntrega] = useState('TODOS')
-  const [entregandoCarnetId, setEntregandoCarnetId] = useState(null)
   const [filterTipo, setFilterTipo] = useState('TODOS')
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
-  const [activeView, setActiveView] = useState('CURSOS')
   const [totalFiltrado, setTotalFiltrado] = useState(0)
   const [estadisticas, setEstadisticas] = useState(getCachedData('/cursos-estadisticas') || {})
   const [revision, setRevision] = useState(0)
   const debouncedSearch = useDebounce(searchTerm)
-  const debouncedAprobados = useDebounce(searchAprobados)
-  const carnets = useListaServidor({ endpoint: '/cursos/carnets', page: currentPage, porPagina: itemsPerPage,
-    activo: activeView === 'APROBADOS', descripcion: 'los carnets',
-    params: { buscar: debouncedAprobados, entrega: filtroEntrega === 'ENTREGADOS' ? 'ENTREGADO' : filtroEntrega === 'PENDIENTES' ? 'PENDIENTE' : '', revision },
-    mapear: p => ({ ...p, curso: { id: p.cursoId, codigo: p.cursoCodigo, titulo: p.cursoTitulo, fecha: p.cursoFecha } }),
-  })
-
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedCurso, setSelectedCurso] = useState(null)
   const [loadError, setLoadError] = useState('')
-  const [participanteResults, setParticipanteResults] = useState([])
-  const [isSearchingParticipante, setIsSearchingParticipante] = useState(false)
-  const [participanteSearch, setParticipanteSearch] = useState('')
-  const [showParticipanteResults, setShowParticipanteResults] = useState(false)
-  const [inscribiendo, setInscribiendo] = useState(false)
-  const [personasVigentes, setPersonasVigentes] = useState([])
   const [formData, setFormData] = useState({
     codigo: '', titulo: '', descripcion: '', fecha: '', fechaFin: '', fechaInscripcionInicio: '', fechaInscripcionFin: '', horaInicio: '09:00', horaFin: '12:00',
     instructor: '', lugar: '', capacidad: 50, costo: 0, estado: 'PROGRAMADO', tipo: 'SEGURIDAD_VIAL'
@@ -92,66 +69,8 @@ export function CursosSeguridad() {
     setIsModalOpen(true)
   }
 
-  const [printCurso, setPrintCurso] = useState(null)
-  const [isResolviendoFotos, setIsResolviendoFotos] = useState(false)
-  const [printAprobado, setPrintAprobado] = useState(null)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
-
-  const handlePrintBatch = async (curso) => {
-    if (!curso.participantes) {
-      try {
-        const respuesta = await apiFetch(`/cursos/${curso.uuid || curso.id}`)
-        if (!respuesta.ok) throw new Error('No se pudo cargar el curso.')
-        curso = (await respuesta.json()).data
-      } catch {
-        showError('Impresión', 'No se pudo cargar el curso. Intente nuevamente.')
-        return
-      }
-    }
-    if (!curso.participantes || curso.participantes.length === 0) {
-      showError('Error de Impresión', 'No hay participantes inscritos en este curso para imprimir.');
-      return;
-    }
-    const aprobados = curso.participantes.filter(p => curso.estado === 'FINALIZADO' ? estadoParticipante(p, curso.estado) === 'APROBADO' : true);
-    if (aprobados.length === 0) {
-      showError('Error de Impresión', 'No hay participantes con asistencia o aprobados para generar los carnets.');
-      return;
-    }
-
-    if (aprobados.length > 40) {
-      const hojas = Math.ceil(aprobados.length / 4);
-      const result = await showConfirm(
-        'Imprimir lote grande',
-        `Se van a generar ${aprobados.length} carnets en ${hojas} hojas. Puede tardar un poco.`,
-        'Sí, imprimir lote',
-        'Cancelar'
-      );
-      if (!result.isConfirmed) return;
-    }
-
-    setIsResolviendoFotos(true);
-    const [participantesConFoto] = await Promise.all([
-      resolverFotosDeParticipantes(aprobados),
-      precargarPlantillasCarnet(),
-    ]);
-    setIsResolviendoFotos(false);
-
-    setPrintCurso({ ...curso, participantes: participantesConFoto });
-    abrirImpresionCuandoEsteListo(() => setPrintCurso(null));
-  }
-
-  const handlePrintSingle = async (aprobado) => {
-    setIsResolviendoFotos(true);
-    const [fotoUrl] = await Promise.all([
-      resolverFotoParaCarnet(aprobado.fotoUrl),
-      precargarPlantillasCarnet(),
-    ]);
-    setIsResolviendoFotos(false);
-
-    setPrintAprobado({ ...aprobado, fotoUrl });
-    abrirImpresionCuandoEsteListo(() => setPrintAprobado(null));
-  }
 
   const handleOpenEditModal = (curso) => {
     setFormData({ ...curso, fechaFin: curso.fechaFin || curso.fecha_fin || curso.fecha || '',
@@ -172,12 +91,12 @@ export function CursosSeguridad() {
     if (result.isConfirmed) {
       try {
         const respuesta = await apiFetch(`/cursos/${id}`, { method: 'DELETE' })
-        if (!respuesta.ok) throw new Error('No se pudo eliminar el curso.')
-        setCursos(cursos.filter(c => c.id !== id))
+        if (!respuesta.ok) throw new Error(await leerMensajeError(respuesta, 'No se pudo eliminar el curso.'))
+        setCursos(cursos.filter(c => (c.uuid || c.id) !== id))
         setRevision(v => v + 1)
         showToast('Curso eliminado correctamente')
       } catch (err) {
-        showError('Error', 'Error al eliminar curso')
+        showError('Error', sanitizarMensaje(err.message, 'Error al eliminar curso'))
       }
     }
   }
@@ -190,8 +109,8 @@ export function CursosSeguridad() {
       return
     }
 
-    if (formData.capacidad < 1 || formData.capacidad > 100) {
-      showError('Validación Fallida', 'El aforo del curso debe ser entre 1 y 100 personas.')
+    if (!Number.isSafeInteger(Number(formData.capacidad)) || Number(formData.capacidad) < 1) {
+      showError('Validación Fallida', 'El aforo del curso debe ser un número entero mayor que cero.')
       return
     }
 
@@ -215,14 +134,14 @@ export function CursosSeguridad() {
     }
     try {
       if (selectedCurso) {
-        const response = await apiFetch(`/cursos/${selectedCurso.id}`, {
+        const response = await apiFetch(`/cursos/${selectedCurso.uuid || selectedCurso.id}`, {
           method: 'PUT',
           body: payload
         })
         const result = await response.json()
         if (!response.ok) throw new Error(result.messages?.error || 'Error al guardar el curso')
         
-        setCursos(cursos.map(c => c.id === selectedCurso.id ? { ...formData, id: c.id } : c))
+        setCursos(cursos.map(c => c.id === selectedCurso.id ? { ...c, ...formData, id: c.id } : c))
         showToast('Curso editado exitosamente')
       } else {
         const response = await apiFetch('/cursos', {
@@ -257,7 +176,7 @@ export function CursosSeguridad() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [debouncedSearch, filterEstado, filterTipo, debouncedAprobados, filtroEntrega, activeView])
+  }, [debouncedSearch, filterEstado, filterTipo])
 
   const [sortBy, setSortBy] = useState('')
   const [sortDir, setSortDir] = useState('DESC')
@@ -356,17 +275,16 @@ export function CursosSeguridad() {
 
   // Bloquea el scroll de la página de fondo mientras hay un modal abierto.
   useEffect(() => {
-    if (isModalOpen || isDetailModalOpen) {
+    if (isModalOpen) {
       const previousOverflow = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       return () => {
         document.body.style.overflow = previousOverflow
       }
     }
-  }, [isModalOpen, isDetailModalOpen])
+  }, [isModalOpen])
 
   useEffect(() => {
-    if (activeView !== 'CURSOS') return
     const controller = new AbortController()
     setIsLoading(true)
     setLoadError('')
@@ -393,92 +311,12 @@ export function CursosSeguridad() {
       .catch(() => { if (!controller.signal.aborted) setLoadError('No se pudo cargar el registro de cursos viales.') })
       .finally(() => { if (!controller.signal.aborted) setIsLoading(false) })
     return () => controller.abort()
-  }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, filterTipo, sortBy, sortDir, revision, activeView])
+  }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, filterTipo, sortBy, sortDir, revision])
 
-  useEffect(() => {
-    if (!isDetailModalOpen) return
-    apiFetch('/cursos/personas-vigentes')
-      .then(res => res.ok ? res.json() : Promise.reject(res))
-      .then(data => setPersonasVigentes(data.data || []))
-      .catch(() => {})
-  }, [isDetailModalOpen])
-
-  const getPersonaNombre = (p) => {
-    if (!p) return ''
-    if (p.nombreCompleto) return p.nombreCompleto
-    return `${p.nombres || ''} ${p.apellidoPaterno || p.apellido_paterno || ''} ${p.apellidoMaterno || p.apellido_materno || ''}`.trim() || 'Sin Nombre'
-  }
-
-  // Búsqueda dinámica y debounced de participantes (evita descargar miles de personas en memoria)
-  useEffect(() => {
-    const rawQuery = (participanteSearch || '').trim()
-    if (!rawQuery || rawQuery.length < 2) {
-      setParticipanteResults([])
-      setIsSearchingParticipante(false)
-      return
-    }
-    const controller = new AbortController()
-    const timer = setTimeout(() => {
-      setIsSearchingParticipante(true)
-      apiFetch(`/personas?page=1&buscar=${encodeURIComponent(rawQuery)}&porPagina=12`, { signal: controller.signal })
-        .then((res) => (res.ok ? res.json() : { data: [] }))
-        .then((payload) => {
-          if (controller.signal.aborted) return
-          const list = (payload.data || []).filter((p) => {
-            const yaInscritoAqui = selectedCurso?.participantes?.some(
-              (part) => part.dni === (p.numeroDocumento || p.numero)
-            )
-            if (personasVigentes.includes(p.id) && !yaInscritoAqui) return false
-            if (getPersonaNombre(p).toUpperCase().includes('SIN PROPIETARIO')) return false
-            return true
-          })
-          setParticipanteResults(list.slice(0, 8))
-        })
-        .catch(() => {})
-        .finally(() => { if (!controller.signal.aborted) setIsSearchingParticipante(false) })
-    }, 250)
-    return () => { clearTimeout(timer); controller.abort() }
-  }, [participanteSearch, personasVigentes, selectedCurso])
-
-  const paginatedAprobados = carnets.filas
-  const [retirandoInscripcion, setRetirandoInscripcion] = useState(null)
-  const handleRetirarInscripcion = async (participante) => {
-    setRetirandoInscripcion(participante.idInscripcion)
-    try {
-      if (await retirarInscripcion(participante)) {
-        await carnets.recargar()
-        setRevision(actual => actual + 1)
-      }
-    } finally {
-      setRetirandoInscripcion(null)
-    }
-  }
-
-  // Marca (o desmarca) la entrega física del carnet: distingue "ya se imprimió" de "ya lo recogió el
-  // conductor". Actualiza en el servidor y refleja el cambio en el padrón sin recargar toda la lista.
-  const handleToggleEntrega = async (participante) => {
-    if (!participante.idInscripcion) return
-    const nuevoValor = !participante.carnetEntregado
-    setEntregandoCarnetId(participante.idInscripcion)
-    try {
-      const response = await apiFetch(`/cursos/inscripciones/${participante.idInscripcion}/entrega`, {
-        method: 'PUT',
-        body: { entregado: nuevoValor },
-      })
-      if (!response.ok) throw new Error('No se pudo actualizar la entrega del carnet.')
-      await carnets.recargar()
-      showToast(nuevoValor ? 'Carnet marcado como entregado' : 'Entrega del carnet revertida')
-    } catch {
-      showError('Error', 'No se pudo actualizar la entrega del carnet.')
-    } finally {
-      setEntregandoCarnetId(null)
-    }
-  }
 
   return (
     <div className="space-y-4">
       {loadError && <PageLoadError message={loadError} />}
-      {activeView === 'APROBADOS' && carnets.error && <PageLoadError message={carnets.error} />}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -546,32 +384,6 @@ export function CursosSeguridad() {
         </div>
       </div>
 
-      <div className="flex border-b border-slate-200 dark:border-[var(--border)]">
-        <button
-          onClick={() => { setActiveView('CURSOS'); setCurrentPage(1) }}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
-            activeView === 'CURSOS'
-              ? 'border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-          }`}
-        >
-          <Icon name="course" className="size-4" />
-          <span>Cursos programados</span>
-        </button>
-        <button
-          onClick={() => { setActiveView('APROBADOS'); setCurrentPage(1) }}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
-            activeView === 'APROBADOS'
-              ? 'border-emerald-600 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-          }`}
-        >
-          <Icon name="idCard" className="size-4" />
-          <span>Registros de Carnet</span>
-        </button>
-      </div>
-
-      {activeView === 'CURSOS' && (
       <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col">
 
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
@@ -746,14 +558,14 @@ export function CursosSeguridad() {
                         {c.estado !== 'FINALIZADO' && <span className="size-8 shrink-0" aria-hidden="true" />}
                         {c.estado === 'FINALIZADO' && (
                           <button onClick={(e) => { e.stopPropagation(); navigate(`/impresion?pestana=CARNETS&cursoId=${c.uuid || c.id}&cursoEtiqueta=${encodeURIComponent(`${c.codigo} · ${c.titulo}`)}`); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title="Imprimir carnets en el Centro de impresión">
-                            <Icon name={isResolviendoFotos ? 'refresh' : 'print'} className={`size-4 ${isResolviendoFotos ? 'animate-spin' : ''}`} />
+                            <Icon name="print" className="size-4" />
                           </button>
                         )}
                         
                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditModal(c); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar Curso">
                           <Icon name="pencil" className="size-4" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar Curso">
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(c.uuid || c.id); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar Curso">
                           <Icon name="trash" className="size-4" />
                         </button>
                       </div>
@@ -776,126 +588,6 @@ export function CursosSeguridad() {
           }}
         />
       </div>
-      )}
-
-      {activeView === 'APROBADOS' && (
-        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col">
-          {/* Controls Aprobados */}
-          <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
-            <div className="relative w-full sm:max-w-xs">
-              <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Buscar por DNI o Nombres..."
-                value={searchAprobados}
-                onChange={(e) => setSearchAprobados(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-emerald-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 dark:bg-white/5 dark:text-slate-300 whitespace-nowrap">
-                {carnets.isLoading ? 'Cargando carnets…' : `${carnets.total} carnets encontrados`}
-              </span>
-              <RoundedSelect
-                value={filtroEntrega}
-                onChange={(val) => { setFiltroEntrega(val); setCurrentPage(1) }}
-                options={[
-                  { value: 'TODOS', label: 'Todos' },
-                  { value: 'PENDIENTES', label: 'Pendientes de entrega' },
-                  { value: 'ENTREGADOS', label: 'Ya entregados' },
-                ]}
-              />
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-5 py-4">Conductor</th>
-                  <th className="px-5 py-4">DNI / Licencia</th>
-                  <th className="px-5 py-4">Curso Válido</th>
-                  <th className="px-5 py-4">Expedición / Venc.</th>
-                  <th className="px-5 py-4 text-center">Entrega</th>
-                  <th className="px-5 py-4 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-                {paginatedAprobados.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="px-5 py-12 text-center text-slate-500 dark:text-slate-400">
-                      <div className="flex flex-col items-center justify-center gap-3">
-                        <div className="rounded-full bg-slate-100 p-4 dark:bg-[var(--bg-subtle)]">
-                          <Icon name="file-check" className="size-8 text-slate-400 dark:text-slate-500" />
-                        </div>
-                        <p className="text-base font-semibold text-slate-700 dark:text-slate-300">{carnets.isLoading ? 'Cargando carnets…' : 'No hay conductores aprobados'}</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedAprobados.map((p, i) => {
-                    const dt = new Date(p.curso.fecha);
-                    dt.setFullYear(dt.getFullYear() + 1);
-                    const fechaVencimiento = dt.toISOString().split('T')[0];
-
-                    return (
-                      <tr key={i} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-[var(--bg-subtle)]">
-                        <td className="px-5 py-4">
-                          <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.nombres} {p.apellido_paterno} {p.apellido_materno}</p>
-                        </td>
-                        <td className="px-5 py-4">
-                          <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.dni}</p>
-                          <p className="text-[10px] font-semibold text-slate-500">LIC. {p.licencia || 'S/N'}</p>
-                        </td>
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{p.curso.codigo}</p>
-                          <p className="text-[10px] font-semibold text-slate-500 max-w-[150px] truncate">{p.curso.titulo}</p>
-                        </td>
-                        <td className="px-5 py-4">
-                          <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.curso.fecha}</p>
-                          <p className="text-[10px] font-semibold text-slate-500">Vence: {fechaVencimiento}</p>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <button
-                            onClick={() => handleToggleEntrega(p)}
-                            disabled={entregandoCarnetId === p.idInscripcion}
-                            title={p.carnetEntregado ? `Entregado${p.carnetFechaEntrega ? ' el ' + new Date(p.carnetFechaEntrega).toLocaleDateString('es-PE') : ''}${p.carnetEntregadoPor ? ' por ' + p.carnetEntregadoPor : ''}. Clic para revertir.` : 'Clic para marcar como entregado'}
-                            className="inline-flex cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <StatusBadge status={p.carnetEntregado ? 'ENTREGADO' : 'PENDIENTE'} />
-                          </button>
-                        </td>
-                        <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#1C2438] dark:group-hover:bg-slate-800/60 px-3 py-3 text-right border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
-                          <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => handlePrintSingle(p)} disabled={isResolviendoFotos} className="rounded-lg p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-950/60 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-200 shadow-2xs hover:shadow-md active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" title="Descargar Carnet Individual">
-                              <Icon name={isResolviendoFotos ? 'refresh' : 'print'} className={`size-4 ${isResolviendoFotos ? 'animate-spin' : ''}`} />
-                            </button>
-                            <button type="button" onClick={() => handleRetirarInscripcion(p)} disabled={retirandoInscripcion !== null}
-                              title="Retirar inscripción del curso" aria-label={`Retirar inscripción de ${p.nombres}`}
-                              className="rounded-lg p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white dark:bg-rose-950/40 dark:text-rose-300 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                              <Icon name="trash" className="size-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            currentPage={currentPage}
-            totalItems={carnets.total}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-            onItemsPerPageChange={(size) => {
-              setItemsPerPage(size)
-              setCurrentPage(1)
-            }}
-          />
-        </div>
-      )}
-
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
           <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
@@ -961,56 +653,6 @@ export function CursosSeguridad() {
       )}
 
       
-      {/* SECCIÓN OFICIAL DE IMPRESIÓN EN LOTE (4 CARNETS POR HOJA A4) */}
-      {printCurso && (() => {
-        const dt = new Date(printCurso.fecha);
-        dt.setFullYear(dt.getFullYear() + 1);
-        const fechaVencimiento = dt.toISOString().split('T')[0];
-
-        const aprobados = (printCurso.participantes || [])
-          .filter(p => printCurso.estado === 'FINALIZADO' ? estadoParticipante(p, printCurso.estado) === 'APROBADO' : true);
-
-        const items = aprobados.map(p => ({
-          codigo: printCurso.codigo,
-          tucNumero: printCurso.codigo,
-          apellidos: `${p.apellido_paterno || ''} ${p.apellido_materno || ''}`.trim(),
-          nombres: p.nombres || '',
-          dni: p.dni || p.numero || '',
-          licencia: p.licencia || '',
-          numeroLicencia: p.licencia || '',
-          fotoUrl: p.fotoUrl || '',
-          fechaExpedicion: printCurso.fecha,
-          fechaExpiracion: fechaVencimiento,
-          fechaVencimiento: fechaVencimiento,
-          asociacion: p.asociacion || 'INDEPENDIENTE'
-        }));
-
-        return <CarnetCursoVialLotePrint items={items} />;
-      })()}
-
-      {/* IMPRESIÓN INDIVIDUAL (DESDE VISTA APROBADOS) */}
-      {printAprobado && (() => {
-        const dt = new Date(printAprobado.curso.fecha);
-        dt.setFullYear(dt.getFullYear() + 1);
-        const fechaVencimiento = dt.toISOString().split('T')[0];
-
-        const item = {
-          codigo: printAprobado.curso.codigo,
-          tucNumero: printAprobado.curso.codigo,
-          apellidos: `${printAprobado.apellido_paterno || ''} ${printAprobado.apellido_materno || ''}`.trim(),
-          nombres: printAprobado.nombres || '',
-          dni: printAprobado.dni || printAprobado.numero || '',
-          licencia: printAprobado.licencia || '',
-          numeroLicencia: printAprobado.licencia || '',
-          fotoUrl: printAprobado.fotoUrl || '',
-          fechaExpedicion: printAprobado.curso.fecha,
-          fechaExpiracion: fechaVencimiento,
-          fechaVencimiento: fechaVencimiento,
-          asociacion: printAprobado.asociacion || 'INDEPENDIENTE'
-        };
-
-        return <CarnetCursoVialLotePrint items={[item]} />;
-      })()}
     </div>
   )
 }

@@ -302,8 +302,7 @@ class PermisosController extends ResourceController
                     if ($idParam && (int)$existeColision['id'] === $idParam) {
                         return $this->update($idParam);
                     }
-                    // Si el número ya existe en otro registro, forzar la generación de un correlativo nuevo único
-                    $numeroAutorizacion = '';
+                    return $this->failValidationErrors(['numeroAutorizacion' => 'Número de autorización duplicado.']);
                 }
             }
 
@@ -357,6 +356,8 @@ class PermisosController extends ResourceController
                 'estado'                 => !empty($payload['estado']) ? strtoupper(trim($payload['estado'])) : 'VIGENTE',
             ], $this->resolverRelaciones($db, $payload, true));
 
+            $errores = \App\Services\ValidacionRegistro::permiso($data);
+            if ($errores) return $this->failValidationErrors($errores);
             $data['uuid'] = \App\Libraries\Identificador::nuevo();
             $db->table('permisos_circulacion')->insert($data);
             $newId = (int)$db->insertID();
@@ -432,6 +433,13 @@ class PermisosController extends ResourceController
             }
 
             $data = array_merge($data, $this->resolverRelaciones($db, $payload, false));
+
+            $actual = $db->table('permisos_circulacion')->where('id', $id)->get()->getRowArray();
+            $errores = \App\Services\ValidacionRegistro::permiso(array_merge($actual, $data));
+            foreach (['numero_autorizacion', 'fecha_emision', 'fecha_inicio_vigencia', 'contenido'] as $campo) {
+                if (array_key_exists($campo, $data) && ($data[$campo] === null || $data[$campo] === '')) $errores[$campo] = 'Campo obligatorio.';
+            }
+            if ($errores) return $this->failValidationErrors($errores);
 
             if (!empty($data['numero_autorizacion'])) {
                 $existeOtro = $db->table('permisos_circulacion')

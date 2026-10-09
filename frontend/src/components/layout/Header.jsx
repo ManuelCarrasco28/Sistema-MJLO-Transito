@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '../ui/Icon'
 import { apiFetch } from '../../config/api'
+import { errorPasswordUsuario } from '../../utils/passwordPolicy'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
 
 export function Header({
@@ -51,8 +52,9 @@ export function Header({
         setProfileError('Completa la contraseña actual, nueva contraseña y confirmación.')
         return
       }
-      if (profileForm.password_nuevo.length < 6) {
-        setProfileError('La nueva contraseña debe tener al menos 6 caracteres.')
+      const errorPassword = errorPasswordUsuario(profileForm.password_nuevo, user?.usuario || user?.nombre_usuario || '')
+      if (errorPassword) {
+        setProfileError(errorPassword)
         return
       }
       if (profileForm.password_nuevo !== profileForm.password_confirmacion) {

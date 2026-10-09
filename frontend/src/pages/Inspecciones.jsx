@@ -156,8 +156,12 @@ export function Inspecciones() {
   const [totalFiltrado, setTotalFiltrado] = useState(0)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const cargaInspecciones = useRef(null)
 
   const loadData = async () => {
+    cargaInspecciones.current?.abort()
+    const controller = new AbortController()
+    cargaInspecciones.current = controller
     setIsLoading(true)
     try {
       const params = new URLSearchParams({
@@ -168,9 +172,10 @@ export function Inspecciones() {
       if (filterResultado !== 'TODOS') params.set('resultado', filterResultado)
       if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
-      const inspRes = await apiFetch(`/inspecciones?${params.toString()}`)
+      const inspRes = await apiFetch(`/inspecciones?${params.toString()}`, { signal: controller.signal })
       if (!inspRes.ok) throw inspRes
       const inspPayload = await inspRes.json()
+      if (controller.signal.aborted) return
       const fetched = (inspPayload.data || []).map((i) => ({
         ...i,
         detalles: typeof i.detalles === 'string' ? JSON.parse(i.detalles) : i.detalles || [],
@@ -178,15 +183,16 @@ export function Inspecciones() {
       setInspecciones(fetched)
       setTotalFiltrado(inspPayload.meta?.total ?? fetched.length)
     } catch {
-      setLoadError('No se pudo cargar el módulo de inspecciones.')
+      if (!controller.signal.aborted) setLoadError('No se pudo cargar el módulo de inspecciones.')
     } finally {
-      setIsLoading(false)
+      if (!controller.signal.aborted) setIsLoading(false)
     }
   }
 
   useEffect(() => {
     setLoadError('')
     loadData()
+    return () => cargaInspecciones.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterResultado, sortBy, sortDir])
 
   const [stats, setStats] = useState({ totales: 0, aprobados: 0, observados: 0, desaprobados: 0 })
@@ -584,7 +590,7 @@ export function Inspecciones() {
       setInspecciones(next)
       setCachedData('/inspecciones', next)
       loadStats()
-      showToast(`Inspección ${objetivo.numeroRegistro || ''} eliminada correctamente`, 'eliminar')
+      showToast(`Inspección ${objetivo.numeroRegistro || ''} anulada correctamente`, 'eliminar')
     } catch {
       showToast('No se pudo conectar con el servidor. Intente nuevamente.', 'error')
     } finally {
@@ -789,7 +795,7 @@ export function Inspecciones() {
                 <Icon name="trash" className="size-6" />
               </span>
               <h3 id="titulo-eliminar" className="text-base font-bold text-slate-900 dark:text-white">
-                ¿Eliminar esta inspección?
+                ¿Anular esta inspección?
               </h3>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Se anulará la inspección{' '}
@@ -810,7 +816,7 @@ export function Inspecciones() {
                 className="flex-1 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-60 cursor-pointer"
                 style={{ backgroundColor: 'oklch(58.6% 0.253 17.585)' }}
               >
-                {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
+                {eliminando ? 'Anulando…' : 'Sí, anular'}
               </button>
             </div>
           </div>
@@ -1213,7 +1219,7 @@ export function Inspecciones() {
                           <button
                             type="button"
                             onClick={() => handleDelete(i.id)}
-                            title="Eliminar inspección"
+                            title="Anular inspección"
                             className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
                             style={{
                               backgroundColor: 'var(--action-del-bg)',

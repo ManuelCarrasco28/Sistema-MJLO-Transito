@@ -36,7 +36,9 @@ describe('campos de los documentos de internamiento', () => {
       interesadoFechaNacimiento: '1990-01-01', numeroOrdenLibertad: 'LIB-51',
       numeroBoleta: 'BOL-19', montoRemolque: 0, totalDias: 0,
     })
-    expect(doc.textContent).toContain('LIB-51')
+    // El número del encabezado se imprime sin el prefijo (LIB-)
+    expect(doc.textContent).toContain('Nº 51')
+    expect(doc.textContent).not.toContain('LIB-51')
     expect(doc.textContent).toContain('Fecha de internamiento:2/9/2026')
     expect(doc.textContent).toContain('03-09-2026')
     expect(doc.textContent).toContain('Total días:0')

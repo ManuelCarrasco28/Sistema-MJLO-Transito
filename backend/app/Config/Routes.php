@@ -15,6 +15,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA'], static function ($routes): void {
         $recursosEliminables = [
             'vehiculos' => 'VehiculosController',
+            'personal' => 'PersonalController',
             'personas' => 'PersonasController',
             'asociaciones' => 'AsociacionesController',
             'documentos' => 'DocumentosController',
@@ -146,6 +147,15 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     // Rutas de exportación y reportes sensibles: restringidas a personal de oficina autorizado
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA'], static function ($routes): void {
         $routes->post('export-pdf', 'ExportPdfController::generar');
+    });
+
+    // Catálogo de infracciones y sus multas (porcentaje de UIT): lo administran los cargos de dirección.
+    $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE'], static function ($routes): void {
+        $routes->get('catalogo-infracciones', 'TiposInfraccionController::index');
+        $routes->post('catalogo-infracciones', 'TiposInfraccionController::create');
+        $routes->put('catalogo-infracciones/(:num)', 'TiposInfraccionController::update/$1');
+        $routes->patch('catalogo-infracciones/(:num)', 'TiposInfraccionController::update/$1');
+        $routes->delete('catalogo-infracciones/(:num)', 'TiposInfraccionController::delete/$1');
     });
 
     // El token de PIDE es un secreto: quitarlo es solo del SuperAdmin.

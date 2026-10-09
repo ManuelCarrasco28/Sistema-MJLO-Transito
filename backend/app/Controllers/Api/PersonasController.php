@@ -148,9 +148,8 @@ class PersonasController extends ResourceController
                 'errors' => ['required' => 'El apellido materno es requerido.']
             ],
             'numeroLicencia' => [
-                'rules' => 'required|max_length[9]',
+                'rules' => 'permit_empty|max_length[9]',
                 'errors' => [
-                    'required' => 'El número de licencia es requerido.',
                     'max_length' => 'El número de licencia no puede exceder los 9 caracteres.'
                 ]
             ],
@@ -396,6 +395,28 @@ class PersonasController extends ResourceController
         return $this->respond(['data' => $this->aplicarFotoPublica($row)]);
     }
 
+    private function camposDuplicados($db, array $input, $id = null): array
+    {
+        $errores = [];
+        $documento = trim((string)($input['numeroDocumento'] ?? ''));
+        if ($documento !== '') {
+            $consulta = $db->table('personas')->where('numero', $documento);
+            if ($id !== null) $consulta->where('id !=', $id);
+            if ($consulta->countAllResults() > 0) {
+                $errores['numeroDocumento'] = 'Documento duplicado.';
+            }
+        }
+        $licencia = strtoupper(trim((string)($input['numeroLicencia'] ?? '')));
+        if ($licencia !== '') {
+            $consulta = $db->table('ciudadanos')->where('numero_licencia', $licencia);
+            if ($id !== null) $consulta->where('id_persona !=', $id);
+            if ($consulta->countAllResults() > 0) {
+                $errores['numeroLicencia'] = 'Licencia duplicada.';
+            }
+        }
+        return $errores;
+    }
+
     public function create()
     {
         $db = \Config\Database::connect();
@@ -418,57 +439,72 @@ class PersonasController extends ResourceController
             return $this->failValidationErrors('El número de documento debe tener entre 8 y 15 caracteres.');
         }
 
-        if ($db->table('personas')->where('numero', $numeroDoc)->countAllResults() > 0) {
-            return $this->failValidationErrors('El número de documento ya se encuentra registrado en el sistema.');
+        try {
+            \App\Services\CandadoPersona::adquirir($db);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
         }
+        try {
+            $duplicados = $this->camposDuplicados($db, $input);
+            if ($duplicados) return $this->failValidationErrors($duplicados);
 
-        $db->transStart();
+            $db->transStart();
 
-        $tipoDocId = $this->resolverTipoDocumentoId($db, $tipoDocName);
+            $tipoDocId = $this->resolverTipoDocumentoId($db, $tipoDocName);
 
-        $pData = [
-            'id_tipo_documento' => $tipoDocId,
-            'numero'            => trim($input['numeroDocumento']),
-            'direccion'         => trim($input['direccion'] ?? ''),
-            'telefono'          => trim($input['telefono'] ?? ''),
-            'celular'           => trim($input['celular'] ?? ''),
-            'email'             => trim($input['email'] ?? ''),
-            'estado'            => strtoupper($input['estado'] ?? 'ACTIVO'),
-        ];
-        $pData['uuid'] = \App\Libraries\Identificador::nuevo();
-        $db->table('personas')->insert($pData);
-        $insertId = $db->insertID();
+            $pData = [
+                'id_tipo_documento' => $tipoDocId,
+                'numero'            => trim($input['numeroDocumento']),
+                'direccion'         => trim($input['direccion'] ?? ''),
+                'telefono'          => trim($input['telefono'] ?? ''),
+                'celular'           => trim($input['celular'] ?? ''),
+                'email'             => trim($input['email'] ?? ''),
+                'estado'            => strtoupper($input['estado'] ?? 'ACTIVO'),
+            ];
+            $pData['uuid'] = \App\Libraries\Identificador::nuevo();
+            $db->table('personas')->insert($pData);
+            $insertId = $db->insertID();
 
-        $cData = [
-            'id_persona'       => $insertId,
-            'nombres'          => trim($input['nombres']),
-            'apellido_paterno' => trim($input['apellidoPaterno']),
-            'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
-            'numero_licencia'  => strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null,
-            'estado_civil'     => trim($input['estadoCivil'] ?? '') ?: null,
-            'foto'             => $this->resolverFotoParaGuardar($input['fotoImg'] ?? $input['fotoUrl'] ?? null),
-        ];
-        $db->table('ciudadanos')->insert($cData);
+            $cData = [
+                'id_persona'       => $insertId,
+                'nombres'          => trim($input['nombres']),
+                'apellido_paterno' => trim($input['apellidoPaterno']),
+                'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
+                'numero_licencia'  => strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null,
+                'estado_civil'     => trim($input['estadoCivil'] ?? '') ?: null,
+                'foto'             => $this->resolverFotoParaGuardar($input['fotoImg'] ?? $input['fotoUrl'] ?? null),
+            ];
+            $db->table('ciudadanos')->insert($cData);
 
-        // Registrar como administrado
-        $db->table('administrados')->insert(['id_persona' => $insertId]);
+            // Registrar como administrado
+            $db->table('administrados')->insert(['id_persona' => $insertId]);
 
-        $db->transComplete();
+            $db->transComplete();
 
-        if ($db->transStatus() === false) {
-            return $this->failServerError('Error guardando la persona.');
+            if ($db->transStatus() === false) {
+                return $this->failServerError('Error guardando la persona.');
+            }
+
+            $newPersona = array_merge(['id' => (int)$insertId, 'tipoDocumento' => $tipoDocName, 'numeroDocumento' => $pData['numero'], 'numeroLicencia' => $cData['numero_licencia'] ?? ''], $cData, $pData);
+            unset($newPersona['id_persona'], $newPersona['id_tipo_documento'], $newPersona['numero'], $newPersona['foto'], $newPersona['estado_civil']);
+            $newPersona['apellidoPaterno'] = $cData['apellido_paterno'];
+            $newPersona['apellidoMaterno'] = $cData['apellido_materno'];
+            $newPersona['estadoCivil'] = $cData['estado_civil'];
+            $newPersona['fotoUrl'] = $cData['foto'];
+            $newPersona['fotoImg'] = $cData['foto'];
+            $newPersona = $this->aplicarFotoPublica($newPersona);
+
+            return $this->respondCreated(['status' => true, 'message' => 'Persona registrada con éxito', 'data' => $newPersona]);
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            if (stripos($e->getMessage(), 'Duplicate entry') !== false) {
+                return $this->failValidationErrors($this->camposDuplicados($db, $input) ?: 'Datos duplicados.');
+            }
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('No se pudo guardar la persona.');
+        } finally {
+            \App\Services\CandadoPersona::liberar($db);
         }
-
-        $newPersona = array_merge(['id' => (int)$insertId, 'tipoDocumento' => $tipoDocName, 'numeroDocumento' => $pData['numero'], 'numeroLicencia' => $cData['numero_licencia'] ?? ''], $cData, $pData);
-        unset($newPersona['id_persona'], $newPersona['id_tipo_documento'], $newPersona['numero'], $newPersona['foto'], $newPersona['estado_civil']);
-        $newPersona['apellidoPaterno'] = $cData['apellido_paterno'];
-        $newPersona['apellidoMaterno'] = $cData['apellido_materno'];
-        $newPersona['estadoCivil'] = $cData['estado_civil'];
-        $newPersona['fotoUrl'] = $cData['foto'];
-        $newPersona['fotoImg'] = $cData['foto'];
-        $newPersona = $this->aplicarFotoPublica($newPersona);
-
-        return $this->respondCreated(['status' => true, 'message' => 'Persona registrada con éxito', 'data' => $newPersona]);
     }
 
     public function update($id = null)
@@ -486,75 +522,92 @@ class PersonasController extends ResourceController
         }
 
         $tipoDocName = $input['tipoDocumento'] ?? null;
-        
-        if (isset($input['numeroDocumento'])) {
-            $numeroDoc = trim($input['numeroDocumento']);
+
+        if (array_key_exists('numeroDocumento', $input) || isset($input['tipoDocumento'])) {
+            $numeroDoc = trim($input['numeroDocumento'] ?? $currentPersona['numero']);
             $currentTipoDoc = $tipoDocName ?? ($db->table('tipo_documentos_identidad')->where('id', $currentPersona['id_tipo_documento'])->get()->getRowArray()['nombre'] ?? 'DNI');
             $docLen = strlen($numeroDoc);
+            $esDni = in_array(strtoupper($currentTipoDoc), ['DNI', 'DOCUMENTO NACIONAL DE IDENTIDAD', '1'], true);
 
-            if ($currentTipoDoc === 'DNI' && ($docLen !== 8 || !ctype_digit($numeroDoc))) {
+            if ($esDni && ($docLen !== 8 || !ctype_digit($numeroDoc))) {
                 return $this->failValidationErrors('El DNI debe tener exactamente 8 dígitos numéricos.');
             }
-            if ($currentTipoDoc !== 'DNI' && ($docLen < 8 || $docLen > 15)) {
+            if (!$esDni && ($docLen < 8 || $docLen > 15)) {
                 return $this->failValidationErrors('El número de documento debe tener entre 8 y 15 caracteres.');
             }
 
-            if ($db->table('personas')->where('numero', $numeroDoc)->where('id !=', $id)->countAllResults() > 0) {
-                return $this->failValidationErrors('El número de documento ya se encuentra registrado en el sistema.');
+        }
+
+        try {
+            \App\Services\CandadoPersona::adquirir($db);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        }
+        try {
+            $duplicados = $this->camposDuplicados($db, $input, $id);
+            if ($duplicados) return $this->failValidationErrors($duplicados);
+
+            if (!$this->validateData($input, $this->personaValidationRules(false))) {
+                return $this->failValidationErrors($this->validator->getErrors());
             }
-        }
 
-        if (!$this->validateData($input, $this->personaValidationRules(false))) {
-            return $this->failValidationErrors($this->validator->getErrors());
-        }
+            $db->transStart();
 
-        $db->transStart();
-
-        $pData = [];
-        if (isset($input['tipoDocumento'])) {
-            $pData['id_tipo_documento'] = $this->resolverTipoDocumentoId($db, trim($input['tipoDocumento']));
-        }
-        if (isset($input['numeroDocumento'])) $pData['numero'] = trim($input['numeroDocumento']);
-        if (isset($input['direccion'])) $pData['direccion'] = trim($input['direccion']);
-        if (isset($input['telefono'])) $pData['telefono'] = trim($input['telefono']);
-        if (isset($input['celular'])) $pData['celular'] = trim($input['celular']);
-        if (isset($input['email'])) $pData['email'] = trim($input['email']);
-        if (isset($input['estado'])) $pData['estado'] = strtoupper($input['estado']);
-
-        if (!empty($pData)) {
-            $db->table('personas')->where('id', $id)->update($pData);
-        }
-
-        $cData = [];
-        if (isset($input['nombres'])) $cData['nombres'] = trim($input['nombres']);
-        if (isset($input['apellidoPaterno'])) $cData['apellido_paterno'] = trim($input['apellidoPaterno']);
-        if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = trim($input['apellidoMaterno']);
-        if (array_key_exists('numeroLicencia', $input)) $cData['numero_licencia'] = strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null;
-        if (array_key_exists('estadoCivil', $input)) $cData['estado_civil'] = trim($input['estadoCivil'] ?? '') ?: null;
-        if (array_key_exists('fotoUrl', $input) || array_key_exists('fotoImg', $input)) $cData['foto'] = $this->resolverFotoParaGuardar($input['fotoImg'] ?? $input['fotoUrl'] ?? null);
-
-        if (!empty($cData)) {
-            if ($db->table('ciudadanos')->where('id_persona', $id)->countAllResults()) {
-                $db->table('ciudadanos')->where('id_persona', $id)->update($cData);
-            } else {
-                $cData['id_persona'] = $id;
-                $db->table('ciudadanos')->insert($cData);
+            $pData = [];
+            if (isset($input['tipoDocumento'])) {
+                $pData['id_tipo_documento'] = $this->resolverTipoDocumentoId($db, trim($input['tipoDocumento']));
             }
+            if (isset($input['numeroDocumento'])) $pData['numero'] = trim($input['numeroDocumento']);
+            if (isset($input['direccion'])) $pData['direccion'] = trim($input['direccion']);
+            if (isset($input['telefono'])) $pData['telefono'] = trim($input['telefono']);
+            if (isset($input['celular'])) $pData['celular'] = trim($input['celular']);
+            if (isset($input['email'])) $pData['email'] = trim($input['email']);
+            if (isset($input['estado'])) $pData['estado'] = strtoupper($input['estado']);
+
+            if (!empty($pData)) {
+                $db->table('personas')->where('id', $id)->update($pData);
+            }
+
+            $cData = [];
+            if (isset($input['nombres'])) $cData['nombres'] = trim($input['nombres']);
+            if (isset($input['apellidoPaterno'])) $cData['apellido_paterno'] = trim($input['apellidoPaterno']);
+            if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = trim($input['apellidoMaterno']);
+            if (array_key_exists('numeroLicencia', $input)) $cData['numero_licencia'] = strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null;
+            if (array_key_exists('estadoCivil', $input)) $cData['estado_civil'] = trim($input['estadoCivil'] ?? '') ?: null;
+            if (array_key_exists('fotoUrl', $input) || array_key_exists('fotoImg', $input)) $cData['foto'] = $this->resolverFotoParaGuardar($input['fotoImg'] ?? $input['fotoUrl'] ?? null);
+
+            if (!empty($cData)) {
+                if ($db->table('ciudadanos')->where('id_persona', $id)->countAllResults()) {
+                    $db->table('ciudadanos')->where('id_persona', $id)->update($cData);
+                } else {
+                    $cData['id_persona'] = $id;
+                    $db->table('ciudadanos')->insert($cData);
+                }
+            }
+
+            $db->transComplete();
+
+            if ($db->transStatus() === false) {
+                return $this->failServerError('Error actualizando la persona.');
+            }
+
+            $persona = $this->findPersona($id);
+
+            return $this->respond([
+                'status'  => true,
+                'message' => 'Persona actualizada con éxito',
+                'data'    => $persona ? $this->aplicarFotoPublica($persona) : $persona,
+            ]);
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            if (stripos($e->getMessage(), 'Duplicate entry') !== false) {
+                return $this->failValidationErrors($this->camposDuplicados($db, $input, $id) ?: 'Datos duplicados.');
+            }
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('No se pudo actualizar la persona.');
+        } finally {
+            \App\Services\CandadoPersona::liberar($db);
         }
-
-        $db->transComplete();
-
-        if ($db->transStatus() === false) {
-            return $this->failServerError('Error actualizando la persona.');
-        }
-
-        $persona = $this->findPersona($id);
-
-        return $this->respond([
-            'status'  => true,
-            'message' => 'Persona actualizada con éxito',
-            'data'    => $persona ? $this->aplicarFotoPublica($persona) : $persona,
-        ]);
     }
 
     public function delete($id = null)
@@ -562,14 +615,17 @@ class PersonasController extends ResourceController
         $db = \Config\Database::connect();
         if (!$id) return $this->failNotFound('ID de persona no especificado.');
         if (!$db->table('personas')->where('id', $id)->countAllResults()) return $this->failNotFound('Persona no encontrada.');
-        
-        $db->transStart();
-        $db->table('ciudadanos')->where('id_persona', $id)->delete();
-        $db->table('personas')->where('id', $id)->delete();
-        $db->transComplete();
 
-        if ($db->transStatus() === false) {
-            return $this->failServerError('Error eliminando persona.');
+        try {
+            // Ambas fichas se crean con la persona; no son trámites ni historial independiente.
+            \App\Services\EliminacionSegura::eliminar($db, 'personas', (int)$id, [
+                'ciudadanos' => 'id_persona', 'administrados' => 'id_persona',
+            ]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('No se pudo eliminar la persona. No se ha borrado ningún dato.');
         }
 
         return $this->respondDeleted(['status' => true, 'message' => 'Persona eliminada del registro']);

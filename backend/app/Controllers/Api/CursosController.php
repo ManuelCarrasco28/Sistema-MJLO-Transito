@@ -421,10 +421,13 @@ class CursosController extends ResourceController
             if (!$id || !$db->table('cursos_seguridad_vial')->where('id', $id)->countAllResults()) {
                 return $this->failNotFound('Curso no encontrado.');
             }
-            $db->table('cursos_seguridad_vial')->where('id', $id)->delete();
+            \App\Services\EliminacionSegura::eliminar($db, 'cursos_seguridad_vial', (int)$id);
             return $this->respondDeleted(['status' => 200, 'message' => 'Curso eliminado correctamente']);
-        } catch (\Exception $e) {
-            return $this->failServerError('Error eliminando el curso.');
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage() . ' Retire o regularice las inscripciones antes de eliminar el curso.');
+        } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('Error eliminando el curso. No se ha borrado ningún dato.');
         }
     }
 

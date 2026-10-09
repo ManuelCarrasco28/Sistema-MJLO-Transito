@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
-import { apiFetch } from '../config/api'
+import { apiFetch, leerMensajeError } from '../config/api'
 import { Pagination } from '../components/ui/Pagination'
 import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
@@ -311,18 +311,19 @@ export function Trabajadores() {
   const handleDelete = async (id) => {
     const result = await showConfirm(
       '¿Desactivar trabajador?',
-      '¿Está seguro de desactivar/eliminar a este trabajador?',
+      'Se desactivará al trabajador conservando su historial. Su cuenta de acceso no se modifica.',
       'Sí, desactivar',
       'Cancelar',
       { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
     if (result.isConfirmed) {
       try {
-        await apiFetch(`/personal/${id}`, { method: 'DELETE' })
-        setRows(rows.filter((p) => p.id !== id))
-        showToast('Trabajador desactivado/eliminado')
+        const response = await apiFetch(`/personal/${id}`, { method: 'DELETE' })
+        if (!response.ok) throw new Error(await leerMensajeError(response, 'No se pudo desactivar al trabajador.'))
+        setRows(actual => actual.map(p => p.id === id ? { ...p, estado: 'INACTIVO' } : p))
+        showToast('Trabajador desactivado correctamente')
       } catch (err) {
-        showError('Error', 'No se pudo eliminar al trabajador.')
+        showError('Error', err.message || 'No se pudo desactivar al trabajador.')
       }
     }
   }
@@ -588,7 +589,7 @@ export function Trabajadores() {
                       <button
                         type="button"
                         onClick={() => handleDelete(row.id)}
-                        title="Eliminar trabajador"
+                        title="Desactivar trabajador"
                         className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
                         style={{
                           backgroundColor: 'var(--action-del-bg)',

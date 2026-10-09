@@ -39,8 +39,8 @@ export const BoletaInternamientoPrint = ({ item }) => {
 
   const InvRow = ({ label }) => (
     <div className="flex items-center justify-between mb-[2px] pr-2">
-      <span className="text-[10.5px] font-bold flex-1 leading-none uppercase tracking-tighter">{label}</span>
-      <div className="border border-black w-14 h-5 flex items-center justify-center text-[12.5px] font-bold">
+      <span className="text-[11.5px] font-bold flex-1 leading-none uppercase">{label}</span>
+      <div className="border border-black w-14 h-5 flex items-center justify-center text-[13.5px] font-bold">
         {String(getInvValue(label)) === '1' ? '✓' : getInvValue(label)}
       </div>
     </div>
@@ -54,8 +54,8 @@ export const BoletaInternamientoPrint = ({ item }) => {
       <div className="relative mb-3 pt-1 flex justify-center">
         {/* El logo ya trae el nombre de la municipalidad: no se repite en texto */}
         <img src="/img/logo-mjlo.png" alt="Municipalidad José Leonardo Ortiz" className="h-24 w-64 object-contain" />
-        <div className="absolute right-0 top-0 text-red-600 font-bold text-xl tracking-widest font-serif">
-          Nº {item?.numeroBoleta || '000000'}
+        <div className="absolute right-0 top-0 text-red-600 font-bold text-xl tracking-widest font-sans [font-variant-numeric:lining-nums_tabular-nums]">
+          Nº {String(item?.numeroBoleta || '000000').replace(/^[A-Za-z]+-/, '')}
         </div>
       </div>
 
@@ -68,7 +68,7 @@ export const BoletaInternamientoPrint = ({ item }) => {
         {/* Left Column (Fecha) */}
         <div className="w-1/2 flex flex-col gap-2">
           <div className="flex gap-2 items-center pl-4 mb-2">
-            <span className="text-[12.5px] font-bold uppercase w-14">FECHA</span>
+            <span className="text-[13.5px] font-bold uppercase w-14">FECHA</span>
             <div className="flex gap-1">
               <div className="border border-black w-11 h-8 flex items-center justify-center font-bold text-lg">{day}</div>
               <div className="border border-black w-11 h-8 flex items-center justify-center font-bold text-lg">{month}</div>
@@ -77,50 +77,50 @@ export const BoletaInternamientoPrint = ({ item }) => {
           </div>
           
           <div className="flex items-end">
-            <span className="text-[11.5px] font-bold uppercase w-24">CLASE VEH</span>
-            <div className="border-b border-black flex-1 font-bold text-[14px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.vehiculoTipo || ''}</div>
+            <span className="text-[12.5px] font-bold uppercase w-24">CLASE VEH</span>
+            <div className="border-b border-black flex-1 font-bold text-[15px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.vehiculoTipo || ''}</div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-bold uppercase w-24">COLOR</span>
-            <div className="border-b border-black flex-1 font-bold text-[14px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.vehiculoColor || ''}</div>
+            <span className="text-[12.5px] font-bold uppercase w-24">COLOR</span>
+            <div className="border-b border-black flex-1 font-bold text-[15px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.vehiculoColor || ''}</div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-bold uppercase w-24">PAPELETA O N° DE DOC</span>
-            <div className="border-b border-black flex-1 font-bold text-[14px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.numeroPapeleta || item?.documentoReferencia || ''}</div>
+            <span className="text-[12.5px] font-bold uppercase w-24">PAPELETA O N° DE DOC</span>
+            <div className="border-b border-black flex-1 font-bold text-[15px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.numeroPapeleta || item?.documentoReferencia || ''}</div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-bold uppercase w-24">GRADO DEL REMISOR</span>
-            <div className="border-b border-black flex-1 font-bold text-[14px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.gradoRemisor || ''}</div>
+            <span className="text-[12.5px] font-bold uppercase w-24">GRADO DEL REMISOR</span>
+            <div className="border-b border-black flex-1 font-bold text-[15px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.gradoRemisor || ''}</div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-bold uppercase w-24">HORA</span>
-            <div className="border-b border-black flex-1 font-bold text-[14px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{time}</div>
+            <span className="text-[12.5px] font-bold uppercase w-24">HORA</span>
+            <div className="border-b border-black flex-1 font-bold text-[15px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{time}</div>
           </div>
         </div>
 
         {/* Right Column (Placa) */}
         <div className="w-1/2 flex flex-col gap-2">
           <div className="flex flex-col items-center mb-2">
-            <span className="text-[12.5px] font-bold uppercase border-b border-black w-44 text-center pb-0.5 mb-1 leading-none">PLACA</span>
+            <span className="text-[13.5px] font-bold uppercase border-b border-black w-44 text-center pb-0.5 mb-1 leading-none">PLACA</span>
             <div className="border-2 border-black w-44 h-11 flex items-center justify-center font-black text-2xl uppercase tracking-widest leading-none">{item?.vehiculoPlaca || ''}</div>
-            <div className="text-center font-bold text-[11.5px] uppercase leading-none mt-0.5">Depósito Oficial<br/>JOSE L. ORTIZ</div>
+            <div className="text-center font-bold text-[12.5px] uppercase leading-none mt-0.5">Depósito Oficial<br/>JOSE L. ORTIZ</div>
           </div>
 
           <div className="flex items-end">
-            <span className="text-[11.5px] font-bold uppercase w-24">MARCA</span>
-            <div className="border-b border-black flex-1 font-bold text-[14px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.vehiculoMarca || ''}</div>
+            <span className="text-[12.5px] font-bold uppercase w-24">MARCA</span>
+            <div className="border-b border-black flex-1 font-bold text-[15px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.vehiculoMarca || ''}</div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-bold uppercase w-24">MOTOR</span>
-            <div className="border-b border-black flex-1 font-bold text-[14px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.vehiculoMotor || ''}</div>
+            <span className="text-[12.5px] font-bold uppercase w-24">MOTOR</span>
+            <div className="border-b border-black flex-1 font-bold text-[15px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.vehiculoMotor || ''}</div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-bold uppercase w-24">INFRACCIÓN</span>
-            <div className="border-b border-black flex-1 font-bold text-[10.5px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{textoInfraccion(item)}</div>
+            <span className="text-[12.5px] font-bold uppercase w-24">INFRACCIÓN</span>
+            <div className="border-b border-black flex-1 font-bold text-[11.5px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{textoInfraccion(item)}</div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-bold uppercase w-24">AUTORIDAD QUE DISPONE</span>
-            <div className="border-b border-black flex-1 font-bold text-[11.5px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.autoridadQueDispone || ''}</div>
+            <span className="text-[12.5px] font-bold uppercase w-24">AUTORIDAD QUE DISPONE</span>
+            <div className="border-b border-black flex-1 font-bold text-[12.5px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.autoridadQueDispone || ''}</div>
           </div>
         </div>
       </div>
@@ -133,29 +133,29 @@ export const BoletaInternamientoPrint = ({ item }) => {
       <div className="flex gap-6 mb-2">
         {/* Col 1 */}
         <div className="w-1/3 pr-2">
-          <h4 className="text-[11.5px] font-black uppercase mb-0.5">1.- ESTADO DE CARROCERIA</h4>
-          <div className="w-full min-h-6 mb-1 border-b border-black text-[12.5px]">{item?.estadoCarroceria || ''}</div>
+          <h4 className="text-[12.5px] font-black uppercase mb-0.5">1.- ESTADO DE CARROCERIA</h4>
+          <div className="w-full min-h-6 mb-1 border-b border-black text-[13.5px]">{item?.estadoCarroceria || ''}</div>
           
-          <h4 className="text-[11.5px] font-black uppercase mb-1 text-center">2.- PARTE EXTERIOR</h4>
+          <h4 className="text-[12.5px] font-black uppercase mb-1 text-center">2.- PARTE EXTERIOR</h4>
           {exteriorItems.map((lbl, idx) => <InvRow key={idx} label={lbl} />)}
         </div>
 
         {/* Col 2 */}
         <div className="w-1/3 px-2 flex flex-col justify-end">
-          <h4 className="text-[11.5px] font-black uppercase mb-1 text-center">2.- PARTE INTERIOR</h4>
+          <h4 className="text-[12.5px] font-black uppercase mb-1 text-center">2.- PARTE INTERIOR</h4>
           {interiorItems.map((lbl, idx) => <InvRow key={idx} label={lbl} />)}
         </div>
 
         {/* Col 3 */}
         <div className="w-1/3 pl-2 flex flex-col justify-end">
-          <h4 className="text-[11.5px] font-black uppercase mb-1 text-center">2.- MOTOR</h4>
+          <h4 className="text-[12.5px] font-black uppercase mb-1 text-center">2.- MOTOR</h4>
           {motorItems.map((lbl, idx) => <InvRow key={idx} label={lbl} />)}
         </div>
       </div>
 
       {/* Observaciones */}
       <div className="flex items-end mt-2 mb-3">
-        <span className="text-[11.5px] font-black uppercase w-28">5.- OBSERVACIONES</span>
+        <span className="text-[12.5px] font-black uppercase w-28">5.- OBSERVACIONES</span>
         <div className="border-b border-black flex-1 font-bold text-xs italic h-4 leading-none">{item?.observaciones || ''}</div>
       </div>
 
@@ -164,32 +164,32 @@ export const BoletaInternamientoPrint = ({ item }) => {
         {/* Remisor */}
         <div className="w-1/2 flex flex-col gap-3">
           <div className="flex items-end">
-            <span className="text-[11.5px] font-black uppercase w-28">REMISOR</span>
+            <span className="text-[12.5px] font-black uppercase w-28">REMISOR</span>
             <div className="border-b border-black flex-1 min-h-6"></div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-black uppercase w-28">NOMBRE</span>
-            <div className="border-b border-black flex-1 text-center text-[11.5px] uppercase font-bold">{item?.remisorNombre || ''}</div>
+            <span className="text-[12.5px] font-black uppercase w-28">NOMBRE</span>
+            <div className="border-b border-black flex-1 text-center text-[12.5px] uppercase font-bold">{item?.remisorNombre || ''}</div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-black uppercase w-28">N° DE CARNÉ</span>
-            <div className="border-b border-black flex-1 text-center text-[11.5px] font-bold">{item?.carnetRemisor || ''}</div>
+            <span className="text-[12.5px] font-black uppercase w-28">N° DE CARNÉ</span>
+            <div className="border-b border-black flex-1 text-center text-[12.5px] font-bold">{item?.carnetRemisor || ''}</div>
           </div>
         </div>
 
         {/* Interesado */}
         <div className="w-1/2 flex flex-col gap-3 mb-4">
           <div className="flex items-end">
-            <span className="text-[11.5px] font-black uppercase w-28">INTERESADO</span>
-            <div className="border-b border-black flex-1 text-center text-[11.5px] uppercase font-bold">{item?.interesadoNombre || ''}</div>
+            <span className="text-[12.5px] font-black uppercase w-28">INTERESADO</span>
+            <div className="border-b border-black flex-1 text-center text-[12.5px] uppercase font-bold">{item?.interesadoNombre || ''}</div>
           </div>
           <div className="flex items-end">
-            <span className="text-[11.5px] font-black uppercase w-28">DOC. ID.</span>
-            <div className="border-b border-black flex-1 text-center text-[11.5px] uppercase font-bold">{item?.interesadoDni || ''}</div>
+            <span className="text-[12.5px] font-black uppercase w-28">DOC. ID.</span>
+            <div className="border-b border-black flex-1 text-center text-[12.5px] uppercase font-bold">{item?.interesadoDni || ''}</div>
           </div>
           <div className="flex items-end mt-2">
-            <span className="text-[11.5px] font-black uppercase w-28"></span>
-            <div className="border-t border-black flex-1 text-center text-[9px] uppercase pt-0.5">Firma del Interesado</div>
+            <span className="text-[12.5px] font-black uppercase w-28"></span>
+            <div className="border-t border-black flex-1 text-center text-[10px] uppercase pt-0.5">Firma del Interesado</div>
           </div>
         </div>
       </div>

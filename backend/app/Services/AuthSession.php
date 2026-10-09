@@ -86,7 +86,9 @@ class AuthSession
     {
         $dir = WRITEPATH . 'rate_limits_' . $bucket . DIRECTORY_SEPARATOR;
         if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
+            if (!@mkdir($dir, 0775, true) && !is_dir($dir)) {
+                throw new \RuntimeException('No se pudo crear el directorio de intentos.');
+            }
         }
         return $dir;
     }
@@ -108,43 +110,57 @@ class AuthSession
     {
         $path = self::rateLimitPath($bucket, $key);
         $now = time();
-        $data = [];
-        if (is_file($path)) {
-            $fp = @fopen($path, 'rb');
-            if ($fp) {
-                @flock($fp, LOCK_SH);
-                $content = stream_get_contents($fp);
-                @flock($fp, LOCK_UN);
-                @fclose($fp);
-                $data = json_decode((string) $content, true) ?: [];
+        $fp = fopen($path, 'c+');
+        if (!$fp) {
+            throw new \RuntimeException('No se pudo abrir el contador de intentos.');
+        }
+        try {
+            if (!flock($fp, LOCK_EX)) {
+                throw new \RuntimeException('No se pudo bloquear el contador de intentos.');
             }
+            $data = json_decode((string)stream_get_contents($fp), true) ?: [];
+            $data += ['attempts' => 0, 'first_attempt_at' => $now, 'blocked_until' => 0];
+
+            $blockedUntil = (int) $data['blocked_until'];
+            if ($blockedUntil > $now) {
+                return ['retryAfterMinutes' => max(1, (int) ceil(($blockedUntil - $now) / 60))];
+            }
+
+            if (($now - (int) $data['first_attempt_at']) > $windowSeconds) {
+                $data = ['attempts' => 0, 'first_attempt_at' => $now, 'blocked_until' => 0];
+            }
+
+            $data['attempts'] = ((int) $data['attempts']) + 1;
+            if ($data['attempts'] >= $maxAttempts) {
+                $data['blocked_until'] = $now + $blockSeconds;
+            }
+
+            rewind($fp);
+            ftruncate($fp, 0);
+            fwrite($fp, json_encode($data));
+            fflush($fp);
+
+            return null;
+        } finally {
+            flock($fp, LOCK_UN);
+            fclose($fp);
         }
-        $data += ['attempts' => 0, 'first_attempt_at' => $now, 'blocked_until' => 0];
-
-        $blockedUntil = (int) $data['blocked_until'];
-        if ($blockedUntil > $now) {
-            return ['retryAfterMinutes' => max(1, (int) ceil(($blockedUntil - $now) / 60))];
-        }
-
-        if (($now - (int) $data['first_attempt_at']) > $windowSeconds) {
-            $data = ['attempts' => 0, 'first_attempt_at' => $now, 'blocked_until' => 0];
-        }
-
-        $data['attempts'] = ((int) $data['attempts']) + 1;
-        if ($data['attempts'] >= $maxAttempts) {
-            $data['blocked_until'] = $now + $blockSeconds;
-        }
-
-        @file_put_contents($path, json_encode($data), LOCK_EX);
-
-        return null;
     }
 
     public static function clearRateLimit(string $bucket, string $key): void
     {
         $path = self::rateLimitPath($bucket, $key);
-        if (is_file($path)) {
-            unlink($path);
+        $fp = fopen($path, 'c+');
+        if ($fp) {
+            try {
+                if (flock($fp, LOCK_EX)) {
+                    ftruncate($fp, 0);
+                    fflush($fp);
+                }
+            } finally {
+                flock($fp, LOCK_UN);
+                fclose($fp);
+            }
         }
     }
 }

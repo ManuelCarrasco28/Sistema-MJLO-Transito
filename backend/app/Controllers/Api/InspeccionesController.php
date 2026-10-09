@@ -234,6 +234,10 @@ class InspeccionesController extends ResourceController
         if (!$this->validateData($input, $rules)) {
             return $this->failValidationErrors($this->validator->getErrors());
         }
+        if (!empty($input['fecha'])) {
+            $erroresFecha = \App\Services\ValidacionRegistro::fechas($input, ['fecha']);
+            if ($erroresFecha) return $this->failValidationErrors($erroresFecha);
+        }
 
         $placa = \App\Libraries\Placa::normalizar($input['vehiculoPlaca'] ?? '');
         $resultado = trim($input['resultado'] ?? 'APROBADO');
@@ -397,6 +401,11 @@ class InspeccionesController extends ResourceController
 
         if (!$this->validateData($input, $rules)) {
             return $this->failValidationErrors($this->validator->getErrors());
+        }
+        if (array_key_exists('fecha', $input)) {
+            if (trim((string)$input['fecha']) === '') return $this->failValidationErrors(['fecha' => 'La fecha de inspección es obligatoria.']);
+            $erroresFecha = \App\Services\ValidacionRegistro::fechas($input, ['fecha']);
+            if ($erroresFecha) return $this->failValidationErrors($erroresFecha);
         }
 
         try {

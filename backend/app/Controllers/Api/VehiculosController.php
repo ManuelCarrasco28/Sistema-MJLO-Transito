@@ -158,7 +158,7 @@ class VehiculosController extends ResourceController
                     $certicavPorVehiculo[$vehiculoId] = $certicav;
                 }
             }
-            
+
             // Historial de Internamientos
             $internamientos = $db->table('ordenes_internamiento')
                 ->select("
@@ -173,7 +173,7 @@ class VehiculosController extends ResourceController
                 ->orderBy('fecha_ingreso', 'DESC')
                 ->get()
                 ->getResultArray();
-                
+
             foreach ($internamientos as $int) {
                 $vehiculoId = (int)$int['id_vehiculo'];
                 unset($int['id_vehiculo']);
@@ -478,13 +478,13 @@ class VehiculosController extends ResourceController
                     $propNames = array_filter(array_map(function($p) {
                         return is_string($p) ? trim($p) : trim($p['nombre'] ?? $p['razon_social'] ?? $p['apellidos_nombres'] ?? '');
                     }, is_array($rawProps) ? $rawProps : []));
-                    
+
                     $propietario = empty($propNames) ? 'Sin Propietario Asignado' : implode(', ', $propNames);
 
                     $cat = strtoupper(trim($sunarpData['categoria'] ?? ''));
                     $carr = strtoupper(trim($sunarpData['carroceria'] ?? ''));
                     $inferredTipo = $sunarpData['clase'] ?? $sunarpData['tipo'] ?? 'Vehículo';
-                    
+
                     if (in_array($cat, ['L1', 'L2', 'L3']) || strpos($carr, 'LINEAL') !== false) {
                         $inferredTipo = 'Moto Lineal';
                     } elseif ($cat === 'L5' && strpos($carr, 'CARG') !== false) {
@@ -547,11 +547,11 @@ class VehiculosController extends ResourceController
                 $propNames = array_filter(array_map(function($p) {
                     return is_string($p) ? trim($p) : trim($p['nombre'] ?? $p['razon_social'] ?? $p['apellidos_nombres'] ?? '');
                 }, is_array($rawProps) ? $rawProps : []));
-                
+
                 if (!empty($propNames)) {
                     $data['propietario'] = implode(', ', $propNames);
                 }
-                
+
                 // Rellenar datos técnicos si están vacíos
                 $data['marca'] = $data['marca'] ?: ($sunarpData['marca'] ?? '');
                 $data['modelo'] = $data['modelo'] ?: ($sunarpData['modelo'] ?? '');
@@ -627,12 +627,17 @@ class VehiculosController extends ResourceController
             return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
         }
 
-        
+
+        if (isset($input['anio']) && $input['anio'] !== '' && (!filter_var($input['anio'], FILTER_VALIDATE_INT) || (int)$input['anio'] < 1900 || (int)$input['anio'] > (int)date('Y') + 1)) {
+            return $this->failValidationErrors('Año de fabricación no válido.');
+        }
+        if (isset($input['estado']) && !in_array(strtoupper(trim($input['estado'])), ['ACTIVO', 'INACTIVO'], true)) {
+            return $this->failValidationErrors('Estado de vehículo no válido.');
+        }
         $tipoNombre = !empty($input['tipo']) ? trim($input['tipo']) : 'Mototaxi';
         $tipoRow = $db->table('tipos_vehiculo')->where('nombre', $tipoNombre)->get()->getRowArray();
         if (!$tipoRow) {
-            $db->table('tipos_vehiculo')->insert(['nombre' => $tipoNombre]);
-            $tipoVehiculoId = $db->insertID();
+            return $this->failValidationErrors('Seleccione un tipo de vehículo registrado.');
         } else {
             $tipoVehiculoId = $tipoRow['id'];
         }
@@ -678,52 +683,61 @@ class VehiculosController extends ResourceController
         $personaId = (int)$personaRow['id'];
 
         // Si el código QR es un UUID, el vehículo usa ese mismo valor como su uuid público.
-        $record['uuid'] = $qrCode;
-        $db->table('vehiculos')->insert($record);
-        $vehiculoId = (int)$db->insertID();
+        $db->transException(true)->transBegin();
+        try {
+            $record['uuid'] = $qrCode;
+            $db->table('vehiculos')->insert($record);
+            $vehiculoId = (int)$db->insertID();
 
-        $db->table('vehiculo_propietarios')->insert([
-            'id_vehiculo'  => $vehiculoId,
-            'id_persona'   => $personaId,
-            'fecha_inicio' => date('Y-m-d'),
-            'estado'       => 'ACTIVO',
-        ]);
+            $db->table('vehiculo_propietarios')->insert([
+                'id_vehiculo'  => $vehiculoId,
+                'id_persona'   => $personaId,
+                'fecha_inicio' => date('Y-m-d'),
+                'estado'       => 'ACTIVO',
+            ]);
 
-        \App\Services\AuditoriaService::registrar(
-            'VEHICULOS',
-            'CREAR',
-            "Se registró el vehículo placa '{$record['placa']}' (" . ($asociacionId ? "Asociación: $orgName" : "Particular/Informal") . ")",
-            ['id' => $vehiculoId, 'placa' => $record['placa'], 'asociacion' => $orgName, 'propietario' => $propietarioNombre]
-        );
+            \App\Services\AuditoriaService::registrar(
+                'VEHICULOS',
+                'CREAR',
+                "Se registró el vehículo placa '{$record['placa']}' (" . ($asociacionId ? "Asociación: $orgName" : "Particular/Informal") . ")",
+                ['id' => $vehiculoId, 'placa' => $record['placa'], 'asociacion' => $orgName, 'propietario' => $propietarioNombre]
+            );
 
-        $newVehiculo = [
-            'id'               => $vehiculoId,
-            'uuid'             => $record['uuid'],
-            'placa'            => $record['placa'],
-            'tipo'             => $tipoNombre,
-            'marca'            => $record['marca'],
-            'modelo'           => $record['modelo'],
-            'color'            => $record['color'],
-            'anio'             => $record['anio_fabricacion'],
-            'categoria'        => $record['categoria'],
-            'carroceria'       => $record['carroceria'],
-            'sedeRegistro'     => $record['sede_registro'],
-            'tipoCarroceria'   => $record['tipo_carroceria'],
-            'numeroSerie'      => $record['numero_serie'],
-            'serieMotor'       => $record['serie_motor'],
-            'partidaRegistral' => $record['partida_registral'],
-            'codigoQr'         => $record['codigo_qr'],
-            'asociacionId'     => $asociacionId,
-            'asociacion'     => $asociacionId ? $orgName : null,
-            'propietario'      => $propietarioNombre ?: 'Sin Propietario',
-            'propietarioDni'   => $propietarioDni,
-            'estado'           => $record['estado'],
-            'formalidad'       => $asociacionId ? 'FORMAL' : 'INFORMAL',
-            'soatEstado'       => $input['soatEstado'] ?? 'VIGENTE',
-            'tucNumero'        => $input['tucNumero'] ?? ('TUC-2026-' . str_pad($vehiculoId, 3, '0', STR_PAD_LEFT)),
-        ];
+            $newVehiculo = [
+                'id'               => $vehiculoId,
+                'uuid'             => $record['uuid'],
+                'placa'            => $record['placa'],
+                'tipo'             => $tipoNombre,
+                'marca'            => $record['marca'],
+                'modelo'           => $record['modelo'],
+                'color'            => $record['color'],
+                'anio'             => $record['anio_fabricacion'],
+                'categoria'        => $record['categoria'],
+                'carroceria'       => $record['carroceria'],
+                'sedeRegistro'     => $record['sede_registro'],
+                'tipoCarroceria'   => $record['tipo_carroceria'],
+                'numeroSerie'      => $record['numero_serie'],
+                'serieMotor'       => $record['serie_motor'],
+                'partidaRegistral' => $record['partida_registral'],
+                'codigoQr'         => $record['codigo_qr'],
+                'asociacionId'     => $asociacionId,
+                'asociacion'     => $asociacionId ? $orgName : null,
+                'propietario'      => $propietarioNombre ?: 'Sin Propietario',
+                'propietarioDni'   => $propietarioDni,
+                'estado'           => $record['estado'],
+                'formalidad'       => $asociacionId ? 'FORMAL' : 'INFORMAL',
+                'soatEstado'       => $input['soatEstado'] ?? 'VIGENTE',
+                'tucNumero'        => $input['tucNumero'] ?? ('TUC-2026-' . str_pad($vehiculoId, 3, '0', STR_PAD_LEFT)),
+            ];
 
-        return $this->respondCreated(['status' => true, 'message' => 'Vehículo registrado con éxito', 'data' => $newVehiculo]);
+            if (!$db->transStatus()) throw new \RuntimeException('Error guardando vehículo.');
+            $db->transCommit();
+            return $this->respondCreated(['status' => true, 'message' => 'Vehículo registrado con éxito', 'data' => $newVehiculo]);
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('No se pudo guardar el vehículo. No se modificó ningún dato.');
+        }
     }
 
     public function update($id = null)
@@ -735,98 +749,137 @@ class VehiculosController extends ResourceController
             return $this->failNotFound('ID de vehículo no especificado.');
         }
 
-        $record = [];
-        if (isset($input['placa'])) {
-            $placa = \App\Libraries\Placa::normalizar($input['placa']);
-            if ($placa !== '') {
-                if (!preg_match('/^[A-Z0-9]{6}$/', $placa)) {
-                    return $this->failValidationErrors('La placa de rodaje debe tener exactamente 6 caracteres alfanuméricos.');
-                }
-                if ($db->table('vehiculos')->where('placa', $placa)->where('id !=', $id)->countAllResults() > 0) {
-                    return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
-                }
-            }
-            $record['placa'] = $placa;
+        if (!$db->table('vehiculos')->where('id', $id)->countAllResults()) {
+            return $this->failNotFound('Vehículo no encontrado.');
         }
-        if (isset($input['marca'])) $record['marca'] = trim($input['marca']);
-        if (isset($input['modelo'])) $record['modelo'] = trim($input['modelo']);
-        if (isset($input['color'])) $record['color'] = trim($input['color']);
-        if (isset($input['anio'])) $record['anio_fabricacion'] = (int)$input['anio'];
-        if (isset($input['categoria'])) $record['categoria'] = trim($input['categoria']);
-        if (isset($input['carroceria'])) $record['carroceria'] = trim($input['carroceria']);
-        if (isset($input['sedeRegistro'])) $record['sede_registro'] = trim($input['sedeRegistro']);
-        if (isset($input['tipoCarroceria'])) $record['tipo_carroceria'] = trim($input['tipoCarroceria']);
-        if (isset($input['numeroSerie'])) $record['numero_serie'] = trim($input['numeroSerie']);
-        if (isset($input['serieMotor'])) $record['serie_motor'] = trim($input['serieMotor']);
-        if (isset($input['partidaRegistral'])) $record['partida_registral'] = trim($input['partidaRegistral']);
-        if (isset($input['estado'])) {
-            $estadoInput = strtoupper(trim($input['estado']));
-            if (in_array($estadoInput, ['ACTIVO', 'INACTIVO'], true)) {
-                $record['estado'] = $estadoInput;
-            }
+        if (isset($input['anio']) && (!filter_var($input['anio'], FILTER_VALIDATE_INT) || (int)$input['anio'] < 1900 || (int)$input['anio'] > (int)date('Y') + 1)) {
+            return $this->failValidationErrors('Año de fabricación no válido.');
         }
-
-        if (array_key_exists('asociacion', $input)) {
-            $record['id_asociacion'] = $this->resolverAsociacionId($db, trim((string)$input['asociacion']));
+        if (isset($input['estado']) && !in_array(strtoupper(trim($input['estado'])), ['ACTIVO', 'INACTIVO'], true)) {
+            return $this->failValidationErrors('Estado de vehículo no válido.');
         }
-
-        if (!empty($input['tipo'])) {
-            $tipoNombre = trim($input['tipo']);
-            $tipoRow = $db->table('tipos_vehiculo')->where('nombre', $tipoNombre)->get()->getRowArray();
-            if (!$tipoRow) {
-                $db->table('tipos_vehiculo')->insert(['nombre' => $tipoNombre, 'estado' => 'ACTIVO']);
-                $record['id_tipo_vehiculo'] = $db->insertID();
-            } else {
-                $record['id_tipo_vehiculo'] = $tipoRow['id'];
-            }
-        }
-
-        if (!empty($record)) {
-            $db->table('vehiculos')->where('id', $id)->update($record);
-        }
-
-        $propietarioNombre = trim($input['propietario'] ?? '');
         $propietarioDni = trim($input['propietarioDni'] ?? '');
-        if ($propietarioDni !== '') {
-            $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
-            if (!$personaRow) {
-                return $this->failValidationErrors('El propietario no existe. Regístrelo primero en el módulo Personas.');
-            }
-            $personaId = (int)$personaRow['id'];
-
-            // El propietario activo actual (si existe y es distinto al nuevo)
-            // se cierra con fecha_fin en vez de borrarse, para conservar el
-            // historial de quién tuvo el vehículo antes.
-            $propietarioActivo = $db->table('vehiculo_propietarios')
-                ->where('id_vehiculo', $id)
-                ->where('fecha_fin IS NULL')
-                ->orderBy('id', 'DESC')
-                ->get()->getRowArray();
-
-            if (!$propietarioActivo || (int)$propietarioActivo['id_persona'] !== $personaId) {
-                if ($propietarioActivo) {
-                    $db->table('vehiculo_propietarios')
-                        ->where('id', $propietarioActivo['id'])
-                        ->update(['fecha_fin' => date('Y-m-d'), 'estado' => 'INACTIVO']);
-                }
-                $db->table('vehiculo_propietarios')->insert([
-                    'id_vehiculo'  => $id,
-                    'id_persona'   => $personaId,
-                    'fecha_inicio' => date('Y-m-d'),
-                    'estado'       => 'ACTIVO',
-                ]);
-            }
+        if ($propietarioDni !== '' && !$db->table('personas')->where('numero', $propietarioDni)->countAllResults()) {
+            return $this->failValidationErrors('El propietario no existe. Regístrelo primero en el módulo Personas.');
+        }
+        if (!empty($input['tipo']) && !$db->table('tipos_vehiculo')->where('nombre', trim($input['tipo']))->countAllResults()) {
+            return $this->failValidationErrors('Seleccione un tipo de vehículo registrado.');
         }
 
-        $vehPlaca = $record['placa'] ?? ($db->table('vehiculos')->where('id', $id)->get()->getRowArray()['placa'] ?? "ID $id");
-        \App\Services\AuditoriaService::registrar(
-            'VEHICULOS',
-            'MODIFICAR',
-            "Se modificó la información del vehículo placa '$vehPlaca'",
-            ['id' => $id, 'cambios' => $record]
-        );
+        $db->transException(true)->transBegin();
+        try {
+            if (!$db->query('SELECT id FROM vehiculos WHERE id = ? FOR UPDATE', [(int)$id])->getRowArray()) {
+                $db->transRollback();
+                return $this->failNotFound('Vehículo no encontrado.');
+            }
 
-        return $this->respond(['status' => true, 'message' => 'Vehículo actualizado con éxito']);
+            $record = [];
+            if (isset($input['placa'])) {
+                $placa = \App\Libraries\Placa::normalizar($input['placa']);
+                if ($placa === '') {
+                    $db->transRollback();
+                    return $this->failValidationErrors('La placa del vehículo es requerida.');
+                } else {
+                    if (!preg_match('/^[A-Z0-9]{6}$/', $placa)) {
+                        $db->transRollback();
+                        return $this->failValidationErrors('La placa de rodaje debe tener exactamente 6 caracteres alfanuméricos.');
+                    }
+                    if ($db->table('vehiculos')->where('placa', $placa)->where('id !=', $id)->countAllResults() > 0) {
+                        $db->transRollback();
+                        return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
+                    }
+                }
+                $record['placa'] = $placa;
+            }
+            if (isset($input['marca'])) $record['marca'] = trim($input['marca']);
+            if (isset($input['modelo'])) $record['modelo'] = trim($input['modelo']);
+            if (isset($input['color'])) $record['color'] = trim($input['color']);
+            if (isset($input['anio'])) $record['anio_fabricacion'] = (int)$input['anio'];
+            if (isset($input['categoria'])) $record['categoria'] = trim($input['categoria']);
+            if (isset($input['carroceria'])) $record['carroceria'] = trim($input['carroceria']);
+            if (isset($input['sedeRegistro'])) $record['sede_registro'] = trim($input['sedeRegistro']);
+            if (isset($input['tipoCarroceria'])) $record['tipo_carroceria'] = trim($input['tipoCarroceria']);
+            if (isset($input['numeroSerie'])) $record['numero_serie'] = trim($input['numeroSerie']);
+            if (isset($input['serieMotor'])) $record['serie_motor'] = trim($input['serieMotor']);
+            if (isset($input['partidaRegistral'])) $record['partida_registral'] = trim($input['partidaRegistral']);
+            if (isset($input['estado'])) {
+                $estadoInput = strtoupper(trim($input['estado']));
+                if (in_array($estadoInput, ['ACTIVO', 'INACTIVO'], true)) {
+                    $record['estado'] = $estadoInput;
+                }
+            }
+
+            if (array_key_exists('asociacion', $input)) {
+                $record['id_asociacion'] = $this->resolverAsociacionId($db, trim((string)$input['asociacion']));
+            }
+
+            if (!empty($input['tipo'])) {
+                $tipoNombre = trim($input['tipo']);
+                $tipoRow = $db->table('tipos_vehiculo')->where('nombre', $tipoNombre)->get()->getRowArray();
+                if (!$tipoRow) {
+                    $db->transRollback();
+                    return $this->failValidationErrors('Seleccione un tipo de vehículo registrado.');
+                } else {
+                    $record['id_tipo_vehiculo'] = $tipoRow['id'];
+                }
+            }
+
+            if (!empty($record)) {
+                $db->table('vehiculos')->where('id', $id)->update($record);
+            }
+
+            $propietarioNombre = trim($input['propietario'] ?? '');
+            $propietarioDni = trim($input['propietarioDni'] ?? '');
+            if ($propietarioDni !== '') {
+                $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
+                if (!$personaRow) {
+                    $db->transRollback();
+                    return $this->failValidationErrors('El propietario no existe. Regístrelo primero en el módulo Personas.');
+                }
+                $personaId = (int)$personaRow['id'];
+
+                // El propietario activo actual (si existe y es distinto al nuevo)
+                // se cierra con fecha_fin en vez de borrarse, para conservar el
+                // historial de quién tuvo el vehículo antes.
+                $propietarioActivo = $db->table('vehiculo_propietarios')
+                    ->where('id_vehiculo', $id)
+                    ->where('fecha_fin IS NULL')
+                    ->orderBy('id', 'DESC')
+                    ->get()->getRowArray();
+
+                if (!$propietarioActivo || (int)$propietarioActivo['id_persona'] !== $personaId) {
+                    if ($propietarioActivo) {
+                        $db->table('vehiculo_propietarios')
+                            ->where('id', $propietarioActivo['id'])
+                            ->update(['fecha_fin' => date('Y-m-d'), 'estado' => 'INACTIVO']);
+                    }
+                    $db->table('vehiculo_propietarios')->insert([
+                        'id_vehiculo'  => $id,
+                        'id_persona'   => $personaId,
+                        'fecha_inicio' => date('Y-m-d'),
+                        'estado'       => 'ACTIVO',
+                    ]);
+                }
+            }
+
+            $vehPlaca = $record['placa'] ?? ($db->table('vehiculos')->where('id', $id)->get()->getRowArray()['placa'] ?? "ID $id");
+            \App\Services\AuditoriaService::registrar(
+                'VEHICULOS',
+                'MODIFICAR',
+                "Se modificó la información del vehículo placa '$vehPlaca'",
+                ['id' => $id, 'cambios' => $record]
+            );
+
+            if (!$db->transStatus()) {
+                throw new \RuntimeException('Error actualizando vehículo.');
+            }
+            $db->transCommit();
+            return $this->respond(['status' => true, 'message' => 'Vehículo actualizado con éxito']);
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('No se pudo guardar el vehículo. No se modificó ningún dato.');
+        }
     }
 
     public function delete($id = null)
@@ -843,9 +896,16 @@ class VehiculosController extends ResourceController
         }
         $placa = $veh['placa'] ?? "ID $id";
 
-        $db->table('vehiculo_propietarios')->where('id_vehiculo', $id)->delete();
-        $db->table('documentos_vehiculo')->where('id_vehiculo', $id)->delete();
-        $db->table('vehiculos')->where('id', $id)->delete();
+        try {
+            \App\Services\EliminacionSegura::eliminar($db, 'vehiculos', (int)$id, [
+                'vehiculo_propietarios' => 'id_vehiculo', 'documentos_vehiculo' => 'id_vehiculo',
+            ]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
+            return $this->failServerError('No se pudo eliminar el vehículo. No se ha borrado ningún dato.');
+        }
 
         \App\Services\AuditoriaService::registrar(
             'VEHICULOS',

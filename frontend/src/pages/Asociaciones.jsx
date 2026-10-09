@@ -9,6 +9,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { sanitizarMensaje, leerMensajeError, apiFetch } from '../config/api'
 import { useListaServidor } from '../hooks/useListaServidor'
+import { usePersonaRapida } from '../hooks/usePersonaRapida'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
@@ -66,6 +67,7 @@ export function Asociaciones() {
   const [socioTipoFilter, setSocioTipoFilter] = useState('TODOS')
   const [socioVehiculosFilter, setSocioVehiculosFilter] = useState('TODOS')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedOrg, setSelectedOrg] = useState(null)
@@ -75,8 +77,8 @@ export function Asociaciones() {
   const [isEditing, setIsEditing] = useState(false)
 
   const [repSearch, setRepSearch] = useState('')
+  const [repPersona, setRepPersona] = useState(null)
   const [showRepResults, setShowRepResults] = useState(false)
-  const [repResults, setRepResults] = useState([])
   const [isSearchingRep, setIsSearchingRep] = useState(false)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
@@ -200,26 +202,6 @@ export function Asociaciones() {
     if (activeTab === 'SOCIOS') loadSocios()
   }
 
-  // Búsqueda dinámica y debounced de representantes (evita descargar 30,000 personas en memoria)
-  useEffect(() => {
-    const rawQuery = (repSearch || '').trim()
-    if (!rawQuery || rawQuery.length < 2) {
-      setRepResults([])
-      setIsSearchingRep(false)
-      return
-    }
-    const controller = new AbortController()
-    const timer = setTimeout(() => {
-      setIsSearchingRep(true)
-      apiFetch(`/personas?page=1&buscar=${encodeURIComponent(rawQuery)}&porPagina=10`, { signal: controller.signal })
-        .then((response) => response.ok ? response.json() : { data: [] })
-        .then((payload) => { if (!controller.signal.aborted) setRepResults(payload.data || []) })
-        .catch(() => {})
-        .finally(() => { if (!controller.signal.aborted) setIsSearchingRep(false) })
-    }, 250)
-    return () => { clearTimeout(timer); controller.abort() }
-  }, [repSearch])
-
   const getPersonaNombre = (p) => {
     if (!p) return ''
     if (p.nombreCompleto) return p.nombreCompleto
@@ -236,6 +218,7 @@ export function Asociaciones() {
       representanteDni: dni,
       representanteNombre: nom,
     }))
+    setRepPersona(p)
     setRepSearch('')
     setShowRepResults(false)
   }
@@ -247,9 +230,41 @@ export function Asociaciones() {
       representanteDni: '',
       representanteNombre: '',
     }))
+    setRepPersona(null)
     setRepSearch('')
     setShowRepResults(false)
   }
+
+  const buscarRepresentantePorDni = async () => {
+    const dni = repSearch.trim()
+    if (!/^\d{8}$/.test(dni)) {
+      showError('DNI inválido', 'Ingresa los 8 dígitos del DNI para buscar.')
+      return
+    }
+
+    setIsSearchingRep(true)
+    setShowRepResults(false)
+    try {
+      const response = await apiFetch(`/personas?page=1&buscar=${encodeURIComponent(dni)}&porPagina=10`)
+      if (!response.ok) throw new Error(await leerMensajeError(response, 'No se pudo buscar el DNI.'))
+      const payload = await response.json()
+      const personas = payload.data || []
+      const encontrada = personas.find((persona) => String(persona.numeroDocumento || persona.numero || '') === dni)
+      if (encontrada) {
+        selectRepresentante(encontrada)
+      } else {
+        setShowRepResults(true)
+      }
+    } catch (error) {
+      showError('Error de búsqueda', sanitizarMensaje(error.message, 'No se pudo buscar el DNI.'))
+    } finally {
+      setIsSearchingRep(false)
+    }
+  }
+
+  const { abrir: abrirRegistroPersona, modal: modalRegistroPersona } = usePersonaRapida({
+    alCrear: (persona) => selectRepresentante(persona),
+  })
 
   const particulares = stats.particulares ?? 0
   const asociacionesCount = stats.asociaciones ?? 0
@@ -404,7 +419,9 @@ export function Asociaciones() {
   ], [orgOptionsRaw])
 
   const handleOpenCreateModal = () => {
+    setFieldErrors({})
     setFormData(emptyForm)
+    setRepPersona(null)
     setRepSearch('')
     setShowRepResults(false)
     setIsEditing(false)
@@ -412,6 +429,12 @@ export function Asociaciones() {
   }
 
   const handleOpenEditModal = (org) => {
+    setFieldErrors({})
+    setRepPersona(org.idRepresentanteLegal ? {
+      nombres: org.representanteNombres || '',
+      apellidoPaterno: org.representanteApellidoPaterno || '',
+      apellidoMaterno: org.representanteApellidoMaterno || '',
+    } : null)
     setSelectedOrg(org)
     setFormData({
       ...emptyForm,
@@ -481,11 +504,22 @@ export function Asociaciones() {
     }
 
     try {
+      const mostrarErroresCampos = async (res) => {
+        if (res.ok) return false
+        const payload = await res.clone().json().catch(() => ({}))
+        const mensajes = payload.messages || {}
+        const errores = Object.fromEntries(Object.entries(mensajes).filter(([campo, valor]) => ['razonSocial', 'ruc'].includes(campo) && typeof valor === 'string'))
+        if (!Object.keys(errores).length) return false
+        setFieldErrors(errores)
+        document.getElementById(errores.razonSocial ? 'org_razon' : 'org_ruc')?.focus()
+        return true
+      }
       if (isEditing) {
         const res = await apiFetch(`/asociaciones/${selectedOrg.id}`, {
           method: 'PUT',
           body: formData,
         })
+        if (await mostrarErroresCampos(res)) return
         if (!res.ok) throw new Error(await leerMensajeError(res, 'No se pudo actualizar la asociación.'))
         recargarTrasCambio()
         showToast('Asociación actualizada correctamente', 'editar')
@@ -494,6 +528,7 @@ export function Asociaciones() {
           method: 'POST',
           body: formData,
         })
+        if (await mostrarErroresCampos(res)) return
         if (!res.ok) throw new Error(await leerMensajeError(res, 'Error al crear la asociación.'))
         setCurrentPage(1)
         recargarTrasCambio()
@@ -1121,8 +1156,8 @@ export function Asociaciones() {
 
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-slate-950/70 backdrop-blur-xs animate-enter">
+          <div className="flex max-h-[98dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Cabecera del Modal */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
@@ -1137,9 +1172,9 @@ export function Asociaciones() {
             </div>
 
             <form onSubmit={handleFormSubmit} autoComplete="off" className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
+              <div className={`min-h-0 flex-1 overflow-y-auto ${formData.tipo === 'PARTICULAR' ? 'space-y-2 p-3 sm:p-4' : 'space-y-3 p-4 sm:p-5'}`}>
 
-              <fieldset className="rounded-xl border border-slate-200 p-3.5 dark:border-[var(--border)]">
+              <fieldset className={`rounded-xl border border-slate-200 dark:border-[var(--border)] ${formData.tipo === 'PARTICULAR' ? 'p-2.5' : 'p-3.5'}`}>
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Identificación Institucional
                 </legend>
@@ -1165,28 +1200,20 @@ export function Asociaciones() {
                     ]}
                   />
 
-                  <div className="sm:col-span-2">
-                    <FloatingTextarea
-                      id="org_razon"
-                      label="Razón Social / Nombre"
-                      required
-                      value={formData.razonSocial}
-                      onChange={(e) => setFormData({ ...formData, razonSocial: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="flex gap-2 sm:col-span-3">
-                    <div className="flex-1">
+                  <div className="flex min-w-0 gap-2 sm:col-span-2">
+                    <div className="min-w-0 flex-1">
                       <FloatingInput
                         id="org_ruc"
                         label="RUC"
                         required
                         maxLength={11}
                         value={formData.ruc}
+                        error={fieldErrors.ruc}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (!/^\d*$/.test(val)) return;
                           setFormData({ ...formData, ruc: val });
+                          setFieldErrors(prev => ({ ...prev, ruc: '' }));
                         }}
                         inputClassName="font-mono"
                       />
@@ -1194,12 +1221,23 @@ export function Asociaciones() {
                     <button
                       type="button"
                       onClick={() => showToast('Búsqueda por RUC pendiente de conectar', 'info')}
-                      className="shrink-0 self-end h-[42px] rounded-xl text-white px-4 text-xs font-bold cursor-pointer flex items-center justify-center gap-2"
+                      className="shrink-0 self-start h-[42px] rounded-xl text-white px-4 text-xs font-bold cursor-pointer flex items-center justify-center gap-2"
                       style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                     >
                       <Icon name="search" className="size-4" />
                       Buscar
                     </button>
+                  </div>
+
+                  <div className="sm:col-span-3">
+                    <FloatingTextarea
+                      id="org_razon"
+                      label="Razón Social / Nombre"
+                      required
+                      value={formData.razonSocial}
+                      error={fieldErrors.razonSocial}
+                      onChange={(e) => { setFormData({ ...formData, razonSocial: e.target.value }); setFieldErrors(prev => ({ ...prev, razonSocial: '' })) }}
+                    />
                   </div>
 
                   {/* Selector de Representante Legal vinculado a Personas */}
@@ -1210,24 +1248,33 @@ export function Asociaciones() {
                     </label>
 
                     {formData.idRepresentanteLegal ? (
-                      <div className="flex items-center justify-between gap-3 p-3 rounded-2xl border border-indigo-200/80 bg-indigo-50/60 dark:border-indigo-900/60 dark:bg-indigo-950/30">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="size-9 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold text-xs shrink-0 shadow-xs">
-                            <Icon name="idCard" className="size-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-black text-slate-800 dark:text-slate-100">
-                              {formData.representanteNombre || 'Nombre no disponible'}
-                            </p>
-                            <p className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                              DNI: {formData.representanteDni || '—'}
-                            </p>
-                          </div>
-                        </div>
+                      <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-4">
+                        <FloatingInput
+                          id="org_representante_dni"
+                          label="DNI"
+                          value={formData.representanteDni || ''}
+                          readOnly
+                          inputClassName="font-mono"
+                        />
+                        <FloatingInput
+                          id="org_representante_nombres"
+                          label="Nombres"
+                          value={repPersona?.nombres || formData.representanteNombre || ''}
+                          readOnly
+                          className="sm:col-span-1"
+                        />
+                        <FloatingInput
+                          id="org_representante_apellidos"
+                          label="Apellidos"
+                          value={repPersona
+                            ? `${repPersona.apellidoPaterno || repPersona.apellido_paterno || ''} ${repPersona.apellidoMaterno || repPersona.apellido_materno || ''}`.trim()
+                            : ''}
+                          readOnly
+                        />
                         <button
                           type="button"
                           onClick={clearRepresentante}
-                          className="px-2.5 py-1 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/60 rounded-lg transition-colors cursor-pointer shrink-0"
+                          className="h-[42px] px-2.5 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/60 rounded-lg transition-colors cursor-pointer"
                           title="Cambiar o quitar representante"
                         >
                           ✕ Quitar
@@ -1235,76 +1282,49 @@ export function Asociaciones() {
                       </div>
                     ) : (
                       <div className="relative" ref={repDropdownRef}>
-                        <div className="relative">
-                          <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+                        <div className="flex gap-2">
                           <input
                             type="text"
-                            placeholder="Buscar representante por DNI o Nombres y Apellidos..."
+                            inputMode="numeric"
+                            maxLength={8}
+                            placeholder="DNI del representante (8 dígitos)"
                             value={repSearch}
-                            onFocus={() => {
-                              setShowRepResults(true)
-                              if (repResults.length === 0 && !repSearch) {
-                                apiFetch('/personas?page=1&porPagina=10')
-                                  .then((res) => (res.ok ? res.json() : { data: [] }))
-                                  .then((payload) => setRepResults(payload.data || []))
-                                  .catch(() => {})
-                              }
-                            }}
                             onChange={(e) => {
-                              setRepSearch(e.target.value)
-                              setShowRepResults(true)
+                              setRepSearch(e.target.value.replace(/\D/g, '').slice(0, 8))
+                              setShowRepResults(false)
                             }}
-                            className="w-full h-[42px] pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); buscarRepresentantePorDni() } }}
+                            className="h-[42px] min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
                           />
+                          <button
+                            type="button"
+                            onClick={buscarRepresentantePorDni}
+                            disabled={isSearchingRep}
+                            aria-label="Buscar representante por DNI"
+                            title="Buscar por DNI"
+                            className="grid size-[42px] shrink-0 place-items-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                          >
+                            {isSearchingRep
+                              ? <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                              : <Icon name="search" className="size-4" />}
+                          </button>
                         </div>
 
                         {showRepResults && (
-                          <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
-                            <div className="flex items-center justify-between px-2.5 py-1 border-b border-slate-100 dark:border-[var(--border)] text-[10px] font-bold text-slate-400 uppercase">
-                              <span>Padrón de Ciudadanos ({repResults.length})</span>
-                              <button
-                                type="button"
-                                onClick={() => setShowRepResults(false)}
-                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                              >
-                                ✕ Cerrar
-                              </button>
-                            </div>
-                            {isSearchingRep && (
-                              <div className="p-3 text-center text-xs text-slate-400 font-medium animate-pulse">
-                                Buscando en padrón de ciudadanos...
-                              </div>
-                            )}
-                            {!isSearchingRep && repResults.length === 0 ? (
-                              <div className="p-3 text-center text-xs text-slate-400 font-medium">
-                                No se encontraron personas con ese DNI o nombre.
-                              </div>
-                            ) : (
-                              repResults.map((p) => {
-                                const dni = p.numeroDocumento || p.numero || ''
-                                const nombre = getPersonaNombre(p)
-                                return (
-                                  <button
-                                    key={p.id}
-                                    type="button"
-                                    onClick={() => selectRepresentante(p)}
-                                    className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center justify-between gap-3 transition-colors cursor-pointer group"
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                                        {nombre}
-                                      </p>
-                                      <p className="font-mono text-[11px] text-slate-400">
-                                        DNI: {dni}
-                                      </p>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      Seleccionar →
-                                    </span>
-                                  </button>
-                                )
-                              })
-                            )}
+                          <div className="absolute left-0 right-0 top-full z-50 mt-1.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
+                            <p className="text-xs text-slate-600 dark:text-slate-300">
+                              No se encontró ese DNI en Personas.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowRepResults(false)
+                                abrirRegistroPersona(repSearch)
+                              }}
+                              className="mt-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700"
+                            >
+                              Registrar persona con DNI {repSearch}
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1332,7 +1352,7 @@ export function Asociaciones() {
               </fieldset>
 
 
-              <fieldset className="rounded-xl border border-slate-200 p-3.5 dark:border-[var(--border)]">
+              <fieldset className={`rounded-xl border border-slate-200 dark:border-[var(--border)] ${formData.tipo === 'PARTICULAR' ? 'p-2.5' : 'p-3.5'}`}>
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Contacto, ubicación y autorización
                 </legend>
@@ -1483,6 +1503,8 @@ export function Asociaciones() {
           </div>
         </div>
       )}
+
+      {modalRegistroPersona}
 
       <MapaCoordenadasPicker
         isOpen={isMapPickerOpen}

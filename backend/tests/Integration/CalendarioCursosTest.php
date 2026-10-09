@@ -1,5 +1,4 @@
 <?php
-// Pruebas con curso temporal, dentro de una transacción que siempre se revierte.
 define('FCPATH', dirname(__DIR__, 2) . '/public/');
 define('ENVIRONMENT', 'development');
 require FCPATH . '../app/Config/Paths.php';

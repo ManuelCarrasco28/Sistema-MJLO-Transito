@@ -4,9 +4,9 @@ import { showError, showToast } from '../../utils/SwalUtil'
 import { VehiculoFormModal } from './VehiculoFormModal'
 import { useOficinaRegistral } from '../../hooks/useOficinaRegistral'
 
-export function StandaloneVehiculoFormModal({ onClose, onSuccess }) {
+export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial = '' }) {
   const [formData, setFormData] = useState({
-    placa: '', tipo: 'Mototaxi', marca: '', modelo: '', color: '', anio: '',
+    placa: placaInicial, tipo: 'Mototaxi', marca: '', modelo: '', color: '', anio: '',
     categoria: '', carroceria: '', sedeRegistro: 'CHICLAYO', tipoCarroceria: '', numeroSerie: '', serieMotor: '',
     asociacion: '', propietario: '', propietarioDni: '', estado: 'ACTIVO', soatEstado: 'VIGENTE',
     tucNumero: `TUC-2026-${Math.floor(100 + Math.random() * 900)}`
@@ -135,8 +135,8 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess }) {
       return
     }
     const anioActual = new Date().getFullYear()
-    if (formData.anio && (formData.anio < 1950 || formData.anio > anioActual + 1)) {
-      showError('Año Inválido', `El año de fabricación debe ser válido (entre 1950 y ${anioActual + 1}).`)
+    if (formData.anio && (!/^\d{4}$/.test(String(formData.anio)) || Number(formData.anio) < 1900 || Number(formData.anio) > anioActual + 1)) {
+      showError('Año Inválido', `El año de fabricación debe ser válido (entre 1900 y ${anioActual + 1}).`)
       return
     }
 

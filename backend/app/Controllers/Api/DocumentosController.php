@@ -406,6 +406,8 @@ class DocumentosController extends ResourceController
             'estado'             => strtoupper($input['estado'] ?? 'VIGENTE'),
         ];
 
+        $errores = \App\Services\ValidacionRegistro::documento($record);
+        if ($errores) return $this->failValidationErrors($errores);
         if ($this->vigenteConFechaPasada($record)) {
             return $this->failValidationErrors('La fecha de vencimiento ya pasó. Un documento vigente necesita una fecha de vencimiento futura.');
         }
@@ -481,7 +483,7 @@ class DocumentosController extends ResourceController
             return $this->failNotFound('ID de documento no especificado.');
         }
 
-        $actual = $db->table('documentos_vehiculo')->select('id_vehiculo, tipo_documento, codigo, estado, fecha_expiracion')->where('id', $id)->get()->getRowArray();
+        $actual = $db->table('documentos_vehiculo')->select('id_vehiculo, tipo_documento, codigo, estado, fecha_expedicion, fecha_expiracion')->where('id', $id)->get()->getRowArray();
         if (!$actual) {
             return $this->failNotFound('Documento no encontrado.');
         }
@@ -502,20 +504,22 @@ class DocumentosController extends ResourceController
 
         $tipoEfectivo = $record['tipo_documento'] ?? $actual['tipo_documento'];
 
-        if (isset($input['codigo'])) $record['codigo'] = trim($input['codigo']);
-        if (isset($input['fechaExpedicion'])) $record['fecha_expedicion'] = $input['fechaExpedicion'] ?: null;
-        if (isset($input['fechaExpiracion'])) {
+        if (array_key_exists('codigo', $input)) $record['codigo'] = trim((string)$input['codigo']);
+        if (array_key_exists('fechaExpedicion', $input)) $record['fecha_expedicion'] = $input['fechaExpedicion'] ?: null;
+        if (array_key_exists('fechaExpiracion', $input)) {
             // La Tarjeta de Propiedad no tiene fecha de vencimiento.
             $record['fecha_expiracion'] = $tipoEfectivo === 'TARJETA_PROPIEDAD'
                 ? null
                 : ($input['fechaExpiracion'] ?: null);
         }
-        if (isset($input['estado'])) $record['estado'] = strtoupper($input['estado']);
+        if (array_key_exists('estado', $input)) $record['estado'] = strtoupper(trim((string)$input['estado']));
         $record = $this->soloColumnasReales($record);
 
         if (!empty($record)) {
             $despues = array_merge($actual, $record);
-            if (isset($record['fecha_expiracion']) && $this->vigenteConFechaPasada($despues)) {
+            $errores = \App\Services\ValidacionRegistro::documento($despues);
+            if ($errores) return $this->failValidationErrors($errores);
+            if ((array_key_exists('fecha_expiracion', $record) || isset($record['estado'])) && $this->vigenteConFechaPasada($despues)) {
                 return $this->failValidationErrors('La fecha de vencimiento ya pasó. Un documento vigente necesita una fecha de vencimiento futura.');
             }
             $cambiaIdentidad = isset($record['codigo']) || isset($record['tipo_documento']);
@@ -556,7 +560,7 @@ class DocumentosController extends ResourceController
 
         $db->table('documentos_vehiculo')->where('id', $id)->delete();
 
-        return $this->respondDeleted(['status' => true, 'message' => 'Documento anulado con éxito']);
+        return $this->respondDeleted(['status' => true, 'message' => 'Documento eliminado con éxito']);
     }
 }
 

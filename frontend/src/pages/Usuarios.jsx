@@ -11,6 +11,7 @@ import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/F
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { formatNumeroTarjeta } from '../utils/formatters'
+import { errorPasswordUsuario } from '../utils/passwordPolicy'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 
 const FILTER_ESTADO_OPTIONS = [
@@ -218,12 +219,13 @@ export function Usuarios({ user }) {
       showError('Falta información', 'Por favor selecciona una persona del padrón (o regístrala con «Registrar nueva persona»).')
       return
     }
-    if (!userForm.nombre_usuario || userForm.nombre_usuario.length < 3) {
-      showError('Validación', 'El nombre de usuario debe tener al menos 3 caracteres.')
+    if (!/^[A-Za-z0-9_-]{3,50}$/.test(userForm.nombre_usuario || '')) {
+      showError('Validación', 'El usuario debe tener entre 3 y 50 caracteres: letras, números, guiones o guion bajo.')
       return
     }
-    if (!userForm.password || userForm.password.length < 6) {
-      showError('Validación', 'La contraseña inicial debe tener al menos 6 caracteres.')
+    const errorPassword = errorPasswordUsuario(userForm.password, userForm.nombre_usuario)
+    if (errorPassword) {
+      showError('Validación', errorPassword)
       return
     }
     if (!userForm.id_rol) {
@@ -295,8 +297,9 @@ export function Usuarios({ user }) {
 
   const handleResetPassword = async (e) => {
     e.preventDefault()
-    if (!newPassword || newPassword.length < 6) {
-      showError('Contraseña corta', 'La contraseña debe tener al menos 6 caracteres.')
+    const errorPassword = errorPasswordUsuario(newPassword, selectedUser?.nombre_usuario)
+    if (errorPassword) {
+      showError('Contraseña inválida', errorPassword)
       return
     }
 
@@ -1149,7 +1152,8 @@ export function Usuarios({ user }) {
                   label="3. Contraseña Inicial"
                   type="password"
                   required
-                  minLength={6}
+                  minLength={8}
+                  maxLength={128}
                   value={userForm.password}
                   onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                 />
@@ -1278,7 +1282,8 @@ export function Usuarios({ user }) {
                   label="Nueva Contraseña"
                   type={showPassword ? 'text' : 'password'}
                   required
-                  minLength={6}
+                  minLength={8}
+                  maxLength={128}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   inputClassName="pr-12"

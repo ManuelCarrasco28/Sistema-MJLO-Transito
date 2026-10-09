@@ -502,9 +502,9 @@ export function Documentos() {
 
   const handleDelete = async (id) => {
     const result = await showConfirm(
-      '¿Anular documento?',
-      '¿Está seguro de anular este documento del padrón oficial?',
-      'Sí, anular',
+      '¿Eliminar documento?',
+      'Se eliminará este documento del vehículo. Esta acción no se puede deshacer.',
+      'Sí, eliminar',
       'Cancelar',
       { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
     )
@@ -516,9 +516,9 @@ export function Documentos() {
         setDocumentos(nextDocs)
         setCachedData('/documentos', nextDocs)
         loadStats()
-        showToast('Documento anulado con éxito')
+        showToast('Documento eliminado con éxito')
       } catch {
-        showError('Error', 'No se pudo anular el documento.')
+        showError('Error', 'No se pudo eliminar el documento.')
       }
     }
   }
@@ -1268,7 +1268,7 @@ export function Documentos() {
                         <button
                           type="button"
                           onClick={() => handleDelete(d.id)}
-                          title="Anular documento"
+                          title="Eliminar documento"
                           className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
                           style={{
                             backgroundColor: 'var(--action-del-bg)',

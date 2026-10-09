@@ -58,10 +58,10 @@ export async function leerMensajeError(response, fallback = 'Ocurrió un error e
     const data = await response.json()
     const mensajes = data?.messages
     if (mensajes && typeof mensajes === 'object') {
-      const primero = mensajes.error || Object.values(mensajes)[0]
-      if (primero) return sanitizarMensaje(primero, fallback)
+      const detalles = Object.values(mensajes).flat().filter(value => typeof value === 'string' && value.trim())
+      if (detalles.length) return detalles.map(value => sanitizarMensaje(value, fallback)).join('\n')
     }
-    return sanitizarMensaje(data?.message, fallback)
+    return typeof data?.message === 'string' ? sanitizarMensaje(data.message, fallback) : fallback
   } catch {
     return fallback
   }

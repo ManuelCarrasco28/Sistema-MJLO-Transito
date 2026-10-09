@@ -20,9 +20,9 @@ function scenario(string $name, callable $operation): void {
     $db->transException(true)->transBegin();
     try {
         $token = bin2hex(random_bytes(5));
-        $db->table('vehiculos')->insert(['placa' => 'TST-' . $token]);
+        $db->table('vehiculos')->insert(['uuid' => \App\Libraries\Identificador::nuevo(), 'placa' => 'TST-' . $token]);
         $vehicle = $db->insertID();
-        $db->table('papeletas')->insert(['numero_papeleta' => 'TEST-' . $token, 'id_vehiculo' => $vehicle, 'monto_total' => '100.00']);
+        $db->table('papeletas')->insert(['uuid' => \App\Libraries\Identificador::nuevo(), 'numero_papeleta' => 'TEST-' . $token, 'id_vehiculo' => $vehicle, 'monto_total' => '100.00']);
         $ticket = (int)$db->insertID();
         $operation($db, new \App\Services\PagosTransito($db), $ticket, $token);
         echo "PASS $name\n";
@@ -46,6 +46,9 @@ scenario('Confirmación y anulación mantienen ambos estados', function ($db, $s
     check($paid['estado'] === 'PAGADO', 'No se confirmó.');
     check($db->table('papeletas')->where('id', $ticket)->get()->getRow('estado') === 'PAGADA', 'Estado papeleta incorrecto.');
     rejects(fn() => $service->confirmar((int)$pago['id'], ['numeroRecibo' => 'TEST-' . $token, 'fechaPago' => date('Y-m-d')]));
+    rejects(fn() => $service->anularPapeleta($ticket));
+    check($db->table('pagos_transito')->where('id', $pago['id'])->get()->getRow('estado') === 'PAGADO', 'Se perdió un pago sin regularizar.');
+    $service->anular((int)$pago['id']);
     $service->anularPapeleta($ticket);
     check($db->table('pagos_transito')->where('id', $pago['id'])->get()->getRow('estado') === 'ANULADO', 'Pago sigue vigente.');
     rejects(fn() => $service->generar('PAPELETA', $ticket));
@@ -54,7 +57,7 @@ scenario('Recibo duplicado no marca otra papeleta como pagada', function ($db, $
     $first = $service->generar('PAPELETA', $ticket);
     $service->confirmar((int)$first['id'], ['numeroRecibo' => 'TEST-' . $token, 'fechaPago' => date('Y-m-d')]);
     $vehicle = $db->table('papeletas')->where('id', $ticket)->get()->getRow('id_vehiculo');
-    $db->table('papeletas')->insert(['numero_papeleta' => 'TEST-2-' . $token, 'id_vehiculo' => $vehicle, 'monto_total' => 20]);
+    $db->table('papeletas')->insert(['uuid' => \App\Libraries\Identificador::nuevo(), 'numero_papeleta' => 'TEST-2-' . $token, 'id_vehiculo' => $vehicle, 'monto_total' => 20]);
     $secondTicket = (int)$db->insertID();
     $second = $service->generar('PAPELETA', $secondTicket);
     rejects(fn() => $service->confirmar((int)$second['id'], ['numeroRecibo' => 'TEST-' . $token, 'fechaPago' => date('Y-m-d')]));
@@ -67,11 +70,11 @@ scenario('Anular un pago restaura la deuda', function ($db, $service, $ticket, $
     check($db->table('papeletas')->where('id', $ticket)->get()->getRow('estado') === 'PENDIENTE_PAGO', 'Deuda no restaurada.');
 });
 scenario('Curso: monto del catálogo y vínculo con inscripción', function ($db, $service, $ticket, $token) {
-    $db->table('personas')->insert(['numero_documento' => 'TEST-' . $token, 'nombres' => 'Prueba transaccional', 'apellido_paterno' => 'Temporal']);
+    $db->table('personas')->insert(['uuid' => \App\Libraries\Identificador::nuevo(), 'numero' => 'TEST-' . $token]);
     $person = $db->insertID();
-    $db->table('cursos_seguridad_vial')->insert(['nombre' => 'Prueba transaccional', 'costo_inscripcion' => 25]);
+    $db->table('cursos_seguridad_vial')->insert(['uuid' => \App\Libraries\Identificador::nuevo(), 'nombre' => 'Prueba transaccional', 'costo_inscripcion' => 25]);
     $course = $db->insertID();
-    $db->table('inscripciones_curso')->insert(['id_curso' => $course, 'id_persona' => $person, 'fecha_inscripcion' => date('Y-m-d')]);
+    $db->table('inscripciones_curso')->insert(['uuid' => \App\Libraries\Identificador::nuevo(), 'id_curso' => $course, 'id_persona' => $person, 'fecha_inscripcion' => date('Y-m-d')]);
     $enrollment = (int)$db->insertID();
     $pago = $service->generar('CURSO', $enrollment);
     check((float)$pago['total'] === 25.0 && (int)$pago['id_inscripcion'] === $enrollment, 'Curso sin trazabilidad.');
@@ -81,9 +84,17 @@ scenario('Curso: monto del catálogo y vínculo con inscripción', function ($db
 scenario('Trámite: importe del procedimiento administrativo', function ($db, $service, $ticket, $token) {
     $db->table('procedimientos_administrativos')->insert(['codigo' => 'TEST-' . $token, 'nombre' => 'Prueba transaccional', 'costo' => 45]);
     $procedure = $db->insertID();
-    $db->table('tramites_documentarios')->insert(['id_procedimiento_admin' => $procedure, 'fecha_solicitud' => date('Y-m-d')]);
+    $db->table('tramites_documentarios')->insert(['uuid' => \App\Libraries\Identificador::nuevo(), 'id_procedimiento_admin' => $procedure, 'fecha_solicitud' => date('Y-m-d')]);
     $pago = $service->generar('TRAMITE', (int)$db->insertID());
     check((float)$pago['total'] === 45.0 && $pago['id_papeleta'] === null, 'Origen de trámite incorrecto.');
+});
+scenario('Papeleta con internamiento no se anula ni pierde su cobro', function ($db, $service, $ticket, $token) {
+    $pago = $service->generar('PAPELETA', $ticket);
+    $vehiculo = $db->table('papeletas')->where('id', $ticket)->get()->getRow('id_vehiculo');
+    $db->table('ordenes_internamiento')->insert(['uuid' => \App\Libraries\Identificador::nuevo(), 'id_papeleta' => $ticket, 'id_vehiculo' => $vehiculo, 'numero_boleta' => 'TEST-' . $token, 'estado' => 'RETENIDO']);
+    rejects(fn() => $service->anularPapeleta($ticket));
+    check($db->table('papeletas')->where('id', $ticket)->get()->getRow('estado') === 'PENDIENTE_PAGO', 'Se anuló una papeleta con vehículo en depósito.');
+    check($db->table('pagos_transito')->where('id', $pago['id'])->get()->getRow('estado') === 'PENDIENTE', 'Se perdió el cobro.');
 });
 scenario('UIT exige el año exacto y no utiliza otro año silenciosamente', function ($db) {
     $db->table('municipalidad')->insert([

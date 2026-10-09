@@ -6,6 +6,8 @@ export function PersonaFormModal({
   isEditing,
   formData,
   setFormData,
+  fieldErrors = {},
+  onClearFieldError,
   handlePhotoUpload,
   handleClearPhoto,
   tipoDocOptions,
@@ -113,7 +115,7 @@ export function PersonaFormModal({
                       options={tipoDocOptions}
                     />
                   </div>
-                  <div className="sm:col-span-5 flex items-end gap-1.5">
+                  <div className="sm:col-span-5 flex items-start gap-1.5">
                     <div className="flex-1 min-w-0">
                       <FloatingInput
                         id="per_num_doc"
@@ -124,12 +126,14 @@ export function PersonaFormModal({
                         pattern={(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') ? '\\d{8}' : undefined}
                         title={(formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD') ? 'El DNI debe tener exactamente 8 dígitos.' : undefined}
                         value={formData.numeroDocumento}
+                        error={fieldErrors.numeroDocumento}
                         inputClassName="font-mono font-bold"
                         onChange={(e) => {
                           const val = e.target.value;
                           const isDni = formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD';
                           if (isDni && !/^\d*$/.test(val)) return;
                           setFormData({ ...formData, numeroDocumento: val })
+                          onClearFieldError?.('numeroDocumento')
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -209,11 +213,12 @@ export function PersonaFormModal({
                 <FloatingInput
                   id="per_licencia"
                   label="Número de licencia"
-                  required
+                  optional
                   maxLength={9}
                   value={formData.numeroLicencia}
+                  error={fieldErrors.numeroLicencia}
                   inputClassName="font-mono font-bold uppercase"
-                  onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() })}
+                  onChange={(e) => { setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() }); onClearFieldError?.('numeroLicencia') }}
                 />
 
                 <FloatingInput

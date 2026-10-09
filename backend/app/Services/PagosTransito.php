@@ -146,6 +146,13 @@ class PagosTransito
     {
         $this->atomic(function () use ($id) {
             $this->origin('PAPELETA', $id);
+            $this->db->query('SELECT id FROM papeletas WHERE id = ? FOR UPDATE', [$id]);
+            if ($this->db->table('pagos_transito')->where('id_papeleta', $id)->where('estado', 'PAGADO')->countAllResults() > 0) {
+                throw new DomainException('Regularice los pagos realizados antes de anular la papeleta.');
+            }
+            if ($this->db->table('ordenes_internamiento')->where('id_papeleta', $id)->countAllResults() > 0) {
+                throw new DomainException('La papeleta tiene un internamiento vinculado. Regularícelo antes de anular.');
+            }
             $this->db->table('papeletas')->where('id', $id)->update(['estado' => 'ANULADA']);
             $this->db->table('pagos_transito')->where('id_papeleta', $id)->update(['estado' => 'ANULADO']);
         });

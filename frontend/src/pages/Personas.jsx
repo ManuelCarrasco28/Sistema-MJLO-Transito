@@ -95,6 +95,7 @@ export function Personas({ user, onUserUpdate }) {
     return []
   })
 
+  const [fieldErrors, setFieldErrors] = useState({})
   const [formData, setFormData] = useState({
     tipoDocumento: 'DNI',
     numeroDocumento: '',
@@ -240,6 +241,7 @@ export function Personas({ user, onUserUpdate }) {
   useQuickCreate(() => handleOpenCreateModal(), !isLoading)
 
   const handleOpenCreateModal = () => {
+    setFieldErrors({})
     setFormData({
       tipoDocumento: 'DNI',
       numeroDocumento: '',
@@ -260,6 +262,7 @@ export function Personas({ user, onUserUpdate }) {
   }
 
   const handleOpenEditModal = (persona) => {
+    setFieldErrors({})
     setSelectedPersona(persona)
     const normalizedTipo = persona.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : (persona.tipoDocumento || 'DNI')
     setFormData({
@@ -411,12 +414,13 @@ export function Personas({ user, onUserUpdate }) {
     )
     if (result.isConfirmed) {
       try {
-        await apiFetch(`/personas/${id}`, { method: 'DELETE' })
+        const response = await apiFetch(`/personas/${id}`, { method: 'DELETE' })
+        if (!response.ok) throw new Error(await leerMensajeError(response, 'No se pudo eliminar a la persona.'))
         showToast('Persona eliminada correctamente', 'eliminar')
         loadPersonas().catch(() => {})
         loadStats()
       } catch (err) {
-        showError('Error', 'No se pudo eliminar a la persona.')
+        showError('Error', err.message || 'No se pudo eliminar a la persona.')
       }
     }
   }
@@ -469,10 +473,9 @@ export function Personas({ user, onUserUpdate }) {
       !formData.nombres.trim() ||
       !formData.apellidoPaterno.trim() ||
       !formData.apellidoMaterno.trim() ||
-      !formData.numeroLicencia.trim() ||
       !formData.direccion.trim()
     ) {
-      showError('Validación Fallida', 'Por favor completa todos los campos requeridos (Documento, Nombres, Apellidos, Licencia y Dirección).')
+      showError('Validación Fallida', 'Por favor completa los campos requeridos (Documento, Nombres, Apellidos y Dirección).')
       return
     }
     const isDni = formData.tipoDocumento === 'DNI' || formData.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD'
@@ -528,14 +531,16 @@ export function Personas({ user, onUserUpdate }) {
     } catch (err) {
       let message = 'Error al guardar la persona en el servidor.'
       if (err?.json) {
-        try {
-          const errorData = await err.json()
-          message = errorData?.message || errorData?.error || message
-        } catch (_) {
-          message = err.statusText || message
+        const data = await err.clone().json().catch(() => ({}))
+        const errors = Object.fromEntries(Object.entries(data.messages || {}).filter(([key, value]) => ['numeroDocumento', 'numeroLicencia'].includes(key) && typeof value === 'string'))
+        if (Object.keys(errors).length) {
+          setFieldErrors(errors)
+          window.requestAnimationFrame(() => document.getElementById(errors.numeroDocumento ? 'per_num_doc' : 'per_licencia')?.focus())
+          return
         }
+        message = await leerMensajeError(err, message)
       }
-      showError('Error', message)
+      showError(/duplicad/i.test(message) ? 'Datos duplicados' : 'Revisa los datos', message)
     }
   }
 
@@ -1024,6 +1029,8 @@ export function Personas({ user, onUserUpdate }) {
         <PersonaFormModal
           isEditing={isEditing}
           formData={formData}
+          fieldErrors={fieldErrors}
+          onClearFieldError={(field) => setFieldErrors(previous => { const next = { ...previous }; delete next[field]; return next })}
           setFormData={setFormData}
           handlePhotoUpload={handlePhotoUpload}
           handleClearPhoto={handleClearPhoto}

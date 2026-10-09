@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useDebounce } from '../hooks/useDebounce'
+import { usePersonaRapida } from '../hooks/usePersonaRapida'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
@@ -14,7 +15,7 @@ import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
-import { showToast, showError } from '../utils/SwalUtil'
+import { showToast, showError, showConfirm } from '../utils/SwalUtil'
 import { sanitizarMensaje } from '../config/api'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import './Retenciones.css'
@@ -26,9 +27,8 @@ const FILTER_ESTADO_OPTIONS = [
 ]
 
 const emptyNuevoInternamiento = {
-  idPapeleta: '', motivo: '', lugarIntervencion: '',
-  interesadoDni: '', gradoRemisor: '', carnetRemisor: '',
-  autoridadQueDispone: '', documentoReferencia: '', estadoCarroceria: '', observaciones: ''
+  idPapeleta: '', motivo: '',
+  interesadoDni: '', observaciones: ''
 }
 
 export function Retenciones({ user }) {
@@ -74,6 +74,8 @@ export function Retenciones({ user }) {
   const [registrando, setRegistrando] = useState(false)
   // Inventario del vehículo al ingresar al depósito: { [idCriterio]: cantidad } y el catálogo de ítems.
   const [infraccionVista, setInfraccionVista] = useState(null)
+  // Internamiento que se está editando (null = el formulario crea uno nuevo)
+  const [editandoItem, setEditandoItem] = useState(null)
   // Cobro y liberación de un vehículo internado
   const [pagoItem, setPagoItem] = useState(null)
   const [pagoForm, setPagoForm] = useState({})
@@ -87,10 +89,19 @@ export function Retenciones({ user }) {
   const [buscandoPapeleta, setBuscandoPapeleta] = useState(false)
   const [listaPapeletaAbierta, setListaPapeletaAbierta] = useState(false)
   const textoBusquedaPapeleta = useDebounce(busquedaPapeleta.trim(), 250)
+  // Interesado (quien paga y retira el vehículo): se escribe el DNI y la lupa lo busca en Gestión de personas.
+  const [busquedaInteresado, setBusquedaInteresado] = useState('')
+  const [interesadoElegido, setInteresadoElegido] = useState(null)
+  const [buscandoInteresado, setBuscandoInteresado] = useState(false)
+  const [interesadoNoRegistrado, setInteresadoNoRegistrado] = useState('')
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
+  const cargaInternamientos = useRef(null)
 
   const loadInternamientos = () => {
+    cargaInternamientos.current?.abort()
+    const controller = new AbortController()
+    cargaInternamientos.current = controller
     setIsLoading(true)
     const params = new URLSearchParams({
       page: String(currentPage),
@@ -100,21 +111,23 @@ export function Retenciones({ user }) {
     if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
-    apiFetch(`/internamientos?${params.toString()}`)
-      .then((res) => res.json())
+    apiFetch(`/internamientos?${params.toString()}`, { signal: controller.signal })
+      .then((res) => res.ok ? res.json() : Promise.reject(res))
       .then((res) => {
+        if (controller.signal.aborted) return
         const rows = res.data || []
         setInternamientos(rows)
         setTotalFiltrado(res.meta?.total ?? rows.length)
         setIsLoading(false)
       })
       .catch(() => {
-        setIsLoading(false)
+        if (!controller.signal.aborted) setIsLoading(false)
       })
   }
 
   useEffect(() => {
     loadInternamientos()
+    return () => cargaInternamientos.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, sortBy, sortDir])
 
   const [stats, setStats] = useState({ total: 0, enDeposito: 0, liberados: 0, avgDias: 0 })
@@ -145,6 +158,48 @@ export function Retenciones({ user }) {
     return () => controlador.abort()
   }, [textoBusquedaPapeleta, isNuevoModalOpen, papeletaElegida, listaPapeletaAbierta])
 
+  const buscarInteresado = async () => {
+    const dni = busquedaInteresado.trim()
+    if (!/^\d{8,15}$/.test(dni)) {
+      showError('Atención', 'Escribe un DNI válido (8 dígitos) para buscar.')
+      return
+    }
+    setBuscandoInteresado(true)
+    setInteresadoNoRegistrado('')
+    try {
+      const res = await apiFetch(`/personas?numeroDocumento=${encodeURIComponent(dni)}`)
+      const payload = res.ok ? await res.json() : { data: [] }
+      // id 0 = dato traído de RENIEC que aún no está en Gestión de personas
+      const persona = (payload.data || []).find((x) => Number(x.id) > 0 && String(x.numeroDocumento) === dni)
+      if (persona) elegirInteresado(persona)
+      else setInteresadoNoRegistrado(dni)
+    } catch {
+      showError('Error', 'No se pudo consultar el DNI. Intenta nuevamente.')
+    } finally {
+      setBuscandoInteresado(false)
+    }
+  }
+
+  const elegirInteresado = (persona) => {
+    setInteresadoElegido({
+      dni: persona.numeroDocumento,
+      nombres: persona.nombres || '',
+      apellidos: [persona.apellidoPaterno, persona.apellidoMaterno].filter(Boolean).join(' '),
+    })
+    setNuevoInternamiento((prev) => ({ ...prev, interesadoDni: persona.numeroDocumento }))
+    setBusquedaInteresado(persona.numeroDocumento)
+    setInteresadoNoRegistrado('')
+  }
+  const quitarInteresado = () => {
+    setInteresadoElegido(null)
+    setBusquedaInteresado('')
+    setInteresadoNoRegistrado('')
+    setNuevoInternamiento((prev) => ({ ...prev, interesadoDni: '' }))
+  }
+  const { abrir: abrirRegistroInteresado, modal: modalPersonaRapida } = usePersonaRapida({
+    alCrear: (persona) => elegirInteresado(persona),
+  })
+
   const elegirPapeleta = (p) => {
     setPapeletaElegida(p)
     setNuevoInternamiento((prev) => ({ ...prev, idPapeleta: String(p.id) }))
@@ -153,17 +208,74 @@ export function Retenciones({ user }) {
   }
 
   const handleOpenNuevo = () => {
+    setEditandoItem(null)
     setNuevoInternamiento(emptyNuevoInternamiento)
     setInventarioMarcado({})
     setBusquedaPapeleta('')
     setPapeletaElegida(null)
     setResultadosPapeleta([])
+    setInteresadoElegido(null)
+    setBusquedaInteresado('')
+    setInteresadoNoRegistrado('')
     setIsNuevoModalOpen(true)
     if (criteriosInventario.length === 0) {
       apiFetch('/inventario-criterios')
         .then((res) => (res.ok ? res.json() : { data: [] }))
         .then((payload) => setCriteriosInventario(payload.data || []))
         .catch(() => {})
+    }
+  }
+
+  const handleOpenEditar = (item) => {
+    setEditandoItem(item)
+    setNuevoInternamiento({
+      idPapeleta: String(item.papeletaId || ''),
+      motivo: item.motivo || '',
+      interesadoDni: item.interesadoDni && item.interesadoDni !== 'S/D' ? item.interesadoDni : '',
+      observaciones: item.observaciones || '',
+    })
+    setInventarioMarcado(Object.fromEntries(
+      (item.inventario || []).filter((i) => Number(i.cantidad) > 0).map((i) => [i.criterioId, String(i.cantidad)])
+    ))
+    setBusquedaPapeleta(item.numeroPapeleta ? `${item.numeroPapeleta} — ${item.vehiculoPlaca}` : (item.vehiculoPlaca || ''))
+    setPapeletaElegida({ id: item.papeletaId })
+    setResultadosPapeleta([])
+    setInteresadoElegido(item.interesadoDni && item.interesadoDni !== 'S/D'
+      ? { dni: item.interesadoDni, nombres: item.interesadoNombres || '', apellidos: item.interesadoApellidos || '' }
+      : null)
+    setBusquedaInteresado(item.interesadoDni && item.interesadoDni !== 'S/D' ? item.interesadoDni : '')
+    setInteresadoNoRegistrado('')
+    setIsNuevoModalOpen(true)
+    if (criteriosInventario.length === 0) {
+      apiFetch('/inventario-criterios')
+        .then((res) => (res.ok ? res.json() : { data: [] }))
+        .then((payload) => setCriteriosInventario(payload.data || []))
+        .catch(() => {})
+    }
+  }
+
+  const handleEliminar = async (item) => {
+    if (item.estado === 'LIBERADO' || item.numeroOrdenLibertad) {
+      showError('No se puede eliminar', 'Este internamiento tiene una orden de libertad. Debe conservarse su historial de cobros.')
+      return
+    }
+    const resultado = await showConfirm(
+      '¿Eliminar internamiento?',
+      `Se eliminará la boleta ${item.numeroBoleta} (placa ${item.vehiculoPlaca}) junto con su inventario. Esta acción no se puede deshacer.`,
+      'Sí, eliminar',
+      'Cancelar',
+      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' },
+    )
+    if (!resultado.isConfirmed) return
+    try {
+      const res = await apiFetch(`/internamientos/${item.uuid || item.id}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo eliminar el internamiento.')
+      loadInternamientos()
+      loadStats()
+      showToast('Internamiento eliminado correctamente')
+    } catch (err) {
+      showError('Error', sanitizarMensaje(err.message, 'No se pudo eliminar el internamiento.'))
     }
   }
 
@@ -233,23 +345,30 @@ export function Retenciones({ user }) {
     }
     setRegistrando(true)
     try {
-      const res = await apiFetch('/internamientos', {
-        method: 'POST',
-        body: {
-          ...nuevoInternamiento,
-          idPapeleta: Number(nuevoInternamiento.idPapeleta),
-          idRemisor: user?.id_persona || null,
-          inventario: Object.entries(inventarioMarcado)
-            .filter(([, cantidad]) => cantidad !== '' && cantidad !== undefined)
-            .map(([idCriterio, cantidad]) => ({ idCriterio: Number(idCriterio), cantidad: Number(cantidad) })),
-        }
-      })
+      const inventario = Object.entries(inventarioMarcado)
+        .filter(([, cantidad]) => cantidad !== '' && cantidad !== undefined)
+        .map(([idCriterio, cantidad]) => ({ idCriterio: Number(idCriterio), cantidad: Number(cantidad) }))
+      const res = editandoItem
+        ? await apiFetch(`/internamientos/${editandoItem.uuid || editandoItem.id}`, {
+          method: 'PUT',
+          body: { ...nuevoInternamiento, inventario },
+        })
+        : await apiFetch('/internamientos', {
+          method: 'POST',
+          body: {
+            ...nuevoInternamiento,
+            idPapeleta: Number(nuevoInternamiento.idPapeleta),
+            idRemisor: user?.id_persona || null,
+            inventario,
+          }
+        })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo registrar el internamiento.')
       setIsNuevoModalOpen(false)
+      setEditandoItem(null)
       loadInternamientos()
       loadStats()
-      showToast(`Internamiento ${data.data?.numeroOrden || ''} registrado correctamente`.trim())
+      showToast(editandoItem ? 'Internamiento actualizado correctamente' : `Internamiento ${data.data?.numeroOrden || ''} registrado correctamente`.trim())
     } catch (err) {
       showError('Error', sanitizarMensaje(err.message, 'No se pudo registrar el internamiento.'))
     } finally {
@@ -316,7 +435,9 @@ export function Retenciones({ user }) {
               { header: 'GRADO REMISOR', key: 'gradoRemisor', width: 110 },
               { header: 'CARNET REMISOR', key: 'carnetRemisor', isText: true, width: 110, align: 'center' },
               { header: 'ESTADO DE CARROCERÍA', key: 'estadoCarroceria', width: 160 },
-              { header: 'CONDUCTOR / INTERESADO', key: 'interesadoNombre', width: 180 },
+              { header: 'CONDUCTOR', key: 'conductorNombre', width: 180 },
+              { header: 'DNI CONDUCTOR', key: 'conductorDni', isText: true, width: 110, align: 'center' },
+              { header: 'INTERESADO (QUIEN PAGA)', key: 'interesadoNombre', width: 180 },
               { header: 'DNI INTERESADO', key: 'interesadoDni', isText: true, width: 110, align: 'center' },
               { header: 'DIRECCIÓN INTERESADO', key: 'interesadoDireccion', width: 220 },
               { header: 'FECHA INGRESO', key: 'fechaIngreso', width: 130, align: 'center' },
@@ -404,13 +525,6 @@ export function Retenciones({ user }) {
         {estado}
       </span>
     )
-  }
-
-  const getItemStateColor = (estado) => {
-    if (estado === 'BUENO') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-    if (estado === 'REGULAR') return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-    if (estado === 'MALO') return 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800'
-    return 'bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-400 border-slate-200 dark:border-[var(--border-strong)]'
   }
 
   return (
@@ -552,22 +666,22 @@ export function Retenciones({ user }) {
         <div className="internamientos-listado">
           <table className="w-full table-fixed text-left text-xs">
             <colgroup>
-              <col className="w-[9%]" />
-              <col className="w-[14%]" />
               <col className="w-[8%]" />
-              <col className="w-[18%]" />
               <col className="w-[13%]" />
-              <col className="w-[17%]" />
-              <col className="w-[10%]" />
+              <col className="w-[7%]" />
+              <col className="w-[16%]" />
+              <col className="w-[12%]" />
               <col className="w-[11%]" />
+              <col className="w-[10%]" />
+              <col className="w-[23%]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3.5 text-center"><SortableHeader column="numeroBoleta" label="Boleta" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="px-4 py-3.5">Vehículo y placa</th>
-                <th className="px-4 py-3.5">Infracción</th>
-                <th className="px-4 py-3.5">Interesado / Conductor</th>
-                <th className="px-4 py-3.5"><SortableHeader column="fechaIngreso" label="Ingreso y custodia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3.5 text-center">Vehículo y placa</th>
+                <th className="px-4 py-3.5 text-center">Infracción</th>
+                <th className="px-4 py-3.5 text-center">Conductor</th>
+                <th className="px-4 py-3.5 text-center"><SortableHeader column="fechaIngreso" label="Ingreso y custodia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3 py-3.5 text-center print:hidden">Documento</th>
                 <th className="px-4 py-3.5 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3.5 text-center">Acciones</th>
@@ -596,8 +710,8 @@ export function Retenciones({ user }) {
                       </div>
                     </td>
 
-                    <td data-label="Vehículo y placa" className="px-4 py-2.5 print:px-1 print:py-1">
-                      <div className="flex items-center gap-2 print:gap-1">
+                    <td data-label="Vehículo y placa" className="px-4 py-2.5 text-center print:px-1 print:py-1">
+                      <div className="flex items-center justify-center gap-2 print:gap-1">
                         <PlacaBadge placa={item.vehiculoPlaca} />
                       </div>
                       <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
@@ -605,10 +719,10 @@ export function Retenciones({ user }) {
                       </div>
                     </td>
 
-                    <td data-label="Infracción" className="px-4 py-2.5">
+                    <td data-label="Infracción" className="px-4 py-2.5 text-center">
                       {/* Solo el código de la infracción de la papeleta; al hacer clic se abre su detalle (igual que en Papeletas) */}
                       {item.infracciones?.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap justify-center gap-1">
                           {item.infracciones.map((inf) => (
                             <button
                               key={inf.codigo}
@@ -633,16 +747,16 @@ export function Retenciones({ user }) {
                       )}
                     </td>
 
-                    <td data-label="Interesado / Conductor" className="px-4 py-2.5 print:px-1 print:py-1">
+                    <td data-label="Conductor" className="px-4 py-2.5 text-center print:px-1 print:py-1">
                       <div className="font-semibold text-xs text-slate-800 dark:text-slate-200 print:text-black">
-                        {item.interesadoNombre}
+                        {item.conductorNombre}
                       </div>
                       <div className="mt-0.5 text-[11px] text-slate-400">
-                        DNI: {item.interesadoDni}
+                        DNI: {item.conductorDni}
                       </div>
                     </td>
 
-                    <td data-label="Ingreso y custodia" className="px-4 py-2.5">
+                    <td data-label="Ingreso y custodia" className="px-4 py-2.5 text-center">
                       <div className="text-slate-800 dark:text-slate-200 font-medium text-xs">
                         {item.fechaIngreso ? new Date(item.fechaIngreso).toLocaleDateString('es-PE') : 'S/F'}
                       </div>
@@ -694,6 +808,27 @@ export function Retenciones({ user }) {
                             <span>Pagar</span>
                           </button>
                         )}
+                        {(
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditar(item)}
+                              className="size-8 shrink-0 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white"
+                              title="Editar internamiento"
+                            >
+                              <Icon name="pencil" className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEliminar(item)}
+                              disabled={item.estado === 'LIBERADO' || Boolean(item.numeroOrdenLibertad)}
+                              className="size-8 shrink-0 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={item.estado === 'LIBERADO' || item.numeroOrdenLibertad ? 'Historial protegido: tiene orden de libertad' : 'Eliminar internamiento'}
+                            >
+                              <Icon name="trash" className="size-4" />
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(item)}
@@ -734,7 +869,7 @@ export function Retenciones({ user }) {
                 <span className="grid size-9 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="garage" className="size-4.5" />
                 </span>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Nuevo Internamiento</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">{editandoItem ? `Editar Internamiento ${editandoItem.numeroBoleta}` : 'Nuevo Internamiento'}</h3>
               </div>
               <BotonCerrarModal onClick={() => setIsNuevoModalOpen(false)} title="Cerrar" />
             </div>
@@ -747,6 +882,7 @@ export function Retenciones({ user }) {
                     id="int_papeleta"
                     label="Papeleta (busca por N°, placa o conductor)"
                     required
+                    disabled={Boolean(editandoItem)}
                     autoComplete="off"
                     value={busquedaPapeleta}
                     onFocus={() => setListaPapeletaAbierta(true)}
@@ -785,14 +921,12 @@ export function Retenciones({ user }) {
                     </div>
                   )}
                 </div>
-                <p className="mt-2 text-[10.5px] text-slate-400">Solo aparecen papeletas que aún no tienen un internamiento registrado.</p>
               </fieldset>
 
               <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Datos del Internamiento</legend>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FloatingInput id="int_deposito" label="Depósito oficial" value="Depósito Oficial José L. Ortiz" disabled inputClassName="bg-slate-100 text-slate-500 dark:bg-[var(--bg-subtle)]" />
-                  <FloatingInput id="int_lugar" label="Lugar de intervención" optional value={nuevoInternamiento.lugarIntervencion} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, lugarIntervencion: e.target.value })} />
                   <div className="sm:col-span-2">
                     <FloatingInput id="int_motivo" label="Motivo del internamiento" optional value={nuevoInternamiento.motivo} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, motivo: e.target.value })} />
                   </div>
@@ -800,24 +934,66 @@ export function Retenciones({ user }) {
               </fieldset>
 
               <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
-                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Interesado / Autoridad</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FloatingInput
-                    id="int_interesado_dni"
-                    label="DNI del interesado"
-                    optional
-                    maxLength={11}
-                    inputClassName="font-mono"
-                    value={nuevoInternamiento.interesadoDni}
-                    onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, interesadoDni: e.target.value.replace(/\D/g, '') })}
-                  />
-                  <FloatingInput id="int_autoridad" label="Autoridad que dispone" optional value={nuevoInternamiento.autoridadQueDispone} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, autoridadQueDispone: e.target.value })} />
-                  <FloatingInput id="int_grado" label="Grado del remisor" optional value={nuevoInternamiento.gradoRemisor} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, gradoRemisor: e.target.value })} />
-                  <FloatingInput id="int_carnet" label="Carnet del remisor" optional value={nuevoInternamiento.carnetRemisor} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, carnetRemisor: e.target.value })} />
-                  <FloatingInput id="int_doc_ref" label="Documento de referencia" optional value={nuevoInternamiento.documentoReferencia} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, documentoReferencia: e.target.value })} />
-                  <FloatingInput id="int_carroceria" label="Estado de carrocería" optional value={nuevoInternamiento.estadoCarroceria} onChange={(e) => setNuevoInternamiento({ ...nuevoInternamiento, estadoCarroceria: e.target.value })} />
+                <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Interesado</legend>
+                <div className="space-y-4">
+                  {!interesadoElegido && (
+                  <div className="flex items-end gap-2">
+                    <div className="min-w-0 flex-1 sm:max-w-xs">
+                      <FloatingInput
+                        id="int_interesado_dni"
+                        label="DNI del interesado"
+                        maxLength={15}
+                        inputClassName="font-mono"
+                        autoComplete="off"
+                        disabled={Boolean(interesadoElegido)}
+                        value={busquedaInteresado}
+                        onChange={(e) => { setBusquedaInteresado(e.target.value.replace(/\D/g, '')); setInteresadoNoRegistrado('') }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (!interesadoElegido) buscarInteresado() } }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={buscarInteresado}
+                        disabled={buscandoInteresado}
+                        title="Buscar el DNI en Gestión de personas"
+                        className="grid size-[42px] shrink-0 cursor-pointer place-items-center rounded-xl text-white disabled:cursor-wait disabled:opacity-50"
+                        style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
+                      >
+                        {buscandoInteresado
+                          ? <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                          : <Icon name="search" className="size-4" />}
+                      </button>
+                  </div>
+                  )}
+
+                  {interesadoNoRegistrado && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/30">
+                      <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
+                        El DNI <b>{interesadoNoRegistrado}</b> no está registrado en Gestión de personas.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => abrirRegistroInteresado(interesadoNoRegistrado)}
+                        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white transition hover:bg-emerald-500 cursor-pointer"
+                      >
+                        <span>+</span><span>Registrar persona</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {interesadoElegido && (
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <FloatingInput id="int_interesado_dni_ok" label="DNI" disabled value={interesadoElegido.dni} inputClassName="font-mono bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)]" />
+                      <FloatingInput id="int_interesado_nombres" label="Nombres" disabled value={interesadoElegido.nombres} inputClassName="bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)]" />
+                      <FloatingInput id="int_interesado_apellidos" label="Apellidos" disabled value={interesadoElegido.apellidos} inputClassName="bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)]" />
+                    </div>
+                  )}
+                  {interesadoElegido && (
+                    <button type="button" onClick={quitarInteresado} className="text-xs font-bold text-rose-600 hover:text-rose-700 cursor-pointer dark:text-rose-300">
+                      Cambiar interesado
+                    </button>
+                  )}
                 </div>
-                <p className="mt-2 text-[10.5px] text-slate-400">El remisor queda registrado automáticamente con tu usuario de inspector.</p>
               </fieldset>
 
               <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
@@ -877,15 +1053,11 @@ export function Retenciones({ user }) {
             <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <BotonCancelar onClick={() => setIsNuevoModalOpen(false)} />
               <BotonGuardar disabled={registrando}>
-                {registrando ? 'Registrando...' : 'Registrar Internamiento'}
+                {registrando ? 'Guardando...' : (editandoItem ? 'Guardar cambios' : 'Registrar Internamiento')}
               </BotonGuardar>
             </div>
           </form>
         </div>
-      )}
-
-      {infraccionVista && (
-        <InfraccionDetalleModal selectedInfraccion={infraccionVista} onClose={() => setInfraccionVista(null)} />
       )}
 
       {pagoItem && (
@@ -955,210 +1127,123 @@ export function Retenciones({ user }) {
       )}
 
       {isDetailModalOpen && selectedItem && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter ${printLayout === 'FICHA' ? 'print:static print:block print:p-0 print:bg-transparent print:overflow-visible' : 'print:hidden'}`}>
-          <div
-            id={printLayout === 'FICHA' ? "seccion-impresion-ticket" : undefined}
-            className={`relative flex flex-col w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] border border-slate-200/80 ${printLayout === 'FICHA' ? 'print:shadow-none print:border-none print:m-0 print:p-0 print:max-h-none print:overflow-visible print:max-w-full' : ''}`}
-          >
-            {/* Modal Header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-9 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
-                  <Icon name="retention" className="size-4.5" />
-                </span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) setIsDetailModalOpen(false) }}>
+          <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3 dark:border-[var(--border)]">
+              <div className="flex min-w-0 items-center gap-3">
+                <PlacaBadge placa={selectedItem.vehiculoPlaca} />
+                <div className="min-w-0">
+                  <h3 className="truncate text-base font-bold leading-tight text-slate-900 dark:text-white">Boleta {selectedItem.numeroBoleta}</h3>
+                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    {selectedItem.vehiculoMarca} {selectedItem.vehiculoModelo} ({selectedItem.vehiculoColor}) · {selectedItem.totalDias} {selectedItem.totalDias === 1 ? 'día' : 'días'} en custodia
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {getStatusBadge(selectedItem.estado)}
+                <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar ventana" />
+              </div>
+            </div>
+
+            <div className="space-y-3 p-4 sm:p-5">
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs sm:grid-cols-3">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Acta de Internamiento e Inventario
-                    </h3>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      Boleta N° {selectedItem.numeroBoleta}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Depósito Municipal Oficial de Vehículos • MJLO
-                  </p>
+                  <dt className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Papeleta</dt>
+                  <dd className="font-bold text-slate-800 dark:text-slate-200">{selectedItem.numeroPapeleta || '—'}</dd>
                 </div>
-              </div>
-              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} className="print:hidden" title="Cerrar ventana" />
-            </div>
-
-            {/* Modal Body: Scrollable & Compact */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
-              {/* Datos Generales Card */}
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]/50">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Vehículo Retenido</span>
-                    <div className="mt-0.5">
-                      <PlacaBadge placa={selectedItem.vehiculoPlaca} size="lg" />
-                    </div>
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      {selectedItem.vehiculoMarca} {selectedItem.vehiculoModelo} <span className="text-slate-500">({selectedItem.vehiculoColor})</span>
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Carrocería: {selectedItem.estadoCarroceria || 'Sin registrar'}
-                    </p>
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Motivo & Infracción</span>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug">
-                      {selectedItem.motivo}
-                    </p>
-                    {selectedItem.numeroPapeleta && (
-                      <p className="text-xs font-bold text-rose-600 dark:text-rose-400">
-                        Papeleta: {selectedItem.numeroPapeleta} <span className="font-black">(S/ {Number(selectedItem.montoPapeleta).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})</span>
-                      </p>
-                    )}
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Autoridad: {selectedItem.autoridadQueDispone || 'Subgerencia de Tránsito'}
-                    </p>
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Intervinientes</span>
-                      {getStatusBadge(selectedItem.estado)}
-                    </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300">
-                      <strong className="text-slate-900 dark:text-white">Remisor:</strong> {selectedItem.remisorNombre}
-                    </p>
-                    <p className="text-xs text-slate-700 dark:text-slate-300">
-                      <strong className="text-slate-900 dark:text-white">Interesado:</strong> {selectedItem.interesadoNombre}
-                    </p>
-                    <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                      DNI: {selectedItem.interesadoDni || '—'}
-                    </p>
-                  </div>
+                <div>
+                  <dt className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Infracción</dt>
+                  <dd className="flex flex-wrap gap-1">
+                    {selectedItem.infracciones?.length > 0 ? selectedItem.infracciones.map((inf) => (
+                      <button
+                        key={inf.codigo}
+                        type="button"
+                        onClick={() => setInfraccionVista({ ...inf, numeroPapeleta: selectedItem.numeroPapeleta })}
+                        title={inf.descripcion}
+                        className="rounded-md border border-rose-200/70 bg-rose-50 px-1.5 py-0.5 font-mono text-[11px] font-black text-rose-700 cursor-pointer hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+                      >
+                        {inf.codigo}
+                      </button>
+                    )) : <span className="font-bold text-slate-800 dark:text-slate-200">—</span>}
+                  </dd>
                 </div>
-              </div>
+                <div>
+                  <dt className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Ingreso</dt>
+                  <dd className="font-bold text-slate-800 dark:text-slate-200">{selectedItem.fechaIngreso ? new Date(String(selectedItem.fechaIngreso).replace(' ', 'T')).toLocaleDateString('es-PE') : '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Conductor</dt>
+                  <dd className="font-bold text-slate-800 dark:text-slate-200">{selectedItem.conductorNombre} <span className="font-mono font-normal text-slate-500">· {selectedItem.conductorDni || '—'}</span></dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Interesado (paga)</dt>
+                  <dd className="font-bold text-slate-800 dark:text-slate-200">{selectedItem.interesadoNombre} <span className="font-mono font-normal text-slate-500">· {selectedItem.interesadoDni || '—'}</span></dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Remisor</dt>
+                  <dd className="font-bold text-slate-800 dark:text-slate-200">{selectedItem.remisorNombre}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Carrocería</dt>
+                  <dd className="font-bold text-slate-800 dark:text-slate-200">{selectedItem.estadoCarroceria || 'Sin registrar'}</dd>
+                </div>
+              </dl>
 
-              {/* Banner de Salida si está liberado */}
               {selectedItem.estado === 'LIBERADO' && (
-                <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
-                    <Icon name="check" className="size-4.5 text-emerald-600 dark:text-emerald-400" />
-                    <h4 className="font-extrabold text-xs sm:text-sm">Vehículo Liberado — Orden de Salida</h4>
-                  </div>
-                  <div className="mt-1.5 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-emerald-950 dark:text-emerald-200 font-medium">
-                    <p>
-                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">N° Orden:</span> {selectedItem.numeroOrdenLibertad || 'S/N'}
-                    </p>
-                    <p>
-                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">Fecha Salida:</span> {selectedItem.fechaLiberacion ? new Date(selectedItem.fechaLiberacion).toLocaleDateString('es-PE') : 'Registrado'}
-                    </p>
-                    <p>
-                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">Liquidación Pagada:</span> S/ {Number(selectedItem.montoTotalLiberacion || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </div>
+                <p className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-emerald-200/90 bg-emerald-50/70 px-3 py-2 text-xs font-medium text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
+                  <span className="inline-flex items-center gap-1.5 font-extrabold"><Icon name="check" className="size-4 text-emerald-600" /> Liberado</span>
+                  <span><b>Orden</b> {selectedItem.numeroOrdenLibertad || 'S/N'}</span>
+                  <span><b>Salida</b> {selectedItem.fechaLiberacion ? new Date(selectedItem.fechaLiberacion).toLocaleDateString('es-PE') : '—'}</span>
+                  <span><b>Pagado</b> S/ {Number(selectedItem.montoTotalLiberacion || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                </p>
               )}
 
-              {/* Detalle de Inventario */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]/30">
-                <div className="flex items-center justify-between mb-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Detalles del Inventario
-                    </span>
-                    <span className="text-slate-300 dark:text-slate-600">•</span>
-                    <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
-                      Partes, Componentes y Accesorios
-                    </h4>
-                  </div>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                    {selectedItem.inventario?.length || 0} ítems evaluados
-                  </span>
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Inventario</span>
+                  <span className="text-[10px] font-bold text-slate-500">{selectedItem.inventario?.length || 0} elementos</span>
                 </div>
-
-                <div className="rounded-xl border border-slate-200/80 overflow-hidden dark:border-[var(--border)]">
-                  <div className="max-h-56 overflow-y-auto print:max-h-none print:overflow-visible">
-                    <table className="w-full text-left text-xs">
-                      <thead className="sticky top-0 z-10 bg-slate-100 text-[10px] font-extrabold uppercase text-slate-600 dark:bg-[#1C2438] dark:text-slate-400">
-                        <tr>
-                          <th className="px-3 py-2">Código</th>
-                          <th className="px-3 py-2">Componente / Criterio</th>
-                          <th className="px-3 py-2">Sección</th>
-                          <th className="px-3 py-2 text-center">Cant.</th>
-                          <th className="px-3 py-2 text-center">Estado Físico</th>
-                          <th className="px-3 py-2">Observación</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)] bg-white dark:bg-[#1C2438]">
-                        {(!selectedItem.inventario || selectedItem.inventario.length === 0) ? (
-                          <tr>
-                            <td colSpan={6} className="px-3.5 py-4 text-center text-xs text-slate-400">
-                              No hay detalle de inventario registrado para esta orden.
-                            </td>
-                          </tr>
-                        ) : (
-                          selectedItem.inventario.map((inv, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                              <td className="px-3 py-1.5 font-mono text-[11px] font-bold text-slate-500">
-                                {inv.codigo}
-                              </td>
-                              <td className="px-3 py-1.5 font-bold text-slate-800 dark:text-slate-200">
-                                {inv.nombre}
-                              </td>
-                              <td className="px-3 py-1.5">
-                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                                  {inv.seccion}
-                                </span>
-                              </td>
-                              <td className="px-3 py-1.5 text-center font-bold text-slate-700 dark:text-slate-300">
-                                {inv.cantidad}
-                              </td>
-                              <td className="px-3 py-1.5 text-center">
-                                <span className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-extrabold ${getItemStateColor(inv.estado)}`}>
-                                  {inv.estado}
-                                </span>
-                              </td>
-                              <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 text-[11px]">
-                                {inv.observacion || '-'}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                {(!selectedItem.inventario || selectedItem.inventario.length === 0) ? (
+                  <p className="rounded-xl border border-dashed border-slate-200 py-3 text-center text-xs text-slate-400 dark:border-[var(--border-strong)]">Sin inventario registrado.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl border border-slate-200/80 p-3 text-[11px] dark:border-[var(--border)] sm:grid-cols-3">
+                    {selectedItem.inventario.map((inv) => (
+                      <div key={inv.criterioId || inv.codigo} className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate font-semibold text-slate-700 dark:text-slate-200" title={`${inv.nombre} · ${inv.estado}`}>{inv.nombre}</span>
+                        <span className="flex shrink-0 items-center gap-1.5 font-black text-slate-800 dark:text-white">
+                          {Number(inv.cantidad) > 1 && <span>×{inv.cantidad}</span>}
+                          <span className={`size-2 rounded-full ${inv.estado === 'MALO' ? 'bg-rose-500' : inv.estado === 'REGULAR' ? 'bg-amber-400' : 'bg-emerald-500'}`} aria-label={inv.estado} />
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                )}
+                <p className="mt-1.5 flex items-center gap-3 text-[10px] text-slate-400">
+                  <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> Bueno</span>
+                  <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-amber-400" /> Regular</span>
+                  <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-rose-500" /> Malo</span>
+                </p>
               </div>
 
-              {/* Observaciones generales */}
               {selectedItem.observaciones && (
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]/40">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                    Observaciones Generales de Internamiento
-                  </span>
-                  <p className="mt-0.5 text-xs text-slate-700 dark:text-slate-300">
-                    {selectedItem.observaciones}
-                  </p>
-                </div>
+                <p className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-3 py-2 text-xs text-slate-700 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]/40 dark:text-slate-300">
+                  <b className="text-slate-500">Observaciones:</b> {selectedItem.observaciones}
+                </p>
               )}
             </div>
 
-            {/* Modal Footer: Fixed at bottom */}
-            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[#1C2438] print:hidden">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handlePrint('FICHA')}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 transition cursor-pointer"
-                >
-                  <Icon name="print" className="size-3.5" />
-                  <span>Imprimir Ficha</span>
-                </button>
-
-              </div>
-
+            <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
             </div>
           </div>
         </div>
       )}
-      
+
+      {/* Va después de la ficha para que se abra encima de ella */}
+      {infraccionVista && (
+        <InfraccionDetalleModal selectedInfraccion={infraccionVista} onClose={() => setInfraccionVista(null)} />
+      )}
+
       {(printLayout === 'INTERNAMIENTO' || printLayout === 'LIBERTAD') && selectedItem && (
         // Sin margen de página, el navegador no imprime fecha, título, dirección ni "1/1" en los bordes;
         // el margen institucional (12 mm × 14 mm) pasa a ser relleno de la propia hoja.
@@ -1170,6 +1255,9 @@ export function Retenciones({ user }) {
       {printLayout === 'LIBERTAD' && selectedItem && (
         <OrdenLibertadPrint item={selectedItem} />
       )}
+
+      {/* Alta rápida de una persona del padrón (desde el interesado) */}
+      {modalPersonaRapida}
     </div>
   )
 }

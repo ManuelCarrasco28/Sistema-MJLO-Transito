@@ -36,26 +36,26 @@ export function PapeletaDetalleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
-      <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
+      <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
         <div className="flex items-center justify-between border-b border-rose-600/20 bg-rose-50 p-5 rounded-t-3xl dark:bg-rose-950/30">
           <div>
-            <h3 className="text-xl font-black text-rose-700 dark:text-rose-400">{selectedPapeleta.numeroPapeleta}</h3>
+            <h3 className="text-2xl font-black text-rose-700 dark:text-rose-400">{selectedPapeleta.numeroPapeleta}</h3>
           </div>
           <BotonCerrarModal onClick={onClose} title="Cerrar" />
         </div>
-        <div className="p-6 overflow-y-auto max-h-[80vh]">
+        <div className="p-6 overflow-y-auto max-h-[88vh]">
 
-          <div className="space-y-4">
-            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
+          <div className="grid grid-flow-dense gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)] lg:col-span-2">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-black uppercase tracking-wider text-rose-600">
+                <h4 className="text-sm font-black uppercase tracking-wider text-rose-600">
                   {detallesList.length > 1
                     ? `Infracciones Imputadas (${detallesList.length})`
                     : 'Identificación de la Falta'}
                 </h4>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="grid gap-2.5 md:grid-cols-2">
                 {detallesList.map((det, idx) => (
                   <div
                     key={idx}
@@ -86,7 +86,7 @@ export function PapeletaDetalleModal({
 
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Descripción</p>
-                      <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5 leading-relaxed">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mt-0.5 leading-relaxed">
                         {det.descripcion || 'Sin descripción registrada'}
                       </p>
                     </div>
@@ -96,8 +96,8 @@ export function PapeletaDetalleModal({
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-              <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Lugar y Fecha</h4>
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <h4 className="text-sm font-black uppercase tracking-wider text-rose-600 mb-2.5">Lugar y Fecha</h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-slate-400">Fecha y Hora</p>
                   <p className="font-bold text-slate-800 dark:text-white">{new Date(selectedPapeleta.fechaHora).toLocaleString()}</p>
@@ -118,8 +118,8 @@ export function PapeletaDetalleModal({
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-              <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Intervinientes y Vehículo</h4>
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <h4 className="text-sm font-black uppercase tracking-wider text-rose-600 mb-2.5">Intervinientes y Vehículo</h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-slate-400">Propietario</p>
                   <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.propietarioNombre || 'No Registrado'}</p>
@@ -151,8 +151,8 @@ export function PapeletaDetalleModal({
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-              <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Estado Económico</h4>
-              <div className="grid grid-cols-2 gap-3 text-xs mb-2">
+              <h4 className="text-sm font-black uppercase tracking-wider text-rose-600 mb-2.5">Estado Económico</h4>
+              <div className="grid grid-cols-2 gap-3 text-sm mb-2">
                 <div>
                   <p className="text-slate-400">Monto Base Total</p>
                   <p className="font-bold text-slate-800 dark:text-white">S/ {montoBaseTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
@@ -171,8 +171,8 @@ export function PapeletaDetalleModal({
                 </div>
               </div>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-              <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Evidencia fotográfica</h4>
+            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)] lg:col-span-2">
+              <h4 className="text-sm font-black uppercase tracking-wider text-rose-600 mb-2.5">Evidencia fotográfica</h4>
               <div className="text-xs">
                 {loadingPapeletaFotos ? (
                   <div className="flex animate-pulse gap-4 overflow-x-auto pb-2">
@@ -184,7 +184,7 @@ export function PapeletaDetalleModal({
                   <div className="flex gap-4 overflow-x-auto pb-3 custom-scrollbar">
                     {selectedPapeletaFotos.map((foto) => (
                       <button type="button" key={foto.id} onClick={() => onVerImagen(foto.foto)} className="shrink-0 relative group block overflow-hidden rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-black/5 cursor-pointer">
-                        <img src={foto.foto} alt="Evidencia" className="h-32 w-48 object-cover transition-transform duration-300 group-hover:scale-105" />
+                        <img src={foto.foto} alt="Evidencia" className="h-40 w-60 object-cover transition-transform duration-300 group-hover:scale-105" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center backdrop-blur-[0px] group-hover:backdrop-blur-[2px]">
                           <Icon name="maximize" className="text-white opacity-0 group-hover:opacity-100 drop-shadow-lg size-8 transition-opacity duration-300" />
                         </div>
@@ -202,8 +202,8 @@ export function PapeletaDetalleModal({
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50 border border-slate-100 dark:border-[var(--border)]">
-              <h4 className="text-xs font-black uppercase tracking-wider text-rose-600 mb-2">Firma del conductor</h4>
-              <div className="grid gap-3 text-xs sm:grid-cols-2">
+              <h4 className="text-sm font-black uppercase tracking-wider text-rose-600 mb-2.5">Firma del conductor</h4>
+              <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <p className="text-slate-400">Estado</p>
                   <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${selectedPapeleta.firmaConductorEstado === 'FIRMADO'

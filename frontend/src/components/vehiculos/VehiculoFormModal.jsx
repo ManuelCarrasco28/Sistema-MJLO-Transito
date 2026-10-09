@@ -228,7 +228,7 @@ export function VehiculoFormModal({
                       id="veh_anio"
                       type="number"
                       label="Año Fabricación"
-                      min={1950}
+                      min={1900}
                       max={new Date().getFullYear() + 1}
                       value={formData.anio || ''}
                       onChange={(e) => {

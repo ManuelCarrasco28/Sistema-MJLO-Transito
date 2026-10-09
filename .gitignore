@@ -49,6 +49,7 @@ Database/
 !backend/app/Database/Seeds/*.php
 *.sql
 !init-db/transitomunicipal.sql
+!init-db/migraciones/002_inscripciones_unicas.sql
 
 *.img/
 

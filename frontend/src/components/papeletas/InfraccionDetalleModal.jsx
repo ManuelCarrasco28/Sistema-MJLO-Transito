@@ -1,7 +1,7 @@
 import { Icon } from '../ui/Icon'
 import { BotonCancelar, BotonCerrarModal } from '../ui/ModalControls'
 
-export function InfraccionDetalleModal({ selectedInfraccion, onClose }) {
+export function InfraccionDetalleModal({ selectedInfraccion, onClose, onEditar = null }) {
   if (!selectedInfraccion) return null
 
   return (
@@ -90,7 +90,17 @@ export function InfraccionDetalleModal({ selectedInfraccion, onClose }) {
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-slate-100 bg-slate-50/50 p-4 dark:border-[var(--border)] dark:bg-slate-900/40">
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/50 p-4 dark:border-[var(--border)] dark:bg-slate-900/40">
+          {onEditar && (
+            <button
+              type="button"
+              onClick={() => onEditar(selectedInfraccion.codigo)}
+              className="inline-flex items-center gap-1.5 rounded-xl border-[1.5px] border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-100 active:scale-95 cursor-pointer dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+            >
+              <Icon name="pencil" className="size-3.5" />
+              <span>Editar infracción</span>
+            </button>
+          )}
           <BotonCancelar onClick={onClose}>Cerrar</BotonCancelar>
         </div>
       </div>
