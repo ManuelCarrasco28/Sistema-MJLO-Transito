@@ -71,7 +71,40 @@ class ReportesIntervencionController extends ResourceController
             $query->where('v.placa', $placa);
         }
 
-        if (empty($dni) && empty($placa)) {
+        // Modo paginado (pantalla de Papeletas): filtros y página en el servidor, para no traer todo el historial
+        $pagina = (int) $this->request->getGet('page');
+        $porPagina = max(1, min(100, (int) ($this->request->getGet('porPagina') ?: 8)));
+        $total = null;
+        if ($pagina > 0) {
+            $estadoFiltro = strtoupper(trim((string) $this->request->getGet('estado')));
+            if ($estadoFiltro === 'CONVERTIDO_PAPELETA') {
+                $query->whereIn('r.estado', ['CONVERTIDO_PAPELETA', 'FINALIZADO']);
+            } elseif (in_array($estadoFiltro, ['PENDIENTE', 'RECHAZADO'], true)) {
+                $query->where('r.estado', $estadoFiltro);
+            }
+            $buscar = trim((string) $this->request->getGet('buscar'));
+            if ($buscar !== '') {
+                $patron = $db->escape('%' . $db->escapeLikeString($buscar) . '%');
+                $num = ltrim($buscar, '#');
+                $query->groupStart()
+                    ->where("(COALESCE(v.placa, r.placa) LIKE $patron ESCAPE '!' OR r.lugar LIKE $patron ESCAPE '!' OR r.observaciones LIKE $patron ESCAPE '!'"
+                        . " OR p.numero_papeleta LIKE $patron ESCAPE '!' OR cond_per.numero LIKE $patron ESCAPE '!' OR r.conductor_informal_dni LIKE $patron ESCAPE '!'"
+                        . " OR EXISTS (SELECT 1 FROM reporte_intervencion_infracciones rx JOIN tipos_infraccion tx ON tx.id = rx.id_tipo_infraccion WHERE rx.id_reporte = r.id AND tx.codigo LIKE $patron ESCAPE '!')"
+                        . (ctype_digit($num) ? ' OR r.id = ' . (int) $num : '') . ')', null, false)
+                    ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'ci.nombres', 'ci.apellido_paterno', 'ci.apellido_materno'), null, false)
+                    ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c_cond.nombres', 'c_cond.apellido_paterno', 'c_cond.apellido_materno'), null, false)
+                    ->groupEnd();
+            }
+            // Conteo: se reutiliza todo lo que sigue al SELECT (joins y filtros), contando reportes distintos
+            $sqlCompleto = (clone $query)->getCompiledSelect();
+            // Se cuenta con el FROM de la consulta compilada (cualquier tipo de salto de línea)
+            if (!preg_match('/\sFROM\s+`?reportes_intervencion`?/i', $sqlCompleto, $m, PREG_OFFSET_CAPTURE)) {
+                throw new \RuntimeException('No se pudo armar el conteo de reportes.');
+            }
+            $sqlConteo = 'SELECT DISTINCT r.id ' . substr($sqlCompleto, $m[0][1]);
+            $total = (int) ($db->query("SELECT COUNT(*) AS n FROM ($sqlConteo) t")->getRowArray()['n'] ?? 0);
+            $query->limit($porPagina, ($pagina - 1) * $porPagina);
+        } elseif (empty($dni) && empty($placa)) {
             $query->limit(100);
         }
 
@@ -108,7 +141,15 @@ class ReportesIntervencionController extends ResourceController
             $row['infraccionesIds'] = array_map('intval', array_column($infrs, 'id'));
         }
 
-        return $this->respond(['data' => $rows]);
+        // Total real de pendientes: la lista trae solo los últimos 100 reportes, el contador no debe depender de eso
+        $pendientes = (int) $db->table('reportes_intervencion')->where('estado', 'PENDIENTE')->countAllResults();
+
+        $meta = ['pendientes' => $pendientes];
+        if ($total !== null) {
+            $meta += ['total' => $total, 'page' => $pagina, 'porPagina' => $porPagina];
+        }
+
+        return $this->respond(['data' => $rows, 'meta' => $meta]);
     }
 
     public function fotos($id)
@@ -432,7 +473,7 @@ class ReportesIntervencionController extends ResourceController
             ]);
 
             $db->transCommit();
-            return $this->respond(['message' => 'Reporte convertido a papeleta.', 'data' => ['id' => $papeletaId, 'numeroPapeleta' => $numeroPapeleta]]);
+            return $this->respond(['message' => 'Reporte convertido a papeleta.', 'data' => ['id' => $papeletaId, 'numeroPapeleta' => $numeroPapeletaDefinitivo]]);
         } catch (\DomainException $e) {
             $db->transRollback();
             return $this->failValidationErrors($e->getMessage());

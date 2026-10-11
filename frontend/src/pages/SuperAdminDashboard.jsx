@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { avisarCambioConfigMovil } from '../utils/configMovil'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
@@ -354,6 +355,7 @@ export function SuperAdminDashboard({ user }) {
       if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo guardar la configuración.')
       setMessage(successMessage || 'Configuración actualizada correctamente.')
       fetchMunicipalidadConfig()
+      avisarCambioConfigMovil()
     } catch (error) {
       setMessage(error.message || 'Error al guardar configuración.')
     } finally {
@@ -518,11 +520,6 @@ export function SuperAdminDashboard({ user }) {
             <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
               {isDashboard ? 'Panel Super Admin' : activeModuleInfo.label}
             </h1>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              {isDashboard
-                ? `Bienvenido, ${user?.nombres || 'Super Admin'}. Gestión administrativa, seguridad y configuración global.`
-                : activeModuleInfo.detail}
-            </p>
           </div>
         </div>
       </div>

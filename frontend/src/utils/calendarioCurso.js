@@ -1,6 +1,13 @@
+const formatoLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' })
+
+// Fecha de hoy (AAAA-MM-DD) en hora de Lima. No usar toISOString(): entre las 7 pm y las 12 am daría el día siguiente.
 export function fechaLocalActual() {
-  const hoy = new Date()
-  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+  return formatoLima.format(new Date())
+}
+
+// Fecha de hoy más N días (AAAA-MM-DD), en hora de Lima
+export function fechaLocalMasDias(dias) {
+  return formatoLima.format(new Date(Date.now() + dias * 24 * 60 * 60 * 1000))
 }
 
 export const HORAS_CURSO = Array.from({ length: 96 }, (_, i) => {

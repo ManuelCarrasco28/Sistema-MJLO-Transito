@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { fechaLocalActual } from '../utils/calendarioCurso'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
@@ -151,7 +152,7 @@ export function Inspecciones() {
     conductorLicencia: '',
     numeroRegistro: '',
     numeroSerieCerticav: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: fechaLocalActual(),
     inspector: '',
     tecnicoId: '',
     primeraEvaluacion: 'APROBADO',
@@ -462,7 +463,7 @@ export function Inspecciones() {
       // Vacíos: el servidor asigna el siguiente correlativo libre al guardar.
       numeroRegistro: '',
       numeroSerieCerticav: '',
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: fechaLocalActual(),
       inspector: '',
       tecnicoId: '',
       primeraEvaluacion: 'APROBADO',
@@ -502,7 +503,7 @@ export function Inspecciones() {
       conductorLicencia: inspeccion.conductorLicencia || '',
       numeroRegistro: inspeccion.numeroRegistro || inspeccion.numeroInspeccion || '',
       numeroSerieCerticav: inspeccion.numeroSerieCerticav || '',
-      fecha: inspeccion.fecha ? String(inspeccion.fecha).split('T')[0] : new Date().toISOString().split('T')[0],
+      fecha: inspeccion.fecha ? String(inspeccion.fecha).split('T')[0] : fechaLocalActual(),
       inspector: inspeccion.inspector || '',
       tecnicoId: inspeccion.tecnicoId || '',
       primeraEvaluacion: inspeccion.primeraEvaluacion || (inspeccion.resultado === 'DESAPROBADO' ? 'DESAPROBADO' : 'APROBADO'),
@@ -711,7 +712,7 @@ export function Inspecciones() {
     try {
       const data = await fetchTodoElFiltro()
       await exportToExcel({
-        filename: `Inspecciones_Tecnicas_${new Date().toISOString().slice(0, 10)}.xls`,
+        filename: `Inspecciones_Tecnicas_${fechaLocalActual()}.xls`,
         sheetName: 'Inspecciones',
         title: 'REGISTRO DE INSPECCIONES TÉCNICAS VEHICULARES - CERTICAV',
         subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',

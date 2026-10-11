@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useRef, useEffect, useMemo } from 'react'
+import { suscribirConfigMovil } from './utils/configMovil'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Login } from './components/auth/Login'
 import { Sidebar } from './components/layout/Sidebar'
@@ -134,7 +135,10 @@ function Layout({ onLogout, user, onUserUpdate }) {
         if (response.ok) {
           const payload = await response.json()
           if (!cancelled && payload.data) {
-            setNotifications(payload.data)
+            // Las ya leídas se recuerdan: el sondeo periódico no debe volver a marcarlas como nuevas
+            let leidas = []
+            try { leidas = JSON.parse(localStorage.getItem('notif_leidas') || '[]') } catch { /* sin almacenamiento */ }
+            setNotifications(payload.data.map((n) => ({ ...n, unread: !leidas.includes(n.id) })))
           }
         }
       } catch {
@@ -143,14 +147,18 @@ function Layout({ onLogout, user, onUserUpdate }) {
     }
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // Poll every minute
+    const interval = setInterval(fetchNotifications, 20000); // cada 20 s, para que un cambio de configuración se refleje solo
     document.addEventListener('visibilitychange', fetchNotifications)
-    
+    window.addEventListener('focus', fetchNotifications)
+    const dejarDeEscuchar = suscribirConfigMovil(fetchNotifications)
+
     return () => {
       cancelled = true;
       controller.abort()
       clearInterval(interval);
       document.removeEventListener('visibilitychange', fetchNotifications)
+      window.removeEventListener('focus', fetchNotifications)
+      dejarDeEscuchar()
     }
   }, [])
 
@@ -299,6 +307,11 @@ function App() {
         const response = await apiFetch('/me')
         if (!response.ok) throw response
         const payload = await response.json()
+        if (String(payload.data?.rol || '').toUpperCase() === 'TRABAJADOR') {
+          // El inspector solo usa la app móvil: se cierra cualquier sesión suya abierta en el navegador
+          apiFetch('/logout', { method: 'POST' }).catch(() => {})
+          throw new Error('rol-movil')
+        }
         if (!cancelled) {
           setUser(payload.data)
         }

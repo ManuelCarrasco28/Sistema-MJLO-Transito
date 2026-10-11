@@ -342,6 +342,11 @@ class AuthController extends ResourceController
             return $this->failUnauthorized('El usuario se encuentra inactivo.');
         }
 
+        // Los inspectores (rol Trabajador) solo usan la app móvil: desde el navegador no se les crea la sesión
+        if (strtoupper((string) ($userData['rol'] ?? '')) === 'TRABAJADOR' && !\App\Libraries\Acceso::esClienteMovil($this->request)) {
+            return $this->failForbidden('El acceso al sistema web está restringido para este rol. Por favor, utilice la aplicación móvil.');
+        }
+
         $this->clearFailedLogins($usuario);
 
         $usuarioModel->update((int) $userRecord['id'], ['fecha_logueo' => date('Y-m-d H:i:s')]);

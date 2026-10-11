@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { fechaLocalActual } from '../utils/calendarioCurso'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -70,7 +71,7 @@ export function Pagos() {
 
   // Estado para Arqueo de Caja Diario
   const [isArqueoModalOpen, setIsArqueoModalOpen] = useState(false)
-  const [arqueoFecha, setArqueoFecha] = useState(new Date().toISOString().slice(0, 10))
+  const [arqueoFecha, setArqueoFecha] = useState(fechaLocalActual())
   const [arqueoData, setArqueoData] = useState(null)
   const [isLoadingArqueo, setIsLoadingArqueo] = useState(false)
 
@@ -89,7 +90,7 @@ export function Pagos() {
 
   const handleOpenCreateModal = () => {
     setPagoToConfirm(null)
-    setFormData({ numeroRecibo: '', tipoPago: 'TRAMITE', metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: '', fechaPago: new Date().toISOString().slice(0, 10) })
+    setFormData({ numeroRecibo: '', tipoPago: 'TRAMITE', metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: '', fechaPago: fechaLocalActual() })
     setDeudaDni('')
     setDeudaPersona(null)
     setDeudaLista([])
@@ -126,7 +127,7 @@ export function Pagos() {
 
   const handleConfirm = (pago) => {
     setPagoToConfirm(pago)
-    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', fechaPago: new Date().toISOString().slice(0, 10) })
+    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', fechaPago: fechaLocalActual() })
     setIsModalOpen(true)
   }
 
@@ -135,7 +136,7 @@ export function Pagos() {
   // sin necesidad de volver a buscarlo por DNI.
   const handleGenerarRecibo = (pago) => {
     setPagoToConfirm(null)
-    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: String(pago.origenId), fechaPago: new Date().toISOString().slice(0, 10) })
+    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: String(pago.origenId), fechaPago: fechaLocalActual() })
     setDeudaDni('')
     setDeudaPersona(null)
     setDeudaLista([])
@@ -244,7 +245,7 @@ export function Pagos() {
     try {
       const data = await fetchTodoElFiltroPagos()
       await exportToPdf({
-        filename: `Pagos_${new Date().toISOString().slice(0, 10)}.pdf`,
+        filename: `Pagos_${fechaLocalActual()}.pdf`,
         title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
         subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',
         metadata: [
@@ -279,7 +280,7 @@ export function Pagos() {
         }
       }
       await exportToExcel({
-        filename: `Pagos_${new Date().toISOString().slice(0, 10)}.xls`,
+        filename: `Pagos_${fechaLocalActual()}.xls`,
         sheetName: 'Pagos',
         title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
         subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',

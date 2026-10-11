@@ -721,7 +721,7 @@ class PagosController extends ResourceController
                 'monto' => (float)$p['total'],
                 'referencia' => $p['referencia_pago'] ?: '',
                 'hora' => $p['hora_pago'] ?: '00:00:00',
-                'cajero' => $p['cajero'] ?: 'Cajero Principal',
+                'cajero' => ($p['cajero'] ?? '') ?: 'Cajero Principal',
             ];
         }
         foreach ($pagosInternamiento as $p) {

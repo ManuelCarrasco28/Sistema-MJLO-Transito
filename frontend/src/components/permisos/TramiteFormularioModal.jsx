@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { fechaLocalActual, fechaLocalMasDias } from '../../utils/calendarioCurso'
 import { normalizarPlaca } from '../../utils/formatters'
 import { Icon } from '../ui/Icon'
 import { FloatingInput } from '../ui/FormInputs'
@@ -31,12 +32,12 @@ export function TramiteFormularioModal({
     ubicacion: '',
     horarioInicio: '',
     horarioFin: '',
-    fechaEmision: new Date().toISOString().slice(0, 10),
-    fechaInicioVigencia: new Date().toISOString().slice(0, 10),
-    fechaFinVigencia: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    fechaEmision: fechaLocalActual(),
+    fechaInicioVigencia: fechaLocalActual(),
+    fechaFinVigencia: fechaLocalMasDias(365),
     reciboIngresoNumero: '',
     reciboIngresoMonto: '',
-    reciboIngresoFecha: new Date().toISOString().slice(0, 10),
+    reciboIngresoFecha: fechaLocalActual(),
     tonelaje: '',
     numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000)),
     recorridoIngreso: '',
@@ -76,8 +77,8 @@ export function TramiteFormularioModal({
         ubicacion: initialData.ubicacion || '',
         horarioInicio: initialData.horarioInicio || '',
         horarioFin: initialData.horarioFin || '',
-        fechaEmision: initialData.fechaEmision || new Date().toISOString().slice(0, 10),
-        fechaInicioVigencia: initialData.fechaInicioVigencia || new Date().toISOString().slice(0, 10),
+        fechaEmision: initialData.fechaEmision || fechaLocalActual(),
+        fechaInicioVigencia: initialData.fechaInicioVigencia || fechaLocalActual(),
         fechaFinVigencia: initialData.fechaFinVigencia || '',
         reciboIngresoNumero: initialData.reciboIngresoNumero || '',
         reciboIngresoMonto: initialData.reciboIngresoMonto ? String(initialData.reciboIngresoMonto) : '',

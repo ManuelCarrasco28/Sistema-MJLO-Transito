@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { fechaLocalActual, fechaLocalMasDias } from '../utils/calendarioCurso'
 import { useNavigate } from 'react-router-dom'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
@@ -330,10 +331,10 @@ export function Documentos() {
         // no se borra a ciegas: si ese tipo es Tarjeta de Operatividad y el vehículo tiene asociación
         // con resolución registrada, se vuelve a heredar en vez de dejar el campo vacío.
         ...resolverCodigoYHerencia(prev.tipoDocumento, prev.asociacionResolucionAlcaldia),
-        fechaExpedicion: new Date().toISOString().slice(0, 10),
+        fechaExpedicion: fechaLocalActual(),
         fechaExpiracion: TIPOS_SIN_VIGENCIA.includes(prev.tipoDocumento)
           ? ''
-          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          : fechaLocalMasDias(365),
       }))
     }
   }, [docExistenteDelTipo?.id, isModalOpen])
@@ -424,8 +425,8 @@ export function Documentos() {
       ...prev,
       tipoDocumento: nuevoTipo,
       ...resolverCodigoYHerencia(nuevoTipo, prev.asociacionResolucionAlcaldia),
-      fechaExpedicion: new Date().toISOString().slice(0, 10),
-      fechaExpiracion: sinVigencia ? '' : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      fechaExpedicion: fechaLocalActual(),
+      fechaExpiracion: sinVigencia ? '' : fechaLocalMasDias(365),
       estado: 'VIGENTE',
     }))
   }
@@ -449,8 +450,8 @@ export function Documentos() {
       vehiculoPlaca: '',
       tipoDocumento: 'TARJETA_OPERATIVIDAD',
       codigo: '',
-      fechaExpedicion: new Date().toISOString().slice(0, 10),
-      fechaExpiracion: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      fechaExpedicion: fechaLocalActual(),
+      fechaExpiracion: fechaLocalMasDias(365),
       estado: 'VIGENTE',
       propietario: '',
       propietarioDni: '',
@@ -477,10 +478,10 @@ export function Documentos() {
       vehiculoPlaca: doc.vehiculoPlaca || '',
       tipoDocumento: tipoValido ? doc.tipoDocumento : 'TARJETA_OPERATIVIDAD',
       codigo: '',
-      fechaExpedicion: new Date().toISOString().slice(0, 10),
+      fechaExpedicion: fechaLocalActual(),
       fechaExpiracion: tipoValido && sinVigencia
         ? ''
-        : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        : fechaLocalMasDias(365),
       estado: 'VIGENTE',
       propietario: doc.propietario || '',
       propietarioDni: doc.propietarioDni || '',
@@ -589,7 +590,7 @@ export function Documentos() {
       return
     }
 
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = fechaLocalActual()
     if (
       (formData.estado || 'VIGENTE') === 'VIGENTE' &&
       !TIPOS_SIN_VIGENCIA.includes(formData.tipoDocumento) &&
@@ -682,7 +683,7 @@ export function Documentos() {
     try {
       const data = await fetchTodoElFiltro()
           await exportToExcel({
-            filename: `Documentos_Transito_${new Date().toISOString().slice(0, 10)}.xls`,
+            filename: `Documentos_Transito_${fechaLocalActual()}.xls`,
             sheetName: 'Documentos',
             title: 'PADRÓN OFICIAL DE DOCUMENTOS DE TRANSPORTE Y VIALIDAD',
             subtitle: 'TUC, Carnets de Seguridad Vial, CERTICAV y SOAT - Control Municipal',
@@ -776,7 +777,7 @@ export function Documentos() {
             <html lang="es">
               <head>
                 <meta charset="utf-8"/>
-                <title>Padron_Documentos_MJLO_${new Date().toISOString().slice(0, 10)}</title>
+                <title>Padron_Documentos_MJLO_${fechaLocalActual()}</title>
                 <style>
                   @page { size: A4 landscape; margin: 10mm 12mm 10mm 12mm; }
                   * { box-sizing: border-box; }
