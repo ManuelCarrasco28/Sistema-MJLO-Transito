@@ -338,36 +338,53 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
 
           const SizedBox(height: 32),
           _buildSectionTitle('Estado de Documentos', Icons.verified_user),
-          if (_documents.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.red.shade200),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 48),
-                  const SizedBox(height: 12),
-                  Text(
-                    (_vehicleData!['id'] == 0 || _vehicleData!['id'] == '0' || _vehicleData!['formalidad'] == 'INFORMAL')
-                        ? 'Vehículo no registrado en la municipalidad de JLO'
-                        : 'No tiene documentos registrados',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 16),
+          Builder(
+            builder: (context) {
+              final isUnregistered = (_vehicleData!['id'] == 0 || _vehicleData!['id'] == '0' || _vehicleData!['formalidad'] == 'INFORMAL');
+              
+              if (isUnregistered && _documents.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.red.shade200),
                   ),
-                ],
-              ),
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _documents.length,
-              itemBuilder: (context, index) => _buildDocumentCard(_documents[index]),
-            ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 48),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Vehículo no registrado en la municipalidad de JLO',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              
+              final expectedDocs = ['TARJETA_OPERATIVIDAD', 'SOAT', 'TARJETA_PROPIEDAD'];
+              final List<dynamic> allDocs = List.from(_documents);
+              
+              for (var expected in expectedDocs) {
+                if (!allDocs.any((d) => d['tipoDocumento'] == expected)) {
+                  allDocs.add({
+                    'tipoDocumento': expected,
+                    'estado': 'NO REGISTRADO',
+                  });
+                }
+              }
+              
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: allDocs.length,
+                itemBuilder: (context, index) => _buildDocumentCard(allDocs[index]),
+              );
+            }
+          ),
         ],
       ),
     );
@@ -434,6 +451,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
 
   Widget _buildDocumentCard(Map<String, dynamic> doc) {
     bool isExpired = doc['estado'] != 'VIGENTE';
+    bool isMissing = doc['estado'] == 'NO REGISTRADO';
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -460,7 +478,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                isExpired ? Icons.gpp_bad : Icons.gpp_good,
+                isMissing ? Icons.cancel : (isExpired ? Icons.gpp_bad : Icons.gpp_good),
                 color: isExpired ? Colors.red : Colors.green,
                 size: 28,
               ),
@@ -480,7 +498,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Vence: ${doc['fechaExpiracion'] ?? '-'}',
+                    isMissing ? 'Documento faltante en el padrón' : 'Vence: ${doc['fechaExpiracion'] ?? '-'}',
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
                 ],

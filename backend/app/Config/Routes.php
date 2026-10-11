@@ -85,6 +85,11 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('cursos', ['controller' => 'CursosController']);
     });
 
+    // Rutas accesibles por inspectores y personal móvil que deben resolverse antes de los recursos de oficina
+    $routes->group('', ['filter' => 'sessionauth'], static function ($routes): void {
+        $routes->get('operativos/activo/(:segment)', 'OperativosController::activo/$1');
+    });
+
     // Resto del sistema: solo oficina (el inspector no ve dashboards, padrones ni gestión).
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA'], static function ($routes): void {
         $routes->get('dashboard', 'DashboardController::index');
@@ -99,7 +104,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->put('papeletas/(:segment)', 'PapeletasController::update/$1');
         $routes->patch('papeletas/(:segment)', 'PapeletasController::update/$1');
         $routes->get('operativos/estadisticas', 'OperativosController::estadisticas');
-        $routes->resource('operativos', ['controller' => 'OperativosController']);
+        $routes->post('operativos/(:segment)/cancelar', 'OperativosController::cancelar/$1');
+        $routes->resource('operativos', ['controller' => 'OperativosController', 'placeholder' => '(:segment)']);
         $routes->get('inspecciones/siguiente-correlativo', 'InspeccionesController::siguienteCorrelativo');
         $routes->get('inspecciones/estadisticas', 'InspeccionesController::estadisticas');
         $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
@@ -135,12 +141,10 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         // Para no-oficina el controlador solo admite búsqueda exacta por numeroDocumento y nunca show por id.
         $routes->resource('personas', ['controller' => 'PersonasController', 'only' => ['index', 'show']]);
         $routes->resource('papeletas', ['controller' => 'PapeletasController', 'only' => ['index', 'create']]);
-        $routes->get('operativos/activo/(:segment)', 'OperativosController::activo/$1');
         $routes->post('papeletas/(:segment)/firma', 'PapeletasController::firma/$1');
         $routes->get('tipos-infraccion', 'PapeletasController::tipos');
         $routes->get('municipalidad/config', 'MunicipalidadController::config');
         $routes->get('reportes-intervencion', 'ReportesIntervencionController::index');
-        $routes->get('reportes-intervencion/(:segment)/fotos', 'ReportesIntervencionController::fotos/$1');
         $routes->post('reportes-intervencion', 'ReportesIntervencionController::create');
     });
 

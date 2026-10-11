@@ -39,6 +39,16 @@ export function StatusBadge({ status, className = '' }) {
 
   const style = tokenStyles[tokenType]
 
+  const labelMap = {
+    EN_CURSO: 'EN CURSO',
+    EN_TRAMITE: 'EN TRÁMITE',
+    EN_DEPOSITO: 'EN DEPÓSITO',
+    POR_COBRAR: 'POR COBRAR',
+    PENDIENTE_PAGO: 'PENDIENTE DE PAGO',
+    POR_PAGAR: 'POR PAGAR',
+  }
+  const displayText = labelMap[norm] || String(status || '').replace(/_/g, ' ')
+
   return (
     <span
       className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-sm)] border px-2 py-0.5 text-[12px] font-medium leading-none ${className}`}
@@ -48,7 +58,7 @@ export function StatusBadge({ status, className = '' }) {
         className="size-1.5 rounded-full shrink-0"
         style={{ backgroundColor: 'currentColor' }}
       />
-      <span>{status}</span>
+      <span>{displayText}</span>
     </span>
   )
 }

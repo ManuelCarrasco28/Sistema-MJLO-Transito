@@ -109,6 +109,419 @@ function CampoFecha({ id, value, onChange, required, disabled, readOnly, onFocus
   )
 }
 
+// Funciones auxiliares para formato de hora 12h (AM / PM)
+function desglosarHora24(val24) {
+  if (!val24 || typeof val24 !== 'string') return null
+  const m = val24.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/)
+  if (!m) return null
+  const h24 = parseInt(m[1], 10)
+  const min = parseInt(m[2], 10)
+  if (isNaN(h24) || isNaN(min) || h24 < 0 || h24 > 23 || min < 0 || min > 59) return null
+  const periodo = h24 >= 12 ? 'PM' : 'AM'
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
+  return {
+    h24,
+    min,
+    h12,
+    periodo,
+    texto12: `${String(h12).padStart(2, '0')}:${String(min).padStart(2, '0')} ${periodo}`,
+  }
+}
+
+function componerHora24(h12, min, periodo) {
+  const h = parseInt(h12, 10)
+  const m = parseInt(min, 10)
+  if (isNaN(h) || isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) return ''
+  let h24 = h % 12
+  if (periodo === 'PM') h24 += 12
+  return `${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function parsearEntradaHora(crudo) {
+  if (!crudo || typeof crudo !== 'string') return null
+  const s = crudo.trim()
+  if (!s) return ''
+
+  // 12h con AM/PM (ej: "2:30 pm", "02:30 PM", "2:30p", "02:30am")
+  const m12 = s.match(/^(\d{1,2}):(\d{2})\s*([ap]\.?\s*m?\.?)$/i)
+  if (m12) {
+    const h = parseInt(m12[1], 10)
+    const m = parseInt(m12[2], 10)
+    const isPm = /p/i.test(m12[3])
+    if (h >= 1 && h <= 12 && m >= 0 && m < 60) {
+      return componerHora24(h, m, isPm ? 'PM' : 'AM')
+    }
+  }
+
+  // 24h formato estándar (ej: "14:00", "08:30")
+  const m24 = s.match(/^(\d{1,2}):(\d{2})$/)
+  if (m24) {
+    const h = parseInt(m24[1], 10)
+    const m = parseInt(m24[2], 10)
+    if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    }
+  }
+
+  // Solo hora con am/pm (ej: "2 pm", "10am")
+  const mSoloHora = s.match(/^(\d{1,2})\s*([ap]\.?\s*m?\.?)$/i)
+  if (mSoloHora) {
+    const h = parseInt(mSoloHora[1], 10)
+    const isPm = /p/i.test(mSoloHora[2])
+    if (h >= 1 && h <= 12) {
+      return componerHora24(h, 0, isPm ? 'PM' : 'AM')
+    }
+  }
+
+  // 4 dígitos seguidos (ej: "1400" o "0830")
+  const m4 = s.match(/^(\d{2})(\d{2})$/)
+  if (m4) {
+    const h = parseInt(m4[1], 10)
+    const m = parseInt(m4[2], 10)
+    if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    }
+  }
+
+  return null
+}
+
+function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocus, onBlur, inputClassName, name }) {
+  const inicial = desglosarHora24(value)
+  const [texto, setTexto] = useState(() => inicial?.texto12 || '')
+  const [selHora, setSelHora] = useState(() => inicial?.h12 ?? 8)
+  const [selMin, setSelMin] = useState(() => inicial?.min ?? 0)
+  const [selPeriodo, setSelPeriodo] = useState(() => inicial?.periodo ?? 'AM')
+  const [abierto, setAbierto] = useState(false)
+  const [posicion, setPosicion] = useState(null)
+
+  const inputRef = useRef(null)
+  const popoverRef = useRef(null)
+
+  useEffect(() => {
+    const d = desglosarHora24(value)
+    if (d) {
+      setTexto(d.texto12)
+      setSelHora(d.h12)
+      setSelMin(d.min)
+      setSelPeriodo(d.periodo)
+    } else if (!value) {
+      setTexto('')
+    }
+  }, [value])
+
+  const emitir = (val24) => {
+    onChange?.({
+      target: {
+        id,
+        name,
+        value: val24,
+        type: 'time',
+      },
+    })
+  }
+
+  const alternarPicker = () => {
+    if (disabled || readOnly) return
+    if (!abierto && inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect()
+      const pickerHeight = 310
+      const spaceBelow = window.innerHeight - rect.bottom
+      const openUpwards = spaceBelow < pickerHeight + 8 && rect.top > spaceBelow
+      setPosicion({
+        left: Math.max(12, Math.min(rect.left, window.innerWidth - 300)),
+        top: openUpwards ? undefined : rect.bottom + 4,
+        bottom: openUpwards ? window.innerHeight - rect.top + 4 : undefined,
+      })
+    }
+    setAbierto((prev) => !prev)
+  }
+
+  useEffect(() => {
+    if (!abierto) return
+    const handleClickOutside = (e) => {
+      if (
+        popoverRef.current && !popoverRef.current.contains(e.target) &&
+        inputRef.current && !inputRef.current.contains(e.target)
+      ) {
+        setAbierto(false)
+      }
+    }
+    const handleScroll = (e) => {
+      if (e?.target?.closest?.('[data-hora-popover]')) return
+      setAbierto(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    window.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('resize', handleScroll)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleScroll)
+    }
+  }, [abierto])
+
+  const aplicarCambio = (h, m, p) => {
+    setSelHora(h)
+    setSelMin(m)
+    setSelPeriodo(p)
+    const val24 = componerHora24(h, m, p)
+    const texto12 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${p}`
+    setTexto(texto12)
+    emitir(val24)
+  }
+
+  const ponerAhora = () => {
+    const ahora = new Date()
+    const h24 = ahora.getHours()
+    const min = ahora.getMinutes()
+    const p = h24 >= 12 ? 'PM' : 'AM'
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12
+    aplicarCambio(h12, min, p)
+  }
+
+  const limpiar = () => {
+    setTexto('')
+    emitir('')
+    setAbierto(false)
+  }
+
+  const alEscribir = (e) => {
+    const nuevo = e.target.value
+    setTexto(nuevo)
+    const parsed = parsearEntradaHora(nuevo)
+    if (parsed !== null) {
+      const d = desglosarHora24(parsed)
+      if (d) {
+        setSelHora(d.h12)
+        setSelMin(d.min)
+        setSelPeriodo(d.periodo)
+      }
+      emitir(parsed)
+    }
+  }
+
+  const alPerderFoco = (e) => {
+    if (!texto.trim()) {
+      emitir('')
+    } else {
+      const parsed = parsearEntradaHora(texto)
+      if (parsed) {
+        const d = desglosarHora24(parsed)
+        if (d) setTexto(d.texto12)
+        emitir(parsed)
+      } else if (value) {
+        const d = desglosarHora24(value)
+        if (d) setTexto(d.texto12)
+      } else {
+        setTexto('')
+        emitir('')
+      }
+    }
+    onBlur?.(e)
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        id={id}
+        name={name}
+        type="text"
+        required={required}
+        disabled={disabled}
+        readOnly={readOnly}
+        value={texto}
+        onChange={alEscribir}
+        onFocus={onFocus}
+        onBlur={alPerderFoco}
+        autoComplete="off"
+        placeholder="hh:mm am/pm"
+        className={`${inputClassName} ${value ? 'pr-14' : 'pr-9'}`}
+      />
+      {value && !disabled && !readOnly && (
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={(e) => {
+            e.stopPropagation()
+            limpiar()
+          }}
+          aria-label="Limpiar hora"
+          title="Borrar hora"
+          className="absolute right-8 top-1/2 grid size-5 -translate-y-1/2 cursor-pointer place-items-center rounded text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition"
+        >
+          ✕
+        </button>
+      )}
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={alternarPicker}
+        disabled={disabled || readOnly}
+        aria-label="Abrir selector de hora"
+        title="Seleccionar hora (AM/PM)"
+        className={`absolute right-2 top-1/2 grid size-6 -translate-y-1/2 cursor-pointer place-items-center rounded-md transition disabled:cursor-not-allowed disabled:opacity-40 ${
+          abierto
+            ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/60'
+            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'
+        }`}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      </button>
+
+      {abierto && posicion && createPortal(
+        <div
+          ref={popoverRef}
+          data-hora-popover
+          style={{
+            position: 'fixed',
+            left: posicion.left,
+            top: posicion.top,
+            bottom: posicion.bottom,
+            width: '286px',
+          }}
+          className="z-[110] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438] animate-in fade-in zoom-in-95 duration-150 select-none text-slate-800 dark:text-slate-100"
+        >
+          <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100 dark:border-[var(--border-strong)]">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-black tracking-tight text-blue-600 dark:text-blue-400">
+                {String(selHora || 12).padStart(2, '0')}:{String(selMin ?? 0).padStart(2, '0')}
+              </span>
+              <span className="text-xs font-black text-slate-600 dark:text-slate-300 uppercase">
+                {selPeriodo}
+              </span>
+            </div>
+
+            <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-100 dark:border-[var(--border-strong)] dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => aplicarCambio(selHora || 12, selMin ?? 0, 'AM')}
+                className={`px-2.5 py-0.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
+                  selPeriodo === 'AM'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                AM
+              </button>
+              <button
+                type="button"
+                onClick={() => aplicarCambio(selHora || 12, selMin ?? 0, 'PM')}
+                className={`px-2.5 py-0.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
+                  selPeriodo === 'PM'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                PM
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-2.5">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+              Hora
+            </span>
+            <div className="grid grid-cols-6 gap-1">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => {
+                const activo = (selHora || 12) === h
+                return (
+                  <button
+                    key={h}
+                    type="button"
+                    onClick={() => aplicarCambio(h, selMin ?? 0, selPeriodo)}
+                    className={`h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activo
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    {h}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Minuto
+              </span>
+              <div className="flex items-center gap-1 text-[11px]">
+                <span className="text-slate-400 text-[10px]">Exacto:</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={selMin}
+                  onChange={(e) => {
+                    const v = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
+                    aplicarCambio(selHora || 12, v, selPeriodo)
+                  }}
+                  className="w-10 rounded border border-slate-200 bg-white px-1 py-0.5 text-center text-[11px] font-bold text-slate-800 dark:border-[var(--border-strong)] dark:bg-slate-900 dark:text-white outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-6 gap-1">
+              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => {
+                const activo = selMin === m
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => aplicarCambio(selHora || 12, m, selPeriodo)}
+                    className={`h-7 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      activo
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    {String(m).padStart(2, '0')}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-[var(--border-strong)] text-[11px]">
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={ponerAhora}
+                className="rounded-md px-2 py-1 font-bold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50 cursor-pointer transition-colors"
+              >
+                Ahora
+              </button>
+              {value && (
+                <button
+                  type="button"
+                  onClick={limpiar}
+                  className="rounded-md px-2 py-1 font-bold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50 cursor-pointer transition-colors"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setAbierto(false)}
+              className="rounded-lg bg-slate-900 px-3 py-1 font-bold text-white hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500 cursor-pointer transition-colors"
+            >
+              Listo
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
 export function FloatingInput({
   id,
   label,
@@ -125,7 +538,7 @@ export function FloatingInput({
   ...props
 }) {
   const [isFocused, setIsFocused] = useState(false)
-  // Los inputs de fecha/hora siempre muestran su propio esqueleto (dd/mm/aaaa),
+  // Los inputs de fecha/hora siempre muestran su propio esqueleto (dd/mm/aaaa o hh:mm am/pm),
   // nunca se ven realmente "vacíos", así que la etiqueta debe quedar arriba
   // desde el inicio para no superponerse con ese texto nativo del navegador.
   const isFloating = ['date', 'time', 'datetime-local', 'month', 'week'].includes(type)
@@ -139,6 +552,19 @@ export function FloatingInput({
     <div className={`relative ${className}`}>
       {type === 'date' ? (
         <CampoFecha
+          id={id}
+          name={props.name}
+          value={value}
+          onChange={onChange}
+          required={required}
+          disabled={props.disabled}
+          readOnly={props.readOnly}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          inputClassName={clasesInput}
+        />
+      ) : type === 'time' ? (
+        <CampoHora12
           id={id}
           name={props.name}
           value={value}

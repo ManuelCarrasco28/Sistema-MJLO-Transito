@@ -157,7 +157,7 @@ export function ConvertirReporteModal({
                         }}
                         options={[
                           { value: '', label: 'Selecciona la infracción...' },
-                          ...tiposInfraccion.map((tipo) => ({ value: String(tipo.id), label: `${tipo.codigo} — ${tipo.descripcion}` })),
+                          ...tiposInfraccion.map((tipo) => ({ value: String(tipo.id), label: `${tipo.codigo} — ${tipo.descripcion || ''} · S/ ${Number(tipo.montoBase || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` })),
                         ]}
                       />
                     </div>
@@ -175,6 +175,17 @@ export function ConvertirReporteModal({
                 <button type="button" onClick={() => setConvertForm({ ...convertForm, infraccionesIds: [...convertForm.infraccionesIds, ''] })} className="text-xs font-black text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 mt-2 block">
                   + Añadir otra infracción
                 </button>
+
+                <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-card)]">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Costo Estimado Total</span>
+                  <span className="text-base font-black text-rose-600 dark:text-rose-400">
+                    S/ {convertForm.infraccionesIds.reduce((sum, id) => {
+                      if (!id) return sum
+                      const tipo = tiposInfraccion.find((t) => String(t.id) === String(id))
+                      return sum + (tipo ? Number(tipo.montoBase || 0) : 0)
+                    }, 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
 
               <label className="block space-y-1.5">

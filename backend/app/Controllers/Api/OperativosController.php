@@ -19,8 +19,76 @@ class OperativosController extends ResourceController
         return $this->request->getJSON(true) ?: $this->request->getPost() ?: [];
     }
 
+    private function sincronizarEstados(): void
+    {
+        $nowLima = (new \DateTimeImmutable('now', new \DateTimeZone('America/Lima')))->format('Y-m-d H:i:s');
+        $curDateLima = substr($nowLima, 0, 10);
+        $curTimeLima = substr($nowLima, 11);
+
+        $db = \Config\Database::connect();
+
+        // 1. Finalizar operativos cuya hora fin o fecha ya pasó (que no estén cancelados)
+        $db->query("
+            UPDATE operativos
+            SET estado = 'FINALIZADO'
+            WHERE estado IN ('PROGRAMADO', 'EN_CURSO')
+              AND (
+                fecha < ?
+                OR (fecha = ? AND hora_fin IS NOT NULL AND hora_fin <= ?)
+              )
+        ", [$curDateLima, $curDateLima, $curTimeLima]);
+
+        // 2. Pasar a EN_CURSO operativos programados cuya hora inicio ya llegó y no han finalizado
+        $db->query("
+            UPDATE operativos
+            SET estado = 'EN_CURSO'
+            WHERE estado = 'PROGRAMADO'
+              AND fecha = ?
+              AND hora_inicio <= ?
+              AND (hora_fin IS NULL OR hora_fin > ?)
+        ", [$curDateLima, $curTimeLima, $curTimeLima]);
+
+        // 3. Regresar a PROGRAMADO si la fecha o inicio es en el futuro
+        $db->query("
+            UPDATE operativos
+            SET estado = 'PROGRAMADO'
+            WHERE estado = 'EN_CURSO'
+              AND (
+                fecha > ?
+                OR (fecha = ? AND hora_inicio > ?)
+              )
+        ", [$curDateLima, $curDateLima, $curTimeLima]);
+    }
+
+    private function calcularEstadoAutomatico(string $fecha, string $horaInicio, ?string $horaFin, string $estadoActual = 'PROGRAMADO'): string
+    {
+        if ($estadoActual === 'CANCELADO') {
+            return 'CANCELADO';
+        }
+
+        $nowLima = (new \DateTimeImmutable('now', new \DateTimeZone('America/Lima')))->format('Y-m-d H:i:s');
+        $horaInicioNorm = strlen($horaInicio) === 5 ? $horaInicio . ':00' : $horaInicio;
+        $inicio = $fecha . ' ' . $horaInicioNorm;
+
+        if (!empty($horaFin)) {
+            $horaFinNorm = strlen($horaFin) === 5 ? $horaFin . ':00' : $horaFin;
+            $fin = $fecha . ' ' . $horaFinNorm;
+        } else {
+            $fin = $fecha . ' 23:59:59';
+        }
+
+        if ($nowLima < $inicio) {
+            return 'PROGRAMADO';
+        } elseif ($nowLima > $fin) {
+            return 'FINALIZADO';
+        } else {
+            return 'EN_CURSO';
+        }
+    }
+
     public function estadisticas()
     {
+        $this->sincronizarEstados();
         $db = \Config\Database::connect();
         $row = $db->table('operativos')
             ->select("
@@ -131,10 +199,11 @@ class OperativosController extends ResourceController
             return $this->failValidationErrors('ID de inspector no válido.');
         }
 
+        $this->sincronizarEstados();
         $db = \Config\Database::connect();
         
         $operativo = $db->table('operativos o')
-            ->select('o.uuid AS uuid, o.id, o.nombre, o.lugar, o.fecha, o.hora_inicio, o.hora_fin, o.estado, ca.nombre as cargo_inspector')
+            ->select('o.uuid AS uuid, o.id, o.nombre, o.lugar, o.fecha, o.hora_inicio, o.fecha_fin, o.hora_fin, o.estado, ca.nombre as cargo_inspector')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id', 'inner')
             ->join('desplazamiento_oficina dof', 'dof.id_trabajador = oi.id_inspector AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
             ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
@@ -152,6 +221,7 @@ class OperativosController extends ResourceController
 
     public function index()
     {
+        $this->sincronizarEstados();
         $db = \Config\Database::connect();
         $builder = $db->table('operativos o')
             ->select("
@@ -252,6 +322,10 @@ class OperativosController extends ResourceController
         $db = \Config\Database::connect();
         $input = $this->parseInput();
 
+        if (isset($input['estado']) && $input['estado'] === 'EN CURSO') {
+            $input['estado'] = 'EN_CURSO';
+        }
+
         $rules = [
             'nombre' => [
                 'rules' => 'required',
@@ -273,17 +347,22 @@ class OperativosController extends ResourceController
                 'errors' => ['required' => 'La hora de inicio es obligatoria.']
             ],
             'estado' => [
-                'rules' => 'permit_empty|in_list[PROGRAMADO,EN CURSO,FINALIZADO,CANCELADO]',
-                'errors' => ['in_list' => 'Estado de operativo no válido.']
+                'rules' => 'permit_empty',
+                'errors' => []
             ]
         ];
 
         if (!$this->validateData($input, $rules)) {
-            return $this->failValidationErrors($this->validator->getErrors());
+            $errors = $this->validator->getErrors();
+            if (isset($errors['estado'])) {
+                $errors['estado'] = 'Estado no válido: "' . ($input['estado'] ?? 'NULL') . '".';
+            }
+            return $this->failValidationErrors($errors);
         }
 
         $db->transStart();
-        $estado = $input['estado'] ?? 'PROGRAMADO';
+        $horaFin = !empty($input['hora_fin']) ? $input['hora_fin'] : null;
+        $estado = $this->calcularEstadoAutomatico($input['fecha'], $input['hora_inicio'], $horaFin, 'PROGRAMADO');
 
         $db->table('operativos')->insert([
             'uuid' => \App\Libraries\Identificador::nuevo(),
@@ -291,7 +370,8 @@ class OperativosController extends ResourceController
             'lugar' => trim($input['lugar']),
             'fecha' => $input['fecha'],
             'hora_inicio' => $input['hora_inicio'],
-            'hora_fin' => $estado === 'FINALIZADO' ? date('H:i:s') : null,
+            'fecha_fin' => !empty($input['fecha_fin']) ? $input['fecha_fin'] : $input['fecha'],
+            'hora_fin' => $horaFin,
             'estado' => $estado,
             'observacion' => trim($input['observacion'] ?? ''),
             'id_usuario_registra' => $input['id_usuario_registra'] ?? null,
@@ -322,6 +402,10 @@ class OperativosController extends ResourceController
         $input = $this->parseInput();
         $id = (int) $id;
 
+        if (isset($input['estado']) && $input['estado'] === 'EN CURSO') {
+            $input['estado'] = 'EN_CURSO';
+        }
+
         $current = $db->table('operativos')->where('id', $id)->get()->getRowArray();
         if (!$id || !$current) {
             return $this->failNotFound('Operativo no encontrado.');
@@ -333,8 +417,8 @@ class OperativosController extends ResourceController
                 'errors' => ['valid_date' => 'La fecha del operativo no es válida.']
             ],
             'estado' => [
-                'rules' => 'permit_empty|in_list[PROGRAMADO,EN CURSO,FINALIZADO,CANCELADO]',
-                'errors' => ['in_list' => 'Estado de operativo no válido.']
+                'rules' => 'permit_empty',
+                'errors' => []
             ]
         ];
         foreach (['nombre', 'lugar', 'hora_inicio'] as $campoObligatorio) {
@@ -345,24 +429,28 @@ class OperativosController extends ResourceController
         }
 
         if (!$this->validateData($input, $rules)) {
-            return $this->failValidationErrors($this->validator->getErrors());
+            $errors = $this->validator->getErrors();
+            if (isset($errors['estado'])) {
+                $errors['estado'] = 'Estado no válido: "' . ($input['estado'] ?? 'NULL') . '".';
+            }
+            return $this->failValidationErrors($errors);
         }
 
         $data = [];
-        foreach (['nombre', 'lugar', 'fecha', 'hora_inicio', 'estado', 'observacion'] as $field) {
+        foreach (['nombre', 'lugar', 'fecha', 'hora_inicio', 'fecha_fin', 'hora_fin', 'observacion'] as $field) {
             if (array_key_exists($field, $input)) {
                 $data[$field] = $input[$field] === '' ? null : $input[$field];
             }
         }
 
-        if (array_key_exists('estado', $data)) {
-            if ($data['estado'] === 'FINALIZADO') {
-                $data['hora_fin'] = ($current['estado'] === 'FINALIZADO' && !empty($current['hora_fin']))
-                    ? $current['hora_fin']
-                    : date('H:i:s');
-            } else {
-                $data['hora_fin'] = null;
-            }
+        $fecha = $data['fecha'] ?? $current['fecha'];
+        $horaInicio = $data['hora_inicio'] ?? $current['hora_inicio'];
+        $horaFin = array_key_exists('hora_fin', $data) ? $data['hora_fin'] : $current['hora_fin'];
+
+        if (($current['estado'] ?? '') === 'CANCELADO') {
+            $data['estado'] = 'CANCELADO';
+        } else {
+            $data['estado'] = $this->calcularEstadoAutomatico($fecha, $horaInicio, $horaFin, $current['estado']);
         }
 
         $db->transStart();
@@ -391,9 +479,68 @@ class OperativosController extends ResourceController
 
     public function show($id = null)
     {
+        $this->sincronizarEstados();
         $row = $this->findOperativo((int) $id);
         if (!$row) return $this->failNotFound('Operativo no encontrado.');
         return $this->respond(['data' => $row]);
+    }
+
+    public function cancelar($id = null)
+    {
+        $db = \Config\Database::connect();
+        $id = (int) $id;
+        $current = $db->table('operativos')->where('id', $id)->get()->getRowArray();
+        if (!$id || !$current) {
+            return $this->failNotFound('Operativo no encontrado.');
+        }
+
+        if ($current['estado'] === 'CANCELADO') {
+            return $this->failValidationErrors('Este operativo ya fue cancelado.');
+        }
+
+        if ($current['estado'] === 'FINALIZADO') {
+            return $this->failValidationErrors('No se puede cancelar un operativo que ya ha finalizado.');
+        }
+
+        $input = $this->parseInput();
+        $motivo = trim((string)($input['motivo_cancelacion'] ?? ''));
+
+        if ($motivo === '') {
+            return $this->failValidationErrors('Debes ingresar el motivo u observaciones de la cancelación.');
+        }
+
+        $nowLima = new \DateTimeImmutable('now', new \DateTimeZone('America/Lima'));
+        $horaCancelacion = $nowLima->format('H:i:s');
+        $fechaHoraCancelacion = $nowLima->format('Y-m-d H:i:s');
+
+        $db->table('operativos')->where('id', $id)->update([
+            'estado' => 'CANCELADO',
+            'hora_cancelacion' => $horaCancelacion,
+            'fecha_hora_cancelacion' => $fechaHoraCancelacion,
+            'motivo_cancelacion' => $motivo,
+        ]);
+
+        if (class_exists('\\App\\Services\\AuditoriaService')) {
+            \App\Services\AuditoriaService::registrar(
+                'OPERATIVOS',
+                'CANCELAR',
+                "Se canceló el operativo '{$current['nombre']}' a las {$horaCancelacion}. Motivo: {$motivo}",
+                [
+                    'id_operativo' => $id,
+                    'nombre' => $current['nombre'],
+                    'hora_inicio' => $current['hora_inicio'],
+                    'hora_fin' => $current['hora_fin'],
+                    'hora_cancelacion' => $horaCancelacion,
+                    'motivo_cancelacion' => $motivo,
+                ]
+            );
+        }
+
+        return $this->respond([
+            'status' => true,
+            'message' => 'Operativo cancelado correctamente.',
+            'data' => $this->findOperativo($id)
+        ]);
     }
 
     public function delete($id = null)
@@ -410,4 +557,5 @@ class OperativosController extends ResourceController
         $db->table('operativos')->where('id', $id)->delete();
         return $this->respondDeleted(['status' => true, 'message' => 'Operativo eliminado correctamente.']);
     }
+
 }

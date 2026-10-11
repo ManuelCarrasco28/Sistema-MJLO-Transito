@@ -234,6 +234,17 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
                 <button type="button" onClick={() => setNuevaForm({ ...nuevaForm, infraccionesIds: [...nuevaForm.infraccionesIds, ''] })} className="text-xs font-black text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 mt-1 block">
                   + Añadir otra infracción
                 </button>
+
+                <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-[var(--border-strong)] dark:bg-[var(--bg-card)]">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Costo Estimado Total</span>
+                  <span className="text-base font-black text-rose-600 dark:text-rose-400">
+                    S/ {nuevaForm.infraccionesIds.reduce((sum, id) => {
+                      if (!id) return sum
+                      const tipo = tiposInfraccion.find((t) => String(t.id) === String(id))
+                      return sum + (tipo ? Number(tipo.montoBase || 0) : 0)
+                    }, 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
 
               <div>

@@ -401,7 +401,11 @@ export function VehiculoFormModal({
                         })
                       ) : (
                         <div className="px-2.5 py-2 text-xs font-semibold text-amber-600">
-                          {propietarioSearch ? 'No se encontró persona con ese DNI o nombre.' : 'Escriba para buscar un titular...'}
+                          {(!propietarioSearch)
+                            ? 'Escriba para buscar un titular...'
+                            : (propietarioSearch.length < 2)
+                              ? 'Siga escribiendo un poco más para buscar...'
+                              : 'No se encontró persona con ese DNI o nombre.'}
                         </div>
                       )}
                     </div>,
@@ -458,7 +462,11 @@ export function VehiculoFormModal({
                         ))
                       ) : (
                         <div className="px-2.5 py-2 text-xs font-semibold text-amber-600">
-                          {asociacionSearch ? 'No se encontró asociación.' : 'Escriba para buscar una asociación...'}
+                          {(!asociacionSearch)
+                            ? 'Escriba para buscar una asociación...'
+                            : (asociacionSearch.length < 2)
+                              ? 'Siga escribiendo un poco más para buscar...'
+                              : 'No se encontró asociación.'}
                         </div>
                       )}
                     </div>,

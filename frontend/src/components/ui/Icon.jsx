@@ -453,6 +453,12 @@ const iconPaths = {
       <path d="M21 15V5a2 2 0 0 0-2-2H9" />
     </>
   ),
+  ban: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m4.9 4.9 14.2 14.2" />
+    </>
+  ),
 }
 
 const aliasMap = {

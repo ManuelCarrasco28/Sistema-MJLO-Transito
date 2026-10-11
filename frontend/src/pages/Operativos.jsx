@@ -30,7 +30,7 @@ const initialForm = {
   lugar: '',
   fecha: getPeruDateInputValue(),
   hora_inicio: '08:00',
-  estado: 'PROGRAMADO',
+  hora_fin: '',
   observacion: '',
   inspectores: [],
 }
@@ -84,6 +84,7 @@ export function Operativos({ user }) {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [cancelModal, setCancelModal] = useState({ open: false, operativo: null, motivo: '', loading: false })
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
   const cargaOperativos = useRef(null)
@@ -104,13 +105,19 @@ export function Operativos({ user }) {
     if (fechaFiltro !== 'TODAS') params.set('fechaFiltro', fechaFiltro)
     if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
-    const response = await apiFetch(`/operativos?${params.toString()}`, { signal: controller.signal })
-    if (!response.ok) throw response
-    const payload = await response.json()
-    if (controller.signal.aborted) return
-    const data = payload.data || []
-    setOperativos(data)
-    setTotalFiltrado(payload.meta?.total ?? data.length)
+    try {
+      const response = await apiFetch(`/operativos?${params.toString()}`, { signal: controller.signal })
+      if (!response.ok) throw response
+      const payload = await response.json()
+      if (controller.signal.aborted) return
+      const data = payload.data || []
+      setOperativos(data)
+      setTotalFiltrado(payload.meta?.total ?? data.length)
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false)
+      }
+    }
   }
 
   useEffect(() => {
@@ -119,12 +126,11 @@ export function Operativos({ user }) {
     const controller = cargaOperativos.current
     peticion
       .catch(() => { if (!controller.signal.aborted) setLoadError('No se pudo cargar el módulo de operativos.') })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [page, itemsPerPage, debouncedSearch, estado, fechaFiltro, sortBy, sortDir])
 
   useEffect(() => {
-    apiFetch('/personal?porPagina=100')
+    apiFetch('/personal?porPagina=200&tipoInspector=TRANSITO')
       .then((r) => r.ok ? r.json() : { data: [] })
       .then((r) => setPersonal((r.data || []).filter((p) => p.estado === 'ACTIVO')))
       .catch(() => {
@@ -174,7 +180,7 @@ export function Operativos({ user }) {
             title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
             subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
             metadata: [
-              { label: 'Estado', value: estado },
+              { label: 'Estado', value: String(estado || '').replace(/_/g, ' ') },
               { label: 'Total Operativos', value: String(data.length) }
             ],
             columns: [
@@ -186,7 +192,7 @@ export function Operativos({ user }) {
               { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 100, align: 'center' },
               { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 110, align: 'center' },
               { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 100, align: 'center' },
-              { header: 'ESTADO', key: 'estado', width: 120, align: 'center' },
+              { header: 'ESTADO', render: (_, o) => String(o.estado || '').replace(/_/g, ' '), width: 120, align: 'center' },
               { header: 'REGISTRADO POR', render: (_, o) => o.usuario_registra || '—', width: 160 },
               { header: 'FECHA DE REGISTRO', render: (_, o) => o.created_at || '—', width: 150, align: 'center' },
               { header: 'OBSERVACIONES', render: (_, o) => o.observacion || '—', width: 240 }
@@ -207,7 +213,7 @@ export function Operativos({ user }) {
             title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
             subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
             metadata: [
-              { label: 'Estado', value: estado },
+              { label: 'Estado', value: String(estado || '').replace(/_/g, ' ') },
               { label: 'Total Operativos', value: String(data.length) }
             ],
             columns: [
@@ -219,7 +225,7 @@ export function Operativos({ user }) {
               { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 20, align: 'center' },
               { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 25, align: 'center' },
               { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 20, align: 'center' },
-              { header: 'ESTADO', key: 'estado', width: 25, align: 'center' }
+              { header: 'ESTADO', render: (_, o) => String(o.estado || '').replace(/_/g, ' '), width: 25, align: 'center' }
             ],
             data
           })
@@ -244,7 +250,7 @@ export function Operativos({ user }) {
       lugar: op.lugar || '',
       fecha: op.fecha || initialForm.fecha,
       hora_inicio: (op.hora_inicio || '08:00').slice(0, 5),
-      estado: op.estado || 'PROGRAMADO',
+      hora_fin: op.hora_fin ? op.hora_fin.slice(0, 5) : '',
       observacion: op.observacion || '',
       inspectores: (op.inspectores || []).map((i) => String(i.id_inspector)),
     })
@@ -279,10 +285,16 @@ export function Operativos({ user }) {
       showError('Atención', 'Completa nombre, lugar, fecha y hora de inicio.')
       return
     }
+    if (form.hora_fin && form.hora_fin < form.hora_inicio) {
+      showError('Atención', 'La hora de fin no puede ser anterior a la hora de inicio.')
+      return
+    }
     setSaving(true)
     try {
       const payload = {
         ...form,
+        hora_fin: form.hora_fin || null,
+        fecha_fin: form.fecha,
         id_usuario_registra: user?.id || null,
         inspectores: form.inspectores.map(Number),
       }
@@ -291,7 +303,15 @@ export function Operativos({ user }) {
         body: payload,
       })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.message || result.messages?.error || 'No se pudo guardar el operativo.')
+      if (!response.ok) {
+        let errMsg = result.message || 'No se pudo guardar el operativo.';
+        if (result.messages) {
+          if (typeof result.messages === 'string') errMsg = result.messages;
+          else if (result.messages.error) errMsg = result.messages.error;
+          else errMsg = Object.values(result.messages)[0];
+        }
+        throw new Error(errMsg);
+      }
       await loadOperativos()
       loadStats()
       showToast(editing ? 'Operativo actualizado correctamente' : 'Operativo registrado correctamente', editing ? 'editar' : 'crear')
@@ -300,6 +320,51 @@ export function Operativos({ user }) {
       showError('Error', sanitizarMensaje(error.message, 'No se pudo guardar el operativo.'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const openCancelar = (op) => {
+    setCancelModal({
+      open: true,
+      operativo: op,
+      motivo: '',
+      loading: false,
+    })
+  }
+
+  const handleConfirmarCancelacion = async (e) => {
+    e.preventDefault()
+    if (!cancelModal.operativo) return
+    const motivoTrim = cancelModal.motivo.trim()
+    if (!motivoTrim) {
+      showError('Motivo requerido', 'Por favor, describe el motivo u observaciones de la cancelación.')
+      return
+    }
+
+    setCancelModal((prev) => ({ ...prev, loading: true }))
+    try {
+      const res = await apiFetch(`/operativos/${cancelModal.operativo.id}/cancelar`, {
+        method: 'POST',
+        body: { motivo_cancelacion: motivoTrim },
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.message || data.messages?.error || 'No se pudo cancelar el operativo.')
+      }
+
+      showToast('Operativo cancelado correctamente')
+      const opActualizado = data.data
+      setCancelModal({ open: false, operativo: null, motivo: '', loading: false })
+
+      if (detail && detail.id === opActualizado?.id) {
+        setDetail(opActualizado)
+      }
+
+      await loadOperativos()
+      loadStats()
+    } catch (err) {
+      showError('Error al cancelar', sanitizarMensaje(err.message, 'No se pudo cancelar el operativo.'))
+      setCancelModal((prev) => ({ ...prev, loading: false }))
     }
   }
 
@@ -386,7 +451,8 @@ export function Operativos({ user }) {
 
   const formatFechaHora = (dateTimeStr) => {
     if (!dateTimeStr) return ''
-    const [datePart, timePart] = String(dateTimeStr).trim().split(' ')
+    const clean = String(dateTimeStr).trim().replace('T', ' ')
+    const [datePart, timePart] = clean.split(' ')
     if (datePart && timePart) {
       return `${formatFecha(datePart)} ${formatHora(timePart)}`
     }
@@ -517,7 +583,7 @@ export function Operativos({ user }) {
         <body>
           <h1>${safeText(op.nombre)}</h1>
           <p><strong>Lugar:</strong> ${safeText(op.lugar)} · <strong>Fecha:</strong> ${safeText(formatFecha(op.fecha))} · <strong>Hora:</strong> ${safeText(formatHora(op.hora_inicio))}${op.hora_fin ? ` - ${safeText(formatHora(op.hora_fin))}` : ''}</p>
-          <p><strong>Estado:</strong> ${safeText(op.estado)} · <strong>Registrado por:</strong> ${safeText(op.usuario_registra || 'No especificado')}</p>
+          <p><strong>Estado:</strong> ${safeText(String(op.estado || '').replace(/_/g, ' '))} · <strong>Registrado por:</strong> ${safeText(op.usuario_registra || 'No especificado')}</p>
           <div class="summary">
             <div class="card"><div class="label">Papeletas</div><div class="value">${op.papeletas?.length || 0}</div></div>
             <div class="card"><div class="label">Monto total</div><div class="value">${safeText(money(op.reporte?.monto_total))}</div></div>
@@ -647,14 +713,14 @@ export function Operativos({ user }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] table-fixed text-left text-xs">
+          <table className="w-full min-w-[850px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[26%]" />
               <col className="w-[20%]" />
-              <col className="w-[13%]" />
-              <col className="w-[13%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
               <col className="w-[14%]" />
-              <col className="w-[14%]" />
+              <col className="w-[16%]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
@@ -684,6 +750,15 @@ export function Operativos({ user }) {
                     <div className="flex justify-center gap-1.5">
                       <button onClick={() => openDetail(op)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver detalle"><Icon name="eye" className="size-4" /></button>
                       <button onClick={() => openEdit(op)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar"><Icon name="pencil" className="size-4" /></button>
+                      {(op.estado === 'PROGRAMADO' || op.estado === 'EN_CURSO') && (
+                        <button
+                          onClick={() => openCancelar(op)}
+                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-amber-500/10 border-amber-500/20 text-amber-600 hover:bg-amber-600 hover:border-amber-600 hover:text-white dark:bg-amber-500/15 dark:border-amber-500/30 dark:text-amber-400 dark:hover:bg-amber-600 dark:hover:text-white"
+                          title="Cancelar operativo"
+                        >
+                          <Icon name="ban" className="size-4" />
+                        </button>
+                      )}
                       <button onClick={() => remove(op.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar"><Icon name="trash" className="size-4" /></button>
                     </div>
                   </td>
@@ -712,7 +787,7 @@ export function Operativos({ user }) {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
-          <form onSubmit={save} className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#1C2438]">
+          <form onSubmit={save} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#1C2438]">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-black">{editing ? 'Editar operativo' : 'Nuevo operativo'}</h2>
               <BotonCerrarModal onClick={() => setModalOpen(false)} title="Cerrar" />
@@ -723,31 +798,22 @@ export function Operativos({ user }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <FloatingInput id="op_nombre" label="Nombre" required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
                 <FloatingInput id="op_lugar" label="Lugar" required value={form.lugar} onChange={(e) => setForm({ ...form, lugar: e.target.value })} />
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <FloatingInput id="op_fecha" label="Fecha" type="date" required value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
-                <FloatingInput id="op_hora_inicio" label="Inicio" type="time" required value={form.hora_inicio} onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })} />
-                <FloatingSelect
-                  id="op_estado"
-                  label="Estado"
-                  value={form.estado}
-                  onChange={(e) => setForm({ ...form, estado: e.target.value })}
-                  options={[
-                    { value: 'PROGRAMADO', label: 'PROGRAMADO' },
-                    { value: 'EN_CURSO', label: 'EN_CURSO' },
-                    { value: 'FINALIZADO', label: 'FINALIZADO' },
-                    { value: 'CANCELADO', label: 'CANCELADO' }
-                  ]}
-                />
-                {editing && (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:border-[var(--border-strong)] dark:bg-slate-900/50 dark:text-slate-400">
-                    <p className="font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">Hora de fin</p>
-                    <p className="mt-1">
-                      {editing.estado === 'FINALIZADO' && editing.hora_fin
-                        ? `Finalizado a las ${formatHora(editing.hora_fin)}.`
-                        : 'Se registrará automáticamente cuando el estado cambie a FINALIZADO. Si se cancela, no se registra hora de fin.'}
-                    </p>
-                  </div>
-                )}
-                <label className="text-sm font-bold sm:col-span-2">Observación<textarea value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} className="mt-1 min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-[var(--border-strong)] dark:bg-[#1C2438]" /></label>
+                <FloatingInput id="op_hora_inicio" label="Hora inicio" type="time" required value={form.hora_inicio} onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })} />
+                <FloatingInput id="op_hora_fin" label="Hora fin" type="time" value={form.hora_fin || ''} onChange={(e) => setForm({ ...form, hora_fin: e.target.value })} />
+              </div>
+              <div className="mt-4">
+                <label className="text-sm font-bold block text-slate-800 dark:text-slate-200">
+                  Observación general del operativo
+                  <textarea
+                    value={form.observacion}
+                    onChange={(e) => setForm({ ...form, observacion: e.target.value })}
+                    placeholder="Detalles u observaciones generales sobre el operativo..."
+                    className="mt-1.5 min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
+                  />
+                </label>
               </div>
             </fieldset>
 
@@ -774,13 +840,73 @@ export function Operativos({ user }) {
           <div className="flex max-h-[94dvh] w-full max-w-[92rem] flex-col rounded-2xl bg-white p-4 shadow-2xl dark:bg-[#1C2438]">
             <div className="mb-3 shrink-0 flex items-start justify-between border-b border-slate-100 pb-3 dark:border-[var(--border)]">
               <div>
-                <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">{detail.nombre}</h2>
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">{detail.nombre}</h2>
+                  <StatusBadge status={detail.estado} />
+                </div>
                 <p className="mt-0.5 text-xs text-slate-500">
                   {detail.lugar} · {formatFecha(detail.fecha)} · <span className="font-semibold text-slate-700 dark:text-slate-300">{formatHora(detail.hora_inicio)}{detail.hora_fin ? ` - ${formatHora(detail.hora_fin)}` : ''}</span>
                 </p>
               </div>
-              <BotonCerrarModal onClick={() => setDetail(null)} title="Cerrar" />
+              <div className="flex items-center gap-2">
+                {(detail.estado === 'PROGRAMADO' || detail.estado === 'EN_CURSO') && (
+                  <button
+                    type="button"
+                    onClick={() => openCancelar(detail)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors cursor-pointer"
+                  >
+                    <Icon name="ban" className="size-3.5" />
+                    <span>Cancelar operativo</span>
+                  </button>
+                )}
+                <BotonCerrarModal onClick={() => setDetail(null)} title="Cerrar" />
+              </div>
             </div>
+
+            {detail.estado === 'CANCELADO' && (
+              <div className="mb-3 shrink-0 rounded-2xl border border-rose-300/80 bg-rose-50/80 p-3.5 dark:border-rose-900/60 dark:bg-rose-950/30">
+                <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-rose-200 dark:border-rose-900/50">
+                  <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-black text-xs uppercase tracking-wider">
+                    <Icon name="ban" className="size-4 shrink-0" />
+                    <span>Información de Cancelación del Operativo</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                    {detail.fecha_hora_cancelacion ? `Cancelado el ${formatFechaHora(detail.fecha_hora_cancelacion)}` : 'Operativo cancelado'}
+                  </span>
+                </div>
+                
+                <div className="grid gap-2.5 sm:grid-cols-3">
+                  <div className="rounded-xl border border-rose-200/80 bg-white/90 p-2.5 dark:border-rose-900/40 dark:bg-[#1C2438]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Hora inicio programada</p>
+                    <p className="mt-0.5 text-sm font-black text-slate-900 dark:text-white">
+                      {formatHora(detail.hora_inicio)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-rose-200/80 bg-white/90 p-2.5 dark:border-rose-900/40 dark:bg-[#1C2438]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Hora fin que estaba prevista</p>
+                    <p className="mt-0.5 text-sm font-black text-slate-900 dark:text-white">
+                      {detail.hora_fin ? formatHora(detail.hora_fin) : 'No definida'}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-rose-300 bg-rose-100/70 p-2.5 dark:border-rose-800 dark:bg-rose-900/40">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">Hora en que se canceló</p>
+                    <p className="mt-0.5 text-sm font-black text-rose-700 dark:text-rose-200">
+                      {detail.hora_cancelacion ? formatHora(detail.hora_cancelacion) : (detail.fecha_hora_cancelacion ? formatHora(detail.fecha_hora_cancelacion.slice(11)) : 'No registrada')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-2.5 rounded-xl border border-rose-200/80 bg-white/90 p-2.5 dark:border-rose-900/40 dark:bg-[#1C2438]">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                    <Icon name="info" className="size-3.5" />
+                    <span>Observaciones / Motivo de la cancelación:</span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-800 dark:text-slate-100 font-medium leading-relaxed">
+                    {detail.motivo_cancelacion || 'Sin observaciones de cancelación especificadas.'}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="mb-3 shrink-0 grid gap-3 sm:grid-cols-4">
               {[
@@ -814,7 +940,7 @@ export function Operativos({ user }) {
                 <div className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2">
                   <p className="flex items-center gap-1.5"><span className="font-bold text-slate-600 dark:text-slate-400">Estado:</span> <StatusBadge status={detail.estado} /></p>
                   <p><span className="font-bold text-slate-600 dark:text-slate-400">Registrado por:</span> <span className="text-slate-800 dark:text-slate-200 font-medium">{detail.usuario_registra || 'No especificado'}</span></p>
-                  <p className="sm:col-span-2"><span className="font-bold text-slate-600 dark:text-slate-400">Observación:</span> <span className="text-slate-800 dark:text-slate-200">{detail.observacion || 'Sin observaciones'}</span></p>
+                  <p className="sm:col-span-2"><span className="font-bold text-slate-600 dark:text-slate-400">Observación general del operativo:</span> <span className="text-slate-800 dark:text-slate-200">{detail.observacion || 'Sin observaciones'}</span></p>
                 </div>
               </div>
             </div>
@@ -898,6 +1024,93 @@ export function Operativos({ user }) {
                 </table>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {cancelModal.open && cancelModal.operativo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-xs"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }}
+          onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1" && !cancelModal.loading) setCancelModal(prev => ({ ...prev, open: false })); e.currentTarget.dataset.downOnOverlay = "" }}
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#1C2438] border border-amber-200/60 dark:border-amber-500/20">
+            <div className="flex items-start gap-3.5">
+              <div className="size-11 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 grid place-items-center shrink-0 border border-amber-200 dark:border-amber-800">
+                <Icon name="alert" className="size-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">¿Deseas cancelar este operativo?</h3>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Estás a punto de cancelar <strong className="text-slate-900 dark:text-white uppercase">{cancelModal.operativo.nombre}</strong>.
+                </p>
+              </div>
+              <BotonCerrarModal onClick={() => !cancelModal.loading && setCancelModal(prev => ({ ...prev, open: false }))} title="Cerrar" />
+            </div>
+
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200 leading-relaxed">
+              <div className="flex gap-2">
+                <Icon name="info" className="size-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                <div>
+                  <p className="font-bold">¿Qué significa cancelar este operativo?</p>
+                  <p className="mt-1">
+                    El operativo se detendrá de inmediato. Los inspectores de tránsito asignados ya no lo tendrán activo en su aplicativo móvil y no podrán registrar nuevas intervenciones bajo este operativo.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3.5 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs dark:border-[var(--border-strong)] dark:bg-slate-900/40">
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div>
+                  <span className="text-slate-500 block">Fecha programada:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">{formatFecha(cancelModal.operativo.fecha)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Horario previsto:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {formatHora(cancelModal.operativo.hora_inicio)}{cancelModal.operativo.hora_fin ? ` a ${formatHora(cancelModal.operativo.hora_fin)}` : ' (Sin hora fin)'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmarCancelacion} className="mt-4">
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                Motivo u observaciones de la cancelación <span className="text-rose-500">*</span>
+                <span className="block font-normal text-[11px] text-slate-500 mt-0.5">
+                  Explica brevemente por qué se cancela (ej: malas condiciones climáticas, disposición superior, etc.).
+                </span>
+                <textarea
+                  rows={3}
+                  required
+                  autoFocus
+                  value={cancelModal.motivo}
+                  onChange={(e) => setCancelModal((prev) => ({ ...prev, motivo: e.target.value }))}
+                  placeholder="Escribe aquí el motivo u observaciones de la cancelación..."
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-amber-500 focus:outline-none dark:border-[var(--border-strong)] dark:bg-slate-900/60 dark:text-white"
+                />
+              </label>
+
+              <div className="mt-5 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  disabled={cancelModal.loading}
+                  onClick={() => setCancelModal(prev => ({ ...prev, open: false }))}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                >
+                  No cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={cancelModal.loading}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-rose-700 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  <Icon name="ban" className="size-3.5" />
+                  <span>{cancelModal.loading ? 'Cancelando...' : 'Confirmar cancelación'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

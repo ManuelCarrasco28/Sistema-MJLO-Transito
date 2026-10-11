@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -14,14 +15,17 @@ class ApiService {
   static const _sessionCookieKey = 'session_cookie';
   static const _savedUsernameKey = 'saved_username';
   static const _savedPasswordKey = 'saved_password';
-  
+
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://192.168.101.18:8080/api'; // Cambiado a IP local para celular físico
+  static const String _defaultUrl = 'http://192.168.18.28:8080/api'; // Cambiado a IP local para celular físico
   // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
   static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
-  static const String _configuredUrl = String.fromEnvironment('API_URL', defaultValue: _defaultUrl);
+  static const String _configuredUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: _defaultUrl,
+  );
 
   static const String baseUrl = kIsWeb
       ? 'http://127.0.0.1:8080/api'
@@ -30,7 +34,10 @@ class ApiService {
   static const Duration _requestTimeout = Duration(seconds: 20);
 
   // --- MÉTODOS DE CREDENCIALES GUARDADAS (BIOMETRÍA) ---
-  static Future<void> saveSavedCredentials(String username, String password) async {
+  static Future<void> saveSavedCredentials(
+    String username,
+    String password,
+  ) async {
     await _secureStorage.write(key: _savedUsernameKey, value: username);
     await _secureStorage.write(key: _savedPasswordKey, value: password);
   }
@@ -61,19 +68,21 @@ class ApiService {
     return headers;
   }
 
-  static Future<Map<String, dynamic>> login(String username, String password) async {
-    final response = await _send(() => http.post(
-          Uri.parse('$baseUrl/login'),
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Mobile-App': 'MJLO-TRANSITO',
-            if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
-          },
-          body: jsonEncode({
-            'usuario': username,
-            'password': password,
-          }),
-        ));
+  static Future<Map<String, dynamic>> login(
+    String username,
+    String password,
+  ) async {
+    final response = await _send(
+      () => http.post(
+        Uri.parse('$baseUrl/login'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Mobile-App': 'MJLO-TRANSITO',
+          if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
+        },
+        body: jsonEncode({'usuario': username, 'password': password}),
+      ),
+    );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -84,7 +93,10 @@ class ApiService {
         if (rawCookie != null) {
           final match = RegExp(r'session_user=[^;]+').firstMatch(rawCookie);
           if (match != null) {
-            await _secureStorage.write(key: _sessionCookieKey, value: match.group(0)!);
+            await _secureStorage.write(
+              key: _sessionCookieKey,
+              value: match.group(0)!,
+            );
           }
         }
 
@@ -120,24 +132,25 @@ class ApiService {
     await _secureStorage.delete(key: _sessionCookieKey);
   }
 
-  static Future<List<dynamic>> getPapeletas({String? dni, String? placa}) async {
+  static Future<List<dynamic>> getPapeletas({
+    String? dni,
+    String? placa,
+  }) async {
     final int? idPersona = await getPersonalId();
     if (idPersona == null) return [];
-    
+
     final Map<String, dynamic> params = {};
     if (dni == null && placa == null) {
       params['inspector_id'] = idPersona.toString();
     }
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
-    
-    final uri = Uri.parse('$baseUrl/papeletas').replace(queryParameters: params);
-    
+
+    final uri = Uri.parse('$baseUrl/papeletas')
+        .replace(queryParameters: params);
+
     final response = await http
-        .get(
-          uri,
-          headers: await _getHeaders(isJson: false),
-        )
+        .get(uri, headers: await _getHeaders(isJson: false))
         .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -149,21 +162,19 @@ class ApiService {
   static Future<List<dynamic>> getReportes({String? dni, String? placa}) async {
     final int? idPersona = await getPersonalId();
     if (idPersona == null) return [];
-    
+
     final Map<String, dynamic> params = {};
     if (dni == null && placa == null) {
       params['inspector_id'] = idPersona.toString();
     }
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
-    
-    final uri = Uri.parse('$baseUrl/reportes-intervencion').replace(queryParameters: params);
-    
+
+    final uri = Uri.parse('$baseUrl/reportes-intervencion')
+        .replace(queryParameters: params);
+
     final response = await http
-        .get(
-          uri,
-          headers: await _getHeaders(isJson: false),
-        )
+        .get(uri, headers: await _getHeaders(isJson: false))
         .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -408,13 +419,19 @@ class ApiService {
     return fallback;
   }
 
-  static Future<http.Response> _send(Future<http.Response> Function() request) async {
+  static Future<http.Response> _send(
+    Future<http.Response> Function() request,
+  ) async {
     try {
       return await request().timeout(_requestTimeout);
     } on TimeoutException {
-      throw Exception('No se pudo conectar con el servidor en $baseUrl. Verifica que tu PC y celular estén en el mismo Wi-Fi y el servidor esté encendido.');
+      throw Exception(
+        'No se pudo conectar con el servidor en $baseUrl. Verifica que tu PC y celular estén en el mismo Wi-Fi y el servidor esté encendido.',
+      );
     } catch (_) {
-      throw Exception('No se pudo conectar con el servidor. Verifica la conexión y que el backend esté levantado.');
+      throw Exception(
+        'No se pudo conectar con el servidor. Verifica la conexión y que el backend esté levantado.',
+      );
     }
   }
 }
