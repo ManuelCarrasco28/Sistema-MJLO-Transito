@@ -13,6 +13,8 @@ export function PagoPapeletaModal({
   setFechaPago,
   metodoPago,
   setMetodoPago,
+  numeroOperacion = '',
+  setNumeroOperacion = () => {},
   isProcessingAction,
   onConfirmar,
 }) {
@@ -71,17 +73,20 @@ export function PagoPapeletaModal({
             onChange={(e) => setMetodoPago(e.target.value)}
             options={[
               { value: 'EFECTIVO', label: 'Efectivo en Caja Municipal' },
-              { value: 'TRANSFERENCIA', label: 'Transferencia / Depósito Bancario' },
               { value: 'TARJETA', label: 'Tarjeta de Débito / Crédito' },
             ]}
           />
+
+          {metodoPago !== 'EFECTIVO' && (
+            <FloatingInput id="numero_operacion" label="N° de operación" required maxLength={50} value={numeroOperacion} onChange={e => setNumeroOperacion(e.target.value)} />
+          )}
 
           <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[var(--border)]">
             <BotonCancelar onClick={onClose} />
             <BotonGuardar
               type="button"
               onClick={onConfirmar}
-              disabled={isProcessingAction || !numeroRecibo.trim() || !fechaPago}
+              disabled={isProcessingAction || !numeroRecibo.trim() || !fechaPago || (metodoPago !== 'EFECTIVO' && !numeroOperacion.trim())}
               className="inline-flex items-center gap-1.5"
             >
               <Icon name="payment" className="size-4" />

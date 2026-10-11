@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { avisarCambioConfigMovil } from '../utils/configMovil'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
@@ -354,6 +355,7 @@ export function SuperAdminDashboard({ user }) {
       if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo guardar la configuración.')
       setMessage(successMessage || 'Configuración actualizada correctamente.')
       fetchMunicipalidadConfig()
+      avisarCambioConfigMovil()
     } catch (error) {
       setMessage(error.message || 'Error al guardar configuración.')
     } finally {
@@ -518,11 +520,6 @@ export function SuperAdminDashboard({ user }) {
             <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
               {isDashboard ? 'Panel Super Admin' : activeModuleInfo.label}
             </h1>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              {isDashboard
-                ? `Bienvenido, ${user?.nombres || 'Super Admin'}. Gestión administrativa, seguridad y configuración global.`
-                : activeModuleInfo.detail}
-            </p>
           </div>
         </div>
       </div>
@@ -664,7 +661,7 @@ export function SuperAdminDashboard({ user }) {
                     type="text"
                     value={auditSearch}
                     onChange={(event) => setAuditSearch(event.target.value)}
-                    placeholder="Buscar por descripción, usuario, módulo o IP..."
+                    placeholder="Buscar por descripción, usuario o módulo"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                   />
                   {auditSearch && (
@@ -864,7 +861,7 @@ export function SuperAdminDashboard({ user }) {
                     setTrabajadorDropdownOpen(true)
                     setUserForm({ ...userForm, id_trabajador: '' })
                   }}
-                  placeholder="Busca por DNI, nombre o cargo..."
+                  placeholder="Busca por DNI, nombre o cargo"
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-blue-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
                 {trabajadorDropdownOpen && !selectedTrabajador && (

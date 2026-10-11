@@ -299,7 +299,7 @@ export default function CursoDetalleVentana() {
                 <h1>{curso.titulo}</h1>
                 <span className="curso-detalle__code">{curso.codigo}</span>
               </div>
-              <StatusBadge status={curso.estado} />
+              <StatusBadge status={curso.estado} label={curso.estado === 'FINALIZADO' ? 'CULMINADO' : undefined} />
             </div>
             <div className="curso-detalle__metadata">
               <span><Icon name="user" className="size-4" /><span><small>Instructor</small>{curso.instructor || 'Por asignar'}</span></span>

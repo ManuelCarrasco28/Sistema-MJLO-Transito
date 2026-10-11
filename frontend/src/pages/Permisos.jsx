@@ -126,7 +126,7 @@ export function Permisos() {
     apiFetch('/permisos/estadisticas')
       .then((res) => res.ok ? res.json() : Promise.reject(res))
       .then((payload) => setStats(payload.data ?? {}))
-      .catch(() => {})
+      .catch(() => { })
   }
 
   useEffect(() => {
@@ -230,46 +230,46 @@ export function Permisos() {
     await new Promise(r => setTimeout(r, 50))
     try {
       const data = await fetchTodoElFiltro()
-          await exportToExcel({
-            filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.xls`,
-            sheetName: 'Autorizaciones',
-            title: 'PADRÓN OFICIAL DE AUTORIZACIONES DE CARGA, DESCARGA Y USO DE VÍAS',
-            subtitle: 'Subgerencia de Tránsito y Transporte - Resoluciones y Permisos Especiales',
-            metadata: [
-              { label: 'Tipo Trámite', value: filterTipo },
-              { label: 'Estado', value: filterEstado },
-              { label: 'Total Registros', value: String(data.length) }
-            ],
-            columns: [
-              { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', isText: true, width: 150, align: 'center' },
-              { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 140 },
-              { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', isText: true, width: 130, align: 'center' },
-              { header: 'SOLICITANTE / EMPRESA', key: 'solicitanteNombre', width: 220 },
-              { header: 'DNI / RUC', key: 'solicitanteDocumento', isText: true, width: 120, align: 'center' },
-              { header: 'REPRESENTANTE LEGAL', key: 'representanteLegal', width: 180 },
-              { header: 'PROCEDIMIENTO (TUPA)', key: 'procedimientoNombre', width: 220 },
-              { header: 'ASUNTO', key: 'asunto', width: 240 },
-              { header: 'EXPEDIENTE', key: 'expediente', isText: true, width: 130, align: 'center' },
-              { header: 'FECHA SOLICITUD', key: 'fechaSolicitud', width: 120, align: 'center' },
-              { header: 'N° DE REGISTRO', key: 'registroNumero', isText: true, width: 120, align: 'center' },
-              { header: 'ZONA', key: 'zonaCirculacion', width: 180 },
-              { header: 'UBICACIÓN', key: 'ubicacion', width: 200 },
-              { header: 'RECORRIDO DE INGRESO', key: 'recorridoIngreso', width: 200 },
-              { header: 'RECORRIDO DE SALIDA', key: 'recorridoSalida', width: 200 },
-              { header: 'TONELAJE', key: 'tonelaje', width: 90, align: 'center' },
-              { header: 'N° DE SEGURIDAD', key: 'numeroSeguridad', isText: true, width: 120, align: 'center' },
-              { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 130, align: 'center' },
-              { header: 'FECHA EMISIÓN', key: 'fechaEmision', width: 120, align: 'center' },
-              { header: 'INICIO VIGENCIA', key: 'fechaInicioVigencia', width: 120, align: 'center' },
-              { header: 'FIN VIGENCIA', key: 'fechaFinVigencia', width: 120, align: 'center' },
-              { header: 'RECIBO INGRESO', key: 'reciboIngresoNumero', isText: true, width: 130, align: 'center' },
-              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 110 },
-              { header: 'FECHA DE PAGO', key: 'reciboIngresoFecha', width: 120, align: 'center' },
-              { header: 'OBSERVACIONES', key: 'observaciones', width: 240 },
-              { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
-            ],
-            data
-          })
+      await exportToExcel({
+        filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.xls`,
+        sheetName: 'Autorizaciones',
+        title: 'PADRÓN OFICIAL DE AUTORIZACIONES DE CARGA, DESCARGA Y USO DE VÍAS',
+        subtitle: 'Subgerencia de Tránsito y Transporte - Resoluciones y Permisos Especiales',
+        metadata: [
+          { label: 'Tipo Trámite', value: filterTipo },
+          { label: 'Estado', value: filterEstado },
+          { label: 'Total Registros', value: String(data.length) }
+        ],
+        columns: [
+          { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', isText: true, width: 150, align: 'center' },
+          { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 140 },
+          { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', isText: true, width: 130, align: 'center' },
+          { header: 'SOLICITANTE / EMPRESA', key: 'solicitanteNombre', width: 220 },
+          { header: 'DNI / RUC', key: 'solicitanteDocumento', isText: true, width: 120, align: 'center' },
+          { header: 'REPRESENTANTE LEGAL', key: 'representanteLegal', width: 180 },
+          { header: 'PROCEDIMIENTO (TUPA)', key: 'procedimientoNombre', width: 220 },
+          { header: 'ASUNTO', key: 'asunto', width: 240 },
+          { header: 'EXPEDIENTE', key: 'expediente', isText: true, width: 130, align: 'center' },
+          { header: 'FECHA SOLICITUD', key: 'fechaSolicitud', width: 120, align: 'center' },
+          { header: 'N° DE REGISTRO', key: 'registroNumero', isText: true, width: 120, align: 'center' },
+          { header: 'ZONA', key: 'zonaCirculacion', width: 180 },
+          { header: 'UBICACIÓN', key: 'ubicacion', width: 200 },
+          { header: 'RECORRIDO DE INGRESO', key: 'recorridoIngreso', width: 200 },
+          { header: 'RECORRIDO DE SALIDA', key: 'recorridoSalida', width: 200 },
+          { header: 'TONELAJE', key: 'tonelaje', width: 90, align: 'center' },
+          { header: 'N° DE SEGURIDAD', key: 'numeroSeguridad', isText: true, width: 120, align: 'center' },
+          { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 130, align: 'center' },
+          { header: 'FECHA EMISIÓN', key: 'fechaEmision', width: 120, align: 'center' },
+          { header: 'INICIO VIGENCIA', key: 'fechaInicioVigencia', width: 120, align: 'center' },
+          { header: 'FIN VIGENCIA', key: 'fechaFinVigencia', width: 120, align: 'center' },
+          { header: 'RECIBO INGRESO', key: 'reciboIngresoNumero', isText: true, width: 130, align: 'center' },
+          { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.reciboIngresoMonto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 110 },
+          { header: 'FECHA DE PAGO', key: 'reciboIngresoFecha', width: 120, align: 'center' },
+          { header: 'OBSERVACIONES', key: 'observaciones', width: 240 },
+          { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
+        ],
+        data
+      })
     } finally {
       setIsExportingExcel(false)
     }
@@ -279,31 +279,31 @@ export function Permisos() {
     setIsExportingPdf(true)
     try {
       const data = await fetchTodoElFiltro()
-          await exportToPdf({
-            filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}`,
-            subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Autorizaciones y Permisos',
-            summaryItems: [
-              { label: 'Total autorizaciones', value: totalPermisos },
-              { label: 'Exportando', value: `${data.length} registros` },
-              { label: 'Carga y Descarga', value: totalCarga },
-              { label: 'Uso de Vías', value: totalVias },
-              { label: 'Vigentes', value: vigentes },
-              { label: 'Vencidos', value: vencidos },
-            ],
-            columns: [
-              { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', width: 110, align: 'center' },
-              { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 120 },
-              { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', width: 100, align: 'center' },
-              { header: 'SOLICITANTE', key: 'solicitanteNombre', width: 180 },
-              { header: 'DNI / RUC', key: 'solicitanteDocumento', width: 100, align: 'center' },
-              { header: 'ZONA', key: 'zonaCirculacion', width: 150 },
-              { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 100, align: 'center' },
-              { header: 'INICIO', key: 'fechaInicioVigencia', width: 85, align: 'center' },
-              { header: 'FIN', key: 'fechaFinVigencia', width: 85, align: 'center' },
-              { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
-            ],
-            data
-          })
+      await exportToPdf({
+        filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}`,
+        subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Autorizaciones y Permisos',
+        summaryItems: [
+          { label: 'Total autorizaciones', value: totalPermisos },
+          { label: 'Exportando', value: `${data.length} registros` },
+          { label: 'Carga y Descarga', value: totalCarga },
+          { label: 'Uso de Vías', value: totalVias },
+          { label: 'Vigentes', value: vigentes },
+          { label: 'Vencidos', value: vencidos },
+        ],
+        columns: [
+          { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', width: 110, align: 'center' },
+          { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 120 },
+          { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', width: 100, align: 'center' },
+          { header: 'SOLICITANTE', key: 'solicitanteNombre', width: 180 },
+          { header: 'DNI / RUC', key: 'solicitanteDocumento', width: 100, align: 'center' },
+          { header: 'ZONA', key: 'zonaCirculacion', width: 150 },
+          { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 100, align: 'center' },
+          { header: 'INICIO', key: 'fechaInicioVigencia', width: 85, align: 'center' },
+          { header: 'FIN', key: 'fechaFinVigencia', width: 85, align: 'center' },
+          { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
+        ],
+        data
+      })
     } finally {
       setIsExportingPdf(false)
     }
@@ -344,9 +344,6 @@ export function Permisos() {
                 Permisos y Autorizaciones
               </h1>
             </div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Directorio oficial de Control Vehicular, Carga y Descarga, Uso de Vías y Zonas Reservadas.
-            </p>
           </div>
         </div>
       </div>
@@ -449,11 +446,10 @@ export function Permisos() {
         <button
           type="button"
           onClick={() => setActiveTab('permisos')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
-            activeTab === 'permisos'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${activeTab === 'permisos'
               ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <Icon name="permit" className="size-4" />
           <span>Padrón de Autorizaciones</span>
@@ -462,11 +458,10 @@ export function Permisos() {
         <button
           type="button"
           onClick={() => setActiveTab('tupa')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
-            activeTab === 'tupa'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${activeTab === 'tupa'
               ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <Icon name="document" className="size-4" />
           <span>Catálogo Normativo TUPA</span>
@@ -477,14 +472,14 @@ export function Permisos() {
         <div className="space-y-4">
           {/* Contenedor de la Tabla - Exacto a Personas.jsx */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
-            
+
             {/* Barra de Filtros y Acciones */}
             <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1">
                 <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar por placa, solicitante, autorización o expediente..."
+                  placeholder="Buscar por placa, solicitante o expediente"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
@@ -532,7 +527,7 @@ export function Permisos() {
                   onClick={handleExportExcel}
                   title="Descargar padrón en Excel (.xls)"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-                 disabled={isExportingExcel}>
+                  disabled={isExportingExcel}>
                   <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
                   <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
                 </button>
@@ -542,7 +537,7 @@ export function Permisos() {
                   onClick={handleExportPdf}
                   title="Descargar o imprimir padrón en PDF"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-                 disabled={isExportingPdf}>
+                  disabled={isExportingPdf}>
                   <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
                   <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
                 </button>
@@ -571,7 +566,7 @@ export function Permisos() {
                     <th className="px-4 py-3 w-[120px]">Vigencia</th>
                     <th className="px-4 py-3 text-center w-[110px]"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                     <th className="sticky right-0 z-20 px-4 py-3 text-center bg-slate-50/75 dark:bg-[var(--bg-subtle)] w-[120px]">
-                        Acciones
+                      Acciones
                     </th>
                   </tr>
                 </thead>
@@ -597,168 +592,167 @@ export function Permisos() {
                       const solicitanteText = p.solicitanteNombre || p.solicitante || '—'
 
                       return (
-                          <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
-                            {/* Solicitante / Titular */}
-                            <td className="px-4 py-3 align-top">
-                              <span
-                                className={`inline-block rounded-md px-2 py-0.5 text-[9px] font-black uppercase mb-0.5 tracking-widest ${
-                                  isCarga
-                                    ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
-                                    : isVias
-                                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                      : isZonas
-                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                                        : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
+                        <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
+                          {/* Solicitante / Titular */}
+                          <td className="px-4 py-3 align-top">
+                            <span
+                              className={`inline-block rounded-md px-2 py-0.5 text-[9px] font-black uppercase mb-0.5 tracking-widest ${isCarga
+                                  ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
+                                  : isVias
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                    : isZonas
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                      : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
                                 }`}
+                            >
+                              {isCarga ? 'Carga y Descarga' : isVias ? 'Uso de Vías' : isZonas ? 'Zonas Reservadas' : 'Control Vehicular'}
+                            </span>
+                            <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-mono">
+                              {p.numeroAutorizacion}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Exp. {p.expediente || p.expedienteNumero || 'S/N'}
+                            </div>
+                          </td>
+
+                          {/* Vehículo / Flota */}
+                          <td className="px-4 py-3 align-top">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 dark:text-white">
+                                {solicitanteText}
+                              </p>
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                {p.solicitanteDocumento || p.solicitanteDoc ? `DOC: ${p.solicitanteDocumento || p.solicitanteDoc}` : 'Sin documento'}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* Nº Autorización & Tipo Badge */}
+                          <td className="px-4 py-3 align-top">
+                            {p.vehiculoPlaca && p.vehiculoPlaca !== '—' ? (
+                              <PlacaBadge placa={p.vehiculoPlaca} />
+                            ) : p.flotaPlacas ? (
+                              <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                {p.flotaPlacas.split(/[\s,]+/).filter(Boolean).map((placa, idx) => (
+                                  <PlacaBadge key={idx} placa={placa.trim()} size="sm" />
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 dark:text-slate-500 italic text-xs">No especificado</span>
+                            )}
+                          </td>
+
+                          {/* Zona / Horario */}
+                          <td className="px-4 py-3 text-xs align-top">
+                            <div className="font-semibold text-slate-800 dark:text-slate-200">
+                              {p.zonaCirculacion || p.zonaPermitida || '—'}
+                            </div>
+                            <div className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                              {p.horarioPermitido || (p.horarioInicio && p.horarioFin ? `${p.horarioInicio.slice(0, 5)} - ${p.horarioFin.slice(0, 5)}` : '—')}
+                            </div>
+                          </td>
+
+                          {/* Vigencia */}
+                          <td className="px-4 py-3 text-xs align-top">
+                            <div className="font-bold text-slate-800 dark:text-slate-200">
+                              {p.fechaInicioVigencia || p.fechaInicio || '—'}
+                            </div>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                              Al: {p.fechaFinVigencia || p.fechaFin || '—'}
+                            </div>
+                          </td>
+
+                          {/* Estado */}
+                          <td className="px-4 py-3 text-center align-top">
+                            <StatusBadge status={p.estado} />
+                          </td>
+
+                          {/* Acciones - Estilo Personas.jsx */}
+                          <td className="sticky right-0 z-20 px-4 py-3 text-center align-top bg-white/95 dark:bg-[#1C2438]/95">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPermiso(p)
+                                  setIsDetailModalOpen(true)
+                                }}
+                                title="Imprimir Formato Oficial"
+                                className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                                style={{
+                                  backgroundColor: 'var(--action-print-bg)',
+                                  borderColor: 'var(--action-print-border)',
+                                  color: 'var(--action-print-text)',
+                                  borderWidth: '1.5px',
+                                  borderStyle: 'solid',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--action-print-hover)'
+                                  e.currentTarget.style.borderColor = 'var(--action-print-hover)'
+                                  e.currentTarget.style.color = '#ffffff'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--action-print-bg)'
+                                  e.currentTarget.style.borderColor = 'var(--action-print-border)'
+                                  e.currentTarget.style.color = 'var(--action-print-text)'
+                                }}
                               >
-                                {isCarga ? 'Carga y Descarga' : isVias ? 'Uso de Vías' : isZonas ? 'Zonas Reservadas' : 'Control Vehicular'}
-                              </span>
-                              <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-mono">
-                                {p.numeroAutorizacion}
-                              </div>
-                              <div className="text-[10px] text-slate-400 font-mono">
-                                Exp. {p.expediente || p.expedienteNumero || 'S/N'}
-                              </div>
-                            </td>
+                                <Icon name="print" className="size-4" />
+                              </button>
 
-                            {/* Vehículo / Flota */}
-                            <td className="px-4 py-3 align-top">
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-slate-900 dark:text-white">
-                                  {solicitanteText}
-                                </p>
-                                <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                                  {p.solicitanteDocumento || p.solicitanteDoc ? `DOC: ${p.solicitanteDocumento || p.solicitanteDoc}` : 'Sin documento'}
-                                </p>
-                              </div>
-                            </td>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(p)}
+                                title="Editar Autorización"
+                                className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                                style={{
+                                  backgroundColor: 'var(--action-edit-bg)',
+                                  borderColor: 'var(--action-edit-border)',
+                                  color: 'var(--action-edit-text)',
+                                  borderWidth: '1.5px',
+                                  borderStyle: 'solid',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--action-edit-hover)'
+                                  e.currentTarget.style.borderColor = 'var(--action-edit-hover)'
+                                  e.currentTarget.style.color = '#ffffff'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--action-edit-bg)'
+                                  e.currentTarget.style.borderColor = 'var(--action-edit-border)'
+                                  e.currentTarget.style.color = 'var(--action-edit-text)'
+                                }}
+                              >
+                                <Icon name="pencil" className="size-4" />
+                              </button>
 
-                            {/* Nº Autorización & Tipo Badge */}
-                            <td className="px-4 py-3 align-top">
-                              {p.vehiculoPlaca && p.vehiculoPlaca !== '—' ? (
-                                <PlacaBadge placa={p.vehiculoPlaca} />
-                              ) : p.flotaPlacas ? (
-                                <div className="flex flex-wrap gap-1 max-w-[200px]">
-                                  {p.flotaPlacas.split(/[\s,]+/).filter(Boolean).map((placa, idx) => (
-                                    <PlacaBadge key={idx} placa={placa.trim()} size="sm" />
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 dark:text-slate-500 italic text-xs">No especificado</span>
-                              )}
-                            </td>
-
-                            {/* Zona / Horario */}
-                            <td className="px-4 py-3 text-xs align-top">
-                              <div className="font-semibold text-slate-800 dark:text-slate-200">
-                                {p.zonaCirculacion || p.zonaPermitida || '—'}
-                              </div>
-                              <div className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
-                                {p.horarioPermitido || (p.horarioInicio && p.horarioFin ? `${p.horarioInicio.slice(0, 5)} - ${p.horarioFin.slice(0, 5)}` : '—')}
-                              </div>
-                            </td>
-
-                            {/* Vigencia */}
-                            <td className="px-4 py-3 text-xs align-top">
-                              <div className="font-bold text-slate-800 dark:text-slate-200">
-                                {p.fechaInicioVigencia || p.fechaInicio || '—'}
-                              </div>
-                              <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                                Al: {p.fechaFinVigencia || p.fechaFin || '—'}
-                              </div>
-                            </td>
-
-                            {/* Estado */}
-                            <td className="px-4 py-3 text-center align-top">
-                              <StatusBadge status={p.estado} />
-                            </td>
-
-                            {/* Acciones - Estilo Personas.jsx */}
-                            <td className="sticky right-0 z-20 px-4 py-3 text-center align-top bg-white/95 dark:bg-[#1C2438]/95">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedPermiso(p)
-                                    setIsDetailModalOpen(true)
-                                  }}
-                                  title="Imprimir Formato Oficial"
-                                  className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
-                                  style={{
-                                    backgroundColor: 'var(--action-print-bg)',
-                                    borderColor: 'var(--action-print-border)',
-                                    color: 'var(--action-print-text)',
-                                    borderWidth: '1.5px',
-                                    borderStyle: 'solid',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--action-print-hover)'
-                                    e.currentTarget.style.borderColor = 'var(--action-print-hover)'
-                                    e.currentTarget.style.color = '#ffffff'
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--action-print-bg)'
-                                    e.currentTarget.style.borderColor = 'var(--action-print-border)'
-                                    e.currentTarget.style.color = 'var(--action-print-text)'
-                                  }}
-                                >
-                                  <Icon name="print" className="size-4" />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEdit(p)}
-                                  title="Editar Autorización"
-                                  className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
-                                  style={{
-                                    backgroundColor: 'var(--action-edit-bg)',
-                                    borderColor: 'var(--action-edit-border)',
-                                    color: 'var(--action-edit-text)',
-                                    borderWidth: '1.5px',
-                                    borderStyle: 'solid',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--action-edit-hover)'
-                                    e.currentTarget.style.borderColor = 'var(--action-edit-hover)'
-                                    e.currentTarget.style.color = '#ffffff'
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--action-edit-bg)'
-                                    e.currentTarget.style.borderColor = 'var(--action-edit-border)'
-                                    e.currentTarget.style.color = 'var(--action-edit-text)'
-                                  }}
-                                >
-                                  <Icon name="pencil" className="size-4" />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeletePermiso(p.id)}
-                                  title="Eliminar Autorización"
-                                  className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
-                                  style={{
-                                    backgroundColor: 'var(--action-del-bg)',
-                                    borderColor: 'var(--action-del-border)',
-                                    color: 'var(--action-del-text)',
-                                    borderWidth: '1.5px',
-                                    borderStyle: 'solid',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--action-del-hover)'
-                                    e.currentTarget.style.borderColor = 'var(--action-del-hover)'
-                                    e.currentTarget.style.color = '#ffffff'
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--action-del-bg)'
-                                    e.currentTarget.style.borderColor = 'var(--action-del-border)'
-                                    e.currentTarget.style.color = 'var(--action-del-text)'
-                                  }}
-                                >
-                                  <Icon name="trash" className="size-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePermiso(p.id)}
+                                title="Eliminar Autorización"
+                                className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
+                                style={{
+                                  backgroundColor: 'var(--action-del-bg)',
+                                  borderColor: 'var(--action-del-border)',
+                                  color: 'var(--action-del-text)',
+                                  borderWidth: '1.5px',
+                                  borderStyle: 'solid',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--action-del-hover)'
+                                  e.currentTarget.style.borderColor = 'var(--action-del-hover)'
+                                  e.currentTarget.style.color = '#ffffff'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--action-del-bg)'
+                                  e.currentTarget.style.borderColor = 'var(--action-del-border)'
+                                  e.currentTarget.style.color = 'var(--action-del-text)'
+                                }}
+                              >
+                                <Icon name="trash" className="size-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
                       )
                     })
                   )}
@@ -839,7 +833,7 @@ export function Permisos() {
       {isDetailModalOpen && selectedPermiso && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xs animate-enter overflow-y-auto">
           <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] my-auto">
-            
+
             {/* Header del visualizador estilo /personas */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">

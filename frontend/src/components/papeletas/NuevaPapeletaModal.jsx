@@ -46,8 +46,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
       const carr = (data.carroceria || '').toUpperCase().trim()
       let inferredClase = nuevaForm.claseVehiculo || ''
 
-      if (cat === 'L1' || cat === 'L2' || cat === 'L3' || carr.includes('LINEAL')) inferredClase = 'Moto Lineal'
-      else if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredClase = 'Mototaxi'
+      if (cat === 'L5' || carr.includes('TRIMOVIL') || carr.includes('MOTOTAXI') || carr.includes('MOTOKAR')) inferredClase = 'Mototaxi'
       else if (cat === 'M1' || carr.includes('SEDAN') || carr.includes('HATCHBACK') || carr.includes('SUV') || carr.includes('COUPE') || carr.includes('STATION') || carr.includes('AUTOMOVIL')) inferredClase = 'Automóvil'
       else if (cat === 'M2' || carr.includes('COMBI') || carr.includes('RURAL') || carr.includes('MICROBUS') || carr.includes('MINIBUS')) inferredClase = 'Camioneta Rural'
 

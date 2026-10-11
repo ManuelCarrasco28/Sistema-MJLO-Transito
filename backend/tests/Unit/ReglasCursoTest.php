@@ -9,8 +9,8 @@ final class ReglasCursoTest extends TestCase
 {
     public function testSoloCursosAbiertosAdmitenInscripcion(): void
     {
-        foreach (['PROGRAMADO','ABIERTO','ACTIVO','EN_CURSO'] as $estado) $this->assertTrue(ReglasCurso::admiteInscripcion($estado));
-        foreach (['FINALIZADO','CANCELADO','OTRO',''] as $estado) $this->assertFalse(ReglasCurso::admiteInscripcion($estado));
+        foreach (['PROGRAMADO','ABIERTO','ACTIVO'] as $estado) $this->assertTrue(ReglasCurso::admiteInscripcion($estado));
+        foreach (['EN_CURSO','FINALIZADO','CANCELADO','OTRO',''] as $estado) $this->assertFalse(ReglasCurso::admiteInscripcion($estado));
     }
 
     public function testCodigoUsaCorrelativoExistenteYAnioActual(): void

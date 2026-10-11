@@ -77,6 +77,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
 
         $routes->get('cursos/personas-vigentes', 'CursosController::personasConCursoVigente');
         $routes->get('cursos/carnets', 'CursosController::listarCarnets');
+        $routes->get('cursos/vigencias', 'CursosController::listarVigenciaCarnets');
         $routes->get('cursos/finalizados', 'CursosController::listarCursosFinalizados');
         $routes->post('cursos/(:segment)/participantes', 'CursosController::inscribirParticipante/$1');
         $routes->put('cursos/(:segment)/participantes/(:segment)', 'CursosController::registrarNota/$1/$2');

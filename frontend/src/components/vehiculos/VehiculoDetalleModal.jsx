@@ -97,10 +97,6 @@ export function VehiculoDetalleModal({
                     {selectedVehiculo.marca} {selectedVehiculo.modelo}
                   </h4>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-right dark:border-[var(--border)] dark:bg-slate-950">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Código QR</p>
-                  <p className="break-all font-mono text-xs font-black text-slate-700 dark:text-slate-200">{selectedVehiculo.codigoQr || 'N/A'}</p>
-                </div>
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -158,13 +154,14 @@ export function VehiculoDetalleModal({
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
               <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Documentos del Vehículo</p>
               {[
+                ['Tarjeta de operatividad', getVehiculoDocumento(selectedVehiculo, 'TARJETA_OPERATIVIDAD')],
                 ['Tarjeta de propiedad', getVehiculoDocumento(selectedVehiculo, 'TARJETA_PROPIEDAD')],
                 ['SOAT', getVehiculoDocumento(selectedVehiculo, 'SOAT')],
               ].map(([label, documento]) => (
                 <div key={label} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-[#1C2438]">
                   <span className="font-bold text-slate-600 dark:text-slate-300">{label}</span>
                   <span className="flex items-center gap-2 text-right font-mono font-black text-slate-800 dark:text-white">
-                    {documento?.codigo || 'N/A'}
+                    {documento?.codigo}
                     <InsigniaEstado estado={documento?.estado} />
                   </span>
                 </div>
@@ -172,7 +169,7 @@ export function VehiculoDetalleModal({
               <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-cyan-50 px-3 py-2 dark:bg-cyan-950/30">
                 <span className="font-bold text-slate-600 dark:text-slate-300">CERTICAV</span>
                 <span className="flex items-center gap-2 text-right font-mono font-black text-slate-800 dark:text-white">
-                  {selectedVehiculo.certicav?.numeroSerieCerticav || selectedVehiculo.certicav?.numeroRegistro || 'N/A'}
+                  {selectedVehiculo.certicav?.numeroSerieCerticav || selectedVehiculo.certicav?.numeroRegistro}
                   <InsigniaEstado estado={selectedVehiculo.certicav?.resultado || selectedVehiculo.certicav?.estado} />
                 </span>
               </div>

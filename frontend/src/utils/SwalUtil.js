@@ -225,8 +225,8 @@ export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelT
         reverseButtons: true,
         customClass: {
             popup: 'rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900',
-            title: 'text-xl font-black text-slate-800 dark:text-white mt-2',
-            htmlContainer: 'text-sm font-medium text-slate-500 dark:text-slate-400 mt-2',
+            title: 'text-xl font-black text-slate-800 mt-2',
+            htmlContainer: 'text-sm font-medium !text-slate-700 mt-2',
             actions: 'flex gap-3 w-full justify-center mt-6',
             confirmButton: confirmColor
                 ? 'rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95'
@@ -258,10 +258,36 @@ export const showError = (title, text) => {
         buttonsStyling: false,
         customClass: {
             popup: 'rounded-3xl shadow-2xl border border-rose-100 dark:border-rose-900/30 dark:bg-slate-900',
-            title: 'text-xl font-black text-slate-800 dark:text-white mt-2',
-            htmlContainer: 'text-sm font-medium text-slate-500 dark:text-slate-400 mt-2',
+            title: 'text-xl font-black text-slate-800 mt-2',
+            htmlContainer: 'text-sm font-medium !text-slate-700 mt-2',
             confirmButton: 'rounded-xl bg-slate-900 dark:bg-white px-8 py-2.5 text-sm font-bold text-white dark:text-slate-900 shadow-md transition-all hover:scale-[1.02] active:scale-95 mt-4',
             icon: 'border-rose-500 text-rose-500 scale-110',
+        }
+    });
+};
+
+// Señal de advertencia: triángulo rojo oscuro con interior blanco y exclamación negra
+const ICONO_ADVERTENCIA = `<svg viewBox="0 0 100 90" width="92" height="83" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <path d="M50 4 L96 84 Q98 88 93 88 L7 88 Q2 88 4 84 Z" fill="#8b0000" stroke="#8b0000" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M50 24 L82 79 L18 79 Z" fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M46.2 38 Q50 36.5 53.8 38 L52.6 62 Q50 63.5 47.4 62 Z" fill="#000"/>
+  <circle cx="50" cy="70" r="4.2" fill="#000"/>
+</svg>`
+
+// Advertencia: algo no salió como se esperaba pero no es un error del sistema (ej. una búsqueda sin resultados).
+export const showWarning = (title, text) => {
+    return Swal.fire({
+        iconHtml: ICONO_ADVERTENCIA,
+        title: title,
+        text: text,
+        confirmButtonText: 'Entendido',
+        buttonsStyling: false,
+        customClass: {
+            popup: 'rounded-3xl shadow-2xl border border-amber-100',
+            icon: '!border-0 !bg-transparent',
+            title: 'text-xl font-black text-slate-800 mt-2',
+            htmlContainer: 'text-sm font-medium !text-slate-700 mt-2',
+            confirmButton: 'rounded-xl bg-slate-900 px-8 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-[1.02] active:scale-95 mt-4',
         }
     });
 };
@@ -275,8 +301,8 @@ export const showSuccess = (title, text) => {
         buttonsStyling: false,
         customClass: {
             popup: 'rounded-3xl shadow-2xl border border-emerald-100 dark:border-emerald-900/30 dark:bg-slate-900 p-6',
-            title: 'text-2xl font-black text-slate-800 dark:text-white mt-3',
-            htmlContainer: 'text-sm font-medium text-slate-500 dark:text-slate-400 mt-2',
+            title: 'text-2xl font-black text-slate-800 mt-3',
+            htmlContainer: 'text-sm font-medium !text-slate-700 mt-2',
             confirmButton: 'rounded-xl bg-emerald-600 px-8 py-2.5 text-sm font-extrabold text-white shadow-md transition-all hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 mt-5',
             icon: 'border-emerald-500 text-emerald-500 scale-125 mb-2',
         }
@@ -295,7 +321,7 @@ export const loading = (title, text) => {
         },
         customClass: {
             popup: 'rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900',
-            title: 'text-lg font-bold text-slate-800 dark:text-white mt-4',
+            title: 'text-lg font-bold text-slate-800 mt-4',
             htmlContainer: 'text-sm font-medium text-slate-500 dark:text-slate-400',
         }
     });

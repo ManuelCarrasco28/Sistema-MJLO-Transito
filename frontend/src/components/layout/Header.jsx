@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Icon } from '../ui/Icon'
 import { apiFetch } from '../../config/api'
 import { errorPasswordUsuario } from '../../utils/passwordPolicy'
@@ -114,6 +115,26 @@ export function Header({
   }, [])
 
   const unreadCount = notifications.filter((item) => item.unread).length
+  const navigate = useNavigate()
+  const [notifFiltro, setNotifFiltro] = useState('TODAS')
+  const hayReportes = notifications.some((n) => n.categoria === 'reportes')
+  const CATEGORIAS_NOTIF = [
+    { id: 'TODAS', label: 'Todas' },
+    { id: 'permisos', label: 'Permisos' },
+    ...(hayReportes ? [{ id: 'reportes', label: 'Reportes' }] : []),
+    { id: 'internamientos', label: 'Depósito' },
+    { id: 'papeletas', label: 'Papeletas' },
+  ]
+  const notifVisibles = notifFiltro === 'TODAS' ? notifications : notifications.filter((n) => n.categoria === notifFiltro)
+  const contarNotif = (id) => (id === 'TODAS' ? notifications : notifications.filter((n) => n.categoria === id)).length
+
+  // Las leídas se recuerdan para que el sondeo periódico no las vuelva a marcar como nuevas
+  const recordarLeidas = (ids) => {
+    try {
+      const actuales = JSON.parse(localStorage.getItem('notif_leidas') || '[]')
+      localStorage.setItem('notif_leidas', JSON.stringify([...new Set([...actuales, ...ids])].slice(-500)))
+    } catch { /* sin almacenamiento */ }
+  }
   const userFullName = [user?.nombres, user?.apellidos].filter(Boolean).join(' ') || 'Usuario'
   const userInitials = [user?.nombres, user?.apellidos]
     .filter(Boolean)
@@ -157,18 +178,19 @@ export function Header({
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>
           <button 
-            className="relative size-8 grid place-items-center rounded-xl text-slate-400 dark:text-white/70 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer" 
+            className={`relative size-8 grid place-items-center rounded-xl transition-colors cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 ${unreadCount > 0 ? 'text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300' : 'text-slate-400 dark:text-white/70 hover:text-slate-700 dark:hover:text-white'}`} 
             title="Notificaciones"
             onClick={() => {
               setNotifOpen(!notifOpen)
               setUserMenuOpen(false)
             }}
           >
-            <svg className="size-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className={`size-4.5 ${unreadCount > 0 ? 'campana-alerta fill-amber-400 stroke-slate-900 dark:fill-amber-400 dark:stroke-amber-400' : ''}`} fill={unreadCount > 0 ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" strokeLinecap="round" strokeLinejoin="round"></path>
             </svg>
             {unreadCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center z-10">
+                <span className="absolute inset-0 animate-ping rounded-full bg-[#EE5D50]/60" />
                 <span className="relative inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[#EE5D50] px-[4px] text-[9px] font-black leading-none text-white shadow-2xs">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
@@ -177,12 +199,12 @@ export function Header({
           </button>
           
           {notifOpen && (
-            <div className="absolute right-0 top-full mt-2.5 z-50 w-80 sm:w-96 rounded-2xl border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[#1C2438] shadow-xl overflow-hidden animate-enter">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[var(--border-strong)] px-4 py-3 bg-slate-50/70 dark:bg-[var(--bg-subtle)]/50">
+            <div className="absolute right-0 top-full z-50 mt-2.5 w-[26rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl animate-enter dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
+              <div className="flex items-center justify-between px-4 pb-2 pt-3.5">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-white">Notificaciones</h4>
+                  <h4 className="text-sm font-extrabold text-slate-800 dark:text-white">Notificaciones</h4>
                   {unreadCount > 0 && (
-                    <span className="rounded-full bg-blue-50 dark:bg-blue-500/20 border border-blue-200/60 dark:border-[var(--border-strong)] px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
                       {unreadCount} nuevas
                     </span>
                   )}
@@ -190,25 +212,44 @@ export function Header({
                 {unreadCount > 0 && (
                   <button
                     type="button"
-                    onClick={() => setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))}
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    onClick={() => {
+                      recordarLeidas(notifications.map((n) => n.id))
+                      setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
+                    }}
+                    className="cursor-pointer text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
                   >
                     Marcar leídas
                   </button>
                 )}
               </div>
 
-              <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
-                {notifications.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-                    <div className="size-12 rounded-full bg-slate-50 dark:bg-white/5 flex items-center justify-center mb-3">
-                      <Icon name="document" className="size-6 text-slate-400 dark:text-slate-500" />
+              <div className={`grid ${hayReportes ? 'grid-cols-5' : 'grid-cols-4'} gap-1 border-b border-slate-100 px-3 pb-2 dark:border-[var(--border)]`}>
+                {CATEGORIAS_NOTIF.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setNotifFiltro(c.id)}
+                    className={`flex min-w-0 cursor-pointer items-center justify-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-bold transition ${notifFiltro === c.id
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                      : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10'}`}
+                  >
+                    <span className="truncate">{c.label}</span>
+                    <span className={`shrink-0 text-[10px] ${notifFiltro === c.id ? 'opacity-70' : 'text-slate-400'}`}>{contarNotif(c.id)}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="custom-scrollbar max-h-[22rem] overflow-y-auto">
+                {notifVisibles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
+                    <div className="mb-3 flex size-11 items-center justify-center rounded-full bg-slate-50 dark:bg-white/5">
+                      <Icon name="bell" className="size-5 text-slate-400 dark:text-slate-500" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No tienes notificaciones pendientes</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Te avisaremos cuando haya novedades importantes.</p>
+                    <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Sin notificaciones</p>
+                    <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Te avisaremos cuando haya novedades.</p>
                   </div>
                 ) : (
-                  notifications.map((n) => {
+                  notifVisibles.map((n) => {
                     const tones = {
                       rose: 'bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300',
                       emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300',
@@ -216,35 +257,29 @@ export function Header({
                       blue: 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300',
                     }
                     return (
-                      <div
+                      <button
                         key={n.id}
+                        type="button"
                         onClick={() => {
-                          setNotifications((prev) =>
-                            prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item))
-                          )
-                          if (n.link) navigate(n.link)
+                          recordarLeidas([n.id])
+                          setNotifications((prev) => prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item)))
                           setNotifOpen(false)
+                          if (n.link) navigate(n.link)
                         }}
-                        className={`flex items-start gap-3.5 p-3.5 transition-colors cursor-pointer ${
-                          n.unread
-                            ? 'bg-blue-50/40 hover:bg-blue-50/70'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                        }`}
+                        className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
                       >
-                        <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${tones[n.tone]}`}>
-                          <Icon name={n.icon} className="size-4.5" />
+                        <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${tones[n.tone] || tones.blue}`}>
+                          <Icon name={n.icon} className="size-4" />
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{n.title}</p>
-                            {n.unread && <span className="size-2 shrink-0 rounded-full bg-blue-600" />}
-                          </div>
-                          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">
-                            {n.description}
-                          </p>
-                          <p className="mt-1 text-[10px] font-medium text-slate-400">{n.time}</p>
-                        </div>
-                      </div>
+                        <span className="min-w-0 flex-1">
+                          <span className={`block truncate text-xs text-slate-800 dark:text-white ${n.unread ? 'font-extrabold' : 'font-semibold'}`}>{n.title}</span>
+                          <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">{n.description}</span>
+                        </span>
+                        <span className="flex shrink-0 flex-col items-end gap-1">
+                          <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">{n.time}</span>
+                          {n.unread && <span className="size-1.5 rounded-full bg-blue-600" />}
+                        </span>
+                      </button>
                     )
                   })
                 )}
@@ -260,9 +295,9 @@ export function Header({
           onClick={() => setDarkMode(!darkMode)}
         >
           {darkMode ? (
-            <Icon name="sun" className="size-4.5" />
+            <Icon name="sun" className="size-4.5 text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.55)]" />
           ) : (
-            <svg className="size-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="size-4.5 fill-indigo-200 stroke-indigo-600" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" strokeLinecap="round" strokeLinejoin="round"></path>
             </svg>
           )}

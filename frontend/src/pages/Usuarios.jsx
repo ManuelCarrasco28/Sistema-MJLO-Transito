@@ -187,7 +187,7 @@ export function Usuarios({ user }) {
     apiFetch(`/personas?buscar=${encodeURIComponent(busquedaPadron)}&page=1&porPagina=8`, { signal: controlador.signal })
       .then((res) => (res.ok ? res.json() : { data: [] }))
       .then((payload) => setResultadosPadron(payload.data || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setBuscandoPadron(false))
     return () => controlador.abort()
   }, [busquedaPadron, isCreateModalOpen, personaElegida])
@@ -354,14 +354,14 @@ export function Usuarios({ user }) {
     await new Promise(r => setTimeout(r, 50))
     try {
       const listToExport = sortedUsuarios
-          if (listToExport.length === 0) {
-            showToast('No hay usuarios para exportar con los filtros actuales', 'warning')
-            return
-          }
-      
-          const rowsHtml = listToExport
-            .map(
-              (u, idx) => `
+      if (listToExport.length === 0) {
+        showToast('No hay usuarios para exportar con los filtros actuales', 'warning')
+        return
+      }
+
+      const rowsHtml = listToExport
+        .map(
+          (u, idx) => `
               <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
                 <td style="text-align: center; font-weight: bold; color: #64748b;">${idx + 1}</td>
                 <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">@${escapeXml(u.nombre_usuario)}</td>
@@ -375,10 +375,10 @@ export function Usuarios({ user }) {
                 </td>
               </tr>
             `
-            )
-            .join('')
-      
-          const excelTemplate = `
+        )
+        .join('')
+
+      const excelTemplate = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
               <head>
                 <meta charset="utf-8"/>
@@ -417,16 +417,16 @@ export function Usuarios({ user }) {
               </body>
             </html>
           `
-      
-          const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' })
-          const url = URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = `Padron_Usuarios_MJLO_${new Date().toISOString().slice(0, 10)}.xls`
-          document.body.appendChild(link)
-          link.click()
-          link.remove()
-          URL.revokeObjectURL(url)
+
+      const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `Padron_Usuarios_MJLO_${new Date().toISOString().slice(0, 10)}.xls`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
     } finally {
       setIsExportingExcel(false)
     }
@@ -437,20 +437,20 @@ export function Usuarios({ user }) {
     setIsExportingPdf(true)
     try {
       const listToExport = sortedUsuarios
-          if (listToExport.length === 0) {
-            showToast('No hay usuarios para imprimir con los filtros actuales', 'warning')
-            return
-          }
-      
-          const printWin = window.open('', '_blank', 'width=1100,height=750')
-          if (!printWin) {
-            showError('Bloqueador emergente', 'Por favor habilita las ventanas emergentes en tu navegador para imprimir.')
-            return
-          }
-      
-          const rowsHtml = listToExport
-            .map(
-              (u, idx) => `
+      if (listToExport.length === 0) {
+        showToast('No hay usuarios para imprimir con los filtros actuales', 'warning')
+        return
+      }
+
+      const printWin = window.open('', '_blank', 'width=1100,height=750')
+      if (!printWin) {
+        showError('Bloqueador emergente', 'Por favor habilita las ventanas emergentes en tu navegador para imprimir.')
+        return
+      }
+
+      const rowsHtml = listToExport
+        .map(
+          (u, idx) => `
               <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
                 <td style="text-align: center; font-weight: bold; color: #64748b;">${idx + 1}</td>
                 <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">@${escapeXml(u.nombre_usuario)}</td>
@@ -458,20 +458,19 @@ export function Usuarios({ user }) {
                 <td style="text-align: center; font-family: monospace;">${escapeXml(u.numero_documento || '—')}</td>
                 <td>${escapeXml(u.rol || 'Sin rol')}</td>
                 <td style="text-align: center;">
-                  <span style="display:inline-block; padding:2px 7px; font-size:9.5px; font-weight:bold; border-radius:4px; ${
-                    u.usuario_estado === 'ACTIVO'
-                      ? 'background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;'
-                      : 'background:#fff1f2; color:#be123c; border:1px solid #fecdd3;'
-                  }">
+                  <span style="display:inline-block; padding:2px 7px; font-size:9.5px; font-weight:bold; border-radius:4px; ${u.usuario_estado === 'ACTIVO'
+              ? 'background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;'
+              : 'background:#fff1f2; color:#be123c; border:1px solid #fecdd3;'
+            }">
                     ${escapeXml(u.usuario_estado || 'ACTIVO')}
                   </span>
                 </td>
               </tr>
             `
-            )
-            .join('')
-      
-          const pdfHtml = `
+        )
+        .join('')
+
+      const pdfHtml = `
             <!doctype html>
             <html lang="es">
               <head>
@@ -532,9 +531,9 @@ export function Usuarios({ user }) {
               </body>
             </html>
           `
-          printWin.document.open()
-          printWin.document.write(pdfHtml)
-          printWin.document.close()
+      printWin.document.open()
+      printWin.document.write(pdfHtml)
+      printWin.document.close()
     } finally {
       setIsExportingPdf(false)
     }
@@ -574,9 +573,6 @@ export function Usuarios({ user }) {
                 Gestión de Usuarios
               </h1>
             </div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Control de cuentas de acceso, roles institucionales y credenciales del sistema.
-            </p>
           </div>
         </div>
       </div>
@@ -677,7 +673,7 @@ export function Usuarios({ user }) {
             <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por usuario, nombre completo, DNI o rol..."
+              placeholder="Buscar por usuario, nombre, DNI o rol"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
@@ -729,7 +725,7 @@ export function Usuarios({ user }) {
               onClick={handleExportExcel}
               title="Descargar padrón de usuarios en Excel (.xls)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-             disabled={isExportingExcel}>
+              disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
@@ -739,7 +735,7 @@ export function Usuarios({ user }) {
               onClick={handleExportPdf}
               title="Descargar o imprimir padrón de usuarios en PDF"
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-             disabled={isExportingPdf}>
+              disabled={isExportingPdf}>
               <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
               <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
@@ -1058,7 +1054,7 @@ export function Usuarios({ user }) {
                       setUserForm((prev) => ({ ...prev, id_trabajador: '' }))
                       setTrabajadorDropdownOpen(true)
                     }}
-                    placeholder="Escribe DNI o nombres para buscar en el padrón..."
+                    placeholder="Escribe DNI o nombres para buscar en el padrón"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
                   />
                 </div>

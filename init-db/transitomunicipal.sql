@@ -1025,7 +1025,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `tipos_vehiculo` WRITE;
 /*!40000 ALTER TABLE `tipos_vehiculo` DISABLE KEYS */;
-INSERT INTO `tipos_vehiculo` (`id`, `nombre`, `descripcion`, `estado`) VALUES (1,'Mototaxi','Vehículo automotor de tres ruedas categoría L5 para transporte público especial de pasajeros','ACTIVO'),(2,'Automóvil','Vehículo de cuatro ruedas categoría M1 para transporte particular o taxi','ACTIVO'),(3,'Moto Lineal','Vehículo menor de dos ruedas categoría L3','ACTIVO'),(4,'Camioneta Rural','Vehículo categoría M2 para transporte colectivo de pasajeros','ACTIVO'),(5,'Mototaxi (Trimovil)',NULL,'ACTIVO'),(6,'Motocarguera','Vehículo automotor de tres ruedas categoría L5 para transporte de carga','ACTIVO');
+INSERT INTO `tipos_vehiculo` (`id`, `nombre`, `descripcion`, `estado`) VALUES (1,'Mototaxi','Vehículo automotor de tres ruedas categoría L5 para transporte público especial de pasajeros','ACTIVO'),(2,'Automóvil','Vehículo de cuatro ruedas categoría M1 para transporte particular o taxi','ACTIVO'),(4,'Camioneta Rural','Vehículo categoría M2 para transporte colectivo de pasajeros','ACTIVO'),(5,'Mototaxi (Trimovil)',NULL,'ACTIVO'),(6,'Motocarguera','Vehículo automotor de tres ruedas categoría L5 para transporte de carga','ACTIVO');
 /*!40000 ALTER TABLE `tipos_vehiculo` ENABLE KEYS */;
 UNLOCK TABLES;
 

@@ -568,9 +568,6 @@ export function Asociaciones() {
                 Asociaciones y Particulares
               </h1>
             </div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Directorio de asociaciones, particulares, ubicación, documentos y control de flotas.
-            </p>
           </div>
         </div>
       </div>
@@ -679,7 +676,7 @@ export function Asociaciones() {
             />
             <input
               type="text"
-              placeholder="Buscar por nombre, RUC, partida, dirección o licencia..."
+              placeholder="Buscar por nombre, RUC, partida o licencia"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
@@ -966,7 +963,7 @@ export function Asociaciones() {
                 />
                 <input
                   type="text"
-                  placeholder="Buscar socio por nombre, doc, placa o asociación..."
+                  placeholder="Buscar socio por nombre, DNI o placa"
                   value={sociosSearch}
                   onChange={(e) => setSociosSearch(e.target.value)}
                   className="w-full rounded-xl border-0 bg-slate-100/70 py-2 pl-9 pr-8 text-xs font-medium text-slate-900 outline-none ring-1 ring-inset ring-slate-200/80 transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-600 dark:bg-slate-900/50 dark:text-white dark:ring-slate-700/50 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 dark:focus:ring-indigo-500"
@@ -1120,11 +1117,6 @@ export function Asociaciones() {
                           <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-700 dark:bg-slate-800 dark:text-slate-300" title={`${socio.vehiculosTotal || 0} vehículo(s) en ${socio.asociacionesTotal || 0} organización(es)`}>
                             {socio.vehiculosTotal || 0}
                           </span>
-                          {Number(socio.documentosVencidos || 0) > 0 && (
-                            <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-black text-rose-600 dark:bg-rose-950/40 dark:text-rose-300" title="Vehículos con documentos vencidos">
-                              {socio.documentosVencidos} venc.
-                            </span>
-                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center align-top text-xs font-medium text-slate-600 dark:text-slate-400">

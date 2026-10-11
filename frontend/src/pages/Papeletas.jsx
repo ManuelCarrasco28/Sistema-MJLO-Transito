@@ -1,4 +1,6 @@
 import { useLocation } from 'react-router-dom'
+import { useDebounce } from '../hooks/useDebounce'
+import { suscribirConfigMovil } from '../utils/configMovil'
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
@@ -72,8 +74,14 @@ export function Papeletas({ user }) {
   }
 
   const [papeletas, setPapeletas] = useState((cachedPapeletas || []).map(normalizePapeleta))
-  const [activeView, setActiveView] = useState('PAPELETAS')
+  // Desde las notificaciones se puede abrir directamente la pestaña de reportes (?vista=reportes)
+  const vistaInicial = new URLSearchParams(window.location.search).get('vista') === 'reportes' ? 'REPORTES' : 'PAPELETAS'
+  const [activeView, setActiveView] = useState(vistaInicial)
+  // "Permiso móvil": activo = el inspector emite la papeleta directo (no hay reportes de evidencia); null = aún no se sabe
+  const [movilAplicaPapeleta, setMovilAplicaPapeleta] = useState(null)
   const [reportes, setReportes] = useState([])
+  const [reportesPendientesTotal, setReportesPendientesTotal] = useState(null)
+  const [reportesTotal, setReportesTotal] = useState(0)
   const [tiposInfraccion, setTiposInfraccion] = useState(cachedTipos || [])
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
   const [asociaciones, setAsociaciones] = useState(cachedOrgs || [])
@@ -117,9 +125,10 @@ export function Papeletas({ user }) {
     setCurrentPage(1)
   }
   const [stats, setStats] = useState({ total: 0, pendientes: 0, pagadas: 0, anuladas: 0 })
-  const [reportesSearch, setReportesSearch] = useState('')
+  const [reportesSearch, setReportesSearch] = useState(() => (vistaInicial === 'REPORTES' ? new URLSearchParams(window.location.search).get('search') || '' : ''))
   const [reportesFilterEstado, setReportesFilterEstado] = useState('TODOS')
   const [reportesPage, setReportesPage] = useState(1)
+  const reportesBusqueda = useDebounce(reportesSearch.trim(), 300)
   const [reportesPerPage, setReportesPerPage] = useState(8)
   const [loadingReportes, setLoadingReportes] = useState(false)
   const [fotosModalReporte, setFotosModalReporte] = useState(null)
@@ -156,6 +165,7 @@ export function Papeletas({ user }) {
   const [numeroRecibo, setNumeroRecibo] = useState('')
   const [fechaPago, setFechaPago] = useState('')
   const [metodoPago, setMetodoPago] = useState('EFECTIVO')
+  const [numeroOperacion, setNumeroOperacion] = useState('')
   const [isProcessingAction, setIsProcessingAction] = useState(false)
   const [selectedPapeleta, setSelectedPapeleta] = useState(null)
 
@@ -193,7 +203,7 @@ export function Papeletas({ user }) {
   }
 
   const totales = stats.total ?? 0
-  const reportesPendientes = reportes.filter((r) => r.estado === 'PENDIENTE').length
+  const reportesPendientes = reportesPendientesTotal ?? reportes.filter((r) => r.estado === 'PENDIENTE').length
   const pendientes = stats.pendientes ?? 0
   const pagadas = stats.pagadas ?? 0
   const anuladas = stats.anuladas ?? 0
@@ -219,35 +229,9 @@ export function Papeletas({ user }) {
     setReportesPage(1)
   }, [reportesSearch, reportesFilterEstado])
 
-  const filteredReportes = reportes.filter((r) => {
-    if (reportesFilterEstado !== 'TODOS') {
-      if (reportesFilterEstado === 'CONVERTIDO_PAPELETA') {
-        if (r.estado !== 'CONVERTIDO_PAPELETA' && r.estado !== 'FINALIZADO') return false
-      } else if (r.estado !== reportesFilterEstado) {
-        return false
-      }
-    }
-    if (!reportesSearch.trim()) return true
-    const term = reportesSearch.trim().toLowerCase()
-    return [
-      r.placa,
-      r.placa_visual,
-      r.lugar,
-      r.observaciones,
-      r.inspector_nombre,
-      r.conductorDni,
-      r.conductorNombre,
-      r.infraccion_visual,
-      r.estado,
-      `#${r.id}`,
-      r.numero_papeleta
-    ].some((v) => String(v || '').toLowerCase().includes(term))
-  })
-
-  const paginatedReportes = filteredReportes.slice(
-    (reportesPage - 1) * reportesPerPage,
-    reportesPage * reportesPerPage
-  )
+  // Los reportes ya llegan filtrados y paginados desde el servidor
+  const filteredReportes = reportes
+  const paginatedReportes = reportes
 
   const paginatedPapeletas = papeletas
 
@@ -391,10 +375,15 @@ export function Papeletas({ user }) {
 
   const loadReportes = () => {
     setLoadingReportes(true)
-    apiFetch('/reportes-intervencion')
+    const params = new URLSearchParams({ page: String(reportesPage), porPagina: String(reportesPerPage) })
+    if (reportesFilterEstado !== 'TODOS') params.set('estado', reportesFilterEstado)
+    if (reportesBusqueda) params.set('buscar', reportesBusqueda)
+    apiFetch(`/reportes-intervencion?${params}`)
       .then((res) => (res.ok ? res.json() : { data: [] }))
       .then((reportesRes) => {
         setReportes(reportesRes.data || [])
+        setReportesTotal(reportesRes.meta?.total ?? (reportesRes.data || []).length)
+        setReportesPendientesTotal(reportesRes.meta?.pendientes ?? null)
         reportesCargados.current = true
       })
       .catch(() => {})
@@ -467,9 +456,40 @@ export function Papeletas({ user }) {
     return () => cargaPapeletas.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha, sortBy, sortDir])
 
+  // El "Permiso móvil" se revisa al entrar, cada 10 s, al volver a esta ventana y cuando se cambia en otra pestaña:
+  // así la pestaña de reportes aparece o desaparece sola, sin recargar.
   useEffect(() => {
-    if (activeView === 'REPORTES' && !reportesCargados.current) loadReportes()
-  }, [activeView])
+    // La primera consulta se hace siempre; las siguientes solo si la pestaña está a la vista
+    const revisar = (primera = false) => {
+      if (primera !== true && document.visibilityState === 'hidden') return
+      apiFetch('/municipalidad/config-mobile')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((payload) => { if (payload) setMovilAplicaPapeleta(payload.data?.permite_aplicar_papeleta === true) })
+        .catch(() => {})
+    }
+    revisar(true)
+    const intervalo = setInterval(() => revisar(), 10000)
+    const alVolver = () => revisar()
+    window.addEventListener('focus', alVolver)
+    document.addEventListener('visibilitychange', alVolver)
+    const dejarDeEscuchar = suscribirConfigMovil(alVolver)
+    return () => {
+      clearInterval(intervalo)
+      window.removeEventListener('focus', alVolver)
+      document.removeEventListener('visibilitychange', alVolver)
+      dejarDeEscuchar()
+    }
+  }, [])
+
+  // Los reportes solo existen si el móvil NO emite papeletas directo. Se cargan al entrar para mostrar cuántos hay pendientes.
+  useEffect(() => {
+    if (movilAplicaPapeleta === true && activeView === 'REPORTES') setActiveView('PAPELETAS')
+  }, [movilAplicaPapeleta])
+
+  // Reportes: se piden al servidor ya filtrados y paginados (solo la página visible)
+  useEffect(() => {
+    if (movilAplicaPapeleta === false) loadReportes()
+  }, [movilAplicaPapeleta, reportesPage, reportesPerPage, reportesFilterEstado, reportesBusqueda])
 
   useEffect(() => {
     loadStats()
@@ -519,7 +539,7 @@ export function Papeletas({ user }) {
     setPapeletaToAction(papeleta)
     setNumeroRecibo('')
     setFechaPago('')
-    setMetodoPago('EFECTIVO')
+    setMetodoPago('EFECTIVO'); setNumeroOperacion('')
     setIsPagarModalOpen(true)
   }
 
@@ -540,7 +560,7 @@ export function Papeletas({ user }) {
     try {
       const res = await apiFetch(`/papeletas/${papeletaToAction.id}/pagar`, {
         method: 'POST',
-        body: { metodoPago, numeroRecibo, fechaPago }
+        body: { metodoPago, numeroRecibo, fechaPago, numeroVoucher: metodoPago === 'EFECTIVO' ? '' : numeroOperacion }
       })
       if (res.ok) {
         setPapeletas(prev => prev.map(p => p.id === papeletaToAction.id ? {
@@ -731,9 +751,6 @@ export function Papeletas({ user }) {
                 Control de Papeletas e Infracciones
               </h1>
             </div>
-            <p className="text-xs font-medium text-slate-500">
-              Registro, notificación y gestión de cobro de actas de infracción al tránsito municipal.
-            </p>
           </div>
         </div>
       </div>
@@ -801,6 +818,7 @@ export function Papeletas({ user }) {
           <Icon name="ticket" className="size-4" />
           <span>Papeletas registradas</span>
         </button>
+        {movilAplicaPapeleta === false && (
         <button
           type="button"
           onClick={() => setActiveView('REPORTES')}
@@ -812,15 +830,24 @@ export function Papeletas({ user }) {
         >
           <Icon name="document" className="size-4" />
           <span>Reportes Evidencias</span>
-          <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${
-            activeView === 'REPORTES'
-              ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-              : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-          }`}>{reportesCargados.current ? reportesPendientes : '—'}</span>
+          {reportesCargados.current && reportesPendientes > 0 ? (
+            // Alerta: hay reportes pendientes de revisar
+            <span className="relative ml-1 inline-flex" title={`${reportesPendientes} reportes pendientes de revisar`}>
+              <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/60" />
+              <span className="relative min-w-6 rounded-full bg-amber-400 px-2 py-0.5 text-center text-[11px] font-black text-amber-950 shadow-sm shadow-amber-500/40">
+                {reportesPendientes}
+              </span>
+            </span>
+          ) : (
+            <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              {reportesCargados.current ? reportesPendientes : '—'}
+            </span>
+          )}
         </button>
+        )}
       </div>
 
-      {activeView === 'REPORTES' && (
+      {activeView === 'REPORTES' && movilAplicaPapeleta === false && (
         <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col print:hidden">
           {/* Top toolbar */}
           <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 dark:border-[var(--border)]">
@@ -832,7 +859,7 @@ export function Papeletas({ user }) {
                 />
                 <input
                   type="text"
-                  placeholder="Buscar por placa, lugar, inspector, infracción, ID..."
+                  placeholder="Buscar por placa, lugar, inspector o infracción"
                   value={reportesSearch}
                   onChange={(e) => setReportesSearch(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-10 text-xs text-slate-800 outline-none transition focus:border-amber-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-amber-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-amber-400"
@@ -885,10 +912,10 @@ export function Papeletas({ user }) {
           {(reportesFilterEstado !== 'TODOS' || reportesSearch) && (
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4 py-2 dark:border-[var(--border)] dark:bg-slate-900/30">
               <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                Filtros activos: {filteredReportes.length} {filteredReportes.length === 1 ? 'reporte encontrado' : 'reportes encontrados'}
+                Filtros activos: {reportesTotal.toLocaleString('es-PE')} {reportesTotal === 1 ? 'reporte encontrado' : 'reportes encontrados'}
               </span>
               <span className="text-[11px] text-slate-400">
-                Página {reportesPage} de {Math.max(1, Math.ceil(filteredReportes.length / reportesPerPage))}
+                Página {reportesPage} de {Math.max(1, Math.ceil(reportesTotal / reportesPerPage))}
               </span>
             </div>
           )}
@@ -1087,7 +1114,7 @@ export function Papeletas({ user }) {
             <div className="border-t border-slate-100 dark:border-[var(--border)]">
               <Pagination
                 currentPage={reportesPage}
-                totalItems={filteredReportes.length}
+                totalItems={reportesTotal}
                 itemsPerPage={reportesPerPage}
                 onPageChange={setReportesPage}
                 onItemsPerPageChange={(size) => {
@@ -1112,7 +1139,7 @@ export function Papeletas({ user }) {
               />
               <input
                 type="text"
-                placeholder="Buscar por código PAP, placa, infractor, DNI..."
+                placeholder="Buscar por PAP, placa, infractor o DNI"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="h-[38px] w-full rounded-xl border border-slate-200 bg-slate-50/70 py-0 pl-10 pr-10 text-sm text-slate-800 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-rose-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-rose-400"
@@ -1302,7 +1329,7 @@ export function Papeletas({ user }) {
                   return (
                     <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-[var(--bg-subtle)]">
                       <td className="px-3.5 py-3.5 text-center ">
-                        <span className="font-mono text-xs font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
+                        <span className="whitespace-nowrap font-mono text-xs font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
                         <div className="mt-0.5">{renderOrigen(p)}</div>
                       </td>
                       <td className="px-3.5 py-3.5">
@@ -1490,7 +1517,7 @@ export function Papeletas({ user }) {
             <div className="space-y-3 p-6">
               <label className="block space-y-1">
                 <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500">Motivo</span>
-                <textarea required value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} rows={4} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" placeholder="Ej. Foto insuficiente, placa ilegible, no procede..." />
+                <textarea required value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} rows={4} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white" placeholder="Ej. Foto insuficiente, placa ilegible, no procede" />
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
@@ -1521,6 +1548,8 @@ export function Papeletas({ user }) {
           fechaPago={fechaPago}
           setFechaPago={setFechaPago}
           metodoPago={metodoPago}
+          numeroOperacion={numeroOperacion}
+          setNumeroOperacion={setNumeroOperacion}
           setMetodoPago={setMetodoPago}
           isProcessingAction={isProcessingAction}
           onConfirmar={handleConfirmPagar}

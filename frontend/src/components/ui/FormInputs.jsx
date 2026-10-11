@@ -424,7 +424,7 @@ function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocu
 
           <div className="mb-2.5">
             <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-              Hora
+              Hora (1 - 12)
             </span>
             <div className="grid grid-cols-6 gap-1">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => {
@@ -527,6 +527,8 @@ export function FloatingInput({
   label,
   value,
   onChange,
+  onFocus: onFocusExterno,
+  onBlur: onBlurExterno,
   type = 'text',
   required = false,
   maxLength,
@@ -559,8 +561,8 @@ export function FloatingInput({
           required={required}
           disabled={props.disabled}
           readOnly={props.readOnly}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={(e) => { setIsFocused(true); onFocusExterno?.(e) }}
+          onBlur={(e) => { setIsFocused(false); onBlurExterno?.(e) }}
           inputClassName={clasesInput}
         />
       ) : type === 'time' ? (
@@ -572,8 +574,8 @@ export function FloatingInput({
           required={required}
           disabled={props.disabled}
           readOnly={props.readOnly}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={(e) => { setIsFocused(true); onFocusExterno?.(e) }}
+          onBlur={(e) => { setIsFocused(false); onBlurExterno?.(e) }}
           inputClassName={clasesInput}
         />
       ) : (
@@ -584,8 +586,8 @@ export function FloatingInput({
           maxLength={maxLength}
           value={value ?? ''}
           onChange={onChange}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={(e) => { setIsFocused(true); onFocusExterno?.(e) }}
+          onBlur={(e) => { setIsFocused(false); onBlurExterno?.(e) }}
           autoComplete={autoComplete}
           placeholder=" "
           className={clasesInput}
@@ -719,7 +721,7 @@ function BuscadorOpciones({ texto, onTexto, onTecla, mostrados, total }) {
         value={texto}
         onChange={(e) => onTexto(e.target.value)}
         onKeyDown={onTecla}
-        placeholder="Escriba para buscar..."
+        placeholder="Escriba para buscar"
         autoComplete="off"
         // La regla global "input { font: inherit }" anula las clases text-*, por eso el tamaño va en línea.
         style={{ fontSize: '11px', lineHeight: '1.25' }}

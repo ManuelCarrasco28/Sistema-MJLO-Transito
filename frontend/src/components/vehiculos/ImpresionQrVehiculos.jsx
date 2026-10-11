@@ -443,7 +443,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
           />
           <input
             type="text"
-            placeholder="Buscar por placa, propietario o asociación..."
+            placeholder="Buscar por placa, propietario o asociación"
             value={buscar}
             onChange={(e) => setBuscar(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-9 pr-8 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-100"

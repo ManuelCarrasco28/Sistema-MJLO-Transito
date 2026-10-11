@@ -24,6 +24,12 @@ use CodeIgniter\HotReloader\HotReloader;
  */
 
 Events::on('pre_system', static function (): void {
+    // La BD (CURDATE, NOW, TIMESTAMP) trabaja en hora de Lima, igual que PHP (appTimezone)
+    date_default_timezone_set('America/Lima');
+    Events::on('post_controller_constructor', static function (): void {
+        \Config\Database::connect()->query("SET time_zone = '-05:00'");
+    });
+
     if (ENVIRONMENT !== 'testing') {
         $value = ini_get('zlib.output_compression');
 

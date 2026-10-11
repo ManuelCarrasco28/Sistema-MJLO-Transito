@@ -140,7 +140,7 @@ export function MapaCoordenadasPicker({ isOpen, onClose, onConfirm, initialValue
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Escribe la dirección a buscar..."
+                placeholder="Escribe la dirección a buscar"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
               />
             </div>

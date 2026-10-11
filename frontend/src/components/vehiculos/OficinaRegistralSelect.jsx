@@ -32,7 +32,7 @@ export function OficinaRegistralSelect({ oficinas, valor, onChange, className = 
       <input
         type="text"
         value={abierto ? texto : (actual ? `${actual.descripcion} (Zona ${actual.codeZona})` : '')}
-        placeholder="Escriba para buscar…"
+        placeholder="Escriba para buscar"
         onFocus={(e) => { setAbierto(true); setTexto(''); e.target.select() }}
         onChange={(e) => { setAbierto(true); setTexto(e.target.value) }}
         onKeyDown={(e) => {

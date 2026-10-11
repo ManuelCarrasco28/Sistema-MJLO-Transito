@@ -1,11 +1,13 @@
-export function StatusBadge({ status, className = '' }) {
+export function StatusBadge({ status, label, className = '' }) {
   const norm = String(status || '').toUpperCase().trim()
 
   // Mapeo semántico según la skill rediseno-sobrio
   let tokenType = 'neutral' // default
 
-  if (['ACTIVO', 'VIGENTE', 'FORMAL', 'PAGADO', 'LIBERADO', 'FINALIZADO', 'APROBADO', 'COMPLETADO', 'EN_CURSO', 'ENTREGADO'].includes(norm)) {
+  if (['ACTIVO', 'VIGENTE', 'FORMAL', 'PAGADO', 'LIBERADO', 'FINALIZADO', 'APROBADO', 'COMPLETADO', 'ENTREGADO'].includes(norm)) {
     tokenType = 'ok'
+  } else if (['EN_CURSO', 'EN CURSO'].includes(norm)) {
+    tokenType = 'info'
   } else if (['EN_TRAMITE', 'EN TRÁMITE', 'EN TRAMITE', 'PENDIENTE', 'INFORMAL', 'POR_COBRAR', 'EN REVISIÓN', 'EN REVISION', 'INSCRITO', 'PROGRAMADO'].includes(norm)) {
     tokenType = 'warn'
   } else if (['VENCIDO', 'EXPIRADO', 'OBSERVADO', 'EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'RETENIDO', 'BAJA', 'SUSPENDIDO', 'CANCELADO', 'DESAPROBADO', 'INACTIVO', 'RECHAZADO'].includes(norm)) {
@@ -24,6 +26,11 @@ export function StatusBadge({ status, className = '' }) {
       color: 'var(--warn-fg)',
       backgroundColor: 'var(--warn-bg)',
       borderColor: 'var(--border-warn)'
+    },
+    info: {
+      color: 'var(--info-fg)',
+      backgroundColor: 'var(--info-bg)',
+      borderColor: 'var(--border-info)'
     },
     danger: {
       color: 'var(--danger-fg)',
@@ -58,7 +65,7 @@ export function StatusBadge({ status, className = '' }) {
         className="size-1.5 rounded-full shrink-0"
         style={{ backgroundColor: 'currentColor' }}
       />
-      <span>{displayText}</span>
+      <span>{label ?? displayText}</span>
     </span>
   )
 }

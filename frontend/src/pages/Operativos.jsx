@@ -147,7 +147,7 @@ export function Operativos({ user }) {
     apiFetch('/operativos/estadisticas')
       .then((res) => res.ok ? res.json() : Promise.reject(res))
       .then((payload) => setStats(payload.data ?? {}))
-      .catch(() => {})
+      .catch(() => { })
   }
 
   useEffect(() => {
@@ -174,31 +174,31 @@ export function Operativos({ user }) {
     await new Promise(r => setTimeout(r, 50))
     try {
       const data = await fetchTodoElFiltro()
-          await exportToExcel({
-            filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.xls`,
-            sheetName: 'Operativos',
-            title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
-            subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
-            metadata: [
-              { label: 'Estado', value: String(estado || '').replace(/_/g, ' ') },
-              { label: 'Total Operativos', value: String(data.length) }
-            ],
-            columns: [
-              { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, isText: true, width: 120, align: 'center' },
-              { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 220 },
-              { header: 'LUGAR / ZONA', key: 'lugar', width: 200 },
-              { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
-              { header: 'HORA INICIO', key: 'hora_inicio', width: 100, align: 'center' },
-              { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 100, align: 'center' },
-              { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 110, align: 'center' },
-              { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 100, align: 'center' },
-              { header: 'ESTADO', render: (_, o) => String(o.estado || '').replace(/_/g, ' '), width: 120, align: 'center' },
-              { header: 'REGISTRADO POR', render: (_, o) => o.usuario_registra || '—', width: 160 },
-              { header: 'FECHA DE REGISTRO', render: (_, o) => o.created_at || '—', width: 150, align: 'center' },
-              { header: 'OBSERVACIONES', render: (_, o) => o.observacion || '—', width: 240 }
-            ],
-            data
-          })
+      await exportToExcel({
+        filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.xls`,
+        sheetName: 'Operativos',
+        title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
+        subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
+        metadata: [
+          { label: 'Estado', value: String(estado || '').replace(/_/g, ' ') },
+          { label: 'Total Operativos', value: String(data.length) }
+        ],
+        columns: [
+          { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, isText: true, width: 120, align: 'center' },
+          { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 220 },
+          { header: 'LUGAR / ZONA', key: 'lugar', width: 200 },
+          { header: 'FECHA', key: 'fecha', width: 110, align: 'center' },
+          { header: 'HORA INICIO', key: 'hora_inicio', width: 100, align: 'center' },
+          { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 100, align: 'center' },
+          { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 110, align: 'center' },
+          { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 100, align: 'center' },
+          { header: 'ESTADO', render: (_, o) => String(o.estado || '').replace(/_/g, ' '), width: 120, align: 'center' },
+          { header: 'REGISTRADO POR', render: (_, o) => o.usuario_registra || '—', width: 160 },
+          { header: 'FECHA DE REGISTRO', render: (_, o) => o.created_at || '—', width: 150, align: 'center' },
+          { header: 'OBSERVACIONES', render: (_, o) => o.observacion || '—', width: 240 }
+        ],
+        data
+      })
     } finally {
       setIsExportingExcel(false)
     }
@@ -208,27 +208,27 @@ export function Operativos({ user }) {
     setIsExportingPdf(true)
     try {
       const data = await fetchTodoElFiltro()
-          await exportToPdf({
-            filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.pdf`,
-            title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
-            subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
-            metadata: [
-              { label: 'Estado', value: String(estado || '').replace(/_/g, ' ') },
-              { label: 'Total Operativos', value: String(data.length) }
-            ],
-            columns: [
-              { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, width: 25, align: 'center' },
-              { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 40 },
-              { header: 'LUGAR / ZONA', key: 'lugar', width: 40 },
-              { header: 'FECHA', key: 'fecha', width: 20, align: 'center' },
-              { header: 'HORA INICIO', key: 'hora_inicio', width: 20, align: 'center' },
-              { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 20, align: 'center' },
-              { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 25, align: 'center' },
-              { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 20, align: 'center' },
-              { header: 'ESTADO', render: (_, o) => String(o.estado || '').replace(/_/g, ' '), width: 25, align: 'center' }
-            ],
-            data
-          })
+      await exportToPdf({
+        filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.pdf`,
+        title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
+        subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
+        metadata: [
+          { label: 'Estado', value: String(estado || '').replace(/_/g, ' ') },
+          { label: 'Total Operativos', value: String(data.length) }
+        ],
+        columns: [
+          { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, width: 25, align: 'center' },
+          { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 40 },
+          { header: 'LUGAR / ZONA', key: 'lugar', width: 40 },
+          { header: 'FECHA', key: 'fecha', width: 20, align: 'center' },
+          { header: 'HORA INICIO', key: 'hora_inicio', width: 20, align: 'center' },
+          { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 20, align: 'center' },
+          { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 25, align: 'center' },
+          { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 20, align: 'center' },
+          { header: 'ESTADO', render: (_, o) => String(o.estado || '').replace(/_/g, ' '), width: 25, align: 'center' }
+        ],
+        data
+      })
     } finally {
       setIsExportingPdf(false)
     }
@@ -382,7 +382,7 @@ export function Operativos({ user }) {
       if (response.ok) {
         setOperativos((actual) => actual.filter((op) => op.id !== id))
         setCachedData('/operativos', null) // el calendario del dashboard vuelve a pedir su lista
-        loadOperativos().catch(() => {}).finally(() => setLoading(false))
+        loadOperativos().catch(() => { }).finally(() => setLoading(false))
         loadStats()
         showToast('Operativo eliminado correctamente')
         return
@@ -614,7 +614,6 @@ export function Operativos({ user }) {
           </span>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Operativos</h1>
-            <p className="text-xs font-medium text-slate-500">Programación, asignación de inspectores e historial de papeletas.</p>
           </div>
         </div>
       </div>
@@ -650,7 +649,7 @@ export function Operativos({ user }) {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nombre, lugar o fecha..."
+              placeholder="Buscar por nombre, lugar o fecha"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-xs font-semibold outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
             />
             {search && (
@@ -697,15 +696,15 @@ export function Operativos({ user }) {
                 Limpiar
               </button>
             )}
-            
+
             <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition-colors" disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} /><span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
-            
+
             <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors" disabled={isExportingPdf}>
               <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} /><span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
-            
+
             <button onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
               <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
             </button>
@@ -792,7 +791,7 @@ export function Operativos({ user }) {
               <h2 className="text-xl font-black">{editing ? 'Editar operativo' : 'Nuevo operativo'}</h2>
               <BotonCerrarModal onClick={() => setModalOpen(false)} title="Cerrar" />
             </div>
-            
+
             <fieldset className="mb-5 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
               <legend className="px-2 text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Datos Generales</legend>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -823,7 +822,7 @@ export function Operativos({ user }) {
                 options={personal.map(p => ({ value: String(p.id), label: `${p.nombres} ${p.apellidos}` }))}
                 selectedIds={form.inspectores}
                 onChange={(newIds) => setForm({ ...form, inspectores: newIds })}
-                placeholder="Escribe el nombre del inspector..."
+                placeholder="Escribe el nombre del inspector"
               />
             </fieldset>
 

@@ -115,16 +115,32 @@ class PagosTransito
             if ($pago['estado'] !== 'PENDIENTE') throw new DomainException('Solo se puede confirmar un pago pendiente.');
             if (in_array($origin['estado'], ['ANULADA', 'ANULADO', 'CANCELADO'], true)) throw new DomainException('No se puede confirmar el pago de un registro anulado.');
             if ($this->db->table('pagos_transito')->where('numero_recibo', $recibo)->countAllResults()) throw new DomainException('Ese recibo ya está registrado.');
+            // N° de operación (Yape, transferencia, tarjeta...): obligatorio si no se paga en efectivo; en efectivo no existe.
+            $medio = strtoupper(trim($input['metodoPago'] ?? ''));
+            $operacion = trim($input['numeroVoucher'] ?? '');
+            if ($medio !== '' && $medio !== 'EFECTIVO' && $operacion === '') {
+                throw new DomainException('Ingrese el N° de operación del pago (' . $medio . ').');
+            }
+            if (strlen($operacion) > 50) throw new DomainException('El N° de operación no puede exceder los 50 caracteres.');
+            if ($medio === '' || $medio === 'EFECTIVO') $operacion = '';
             $this->db->table('pagos_transito')->where('id', $id)->update([
                 'numero_recibo' => $recibo, 'fecha_pago' => $fecha,
-                'numero_voucher' => trim($input['numeroVoucher'] ?? '') ?: null,
-                'medio_pago' => trim($input['metodoPago'] ?? '') ?: null,
-                'referencia_pago' => trim($input['referenciaPago'] ?? '') ?: null,
+                'numero_voucher' => $operacion ?: null,
+                'medio_pago' => $medio ?: null,
+                // La referencia guarda la descripción del cobro; solo se cambia si llega una nueva
+                'referencia_pago' => trim($input['referenciaPago'] ?? '') ?: ($pago['referencia_pago'] ?? null),
                 'estado' => 'PAGADO',
             ]);
             if ($pago['tipo_pago'] === 'PAPELETA') $this->db->table('papeletas')->where('id', $pago['id_papeleta'])->update(['estado' => 'PAGADA']);
             if ($pago['tipo_pago'] === 'CURSO') $this->db->table('inscripciones_curso')->where('id', $pago['id_inscripcion'])->update(['estado_pago' => 'PAGADO']);
-            return $this->db->table('pagos_transito')->where('id', $id)->get()->getRowArray();
+            $confirmado = $this->db->table('pagos_transito')->where('id', $id)->get()->getRowArray();
+            if (!empty($confirmado['numero_voucher'])) {
+                // Aviso (no bloqueo): una misma operación puede pagar varias cosas a la vez
+                $confirmado['operacion_repetida'] = $this->db->table('pagos_transito')
+                    ->where('numero_voucher', $confirmado['numero_voucher'])->where('medio_pago', $confirmado['medio_pago'])
+                    ->where('estado', 'PAGADO')->where('id !=', $id)->countAllResults();
+            }
+            return $confirmado;
         });
     }
 

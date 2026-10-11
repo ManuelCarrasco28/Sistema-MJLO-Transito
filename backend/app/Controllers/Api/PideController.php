@@ -214,7 +214,7 @@ class PideController extends ResourceController
         if (is_array($ultimo)) {
             unset($ultimo['raw_xml']);
             if ($codeZona !== '' && !empty($ultimo) && array_key_exists('data', $ultimo) && $ultimo['data'] === null) {
-                $ultimo['message'] = "No se encontró la placa en ninguna oficina registral de la zona {$codeZona}. Puede buscar en otra zona o ingresar los datos manualmente.";
+                $ultimo['message'] = "No se encontró la placa en ninguna oficina registral de la zona {$codeZona}. Puede buscar en otra zona.";
             }
         }
 

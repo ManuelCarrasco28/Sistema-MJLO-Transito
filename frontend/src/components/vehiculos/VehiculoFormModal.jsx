@@ -31,6 +31,8 @@ export function VehiculoFormModal({
   isBuscandoSunarp,
   titularDetectado,
   onOpenPersonaRapida,
+  errores = {},
+  onLimpiarError = () => {},
 }) {
   // Cada vez que se abre el formulario la búsqueda parte de Chiclayo.
   useEffect(() => { oficinaRegistral?.reiniciar?.() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -141,6 +143,8 @@ export function VehiculoFormModal({
                         id="veh_placa"
                         label="Placa de Rodaje"
                         required
+                        error={errores.placa && !formData.placa ? errores.placa : ''}
+                        onFocus={() => onLimpiarError('placa')}
                         minLength={6}
                         pattern="[A-Z0-9]{6}"
                         title="La placa debe tener exactamente 6 caracteres (letras y números)."
@@ -188,7 +192,6 @@ export function VehiculoFormModal({
                         { value: 'Motocarguera', label: 'Motocarguera' },
                         { value: 'Automóvil', label: 'Automóvil' },
                         { value: 'Camioneta Rural', label: 'Camioneta Rural' },
-                        { value: 'Moto Lineal', label: 'Moto Lineal' },
                       ]}
                     />
                   </div>
@@ -197,6 +200,9 @@ export function VehiculoFormModal({
                     <FloatingInput
                       id="veh_marca"
                       label="Marca"
+                      required
+                      error={errores.marca && !formData.marca?.trim() ? errores.marca : ''}
+                      onFocus={() => onLimpiarError('marca')}
                       value={formData.marca}
                       onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
                     />
@@ -209,6 +215,9 @@ export function VehiculoFormModal({
                     <FloatingInput
                       id="veh_modelo"
                       label="Modelo"
+                      required
+                      error={errores.modelo && !formData.modelo?.trim() ? errores.modelo : ''}
+                      onFocus={() => onLimpiarError('modelo')}
                       value={formData.modelo}
                       onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
                     />
@@ -218,6 +227,9 @@ export function VehiculoFormModal({
                     <FloatingInput
                       id="veh_color"
                       label="Color"
+                      required
+                      error={errores.color && !formData.color?.trim() ? errores.color : ''}
+                      onFocus={() => onLimpiarError('color')}
                       value={formData.color}
                       onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                     />
@@ -356,8 +368,10 @@ export function VehiculoFormModal({
                     id="veh_propietario"
                     label={formData.placa?.includes('SIN-PLACA') ? 'Supuesto Dueño' : 'Propietario Legal'}
                     required
+                    error={errores.propietario && !formData.propietarioDni ? errores.propietario : ''}
                     value={propietarioSearch}
                     onFocus={() => {
+                      onLimpiarError('propietario')
                       setShowPropietarioResults(true)
                       setShowAsociacionResults(false)
                     }}

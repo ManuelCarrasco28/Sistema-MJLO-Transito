@@ -81,7 +81,7 @@ export function ImpresionTarjetasOperatividad({ inicial }) {
       storageKey="impresion_carrito_tarjetas_operatividad_v2"
       endpoint="/documentos"
       baseParams={{ tipoDocumento: 'TARJETA_OPERATIVIDAD' }}
-      placeholder="Buscar por placa, titular, DNI, asociación o N° de tarjeta..."
+      placeholder="Buscar por placa, titular, DNI o tarjeta"
       filtros={FILTROS}
       columnas={COLUMNAS_LISTA}
       columnasCarrito={COLUMNAS_CARRITO}

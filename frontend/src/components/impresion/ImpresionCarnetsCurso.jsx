@@ -153,7 +153,7 @@ export function ImpresionCarnetsCurso({ cursoInicial, alUsarCursoInicial }) {
     <ListaImpresion
       storageKey="impresion_carrito_carnets_curso_v2"
       endpoint="/cursos/carnets"
-      placeholder="Buscar por nombre, DNI, licencia o curso..."
+      placeholder="Buscar por nombre, DNI o curso"
       filtros={FILTROS}
       columnas={COLUMNAS_LISTA}
       columnasCarrito={COLUMNAS_CARRITO}

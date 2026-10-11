@@ -201,8 +201,10 @@ class PersonasController extends ResourceController
 
     public function index()
     {
-        // Fuera de oficina (inspector) solo se admite la consulta exacta por documento; no hay listado ni búsqueda por texto.
-        if (!\App\Libraries\Acceso::esOficina() && trim((string) $this->request->getGet('numeroDocumento')) === '') {
+        // Fuera de oficina (inspector) solo se admite la consulta exacta por un documento con formato válido;
+        // no hay listado ni búsqueda por texto (ni valores como "0" que no filtrarían nada).
+        $numeroConsulta = trim((string) $this->request->getGet('numeroDocumento'));
+        if (!\App\Libraries\Acceso::esOficina() && !preg_match('/^[A-Za-z0-9]{8,15}$/', $numeroConsulta)) {
             return $this->failForbidden('Solo se permite consultar por número de documento.');
         }
         \App\Libraries\Acceso::limitarListadoCompleto($this->request, ['numeroDocumento']);
@@ -214,9 +216,9 @@ class PersonasController extends ResourceController
 
         $builder = $this->personaSelectQuery($db);
 
-        $numero = $this->request->getGet('numeroDocumento');
-        if ($numero) {
-            $builder->where('p.numero', trim($numero));
+        $numero = trim((string) $this->request->getGet('numeroDocumento'));
+        if ($numero !== '') {
+            $builder->where('p.numero', $numero);
         }
 
         if ($rol !== 'SUPERADMIN') {
