@@ -17,6 +17,7 @@ import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/F
 import { formatFecha, formatNumeroTarjeta, normalizarPlaca } from '../utils/formatters'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import { puedeEliminarRegistros } from '../config/roles'
 
 const TIPO_DOC_OPTIONS = [
   { value: 'TARJETA_OPERATIVIDAD', label: 'Tarjeta de Operatividad (TUC)' },
@@ -1280,7 +1281,7 @@ export function Documentos() {
                         </button>
 
                         {/* ELIMINAR: Rojo */}
-                        <button
+                        <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
                           type="button"
                           onClick={() => handleDelete(d.id)}
                           title="Eliminar documento"

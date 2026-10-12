@@ -52,11 +52,12 @@ FROM ordenes_internamiento oi WHERE oi.estado = 'RETENIDO'
 UNION ALL
 SELECT ol.id AS id, NULL AS uuid, NULL AS id_papeleta, NULL AS id_tramite, NULL AS id_inscripcion, ol.id_internamiento,
  'int_l_' AS prefijo, ol.fecha_emision AS fecha_pago, NULL AS hora_pago, 'INTERNAMIENTO' AS tipo_pago,
- COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_papeleta, ol.numero_recibo_remolque, 'VARIOS') AS numero_recibo, NULL AS numero_voucher,
- COALESCE(NULLIF(CONCAT_WS(' + ', IF(ol.numero_recibo_guardiania IS NOT NULL, 'GUARDIANÍA', NULL),
- IF(ol.numero_recibo_papeleta IS NOT NULL, 'PAPELETA', NULL), IF(ol.numero_recibo_remolque IS NOT NULL, 'REMOLQUE', NULL)), ''), 'VARIOS CONCEPTOS') AS medio_pago,
- CONCAT('Orden #', ol.numero_orden) AS referencia_pago, ol.monto_total AS total, 'PAGADO' AS estado
+ COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_remolque, 'VARIOS') AS numero_recibo, NULL AS numero_voucher,
+ COALESCE(NULLIF(CONCAT_WS(' + ', IF(ol.monto_guardiania > 0, 'GUARDIANÍA', NULL),
+ IF(ol.monto_remolque > 0, 'REMOLQUE', NULL)), ''), 'VARIOS CONCEPTOS') AS medio_pago,
+ CONCAT('Orden #', ol.numero_orden) AS referencia_pago, (ol.monto_guardiania + ol.monto_remolque) AS total, 'PAGADO' AS estado
 FROM ordenes_libertad ol
+WHERE (ol.monto_guardiania + ol.monto_remolque) > 0
 UNION ALL
 SELECT p.id AS id, NULL AS uuid, p.id AS id_papeleta, NULL AS id_tramite, NULL AS id_inscripcion, NULL AS id_internamiento,
  'pap_pend_' AS prefijo, p.fecha_hora AS fecha_pago, NULL AS hora_pago, 'PAPELETA' AS tipo_pago,

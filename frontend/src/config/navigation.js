@@ -76,9 +76,9 @@ export const navigationGroups = [
     ]
   },
   {
-    name: 'Inspecciones Técnicas',
+    name: 'Control y Operativos',
     items: [
-      { id: 'certicav',   label: 'Certicav',   icon: 'certificate', path: '/inspecciones' },
+      { id: 'certicav',   label: 'Inspección Técnica Vehicular', icon: 'certificate', path: '/inspecciones' },
       { id: 'operativos', label: 'Operativos', icon: 'operations',  path: '/operativos' },
     ]
   },

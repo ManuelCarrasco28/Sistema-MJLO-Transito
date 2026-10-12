@@ -50,4 +50,16 @@ describe('campos de los documentos de internamiento', () => {
     expect(doc.textContent).not.toContain('Invalid Date')
     expect(doc.textContent).not.toMatch(/HORA\d{2}:\d{2}/)
   })
+  it('la orden de libertad identifica a la persona autorizada, no al interesado original', () => {
+    const doc = render(OrdenLibertadPrint, {
+      interesadoNombre: 'Persona original', interesadoDni: '11111111',
+      autorizadoNombre: 'Persona autorizada', autorizadoDni: '22222222',
+      autorizadoDireccion: 'Av. Principal 123',
+    })
+    expect(doc.textContent).toContain('Persona autorizada')
+    expect(doc.textContent).toContain('22222222')
+    expect(doc.textContent).toContain('Av. Principal 123')
+    expect(doc.textContent).not.toContain('Persona original')
+    expect(doc.textContent).not.toContain('11111111')
+  })
 })

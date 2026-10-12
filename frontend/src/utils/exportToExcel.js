@@ -58,7 +58,8 @@ export async function exportToExcel({
       ...fuentePaginada.opciones, concurrencia: 1,
       procesarPagina: filas => procesarFilas(fuentePaginada.transformar ? fuentePaginada.transformar(filas) : filas),
     })
-    } catch {
+    } catch (error) {
+      if (error.name === 'AbortError') return
       showError('Descarga no completada', 'No se pudo preparar el archivo completo. Intente nuevamente.')
       return
     }

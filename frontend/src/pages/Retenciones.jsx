@@ -15,9 +15,13 @@ import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
+import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { showToast, showError, showConfirm } from '../utils/SwalUtil'
 import { sanitizarMensaje } from '../config/api'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import { puedeEliminarRegistros } from '../config/roles'
+import { PageLoadError } from '../components/ui/PageLoadError'
 import './Retenciones.css'
 
 const FILTER_ESTADO_OPTIONS = [
@@ -78,6 +82,36 @@ export function Retenciones({ user }) {
   const [editandoItem, setEditandoItem] = useState(null)
   // Cobro y liberación de un vehículo internado
   const [pagoItem, setPagoItem] = useState(null)
+  // Tarifas del depósito (guardianía por día y remolque): el servidor valida que el cobro las respete
+  const [tarifas, setTarifas] = useState({ guardianiaDia: 0, remolque: 0, puedeEditar: false })
+  const [tarifasForm, setTarifasForm] = useState(null)
+  const [guardandoTarifas, setGuardandoTarifas] = useState(false)
+  const cargarTarifas = () => {
+    apiFetch('/internamientos/tarifas')
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((payload) => setTarifas(payload.data || { guardianiaDia: 0, remolque: 0, puedeEditar: false }))
+      .catch(() => {})
+  }
+  useEffect(() => { cargarTarifas() }, [])
+  const guardarTarifas = async (e) => {
+    e.preventDefault()
+    setGuardandoTarifas(true)
+    try {
+      const res = await apiFetch('/internamientos/tarifas', {
+        method: 'PUT',
+        body: { guardianiaDia: Number(tarifasForm.guardianiaDia || 0), remolque: Number(tarifasForm.remolque || 0) },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudieron guardar las tarifas.')
+      setTarifas(data.data)
+      setTarifasForm(null)
+      showToast('Tarifas actualizadas')
+    } catch (err) {
+      showError('Error', sanitizarMensaje(err.message, 'No se pudieron guardar las tarifas.'))
+    } finally {
+      setGuardandoTarifas(false)
+    }
+  }
   const [pagoForm, setPagoForm] = useState({})
   const [pagando, setPagando] = useState(false)
   const [criteriosInventario, setCriteriosInventario] = useState([])
@@ -97,12 +131,14 @@ export function Retenciones({ user }) {
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
   const cargaInternamientos = useRef(null)
+  const [loadError, setLoadError] = useState('')
 
   const loadInternamientos = () => {
     cargaInternamientos.current?.abort()
     const controller = new AbortController()
     cargaInternamientos.current = controller
     setIsLoading(true)
+    setLoadError('')
     const params = new URLSearchParams({
       page: String(currentPage),
       porPagina: String(itemsPerPage),
@@ -121,7 +157,10 @@ export function Retenciones({ user }) {
         setIsLoading(false)
       })
       .catch(() => {
-        if (!controller.signal.aborted) setIsLoading(false)
+        if (!controller.signal.aborted) {
+          setIsLoading(false)
+          setLoadError('No se pudo cargar la lista de internamientos.')
+        }
       })
   }
 
@@ -286,7 +325,10 @@ export function Retenciones({ user }) {
 
   const handleOpenPago = (item) => {
     setPagoForm({
-      fechaPago: hoyISO(), reciboPapeleta: '', montoGuardiania: '', reciboGuardiania: '',
+      fechaPago: hoyISO(), reciboPapeleta: '',
+      // Con tarifa configurada, la guardianía se propone según los días de custodia
+      montoGuardiania: tarifas.guardianiaDia > 0 ? (tarifas.guardianiaDia * Math.max(1, Number(item.totalDias || 1))).toFixed(2) : '',
+      reciboGuardiania: '',
       montoRemolque: '', reciboRemolque: '', autorizadoDni: item.interesadoDni && item.interesadoDni !== 'S/D' ? item.interesadoDni : '',
       observaciones: '',
     })
@@ -390,14 +432,13 @@ export function Retenciones({ user }) {
   const paginatedItems = internamientos
 
   const fetchTodoElFiltro = async () => {
-    const params = new URLSearchParams()
-    if (searchTerm) params.set('buscar', searchTerm)
-    if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
-    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
-    const res = await apiFetch(`/internamientos?${params.toString()}`)
-    if (!res.ok) return filteredItems
-    const payload = await res.json()
-    return payload.data || []
+    // Todas las páginas del filtro (antes una sola petición podía quedar recortada sin avisar)
+    return fetchTodasLasFilas('/internamientos', {
+      buscar: searchTerm,
+      estado: filterEstado !== 'TODOS' ? filterEstado : '',
+      sortBy,
+      sortDir: sortBy ? sortDir : '',
+    })
   }
 
   const handleExportExcel = async () => {
@@ -653,6 +694,11 @@ export function Retenciones({ user }) {
               <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
               <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
             </button>
+            {tarifas.puedeEditar && (
+              <button onClick={() => setTarifasForm({ guardianiaDia: String(tarifas.guardianiaDia || ''), remolque: String(tarifas.remolque || '') })} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 transition-colors" title="Tarifas de guardianía y remolque">
+                <span>Tarifas</span>
+              </button>
+            )}
             <button onClick={handleOpenNuevo} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
               <span className="text-base leading-none font-black">+</span>
               <span>Nuevo</span>
@@ -660,6 +706,7 @@ export function Retenciones({ user }) {
           </div>
         </div>
 
+        {loadError && <PageLoadError message={loadError} />}
         <div className="internamientos-listado">
           <table className="w-full table-fixed text-left text-xs">
             <colgroup>
@@ -709,7 +756,7 @@ export function Retenciones({ user }) {
 
                     <td data-label="Vehículo y placa" className="px-4 py-2.5 text-center print:px-1 print:py-1">
                       <div className="flex items-center justify-center gap-2 print:gap-1">
-                        <PlacaBadge placa={item.vehiculoPlaca} />
+                        <PlacaVehiculo placa={item.vehiculoPlaca} vehiculoId={item.vehiculoId} />
                       </div>
                       <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                         {item.vehiculoMarca} {item.vehiculoModelo} ({item.vehiculoColor})
@@ -815,7 +862,7 @@ export function Retenciones({ user }) {
                             >
                               <Icon name="pencil" className="size-4" />
                             </button>
-                            <button
+                            <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
                               type="button"
                               onClick={() => handleEliminar(item)}
                               disabled={item.estado === 'LIBERADO' || Boolean(item.numeroOrdenLibertad)}
@@ -1057,6 +1104,25 @@ export function Retenciones({ user }) {
         </div>
       )}
 
+      {tarifasForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget && !guardandoTarifas) setTarifasForm(null) }}>
+          <form onSubmit={guardarTarifas} className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
+            <div className="border-b border-slate-100 px-5 py-3.5 dark:border-[var(--border)]">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Tarifas del depósito</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Con 0 no se valida ese concepto y el cajero escribe el monto.</p>
+            </div>
+            <div className="grid gap-4 p-5">
+              <FloatingInput id="tarifa_guardiania" label="Guardianía por día (S/)" type="number" min="0" step="0.01" value={tarifasForm.guardianiaDia} onChange={(e) => setTarifasForm({ ...tarifasForm, guardianiaDia: e.target.value })} />
+              <FloatingInput id="tarifa_remolque" label="Remolque (S/)" type="number" min="0" step="0.01" value={tarifasForm.remolque} onChange={(e) => setTarifasForm({ ...tarifasForm, remolque: e.target.value })} />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3 dark:border-[var(--border)]">
+              <BotonCancelar onClick={() => setTarifasForm(null)} />
+              <BotonGuardar disabled={guardandoTarifas}>{guardandoTarifas ? 'Guardando...' : 'Guardar'}</BotonGuardar>
+            </div>
+          </form>
+        </div>
+      )}
+
       {pagoItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget && !pagando) setPagoItem(null) }}>
           <form onSubmit={handleConfirmarPago} className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
@@ -1097,6 +1163,15 @@ export function Retenciones({ user }) {
                 <FloatingInput id="pago_rec_guard" label="N° de recibo de guardianía" optional value={pagoForm.reciboGuardiania} onChange={(e) => setPagoForm({ ...pagoForm, reciboGuardiania: e.target.value })} />
                 <FloatingInput id="pago_monto_rem" label="Remolque (S/)" type="number" min="0" step="0.01" optional value={pagoForm.montoRemolque} onChange={(e) => setPagoForm({ ...pagoForm, montoRemolque: e.target.value })} />
                 <FloatingInput id="pago_rec_rem" label="N° de recibo de remolque" optional value={pagoForm.reciboRemolque} onChange={(e) => setPagoForm({ ...pagoForm, reciboRemolque: e.target.value })} />
+                {(tarifas.guardianiaDia > 0 || tarifas.remolque > 0) && (
+                  <p className="sm:col-span-2 -mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    Tarifa del depósito:{' '}
+                    {tarifas.guardianiaDia > 0 && `guardianía S/ ${tarifas.guardianiaDia.toFixed(2)} por día × ${Math.max(1, Number(pagoItem.totalDias || 1))} día(s) = S/ ${(tarifas.guardianiaDia * Math.max(1, Number(pagoItem.totalDias || 1))).toFixed(2)}`}
+                    {tarifas.guardianiaDia > 0 && tarifas.remolque > 0 && ' · '}
+                    {tarifas.remolque > 0 && `remolque S/ ${tarifas.remolque.toFixed(2)} (deja 0 si no hubo remolque)`}
+                    . Solo la jefatura puede cobrar menos.
+                  </p>
+                )}
                 <div className="sm:col-span-2">
                   <FloatingInput id="pago_dni" label="DNI de quien retira el vehículo" required maxLength={15} value={pagoForm.autorizadoDni} onChange={(e) => setPagoForm({ ...pagoForm, autorizadoDni: e.target.value.replace(/\D/g, '') })} />
                 </div>

@@ -21,6 +21,8 @@ import { VehiculoFormModal } from '../components/vehiculos/VehiculoFormModal'
 import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleModal'
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import { esRolOficina } from '../config/roles'
+import { puedeEliminarRegistros } from '../config/roles'
 
 function formatTipoDocLabel(t) {
   const code = (t.codigo || '').toUpperCase().trim()
@@ -49,7 +51,7 @@ const ESTADO_OPTIONS = [
 
 export function Vehiculos({ user }) {
   const rolNormalizado = (user?.rol || '').toUpperCase()
-  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNormalizado)
+  const isOffice = esRolOficina(rolNormalizado)
 
   const cachedOrg = getCachedData('/asociaciones')
   const [vehiculos, setVehiculos] = useState([])
@@ -888,15 +890,14 @@ export function Vehiculos({ user }) {
   }
 
   const handleOpenDetail = async (vehiculo) => {
-    setSelectedVehiculo(vehiculo)
-    setIsDetailModalOpen(true)
     try {
       const res = await apiFetch(`/vehiculos/${vehiculo.uuid || vehiculo.id}`)
-      if (res.ok) {
-        const full = await res.json()
-        if (full?.data) setSelectedVehiculo(full.data)
-      }
-    } catch (err) { console.warn("No se pudo cargar el detalle completo del vehículo:", err) }
+      if (!res.ok) throw new Error('No se pudo cargar la ficha completa del vehículo.')
+      const full = await res.json()
+      if (!full?.data) throw new Error('No se encontró la ficha del vehículo.')
+      setSelectedVehiculo(full.data)
+      setIsDetailModalOpen(true)
+    } catch (err) { showError('No se pudo abrir la ficha', err.message) }
   }
 
   const handleDelete = async (id) => {
@@ -1253,6 +1254,7 @@ export function Vehiculos({ user }) {
           <div className="order-last flex w-full flex-wrap items-center gap-2.5">
             <RoundedSelect
               value={filterEstado}
+              align="start"
               onChange={(val) => {
                 setFilterEstado(val)
                 setCurrentPage(1)
@@ -1451,16 +1453,6 @@ export function Vehiculos({ user }) {
                         >
                           <Icon name="eye" className="size-4" />
                         </button>
-                        {plantillaDeVehiculo(v) && (
-                          <button
-                            type="button"
-                            onClick={() => setVehiculoQrImpresion(v)}
-                            title="Imprimir QR"
-                            className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
-                          >
-                            <Icon name="print" className="size-4" />
-                          </button>
-                        )}
                         {isOffice && (
                           <>
                             <button
@@ -1471,7 +1463,7 @@ export function Vehiculos({ user }) {
                             >
                               <Icon name="pencil" className="size-4" />
                             </button>
-                            <button
+                            <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
                               type="button"
                               onClick={() => handleDelete(v.id)}
                               title="Eliminar Vehículo"

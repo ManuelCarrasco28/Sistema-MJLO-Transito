@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon } from '../ui/Icon'
 import { PlacaBadge } from '../ui/PlacaBadge'
 import { apiFetch, getCachedData, setCachedData } from '../../config/api'
+import { esRolOficina } from '../../config/roles'
 
 const CONCEPTOS_DINERO = [
   { key: 'papeletas', label: 'Papeletas', color: '#E57373' },
@@ -183,7 +184,7 @@ function CarruselAnios({ children, total }) {
 
 export function ChartsSection({ data, loading = false, user }) {
   const rolNormalizado = (user?.rol || '').toUpperCase()
-  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA', 'ADMINISTRATIVO'].includes(rolNormalizado)
+  const isOffice = esRolOficina(rolNormalizado)
   const navigate = useNavigate()
   const [expandedChart, setExpandedChart] = useState(null)
   const [expandedMultasPagos, setExpandedMultasPagos] = useState(null)
@@ -289,7 +290,7 @@ export function ChartsSection({ data, loading = false, user }) {
     { label: 'Por vencer', value: 0, percent: '0%', color: 'bg-[#FFB547]', progress: '0%' },
   ]
   const multasPagosPorAnio = data?.multasPagosPorAnio ?? {
-    2026: { totals: { multas: 0, pagos: 0, pendiente: 0 }, months: emptyMonths },
+    [new Date().getFullYear()]: { totals: { multas: 0, pagos: 0, pendiente: 0 }, months: emptyMonths },
   }
   const availableYears = Object.keys(multasPagosPorAnio).sort((a, b) => Number(b) - Number(a))
   const parseNumber = (value) => Number(String(value).replaceAll(',', '').replace('S/', '').replace('%', '').trim())

@@ -16,6 +16,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal } from '../components/ui/ModalControls'
+import { puedeEliminarRegistros } from '../config/roles'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -725,7 +726,7 @@ export function Permisos() {
                                 <Icon name="pencil" className="size-4" />
                               </button>
 
-                              <button
+                              <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
                                 type="button"
                                 onClick={() => handleDeletePermiso(p.id)}
                                 title="Eliminar Autorización"

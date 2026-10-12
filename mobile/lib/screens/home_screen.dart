@@ -64,13 +64,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _startMobileConfigAutoRefresh() {
     _mobileConfigTimer?.cancel();
-    _mobileConfigTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (!mounted) return;
+    _mobileConfigTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted || _cargandoPanel) return;
       _loadDashboardData();
     });
   }
 
+  bool _cargandoPanel = false;
+
   Future<void> _loadDashboardData() async {
+    if (_cargandoPanel) return;
+    _cargandoPanel = true;
+    try {
+      await _cargarPanel();
+    } finally {
+      _cargandoPanel = false;
+    }
+  }
+
+  Future<void> _cargarPanel() async {
     // Un solo endpoint liviano en lugar de 3 peticiones pesadas.
     // Cada llamada se maneja por separado para que una falla en una
     // (p. ej. sin operativo asignado o wifi inestable) no bloquee
@@ -108,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _logout(BuildContext context) async {
-    await ApiService.logout();
+    await ApiService.cerrarSesion();
     if (context.mounted) {
       Navigator.pushReplacementNamed(context, '/');
     }

@@ -30,11 +30,7 @@ class CursosController extends ResourceController
      */
     private function sincronizarEstadosPorFecha($db): void
     {
-        $hoy = \App\Libraries\ReglasCurso::hoy();
-        $abiertos = "('PROGRAMADO','ABIERTO','ACTIVO','EN_CURSO')";
-        $db->query("UPDATE cursos_seguridad_vial SET estado = 'FINALIZADO' WHERE fecha_fin < ? AND estado IN $abiertos", [$hoy]);
-        $db->query("UPDATE cursos_seguridad_vial SET estado = 'EN_CURSO' WHERE fecha_inicio <= ? AND fecha_fin >= ? AND estado IN $abiertos AND estado <> 'EN_CURSO'", [$hoy, $hoy]);
-        $db->query("UPDATE cursos_seguridad_vial SET estado = 'PROGRAMADO' WHERE fecha_inicio > ? AND estado IN $abiertos AND estado <> 'PROGRAMADO'", [$hoy]);
+        \App\Libraries\ReglasCurso::sincronizarEstados($db);
     }
 
     public function index()
@@ -422,7 +418,7 @@ class CursosController extends ResourceController
             $yaEstaban = 0;
             $cancelando = ($data['estado'] ?? null) === 'CANCELADO' && ($cursoActual['estado'] ?? '') !== 'CANCELADO';
             if ($cancelando) {
-                $inscritosAMover = $db->table('inscripciones_curso')->where('id_curso', $id)->where('estado', 'INSCRITO')->countAllResults();
+                $inscritosAMover = $db->table('inscripciones_curso')->where('id_curso', $id)->whereIn('estado', ['INSCRITO', 'CONFIRMADO'])->countAllResults();
                 if ($inscritosAMover > 0) {
                     $destinoId = (int)($input['cursoDestinoId'] ?? 0);
                     if ($destinoId < 1) {
@@ -468,9 +464,10 @@ class CursosController extends ResourceController
         if (!$destino) throw new \DomainException('El curso destino no existe.');
         if (!\App\Libraries\ReglasCurso::admiteInscripcion($destino['estado'])) throw new \DomainException('El curso destino no admite inscripciones.');
 
-        $inscritos = $db->table('inscripciones_curso')->where('id_curso', $origenId)->where('estado', 'INSCRITO')->get()->getResultArray();
+        $inscritos = $db->table('inscripciones_curso')->where('id_curso', $origenId)->whereIn('estado', ['INSCRITO', 'CONFIRMADO'])->get()->getResultArray();
+        // Solo cuentan como "ya inscritas" las personas con inscripción vigente en el destino (no las retiradas o anuladas)
         $enDestino = array_column(
-            $db->table('inscripciones_curso')->select('id_persona')->where('id_curso', $destinoId)->get()->getResultArray(),
+            $db->table('inscripciones_curso')->select('id_persona')->where('id_curso', $destinoId)->whereNotIn('estado', ['ANULADO', 'CANCELADO'])->get()->getResultArray(),
             'id_persona'
         );
         $enDestino = array_map('intval', $enDestino);
@@ -482,8 +479,25 @@ class CursosController extends ResourceController
             throw new \DomainException('El curso destino no tiene cupos suficientes para ' . count($aMover) . ' participante(s).');
         }
 
+        $costoDestino = $db->table('cursos_seguridad_vial')->select('costo_inscripcion')->where('id', $destinoId)->get()->getRowArray()['costo_inscripcion'] ?? null;
         foreach ($aMover as $i) {
-            $db->table('inscripciones_curso')->where('id', (int)$i['id'])->update(['id_curso' => $destinoId]);
+            $idFinal = (int)$i['id'];
+            // Si la persona tuvo una inscripción retirada en el destino, esa misma fila se reactiva (el par curso-persona es único)
+            $retirada = $db->table('inscripciones_curso')->where('id_curso', $destinoId)->where('id_persona', (int)$i['id_persona'])->whereIn('estado', ['ANULADO', 'CANCELADO'])->get()->getRowArray();
+            if ($retirada) {
+                $db->table('inscripciones_curso')->where('id', (int)$retirada['id'])->update([
+                    'estado' => $i['estado'], 'estado_pago' => $i['estado_pago'], 'asistio' => 0, 'fecha_inscripcion' => $i['fecha_inscripcion'],
+                ]);
+                $db->table('pagos_transito')->where('id_inscripcion', (int)$i['id'])->update(['id_inscripcion' => (int)$retirada['id']]);
+                $db->table('inscripciones_curso')->where('id', (int)$i['id'])->update(['estado' => 'CANCELADO', 'estado_pago' => 'ANULADO']);
+                $idFinal = (int)$retirada['id'];
+            } else {
+                $db->table('inscripciones_curso')->where('id', (int)$i['id'])->update(['id_curso' => $destinoId]);
+            }
+            // El cobro que aún no se hizo pasa a costar lo que cuesta el curso nuevo; lo ya cobrado no se modifica
+            if ($costoDestino !== null) {
+                $db->table('pagos_transito')->where('id_inscripcion', $idFinal)->where('estado', 'PENDIENTE')->update(['total' => $costoDestino]);
+            }
         }
         foreach ($repetidos as $i) {
             $db->table('inscripciones_curso')->where('id', (int)$i['id'])->update(['estado' => 'CANCELADO']);
@@ -729,6 +743,18 @@ class CursosController extends ResourceController
         if (!$estado && $asistio === null) {
             return $this->failValidationErrors('No se enviaron datos para actualizar.');
         }
+        // Aprobar o culminar exige que el curso esté pagado (o sea gratuito): el carnet depende de ello
+        if (in_array($estado, ['APROBADO', 'CULMINADO'], true)) {
+            $pendiente = $db->query(
+                "SELECT 1 FROM inscripciones_curso ic JOIN personas p ON p.id = ic.id_persona
+                 JOIN cursos_seguridad_vial c ON c.id = ic.id_curso
+                 WHERE ic.id_curso = ? AND p.numero = ? AND ic.estado NOT IN ('ANULADO','CANCELADO') AND ic.estado_pago <> 'PAGADO' AND c.costo_inscripcion > 0 LIMIT 1",
+                [(int) $idCurso, (string) $dni]
+            )->getRowArray();
+            if ($pendiente) {
+                return $this->failValidationErrors('La inscripción tiene el pago pendiente. Cobre el curso antes de registrar la aprobación.');
+            }
+        }
 
         // Buscar persona por DNI para obtener su ID
         $persona = $db->table('personas')->where('numero', $dni)->get()->getRowArray();
@@ -817,6 +843,7 @@ class CursosController extends ResourceController
     public function listarVigenciaCarnets()
     {
         $db = \Config\Database::connect();
+        $this->sincronizarEstadosPorFecha($db);
         $hoy = \App\Libraries\ReglasCurso::hoy();
         $limite = date('Y-m-d', strtotime($hoy . ' -1 year'));
         $limitePorVencer = date('Y-m-d', strtotime($hoy . ' -1 year +30 days'));
@@ -914,6 +941,7 @@ class CursosController extends ResourceController
     public function listarCarnets()
     {
         $db = \Config\Database::connect();
+        $this->sincronizarEstadosPorFecha($db);
         $builder = $db->table('inscripciones_curso ic')
             ->select("ic.id AS idInscripcion, ic.uuid, cu.id AS cursoId, cu.codigo AS cursoCodigo, cu.nombre AS cursoTitulo, cu.fecha_inicio AS cursoFecha, c.nombres, c.apellido_paterno, c.apellido_materno, p.numero AS dni, c.numero_licencia AS licencia, c.foto AS fotoUrl, ic.carnet_entregado AS carnetEntregado, ic.carnet_fecha_entrega AS carnetFechaEntrega", false)
             ->join('cursos_seguridad_vial cu', 'cu.id = ic.id_curso')
@@ -994,6 +1022,13 @@ class CursosController extends ResourceController
             if (!$inscripcion || in_array($inscripcion['estado'], ['ANULADO', 'CANCELADO'], true)) {
                 $db->transRollback();
                 return $this->failValidationErrors('No se puede registrar la entrega de una inscripción retirada.');
+            }
+            if ($entregado) {
+                $conDerecho = $db->query('SELECT 1 FROM inscripciones_curso ic WHERE ic.id = ? AND ' . \App\Libraries\ReglasCurso::condicionAprobado('ic'), [(int) $idInscripcion])->getRowArray();
+                if (!$conDerecho) {
+                    $db->transRollback();
+                    return $this->failValidationErrors('El carnet solo se entrega a quien aprobó el curso y lo tiene pagado.');
+                }
             }
             $db->table('inscripciones_curso')->where('id', $idInscripcion)->update($data);
 

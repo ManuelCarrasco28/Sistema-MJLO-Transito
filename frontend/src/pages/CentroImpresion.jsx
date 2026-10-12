@@ -37,6 +37,28 @@ export function CentroImpresion() {
     return PESTANAS.some((p) => p.id === pedida) ? pedida : pestanaGuardada()
   })
   const [asociaciones, setAsociaciones] = useState(getCachedData('/asociaciones') || [])
+  const [resumen, setResumen] = useState({ CARNETS: null, TARJETAS: null, QR: null })
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const consultas = [
+      ['CARNETS', '/cursos/carnets?page=1&porPagina=1'],
+      ['TARJETAS', '/documentos?tipoDocumento=TARJETA_OPERATIVIDAD&page=1&porPagina=1'],
+      ['QR', '/vehiculos/estadisticas'],
+    ]
+    consultas.forEach(async ([clave, url]) => {
+      try {
+        const response = await apiFetch(url, { signal: controller.signal })
+        if (!response.ok) return
+        const payload = await response.json()
+        const total = clave === 'QR' ? payload.data?.total : payload.meta?.total
+        if (!controller.signal.aborted && total != null) {
+          setResumen(prev => ({ ...prev, [clave]: Number(total) }))
+        }
+      } catch { /* Una consulta fallida se muestra sin cifra, no como cero. */ }
+    })
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     try { localStorage.setItem(CLAVE_PESTANA, pestana) } catch { /* sin almacenamiento */ }
@@ -79,6 +101,22 @@ export function CentroImpresion() {
             <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">Centro de impresión</h1>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {PESTANAS.map((t, i) => (
+          <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
+            <div className="flex items-start justify-between gap-2">
+              <p className={`text-[10px] font-bold uppercase tracking-wide ${['text-indigo-600 dark:text-indigo-400', 'text-amber-600 dark:text-amber-400', 'text-cyan-600 dark:text-cyan-400'][i]}`}>
+                {['Carnets del curso', 'Tarjetas de operatividad', 'Vehículos para QR'][i]}
+              </p>
+              <span className={`grid size-6 shrink-0 place-items-center rounded-md ${['bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400', 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400', 'bg-cyan-50 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400'][i]}`}>
+                <Icon name={t.icono} className="size-4" />
+              </span>
+            </div>
+            <p className="shrink-0 text-xl font-black leading-none text-slate-900 dark:text-white">{resumen[t.id] == null ? '—' : resumen[t.id].toLocaleString('es-PE')}</p>
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 dark:border-[var(--border)]">

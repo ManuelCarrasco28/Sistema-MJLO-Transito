@@ -13,6 +13,7 @@ import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import { puedeEliminarRegistros } from '../config/roles'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -251,7 +252,10 @@ export function Pagos() {
         metadata: [
           { label: 'Estado', value: filterEstado },
           { label: 'Tipo', value: filterTipoPago },
-          { label: 'Total Recaudado', value: `S/ ${totalMonto.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` }
+          { label: 'Método', value: filterMetodo },
+          { label: 'Búsqueda', value: debouncedSearch || '—' },
+          // Suma de lo exportado (pagos confirmados), no la recaudación total del sistema
+          { label: 'Recaudado en este listado', value: `S/ ${data.filter((p) => p.estado === 'PAGADO').reduce((s, p) => s + Number(p.montoTotal || 0), 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
         ],
         columns: [
           { header: 'N° RECIBO', key: 'numeroRecibo' },
@@ -287,7 +291,8 @@ export function Pagos() {
         metadata: [
           { label: 'Estado', value: filterEstado },
           { label: 'Tipo', value: filterTipoPago },
-          { label: 'Total Recaudado', value: `S/ ${totalMonto.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` }
+          { label: 'Método', value: filterMetodo },
+          { label: 'Búsqueda', value: debouncedSearch || '—' }
         ],
         columns: [
           { header: 'N° RECIBO', key: 'numeroRecibo', isText: true, width: 140 },
@@ -750,7 +755,7 @@ export function Pagos() {
                           <Icon name="print" className="size-4" />
                         </button>
                         {p.tipoPago !== 'INTERNAMIENTO' && typeof p.id === 'number' && (
-                          <button disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title="Anular Pago">
+                          <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }} disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title="Anular Pago">
                             <Icon name="trash" className="size-4" />
                           </button>
                         )}
@@ -962,18 +967,22 @@ export function Pagos() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter print:static print:block print:p-0 print:bg-transparent">
           <div id="seccion-impresion-ticket" className="w-full max-w-[330px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-100 p-5 text-center text-slate-900 font-mono text-xs print:rounded-none print:shadow-none print:p-1.5 print:max-w-full">
             <h4 className="font-bold text-sm mb-1">MUNICIPALIDAD DISTRITAL JLO</h4>
-            <p className="mb-4">TICKET DE PAGO MUNICIPAL</p>
-            <p className="text-left"><strong>N° RECIBO:</strong> {selectedPago.numeroRecibo}</p>
-            <p className="text-left"><strong>FECHA:</strong> {new Date(selectedPago.fecha).toLocaleString()}</p>
+            <p className="mb-4">CONSTANCIA INTERNA DE PAGO</p>
+            <p className="text-left"><strong>N° REGISTRADO:</strong> {selectedPago.numeroRecibo || '—'}</p>
+            <p className="text-left"><strong>FECHA REGISTRADA:</strong> {selectedPago.fecha ? String(selectedPago.fecha).slice(0, 10) : '—'}</p>
             <div className="my-4 border-y border-dashed border-slate-400 py-2 text-left">
               <p className="font-bold mb-1">TIPO: {selectedPago.tipoPago || 'TRAMITE'}</p>
+              <p className="break-words">CONCEPTO: {selectedPago.referenciaPago || '—'}</p>
               <p>PAGADO POR: {selectedPago.pagadoPor || 'No identificado'}</p>
               <p>N° OPERACIÓN: {selectedPago.numeroVoucher || '---'}</p>
-              <p>MÉTODO: {selectedPago.metodo}</p>
+              {selectedPago.tipoPago === 'INTERNAMIENTO'
+                ? <><p>CONCEPTOS: {selectedPago.metodo || '—'}</p><p>MÉTODO: No registrado por separado</p></>
+                : <p>MÉTODO: {selectedPago.metodo || '—'}</p>}
             </div>
             <div className="text-right text-sm">
               <p><strong>TOTAL: S/ {selectedPago.montoTotal?.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong></p>
             </div>
+            <p className="mt-4 text-left text-[10px] leading-tight">Esta constancia muestra lo registrado en el sistema. No sustituye un comprobante oficial emitido por el SAT.</p>
             <div className="mt-8 pt-4 border-t border-slate-300 flex justify-between print:hidden">
               <button onClick={handlePrintTicket} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-sans font-bold hover:bg-emerald-700 cursor-pointer">Imprimir Ticket</button>
               <BotonCancelar onClick={() => setIsPreviewModalOpen(false)}>Cerrar</BotonCancelar>

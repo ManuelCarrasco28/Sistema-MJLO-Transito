@@ -83,16 +83,16 @@ export function Header({
         if (!response.ok) {
           const data = await response.json().catch(() => ({}))
           const message = data.messages?.error || data.messages || data.message || 'Error al cambiar contraseña.'
-          setProfileError(Array.isArray(message) ? message.join(' ') : message)
+          setProfileError(Array.isArray(message) ? message.join(' ') : (typeof message === 'string' ? message : 'Error al cambiar contraseña.'))
           return
         }
+        setProfileSuccess('Contraseña actualizada correctamente.')
+        setProfileForm({
+          password_actual: '',
+          password_nuevo: '',
+          password_confirmacion: '',
+        })
       }
-      setProfileSuccess('Contraseña actualizada correctamente.')
-      setProfileForm({
-        password_actual: '',
-        password_nuevo: '',
-        password_confirmacion: '',
-      })
     } finally {
       setSavingProfile(false)
     }
@@ -199,7 +199,7 @@ export function Header({
           </button>
           
           {notifOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2.5 w-[26rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl animate-enter dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
+            <div className="absolute right-0 top-full z-50 mt-2.5 w-[28rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl animate-enter dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
               <div className="flex items-center justify-between px-4 pb-2 pt-3.5">
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-extrabold text-slate-800 dark:text-white">Notificaciones</h4>
@@ -223,18 +223,20 @@ export function Header({
                 )}
               </div>
 
-              <div className={`grid ${hayReportes ? 'grid-cols-5' : 'grid-cols-4'} gap-1 border-b border-slate-100 px-3 pb-2 dark:border-[var(--border)]`}>
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar border-b border-slate-100 px-3 pb-2.5 pt-0.5 dark:border-[var(--border)]">
                 {CATEGORIAS_NOTIF.map((c) => (
                   <button
                     key={c.id}
                     type="button"
                     onClick={() => setNotifFiltro(c.id)}
-                    className={`flex min-w-0 cursor-pointer items-center justify-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-bold transition ${notifFiltro === c.id
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                    className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition whitespace-nowrap ${notifFiltro === c.id
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
                       : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10'}`}
                   >
-                    <span className="truncate">{c.label}</span>
-                    <span className={`shrink-0 text-[10px] ${notifFiltro === c.id ? 'opacity-70' : 'text-slate-400'}`}>{contarNotif(c.id)}</span>
+                    <span>{c.label}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${notifFiltro === c.id ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900' : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400'}`}>
+                      {contarNotif(c.id)}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -272,8 +274,8 @@ export function Header({
                           <Icon name={n.icon} className="size-4" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className={`block truncate text-xs text-slate-800 dark:text-white ${n.unread ? 'font-extrabold' : 'font-semibold'}`}>{n.title}</span>
-                          <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">{n.description}</span>
+                          <span className={`block text-xs leading-snug text-slate-800 dark:text-white ${n.unread ? 'font-extrabold' : 'font-semibold'}`}>{n.title}</span>
+                          <span className="block text-[11px] leading-snug text-slate-500 dark:text-slate-400">{n.description}</span>
                         </span>
                         <span className="flex shrink-0 flex-col items-end gap-1">
                           <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">{n.time}</span>

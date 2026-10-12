@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '../ui/Icon'
 import { Pagination } from '../ui/Pagination'
-import { PlacaBadge } from '../ui/PlacaBadge'
+import { PlacaVehiculo } from './PlacaVehiculo'
 import { RoundedSelect } from '../ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal } from '../ui/ModalControls'
 import { apiFetch } from '../../config/api'
@@ -89,7 +89,7 @@ function EtiquetaCampo({ texto, children }) {
   )
 }
 
-// Carrito de impresión: lista lo reunido, permite quitar vehículos e imprimir todo o por lotes.
+// Cola de impresión: lista lo reunido, permite quitar vehículos e imprimir todo o por lotes.
 function CarritoQrModal({ carrito, onQuitar, onVaciar, onClose, onImprimir, onImprimirTodo }) {
   const [copias, setCopias] = useState('3')
   const [tamanoLote, setTamanoLote] = useState('40')
@@ -125,7 +125,7 @@ function CarritoQrModal({ carrito, onQuitar, onVaciar, onClose, onImprimir, onIm
               <Icon name="print" className="size-5" />
             </span>
             <div>
-              <h3 className="text-base font-black leading-tight text-slate-900 dark:text-white">Carrito de impresión de QR</h3>
+              <h3 className="text-base font-black leading-tight text-slate-900 dark:text-white">Cola de impresión de QR</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">Plantillas de mototaxi y motocarguera en hojas A4 de 4 cuadrantes</p>
             </div>
           </div>
@@ -135,7 +135,7 @@ function CarritoQrModal({ carrito, onQuitar, onVaciar, onClose, onImprimir, onIm
         {items.length === 0 ? (
           <div className="px-5 py-14 text-center">
             <Icon name="vehicle" className="mx-auto mb-2 size-10 text-slate-300 dark:text-slate-600" />
-            <p className="font-bold text-slate-600 dark:text-slate-300">El carrito está vacío</p>
+            <p className="font-bold text-slate-600 dark:text-slate-300">La cola está vacía</p>
             <p className="mt-1 text-xs text-slate-400">Agregue vehículos desde la lista para imprimir sus QR.</p>
           </div>
         ) : (
@@ -202,7 +202,7 @@ function CarritoQrModal({ carrito, onQuitar, onVaciar, onClose, onImprimir, onIm
               {/* Vehículos */}
               <div className="px-5 py-4">
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {plural(items.length, 'vehículo en el carrito', 'vehículos en el carrito')}
+                  {plural(items.length, 'vehículo en la cola', 'vehículos en la cola')}
                 </p>
                 <div className="max-h-[34vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-[var(--border)]">
                   <table className="w-full text-left text-xs">
@@ -217,14 +217,14 @@ function CarritoQrModal({ carrito, onQuitar, onVaciar, onClose, onImprimir, onIm
                     <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                       {items.slice(0, 300).map((v) => (
                         <tr key={v.id} className="transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]">
-                          <td className="px-3.5 py-2"><PlacaBadge placa={v.placa} /></td>
+                          <td className="px-3.5 py-2"><PlacaVehiculo placa={v.placa} vehiculoId={v.id} /></td>
                           <td className="px-3.5 py-2 font-semibold text-slate-800 dark:text-slate-100">{v.propietario || <span className="text-slate-400">Sin propietario</span>}</td>
                           <td className="px-3.5 py-2 text-slate-600 dark:text-slate-300">{nombreAsociacion(v.asociacion) || <span className="text-slate-400">Sin asociación</span>}</td>
                           <td className="px-3.5 py-2 text-right">
                             <button
                               type="button"
                               onClick={() => onQuitar(v.id)}
-                              title="Quitar del carrito"
+                              title="Quitar de la cola"
                               className="grid size-7 cursor-pointer place-items-center rounded-lg border border-transparent text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:hover:border-rose-900/60 dark:hover:bg-rose-950/40"
                             >
                               <Icon name="x" className="size-3.5" />
@@ -254,7 +254,7 @@ function CarritoQrModal({ carrito, onQuitar, onVaciar, onClose, onImprimir, onIm
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50"
           >
             <Icon name="trash" className="size-3.5" />
-            Vaciar carrito
+            Vaciar cola
           </button>
           <div className="flex items-center gap-2">
             <BotonCancelar onClick={onClose}>Cerrar</BotonCancelar>
@@ -364,7 +364,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
         todas.forEach((v) => { sig[v.id] = compactar(v) })
         return sig
       })
-      showToast(`${todas.length.toLocaleString('es-PE')} vehículos agregados al carrito`)
+      showToast(`${todas.length.toLocaleString('es-PE')} vehículos agregados a la cola`)
     } catch {
       showError('Error', 'No se pudieron agregar todos los vehículos.')
     } finally {
@@ -374,15 +374,15 @@ export function ImpresionQrVehiculos({ asociaciones }) {
 
   const vaciarCarrito = async () => {
     const resultado = await showConfirm(
-      '¿Vaciar el carrito?',
-      `Se quitarán los ${enCarrito.toLocaleString('es-PE')} vehículos del carrito de impresión.`,
+      '¿Vaciar la cola de impresión?',
+      `Se quitarán los ${enCarrito.toLocaleString('es-PE')} vehículos de la cola de impresión.`,
       'Sí, vaciar',
       'Cancelar',
-      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' },
+      { confirmColor: '#e11d48' },
     )
     if (resultado.isConfirmed) {
       setCarrito({})
-      showToast('Carrito vaciado')
+      showToast('Cola de impresión vaciada')
     }
   }
 
@@ -399,7 +399,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
 
   const imprimir = async (vehiculos, copias, alTerminar) => {
     if (vehiculos.length === 0) {
-      showError('Sin vehículos', 'Agregue al menos un mototaxi o motocarguera al carrito.')
+      showError('Sin vehículos', 'Agregue al menos un mototaxi o motocarguera a la cola.')
       return
     }
     if (trabajo || progreso) return
@@ -410,7 +410,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
   // Imprime varios lotes seguidos sin tener que pulsar nada entre uno y otro.
   const imprimirLotes = async (lotes, copias, alTerminarLote) => {
     if (lotes.length === 0) {
-      showError('Sin vehículos', 'Agregue al menos un mototaxi o motocarguera al carrito.')
+      showError('Sin vehículos', 'Agregue al menos un mototaxi o motocarguera a la cola.')
       return
     }
     if (trabajo || progreso) return
@@ -485,7 +485,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
             type="button"
             onClick={agregarTodosLosResultados}
             disabled={agregandoTodo || total === 0}
-            title="Agregar al carrito todos los vehículos que cumplen los filtros"
+            title="Agregar a la cola todos los vehículos que cumplen los filtros"
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-indigo-200/80 bg-indigo-50/70 px-2.5 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-50 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
           >
             <Icon name={agregandoTodo ? 'refresh' : 'add'} className={`size-3.5 ${agregandoTodo ? 'animate-spin' : ''}`} />
@@ -497,10 +497,10 @@ export function ImpresionQrVehiculos({ asociaciones }) {
               <button
                 type="button"
                 onClick={vaciarCarrito}
-                title="Vaciar todo el carrito"
+                title="Vaciar toda la cola"
                 className="grid size-8.5 cursor-pointer place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50"
               >
-                <Icon name="trash" className="size-4" />
+                <Icon name="filterX" className="size-4" />
               </button>
             </>
           )}
@@ -512,7 +512,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
             style={{ backgroundColor: COLOR_PRIMARIO }}
           >
             <Icon name="print" className="size-3.5" />
-            <span>Carrito de impresión</span>
+            <span>Cola de impresión</span>
             <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[11px] leading-none">{enCarrito.toLocaleString('es-PE')}</span>
           </button>
         </div>
@@ -563,7 +563,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
               const agregado = Boolean(carrito[v.id])
               return (
                 <tr key={v.id} onClick={() => alternar(v)} className="group cursor-pointer transition-colors hover:bg-cyan-50/30 dark:hover:bg-[var(--bg-subtle)]">
-                  <td className="px-3.5 py-2.5"><PlacaBadge placa={v.placa} /></td>
+                  <td className="px-3.5 py-2.5"><PlacaVehiculo placa={v.placa} vehiculoId={v.id} /></td>
 
                   <td className="px-3.5 py-2.5">
                     <p className="text-xs font-semibold leading-snug text-slate-900 dark:text-white" title={v.propietario}>
@@ -599,7 +599,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); alternar(v) }}
-                        title={agregado ? 'Quitar del carrito' : 'Añadir al carrito'}
+                        title={agregado ? 'Quitar de la cola' : 'Añadir a la cola'}
                         className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border-[1.5px] px-2.5 text-[11px] font-bold shadow-xs transition-all active:scale-95 ${
                           agregado
                             ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
@@ -607,7 +607,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
                         }`}
                       >
                         <Icon name={agregado ? 'check' : 'add'} className="size-3.5" />
-                        {agregado ? 'En carrito' : 'Añadir'}
+                        {agregado ? 'En cola' : 'Añadir'}
                       </button>
                       <button
                         type="button"

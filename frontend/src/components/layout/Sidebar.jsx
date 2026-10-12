@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { navigationGroups, PREFETCH_MAP } from '../../config/navigation'
 import { Icon } from '../ui/Icon'
 import { apiFetch } from '../../config/api'
+import { esRolOficina } from '../../config/roles'
 
 export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, collapsedOnDesktop, user, onToggleSidebar }) {
   const navigate = useNavigate()
@@ -12,7 +13,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const rolNormalizado = (user?.rol || '').toUpperCase()
   const isSuperAdmin = rolNormalizado === 'SUPERADMIN'
   const isAdmin = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE'].includes(rolNormalizado)
-  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNormalizado)
+  const isOffice = esRolOficina(rolNormalizado)
 
   // Memoizado: antes se recalculaba en cada render con una referencia nueva,
   // lo que el useEffect de auto-apertura (más abajo) no podía declarar como
@@ -108,6 +109,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
     'Principal': { icon: 'dashboard', color: 'text-[#5B6EE1] dark:text-indigo-400', bg: '' },
     'Padrón municipal': { icon: 'people', color: 'text-[#5B6EE1] dark:text-indigo-400', bg: '' },
     'Trámites': { icon: 'document', color: 'text-amber-500 dark:text-amber-400', bg: '' },
+    'Control y Operativos': { icon: 'certificate', color: 'text-purple-600 dark:text-purple-400', bg: '' },
     'Inspecciones Técnicas': { icon: 'certificate', color: 'text-purple-600 dark:text-purple-400', bg: '' },
     'Fiscalización': { icon: 'ticket', color: 'text-rose-500 dark:text-rose-400', bg: '' },
     'Pagos': { icon: 'receiptCheck', color: 'text-emerald-600 dark:text-emerald-400', bg: '' },

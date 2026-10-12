@@ -396,11 +396,12 @@ div:has(> input[placeholder^="Busca "]) {
   min-width: min(100%, 340px);
 }
 
-/* Al hacer clic en un buscador o campo, el texto de ayuda desaparece y queda limpio para escribir */
-input:focus::placeholder,
-textarea:focus::placeholder,
-html.dark input:focus::placeholder,
-html.dark textarea:focus::placeholder {
+/* Al hacer clic en un buscador, el texto de ayuda desaparece y queda limpio para escribir.
+   Solo en buscadores: en los formularios la ayuda del campo debe seguir visible mientras se escribe. */
+input[placeholder^="Buscar"]:focus::placeholder,
+input[placeholder^="Busca "]:focus::placeholder,
+html.dark input[placeholder^="Buscar"]:focus::placeholder,
+html.dark input[placeholder^="Busca "]:focus::placeholder {
   color: transparent;
 }
 
@@ -711,6 +712,7 @@ html.dark textarea:focus::placeholder {
 @page {
   size: A4 portrait;
   margin: 12mm 14mm 12mm 14mm;
+  background: #ffffff;
 }
 
 /* 2. Estándar Horizontal Oficial (A4 Landscape): Margen de 10mm superior/inferior y 12mm laterales para reportes y padrones */
@@ -724,6 +726,7 @@ html.dark textarea:focus::placeholder {
   size: 80mm auto;
   margin: 2mm 3mm 2mm 3mm;
 }
+
 
 .print-landscape,
 .page-landscape,
@@ -773,7 +776,8 @@ body.is-printing-ticket,
     display: none !important;
   }
 
-  html, body {
+  html, body, html.dark, html.dark body {
+    color-scheme: light !important;
     background: #ffffff !important;
     color: #000000 !important;
     margin: 0 !important;
@@ -782,6 +786,7 @@ body.is-printing-ticket,
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
+    scrollbar-gutter: auto !important;
   }
 
   /* 2. Visualización limpia y completa del portal inyectado en document.body */
@@ -804,6 +809,94 @@ body.is-printing-ticket,
   body > .seccion-impresion-portal *,
   .seccion-impresion-portal * {
     visibility: visible !important;
+  }
+
+  /* Formato completo A4 con margen físico de seguridad para la impresora. */
+  body > #seccion-impresion.papeleta-hoja {
+    padding: 10mm 12mm !important;
+  }
+  body > #seccion-impresion > .papeleta-impresion {
+    display: flex;
+    flex-direction: column;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 276mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Distribuir los bloques y las zonas de observación a lo largo de la hoja. */
+  .papeleta-impresion .papeleta-cabecera {
+    display: grid !important;
+    grid-template-columns: 20mm minmax(0, 1fr) 38mm;
+    align-items: center;
+    column-gap: 2mm;
+    row-gap: 2mm;
+    margin-bottom: 1.5mm !important;
+    padding-bottom: 1.5mm !important;
+  }
+  .papeleta-impresion .papeleta-cabecera > img {
+    width: 20mm !important;
+    height: 20mm !important;
+  }
+  .papeleta-impresion .papeleta-cabecera h1 {
+    font-size: 18px !important;
+    line-height: 1.15;
+  }
+  .papeleta-impresion .papeleta-cabecera p {
+    font-size: 11px !important;
+    line-height: 1.2;
+  }
+  .papeleta-impresion .papeleta-titulo {
+    grid-column: 1 / -1;
+  }
+  .papeleta-impresion .papeleta-campo > span {
+    display: block;
+    min-height: 13px;
+    line-height: 1.2;
+  }
+  .papeleta-impresion .papeleta-columnas {
+    flex: 1;
+    align-items: stretch !important;
+    gap: 2mm !important;
+  }
+  .papeleta-impresion .papeleta-columna {
+    display: flex;
+    flex-direction: column;
+  }
+  .papeleta-impresion .papeleta-columna > .papeleta-bloque:last-child {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  .papeleta-impresion .papeleta-columna > .papeleta-bloque:last-child > div {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  .papeleta-impresion .papeleta-columna:first-child > .papeleta-bloque:last-child > div > .papeleta-campo:nth-child(3) {
+    flex: 1;
+  }
+  .papeleta-impresion .papeleta-columna > :not(:first-child) {
+    margin-top: 2mm !important;
+  }
+  .papeleta-impresion .papeleta-bloque > div {
+    padding: 0 3mm 2mm !important;
+  }
+  .papeleta-impresion .papeleta-campo {
+    padding-top: 1.5mm !important;
+    padding-bottom: 1.5mm !important;
+    font-size: 13px;
+  }
+  .papeleta-impresion .papeleta-observaciones {
+    min-height: 13mm !important;
+    flex: 1;
+    padding: 1mm 0 !important;
+  }
+  .papeleta-impresion .papeleta-firma-espacio {
+    height: 7mm !important;
   }
 
   /* 3. Tickets térmicos impresos (Papeletas, Pagos, Retenciones) */

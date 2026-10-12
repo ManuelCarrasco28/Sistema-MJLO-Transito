@@ -158,6 +158,7 @@ class DocumentosController extends ResourceController
     public function estadisticas()
     {
         $db = \Config\Database::connect();
+        \App\Libraries\EstadosPorFecha::alDia($db);
         $row = $db->table('documentos_vehiculo')
             ->select("
                 COUNT(*) as total,
@@ -182,6 +183,7 @@ class DocumentosController extends ResourceController
     public function index()
     {
         $db = \Config\Database::connect();
+        \App\Libraries\EstadosPorFecha::alDia($db);
         $resMunicipalCol = "COALESCE(o.resolucion_alcaldia, '')";
 
         $builder = $db->table('documentos_vehiculo d')
@@ -377,15 +379,23 @@ class DocumentosController extends ResourceController
                 return $this->failValidationErrors('No se puede emitir la Tarjeta Única de Circulación (TUC): El vehículo con placa ' . $placa . ' figura como "Sin Propietario Asignado". Es requisito legal vincular previamente al propietario en el Padrón Vehicular.');
             }
 
+            // Requisito: CERTICAV aprobado, no anulado y dentro de sus 6 meses de vigencia
+            $inspRow = $db->table('certicav')
+                ->where('id_vehiculo', $vehiculoId)
+                ->where('resultado', 'APROBADO')
+                ->where('estado <>', 'ANULADA')
+                ->where('DATE_ADD(fecha, INTERVAL 6 MONTH) >= CURDATE()', null, false)
+                ->orderBy('fecha', 'DESC')
+                ->orderBy('id', 'DESC')
+                ->limit(1)
+                ->get()
+                ->getRowArray();
+            if (!$inspRow) {
+                return $this->failValidationErrors('No se puede emitir la Tarjeta de Operatividad: el vehículo con placa ' . $placa . ' no tiene un CERTICAV aprobado y vigente. Registre primero su inspección técnica.');
+            }
+
             // Look for approved municipal inspection if not supplied
             if (empty($input['numeroInspeccion']) && empty($input['idInspeccion'])) {
-                $inspRow = $db->table('certicav')
-                    ->where('id_vehiculo', $vehiculoId)
-                    ->where('resultado', 'APROBADO')
-                    ->orderBy('id', 'DESC')
-                    ->limit(1)
-                    ->get()
-                    ->getRowArray();
 
                 if ($inspRow) {
                     $input['idInspeccion'] = (int)$inspRow['id'];
@@ -559,6 +569,7 @@ class DocumentosController extends ResourceController
         }
 
         $db->table('documentos_vehiculo')->where('id', $id)->delete();
+        \App\Services\AuditoriaService::registrar('DOCUMENTOS', 'ELIMINAR', 'Documento del vehículo eliminado (id ' . (int)$id . ')', ['id' => (int)$id]);
 
         return $this->respondDeleted(['status' => true, 'message' => 'Documento eliminado con éxito']);
     }

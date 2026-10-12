@@ -15,6 +15,7 @@ class PersonDetailsScreen extends StatefulWidget {
 
 class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
   bool _isLoading = true;
+  bool _errorConsulta = false;
   bool _permitePapeleta = true;
   Map<String, dynamic>? _persona;
   List<dynamic> _vehiculos = [];
@@ -40,7 +41,10 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _errorConsulta = true;
+        });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
       }
     }
@@ -52,6 +56,34 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Detalles de Persona', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), backgroundColor: AppTheme.primaryBlue, iconTheme: const IconThemeData(color: Colors.white)),
         body: const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue)),
+      );
+    }
+
+    if (_persona == null && _errorConsulta) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Detalles de Persona', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), backgroundColor: AppTheme.primaryBlue, iconTheme: const IconThemeData(color: Colors.white)),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('No se pudo consultar. Verifique la conexión e intente de nuevo.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey)),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isLoading = true;
+                      _errorConsulta = false;
+                    });
+                    _loadData();
+                  },
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -216,7 +248,7 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
             decoration: BoxDecoration(
               color: Colors.white24,
               borderRadius: BorderRadius.circular(12),
-              image: hasPhoto ? DecorationImage(image: NetworkImage('${ApiService.fileBaseUrl}/${_persona!['fotoUrl']}'), fit: BoxFit.cover) : null,
+              image: hasPhoto ? DecorationImage(image: NetworkImage(ApiService.urlArchivo(_persona!['fotoUrl'].toString()), headers: ApiService.headersImagen), fit: BoxFit.cover) : null,
             ),
             child: !hasPhoto ? const Icon(Icons.person, size: 40, color: Colors.white) : null,
           ),

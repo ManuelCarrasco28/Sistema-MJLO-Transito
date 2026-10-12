@@ -26,7 +26,7 @@ class VehiculosController extends ResourceController
         $db = \Config\Database::connect();
         $total = (int) $db->table('vehiculos')->countAllResults();
         $formales = (int) $db->table('vehiculos')->where('id_asociacion IS NOT NULL', null, false)->countAllResults();
-        $suspendidos = (int) $db->table('vehiculos')->whereIn('estado', ['SUSPENDIDO', 'BAJA'])->countAllResults();
+        $suspendidos = (int) $db->table('vehiculos')->where('estado', 'INACTIVO')->countAllResults();
 
         return $this->respond(['data' => [
             'total' => $total,
@@ -75,7 +75,7 @@ class VehiculosController extends ResourceController
                 o.razon_social AS asociacion,
                 COALESCE(o.ruc, '') AS asociacionRuc,
                 COALESCE(o.resolucion_alcaldia, '') AS asociacionResolucionAlcaldia,
-                COALESCE(td.nombre, 'DNI') AS propietarioTipoDocumento,
+                COALESCE(td.codigo, '') AS propietarioTipoDocumento,
                 COALESCE(c.nombres, '') AS propietarioNombres,
                 COALESCE(c.apellido_paterno, '') AS propietarioPaterno,
                 COALESCE(c.apellido_materno, '') AS propietarioMaterno,
@@ -85,7 +85,7 @@ class VehiculosController extends ResourceController
             ", false)
             ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
             ->join('asociaciones o', 'o.id = v.id_asociacion', 'left')
-            ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')
+            ->join('vehiculo_propietarios vp', "vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL AND vp.estado = 'ACTIVO'", 'left')
             ->join('personas p', 'p.id = vp.id_persona', 'left')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
             ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left');
@@ -106,11 +106,15 @@ class VehiculosController extends ResourceController
             $documentos = $db->table('documentos_vehiculo')
                 ->select('id_vehiculo, tipo_documento as tipoDocumento, codigo, fecha_expedicion as fechaExpedicion, fecha_expiracion as fechaExpiracion, estado')
                 ->whereIn('id_vehiculo', $vehiculoIds)
-                ->orderBy('fecha_expiracion', 'DESC')
+                ->orderBy('fecha_expedicion', 'DESC')
+                ->orderBy('id', 'DESC')
                 ->get()
                 ->getResultArray();
 
             foreach ($documentos as $doc) {
+                if (in_array($doc['estado'], ['VIGENTE', 'VENCIDO'], true) && !empty($doc['fechaExpiracion'])) {
+                    $doc['estado'] = $doc['fechaExpiracion'] < \App\Libraries\ReglasCurso::hoy() ? 'VENCIDO' : 'VIGENTE';
+                }
                 $vehiculoId = (int)$doc['id_vehiculo'];
                 unset($doc['id_vehiculo']);
                 $documentosPorVehiculo[$vehiculoId][] = $doc;
@@ -119,24 +123,34 @@ class VehiculosController extends ResourceController
             $papeletas = $db->table('papeletas p')
                 ->select("
                     p.id_vehiculo,
+                    p.id as papeletaId,
                     p.numero_papeleta as numeroPapeleta,
                     p.fecha_hora as fechaHora,
                     p.lugar,
                     p.monto_total as montoTotal,
-                    p.estado,
-                    COALESCE(ti.codigo, 'SIN CODIGO') as codigoInfraccion,
-                    COALESCE(ti.descripcion, 'Infraccion no especificada') as tipoInfraccion,
-                    COALESCE(ti.gravedad, 'SIN GRAVEDAD') as gravedad
+                    p.estado
                 ", false)
-                ->join('papeleta_detalles pd', 'pd.id_papeleta = p.id', 'left')
-                ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
                 ->whereIn('id_vehiculo', $vehiculoIds)
-                ->groupBy('p.id')
                 ->orderBy('p.fecha_hora', 'DESC')
                 ->get()
                 ->getResultArray();
 
+            $detallesPorPapeleta = [];
+            if (!empty($papeletas)) {
+                $detalles = $db->table('papeleta_detalles pd')
+                    ->select('pd.id_papeleta, ti.codigo, ti.descripcion, ti.gravedad')
+                    ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'left')
+                    ->whereIn('pd.id_papeleta', array_column($papeletas, 'papeletaId'))
+                    ->orderBy('ti.codigo', 'ASC')->get()->getResultArray();
+                foreach ($detalles as $detalle) {
+                    $detallesPorPapeleta[$detalle['id_papeleta']][] = $detalle;
+                }
+            }
             foreach ($papeletas as $papeleta) {
+                $detalles = $detallesPorPapeleta[$papeleta['papeletaId']] ?? [];
+                $papeleta['codigoInfraccion'] = implode(', ', array_filter(array_column($detalles, 'codigo'))) ?: 'SIN CODIGO';
+                $papeleta['tipoInfraccion'] = implode(' | ', array_map(static fn($d) => ($d['codigo'] ?? '') . ': ' . ($d['descripcion'] ?? ''), $detalles)) ?: 'Infracción no especificada';
+                $papeleta['gravedad'] = implode(', ', array_unique(array_filter(array_column($detalles, 'gravedad')))) ?: 'SIN GRAVEDAD';
                 $vehiculoId = (int)$papeleta['id_vehiculo'];
                 unset($papeleta['id_vehiculo']);
                 $papeleta['montoTotal'] = (float)$papeleta['montoTotal'];
@@ -144,8 +158,9 @@ class VehiculosController extends ResourceController
             }
 
             $certicavs = $db->table('certicav')
-                ->select('id_vehiculo, numero_registro as numeroRegistro, numero_serie_certicav as numeroSerieCerticav, fecha, primera_evaluacion as primeraEvaluacion, segunda_evaluacion as segundaEvaluacion, resultado, estado')
+                ->select('id_vehiculo, numero_registro as numeroRegistro, numero_serie_certicav as numeroSerieCerticav, fecha, primera_evaluacion as primeraEvaluacion, segunda_evaluacion as segundaEvaluacion, fecha_segunda_evaluacion as fechaSegundaEvaluacion, resultado, estado')
                 ->whereIn('id_vehiculo', $vehiculoIds)
+                ->where('estado !=', 'ANULADA')
                 ->orderBy('fecha', 'DESC')
                 ->orderBy('id', 'DESC')
                 ->get()
@@ -155,6 +170,9 @@ class VehiculosController extends ResourceController
                 $vehiculoId = (int)$certicav['id_vehiculo'];
                 if (!isset($certicavPorVehiculo[$vehiculoId])) {
                     unset($certicav['id_vehiculo']);
+                    $base = $certicav['resultado'] === 'APROBADO' && $certicav['segundaEvaluacion'] === 'APROBADO' && !empty($certicav['fechaSegundaEvaluacion']) ? $certicav['fechaSegundaEvaluacion'] : $certicav['fecha'];
+                    $certicav['fechaVencimiento'] = \App\Libraries\VigenciaCertificado::vencimiento($base);
+                    $certicav['estadoVigencia'] = in_array($certicav['estado'], ['ANULADA', 'ANULADO', 'INACTIVO'], true) ? $certicav['estado'] : ($certicav['resultado'] === 'APROBADO' ? ($certicav['fechaVencimiento'] < \App\Libraries\ReglasCurso::hoy() ? 'VENCIDO' : 'VIGENTE') : $certicav['resultado']);
                     $certicavPorVehiculo[$vehiculoId] = $certicav;
                 }
             }
@@ -167,6 +185,7 @@ class VehiculosController extends ResourceController
                     fecha_ingreso,
                     fecha_salida,
                     motivo,
+                    lugar_intervencion,
                     estado
                 ")
                 ->whereIn('id_vehiculo', $vehiculoIds)
@@ -189,10 +208,12 @@ class VehiculosController extends ResourceController
                     vp.fecha_inicio,
                     vp.fecha_fin,
                     vp.estado,
+                    td.codigo as tipoDocumento,
                     COALESCE(p.numero, '') as dni,
                     TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) as nombre
                 ", false)
                 ->join('personas p', 'p.id = vp.id_persona', 'left')
+                ->join('tipo_documentos_identidad td', 'td.id = p.id_tipo_documento', 'left')
                 ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
                 ->whereIn('vp.id_vehiculo', $vehiculoIds)
                 ->orderBy('vp.fecha_inicio', 'DESC')
@@ -229,7 +250,7 @@ class VehiculosController extends ResourceController
                 'historialInternamientos' => $internamientosPorVehiculo[$vehiculoId] ?? [],
                 'historialPropietarios' => $propietariosPorVehiculo[$vehiculoId] ?? [],
                 'soatEstado' => $soat['estado'] ?? 'SIN_REGISTRO',
-                'tucNumero' => 'TUC-2026-' . str_pad($row['id'], 3, '0', STR_PAD_LEFT),
+                'tucNumero' => 'TUC-' . date('Y') . '-' . str_pad($row['id'], 3, '0', STR_PAD_LEFT),
             ];
         }, $rows);
 
@@ -375,7 +396,7 @@ class VehiculosController extends ResourceController
                 unset($row['propietarioNombres'], $row['propietarioPaterno'], $row['propietarioMaterno']);
                 return $row + [
                     'propietario' => $propietario ?: 'Sin Propietario Asignado',
-                    'tucNumero' => 'TUC-2026-' . str_pad($row['id'], 3, '0', STR_PAD_LEFT),
+                    'tucNumero' => 'TUC-' . date('Y') . '-' . str_pad($row['id'], 3, '0', STR_PAD_LEFT),
                 ];
             }, $rows);
 
@@ -525,7 +546,7 @@ class VehiculosController extends ResourceController
                         'historialInternamientos' => [],
                         'historialPropietarios' => [],
                         'soatEstado' => 'SIN_REGISTRO',
-                        'tucNumero' => 'TUC-2026-000',
+                        'tucNumero' => 'TUC-' . date('Y') . '-000',
                     ]]);
                 }
             }
@@ -725,7 +746,7 @@ class VehiculosController extends ResourceController
                 'estado'           => $record['estado'],
                 'formalidad'       => $asociacionId ? 'FORMAL' : 'INFORMAL',
                 'soatEstado'       => $input['soatEstado'] ?? 'VIGENTE',
-                'tucNumero'        => $input['tucNumero'] ?? ('TUC-2026-' . str_pad($vehiculoId, 3, '0', STR_PAD_LEFT)),
+                'tucNumero'        => $input['tucNumero'] ?? ('TUC-' . date('Y') . '-' . str_pad($vehiculoId, 3, '0', STR_PAD_LEFT)),
             ];
 
             if (!$db->transStatus()) throw new \RuntimeException('Error guardando vehículo.');

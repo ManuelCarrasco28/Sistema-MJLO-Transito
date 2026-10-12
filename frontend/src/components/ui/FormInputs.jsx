@@ -335,6 +335,7 @@ export function FloatingSelect({
   options = [],
   className = '',
   multilineOptions = false,
+  hideEmptyOption = false,
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPos, setMenuPos] = useState(null)
@@ -467,6 +468,7 @@ export function FloatingSelect({
               <p className="px-2 py-2 text-center text-slate-400" style={{ fontSize: '11px' }}>Sin resultados</p>
             )}
             {buscador.filtradas.map((opt, indice) => {
+              if (hideEmptyOption && !String(opt.label ?? '').trim()) return null
               const isSelected = opt.value === value
               const resaltada = buscador.buscable && indice === buscador.activo
               return (
@@ -518,6 +520,7 @@ export function RoundedSelect({
   className = '',
   buttonClassName = '',
   placeholder = 'Seleccionar',
+  align = 'end',
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
@@ -568,7 +571,7 @@ export function RoundedSelect({
       </button>
 
       {isOpen && (
-        <div className={`absolute right-0 top-full mt-1.5 min-w-full w-max z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100 ${
+        <div className={`absolute ${align === 'start' ? 'left-0' : 'right-0'} top-full mt-1.5 min-w-full w-max z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100 ${
           buscador.buscable ? 'min-w-[240px] max-w-[min(360px,calc(100vw-2rem))]' : 'max-w-[320px]'
         }`}>
           <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">

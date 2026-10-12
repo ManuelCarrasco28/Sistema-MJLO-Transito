@@ -512,31 +512,31 @@ export function CerticavFichaPrint({ data }) {
   // Un ítem sin resultado registrado se imprime vacío, nunca como "B".
   const getCriterioVal = (numeroItem) => {
     if (!Array.isArray(data.detalles)) return ''
-    const codigo = `CV-${String(numeroItem).padStart(2, '0')}`
+    const codigo = String(numeroItem).startsWith('CV-') ? numeroItem : `CV-${String(numeroItem).padStart(2, '0')}`
     const found = data.detalles.find((d) => d.codigo === codigo)
     return found ? found.estado : ''
   }
 
-  // Lista exacta de los 37 ítems oficiales de la ficha municipal organizados en 2 columnas
+  // Subítems y filas generales evaluables del papel municipal, en dos columnas.
   const columnaIzquierda = [
     { tipo: 'header', titulo: 'SISTEMA ELECTRICO' },
     { id: 1, label: 'Encendido de máquina' },
     { id: 2, label: 'Velocímetro' },
     { id: 3, label: 'Sonido de Claxón' },
-    { tipo: 'sub', label: 'Luces Direccionales' },
+    { tipo: 'grupo', codigo: 'CV-G01', label: 'Luces Direccionales' },
     { id: 4, label: '- Lado delantero derecho', isChild: true },
     { id: 5, label: '- Lado delantero izquierdo', isChild: true },
     { id: 6, label: '- Lado posterior derecho', isChild: true },
     { id: 7, label: '- Lado posterior izquierdo', isChild: true },
-    { tipo: 'sub', label: 'Luces de faro delantero' },
+    { tipo: 'grupo', codigo: 'CV-G02', label: 'Luces de faro delantero' },
     { id: 8, label: '- Luz de alta', isChild: true },
     { id: 9, label: '- Luz de baja', isChild: true },
-    { tipo: 'sub', label: 'Luces de freno' },
+    { tipo: 'grupo', codigo: 'CV-G03', label: 'Luces de freno' },
     { id: 10, label: '- Lado delantero derecho', isChild: true },
     { id: 11, label: '- Lado delantero izquierdo', isChild: true },
     { id: 12, label: '- Lado posterior derecho', isChild: true },
     { id: 13, label: '- Lado posterior izquierdo', isChild: true },
-    { tipo: 'sub', label: 'Luces de estacionamiento' },
+    { tipo: 'grupo', codigo: 'CV-G04', label: 'Luces de faro delantero' },
     { id: 14, label: '- Lado delantero derecho', isChild: true },
     { id: 15, label: '- Lado delantero izquierdo', isChild: true },
     { id: 16, label: '- Lado posterior derecho', isChild: true },
@@ -551,7 +551,7 @@ export function CerticavFichaPrint({ data }) {
     { id: 20, label: 'Acelerador' },
     { id: 21, label: 'Embrague' },
     { id: 22, label: 'Tapa de tanque de combustible' },
-    { tipo: 'sub', label: 'Sistema de frenos' },
+    { tipo: 'grupo', codigo: 'CV-G05', label: 'Sistema de frenos' },
     { id: 23, label: '- Freno de pedal', isChild: true },
     { id: 24, label: '- Freno de mano auxiliar', isChild: true },
     { tipo: 'header', titulo: 'ASPECTOS EXTERIORES' },
@@ -560,11 +560,11 @@ export function CerticavFichaPrint({ data }) {
     { id: 27, label: '- Visibilidad del parabrisas', isChild: true },
     { id: 28, label: 'Micas transparentes' },
     { id: 29, label: 'Placa original del vehículo' },
-    { tipo: 'sub', label: 'Cinta reflectiva' },
+    { tipo: 'grupo', codigo: 'CV-G06', label: 'Cinta reflectiva' },
     { id: 30, label: '- Lado izquierdo', isChild: true },
     { id: 31, label: '- Lado derecho', isChild: true },
     { id: 32, label: '- Lado posterior', isChild: true },
-    { tipo: 'sub', label: 'Pintado' },
+    { tipo: 'grupo', codigo: 'CV-G07', label: 'Pintado' },
     { id: 33, label: '- Placa lado posterior del vehículo', isChild: true },
     { id: 34, label: '- Placa lado superior techo', isChild: true },
     { id: 35, label: '- Placa lado interior respaldar del conductor', isChild: true },
@@ -618,7 +618,7 @@ export function CerticavFichaPrint({ data }) {
             )
           }
 
-          const val = getCriterioVal(item.id)
+          const val = getCriterioVal(item.codigo || item.id)
 
           return (
             <tr key={'row-' + item.id} style={{ height: '17px', lineHeight: 1 }}>
@@ -732,7 +732,7 @@ export function CerticavFichaPrint({ data }) {
                   N° LICENCIA DE CONDUCTOR:
                 </strong>
                 <span style={{ fontSize: '7.5pt', fontWeight: 900, fontFamily: 'monospace', color: '#000' }}>
-                  {data.conductorLicencia || data.numeroLicencia || data.propietarioDni || data.conductorDni || '—'}
+                  {data.conductorLicencia || data.numeroLicencia || '—'}
                 </span>
               </div>
             </div>

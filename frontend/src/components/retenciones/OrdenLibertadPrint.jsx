@@ -23,6 +23,7 @@ export const OrdenLibertadPrint = ({ item }) => {
           Y TRANSPORTE
         </h2>
         <div className="absolute right-0 bottom-0 text-red-600 font-bold text-xl tracking-widest font-sans [font-variant-numeric:lining-nums_tabular-nums]">
+          <div className="text-[9px] font-bold uppercase tracking-normal text-slate-700">Registro digital</div>
           Nº {String(item?.numeroOrdenLibertad || 'S/N').replace(/^[A-Za-z]+-/, '')}
         </div>
       </div>
@@ -49,15 +50,15 @@ export const OrdenLibertadPrint = ({ item }) => {
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex items-end text-[15px]">
           <span className="whitespace-nowrap mr-2">Esta jefatura autoriza al Sr. (a):</span>
-          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.interesadoNombre || ''}</div>
+          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.autorizadoNombre ?? item?.interesadoNombre ?? ''}</div>
         </div>
         <div className="flex items-end text-[15px]">
           <span className="whitespace-nowrap mr-2">Domicilio:</span>
-          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.interesadoDireccion || ''}</div>
+          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.autorizadoDireccion ?? item?.interesadoDireccion ?? ''}</div>
         </div>
         <div className="flex items-end text-[15px]">
           <span className="whitespace-nowrap mr-2">Doc. de Identidad:</span>
-          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.interesadoDni || ''}</div>
+          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.autorizadoDni ?? item?.interesadoDni ?? ''}</div>
         </div>
       </div>
 
@@ -161,8 +162,8 @@ export const OrdenLibertadPrint = ({ item }) => {
           <div className="flex gap-2">N° DE CARNÉ <span className="flex-1 border-b border-black">{item?.carnetRemisor || ''}</span></div>
         </div>
         <div className="space-y-4">
-          <div className="flex gap-2">INTERESADO <span className="flex-1 border-b border-black uppercase">{item?.interesadoNombre || ''}</span></div>
-          <div className="flex gap-2">DOC. ID. <span className="flex-1 border-b border-black">{item?.interesadoDni || ''}</span></div>
+          <div className="flex gap-2">INTERESADO <span className="flex-1 border-b border-black uppercase">{item?.autorizadoNombre ?? item?.interesadoNombre ?? ''}</span></div>
+          <div className="flex gap-2">DOC. ID. <span className="flex-1 border-b border-black">{item?.autorizadoDni ?? item?.interesadoDni ?? ''}</span></div>
           <div className="mt-6 border-t border-black pt-1 text-center text-[11px]">Firma del interesado</div>
         </div>
       </div>

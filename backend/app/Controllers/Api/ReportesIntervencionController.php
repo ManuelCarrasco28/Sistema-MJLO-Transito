@@ -27,9 +27,9 @@ class ReportesIntervencionController extends ResourceController
             ->select("r.uuid AS uuid, 
                 r.*,
                 COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa_visual,
-                COALESCE(v.marca, '') AS vehiculo_marca,
+                COALESCE(NULLIF(v.marca, ''), r.vehiculo_marca, '') AS vehiculo_marca,
                 COALESCE(v.modelo, '') AS vehiculo_modelo,
-                COALESCE(v.color, '') AS vehiculo_color,
+                COALESCE(NULLIF(v.color, ''), r.vehiculo_color, '') AS vehiculo_color,
                 COALESCE(CONCAT(ci.nombres, ' ', ci.apellido_paterno, ' ', COALESCE(ci.apellido_materno, '')), 'Inspector Municipal') AS inspector_nombre,
                 p.numero_papeleta,
                 CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END as tipoInfractor,
@@ -111,7 +111,35 @@ class ReportesIntervencionController extends ResourceController
         $query->groupBy('r.id');
         $rows = $query->orderBy('r.id', 'DESC')->get()->getResultArray();
 
-        $reporteIds = array_column($rows, 'id');
+        // Infracciones de todos los reportes de la página en dos consultas (antes eran 1 o 2 por cada reporte)
+        $porReporte = [];
+        $porPapeleta = [];
+        if ($rows) {
+            $ids = array_map('intval', array_column($rows, 'id'));
+            $filas = $db->table('reporte_intervencion_infracciones ri')
+                ->select('ri.id_reporte, ti.id, ti.codigo, ti.descripcion')
+                ->join('tipos_infraccion ti', 'ti.id = ri.id_tipo_infraccion', 'left')
+                ->whereIn('ri.id_reporte', $ids)
+                ->get()->getResultArray();
+            foreach ($filas as $f) {
+                $porReporte[(int)$f['id_reporte']][] = ['id' => $f['id'], 'codigo' => $f['codigo'], 'descripcion' => $f['descripcion']];
+            }
+            $idsPapeleta = array_values(array_unique(array_filter(array_map(
+                static fn ($r) => $r['id_papeleta'] !== null ? (int)$r['id_papeleta'] : null,
+                array_filter($rows, static fn ($r) => empty($porReporte[(int)$r['id']]))
+            ))));
+            if ($idsPapeleta) {
+                $filas = $db->table('papeleta_detalles pd')
+                    ->select('pd.id_papeleta, ti.id, ti.codigo, ti.descripcion')
+                    ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'inner')
+                    ->whereIn('pd.id_papeleta', $idsPapeleta)
+                    ->orderBy('pd.id', 'ASC')
+                    ->get()->getResultArray();
+                foreach ($filas as $f) {
+                    $porPapeleta[(int)$f['id_papeleta']][] = ['id' => $f['id'], 'codigo' => $f['codigo'], 'descripcion' => $f['descripcion']];
+                }
+            }
+        }
 
         foreach ($rows as &$row) {
             $row['id'] = (int)$row['id'];
@@ -119,22 +147,11 @@ class ReportesIntervencionController extends ResourceController
             $row['id_vehiculo'] = $row['id_vehiculo'] !== null ? (int)$row['id_vehiculo'] : null;
             $row['id_papeleta'] = $row['id_papeleta'] !== null ? (int)$row['id_papeleta'] : null;
             $row['fotos'] = []; // No cargamos fotos en el historial para evitar colapsar la memoria RAM del servidor
-            
-            $infrs = $db->table('reporte_intervencion_infracciones ri')
-                ->select('ti.id, ti.codigo, ti.descripcion')
-                ->join('tipos_infraccion ti', 'ti.id = ri.id_tipo_infraccion', 'left')
-                ->where('ri.id_reporte', $row['id'])
-                ->get()
-                ->getResultArray();
+
+            $infrs = $porReporte[$row['id']] ?? [];
             // Un reporte ya convertido muestra las infracciones que la oficina aplicó en su papeleta.
             if (empty($infrs) && !empty($row['id_papeleta'])) {
-                $infrs = $db->table('papeleta_detalles pd')
-                    ->select('ti.id, ti.codigo, ti.descripcion')
-                    ->join('tipos_infraccion ti', 'ti.id = pd.id_tipo_infraccion', 'inner')
-                    ->where('pd.id_papeleta', $row['id_papeleta'])
-                    ->orderBy('pd.id', 'ASC')
-                    ->get()
-                    ->getResultArray();
+                $infrs = $porPapeleta[$row['id_papeleta']] ?? [];
             }
             $row['infracciones'] = $infrs;
             $row['infraccion_visual'] = !empty($infrs) ? implode(', ', array_column($infrs, 'codigo')) : ($row['estado'] === 'PENDIENTE' ? 'Por definir' : 'Sin Infracción');
@@ -221,9 +238,30 @@ class ReportesIntervencionController extends ResourceController
             $vehiculoId = $vehiculo ? (int)$vehiculo['id'] : null;
         }
 
+        $ahoraLima = new \DateTime('now', new \DateTimeZone('America/Lima'));
         $fechaHora = trim((string)($input['fechaHora'] ?? $input['fecha_hora'] ?? ''));
         if ($fechaHora === '') {
-            $fechaHora = (new \DateTime('now', new \DateTimeZone('America/Lima')))->format('Y-m-d H:i:s');
+            $fechaHora = $ahoraLima->format('Y-m-d H:i:s');
+        } else {
+            // La hora la manda el cliente: debe ser una fecha válida, no futura y de los últimos 7 días
+            try {
+                $momento = new \DateTime($fechaHora, new \DateTimeZone('America/Lima'));
+            } catch (\Throwable $e) {
+                return $this->failValidationErrors('La fecha y hora del reporte no son válidas.');
+            }
+            if ($momento > (clone $ahoraLima)->modify('+10 minutes')) {
+                return $this->failValidationErrors('La fecha y hora del reporte no pueden ser futuras.');
+            }
+            if ($momento < (clone $ahoraLima)->modify('-7 days')) {
+                return $this->failValidationErrors('La fecha y hora del reporte son demasiado antiguas (máximo 7 días).');
+            }
+            $fechaHora = $momento->format('Y-m-d H:i:s');
+        }
+        if (mb_strlen($lugar) > 250) {
+            return $this->failValidationErrors('El lugar de la intervención no puede superar los 250 caracteres.');
+        }
+        if (mb_strlen($observaciones) > 500) {
+            return $this->failValidationErrors('La observación no puede superar los 500 caracteres.');
         }
 
 
@@ -272,6 +310,9 @@ class ReportesIntervencionController extends ResourceController
                 'id_vehiculo' => $vehiculoId,
                 'id_conductor' => $conductorId,
                 'placa' => $placa !== '' ? $placa : null,
+                'vehiculo_clase' => mb_substr(trim((string)($input['claseVehiculo'] ?? '')), 0, 60) ?: null,
+                'vehiculo_marca' => mb_substr(trim((string)($input['marcaVehiculo'] ?? '')), 0, 60) ?: null,
+                'vehiculo_color' => mb_substr(trim((string)($input['colorVehiculo'] ?? '')), 0, 40) ?: null,
                 'dueno_informal_nombres' => $duenoNombresInformal,
                 'dueno_informal_dni' => $duenoDniInformal,
                 'conductor_informal_nombres' => $conductorNombresInformal,
@@ -317,6 +358,7 @@ class ReportesIntervencionController extends ResourceController
             return $this->respondCreated(['message' => 'Reporte registrado para revisión administrativa.', 'data' => ['id' => $id]]);
         } catch (\Throwable $e) {
             $db->transRollback();
+            \App\Services\FileStorageService::descartarEscritos();
             log_message('error', 'No se pudo registrar el reporte: ' . $e->getMessage());
             return $this->failServerError('No se pudo registrar el reporte. Intente nuevamente.');
         }
@@ -501,10 +543,14 @@ class ReportesIntervencionController extends ResourceController
             return $this->failValidationErrors('Solo se pueden rechazar reportes pendientes.');
         }
 
-        $db->table('reportes_intervencion')->where('id', (int)$id)->update([
+        // Atómico: si otro usuario lo convirtió mientras tanto, no se pisa (el UPDATE exige que siga PENDIENTE)
+        $db->table('reportes_intervencion')->where('id', (int)$id)->where('estado', 'PENDIENTE')->update([
             'estado' => 'RECHAZADO',
             'motivo_rechazo' => $motivo,
         ]);
+        if ($db->affectedRows() === 0) {
+            return $this->failValidationErrors('El reporte ya fue atendido por otro usuario. Actualice la lista.');
+        }
 
         return $this->respond(['message' => 'Reporte rechazado correctamente.']);
     }

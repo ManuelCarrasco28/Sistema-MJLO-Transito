@@ -11,10 +11,10 @@ use Config\Exceptions as ExceptionsConfig;
 use Throwable;
 
 /**
- * Las rutas /api nunca devuelven trazas, rutas de archivos ni mensajes internos,
+ * Ninguna ruta devuelve trazas, rutas de archivos ni mensajes internos,
  * sin importar CI_ENVIRONMENT. La excepción completa ya queda en el log del
  * servidor (Config\Exceptions::$log); el cliente solo recibe un mensaje genérico.
- * El resto de rutas usa el manejador por defecto de CodeIgniter.
+ * Solo la línea de comandos (spark) usa el manejador por defecto de CodeIgniter.
  */
 class ApiExceptionHandler implements ExceptionHandlerInterface
 {
@@ -40,7 +40,8 @@ class ApiExceptionHandler implements ExceptionHandlerInterface
         int $statusCode,
         int $exitCode,
     ): void {
-        if (! $request instanceof IncomingRequest || ! $this->esRutaApi($request)) {
+        // Este servidor es solo API: ninguna ruta devuelve trazas ni rutas internas (antes solo /api, y /noexiste las mostraba)
+        if (! $request instanceof IncomingRequest) {
             $this->porDefecto->handle($exception, $request, $response, $statusCode, $exitCode);
 
             return;

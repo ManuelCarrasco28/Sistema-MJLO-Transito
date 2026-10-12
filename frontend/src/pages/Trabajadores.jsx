@@ -9,6 +9,7 @@ import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import { puedeEliminarRegistros } from '../config/roles'
 
 const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_inspector: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 
@@ -583,7 +584,7 @@ export function Trabajadores() {
                         <Icon name="pencil" className="size-4" />
                       </button>
 
-                      <button
+                      <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
                         type="button"
                         onClick={() => handleDelete(row.id)}
                         title="Desactivar trabajador"

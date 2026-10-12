@@ -13,6 +13,9 @@ import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { SearchableMultiSelect } from '../components/ui/SearchableMultiSelect'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import { sanitizeCellValue } from '../utils/exportHelpers'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import { puedeEliminarRegistros } from '../config/roles'
 
 const getPeruDateInputValue = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -152,15 +155,14 @@ export function Operativos({ user }) {
   const visible = operativos
 
   const fetchTodoElFiltro = async () => {
-    const params = new URLSearchParams()
-    if (search) params.set('buscar', search)
-    if (estado !== 'TODOS') params.set('estado', estado)
-    if (fechaFiltro !== 'TODAS') params.set('fechaFiltro', fechaFiltro)
-    if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
-    const res = await apiFetch(`/operativos?${params.toString()}`)
-    if (!res.ok) return filtered
-    const payload = await res.json()
-    return payload.data || []
+    // Todas las páginas del filtro (antes una sola petición podía quedar recortada sin avisar)
+    return fetchTodasLasFilas('/operativos', {
+      buscar: search,
+      estado: estado !== 'TODOS' ? estado : '',
+      fechaFiltro: fechaFiltro !== 'TODAS' ? fechaFiltro : '',
+      sortBy,
+      sortDir: sortBy ? sortDir : '',
+    })
   }
 
   const handleExportExcel = async () => {
@@ -429,12 +431,12 @@ export function Operativos({ user }) {
       <tr>
         <td>${safeText(r.papeleta)}</td>
         <td>${safeText(r.fecha)}</td>
-        <td>${safeText(r.lugar)}</td>
-        <td>${safeText(r.inspector)}</td>
-        <td>${safeText(r.intervenido)}</td>
+        <td>${safeText(sanitizeCellValue(r.lugar))}</td>
+        <td>${safeText(sanitizeCellValue(r.inspector))}</td>
+        <td>${safeText(sanitizeCellValue(r.intervenido))}</td>
         <td>${safeText(r.dni)}</td>
         <td>${safeText(r.placa)}</td>
-        <td>${safeText(r.infraccion)}</td>
+        <td>${safeText(sanitizeCellValue(r.infraccion))}</td>
         <td style="text-align:right">${safeText(r.monto)}</td>
         <td>${safeText(r.estado)}</td>
       </tr>
@@ -683,7 +685,7 @@ export function Operativos({ user }) {
                     <div className="flex justify-center gap-1.5">
                       <button onClick={() => openDetail(op)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver detalle"><Icon name="eye" className="size-4" /></button>
                       <button onClick={() => openEdit(op)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar"><Icon name="pencil" className="size-4" /></button>
-                      <button onClick={() => remove(op.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar"><Icon name="trash" className="size-4" /></button>
+                      <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }} onClick={() => remove(op.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar"><Icon name="trash" className="size-4" /></button>
                     </div>
                   </td>
                 </tr>

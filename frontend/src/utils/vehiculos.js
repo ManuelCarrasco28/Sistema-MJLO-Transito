@@ -20,6 +20,7 @@ const formatCerticavQr = (certicav) => {
     `CERTICAV / Inspeccion tecnica: ${certicav.numeroSerieCerticav || certicav.numeroRegistro || 'SIN NUMERO'}`,
     `Resultado: ${certicav.resultado || 'SIN RESULTADO'}`,
     `Estado: ${certicav.estado || 'SIN ESTADO'}`,
+    `Vigencia: ${certicav.estadoVigencia || 'SIN VIGENCIA'}`,
     `Fecha: ${certicav.fecha || 'SIN FECHA'}`,
   ].join(' | ')
 }
@@ -49,7 +50,7 @@ export const buildVehiculoQrValue = (vehiculo) => {
     `Sede de registro: ${vehiculo.sedeRegistro || 'SIN SEDE'}`,
     `Tipo de carroceria: ${vehiculo.tipoCarroceria || 'SIN TIPO CARROCERIA'}`,
     `Propietario: ${vehiculo.propietario || 'SIN PROPIETARIO'}`,
-    `DNI propietario: ${vehiculo.propietarioTipoDocumento === 'DNI' ? vehiculo.propietarioDni || 'SIN DNI' : 'NO APLICA'}`,
+    `Documento propietario (${vehiculo.propietarioTipoDocumento || 'SIN TIPO'}): ${vehiculo.propietarioDni || 'SIN DOCUMENTO'}`,
     `RUC asociacion: ${vehiculo.asociacionRuc || 'SIN RUC'}`,
     `Asociacion vehiculo: ${vehiculo.asociacion || 'INDEPENDIENTE'}`,
     formatDocumentoQr('Tarjeta de propiedad numero', tarjetaPropiedad),

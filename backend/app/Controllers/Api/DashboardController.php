@@ -109,7 +109,7 @@ class DashboardController extends ResourceController
             FROM (
                 SELECT DATE_ADD(MAX(fecha), INTERVAL 6 MONTH) AS vence
                 FROM certicav
-                WHERE resultado = 'APROBADO' AND estado <> 'ANULADO'
+                WHERE resultado = 'APROBADO' AND estado <> 'ANULADA'
                 GROUP BY id_vehiculo
             ) t
         ")->getRowArray());
@@ -164,7 +164,8 @@ class DashboardController extends ResourceController
                 DATEDIFF(DATE_ADD(c.fecha, INTERVAL 6 MONTH), CURDATE()) as dias_restantes
             ", false)
             ->join('vehiculos v', 'v.id = c.id_vehiculo', 'left')
-            ->where('c.estado', 'APROBADO')
+            ->where('c.resultado', 'APROBADO')
+            ->where('c.estado <>', 'ANULADA')
             ->where('DATE_ADD(c.fecha, INTERVAL 6 MONTH) >=', 'CURDATE()', false)
             ->where('DATE_ADD(c.fecha, INTERVAL 6 MONTH) <=', 'DATE_ADD(CURDATE(), INTERVAL 30 DAY)', false)
             ->get()->getResultArray();

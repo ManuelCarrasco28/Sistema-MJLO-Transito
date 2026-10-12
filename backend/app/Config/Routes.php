@@ -9,10 +9,10 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->post('login', 'AuthController::login');
     $routes->get('status', 'StatusController::index');
 
-    // Eliminaciones: solo personal de oficina. El frontend ya oculta estas acciones al rol
-    // Trabajador y la app móvil no elimina registros; aquí se exige también en el servidor.
+    // Eliminaciones y anulaciones: solo la jefatura (Super Admin, Gerente y Subgerente). Secretaría cobra y registra,
+    // pero no borra ni anula; el frontend oculta estas acciones y aquí se exige también en el servidor.
     // Va antes del grupo general para que estas rutas DELETE se resuelvan primero.
-    $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA'], static function ($routes): void {
+    $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE'], static function ($routes): void {
         $recursosEliminables = [
             'vehiculos' => 'VehiculosController',
             'personal' => 'PersonalController',
@@ -27,6 +27,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
             'internamientos' => 'InternamientosController',
             'permisos' => 'PermisosController',
         ];
+        $routes->put('internamientos/tarifas', 'InternamientosController::guardarTarifas');
         foreach ($recursosEliminables as $recurso => $controlador) {
             $routes->delete("{$recurso}/(:segment)", "{$controlador}::delete/$1");
         }
@@ -106,12 +107,14 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
         $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
         $routes->get('internamientos/estadisticas', 'InternamientosController::estadisticas');
+        $routes->get('internamientos/tarifas', 'InternamientosController::tarifas');
         $routes->post('internamientos/(:segment)/liberar', 'InternamientosController::liberar/$1');
         $routes->resource('internamientos', ['controller' => 'InternamientosController']);
         $routes->get('inventario-criterios', 'InternamientosController::criterios');
         $routes->post('reportes-intervencion/(:segment)/convertir', 'ReportesIntervencionController::convertir/$1');
         $routes->post('reportes-intervencion/(:segment)/rechazar', 'ReportesIntervencionController::rechazar/$1');
         $routes->get('notificaciones/resumen', 'NotificacionesController::resumen');
+        $routes->get('ruc/(:segment)', 'RucController::consultar/$1');
     });
 
     // Lista blanca de lo que necesita la app móvil (inspector). Todo lo demás es solo de oficina.

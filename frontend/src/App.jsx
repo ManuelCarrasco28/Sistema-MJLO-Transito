@@ -8,6 +8,7 @@ import { NotFound } from './pages/NotFound'
 import { PREFETCH_MAP } from './config/navigation'
 import { apiFetch } from './config/api'
 import { limpiarDatosLocales } from './utils/sesionLocal'
+import { esRolOficina } from './config/roles'
 
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000
 
@@ -32,7 +33,7 @@ const CursoDetalleVentana = lazy(() => import('./pages/CursoDetalleVentana'))
 
 
 const isSuperAdminUser = (user) => (user?.rol || '').toUpperCase() === 'SUPERADMIN'
-const isOfficeUser = (user) => ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes((user?.rol || '').toUpperCase())
+const isOfficeUser = (user) => esRolOficina((user?.rol || '').toUpperCase())
 
 const onlyNormalUser = (user, element) => isSuperAdminUser(user) ? <Navigate to="/superadmin" replace /> : element
 const onlyOfficeUser = (user, element) => isSuperAdminUser(user) ? <Navigate to="/superadmin" replace /> : (!isOfficeUser(user) ? <Navigate to="/dashboard" replace /> : element)
@@ -97,7 +98,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (p.startsWith('/asociaciones'))             return 'Asociaciones'
     if (p.startsWith('/documentos'))               return 'Documentos del Vehículo'
     if (p.startsWith('/impresion'))                return 'Centro de impresión'
-    if (p.startsWith('/inspecciones'))             return 'Certicav'
+    if (p.startsWith('/inspecciones'))             return 'Inspección Técnica Vehicular'
     if (p.startsWith('/papeletas'))                return 'Papeletas'
     if (p.startsWith('/operativos'))               return 'Operativos'
     if (p.startsWith('/cursos'))                   return 'Cursos de Seguridad Vial'
@@ -192,7 +193,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
   useEffect(() => {
     const rolNorm = (user?.rol || '').toUpperCase()
     const isSA = rolNorm === 'SUPERADMIN'
-    const isOff = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNorm)
+    const isOff = esRolOficina(rolNorm)
 
     let cancelled = false
     let idleId
@@ -359,7 +360,12 @@ function App() {
       return undefined
     }
 
+    let ultimoReinicio = 0
     const resetInactivityTimer = () => {
+      // mousemove dispara decenas de eventos por segundo: basta reiniciar el contador una vez por segundo
+      const ahora = Date.now()
+      if (inactivityTimerRef.current && ahora - ultimoReinicio < 1000) return
+      ultimoReinicio = ahora
       if (inactivityTimerRef.current) {
         window.clearTimeout(inactivityTimerRef.current)
       }

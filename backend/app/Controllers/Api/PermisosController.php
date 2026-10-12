@@ -17,6 +17,7 @@ class PermisosController extends ResourceController
     public function estadisticas()
     {
         $db = \Config\Database::connect();
+        \App\Libraries\EstadosPorFecha::alDia($db);
         // "Control Vehicular" es la categoría por defecto en la UI (todo lo que
         // no es Carga/Descarga, Uso de Vías o Zonas Reservadas), no un valor de
         // enum propio — replicamos exactamente esa misma regla aquí.
@@ -165,6 +166,7 @@ class PermisosController extends ResourceController
     public function index()
     {
         try {
+            \App\Libraries\EstadosPorFecha::alDia(\Config\Database::connect());
             $builder = $this->getBaseQuery();
 
             $buscar = trim((string)$this->request->getGet('buscar'));
@@ -481,6 +483,7 @@ class PermisosController extends ResourceController
             }
 
             $db->table('permisos_circulacion')->where('id', $id)->delete();
+            \App\Services\AuditoriaService::registrar('PERMISOS', 'ELIMINAR', 'Permiso eliminado (id ' . (int)$id . ')', ['id' => (int)$id]);
             return $this->respondDeleted([
                 'status'  => 200,
                 'message' => 'Autorización eliminada correctamente.'

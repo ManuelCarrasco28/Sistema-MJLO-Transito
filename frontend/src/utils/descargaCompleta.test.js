@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchTodasLasFilas } from './descargaCompleta'
 import { apiFetch } from '../config/api'
+import { loading } from './SwalUtil'
 
 vi.mock('../config/api', () => ({ apiFetch: vi.fn() }))
 vi.mock('./SwalUtil', () => ({ loading: vi.fn(), closeLoading: vi.fn() }))
@@ -46,6 +47,13 @@ describe('descargas por páginas', () => {
   it('rechaza un PDF excesivo después de leer solamente la primera página', async () => {
     apiFetch.mockResolvedValue(respuesta([1, 2], 30000))
     await expect(fetchTodasLasFilas('/personas', {}, { maxFilas: 10000, silencioso: true })).rejects.toThrow('use Excel')
+    expect(apiFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('el botón Cancelar detiene la descarga sin entregar registros parciales', async () => {
+    apiFetch.mockResolvedValue(respuesta([1, 2]))
+    loading.mockImplementationOnce((_titulo, _texto, opciones) => opciones.onCancel())
+    await expect(fetchTodasLasFilas('/personas')).rejects.toMatchObject({ name: 'AbortError' })
     expect(apiFetch).toHaveBeenCalledTimes(1)
   })
 })

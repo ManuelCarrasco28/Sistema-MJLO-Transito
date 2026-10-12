@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y \
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
+# No revelar la versión del servidor
+RUN { echo 'ServerTokens Prod'; echo 'ServerSignature Off'; echo 'TraceEnable Off'; } > /etc/apache2/conf-available/seguridad.conf && a2enconf seguridad
+
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -26,6 +29,7 @@ RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf
 
 RUN { \
       echo 'memory_limit=1024M'; \
+      echo 'expose_php=Off'; \
       echo 'post_max_size=64M'; \
       echo 'max_execution_time=300'; \
       echo 'opcache.enable=1'; \
@@ -38,7 +42,7 @@ RUN { \
 
 # Copy application files (will be overridden by volume during dev, but good for prod)
 COPY . /var/www/html
-RUN composer dump-autoload --optimize --no-interaction --working-dir=/var/www/html || true
+RUN composer install --optimize-autoloader --no-interaction --working-dir=/var/www/html
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/writable /var/www/html/public/uploads || true

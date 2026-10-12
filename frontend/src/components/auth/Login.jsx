@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { apiFetch } from '../../config/api'
 
 export function Login({ onLogin }) {
@@ -20,6 +20,12 @@ export function Login({ onLogin }) {
   const [captchaToken, setCaptchaToken] = useState('')
   const turnstileContainerRef = useRef(null)
   const turnstileWidgetRef = useRef(null)
+
+  // El tema guardado se conserva para el sistema, pero nunca se aplica al login.
+  // Al iniciar sesión, AppLayout vuelve a aplicar la preferencia guardada.
+  useLayoutEffect(() => {
+    document.documentElement.classList.remove('dark')
+  }, [])
 
   useEffect(() => {
     if (isShaking) {

@@ -29,12 +29,14 @@ class PagosController extends ResourceController
             ", false)
             ->get()->getRowArray();
 
+        // Solo guardianía y remolque: el importe de la papeleta ya está en su propio recibo de pagos_transito
         $liberados = $db->table('ordenes_libertad')
             ->select("
                 COUNT(*) as total,
-                SUM(monto_total) as monto,
+                SUM(monto_guardiania + monto_remolque) as monto,
                 SUM(CASE WHEN DATE(fecha_emision) = CURDATE() THEN 1 ELSE 0 END) as hoy
             ", false)
+            ->where('(monto_guardiania + monto_remolque) >', 0, false)
             ->get()->getRowArray();
 
         $pendientesInternamiento = (int) $db->table('ordenes_internamiento')->where('estado', 'RETENIDO')->countAllResults();
@@ -95,13 +97,13 @@ class PagosController extends ResourceController
         // (guardianía, papeleta y/o remolque), ya que el sistema no registra
         // un único método por cada recibo combinado.
         $pagados = $db->table('ordenes_libertad ol')
-            ->select("ol.id, ol.id_internamiento, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_papeleta, ol.numero_recibo_remolque, 'VARIOS') as numero_recibo, NULL as numero_voucher,
+            ->select("ol.id, ol.id_internamiento, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_remolque, 'VARIOS') as numero_recibo, NULL as numero_voucher,
                 COALESCE(NULLIF(CONCAT_WS(' + ',
-                    IF(ol.numero_recibo_guardiania IS NOT NULL, 'GUARDIANÍA', NULL),
-                    IF(ol.numero_recibo_papeleta IS NOT NULL, 'PAPELETA', NULL),
-                    IF(ol.numero_recibo_remolque IS NOT NULL, 'REMOLQUE', NULL)
+                    IF(ol.monto_guardiania > 0, 'GUARDIANÍA', NULL),
+                    IF(ol.monto_remolque > 0, 'REMOLQUE', NULL)
                 ), ''), 'VARIOS CONCEPTOS') as medio_pago,
-                CONCAT('Orden #', ol.numero_orden) as referencia_pago, ol.monto_total as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado", false)
+                CONCAT('Orden #', ol.numero_orden) as referencia_pago, (ol.monto_guardiania + ol.monto_remolque) as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado", false)
+            ->where('(ol.monto_guardiania + ol.monto_remolque) >', 0, false)
             ->get()->getResultArray();
 
         // Papeletas pendientes de pago que aún no tienen un recibo generado
@@ -699,15 +701,18 @@ class PagosController extends ResourceController
         }
 
         $pagosTransito = $db->table('pagos_transito')
-            ->where('DATE(fecha_pago)', $fecha)
-            ->where('estado', 'PAGADO')
-            ->orderBy('hora_pago', 'ASC')
+            ->select('pagos_transito.*, u.usuario AS cajero')
+            ->join('usuarios u', 'u.id = pagos_transito.id_usuario_cobra', 'left')
+            ->where('pagos_transito.fecha_pago', $fecha)
+            ->where('pagos_transito.estado', 'PAGADO')
+            ->orderBy('pagos_transito.hora_pago', 'ASC')
             ->get()
             ->getResultArray();
 
         $pagosInternamiento = $db->table('ordenes_libertad ol')
-            ->select("ol.id, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_papeleta, ol.numero_recibo_remolque, CONCAT('ORD-', ol.numero_orden)) as numero_recibo, 'EFECTIVO' as medio_pago, CONCAT('Liberación Vehículo - Orden #', ol.numero_orden) as referencia_pago, ol.monto_total as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado", false)
-            ->where('DATE(ol.fecha_emision)', $fecha)
+            ->select("ol.id, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_remolque, CONCAT('ORD-', ol.numero_orden)) as numero_recibo, 'EFECTIVO' as medio_pago, CONCAT('Liberación Vehículo - Orden #', ol.numero_orden) as referencia_pago, (ol.monto_guardiania + ol.monto_remolque) as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado", false)
+            ->where('ol.fecha_emision', $fecha)
+            ->where('(ol.monto_guardiania + ol.monto_remolque) >', 0, false)
             ->get()
             ->getResultArray();
 

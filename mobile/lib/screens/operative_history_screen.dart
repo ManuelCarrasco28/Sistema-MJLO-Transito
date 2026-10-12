@@ -164,7 +164,8 @@ class OperativeHistoryScreen extends StatelessWidget {
                             errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
                           )
                         : Image.network(
-                            '${ApiService.fileBaseUrl}/${data['firmaConductorImg']}',
+                            ApiService.urlArchivo(data['firmaConductorImg'].toString()),
+                            headers: ApiService.headersImagen,
                             height: 100,
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) => const Text('Error al cargar la firma'),
@@ -205,7 +206,8 @@ class OperativeHistoryScreen extends StatelessWidget {
                                         errorBuilder: (context, error, stackTrace) => const Text('Error al cargar'),
                                       )
                                     : Image.network(
-                                        '${ApiService.fileBaseUrl}/$fotoUrl',
+                                        ApiService.urlArchivo(fotoUrl.toString()),
+                                        headers: ApiService.headersImagen,
                                         height: 100,
                                         width: 100,
                                         fit: BoxFit.cover,
