@@ -424,7 +424,7 @@ function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocu
 
           <div className="mb-2.5">
             <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-              Hora (1 - 12)
+              Hora
             </span>
             <div className="grid grid-cols-6 gap-1">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => {

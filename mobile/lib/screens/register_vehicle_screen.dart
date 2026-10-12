@@ -24,14 +24,10 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
   final _colorController = TextEditingController();
   final _motorController = TextEditingController();
 
-  // Conductor y Propietario
-  bool _conductorEsDueno = false;
+  // Conductor
   final _dniConductorController = TextEditingController();
   final _nombresConductorController = TextEditingController();
   final _apellidosConductorController = TextEditingController();
-  final _dniDuenoController = TextEditingController();
-  final _nombresDuenoController = TextEditingController();
-  final _apellidosDuenoController = TextEditingController();
 
   // GPS y Evidencias
   bool _isLoadingLocation = false;
@@ -211,10 +207,10 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
       'dni_conductor': _dniConductorController.text.trim(),
       'nombres_conductor': _nombresConductorController.text.trim(),
       'apellidos_conductor': _apellidosConductorController.text.trim(),
-      'conductor_es_dueno': _conductorEsDueno,
-      'dni_dueño': _conductorEsDueno ? _dniConductorController.text.trim() : _dniDuenoController.text.trim(),
-      'nombres_dueño': _conductorEsDueno ? _nombresConductorController.text.trim() : _nombresDuenoController.text.trim(),
-      'apellidos_dueño': _conductorEsDueno ? _apellidosConductorController.text.trim() : _apellidosDuenoController.text.trim(),
+      'conductor_es_dueno': false,
+      'dni_dueño': '',
+      'nombres_dueño': '',
+      'apellidos_dueño': '',
       'estado_placa': 'SIN_PLACA',
       'placa': null,
       'chasis': null,
@@ -257,9 +253,6 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
     _dniConductorController.dispose();
     _nombresConductorController.dispose();
     _apellidosConductorController.dispose();
-    _dniDuenoController.dispose();
-    _nombresDuenoController.dispose();
-    _apellidosDuenoController.dispose();
     super.dispose();
   }
 
@@ -297,38 +290,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             const SizedBox(height: 12),
             _buildTextField(_apellidosConductorController, 'Apellidos', Icons.person_outline, TextInputType.name),
 
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(12)),
-              child: SwitchListTile(
-                title: const Text('El dueño está conduciendo', style: TextStyle(fontWeight: FontWeight.bold)),
-                value: _conductorEsDueno,
-                activeColor: Colors.orange.shade700,
-                onChanged: (val) => setState(() => _conductorEsDueno = val),
-              ),
-            ),
-            
-            if (!_conductorEsDueno) ...[
-              const SizedBox(height: 16),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8.0),
-                child: Text('Datos del Propietario', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-              ),
-              _buildTextField(
-                _dniDuenoController, 
-                'N° de Documento del Propietario', 
-                Icons.badge, 
-                TextInputType.number, 
-                hasSearch: true, 
-                maxLength: 15,
-                onSearch: () => _searchPersona(_dniDuenoController, _nombresDuenoController, _apellidosDuenoController)
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(_nombresDuenoController, 'Nombres del Propietario', Icons.person, TextInputType.name),
-              const SizedBox(height: 12),
-              _buildTextField(_apellidosDuenoController, 'Apellidos del Propietario', Icons.person_outline, TextInputType.name),
-            ],
+
 
             const SizedBox(height: 24),
             const Padding(

@@ -365,18 +365,29 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                 );
               }
               
-              final expectedDocs = ['TARJETA_OPERATIVIDAD', 'SOAT', 'TARJETA_PROPIEDAD'];
+              final expectedDocs = ['TARJETA_OPERATIVIDAD', 'TARJETA_PROPIEDAD', 'SOAT', 'CERTICAV'];
               final List<dynamic> allDocs = List.from(_documents);
-              
+
+              if (_vehicleData?['certicav'] != null &&
+                  !allDocs.any((d) => (d['tipoDocumento'] ?? '').toString().toUpperCase() == 'CERTICAV')) {
+                final c = _vehicleData!['certicav'];
+                allDocs.add({
+                  'tipoDocumento': 'CERTICAV',
+                  'codigo': c['numeroSerieCerticav'] ?? c['numeroRegistro'],
+                  'estado': c['resultado'] ?? c['estado'] ?? 'VIGENTE',
+                  'fechaExpiracion': c['fecha'],
+                });
+              }
+
               for (var expected in expectedDocs) {
-                if (!allDocs.any((d) => d['tipoDocumento'] == expected)) {
+                if (!allDocs.any((d) => (d['tipoDocumento'] ?? '').toString().toUpperCase() == expected)) {
                   allDocs.add({
                     'tipoDocumento': expected,
                     'estado': 'NO REGISTRADO',
                   });
                 }
               }
-              
+
               return ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -449,6 +460,25 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
     );
   }
 
+  String _formatTipoDocumento(String? tipo) {
+    if (tipo == null) return 'Documento';
+    switch (tipo.toUpperCase().trim()) {
+      case 'TARJETA_OPERATIVIDAD':
+        return 'Tarjeta de Operatividad';
+      case 'TARJETA_PROPIEDAD':
+        return 'Tarjeta de Propiedad';
+      case 'SOAT':
+        return 'SOAT';
+      case 'CERTICAV':
+        return 'CERTICAV';
+      default:
+        return tipo.replaceAll('_', ' ').split(' ').map((w) {
+          if (w.isEmpty) return '';
+          return w[0].toUpperCase() + w.substring(1).toLowerCase();
+        }).join(' ');
+    }
+  }
+
   Widget _buildDocumentCard(Map<String, dynamic> doc) {
     bool isExpired = doc['estado'] != 'VIGENTE';
     bool isMissing = doc['estado'] == 'NO REGISTRADO';
@@ -489,7 +519,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    doc['tipoDocumento'] ?? 'Desconocido',
+                    _formatTipoDocumento(doc['tipoDocumento']),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -498,7 +528,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    isMissing ? 'Documento faltante en el padrón' : 'Vence: ${doc['fechaExpiracion'] ?? '-'}',
+                    isMissing
+                        ? 'Documento faltante en el padrón'
+                        : (doc['codigo'] != null && doc['codigo'].toString().trim().isNotEmpty
+                            ? 'N°: ${doc['codigo']} • Vence: ${doc['fechaExpiracion'] ?? '-'}'
+                            : 'Vence: ${doc['fechaExpiracion'] ?? '-'}'),
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
                 ],
@@ -511,7 +545,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                doc['estado'] ?? 'DESCONOCIDO',
+                (doc['estado'] ?? 'DESCONOCIDO').toString().replaceAll('_', ' '),
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
               ),
             ),

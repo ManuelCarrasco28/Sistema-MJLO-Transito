@@ -501,9 +501,7 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
         final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
         final placaForCheck = (data['vehiculoPlaca']?.toString() ?? data['placa_visual']?.toString() ?? '');
         final isSinPlaca = placaForCheck.isEmpty || placaForCheck.startsWith('SIN-PLACA') || placaForCheck == 'SIN PLACA' || placaForCheck == 'Sin placa';
-        final isSinConductor = (data['conductorNombre'] == null || data['conductorNombre'] == 'No identificado' || data['conductorDni'] == 'S/D');
-        final isSinDueno = (data['propietarioNombre'] == null || data['propietarioNombre'] == 'No Registrado' || data['propietarioDni'] == 'S/D');
-        final esSinIdentificar = isSinPlaca && isSinConductor && isSinDueno;
+        final esSinIdentificar = isSinPlaca;
         
         final tipoTextoVehiculo = isSinPlaca ? "Sin identificar" : (isFormal ? "Formal" : "Informal");
 
@@ -539,11 +537,13 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                   _buildDetailRow('Conductor:', '${data['conductorNombre']}$condDniText')
                 else
                   _buildDetailRow('Conductor:', 'No identificado'),
-                const SizedBox(height: 8),
-                if (data['propietarioNombre'] != null && data['propietarioNombre'].toString().trim().isNotEmpty)
-                  _buildDetailRow(isSinPlaca ? 'Supuesto Dueño:' : 'Dueño:', '${data['propietarioNombre']}$propDniText')
-                else if (!isSinPlaca)
-                  _buildDetailRow('Dueño:', 'No identificado'),
+                if (!isSinPlaca) ...[
+                  const SizedBox(height: 8),
+                  if (data['propietarioNombre'] != null && data['propietarioNombre'].toString().trim().isNotEmpty)
+                    _buildDetailRow('Dueño:', '${data['propietarioNombre']}$propDniText')
+                  else
+                    _buildDetailRow('Dueño:', 'No identificado'),
+                ],
                 const Divider(height: 24),
                 
                 if (!esReporte) ...[
@@ -577,20 +577,22 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                           children: fotosList.map((fotoInfo) {
                             final fotoUrl = fotoInfo is Map ? fotoInfo['foto'] : fotoInfo;
                             if (fotoUrl == null) return const SizedBox();
+                            final String urlStr = fotoUrl.toString();
+                            final String fullUrl = urlStr.startsWith('http') ? urlStr : '${ApiService.fileBaseUrl}/$urlStr';
                             return Padding(
                               padding: const EdgeInsets.only(right: 8.0),
                               child: Container(
                                 decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300)),
-                                child: fotoUrl.toString().startsWith('data:image')
+                                child: urlStr.startsWith('data:image')
                                     ? Image.memory(
-                                        base64Decode(fotoUrl.toString().split(',').last),
+                                        base64Decode(urlStr.split(',').last),
                                         height: 100,
                                         width: 100,
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) => const Text('Error al cargar'),
                                       )
                                     : Image.network(
-                                        fotoUrl.toString(),
+                                        fullUrl,
                                         height: 100,
                                         width: 100,
                                         fit: BoxFit.cover,

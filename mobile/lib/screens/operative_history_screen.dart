@@ -103,13 +103,19 @@ class OperativeHistoryScreen extends StatelessWidget {
       builder: (context) {
         final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
         
-        final placa = (data['vehiculoPlaca']?.toString() ?? data['placa_visual']?.toString() ?? '');
-        final isSinPlaca = placa.isEmpty || placa.startsWith('SIN-PLACA') || placa == 'SIN PLACA' || placa == 'Sin placa';
-        final isSinConductor = (data['conductorNombre'] == null || data['conductorNombre'] == 'No identificado' || data['conductorDni'] == 'S/D');
-        final isSinDueno = (data['propietarioNombre'] == null || data['propietarioNombre'] == 'No Registrado' || data['propietarioDni'] == 'S/D');
-        final esSinIdentificar = isSinPlaca && isSinConductor && isSinDueno;
+        final placaForCheck = (data['vehiculoPlaca']?.toString() ?? data['placa_visual']?.toString() ?? '');
+        final isSinPlaca = placaForCheck.isEmpty || placaForCheck.startsWith('SIN-PLACA') || placaForCheck == 'SIN PLACA' || placaForCheck == 'Sin placa';
+        final esSinIdentificar = isSinPlaca;
 
-        final tipoTextoVehiculo = esSinIdentificar ? "Sin identificar" : (isFormal ? "Formal" : "Informal");
+        final tipoTextoVehiculo = isSinPlaca ? "Sin identificar" : (isFormal ? "Formal" : "Informal");
+
+        final propDniText = (data['propietarioDni'] != null && data['propietarioDni'].toString().trim().isNotEmpty && data['propietarioDni'] != 'S/D')
+            ? '\nN° Doc: ${data['propietarioDni']}'
+            : '';
+            
+        final condDniText = (data['conductorDni'] != null && data['conductorDni'].toString().trim().isNotEmpty && data['conductorDni'] != 'S/D')
+            ? '\nN° Doc: ${data['conductorDni']}'
+            : '';
 
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -132,14 +138,16 @@ class OperativeHistoryScreen extends StatelessWidget {
                   _buildFormattedObservaciones('Obs. Conductor:', data['observacionesConductor']),
                 const Divider(height: 24),
                 if (data['conductorNombre'] != null && data['conductorNombre'].toString().trim().isNotEmpty)
-                  _buildDetailRow('Conductor:', '${data['conductorNombre']}\nN° Doc: ${data['conductorDni'] ?? 'S/D'}')
+                  _buildDetailRow('Conductor:', '${data['conductorNombre']}$condDniText')
                 else
                   _buildDetailRow('Conductor:', 'No identificado'),
-                const SizedBox(height: 8),
-                if (data['propietarioNombre'] != null && data['propietarioNombre'].toString().trim().isNotEmpty)
-                  _buildDetailRow('Dueño:', '${data['propietarioNombre']}\nN° Doc: ${data['propietarioDni'] ?? 'S/D'}')
-                else
-                  _buildDetailRow('Dueño:', 'No identificado'),
+                if (!isSinPlaca) ...[
+                  const SizedBox(height: 8),
+                  if (data['propietarioNombre'] != null && data['propietarioNombre'].toString().trim().isNotEmpty)
+                    _buildDetailRow('Dueño:', '${data['propietarioNombre']}$propDniText')
+                  else
+                    _buildDetailRow('Dueño:', 'No identificado'),
+                ],
                 const Divider(height: 24),
                 
                 if (!esReporte) ...[
@@ -192,20 +200,22 @@ class OperativeHistoryScreen extends StatelessWidget {
                           children: fotosList.map((fotoInfo) {
                             final fotoUrl = fotoInfo is Map ? fotoInfo['foto'] : fotoInfo;
                             if (fotoUrl == null) return const SizedBox();
+                            final String urlStr = fotoUrl.toString();
+                            final String fullUrl = urlStr.startsWith('http') ? urlStr : '${ApiService.fileBaseUrl}/$urlStr';
                             return Padding(
                               padding: const EdgeInsets.only(right: 8.0),
                               child: Container(
                                 decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300)),
-                                child: fotoUrl.toString().startsWith('data:image')
+                                child: urlStr.startsWith('data:image')
                                     ? Image.memory(
-                                        base64Decode(fotoUrl.toString().split(',').last),
+                                        base64Decode(urlStr.split(',').last),
                                         height: 100,
                                         width: 100,
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) => const Text('Error al cargar'),
                                       )
                                     : Image.network(
-                                        '${ApiService.fileBaseUrl}/$fotoUrl',
+                                        fullUrl,
                                         height: 100,
                                         width: 100,
                                         fit: BoxFit.cover,

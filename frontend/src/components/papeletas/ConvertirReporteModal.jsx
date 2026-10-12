@@ -70,7 +70,18 @@ export function ConvertirReporteModal({
                   <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">Vehículo</span><span className="font-semibold text-slate-700 dark:text-slate-300">{[reporteToConvert.vehiculo_marca, reporteToConvert.vehiculo_modelo, reporteToConvert.vehiculo_color].filter(Boolean).join(' / ')}</span></p>
                 )}
                 {reporteToConvert.propietarioNombre && reporteToConvert.propietarioNombre !== 'No Registrado' && (
-                  <p><span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">{reporteToConvert.tipoInfractor === 'FORMAL' ? 'Titular / Asociación' : 'Propietario'}</span><span className="font-semibold text-slate-700 dark:text-slate-300 leading-snug">{reporteToConvert.propietarioNombre} <br/><span className="text-xs text-slate-500 font-medium">DNI: {reporteToConvert.propietarioDni}</span></span></p>
+                  <p>
+                    <span className="text-slate-400 font-black text-[10px] tracking-wider uppercase block mb-0.5">{reporteToConvert.tipoInfractor === 'FORMAL' ? 'Titular / Asociación' : 'Propietario'}</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 leading-snug">
+                      {reporteToConvert.propietarioNombre}
+                      {reporteToConvert.propietarioDni && reporteToConvert.propietarioDni.toUpperCase() !== 'S/D' && (
+                        <>
+                          <br/>
+                          <span className="text-xs text-slate-500 font-medium">DNI: {reporteToConvert.propietarioDni}</span>
+                        </>
+                      )}
+                    </span>
+                  </p>
                 )}
               </div>
             </div>

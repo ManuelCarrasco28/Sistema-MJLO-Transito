@@ -1334,7 +1334,9 @@ export function Papeletas({ user }) {
                       </td>
                       <td className="px-3.5 py-3.5">
                         <p className="font-bold text-slate-800 dark:text-slate-100 text-xs">{p.propietarioNombre || 'No Registrado'}</p>
-                        <p className="font-mono text-xs text-slate-400">DNI: {p.propietarioDni || 'S/D'}</p>
+                        {p.propietarioDni && p.propietarioDni.toUpperCase() !== 'S/D' ? (
+                          <p className="font-mono text-xs text-slate-400">DNI: {p.propietarioDni}</p>
+                        ) : null}
                       </td>
                       <td className="px-3.5 py-3.5">
                         <p className="font-bold text-slate-800 dark:text-slate-100 text-xs">{p.conductorNombre || p.infractor || 'No Identificado'}</p>

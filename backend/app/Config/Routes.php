@@ -8,6 +8,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->options('(:any)', 'AuthController::options');
     $routes->post('login', 'AuthController::login');
     $routes->get('status', 'StatusController::index');
+    $routes->get('files/(:segment)/(:segment)', 'FilesController::ver/$1/$2');
 
     // Eliminaciones: solo personal de oficina. El frontend ya oculta estas acciones al rol
     // Trabajador y la app móvil no elimina registros; aquí se exige también en el servidor.
@@ -127,7 +128,6 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('mobile/dashboard', 'MunicipalidadController::mobileDashboard');
         $routes->get('mobile/vehiculos/buscar', 'VehiculosController::buscarMobile');
         $routes->get('papeletas/(:segment)/fotos', 'PapeletasController::fotos/$1');
-        $routes->get('files/(:segment)/(:segment)', 'FilesController::ver/$1/$2');
 
         $routes->get('pide/reniec/(:segment)', 'PideController::reniec/$1');
         $routes->get('pide/oficinas-registrales', 'PideController::oficinasRegistrales');
@@ -147,6 +147,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('municipalidad/config', 'MunicipalidadController::config');
         $routes->get('reportes-intervencion', 'ReportesIntervencionController::index');
         $routes->post('reportes-intervencion', 'ReportesIntervencionController::create');
+        $routes->get('reportes-intervencion/(:segment)/fotos', 'ReportesIntervencionController::fotos/$1');
     });
 
     // Rutas de exportación y reportes sensibles: restringidas a personal de oficina autorizado

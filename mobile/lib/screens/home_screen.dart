@@ -412,6 +412,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  String _formatHora12(dynamic timeVal) {
+    if (timeVal == null) return '--:--';
+    final str = timeVal.toString().trim();
+    if (str.isEmpty || str == '-') return '--:--';
+    final parts = str.split(':');
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null && minute != null) {
+        final period = hour >= 12 ? 'PM' : 'AM';
+        final h12 = hour % 12 == 0 ? 12 : hour % 12;
+        final hStr = h12.toString().padLeft(2, '0');
+        final mStr = minute.toString().padLeft(2, '0');
+        return '$hStr:$mStr $period';
+      }
+    }
+    return str;
+  }
+
+  String _formatFecha(dynamic dateVal) {
+    if (dateVal == null) return '-';
+    final str = dateVal.toString().trim();
+    if (str.isEmpty || str == '-') return '-';
+    final parts = str.split('T')[0].split('-');
+    if (parts.length == 3 && parts[0].length == 4) {
+      return '${parts[2]}/${parts[1]}/${parts[0]}';
+    }
+    return str;
+  }
+
   void _showOperativoInfoDialog() {
     final op = _operativoActivo!;
     showDialog(
@@ -436,7 +466,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _buildDialogRow(
               Icons.event,
               'Fecha y Hora',
-              '${op['fecha']}\nInicio: ${op['hora_inicio'] ?? '-'} | Fin: ${op['hora_fin'] ?? '--:--'}',
+              '${_formatFecha(op['fecha'])}\nInicio: ${_formatHora12(op['hora_inicio'])} | Fin: ${_formatHora12(op['hora_fin'])}',
             ),
             const SizedBox(height: 12),
             _buildDialogRow(

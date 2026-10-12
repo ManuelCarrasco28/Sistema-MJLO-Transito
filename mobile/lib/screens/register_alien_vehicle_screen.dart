@@ -70,39 +70,6 @@ class _RegisterAlienVehicleScreenState
     }
   }
 
-  Future<void> _searchPersona(
-    TextEditingController dniCtrl,
-    TextEditingController nomCtrl,
-    TextEditingController apeCtrl,
-  ) async {
-    final dni = dniCtrl.text.trim();
-    if (dni.isEmpty) {
-      _showError('Ingrese un documento para buscar');
-      return;
-    }
-    setState(() => _isSearching = true);
-    try {
-      final persona = await ApiService.getPersonaByDni(dni);
-      if (persona != null) {
-        setState(() {
-          nomCtrl.text = persona['nombres'] ?? '';
-          apeCtrl.text =
-              '${persona['apellidoPaterno'] ?? ''} ${persona['apellidoMaterno'] ?? ''}'
-                  .trim();
-        });
-      } else {
-        _showError('Documento no encontrado. Ingrese datos manualmente.');
-        setState(() {
-          nomCtrl.text = '';
-          apeCtrl.text = '';
-        });
-      }
-    } catch (e) {
-      _showError('Error al buscar: $e');
-    } finally {
-      if (mounted) setState(() => _isSearching = false);
-    }
-  }
 
   Future<void> _searchVehiculo() async {
     final placa = _placaController.text.trim();
@@ -270,9 +237,9 @@ class _RegisterAlienVehicleScreenState
               .trim(),
 
       'dueño_es_conductor': false,
-      'dni_dueño': _duenioDniController.text,
-      'nombres_dueño': _duenioNombresController.text,
-      'apellidos_dueño': _duenioApellidosController.text,
+      'dni_dueño': _estadoPlaca == 'SIN_PLACA' ? '' : _duenioDniController.text,
+      'nombres_dueño': _estadoPlaca == 'SIN_PLACA' ? '' : _duenioNombresController.text,
+      'apellidos_dueño': _estadoPlaca == 'SIN_PLACA' ? '' : _duenioApellidosController.text,
 
       'estado_placa': _estadoPlaca,
       'placa': _estadoPlaca == 'CON_PLACA'
@@ -492,45 +459,7 @@ class _RegisterAlienVehicleScreenState
               ),
             ],
 
-            if (_estadoPlaca == 'SIN_PLACA') ...[
-              const SizedBox(height: 24),
-              const Text(
-                '3. Datos del Supuesto Propietario',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E3A8A),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                _duenioDniController,
-                'N° de Documento del Propietario',
-                Icons.badge,
-                TextInputType.number,
-                hasSearch: true,
-                onSearch: () => _searchPersona(
-                  _duenioDniController,
-                  _duenioNombresController,
-                  _duenioApellidosController,
-                ),
-                maxLength: 15,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                _duenioNombresController,
-                'Nombres del Propietario',
-                Icons.person,
-                TextInputType.text,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                _duenioApellidosController,
-                'Apellidos del Propietario',
-                Icons.person_outline,
-                TextInputType.text,
-              ),
-            ],
+
 
             const SizedBox(height: 16),
             const Padding(
@@ -891,7 +820,28 @@ class _RegisterAlienVehicleScreenState
     final isFormal = _vehiculoData?['asociacion'] != null;
     final estadoTexto = isFormal ? 'FORMAL' : 'INFORMAL';
     final estadoColor = isFormal ? Colors.blueAccent : Colors.redAccent;
-    final List<dynamic> documentos = _vehiculoData?['documentosVehiculo'] ?? [];
+    final expectedDocs = ['TARJETA_OPERATIVIDAD', 'TARJETA_PROPIEDAD', 'SOAT', 'CERTICAV'];
+    final List<dynamic> allDocs = List.from(_vehiculoData?['documentosVehiculo'] ?? _vehiculoData?['documentos'] ?? []);
+
+    if (_vehiculoData?['certicav'] != null &&
+        !allDocs.any((d) => (d['tipoDocumento'] ?? '').toString().toUpperCase() == 'CERTICAV')) {
+      final c = _vehiculoData!['certicav'];
+      allDocs.add({
+        'tipoDocumento': 'CERTICAV',
+        'numero': c['numeroSerieCerticav'] ?? c['numeroRegistro'],
+        'estado': c['resultado'] ?? c['estado'] ?? 'VIGENTE',
+        'fechaExpiracion': c['fecha'],
+      });
+    }
+
+    for (var expected in expectedDocs) {
+      if (!allDocs.any((d) => (d['tipoDocumento'] ?? '').toString().toUpperCase() == expected)) {
+        allDocs.add({
+          'tipoDocumento': expected,
+          'estado': 'NO REGISTRADO',
+        });
+      }
+    }
 
     return Card(
       color: const Color(0xFF0F172A),
@@ -972,16 +922,39 @@ class _RegisterAlienVehicleScreenState
               ),
             _buildSummaryRow(
               'MARCA',
-              _marcaController.text,
+              _marcaController.text.isNotEmpty ? _marcaController.text : (_vehiculoData?['marca'] ?? '-'),
               'CLASE',
-              _claseController.text,
+              _claseController.text.isNotEmpty ? _claseController.text : (_vehiculoData?['modelo'] ?? _vehiculoData?['tipo'] ?? '-'),
             ),
             const SizedBox(height: 12),
             _buildSummaryRow(
               'COLOR',
-              _colorController.text,
-              'CHASIS',
-              _chasisController.text,
+              _colorController.text.isNotEmpty ? _colorController.text : (_vehiculoData?['color'] ?? '-'),
+              'AÑO FABRICACIÓN',
+              (_vehiculoData?['anio'] ?? _vehiculoData?['ano_fabricacion'] ?? _vehiculoData?['anio_fabricacion'] ?? '-').toString(),
+            ),
+            const SizedBox(height: 12),
+            _buildSummaryRow(
+              'CATEGORÍA',
+              (_vehiculoData?['categoria'] ?? '-').toString(),
+              'CARROCERÍA',
+              (_vehiculoData?['carroceria'] ?? '-').toString(),
+            ),
+            const SizedBox(height: 12),
+            _buildSummaryRow(
+              'TIPO DE CARROCERÍA',
+              (_vehiculoData?['tipoCarroceria'] ?? _vehiculoData?['tipo_carroceria'] ?? '-').toString(),
+              'SEDE DE REGISTRO',
+              (_vehiculoData?['sedeRegistro'] ?? _vehiculoData?['sede'] ?? '-').toString(),
+            ),
+            const SizedBox(height: 12),
+            _buildSummaryRow(
+              'CHASIS (N° SERIE)',
+              _chasisController.text.isNotEmpty
+                  ? _chasisController.text
+                  : (_vehiculoData?['numeroSerie'] ?? _vehiculoData?['serie'] ?? '-').toString(),
+              'SERIE DEL MOTOR',
+              (_vehiculoData?['serieMotor'] ?? _vehiculoData?['numeroMotor'] ?? _vehiculoData?['nro_motor'] ?? '-').toString(),
             ),
             const Divider(color: Colors.white24, height: 24),
             const Text(
@@ -999,81 +972,105 @@ class _RegisterAlienVehicleScreenState
                 fontSize: 15,
               ),
             ),
-            if (_duenioDniController.text.isNotEmpty) ...[
+            if (_duenioDniController.text.trim().isNotEmpty &&
+                _duenioDniController.text.trim() != 'S/D' &&
+                !_duenioDniController.text.trim().startsWith('S/D')) ...[
               const SizedBox(height: 4),
               Text(
                 'N° Doc/RUC: ${_duenioDniController.text}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
             ],
-
-            if (isFormal) ...[
-              const Divider(color: Colors.white24, height: 24),
-              const Text(
-                'DOCUMENTOS REGISTRADOS',
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
+            const Divider(color: Colors.white24, height: 24),
+            const Text(
+              'ASOCIACIÓN DEL VEHÍCULO',
+              style: TextStyle(color: Colors.white54, fontSize: 11),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isFormal
+                  ? (_vehiculoData?['asociacion'] ?? 'Vehículo Formal')
+                  : 'Sin Asociación (Vehículo Informal)',
+              style: TextStyle(
+                color: isFormal ? Colors.cyanAccent : Colors.white70,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
               ),
-              const SizedBox(height: 8),
-              if (documentos.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 6.0),
-                  child: Text(
-                    'No se encontraron documentos vigentes en el sistema',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
+            ),
+
+            const Divider(color: Colors.white24, height: 24),
+            const Text(
+              'ESTADO DE DOCUMENTOS',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...allDocs.map((doc) {
+              final String estado = (doc['estado'] ?? '').toString().toUpperCase();
+              final bool isVigente = estado == 'VIGENTE';
+              final bool isNoRegistrado = estado == 'NO REGISTRADO' || estado == 'SIN REGISTRO';
+              final docColor = isVigente
+                  ? Colors.greenAccent
+                  : (isNoRegistrado ? Colors.orangeAccent : Colors.redAccent);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      isVigente
+                          ? Icons.verified
+                          : (isNoRegistrado ? Icons.help_outline : Icons.warning_amber_rounded),
+                      color: docColor,
+                      size: 16,
                     ),
-                  ),
-                ),
-              if (documentos.isNotEmpty)
-                ...documentos.map((doc) {
-                final bool isVigente = doc['estado'] == 'VIGENTE';
-                final docColor = isVigente
-                    ? Colors.greenAccent
-                    : Colors.redAccent;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6.0),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isVigente
-                            ? Icons.verified
-                            : Icons.warning_amber_rounded,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${_formatTipoDocumento(doc['tipoDocumento'])}${doc['numero'] != null && doc['numero'] != 'null' ? ' - ${doc['numero']}' : (doc['codigo'] != null && doc['codigo'] != 'null' ? ' - ${doc['codigo']}' : '')}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      estado.replaceAll('_', ' '),
+                      style: TextStyle(
                         color: docColor,
-                        size: 16,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${doc['tipoDocumento']}${doc['numero'] != null && doc['numero'] != 'null' ? ' - ${doc['numero']}' : ''}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        doc['estado'] ?? '',
-                        style: TextStyle(
-                          color: docColor,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),
     );
+  }
+
+  String _formatTipoDocumento(String? tipo) {
+    if (tipo == null) return 'Documento';
+    switch (tipo.toUpperCase().trim()) {
+      case 'TARJETA_OPERATIVIDAD':
+        return 'Tarjeta de Operatividad';
+      case 'TARJETA_PROPIEDAD':
+        return 'Tarjeta de Propiedad';
+      case 'SOAT':
+        return 'SOAT';
+      case 'CERTICAV':
+        return 'CERTICAV';
+      default:
+        return tipo.replaceAll('_', ' ').split(' ').map((w) {
+          if (w.isEmpty) return '';
+          return w[0].toUpperCase() + w.substring(1).toLowerCase();
+        }).join(' ');
+    }
   }
 
   Widget _buildSummaryRow(

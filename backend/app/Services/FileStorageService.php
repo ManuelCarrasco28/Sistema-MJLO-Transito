@@ -103,6 +103,13 @@ class FileStorageService
             return $ruta;
         }
 
+        $request = \Config\Services::request();
+        $host = $request->getServer('HTTP_HOST');
+        if (!empty($host)) {
+            $scheme = ($request->getServer('HTTPS') === 'on' || (int)$request->getServer('SERVER_PORT') === 443) ? 'https' : 'http';
+            return "{$scheme}://{$host}/api/files/" . ltrim($ruta, '/');
+        }
+
         return rtrim(base_url('api/files'), '/') . '/' . ltrim($ruta, '/');
     }
 }
