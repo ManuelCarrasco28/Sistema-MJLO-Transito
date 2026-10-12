@@ -481,6 +481,7 @@ class ReportesIntervencionController extends ResourceController
                 'id_vehiculo' => $vehiculoId,
                 'id_persona_infractor' => $personaId,
                 'id_inspector' => (int)$reporte['id_inspector'],
+                'id_operativo' => !empty($reporte['id_operativo']) ? (int)$reporte['id_operativo'] : null,
                 'fecha_hora' => $reporte['fecha_hora'],
                 'lugar' => $reporte['lugar'],
                 'nombre_autoridad' => $nombreAutoridad,

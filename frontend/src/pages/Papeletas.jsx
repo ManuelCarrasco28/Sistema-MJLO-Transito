@@ -349,7 +349,7 @@ export function Papeletas({ user }) {
           : 'bg-slate-100 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
         }`}>
         <span className="size-1 rounded-full bg-current" />
-        {isOperativo ? 'OPERATIVO' : 'RUTINA'}
+        {isOperativo ? (p.operativoNombre ? `OPERATIVO: ${p.operativoNombre}` : 'OPERATIVO') : 'RUTINA'}
       </span>
     )
   }
