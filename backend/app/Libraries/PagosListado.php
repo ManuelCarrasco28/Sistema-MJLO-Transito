@@ -13,7 +13,12 @@ final class PagosListado
     public static function builder($db)
     {
         // Los SELECT son constantes; los FROM/JOIN/WHERE se construyen por separado.
-        $selects = array_map(static fn($sql) => substr(explode("\nFROM ", $sql, 2)[0], 7), explode("\nUNION ALL\n", self::sql()));
+        $sqlNormalizado = str_replace("\r\n", "\n", self::sql());
+        $partes = explode("\nUNION ALL\n", $sqlNormalizado);
+        $selects = array_map(static function ($sql) {
+            $trozos = explode("\nFROM ", $sql, 2);
+            return preg_replace('/^\s*SELECT\s+/i', '', trim($trozos[0]));
+        }, $partes);
         $recibos = $db->table('pagos_transito pt')->select($selects[0], false)->where(self::condicionReciboVisible(), null, false);
         $retenidos = $db->table('ordenes_internamiento oi')->select($selects[1], false)->where('oi.estado', 'RETENIDO');
         $liberados = $db->table('ordenes_libertad ol')->select($selects[2], false);
