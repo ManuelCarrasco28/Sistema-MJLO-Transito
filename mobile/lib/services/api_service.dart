@@ -43,6 +43,7 @@ class ApiService {
   static const _keyHistorialUsuarios = 'historial_usuarios_login';
   static const _keyRecordarUsuario = 'recordar_usuario_activo';
   static const _keyUsuarioRecordado = 'usuario_recordado_login';
+  static const _keyPasswordRecordado = 'password_recordado_login';
 
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
@@ -61,13 +62,16 @@ class ApiService {
   static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api/?$'), '');
   static const Duration _requestTimeout = Duration(seconds: 20);
 
-  // --- GESTIÓN SEGURA Y PROFESIONAL DE USUARIOS Y LOGIN ---
+  // --- GESTIÓN DE USUARIOS Y RECORDAR SESIÓN ---
   /// Registra el inicio de sesión exitoso.
-  /// - Guarda el usuario en el historial de cuentas válidas (sin importar el estado del checkbox).
-  /// - Si recordar == true, almacena este usuario como predeterminado para el próximo inicio.
-  /// - Si recordar == false, borra el usuario predeterminado pero conserva el historial de cuentas.
-  /// - NUNCA se guardan contraseñas.
-  static Future<void> registrarLoginExitoso(String username, bool recordar) async {
+  /// - Guarda el usuario en el historial de cuentas válidas.
+  /// - Si recordar == true, almacena usuario y contraseña para autocompletar en el próximo inicio.
+  /// - Si recordar == false, borra los datos guardados de autocompletado pero conserva el historial de cuentas.
+  static Future<void> registrarLoginExitoso(
+    String username,
+    String password,
+    bool recordar,
+  ) async {
     final clean = username.trim();
     if (clean.isEmpty) return;
 
@@ -82,34 +86,43 @@ class ApiService {
     }
     await prefs.setStringList(_keyHistorialUsuarios, historial);
 
-    // 2. Opción "Recordar mi usuario"
+    // 2. Opción "Recordar mi usuario y contraseña"
     await prefs.setBool(_keyRecordarUsuario, recordar);
     if (recordar) {
       await prefs.setString(_keyUsuarioRecordado, clean);
+      await prefs.setString(_keyPasswordRecordado, password);
       try {
         await _secureStorage.write(key: _savedUsernameKey, value: clean);
+        await _secureStorage.write(key: _savedPasswordKey, value: password);
       } catch (_) {}
     } else {
       await prefs.remove(_keyUsuarioRecordado);
+      await prefs.remove(_keyPasswordRecordado);
       try {
         await _secureStorage.delete(key: _savedUsernameKey);
+        await _secureStorage.delete(key: _savedPasswordKey);
       } catch (_) {}
     }
-    try {
-      await _secureStorage.delete(key: _savedPasswordKey);
-    } catch (_) {}
   }
 
-  /// Obtiene la configuración de login (si recordar está activo, el usuario guardado y el historial)
+  /// Obtiene la configuración de login (si recordar está activo, el usuario guardado, contraseña y el historial)
   static Future<Map<String, dynamic>> obtenerConfiguracionLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final bool recordar = prefs.getBool(_keyRecordarUsuario) ?? false;
     String? usuario = prefs.getString(_keyUsuarioRecordado);
+    String? password = prefs.getString(_keyPasswordRecordado);
 
-    if (recordar && (usuario == null || usuario.isEmpty)) {
-      try {
-        usuario = await _secureStorage.read(key: _savedUsernameKey);
-      } catch (_) {}
+    if (recordar) {
+      if (usuario == null || usuario.isEmpty) {
+        try {
+          usuario = await _secureStorage.read(key: _savedUsernameKey);
+        } catch (_) {}
+      }
+      if (password == null || password.isEmpty) {
+        try {
+          password = await _secureStorage.read(key: _savedPasswordKey);
+        } catch (_) {}
+      }
     }
 
     final List<String> historial = prefs.getStringList(_keyHistorialUsuarios) ?? [];
@@ -117,6 +130,7 @@ class ApiService {
     return {
       'recordar': recordar,
       'usuario': (recordar && usuario != null && usuario.isNotEmpty) ? usuario : null,
+      'password': (recordar && password != null && password.isNotEmpty) ? password : null,
       'historial': historial,
     };
   }
@@ -132,22 +146,27 @@ class ApiService {
     final usuarioRecordado = prefs.getString(_keyUsuarioRecordado);
     if (usuarioRecordado != null && usuarioRecordado.trim().toLowerCase() == clean.toLowerCase()) {
       await prefs.remove(_keyUsuarioRecordado);
+      await prefs.remove(_keyPasswordRecordado);
       await prefs.setBool(_keyRecordarUsuario, false);
       try {
         await _secureStorage.delete(key: _savedUsernameKey);
+        await _secureStorage.delete(key: _savedPasswordKey);
       } catch (_) {}
     }
   }
 
   // Métodos de compatibilidad
   static Future<void> saveSavedCredentials(String username, String password) async {
-    await registrarLoginExitoso(username, true);
+    await registrarLoginExitoso(username, password, true);
   }
 
   static Future<Map<String, String>?> getSavedCredentials() async {
     final conf = await obtenerConfiguracionLogin();
     if (conf['recordar'] == true && conf['usuario'] != null) {
-      return {'username': conf['usuario'] as String, 'password': ''};
+      return {
+        'username': conf['usuario'] as String,
+        'password': (conf['password'] as String?) ?? '',
+      };
     }
     return null;
   }
@@ -156,6 +175,7 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyRecordarUsuario, false);
     await prefs.remove(_keyUsuarioRecordado);
+    await prefs.remove(_keyPasswordRecordado);
     try {
       await _secureStorage.delete(key: _savedUsernameKey);
       await _secureStorage.delete(key: _savedPasswordKey);

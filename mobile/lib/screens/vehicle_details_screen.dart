@@ -286,7 +286,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                       const SizedBox(height: 8),
                       _buildErrorTip(
                         Icons.fact_check_outlined,
-                        'Si la unidad no cuenta con placa o está ilegible, use la opción "Registrar sin placa".',
+                        'Si la unidad no cuenta con placa o está ilegible, use la opción "Registrar Veh./Pers. sin ident.".',
                       ),
                     ],
                   ),

@@ -19,6 +19,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _recordarUsuario = false;
   List<String> _historialUsuarios = [];
+  String? _usuarioGuardado;
+  String? _passwordGuardado;
 
   @override
   void initState() {
@@ -32,9 +34,13 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() {
           _recordarUsuario = config['recordar'] as bool;
-          final guardado = config['usuario'] as String?;
-          if (_recordarUsuario && guardado != null && guardado.isNotEmpty) {
-            _usuarioController.text = guardado;
+          _usuarioGuardado = config['usuario'] as String?;
+          _passwordGuardado = config['password'] as String?;
+          if (_recordarUsuario && _usuarioGuardado != null && _usuarioGuardado!.isNotEmpty) {
+            _usuarioController.text = _usuarioGuardado!;
+            if (_passwordGuardado != null && _passwordGuardado!.isNotEmpty) {
+              _passwordController.text = _passwordGuardado!;
+            }
           }
           _historialUsuarios = List<String>.from(config['historial'] ?? []);
         });
@@ -45,8 +51,17 @@ class _LoginScreenState extends State<LoginScreen> {
   void _seleccionarUsuario(String user) {
     setState(() {
       _usuarioController.text = user;
+      if (_recordarUsuario &&
+          _usuarioGuardado != null &&
+          user.trim().toLowerCase() == _usuarioGuardado!.trim().toLowerCase() &&
+          _passwordGuardado != null &&
+          _passwordGuardado!.isNotEmpty) {
+        _passwordController.text = _passwordGuardado!;
+      }
     });
-    _passwordFocusNode.requestFocus();
+    if (_passwordController.text.isEmpty) {
+      _passwordFocusNode.requestFocus();
+    }
   }
 
   Future<void> _eliminarDeHistorial(String user) async {
@@ -106,25 +121,27 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Cuentas Recientes',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryBlue,
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cuentas Recientes',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryBlue,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'Usuarios validados previamente en este dispositivo',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
+                              Text(
+                                'Usuarios validados previamente en este dispositivo',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -215,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await ApiService.login(usuario, password);
 
       // SOLO guardamos en historial y actualizamos recordar si la autenticación fue exitosa
-      await ApiService.registrarLoginExitoso(usuario, _recordarUsuario);
+      await ApiService.registrarLoginExitoso(usuario, password, _recordarUsuario);
 
       if (mounted) {
         Navigator.pushReplacement(
