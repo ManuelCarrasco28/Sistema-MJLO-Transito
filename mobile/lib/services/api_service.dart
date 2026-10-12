@@ -48,7 +48,7 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://192.168.18.28:8080/api'; // Cambiado a IP local para celular físico
+  static const String _defaultUrl = 'http://10.24.31.109:8080/api'; // Cambiado a IP local para celular físico
   // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
   static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
   static const String _configuredUrl = String.fromEnvironment(
