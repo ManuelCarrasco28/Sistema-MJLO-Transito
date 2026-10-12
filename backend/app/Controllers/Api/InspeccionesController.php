@@ -118,6 +118,12 @@ class InspeccionesController extends ResourceController
         try {
             $builder = $this->consultaInspeccion($db)
                 ->where('i.estado !=', 'ANULADA');
+            $historial = strtoupper((string) $this->request->getGet('historial'));
+            if ($historial === 'ACTUALES') {
+                $builder->where($this->esActualSql(), null, false);
+            } elseif ($historial === 'HISTORICAS') {
+                $builder->where('NOT (' . $this->esActualSql() . ')', null, false);
+            }
 
             $buscar = trim((string)$this->request->getGet('buscar'));
             if ($buscar !== '') {
@@ -139,16 +145,17 @@ class InspeccionesController extends ResourceController
                 $builder->where('i.resultado', $resultado);
             }
 
-            // Vigencia del certificado (6 meses desde la fecha de inspección; solo aplica a los aprobados)
+            // Vigencia del certificado: 6 meses desde la inspección (o desde la segunda evaluación si se aprobó en ella)
             $vigencia = strtoupper(trim((string)$this->request->getGet('vigencia')));
+            $baseVigencia = "CASE WHEN i.resultado = 'APROBADO' AND i.segunda_evaluacion = 'APROBADO' AND i.fecha_segunda_evaluacion IS NOT NULL THEN i.fecha_segunda_evaluacion ELSE i.fecha END";
             if ($vigencia === 'VIGENTE') {
-                $builder->where('i.resultado', 'APROBADO')->where('DATE_ADD(i.fecha, INTERVAL 6 MONTH) >= CURDATE()', null, false);
+                $builder->where('i.resultado', 'APROBADO')->where("DATE_ADD($baseVigencia, INTERVAL 6 MONTH) >= CURDATE()", null, false);
             } elseif ($vigencia === 'POR_VENCER') {
                 $builder->where('i.resultado', 'APROBADO')
-                    ->where('DATE_ADD(i.fecha, INTERVAL 6 MONTH) >= CURDATE()', null, false)
-                    ->where('DATE_ADD(i.fecha, INTERVAL 6 MONTH) <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)', null, false);
+                    ->where("DATE_ADD($baseVigencia, INTERVAL 6 MONTH) >= CURDATE()", null, false)
+                    ->where("DATE_ADD($baseVigencia, INTERVAL 6 MONTH) <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)", null, false);
             } elseif ($vigencia === 'VENCIDO') {
-                $builder->where('i.resultado', 'APROBADO')->where('DATE_ADD(i.fecha, INTERVAL 6 MONTH) < CURDATE()', null, false);
+                $builder->where('i.resultado', 'APROBADO')->where("DATE_ADD($baseVigencia, INTERVAL 6 MONTH) < CURDATE()", null, false);
             }
 
             $page = (int)$this->request->getGet('page');
@@ -255,13 +262,32 @@ class InspeccionesController extends ResourceController
         $resultado = trim($input['resultado'] ?? 'APROBADO');
         $observaciones = trim($input['observaciones'] ?? '');
         $detalles = $input['detalles'] ?? [];
+        $conductorDniEntrada = trim((string)($input['conductorDni'] ?? ''));
+        if ($conductorDniEntrada !== '' && !preg_match('/^[A-Za-z0-9]{8,15}$/', $conductorDniEntrada)) {
+            return $this->failValidationErrors('El documento del conductor no es válido (8 a 15 letras o números).');
+        }
+        if (mb_strlen($observaciones) > 500) {
+            return $this->failValidationErrors('Las observaciones no pueden superar los 500 caracteres.');
+        }
 
+        $candado = false;
+        $candadoPersona = false;
         try {
             $vehiculo = $placa !== '' ? $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray() : null;
             if (!$vehiculo) {
                 throw new \DomainException("La placa {$placa} no está registrada en el padrón vehicular. Regístrela primero en Vehículos.");
             }
             $vehiculoId = (int)$vehiculo['id'];
+
+            // Un solo registro a la vez: los correlativos se calculan con MAX()+1 y se validan antes de insertar
+            $candado = (int)($db->query("SELECT GET_LOCK('mjlo_certicav', 10) AS l")->getRowArray()['l'] ?? 0) === 1;
+            if (!$candado) {
+                throw new \DomainException('El sistema está registrando otra inspección. Intente de nuevo en unos segundos.');
+            }
+            // Si el conductor no existe se crea: se serializa con el resto de altas de personas (mismo candado que Personas)
+            \App\Services\CandadoPersona::adquirir($db);
+            $candadoPersona = true;
+            $db->transException(true)->transBegin();
 
             // Actualizar datos técnicos del vehículo si se ingresaron en la inspección
             $vehUpdate = [];
@@ -283,8 +309,6 @@ class InspeccionesController extends ResourceController
             $numeroSerieCerticav = trim((string)($input['numeroSerieCerticav'] ?? ''));
             $this->validarCorrelativos($db, $numeroInspeccion, $numeroSerieCerticav);
 
-            $db->transException(true)->transBegin();
-
             if ($numeroInspeccion === '') {
                 $numeroInspeccion = $this->siguienteNumeroRegistro($db, substr($fecha, 0, 4));
             }
@@ -298,7 +322,7 @@ class InspeccionesController extends ResourceController
             $conductorLicencia = trim($input['conductorLicencia'] ?? '');
             $conductorId = $this->resolverConductor($db, $conductorNombre, $conductorDni, $conductorLicencia);
 
-            $fechaVencimiento = date('Y-m-d', strtotime('+6 months', strtotime($fecha)));
+            $fechaVencimiento = \App\Libraries\VigenciaCertificado::vencimiento($fecha);
             $hoy = date('Y-m-d');
 
             $inspData = [
@@ -354,8 +378,6 @@ class InspeccionesController extends ResourceController
                 return $this->failServerError('Error guardando inspección técnica.');
             }
 
-
-            $db->transCommit();
             return $this->respondCreated([
                 'status' => true,
                 'message' => 'Inspección registrada con éxito',
@@ -388,7 +410,15 @@ class InspeccionesController extends ResourceController
             return $this->failValidationErrors($e->getMessage());
         } catch (\Exception $e) {
             $db->transRollback();
+            log_message('error', '{exception}', ['exception' => $e]);
             return $this->failServerError('Error creando la inspección.');
+        } finally {
+            if ($candadoPersona) {
+                \App\Services\CandadoPersona::liberar($db);
+            }
+            if ($candado) {
+                $db->query("SELECT RELEASE_LOCK('mjlo_certicav')");
+            }
         }
     }
 
@@ -537,6 +567,7 @@ class InspeccionesController extends ResourceController
                 return $this->failNotFound('Inspección técnica no encontrada.');
             }
             $db->table('certicav')->where('id', $id)->update(['estado' => 'ANULADA']);
+            \App\Services\AuditoriaService::registrar('INSPECCIONES', 'ANULAR', 'Inspección técnica anulada (id ' . (int)$id . ')', ['id' => (int)$id]);
             return $this->respondDeleted(['status' => 200, 'message' => 'Inspección técnica anulada con éxito']);
         } catch (\Exception $e) {
             return $this->failServerError('Error anulando inspección técnica.');
@@ -562,6 +593,14 @@ class InspeccionesController extends ResourceController
                 $db->table('ciudadanos')->where('id_persona', $conductorId)->update(['numero_licencia' => $licencia]);
             }
             return $conductorId;
+        }
+
+        $nombre = trim($nombre);
+        if (mb_strlen($nombre) < 3 || mb_strlen($nombre) > 150) {
+            throw new \DomainException('El conductor no está registrado: escriba su nombre completo (3 a 150 caracteres) para crearlo.');
+        }
+        if ($licencia !== '' && mb_strlen($licencia) > 20) {
+            throw new \DomainException('El número de licencia no puede superar los 20 caracteres.');
         }
 
         // Convención peruana: los dos últimos términos son los apellidos y el
@@ -604,10 +643,15 @@ class InspeccionesController extends ResourceController
      * Consulta base de CERTICAV con los datos de vehículo, conductor, propietario
      * y técnico. Compartida por index() y show() para evitar duplicar el SELECT/JOIN.
      */
+    private function esActualSql(): string
+    {
+        return "NOT EXISTS (SELECT 1 FROM certicav mas WHERE mas.id_vehiculo = i.id_vehiculo AND mas.estado != 'ANULADA' AND (mas.fecha > i.fecha OR (mas.fecha = i.fecha AND mas.id > i.id)))";
+    }
+
     private function consultaInspeccion($db)
     {
         return $db->table('certicav i')
-            ->select("i.uuid AS uuid, 
+            ->select("(" . $this->esActualSql() . ") AS esActual, i.uuid AS uuid,
                 i.id,
                 i.id_tecnico as tecnicoId,
                 i.id_conductor as conductorId,
@@ -620,6 +664,7 @@ class InspeccionesController extends ResourceController
                 COALESCE(pc.numero, '') as conductorDni,
                 COALESCE(cc.numero_licencia, '') as conductorLicencia,
                 v.placa as vehiculoPlaca,
+                v.id as vehiculoId,
                 COALESCE(v.marca, '') as vehiculoMarca,
                 COALESCE(v.modelo, '') as vehiculoModelo,
                 COALESCE(v.color, '') as vehiculoColor,
@@ -667,7 +712,7 @@ class InspeccionesController extends ResourceController
         $base = ($row['resultado'] === 'APROBADO' && ($row['segundaEvaluacion'] ?? '') === 'APROBADO' && !empty($row['fechaSegundaEvaluacion']))
             ? $row['fechaSegundaEvaluacion']
             : ($row['fecha'] ?: date('Y-m-d'));
-        $fechaVencimiento = date('Y-m-d', strtotime('+6 months', strtotime($base)));
+        $fechaVencimiento = \App\Libraries\VigenciaCertificado::vencimiento($base);
         $hoy = date('Y-m-d');
 
         $row['fechaVencimiento'] = $fechaVencimiento;
@@ -754,6 +799,7 @@ class InspeccionesController extends ResourceController
             if (!in_array($detalle['estado'] ?? '', ['BIEN','MAL_ESTADO','NO_TIENE'], true)) throw new \DomainException('Estado de revisión inválido.');
             $seen[$id] = true;
         }
+        if (count($seen) !== count($existentes)) throw new \DomainException('Debes evaluar todos los ítems del checklist.');
         return $detalles;
     }
 }

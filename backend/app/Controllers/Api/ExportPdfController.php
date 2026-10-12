@@ -23,7 +23,8 @@ class ExportPdfController extends ResourceController
     {
         $input = $this->request->getJSON(true) ?: [];
 
-        $filename = trim((string) ($input['filename'] ?? 'Reporte'));
+        // El nombre se corta a 100 caracteres: antes un nombre enorme llenaba la auditoría y el registro del servidor
+        $filename = mb_substr(trim((string) ($input['filename'] ?? 'Reporte')), 0, 100);
         $title = (string) ($input['title'] ?? 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ');
         $subtitle = (string) ($input['subtitle'] ?? 'Subgerencia de Tránsito y Transporte');
         $summaryItems = is_array($input['summaryItems'] ?? null) ? $input['summaryItems'] : [];
@@ -36,8 +37,8 @@ class ExportPdfController extends ResourceController
         }
 
         // Los PDF grandes necesitan más memoria y tiempo que una petición normal.
-        @ini_set('memory_limit', '2048M');
-        @set_time_limit(0);
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(120);
 
         // Nunca se recorta en silencio: si el reporte excede lo que el render soporta, se avisa.
         if (count($data) > self::MAXIMO_FILAS) {
@@ -123,8 +124,8 @@ class ExportPdfController extends ResourceController
 
         $headersHtml = '<th style="width: 28px; text-align: center;">N&deg;</th>';
         foreach ($columns as $col) {
-            $align = $col['align'] ?? 'left';
-            $width = isset($col['width']) ? 'width:' . (is_numeric($col['width']) ? $col['width'] . 'px' : $col['width']) . ';' : '';
+            $align = in_array($col['align'] ?? 'left', ['left', 'right', 'center'], true) ? $col['align'] : 'left';
+            $width = isset($col['width']) && is_numeric($col['width']) ? 'width:' . (int) $col['width'] . 'px;' : '';
             $headersHtml .= "<th style=\"text-align:{$align};{$width}\">{$this->e($col['header'] ?? '')}</th>";
         }
 
@@ -144,7 +145,7 @@ class ExportPdfController extends ResourceController
                 } else {
                     $val = $this->e((string) $val);
                 }
-                $align = $col['align'] ?? 'left';
+                $align = in_array($col['align'] ?? 'left', ['left', 'right', 'center'], true) ? $col['align'] : 'left';
                 $cells .= "<td style=\"text-align:{$align};\">{$val}</td>";
             }
             $filasBloque .= "<tr style=\"background-color:{$bg};\">{$cells}</tr>";

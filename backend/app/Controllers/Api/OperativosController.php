@@ -374,7 +374,7 @@ class OperativosController extends ResourceController
             'hora_fin' => $horaFin,
             'estado' => $estado,
             'observacion' => trim($input['observacion'] ?? ''),
-            'id_usuario_registra' => $input['id_usuario_registra'] ?? null,
+            'id_usuario_registra' => ((int) (\App\Libraries\Acceso::usuario()['id'] ?? 0)) ?: null,
         ]);
         $id = (int) $db->insertID();
 
@@ -555,6 +555,7 @@ class OperativosController extends ResourceController
         }
 
         $db->table('operativos')->where('id', $id)->delete();
+        \App\Services\AuditoriaService::registrar('OPERATIVOS', 'ELIMINAR', 'Operativo eliminado (id ' . (int)$id . ')', ['id' => (int)$id]);
         return $this->respondDeleted(['status' => true, 'message' => 'Operativo eliminado correctamente.']);
     }
 

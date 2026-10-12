@@ -146,6 +146,8 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 80,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
       if (photo != null) {
         setState(() {
@@ -232,6 +234,17 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   }
 
   Future<void> _submitTicket() async {
+    // Evita el doble toque: el botón se bloquea desde el primer instante, antes de consultar el permiso
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await _submitTicketInterno();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _submitTicketInterno() async {
     bool permisoActual = _permitePapeletaMovil == true;
     try {
       permisoActual = await ApiService.permiteAplicarPapeletaMovil();
@@ -240,6 +253,8 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       }
     } catch (_) {
       permisoActual = false;
+      // No se pudo confirmar el permiso: se avisa en vez de cambiar a "solo reporte" sin explicación
+      _showError('No se pudo verificar si puede aplicar papeletas. Se registrará como reporte de intervención.');
     }
 
     if (!permisoActual) {

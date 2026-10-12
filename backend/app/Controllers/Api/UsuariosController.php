@@ -344,6 +344,10 @@ class UsuariosController extends ResourceController
         }
 
         $esMismaCuenta = $actor && (int) ($actor['id'] ?? 0) === (int) $id;
+        if ($esMismaCuenta) {
+            // La contraseña propia se cambia desde "Mi perfil", donde se exige la contraseña actual
+            return $this->fail('Para cambiar su propia contraseña use "Mi perfil": allí se pide la contraseña actual.', 403);
+        }
         if ($actor && !$esMismaCuenta && $this->sinJerarquia($actor, $this->rolDeUsuario($db, $id))) {
             return $this->fail('No tiene jerarquía para restablecer la contraseña de esta cuenta.', 403);
         }

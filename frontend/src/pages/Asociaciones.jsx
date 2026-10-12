@@ -19,6 +19,7 @@ import { FloatingInput, FloatingSelect, FloatingTextarea, RoundedSelect } from '
 import { MapaCoordenadasPicker } from '../components/ui/MapaCoordenadasPicker'
 import { MapaInline, MapaPreviewModal } from '../components/ui/MapaVisualizador'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import { puedeEliminarRegistros } from '../config/roles'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -68,6 +69,15 @@ export function Asociaciones() {
   const [socioVehiculosFilter, setSocioVehiculosFilter] = useState('TODOS')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
+  const [isSearchingRuc, setIsSearchingRuc] = useState(false)
+  const rucRequestRef = useRef(null)
+  useEffect(() => {
+    if (!isModalOpen) {
+      rucRequestRef.current?.abort()
+      setIsSearchingRuc(false)
+    }
+    return () => rucRequestRef.current?.abort()
+  }, [isModalOpen])
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedOrg, setSelectedOrg] = useState(null)
@@ -133,6 +143,38 @@ export function Asociaciones() {
   }
 
   const [formData, setFormData] = useState(emptyForm)
+
+  const buscarRuc = async () => {
+    const ruc = formData.ruc.trim()
+    if (!/^\d{11}$/.test(ruc)) {
+      setFieldErrors(prev => ({ ...prev, ruc: 'Ingresa un RUC de 11 dígitos.' }))
+      return
+    }
+    if (!ruc.startsWith('20')) {
+      setFieldErrors(prev => ({ ...prev, ruc: 'La consulta admite RUC que empiezan en 20. Ingresa los datos manualmente.' }))
+      return
+    }
+    const controller = new AbortController()
+    rucRequestRef.current?.abort()
+    rucRequestRef.current = controller
+    setIsSearchingRuc(true)
+    setFieldErrors(prev => ({ ...prev, ruc: '' }))
+    try {
+      const res = await apiFetch(`/ruc/${ruc}`, { signal: controller.signal })
+      if (!res.ok) throw new Error(await leerMensajeError(res, 'No se pudo consultar el RUC.'))
+      const payload = await res.json()
+      if (controller.signal.aborted) return
+      const datos = payload.data
+      if (!datos?.razonSocial || datos.ruc !== ruc) throw new Error('No se encontraron datos para este RUC.')
+      setFormData(prev => prev.ruc.trim() === ruc ? { ...prev, razonSocial: datos.razonSocial, direccion: datos.direccion || prev.direccion } : prev)
+      setFieldErrors(prev => ({ ...prev, ruc: '', razonSocial: '' }))
+      showToast('Datos del RUC encontrados', 'success')
+    } catch (error) {
+      if (!controller.signal.aborted) setFieldErrors(prev => ({ ...prev, ruc: error.message || 'No se pudo consultar el RUC.' }))
+    } finally {
+      if (rucRequestRef.current === controller) setIsSearchingRuc(false)
+    }
+  }
 
   const handleOrgSort = (column, dir) => {
     setOrgSortBy(column)
@@ -919,7 +961,7 @@ export function Asociaciones() {
                         >
                           <Icon name="pencil" className="size-4" />
                         </button>
-                        <button
+                        <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
                           type="button"
                           onClick={() => handleDelete(o.id)}
                           title="Eliminar Asociación"
@@ -1200,6 +1242,7 @@ export function Asociaciones() {
                         required
                         maxLength={11}
                         value={formData.ruc}
+                        disabled={isSearchingRuc}
                         error={fieldErrors.ruc}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -1212,12 +1255,13 @@ export function Asociaciones() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => showToast('Búsqueda por RUC pendiente de conectar', 'info')}
+                      onClick={buscarRuc}
+                      disabled={isSearchingRuc}
                       className="shrink-0 self-start h-[42px] rounded-xl text-white px-4 text-xs font-bold cursor-pointer flex items-center justify-center gap-2"
                       style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                     >
                       <Icon name="search" className="size-4" />
-                      Buscar
+                      {isSearchingRuc ? 'Buscando…' : 'Buscar'}
                     </button>
                   </div>
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Icon } from '../ui/Icon'
 import { formatNumeroTarjeta } from '../../utils/formatters'
+import { esRolOficina } from '../../config/roles'
 
 // Abrevia cifras grandes para que la tarjeta no se desborde: 1.2 K, 4.58 M, 17.2 M, 3.1 MM
 export function abreviarNumero(n) {
@@ -120,7 +121,7 @@ function GraficoTarjeta({ chart, color }) {
 
 export function MetricCards({ cards = [], loading = false, user }) {
   const rolNormalizado = (user?.rol || '').toUpperCase()
-  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA', 'ADMINISTRATIVO'].includes(rolNormalizado)
+  const isOffice = esRolOficina(rolNormalizado)
 
   const adminaStyles = [
     { arrowColor: 'text-indigo-500 dark:text-indigo-400', arrowIcon: 'M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25', chartColor: 'indigo' },

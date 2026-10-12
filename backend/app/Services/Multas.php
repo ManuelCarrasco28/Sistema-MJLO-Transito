@@ -25,7 +25,22 @@ class Multas
             ->getRowArray();
 
         if (!$row || (float)$row['uit'] <= 0) {
-            throw new DomainException("Falta configurar la UIT del año $anio.");
+            // Al cambiar de año todavía puede faltar la UIT nueva: se usa la última configurada para no frenar las papeletas
+            $ultima = $this->db->table('municipalidad_anio ma')
+                ->select('ma.uit, ma.anio')
+                ->join('municipalidad m', 'm.id = ma.id_municipalidad', 'inner')
+                ->where('ma.uit >', 0)
+                ->where('CAST(ma.anio AS UNSIGNED) <', $anio, false)
+                ->where('m.estado', 'ACTIVO')
+                ->orderBy('CAST(ma.anio AS UNSIGNED)', 'DESC', false)
+                ->get()
+                ->getRowArray();
+            if (!$ultima) {
+                throw new DomainException("Falta configurar la UIT del año $anio.");
+            }
+            log_message('warning', "No hay UIT configurada para $anio; se usa la del año {$ultima['anio']}. Configure la UIT del año en Super Admin.");
+
+            return (float) $ultima['uit'];
         }
 
         return (float)$row['uit'];

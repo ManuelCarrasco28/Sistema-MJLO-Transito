@@ -214,9 +214,12 @@ showToast.info = (title, timer) => showToast(title, 'info', timer);
  */
 export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelText = 'Cancelar', options = {}) => {
     const { confirmColor, cancelColor } = options;
+    const oscuro = document.documentElement.classList.contains('dark');
     return Swal.fire({
         title: title,
         text: text,
+        background: oscuro ? '#1C2438' : '#ffffff',
+        color: oscuro ? '#f1f5f9' : '#1e293b',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: confirmText,
@@ -225,8 +228,8 @@ export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelT
         reverseButtons: true,
         customClass: {
             popup: 'rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900',
-            title: 'text-xl font-black text-slate-800 mt-2',
-            htmlContainer: 'text-sm font-medium !text-slate-700 mt-2',
+            title: 'text-xl font-black mt-2',
+            htmlContainer: oscuro ? 'text-sm font-medium !text-slate-300 mt-2' : 'text-sm font-medium !text-slate-700 mt-2',
             actions: 'flex gap-3 w-full justify-center mt-6',
             confirmButton: confirmColor
                 ? 'rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95'
@@ -309,21 +312,30 @@ export const showSuccess = (title, text) => {
     });
 };
 
-export const loading = (title, text) => {
-    Swal.fire({
+export const loading = (title, text, { onCancel } = {}) => {
+    const oscuro = document.documentElement.classList.contains('dark');
+    return Swal.fire({
         title: title,
         text: text,
+        background: oscuro ? '#1C2438' : '#ffffff',
+        color: oscuro ? '#f1f5f9' : '#1e293b',
         allowOutsideClick: false,
         allowEscapeKey: false,
         showConfirmButton: false,
+        showCancelButton: Boolean(onCancel),
+        cancelButtonText: 'Cancelar',
+        cancelButtonColor: '#e11d48',
         didOpen: () => {
             Swal.showLoading();
         },
         customClass: {
             popup: 'rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900',
-            title: 'text-lg font-bold text-slate-800 mt-4',
+            title: 'text-lg font-bold mt-4',
             htmlContainer: 'text-sm font-medium text-slate-500 dark:text-slate-400',
         }
+    }).then(result => {
+        if (result.dismiss === Swal.DismissReason.cancel) onCancel?.();
+        return result;
     });
 };
 

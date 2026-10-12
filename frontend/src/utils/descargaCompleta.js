@@ -41,8 +41,8 @@ export async function fetchTodasLasFilas(endpoint, params = {}, opciones = {}) {
   let hechas = primerasFilas.length
   let siguiente = 2
 
-  const mostrarAvance = () => !silencioso && Swal.update({ text: `${Math.min(hechas, total).toLocaleString('es-PE')} de ${total.toLocaleString('es-PE')} registros` })
-  if (!silencioso) loading(mensaje, `${hechas.toLocaleString('es-PE')} de ${total.toLocaleString('es-PE')} registros`)
+  const mostrarAvance = () => !silencioso && !controller.signal.aborted && Swal.update({ text: `${Math.min(hechas, total).toLocaleString('es-PE')} de ${total.toLocaleString('es-PE')} registros` })
+  if (!silencioso) loading(mensaje, `${hechas.toLocaleString('es-PE')} de ${total.toLocaleString('es-PE')} registros`, { onCancel: cancelar })
 
   try {
     let primeraFalla

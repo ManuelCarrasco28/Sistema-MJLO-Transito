@@ -61,6 +61,8 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 80,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
       if (photo != null) {
         setState(() {

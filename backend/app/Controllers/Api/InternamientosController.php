@@ -17,6 +17,29 @@ class InternamientosController extends ResourceController
 
     protected $format = 'json';
 
+    /** Tarifas del depósito y si el usuario puede cambiarlas o rebajar un cobro (jefatura). */
+    public function tarifas()
+    {
+        $db = \Config\Database::connect();
+
+        return $this->respond(['data' => \App\Libraries\TarifasDeposito::obtener($db) + ['puedeEditar' => \App\Libraries\TarifasDeposito::esJefatura()]]);
+    }
+
+    public function guardarTarifas()
+    {
+        $input = $this->request->getJSON(true) ?? [];
+        $guardiania = round((float) ($input['guardianiaDia'] ?? -1), 2);
+        $remolque = round((float) ($input['remolque'] ?? -1), 2);
+        if ($guardiania < 0 || $remolque < 0 || $guardiania > 10000 || $remolque > 10000) {
+            return $this->failValidationErrors('Las tarifas deben estar entre 0 y 10,000 soles.');
+        }
+        $db = \Config\Database::connect();
+        \App\Libraries\TarifasDeposito::guardar($db, $guardiania, $remolque);
+        \App\Services\AuditoriaService::registrar('INTERNAMIENTOS', 'TARIFAS', 'Tarifas del depósito actualizadas: guardianía S/ ' . $guardiania . ' por día, remolque S/ ' . $remolque, ['guardianiaDia' => $guardiania, 'remolque' => $remolque]);
+
+        return $this->respond(['data' => \App\Libraries\TarifasDeposito::obtener($db) + ['puedeEditar' => true], 'message' => 'Tarifas actualizadas.']);
+    }
+
     public function estadisticas()
     {
         $db = \Config\Database::connect();
@@ -87,6 +110,9 @@ class InternamientosController extends ResourceController
                     ) as conductorNombre,
                     COALESCE(con.numero, NULLIF(p.conductor_informal_dni, ''), 'S/D') as conductorDni,
                     COALESCE(inte.direccion, '') as interesadoDireccion,
+                    CASE WHEN aut.id IS NOT NULL THEN COALESCE(NULLIF(TRIM(CONCAT_WS(' ', aut_c.nombres, aut_c.apellido_paterno, aut_c.apellido_materno)), ''), '') ELSE COALESCE(NULLIF(TRIM(CONCAT_WS(' ', inte_c.nombres, inte_c.apellido_paterno, inte_c.apellido_materno)), ''), '') END as autorizadoNombre,
+                    CASE WHEN aut.id IS NOT NULL THEN COALESCE(aut.numero, '') ELSE COALESCE(inte.numero, '') END as autorizadoDni,
+                    CASE WHEN aut.id IS NOT NULL THEN COALESCE(aut.direccion, '') ELSE COALESCE(inte.direccion, '') END as autorizadoDireccion,
                     COALESCE(v.anio_fabricacion, '') as vehiculoAnio,
                     COALESCE(inte_c.fecha_nacimiento, '') as interesadoFechaNacimiento,
                     ol.id as ordenLibertadId,
@@ -110,7 +136,9 @@ class InternamientosController extends ResourceController
                 ->join('ciudadanos con_c', 'con_c.id_persona = con.id', 'left')
                 ->join('personas inte', 'inte.id = oi.id_interesado', 'left')
                 ->join('ciudadanos inte_c', 'inte_c.id_persona = inte.id', 'left')
-                ->join('ordenes_libertad ol', 'ol.id_internamiento = oi.id', 'left');
+                ->join('ordenes_libertad ol', 'ol.id_internamiento = oi.id', 'left')
+                ->join('personas aut', 'aut.id = ol.id_persona_autorizada', 'left')
+                ->join('ciudadanos aut_c', 'aut_c.id_persona = aut.id', 'left');
 
             $buscar = trim((string)$this->request->getGet('buscar'));
             if ($buscar !== '') {
@@ -266,6 +294,7 @@ class InternamientosController extends ResourceController
             return $this->failValidationErrors($this->validator->getErrors());
         }
 
+        $candadoNumero = false;
         try {
             $idPapeleta = (int)$input['idPapeleta'];
 
@@ -275,6 +304,13 @@ class InternamientosController extends ResourceController
             }
             if (!$papeleta['id_vehiculo']) {
                 return $this->failValidationErrors('Esta papeleta no tiene un vehículo identificado; no se puede generar el internamiento.');
+            }
+            if ($papeleta['estado'] === 'ANULADA') {
+                return $this->failValidationErrors('La papeleta está anulada: no se puede internar un vehículo por una papeleta anulada.');
+            }
+            $yaRetenido = $db->table('ordenes_internamiento')->select('numero_orden')->where('id_vehiculo', (int)$papeleta['id_vehiculo'])->where('estado', 'RETENIDO')->get()->getRowArray();
+            if ($yaRetenido) {
+                return $this->failValidationErrors('Este vehículo ya está retenido en el depósito (orden ' . ($yaRetenido['numero_orden'] ?? 's/n') . '). Libérelo antes de registrar otro internamiento.');
             }
 
             $existe = $db->table('ordenes_internamiento')->where('id_papeleta', $idPapeleta)->countAllResults();
@@ -302,12 +338,21 @@ class InternamientosController extends ResourceController
                 $idRemisor = null;
             }
 
-            $numeroOrden = 'INT-' . date('Y') . '-' . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            // Orden y boleta correlativas bajo candado (antes la orden era un número al azar y la boleta quedaba vacía)
+            $candadoNumero = (int) ($db->query("SELECT GET_LOCK('mjlo_numero_internamiento', 10) AS ok")->getRowArray()['ok'] ?? 0) === 1;
+            if (!$candadoNumero) {
+                return $this->failServerError('El sistema está generando otro internamiento. Intente nuevamente.');
+            }
+            $ultimaOrden = (int) ($db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(numero_orden, 5) AS UNSIGNED)), 0) AS m FROM ordenes_internamiento WHERE numero_orden REGEXP '^INT-[0-9]+$'")->getRowArray()['m'] ?? 0);
+            $ultimaBoleta = (int) ($db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(numero_boleta, 5) AS UNSIGNED)), 0) AS m FROM ordenes_internamiento WHERE numero_boleta REGEXP '^BOL-[0-9]+$'")->getRowArray()['m'] ?? 0);
+            $numeroOrden = 'INT-' . str_pad((string)($ultimaOrden + 1), 6, '0', STR_PAD_LEFT);
+            $numeroBoleta = 'BOL-' . str_pad((string)($ultimaBoleta + 1), 5, '0', STR_PAD_LEFT);
 
             $record = [
                 'id_papeleta' => $idPapeleta,
                 'id_vehiculo' => (int)$papeleta['id_vehiculo'],
                 'numero_orden' => $numeroOrden,
+                'numero_boleta' => $numeroBoleta,
                 'id_remisor' => $idRemisor,
                 'id_interesado' => $idInteresado,
                 'fecha_ingreso' => date('Y-m-d H:i:s'),
@@ -372,9 +417,18 @@ class InternamientosController extends ResourceController
             return $this->respondCreated(['status' => 201, 'message' => 'Internamiento registrado exitosamente.', 'data' => [
                 'id' => $insertId,
                 'numeroOrden' => $numeroOrden,
+                'numeroBoleta' => $numeroBoleta,
             ]]);
         } catch (\Throwable $e) {
+            if (str_contains($e->getMessage(), 'Duplicate entry')) {
+                return $this->failValidationErrors('Este vehículo o esta papeleta ya tiene un internamiento activo.');
+            }
+            log_message('error', '{exception}', ['exception' => $e]);
             return $this->failServerError('Error al registrar el internamiento.');
+        } finally {
+            if ($candadoNumero) {
+                $db->query("SELECT RELEASE_LOCK('mjlo_numero_internamiento')");
+            }
         }
     }
 
@@ -413,6 +467,11 @@ class InternamientosController extends ResourceController
                 }
             }
 
+            // El candado evita que dos liberaciones simultáneas calculen el mismo número LIB-; se suelta al terminar
+            $candadoLibertad = (int) ($db->query("SELECT GET_LOCK('mjlo_numero_libertad', 10) AS ok")->getRowArray()['ok'] ?? 0) === 1;
+            if (!$candadoLibertad) {
+                throw new \DomainException('El sistema está generando otra orden de libertad. Intente nuevamente.');
+            }
             $db->transException(true)->transBegin();
 
             $orden = $db->query('SELECT * FROM ordenes_internamiento WHERE id = ? FOR UPDATE', [(int)$id])->getRowArray();
@@ -423,6 +482,12 @@ class InternamientosController extends ResourceController
             if ($orden['estado'] !== 'RETENIDO') {
                 throw new \DomainException('Este vehículo ya fue liberado.');
             }
+
+            // Guardianía y remolque contra la tarifa del depósito (los montos ya no los decide solo el cliente)
+            $diasCustodia = max(1, (int)(new \DateTime(substr($orden['fecha_ingreso'], 0, 10)))->diff(new \DateTime(date('Y-m-d')))->days);
+            $huboRebaja = \App\Libraries\TarifasDeposito::validar(
+                \App\Libraries\TarifasDeposito::obtener($db), $diasCustodia, $montoGuardiania, $montoRemolque, \App\Libraries\TarifasDeposito::esJefatura()
+            );
 
             // Persona que retira el vehículo: la indicada por DNI o, por defecto, el interesado del internamiento.
             $idAutorizada = (int)($orden['id_interesado'] ?? 0);
@@ -497,7 +562,7 @@ class InternamientosController extends ResourceController
             \App\Services\AuditoriaService::registrar(
                 'INTERNAMIENTOS',
                 'LIBERAR',
-                "Se cobró y liberó el vehículo del internamiento {$orden['numero_boleta']} (orden {$numeroOrden}, total S/ {$total})",
+                "Se cobró y liberó el vehículo del internamiento {$orden['numero_boleta']} (orden {$numeroOrden}, total S/ {$total})" . ($huboRebaja ? ' con rebaja de la tarifa autorizada por jefatura' : ''),
                 ['idInternamiento' => (int)$orden['id'], 'numeroOrden' => $numeroOrden, 'total' => $total]
             );
 
@@ -513,6 +578,8 @@ class InternamientosController extends ResourceController
             $db->transRollback();
             log_message('error', '{exception}', ['exception' => $e]);
             return $this->failServerError('No se pudo registrar el pago y la liberación.');
+        } finally {
+            $db->query("SELECT RELEASE_LOCK('mjlo_numero_libertad')");
         }
     }
 
@@ -535,6 +602,10 @@ class InternamientosController extends ResourceController
             if (!$orden) {
                 $db->transRollback();
                 return $this->failNotFound('Internamiento no encontrado.');
+            }
+            // Ya liberado: la orden de libertad está emitida, así que no se cambian interesado, motivo ni inventario
+            if ($orden['estado'] !== 'RETENIDO') {
+                unset($input['motivo'], $input['interesadoDni'], $input['inventario']);
             }
             $cambios = [];
             $mapa = [

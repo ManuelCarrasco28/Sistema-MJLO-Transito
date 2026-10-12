@@ -41,6 +41,7 @@ export function PersonaFormModal({
           <div className="p-4 sm:p-4.5 space-y-2.5">
             <div className="flex flex-col sm:flex-row gap-3 items-stretch">
               <div className="w-full sm:w-[110px] shrink-0 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-2.5 flex flex-col items-center justify-center gap-2 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-xs">
+                <div className="relative shrink-0">
                 {formData.fotoImg ? (
                   <img
                     src={formData.fotoImg}
@@ -57,31 +58,30 @@ export function PersonaFormModal({
                     <span className="text-[9px] text-slate-400 font-normal tracking-wide mt-0.5">Sin foto</span>
                   </div>
                 )}
-
-                <div className="flex items-center gap-1.5 w-full justify-center">
-                  <label className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white dark:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
-                    <Icon name="camera" className="size-3" />
-                    <span>{formData.fotoImg ? 'Cambiar' : 'Subir'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoUpload}
-                      className="hidden"
-                    />
-                  </label>
                   {formData.fotoImg && (
                     <button
                       type="button"
                       onClick={handleClearPhoto}
                       title="Quitar foto"
-                      className="rounded-lg p-1 text-white hover:opacity-90 cursor-pointer"
-                      style={{ backgroundColor: 'oklch(58.6% 0.253 17.585)' }}
+                      aria-label="Quitar foto"
+                      className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-lg bg-rose-600 text-white shadow-sm hover:bg-rose-700 cursor-pointer"
                     >
-                      <Icon name="trash" className="size-3" />
+                      <Icon name="trash" className="size-3.5" />
                     </button>
                   )}
                 </div>
 
+                <div className="flex flex-wrap items-center gap-1.5 w-full justify-center">
+                  <label title="Seleccionar foto" className="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white dark:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                    <Icon name="camera" className="size-3.5 shrink-0" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      aria-label="Seleccionar foto"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
                 {handleUsarFotoReniec && dniValido && (
                   <button
                     type="button"
@@ -89,7 +89,7 @@ export function PersonaFormModal({
                     disabled={isFetchingFotoReniec}
                     title="Cargar la foto registrada para este documento (solo si la persona no trae foto propia)"
                     aria-label="Cargar foto del documento"
-                    className="grid size-7 place-items-center rounded-lg border border-slate-200 bg-white dark:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] text-slate-600 dark:text-slate-300 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                    className="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white dark:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] text-slate-600 dark:text-slate-300 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
                   >
                     {isFetchingFotoReniec ? (
                       <span className="size-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
@@ -98,6 +98,7 @@ export function PersonaFormModal({
                     )}
                   </button>
                 )}
+                </div>
               </div>
 
               <div className="relative z-20 flex-1 min-w-0 space-y-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
@@ -149,7 +150,7 @@ export function PersonaFormModal({
                         onClick={handleReniecSearch}
                         disabled={isSearchingReniec}
                         title="Consultar número de documento"
-                        className="shrink-0 size-[42px] rounded-xl text-white flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                        className="shrink-0 h-[42px] px-3 gap-1.5 rounded-xl text-xs font-bold text-white flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-wait"
                         style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
                       >
                         {isSearchingReniec ? (
@@ -157,12 +158,14 @@ export function PersonaFormModal({
                         ) : (
                           <Icon name="search" className="size-4" />
                         )}
+                        <span>{isSearchingReniec ? 'Buscando…' : 'Buscar'}</span>
                       </button>
                     )}
                   </div>
                   <div className="sm:col-span-3">
                     <FloatingSelect
                       id="per_estado_civil"
+                      hideEmptyOption
                       label="Estado civil"
                       value={formData.estadoCivil || ''}
                       onChange={(e) => setFormData({ ...formData, estadoCivil: e.target.value })}

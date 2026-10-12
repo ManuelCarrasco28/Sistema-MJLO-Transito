@@ -78,12 +78,19 @@ class AuthController extends ResourceController
             return $this->failValidationErrors('No se recibieron preferencias válidas.');
         }
 
+        if (strlen(json_encode($input)) > 20000) {
+            return $this->failValidationErrors('Las preferencias son demasiado grandes.');
+        }
+
         $usuarioModel = new UsuarioModel();
         $actual = $usuarioModel->asArray()->select('preferencias')->find($userId);
         $actuales = json_decode((string) ($actual['preferencias'] ?? ''), true) ?: [];
 
         // Fusión recursiva segura para conservar estructuras anidadas sin sobrescribirlas por completo
         $fusionadas = array_replace_recursive($actuales, $input);
+        if (strlen(json_encode($fusionadas)) > 20000) {
+            return $this->failValidationErrors('Las preferencias son demasiado grandes.');
+        }
         $usuarioModel->update($userId, ['preferencias' => json_encode($fusionadas, JSON_UNESCAPED_UNICODE)]);
 
         return $this->respond(['status' => true, 'data' => $fusionadas]);
@@ -121,7 +128,21 @@ class AuthController extends ResourceController
     {
         $ip = $this->request->getIPAddress() ?: 'unknown';
 
-        return hash('sha256', strtolower(trim($usuario)) . '|' . $ip);
+        return hash('sha256', $this->normalizarUsuario($usuario) . '|' . $ip);
+    }
+
+    /**
+     * Misma regla que la base de datos al comparar el usuario (sin distinguir mayúsculas ni acentos, ignorando
+     * espacios sobrantes): así "ÁDMÍN" y "admin " no sirven para tener un contador de intentos nuevo.
+     */
+    private function normalizarUsuario(string $usuario): string
+    {
+        $u = mb_strtolower(trim($usuario), 'UTF-8');
+        $u = strtr($u, ['á' => 'a', 'à' => 'a', 'ä' => 'a', 'â' => 'a', 'é' => 'e', 'è' => 'e', 'ë' => 'e', 'ê' => 'e',
+            'í' => 'i', 'ì' => 'i', 'ï' => 'i', 'î' => 'i', 'ó' => 'o', 'ò' => 'o', 'ö' => 'o', 'ô' => 'o',
+            'ú' => 'u', 'ù' => 'u', 'ü' => 'u', 'û' => 'u']);
+
+        return preg_replace('/\s+/', ' ', $u) ?? $u;
     }
 
     private function rateLimitIpKey(): string
@@ -212,21 +233,37 @@ class AuthController extends ResourceController
 
     private function recordFailedAttempt(string $key, int $maxAttempts, int $windowSeconds, int $blockSeconds): void
     {
-        $now = time();
-        $data = $this->readRateLimitByKey($key);
-
-        if (($now - (int) ($data['first_attempt_at'] ?? $now)) > $windowSeconds) {
-            $data = $this->freshRateLimitData();
-            $data['first_attempt_at'] = $now;
+        // Leer, sumar y escribir bajo un mismo bloqueo: una ráfaga de intentos paralelos no se cuela entre medias
+        $fp = @fopen($this->rateLimitPath($key), 'c+');
+        if (!$fp) {
+            log_message('warning', 'No se pudo abrir el contador de intentos de login.');
+            return;
         }
-
-        $data['attempts'] = ((int) ($data['attempts'] ?? 0)) + 1;
-
-        if ($data['attempts'] >= $maxAttempts) {
-            $data['blocked_until'] = $now + $blockSeconds;
+        try {
+            if (!flock($fp, LOCK_EX)) {
+                return;
+            }
+            $now = time();
+            $data = json_decode((string) stream_get_contents($fp), true);
+            if (!is_array($data)) {
+                $data = $this->freshRateLimitData();
+            }
+            if (($now - (int) ($data['first_attempt_at'] ?? $now)) > $windowSeconds) {
+                $data = $this->freshRateLimitData();
+                $data['first_attempt_at'] = $now;
+            }
+            $data['attempts'] = ((int) ($data['attempts'] ?? 0)) + 1;
+            if ($data['attempts'] >= $maxAttempts) {
+                $data['blocked_until'] = $now + $blockSeconds;
+            }
+            rewind($fp);
+            ftruncate($fp, 0);
+            fwrite($fp, json_encode($data));
+            fflush($fp);
+        } finally {
+            flock($fp, LOCK_UN);
+            fclose($fp);
         }
-
-        $this->writeRateLimitByKey($key, $data);
     }
 
     private function registerFailedLogin(string $usuario): void
@@ -322,11 +359,13 @@ class AuthController extends ResourceController
 
         if (!$userRecord || !$passwordMatches) {
             $this->registerFailedLogin($usuario);
+            // Lo escrito como usuario puede ser una contraseña tecleada en el campo equivocado: se acota y se limpia
+            $usuarioAuditoria = mb_substr(preg_replace('/[^\P{C}]/u', '', $usuario) ?? '', 0, 40);
             \App\Services\AuditoriaService::registrar(
                 'SEGURIDAD',
                 'LOGIN_FALLIDO',
-                "Intento de acceso fallido para el usuario '$usuario' (credenciales incorrectas)",
-                ['usuario' => $usuario]
+                "Intento de acceso fallido para el usuario '$usuarioAuditoria' (credenciales incorrectas)",
+                ['usuario' => $usuarioAuditoria]
             );
             return $this->failUnauthorized('El usuario o la contraseña son incorrectos.');
         }

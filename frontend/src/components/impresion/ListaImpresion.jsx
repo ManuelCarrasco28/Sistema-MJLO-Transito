@@ -78,7 +78,7 @@ const pedirPagina = async (endpoint, filtros, pagina, porPagina) => {
   return resultado
 }
 
-// Carrito de impresión: lo reunido, quitar elementos e imprimir todo o por lotes (4 por hoja A4).
+// Cola de impresión: lo reunido, quitar elementos e imprimir todo o por lotes (4 por hoja A4).
 function CarritoImpresionModal({ titulo, nombreItem, items, columnas, onQuitar, onVaciar, onClose, onImprimir, onImprimirTodo }) {
   const [tamanoLote, setTamanoLote] = useState('40')
   const [impresos, setImpresos] = useState([])
@@ -117,7 +117,7 @@ function CarritoImpresionModal({ titulo, nombreItem, items, columnas, onQuitar, 
         {items.length === 0 ? (
           <div className="px-5 py-14 text-center">
             <Icon name="print" className="mx-auto mb-2 size-10 text-slate-300 dark:text-slate-600" />
-            <p className="font-bold text-slate-600 dark:text-slate-300">El carrito está vacío</p>
+            <p className="font-bold text-slate-600 dark:text-slate-300">La cola está vacía</p>
             <p className="mt-1 text-xs text-slate-400">Agregue elementos desde la lista para imprimirlos.</p>
           </div>
         ) : (
@@ -174,7 +174,7 @@ function CarritoImpresionModal({ titulo, nombreItem, items, columnas, onQuitar, 
 
               <div className="px-5 py-4">
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {plural(items.length, `${singular} en el carrito`, `${pluralItem} en el carrito`)}
+                  {plural(items.length, `${singular} en la cola`, `${pluralItem} en la cola`)}
                 </p>
                 <div className="max-h-[34vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-[var(--border)]">
                   <table className="w-full text-left text-xs">
@@ -192,7 +192,7 @@ function CarritoImpresionModal({ titulo, nombreItem, items, columnas, onQuitar, 
                             <button
                               type="button"
                               onClick={() => onQuitar(item.__id)}
-                              title="Quitar del carrito"
+                              title="Quitar de la cola"
                               className="grid size-7 cursor-pointer place-items-center rounded-lg border border-transparent text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:hover:border-rose-900/60 dark:hover:bg-rose-950/40"
                             >
                               <Icon name="x" className="size-3.5" />
@@ -221,7 +221,7 @@ function CarritoImpresionModal({ titulo, nombreItem, items, columnas, onQuitar, 
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50"
           >
             <Icon name="trash" className="size-3.5" />
-            Vaciar carrito
+            Vaciar cola
           </button>
           <div className="flex items-center gap-2">
             <BotonCancelar onClick={onClose}>Cerrar</BotonCancelar>
@@ -252,7 +252,7 @@ export function ResumenImpresion({ total, enCarrito }) {
       </span>
       <span className="inline-flex items-baseline gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/70 px-2.5 py-1 dark:border-emerald-900/60 dark:bg-emerald-950/40">
         <strong className="text-sm font-black leading-none text-emerald-700 dark:text-emerald-300">{enCarrito.toLocaleString('es-PE')}</strong>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400">en el carrito</span>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400">en la cola</span>
       </span>
     </div>
   )
@@ -378,7 +378,7 @@ export function ListaImpresion({
         todas.forEach((fila) => { const id = String(idDe(fila)); sig[id] = { ...compactar(fila), __id: id } })
         return sig
       })
-      showToast(`${todas.length.toLocaleString('es-PE')} ${todas.length === 1 ? singular : pluralItem} agregados al carrito`)
+      showToast(`${todas.length.toLocaleString('es-PE')} ${todas.length === 1 ? singular : pluralItem} agregados a la cola`)
     } catch {
       showError('Error', 'No se pudieron agregar todos los resultados.')
     } finally {
@@ -400,15 +400,15 @@ export function ListaImpresion({
 
   const vaciarCarrito = async () => {
     const resultado = await showConfirm(
-      '¿Vaciar el carrito?',
-      `Se quitarán los ${enCarrito.toLocaleString('es-PE')} elementos del carrito de impresión.`,
+      '¿Vaciar la cola de impresión?',
+      `Se quitarán los ${enCarrito.toLocaleString('es-PE')} elementos de la cola de impresión.`,
       'Sí, vaciar',
       'Cancelar',
-      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' },
+      { confirmColor: '#e11d48' },
     )
     if (resultado.isConfirmed) {
       setCarrito({})
-      showToast('Carrito vaciado')
+      showToast('Cola de impresión vaciada')
     }
   }
 
@@ -433,7 +433,7 @@ export function ListaImpresion({
 
   const imprimir = async (items, alTerminar) => {
     if (items.length === 0) {
-      showError('Sin elementos', 'Agregue al menos un elemento al carrito.')
+      showError('Sin elementos', 'Agregue al menos un elemento a la cola.')
       return
     }
     if (trabajo || preparando || progreso) return
@@ -444,7 +444,7 @@ export function ListaImpresion({
   // Imprime varios lotes seguidos sin tener que pulsar nada entre uno y otro.
   const imprimirLotes = async (lotes, alTerminarLote) => {
     if (lotes.length === 0) {
-      showError('Sin elementos', 'Agregue al menos un elemento al carrito.')
+      showError('Sin elementos', 'Agregue al menos un elemento a la cola.')
       return
     }
     if (trabajo || preparando || progreso) return
@@ -538,7 +538,7 @@ export function ListaImpresion({
             type="button"
             onClick={agregarTodosLosResultados}
             disabled={procesandoTodo || total === 0}
-            title="Agregar al carrito todos los que cumplen los filtros"
+            title="Agregar a la cola todos los que cumplen los filtros"
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-indigo-200/80 bg-indigo-50/70 px-2.5 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-50 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
           >
             <Icon name={procesandoTodo ? 'refresh' : 'add'} className={`size-3.5 ${procesandoTodo ? 'animate-spin' : ''}`} />
@@ -550,10 +550,10 @@ export function ListaImpresion({
               <button
                 type="button"
                 onClick={vaciarCarrito}
-                title="Vaciar todo el carrito"
+                title="Vaciar toda la cola"
                 className="grid size-8.5 cursor-pointer place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/50"
               >
-                <Icon name="trash" className="size-4" />
+                <Icon name="filterX" className="size-4" />
               </button>
             </>
           )}
@@ -565,7 +565,7 @@ export function ListaImpresion({
             style={{ backgroundColor: COLOR_PRIMARIO }}
           >
             <Icon name={preparando ? 'refresh' : 'print'} className={`size-3.5 ${preparando ? 'animate-spin' : ''}`} />
-            <span>{preparando ? 'Preparando…' : 'Carrito de impresión'}</span>
+            <span>{preparando ? 'Preparando…' : 'Cola de impresión'}</span>
             <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[11px] leading-none">{enCarrito.toLocaleString('es-PE')}</span>
           </button>
         </div>
@@ -611,7 +611,7 @@ export function ListaImpresion({
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); alternar(fila) }}
-                        title={agregado ? 'Quitar del carrito' : 'Añadir al carrito'}
+                        title={agregado ? 'Quitar de la cola' : 'Añadir a la cola'}
                         className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border-[1.5px] px-2.5 text-[11px] font-bold shadow-xs transition-all active:scale-95 ${
                           agregado
                             ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
@@ -619,7 +619,7 @@ export function ListaImpresion({
                         }`}
                       >
                         <Icon name={agregado ? 'check' : 'add'} className="size-3.5" />
-                        {agregado ? 'En carrito' : 'Añadir'}
+                        {agregado ? 'En cola' : 'Añadir'}
                       </button>
                       <button
                         type="button"

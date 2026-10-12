@@ -29,7 +29,16 @@ class PersonasController extends ResourceController
         if (str_starts_with($valor, 'data:image')) {
             return (new \App\Services\FileStorageService())->guardarImagenBase64($valor, 'personas');
         }
-        return $valor;
+        // Solo imágenes propias: la URL que arma el servidor se guarda como ruta relativa; cualquier otra URL
+        // (externa) se descarta para no guardar enlaces a sitios de terceros.
+        $pos = strpos($valor, '/api/files/');
+        if ($pos !== false) {
+            $valor = substr($valor, $pos + strlen('/api/files/'));
+        }
+        if (preg_match('#^[a-z]+/[A-Za-z0-9_\-]+\.(jpg|jpeg|png|webp)$#i', $valor)) {
+            return $valor;
+        }
+        return null;
     }
 
     /**
@@ -630,6 +639,7 @@ class PersonasController extends ResourceController
             return $this->failServerError('No se pudo eliminar la persona. No se ha borrado ningún dato.');
         }
 
+        \App\Services\AuditoriaService::registrar('PERSONAS', 'ELIMINAR', 'Persona eliminada (id ' . (int)$id . ')', ['id' => (int)$id]);
         return $this->respondDeleted(['status' => true, 'message' => 'Persona eliminada del registro']);
     }
 }

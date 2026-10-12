@@ -55,6 +55,7 @@ export const BoletaInternamientoPrint = ({ item }) => {
         {/* El logo ya trae el nombre de la municipalidad: no se repite en texto */}
         <img src="/img/logo-mjlo.png" alt="Municipalidad José Leonardo Ortiz" className="h-24 w-64 object-contain" />
         <div className="absolute right-0 top-0 text-red-600 font-bold text-xl tracking-widest font-sans [font-variant-numeric:lining-nums_tabular-nums]">
+          <div className="text-[9px] font-bold uppercase tracking-normal text-slate-700">Registro digital</div>
           Nº {String(item?.numeroBoleta || '000000').replace(/^[A-Za-z]+-/, '')}
         </div>
       </div>

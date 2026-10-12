@@ -134,7 +134,7 @@ class _RegisterAlienVehicleScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Error o vehículo no registrado en la municipalidad JLO ni en Chiclayo.',
+              'No se pudo consultar el vehículo. Verifique la conexión e intente de nuevo.',
             ),
             duration: Duration(seconds: 4),
           ),
@@ -150,6 +150,8 @@ class _RegisterAlienVehicleScreenState
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 80,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
       if (photo != null) {
         setState(() {

@@ -160,7 +160,7 @@ export function ImpresionCarnetsCurso({ cursoInicial, alUsarCursoInicial }) {
       idDe={(p) => p.idInscripcion}
       compactar={compactar}
       nombreItem={['carnet', 'carnets']}
-      tituloCarrito="Carrito de carnets del curso"
+      tituloCarrito="Cola de impresión de carnets"
       porPaginaMax={1000}
       valoresIniciales={cursoInicial ? { cursoId: cursoInicial.id } : {}}
       etiquetasIniciales={cursoInicial ? { cursoId: cursoInicial.etiqueta } : {}}

@@ -1,4 +1,4 @@
-import { PlacaBadge } from '../ui/PlacaBadge'
+import { PlacaVehiculo } from '../vehiculos/PlacaVehiculo'
 import { StatusBadge } from '../ui/StatusBadge'
 import { ListaImpresion } from './ListaImpresion'
 import { TarjetaOperatividadLotePrint, precargarPlantillasOperatividad } from '../documentos/TarjetaOperatividadPrint'
@@ -26,7 +26,7 @@ const urlDeFoto = (ruta) => {
 }
 
 const COLUMNAS_LISTA = [
-  { titulo: 'Placa', ancho: '11%', celda: (d) => <PlacaBadge placa={d.vehiculoPlaca} /> },
+  { titulo: 'Placa', ancho: '11%', celda: (d) => <PlacaVehiculo placa={d.vehiculoPlaca} vehiculoId={d.vehiculoId} /> },
   {
     titulo: 'Titular',
     ancho: '25%',
@@ -47,7 +47,7 @@ const COLUMNAS_LISTA = [
 ]
 
 const COLUMNAS_CARRITO = [
-  { titulo: 'Placa', celda: (d) => <PlacaBadge placa={d.vehiculoPlaca} /> },
+  { titulo: 'Placa', celda: (d) => <PlacaVehiculo placa={d.vehiculoPlaca} vehiculoId={d.vehiculoId} /> },
   { titulo: 'Titular', celda: (d) => <span className="font-semibold text-slate-800 dark:text-slate-100">{d.propietario || 'Sin propietario'}</span> },
   { titulo: 'Tarjeta', celda: (d) => <span className="font-mono text-slate-600 dark:text-slate-300">{d.codigo}</span> },
 ]
@@ -55,6 +55,7 @@ const COLUMNAS_CARRITO = [
 // Del documento solo se guarda lo que usa la tarjeta: el carrito sobrevive a recargar la página.
 const compactar = (d) => ({
   id: d.id,
+  vehiculoId: d.vehiculoId,
   tipoDocumento: d.tipoDocumento,
   codigo: d.codigo,
   asociacion: d.asociacion,
@@ -88,7 +89,7 @@ export function ImpresionTarjetasOperatividad({ inicial }) {
       idDe={(d) => d.id}
       compactar={compactar}
       nombreItem={['tarjeta', 'tarjetas']}
-      tituloCarrito="Carrito de tarjetas de operatividad"
+      tituloCarrito="Cola de impresión de tarjetas"
       porPaginaMax={200}
       buscarInicial={inicial?.buscar || ''}
       valoresIniciales={inicial?.estado ? { estado: inicial.estado } : {}}

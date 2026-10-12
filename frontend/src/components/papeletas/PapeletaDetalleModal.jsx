@@ -145,7 +145,7 @@ export function PapeletaDetalleModal({
                 </div>
                 <div>
                   <p className="text-slate-400">Inspector</p>
-                  <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.inspector} {selectedPapeleta.inspectorCIP ? `(CIP: ${selectedPapeleta.inspectorCIP})` : ''}</p>
+                  <p className="font-bold text-slate-800 dark:text-white">{selectedPapeleta.inspector} {selectedPapeleta.inspectorDocumento ? `(Doc.: ${selectedPapeleta.inspectorDocumento})` : ''}</p>
                 </div>
               </div>
             </div>

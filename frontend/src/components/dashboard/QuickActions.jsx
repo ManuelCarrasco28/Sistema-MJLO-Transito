@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotonCancelar, BotonGuardar } from '../ui/ModalControls'
+import { esRolOficina } from '../../config/roles'
 
 const AVAILABLE_SHORTCUTS = [
   {
@@ -140,7 +141,7 @@ export function QuickActions({ user }) {
   };
 
   const rolNormalizado = (user?.rol || '').toUpperCase();
-  const isOffice = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(rolNormalizado);
+  const isOffice = esRolOficina(rolNormalizado);
 
   // Filtramos los atajos disponibles basados en el rol
   const allowedShortcuts = AVAILABLE_SHORTCUTS.filter(s => {

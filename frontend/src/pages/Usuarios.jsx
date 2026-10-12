@@ -13,6 +13,7 @@ import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../con
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { errorPasswordUsuario } from '../utils/passwordPolicy'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import { escapeExcelCell } from '../utils/exportHelpers'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -364,13 +365,13 @@ export function Usuarios({ user }) {
           (u, idx) => `
               <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
                 <td style="text-align: center; font-weight: bold; color: #64748b;">${idx + 1}</td>
-                <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">@${escapeXml(u.nombre_usuario)}</td>
-                <td><strong>${escapeXml(u.nombre_completo || '—')}</strong></td>
-                <td style="text-align: center; font-family: monospace;">${escapeXml(u.numero_documento || '—')}</td>
-                <td>${escapeXml(u.rol || 'Sin rol')}</td>
+                <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">@${escapeExcelCell(u.nombre_usuario)}</td>
+                <td><strong>${escapeExcelCell(u.nombre_completo || '—')}</strong></td>
+                <td style="text-align: center; font-family: monospace;">${escapeExcelCell(u.numero_documento || '—')}</td>
+                <td>${escapeExcelCell(u.rol || 'Sin rol')}</td>
                 <td style="text-align: center;">
                   <span style="font-weight: bold; color: ${u.usuario_estado === 'ACTIVO' ? '#047857' : '#be123c'};">
-                    ${escapeXml(u.usuario_estado || 'ACTIVO')}
+                    ${escapeExcelCell(u.usuario_estado || 'ACTIVO')}
                   </span>
                 </td>
               </tr>

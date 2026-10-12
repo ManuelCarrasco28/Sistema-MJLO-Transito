@@ -14,15 +14,17 @@ import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
+import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { PagoPapeletaModal } from '../components/papeletas/PagoPapeletaModal'
 import { NuevaPapeletaModal } from '../components/papeletas/NuevaPapeletaModal'
 import { PapeletaDetalleModal } from '../components/papeletas/PapeletaDetalleModal'
 import { ConvertirReporteModal } from '../components/papeletas/ConvertirReporteModal'
-import { PreviewTicketModal } from '../components/papeletas/PreviewTicketModal'
+import { PapeletaOficialPrint } from '../components/papeletas/PapeletaOficialPrint'
 import { InfraccionDetalleModal } from '../components/papeletas/InfraccionDetalleModal'
 import { CatalogoInfraccionesModal } from '../components/papeletas/CatalogoInfraccionesModal'
 import { BotonCancelar, BotonCerrarModal } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import { esRolOficina } from '../config/roles'
 
 const FILTER_ORIGEN_OPTIONS = [
   { value: 'TODOS', label: 'Todos los orígenes' },
@@ -59,7 +61,7 @@ const FILTER_REPORTES_ESTADOS = [
 
 export function Papeletas({ user }) {
   // Los inspectores emiten papeletas pero no cobran: el pago es solo del personal de oficina (también se exige en el servidor).
-  const puedeCobrar = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'].includes(String(user?.rol || '').toUpperCase())
+  const puedeCobrar = esRolOficina(String(user?.rol || '').toUpperCase())
   const cachedPapeletas = getCachedData('/papeletas')
   const cachedTipos = getCachedData('/tipos-infraccion')
   const cachedVeh = getCachedData('/vehiculos')
@@ -108,6 +110,8 @@ export function Papeletas({ user }) {
     const params = new URLSearchParams(location.search)
     const s = params.get('search')
     setSearchTerm(s || '')
+    // Una notificación puede llevar a la pestaña de reportes estando ya en Papeletas
+    if (params.get('vista') === 'reportes') setActiveView('REPORTES')
   }, [location.search])
 
   const [filterEstado, setFilterEstado] = useState('TODOS')
@@ -318,7 +322,7 @@ export function Papeletas({ user }) {
               { header: 'PROPIETARIO', key: 'propietarioNombre', width: 180 },
               { header: 'DNI PROPIETARIO', key: 'propietarioDni', isText: true, width: 120, align: 'center' },
               { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 170 },
-              { header: 'CIP INSPECTOR', key: 'inspectorCIP', isText: true, width: 100, align: 'center' },
+              { header: 'DOC. INSPECTOR', key: 'inspectorDocumento', isText: true, width: 100, align: 'center' },
               { header: 'FECHA Y HORA', render: (_, p) => (p.fechaHora ? new Date(String(p.fechaHora).replace(' ', 'T')).toLocaleString('es-PE') : '—'), key: 'fechaHora', width: 150, align: 'center' },
               { header: 'LUGAR', key: 'lugar', width: 200 },
               { header: 'ORIGEN', key: 'origen', width: 100, align: 'center' },
@@ -362,7 +366,7 @@ export function Papeletas({ user }) {
   const loadCatalogs = () => {
     Promise.all([
       apiFetch('/tipos-infraccion').then((res) => (res.ok ? res.json() : { data: [] })),
-      apiFetch('/vehiculos?porPagina=50&ligero=1').then((res) => (res.ok ? res.json() : { data: [] })),
+      apiFetch('/vehiculos?page=1&porPagina=50&ligero=1').then((res) => (res.ok ? res.json() : { data: [] })),
       apiFetch('/asociaciones?porPagina=50').then((res) => (res.ok ? res.json() : { data: [] })),
     ])
       .then(([tiposRes, vehiculosRes, orgsRes]) => {
@@ -373,30 +377,46 @@ export function Papeletas({ user }) {
       .catch(() => {})
   }
 
+  const solicitudReportes = useRef(0)
   const loadReportes = () => {
+    const solicitud = ++solicitudReportes.current
     setLoadingReportes(true)
     const params = new URLSearchParams({ page: String(reportesPage), porPagina: String(reportesPerPage) })
     if (reportesFilterEstado !== 'TODOS') params.set('estado', reportesFilterEstado)
     if (reportesBusqueda) params.set('buscar', reportesBusqueda)
     apiFetch(`/reportes-intervencion?${params}`)
-      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((reportesRes) => {
+        // Si mientras tanto se pidió otra página o filtro, esta respuesta ya es vieja y no se muestra
+        if (solicitud !== solicitudReportes.current) return
         setReportes(reportesRes.data || [])
         setReportesTotal(reportesRes.meta?.total ?? (reportesRes.data || []).length)
         setReportesPendientesTotal(reportesRes.meta?.pendientes ?? null)
         reportesCargados.current = true
       })
-      .catch(() => {})
-      .finally(() => setLoadingReportes(false))
+      .catch(() => {
+        if (solicitud === solicitudReportes.current) showError('Error', 'No se pudieron cargar los reportes de intervención. Intenta nuevamente.')
+      })
+      .finally(() => { if (solicitud === solicitudReportes.current) setLoadingReportes(false) })
+  }
+
+  // Busca un vehículo por placa en el servidor y lo suma a la lista (ya no se descarga todo el padrón de vehículos)
+  const cargarVehiculoPorPlaca = async (placa) => {
+    const p = String(placa || '').trim()
+    if (!p || p === 'SIN PLACA') return []
+    try {
+      const res = await apiFetch(`/vehiculos?page=1&porPagina=10&ligero=1&buscar=${encodeURIComponent(p)}`)
+      const lista = res.ok ? ((await res.json()).data || []) : []
+      setVehiculos((prev) => [...prev.filter((v) => !lista.some((n) => n.id === v.id)), ...lista])
+      return lista
+    } catch {
+      return []
+    }
   }
 
   const loadVehiculos = () => {
-    apiFetch('/vehiculos?porPagina=50&ligero=1')
-      .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((vehiculosRes) => {
-        setVehiculos(vehiculosRes.data || [])
-      })
-      .catch(() => {})
+    const placa = reporteToConvert?.placa || reporteToConvert?.placa_visual
+    if (placa) cargarVehiculoPorPlaca(placa)
   }
 
   const handleVerFotosReporte = async (reporte) => {
@@ -567,6 +587,7 @@ export function Papeletas({ user }) {
           ...p,
           estado: 'PAGADA'
         } : p))
+        loadStats()
         setIsPagarModalOpen(false)
         setPapeletaToAction(null)
       } else {
@@ -581,7 +602,9 @@ export function Papeletas({ user }) {
   }
 
   const openConvertReporte = async (reporte) => {
-    const matchVehiculo = vehiculos.find((v) => String(v.placa || '').toUpperCase() === String(reporte.placa || reporte.placa_visual || '').toUpperCase())
+    const placaReporte = String(reporte.placa || reporte.placa_visual || '').toUpperCase()
+    const matchVehiculo = vehiculos.find((v) => String(v.placa || '').toUpperCase() === placaReporte)
+      || (reporte.id_vehiculo ? null : (await cargarVehiculoPorPlaca(placaReporte)).find((v) => String(v.placa || '').toUpperCase() === placaReporte))
     setReporteToConvert({ ...reporte, loadingFotos: true })
     setConvertForm({
       infraccionesIds: reporte.infraccionesIds?.length ? reporte.infraccionesIds.map(String) : [''],
@@ -1344,7 +1367,7 @@ export function Papeletas({ user }) {
                       </td>
                       <td className="px-3.5 py-3.5 ">
                         {p.vehiculoPlaca && p.vehiculoPlaca !== 'SIN PLACA' ? (
-                          <PlacaBadge placa={p.vehiculoPlaca} />
+                          <PlacaVehiculo placa={p.vehiculoPlaca} vehiculoId={p.vehiculoId} />
                         ) : (
                           <div>
                             <PlacaBadge placa={null} />
@@ -1560,7 +1583,7 @@ export function Papeletas({ user }) {
 
 
       {isPreviewModalOpen && (
-        <PreviewTicketModal selectedPapeleta={selectedPapeleta} onClose={() => setIsPreviewModalOpen(false)} />
+        <PapeletaOficialPrint papeleta={selectedPapeleta} onClose={() => setIsPreviewModalOpen(false)} />
       )}
 
       {catalogoInfracciones && (

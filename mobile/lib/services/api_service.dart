@@ -7,7 +7,32 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+/// Envuelve las llamadas autenticadas: si el servidor responde 401 la sesión venció (o la cerraron),
+/// se limpian las credenciales y se avisa a la app para volver al login en vez de mostrar errores sueltos.
+class _ClienteAutenticado {
+  const _ClienteAutenticado();
+
+  Future<http.Response> get(Uri url, {Map<String, String>? headers}) async =>
+      _revisar(await http.get(url, headers: headers));
+
+  Future<http.Response> post(Uri url, {Map<String, String>? headers, Object? body}) async =>
+      _revisar(await http.post(url, headers: headers, body: body));
+
+  Future<http.Response> _revisar(http.Response r) async {
+    if (r.statusCode == 401) {
+      await ApiService.logout();
+      ApiService.onSesionExpirada?.call();
+    }
+    return r;
+  }
+}
+
+const _http = _ClienteAutenticado();
+
 class ApiService {
+  /// La pantalla raíz lo define para llevar al login cuando la sesión vence.
+  static void Function()? onSesionExpirada;
+
   // La cookie de sesión es una credencial: se guarda en almacenamiento
   // cifrado (Keystore en Android / Keychain en iOS), no en SharedPreferences
   // en texto plano.
@@ -34,19 +59,18 @@ class ApiService {
   static const Duration _requestTimeout = Duration(seconds: 20);
 
   // --- MÉTODOS DE CREDENCIALES GUARDADAS (BIOMETRÍA) ---
-  static Future<void> saveSavedCredentials(
-    String username,
-    String password,
-  ) async {
+  // Solo se recuerda el usuario: la contraseña no se guarda (ni se autocompleta) en el teléfono.
+  static Future<void> saveSavedCredentials(String username, String password) async {
     await _secureStorage.write(key: _savedUsernameKey, value: username);
-    await _secureStorage.write(key: _savedPasswordKey, value: password);
+    await _secureStorage.delete(key: _savedPasswordKey);
   }
 
   static Future<Map<String, String>?> getSavedCredentials() async {
     final username = await _secureStorage.read(key: _savedUsernameKey);
-    final password = await _secureStorage.read(key: _savedPasswordKey);
-    if (username != null && password != null && username.isNotEmpty) {
-      return {'username': username, 'password': password};
+    // Limpia contraseñas guardadas por versiones anteriores de la app
+    await _secureStorage.delete(key: _savedPasswordKey);
+    if (username != null && username.isNotEmpty) {
+      return {'username': username, 'password': ''};
     }
     return null;
   }
@@ -57,8 +81,34 @@ class ApiService {
   }
   // ----------------------------------------------------
 
+  // Copia en memoria de la cookie de sesión para las imágenes (Image.network pide encabezados sin esperar)
+  static String? _cookieEnMemoria;
+
+  static Future<void> precargarSesion() async {
+    _cookieEnMemoria = await _secureStorage.read(key: _sessionCookieKey);
+  }
+
+  /// Encabezados para cargar fotos y firmas: el servidor las entrega solo con sesión iniciada.
+  static Map<String, String> get headersImagen => {
+        'X-Mobile-App': 'MJLO-TRANSITO',
+        if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
+        if (_cookieEnMemoria != null && _cookieEnMemoria!.isNotEmpty) 'Cookie': _cookieEnMemoria!,
+      };
+
+  /// URL de un archivo guardado en el servidor (foto, firma). Acepta la ruta relativa ('papeletas/abc.jpg')
+  /// o la URL completa que arma el servidor, y siempre apunta al servidor que usa la app.
+  static String urlArchivo(String ruta) {
+    final r = ruta.trim();
+    if (r.startsWith('data:')) return r;
+    final i = r.indexOf('/api/files/');
+    if (i >= 0) return '$baseUrl/files/${r.substring(i + '/api/files/'.length)}';
+    if (r.startsWith('http://') || r.startsWith('https://')) return r;
+    return '$baseUrl/files/${r.replaceFirst(RegExp(r'^/+'), '')}';
+  }
+
   static Future<Map<String, String>> _getHeaders({bool isJson = true}) async {
     final cookie = await _secureStorage.read(key: _sessionCookieKey);
+    _cookieEnMemoria = cookie;
     final headers = <String, String>{
       'X-Mobile-App': 'MJLO-TRANSITO',
       if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
@@ -93,10 +143,8 @@ class ApiService {
         if (rawCookie != null) {
           final match = RegExp(r'session_user=[^;]+').firstMatch(rawCookie);
           if (match != null) {
-            await _secureStorage.write(
-              key: _sessionCookieKey,
-              value: match.group(0)!,
-            );
+            await _secureStorage.write(key: _sessionCookieKey, value: match.group(0)!);
+            _cookieEnMemoria = match.group(0)!;
           }
         }
 
@@ -126,9 +174,20 @@ class ApiService {
     return prefs.getInt('id_persona');
   }
 
+  /// Cierra la sesión también en el servidor (mejor esfuerzo) y luego borra lo local.
+  static Future<void> cerrarSesion() async {
+    try {
+      await http
+          .post(Uri.parse('$baseUrl/logout'), headers: await _getHeaders())
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
+    await logout();
+  }
+
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    _cookieEnMemoria = null;
     await _secureStorage.delete(key: _sessionCookieKey);
   }
 
@@ -145,12 +204,13 @@ class ApiService {
     }
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
-
-    final uri = Uri.parse('$baseUrl/papeletas')
-        .replace(queryParameters: params);
-
-    final response = await http
-        .get(uri, headers: await _getHeaders(isJson: false))
+    final uri = Uri.parse('$baseUrl/papeletas').replace(queryParameters: params);
+    
+    final response = await _http
+        .get(
+          uri,
+          headers: await _getHeaders(isJson: false),
+        )
         .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -169,12 +229,13 @@ class ApiService {
     }
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
-
-    final uri = Uri.parse('$baseUrl/reportes-intervencion')
-        .replace(queryParameters: params);
-
-    final response = await http
-        .get(uri, headers: await _getHeaders(isJson: false))
+    final uri = Uri.parse('$baseUrl/reportes-intervencion').replace(queryParameters: params);
+    
+    final response = await _http
+        .get(
+          uri,
+          headers: await _getHeaders(isJson: false),
+        )
         .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -192,7 +253,7 @@ class ApiService {
         '_': DateTime.now().millisecondsSinceEpoch.toString(),
       },
     );
-    final response = await http
+    final response = await _http
         .get(
           uri,
           headers: {
@@ -213,7 +274,7 @@ class ApiService {
     final idPersona = await getPersonalId();
     if (idPersona == null) return null;
 
-    final response = await http
+    final response = await _http
         .get(
           Uri.parse('$baseUrl/operativos/activo/$idPersona'),
           headers: await _getHeaders(isJson: false),
@@ -231,7 +292,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/mobile/config').replace(
       queryParameters: {'_': DateTime.now().millisecondsSinceEpoch.toString()},
     );
-    final response = await http
+    final response = await _http
         .get(
           uri,
           headers: {
@@ -258,7 +319,7 @@ class ApiService {
       }
     } catch (_) {}
 
-    final response = await http
+    final response = await _http
         .post(
           Uri.parse('$baseUrl/papeletas'),
           headers: await _getHeaders(),
@@ -284,7 +345,7 @@ class ApiService {
       }
     } catch (_) {}
 
-    final response = await http
+    final response = await _http
         .post(
           Uri.parse('$baseUrl/reportes-intervencion'),
           headers: await _getHeaders(),
@@ -299,7 +360,7 @@ class ApiService {
   }
 
   static Future<void> uploadFirma(int papeletaId, String firmaBase64) async {
-    final response = await http
+    final response = await _http
         .post(
           Uri.parse('$baseUrl/papeletas/$papeletaId/firma'),
           headers: await _getHeaders(),
@@ -313,7 +374,7 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getTiposInfraccion() async {
-    final response = await http
+    final response = await _http
         .get(
           Uri.parse('$baseUrl/tipos-infraccion'),
           headers: await _getHeaders(isJson: false),
@@ -327,7 +388,7 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getVehiculos() async {
-    final response = await http
+    final response = await _http
         .get(
           Uri.parse('$baseUrl/vehiculos'),
           headers: await _getHeaders(isJson: false),
@@ -351,7 +412,7 @@ class ApiService {
         '_': DateTime.now().millisecondsSinceEpoch.toString(),
       },
     );
-    final response = await http
+    final response = await _http
         .get(
           uri,
           headers: {
@@ -373,7 +434,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>?> getPersonaByDni(String dni) async {
-    final response = await http
+    final response = await _http
         .get(
           Uri.parse('$baseUrl/personas?numeroDocumento=$dni'),
           headers: await _getHeaders(isJson: false),
@@ -390,7 +451,7 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getVehiculosByPersonaDni(String dni) async {
-    final response = await http
+    final response = await _http
         .get(
           Uri.parse('$baseUrl/vehiculos/persona/dni?dni=$dni'),
           headers: await _getHeaders(isJson: false),

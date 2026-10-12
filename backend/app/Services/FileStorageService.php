@@ -12,7 +12,9 @@ class FileStorageService
     ];
 
     private const TAMANO_MAXIMO_BYTES = 8 * 1024 * 1024; // 8 MB
-    private const LADO_MAXIMO_PX = 8000;
+    private const LADO_MAXIMO_PX = 10000;
+    // Una foto de 64 megapíxeles ocupa ~256 MB al decodificarse: se limita la superficie total (50 MP cubre los celulares actuales; la app debe reducir las fotos antes de enviarlas)
+    private const PIXELES_MAXIMOS = 50000000;
 
     /**
      * Decodifica una imagen en base64 (con o sin prefijo data:image/...) y la
@@ -51,7 +53,7 @@ class FileStorageService
         if ($info === false || !isset(self::MIME_EXT[$info['mime'] ?? ''])) {
             return null;
         }
-        if ($info[0] > self::LADO_MAXIMO_PX || $info[1] > self::LADO_MAXIMO_PX) {
+        if ($info[0] > self::LADO_MAXIMO_PX || $info[1] > self::LADO_MAXIMO_PX || ($info[0] * $info[1]) > self::PIXELES_MAXIMOS) {
             return null;
         }
         $extension = self::MIME_EXT[$info['mime']];
@@ -87,7 +89,20 @@ class FileStorageService
             return null;
         }
 
+        self::$escritosEnPeticion[] = $rutaCompleta;
+
         return $subcarpeta . '/' . $nombre;
+    }
+
+    /** Archivos escritos en esta petición: si la transacción falla se borran para no dejar fotos sin registro. */
+    private static array $escritosEnPeticion = [];
+
+    public static function descartarEscritos(): void
+    {
+        foreach (self::$escritosEnPeticion as $ruta) {
+            @unlink($ruta);
+        }
+        self::$escritosEnPeticion = [];
     }
 
     /**

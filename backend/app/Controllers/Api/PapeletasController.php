@@ -45,7 +45,13 @@ class PapeletasController extends ResourceController
     public function estadisticas()
     {
         $db = \Config\Database::connect();
-        $row = $db->table('papeletas')
+        $consulta = $db->table('papeletas');
+        // Un inspector solo ve los totales de sus propias papeletas (igual que su listado)
+        $sesion = \App\Libraries\Acceso::usuario();
+        if (!\App\Libraries\Acceso::esOficina($sesion)) {
+            $consulta->where('id_inspector', (int) ($sesion['id_persona'] ?? -1));
+        }
+        $row = $consulta
             ->select("
                 COUNT(*) as total,
                 SUM(CASE WHEN estado = 'PENDIENTE_PAGO' THEN 1 ELSE 0 END) as pendientes,
@@ -84,16 +90,22 @@ class PapeletasController extends ResourceController
                     COALESCE(v.marca, '') as vehiculoMarca,
                     COALESCE(v.modelo, '') as vehiculoModelo,
                     COALESCE(v.color, '') as vehiculoColor,
+                    COALESCE(v.serie_motor, '') as vehiculoMotor,
+                    COALESCE(tv.nombre, '') as vehiculoClase,
+                    COALESCE(v.categoria, '') as vehiculoCategoria,
                     v.anio_fabricacion as vehiculoAnio,
                     CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END as vehiculoEstadoFormalizacion,
                     v.id_asociacion as vehiculoAsociacionId,
                     aso.razon_social as vehiculoAsociacion,
                     
                     COALESCE(per.numero, p.conductor_informal_dni, 'S/D') as conductorDni,
+                    COALESCE(per.direccion, '') as conductorDireccion,
+                    COALESCE(c_per.numero_licencia, '') as conductorLicencia,
                     COALESCE(NULLIF(TRIM(CONCAT(c_per.nombres, ' ', c_per.apellido_paterno, ' ', COALESCE(c_per.apellido_materno, ''))), ''), p.conductor_informal_nombres, p.nombre_autoridad, 'Infractor No Identificado') as conductorNombre,
                     COALESCE(NULLIF(p.nombre_autoridad, ''), CONCAT(c_per.nombres, ' ', c_per.apellido_paterno), 'Infractor No Identificado') as infractor,
                     
                     COALESCE(prop_per.numero, aso.ruc, p.dueño_informal_dni, 'S/D') as propietarioDni,
+                    COALESCE(NULLIF(prop_per.direccion, ''), aso.direccion, '') as propietarioDireccion,
                     COALESCE(
                         NULLIF(TRIM(CONCAT(c_prop.nombres, ' ', c_prop.apellido_paterno, ' ', COALESCE(c_prop.apellido_materno, ''))), ''),
                         aso.razon_social,
@@ -102,7 +114,8 @@ class PapeletasController extends ResourceController
                     ) as propietarioNombre,
                     
                     COALESCE(CONCAT(c_ins.nombres, ' ', c_ins.apellido_paterno, ' ', COALESCE(c_ins.apellido_materno, '')), 'Inspector Municipal') as inspector,
-                    ins_per.numero as inspectorCIP,
+                    ins_per.numero as inspectorDocumento,
+                    COALESCE(p.unidad_autoridad, '') as unidadAutoridad,
                     p.fecha_hora as fechaHora,
                     p.lugar,
                     p.observacion_autoridad as observacionesAutoridad,
@@ -119,6 +132,7 @@ class PapeletasController extends ResourceController
                 ")
                 ->join('operativos op', 'op.id = p.id_operativo', 'left')
                 ->join('vehiculos v', 'v.id = p.id_vehiculo', 'left')
+                ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
                 ->join('asociaciones aso', 'aso.id = v.id_asociacion', 'left')
                 ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
                 ->join('ciudadanos c_per', 'c_per.id_persona = per.id', 'left')
@@ -375,6 +389,18 @@ class PapeletasController extends ResourceController
         $lugar = trim($input['lugar'] ?? '');
         $obsAutoridad = trim($input['observacionesAutoridad'] ?? '');
         $obsConductor = trim($input['observacionesConductor'] ?? '');
+        if (mb_strlen($lugar) > 200) {
+            return $this->failValidationErrors('El lugar de la infracción no puede superar los 200 caracteres.');
+        }
+        if (mb_strlen($obsAutoridad) > 500 || mb_strlen($obsConductor) > 500) {
+            return $this->failValidationErrors('Las observaciones no pueden superar los 500 caracteres.');
+        }
+        if ($conductorDni !== '' && !preg_match('/^[A-Za-z0-9]{8,15}$/', $conductorDni)) {
+            return $this->failValidationErrors('El documento del conductor no es válido (8 a 15 letras o números).');
+        }
+        if ($placa === '' || mb_strlen($placa) > 20) {
+            return $this->failValidationErrors('La placa del vehículo no es válida.');
+        }
         $inputInspectorId = (int)($input['inspectorId'] ?? 0);
         // El inspector siempre firma con su propia identidad (no se puede emitir a nombre de otro).
         if (!\App\Libraries\Acceso::esOficina($usuarioSesion)) {
@@ -422,6 +448,23 @@ class PapeletasController extends ResourceController
             ['vehiculoId' => $vehiculoId, 'placa' => $placa, 'duenoId' => $duenoId, 'duenoNombresInformal' => $duenoNombresInformal, 'duenoDniInformal' => $duenoDniInformal] = $this->resolverVehiculo(
                 $db, $placa, $marcaVehiculo, $colorVehiculo, $claseVehiculo, $motorVehiculo, $input
             );
+
+            // Reintento (doble toque o red caída tras guardar): si el mismo inspector acaba de registrar la misma
+            // papeleta (vehículo, lugar e importe) en los últimos 2 minutos, se devuelve esa y no se crea otra.
+            $reciente = $db->query(
+                "SELECT id, uuid, numero_papeleta, fecha_hora FROM papeletas WHERE id_inspector = ? AND id_vehiculo <=> ? AND lugar = ? AND monto_total = ?
+                 AND estado <> 'ANULADA' AND fecha_hora >= DATE_SUB(?, INTERVAL 120 SECOND) ORDER BY id DESC LIMIT 1 FOR UPDATE",
+                [$inputInspectorId, $vehiculoId ?: null, $lugar, $montoTotal, $fechaHora]
+            )->getRowArray();
+            if ($reciente) {
+                $db->transRollback();
+                $txStarted = false;
+                return $this->respond(['status' => 200, 'duplicado' => true, 'data' => [
+                    'id' => (int)$reciente['id'], 'uuid' => $reciente['uuid'], 'numeroPapeleta' => $reciente['numero_papeleta'],
+                    'vehiculoPlaca' => $placa, 'infractor' => $infractor, 'inspector' => trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? '')),
+                    'fechaHora' => $reciente['fecha_hora'], 'lugar' => $lugar, 'montoTotal' => $montoTotal, 'estado' => 'PENDIENTE_PAGO',
+                ]]);
+            }
 
             $fuga = $input['fuga'] ?? false;
             ['personaId' => $personaId, 'conductorNombresInformal' => $conductorNombresInformal, 'conductorDniInformal' => $conductorDniInformal] = $this->resolverInfractor($db, $fuga, $duenoId, $conductorDni, $conductorNombres, $conductorApellidos, $infractor, $duenoNombresInformal, $duenoDniInformal);
@@ -512,6 +555,7 @@ class PapeletasController extends ResourceController
             if ($txStarted) {
                 $db->transRollback();
             }
+            \App\Services\FileStorageService::descartarEscritos();
             log_message('error', 'Error creando la papeleta: ' . $e->getMessage());
             return $this->failServerError('Error creando la papeleta. Intente nuevamente.');
         }
@@ -553,6 +597,7 @@ class PapeletasController extends ResourceController
     {
         try {
             (new \App\Services\PagosTransito(\Config\Database::connect()))->anularPapeleta((int)$id);
+            \App\Services\AuditoriaService::registrar('PAPELETAS', 'ANULAR', 'Papeleta anulada (id ' . (int)$id . ')', ['id' => (int)$id]);
             return $this->respond(['message' => 'Papeleta y pagos asociados anulados.']);
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
@@ -570,6 +615,7 @@ class PapeletasController extends ResourceController
             $service = new \App\Services\PagosTransito(\Config\Database::connect());
             $pago = $service->generar('PAPELETA', (int)$id);
             $pago = $service->confirmar((int)$pago['id'], $input);
+            \App\Services\AuditoriaService::registrar('PAPELETAS', 'COBRAR', 'Cobro de papeleta (id ' . (int)$id . ')', ['id' => (int)$id, 'recibo' => $pago['numero_recibo'] ?? null]);
             return $this->respond(['message' => 'Pago confirmado.', 'numeroRecibo' => $pago['numero_recibo']]);
         } catch (\DomainException $e) {
             return $this->failValidationErrors($e->getMessage());
@@ -588,6 +634,10 @@ class PapeletasController extends ResourceController
             $papeleta = $db->table('papeletas')->where('id', $id)->get()->getRowArray();
             if (!$papeleta) {
                 return $this->failNotFound('Papeleta no encontrada');
+            }
+
+            if (in_array($papeleta['estado'], ['ANULADA', 'PAGADA'], true)) {
+                return $this->failValidationErrors('No se puede registrar la firma en una papeleta ' . ($papeleta['estado'] === 'ANULADA' ? 'anulada' : 'pagada') . '.');
             }
 
             // La firma del conductor la registra el inspector que emitió la papeleta (o el personal de oficina):

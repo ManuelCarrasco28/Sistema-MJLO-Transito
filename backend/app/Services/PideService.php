@@ -22,9 +22,33 @@ class PideService
         return \App\Libraries\SecretoCifrado::descifrar($anio["token"]);
     }
 
+    /**
+     * Límite de consultas por usuario e IP (20 por minuto, igual que PideController) y registro en la auditoría.
+     * Devuelve true si la consulta debe bloquearse. Antes, estas rutas "de respaldo" no tenían ni límite ni rastro.
+     */
+    private static function bloqueada(string $accion, string $detalle): bool
+    {
+        try {
+            $user = \App\Libraries\Acceso::usuario();
+            $key = ($user['id'] ?? 'anon') . '|' . service('request')->getIPAddress();
+            if (\App\Services\AuthSession::checkRateLimit('pide', $key, 20, 60, 300) !== null) {
+                \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_BLOQUEADA', 'Demasiadas consultas a PIDE en poco tiempo (' . $accion . ')', ['detalle' => $detalle]);
+                return true;
+            }
+            \App\Services\AuditoriaService::registrar('PIDE', $accion, 'Consulta a PIDE: ' . $detalle, ['detalle' => $detalle]);
+        } catch (\Throwable $e) {
+            log_message('error', 'No se pudo aplicar el límite de consultas a PIDE: ' . $e->getMessage());
+        }
+
+        return false;
+    }
+
     public static function reniec($dni)
     {
         if (!preg_match("/^\d{8}$/", $dni)) {
+            return null;
+        }
+        if (self::bloqueada('CONSULTA_RENIEC', 'DNI ' . substr($dni, 0, 2) . '****' . substr($dni, -2))) {
             return null;
         }
 
@@ -75,6 +99,9 @@ class PideService
     {
         $placa = strtoupper(str_replace([' ', '-'], '', trim($placa)));
         if (empty($placa)) {
+            return null;
+        }
+        if (self::bloqueada('CONSULTA_SUNARP', 'placa ' . $placa)) {
             return null;
         }
 

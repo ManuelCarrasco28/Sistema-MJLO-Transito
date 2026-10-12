@@ -14,6 +14,7 @@ import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import { PersonaDetalleModal } from '../components/personas/PersonaDetalleModal'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import { puedeEliminarRegistros } from '../config/roles'
 
 function formatTipoDocLabel(t) {
   const code = (t.codigo || '').toUpperCase().trim()
@@ -39,7 +40,7 @@ const FILTER_ESTADO_OPTIONS = [
 ]
 
 const ESTADO_CIVIL_OPTIONS = [
-  { value: '', label: 'Seleccionar...' },
+  { value: '', label: '' },
   { value: 'SOLTERO', label: 'SOLTERO(A)' },
   { value: 'CASADO', label: 'CASADO(A)' },
   { value: 'DIVORCIADO', label: 'DIVORCIADO(A)' },
@@ -115,7 +116,9 @@ export function Personas({ user, onUserUpdate }) {
   // Trae solo la página actual desde el backend (antes se cargaba el padrón
   // completo a memoria y se filtraba/paginaba en el navegador; con 30,000+
   // personas eso era el cuello de botella real del módulo).
+  const solicitudPersonas = useRef(0)
   const loadPersonas = async () => {
+    const solicitud = ++solicitudPersonas.current
     const params = new URLSearchParams({
       page: String(currentPage),
       porPagina: String(itemsPerPage),
@@ -127,6 +130,8 @@ export function Personas({ user, onUserUpdate }) {
     const response = await apiFetch(`/personas?${params.toString()}`)
     if (!response.ok) throw response
     const payload = await response.json()
+    // Una respuesta vieja (otra página o búsqueda anterior) no debe pisar a la más reciente
+    if (solicitud !== solicitudPersonas.current) return payload.data
     setPersonas(payload.data ?? [])
     setTotalFiltrado(payload.meta?.total ?? 0)
     return payload.data
@@ -458,7 +463,7 @@ export function Personas({ user, onUserUpdate }) {
           }
           await exportPersonasPdf({ listToExport, totalPersonas, conductores, propietarios, activos })
     } catch (err) {
-      showError('Descarga no completada', err.message || 'No se pudo preparar el PDF.')
+      if (err.name !== 'AbortError') showError('Descarga no completada', err.message || 'No se pudo preparar el PDF.')
     } finally {
       setIsExportingPdf(false)
     }
@@ -975,7 +980,7 @@ export function Personas({ user, onUserUpdate }) {
                         </button>
 
                         {/* ELIMINAR: Rojo */}
-                        <button
+                        <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
                           type="button"
                           onClick={() => handleDelete(p.id)}
                           title="Eliminar persona"

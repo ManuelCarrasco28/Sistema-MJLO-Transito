@@ -3,6 +3,7 @@ import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
 import { PlacaBadge } from '../ui/PlacaBadge'
 import { BotonCerrarModal } from '../ui/ModalControls'
+import { formatFecha } from '../../utils/formatters'
 
 const COLORES_ESTADO = {
   VIGENTE: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800',
@@ -131,7 +132,7 @@ export function VehiculoDetalleModal({
                   <p className="font-mono text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.tipoCarroceria || 'N/A'}</p>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Condición Legal</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Vinculación a asociación</p>
                   <StatusBadge status={isVehiculoFormal(selectedVehiculo) ? 'FORMAL' : 'INFORMAL'} className="mt-1" />
                 </div>
               </div>
@@ -143,11 +144,11 @@ export function VehiculoDetalleModal({
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border)] dark:bg-slate-950">
               <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Propietario Registrado</p>
               <p className="mt-1 text-sm font-extrabold text-slate-800 dark:text-white">{selectedVehiculo.propietario}</p>
-              <p className="text-slate-500 font-mono">DNI: {selectedVehiculo.propietarioTipoDocumento === 'DNI' ? selectedVehiculo.propietarioDni || 'N/A' : 'N/A'}</p>
-              <p className="text-slate-500 font-mono">RUC: {selectedVehiculo.asociacionRuc || 'N/A'}</p>
+              <p className="text-slate-500 font-mono">{selectedVehiculo.propietarioTipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : selectedVehiculo.propietarioTipoDocumento || 'Documento'}: {selectedVehiculo.propietarioDni || 'Sin registro'}</p>
               <div className="mt-3 border-t border-slate-100 pt-3 dark:border-[var(--border)]">
                 <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Asociación del vehículo</p>
                 <p className="mt-1 font-bold text-slate-800 dark:text-cyan-300">{isVehiculoFormal(selectedVehiculo) ? selectedVehiculo.asociacion : 'Sin Asociación (Vehículo Informal)'}</p>
+                {selectedVehiculo.asociacionRuc && <p className="mt-1 font-mono text-slate-500">RUC de la asociación: {selectedVehiculo.asociacionRuc}</p>}
               </div>
             </div>
 
@@ -171,6 +172,7 @@ export function VehiculoDetalleModal({
                 <span className="flex items-center gap-2 text-right font-mono font-black text-slate-800 dark:text-white">
                   {selectedVehiculo.certicav?.numeroSerieCerticav || selectedVehiculo.certicav?.numeroRegistro}
                   <InsigniaEstado estado={selectedVehiculo.certicav?.resultado || selectedVehiculo.certicav?.estado} />
+                  {selectedVehiculo.certicav?.estadoVigencia && <InsigniaEstado estado={selectedVehiculo.certicav.estadoVigencia} />}
                 </span>
               </div>
             </div>
@@ -232,7 +234,7 @@ export function VehiculoDetalleModal({
                           <div key={papeleta.numeroPapeleta} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-[var(--border)] sm:grid-cols-[140px_1fr_110px_120px] sm:items-center">
                             <div>
                               <p className="font-mono text-xs font-black text-rose-700 dark:text-rose-300">{papeleta.numeroPapeleta}</p>
-                              <p className="text-[10px] font-bold text-slate-400">{papeleta.fechaHora ? new Date(papeleta.fechaHora).toLocaleDateString() : 'Sin fecha'}</p>
+                              <p className="text-[10px] font-bold text-slate-400">{papeleta.fechaHora ? formatFecha(papeleta.fechaHora) : 'Sin fecha'}</p>
                             </div>
                             <div className="min-w-0">
                               <p className="text-xs font-black text-slate-800 dark:text-slate-100">{papeleta.codigoInfraccion || 'SIN CODIGO'} · {papeleta.gravedad || 'SIN GRAVEDAD'}</p>
@@ -272,7 +274,7 @@ export function VehiculoDetalleModal({
                         <div key={int.numero_orden} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-[var(--border)] sm:grid-cols-[140px_1fr_120px] sm:items-center">
                           <div>
                             <p className="font-mono text-xs font-black text-rose-700 dark:text-rose-300">{int.numero_orden}</p>
-                            <p className="text-[10px] font-bold text-slate-400">{int.fecha_ingreso ? new Date(int.fecha_ingreso).toLocaleDateString() : 'Sin fecha'}</p>
+                            <p className="text-[10px] font-bold text-slate-400">{int.fecha_ingreso ? formatFecha(int.fecha_ingreso) : 'Sin fecha'}</p>
                           </div>
                           <div className="min-w-0">
                             <p className="text-xs font-black text-slate-800 dark:text-slate-100">{int.motivo || 'Sin motivo'}</p>
@@ -316,12 +318,12 @@ export function VehiculoDetalleModal({
                         <div key={`${prop.dni}-${prop.fecha_inicio}-${index}`} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-[var(--border)] sm:grid-cols-[1fr_170px_100px] sm:items-center">
                           <div className="min-w-0">
                             <p className="text-xs font-black text-slate-800 dark:text-slate-100">{prop.nombre}</p>
-                            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 font-mono">DNI: {prop.dni || 'S/D'}</p>
+                            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 font-mono">{prop.tipoDocumento || 'Documento'}: {prop.dni || 'S/D'}</p>
                           </div>
                           <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                            {prop.fecha_inicio ? new Date(prop.fecha_inicio).toLocaleDateString() : '—'}
+                            {formatFecha(prop.fecha_inicio)}
                             {' → '}
-                            {prop.fecha_fin ? new Date(prop.fecha_fin).toLocaleDateString() : 'Actualidad'}
+                            {prop.fecha_fin ? formatFecha(prop.fecha_fin) : 'Actualidad'}
                           </p>
                           <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${activo ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' : 'bg-slate-200 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'}`}>
                             <span className="size-1.5 rounded-full bg-current" />

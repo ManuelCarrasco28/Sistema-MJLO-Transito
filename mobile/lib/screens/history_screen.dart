@@ -415,7 +415,7 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
   Widget _buildListActividades(List<dynamic> list) {
     if (list.isEmpty) {
       final String mensaje = (widget.filterDni != null || widget.filterPlaca != null)
-          ? 'No registra papeletas ni reportes'
+          ? 'No hay papeletas ni reportes tuyos para esta consulta. Solo ves los que tú registraste; en la oficina se ve el historial completo.'
           : 'No tienes actividades registradas';
 
       return Center(
@@ -578,7 +578,6 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                             final fotoUrl = fotoInfo is Map ? fotoInfo['foto'] : fotoInfo;
                             if (fotoUrl == null) return const SizedBox();
                             final String urlStr = fotoUrl.toString();
-                            final String fullUrl = urlStr.startsWith('http') ? urlStr : '${ApiService.fileBaseUrl}/$urlStr';
                             return Padding(
                               padding: const EdgeInsets.only(right: 8.0),
                               child: Container(
@@ -592,7 +591,8 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                                         errorBuilder: (context, error, stackTrace) => const Text('Error al cargar'),
                                       )
                                     : Image.network(
-                                        fullUrl,
+                                        ApiService.urlArchivo(fotoUrl.toString()),
+                                        headers: ApiService.headersImagen,
                                         height: 100,
                                         width: 100,
                                         fit: BoxFit.cover,

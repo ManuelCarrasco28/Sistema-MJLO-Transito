@@ -5,7 +5,7 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { PlacaBadge } from '../components/ui/PlacaBadge'
+import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { apiFetch, getCachedData, setCachedData, invalidateCache, leerMensajeError } from '../config/api'
 import { CerticavFichaPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
@@ -17,6 +17,7 @@ import { formatFecha, formatNumeroTarjeta, normalizarPlaca } from '../utils/form
 import { imprimirInspeccionesPdf } from '../utils/exportInspeccionesPdf'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import { puedeEliminarRegistros } from '../config/roles'
 import './Inspecciones.css'
 
 const FILTER_RESULTADO_OPTIONS = [
@@ -37,6 +38,7 @@ const FILTER_VIGENCIA_OPTIONS = [
 // "No tiene" solo desaprueba en criterios obligatorios: la razón social, por
 // ejemplo, no aplica a unidades independientes.
 function calcularPrimeraEvaluacion(detalles, criterios = []) {
+  if (detalles.some(d => !d.estado)) return 'PENDIENTE'
   const obligatorio = (criterioId) => criterios.find((c) => c.id === criterioId)?.obligatorio !== false
   const hayProblema = detalles.some(
     (d) => d.estado === 'MAL_ESTADO' || (d.estado === 'NO_TIENE' && obligatorio(d.criterioId))
@@ -47,6 +49,7 @@ function calcularPrimeraEvaluacion(detalles, criterios = []) {
 // Resultado final: aprobado directo si pasó la primera, o según la segunda
 // evaluación (subsanación) cuando la primera fue desaprobada.
 function calcularResultado(primeraEvaluacion, segundaEvaluacion) {
+  if (primeraEvaluacion === 'PENDIENTE' || segundaEvaluacion === 'PENDIENTE') return 'PENDIENTE'
   if (primeraEvaluacion === 'APROBADO') return 'APROBADO'
   if (segundaEvaluacion === 'APROBADO') return 'APROBADO'
   if (segundaEvaluacion === 'DESAPROBADO') return 'DESAPROBADO'
@@ -113,6 +116,8 @@ export function Inspecciones() {
 
   const [filterResultado, setFilterResultado] = useState('TODOS')
   const [filterVigencia, setFilterVigencia] = useState('TODOS')
+  const [filterHistorial, setFilterHistorial] = useState('ACTUALES')
+  const [inspeccionPendiente, setInspeccionPendiente] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
   const [sortBy, setSortBy] = useState('')
@@ -180,6 +185,7 @@ export function Inspecciones() {
       if (debouncedSearch) params.set('buscar', debouncedSearch)
       if (filterResultado !== 'TODOS') params.set('resultado', filterResultado)
       if (filterVigencia !== 'TODOS') params.set('vigencia', filterVigencia)
+      params.set('historial', filterHistorial)
       if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
       const inspRes = await apiFetch(`/inspecciones?${params.toString()}`, { signal: controller.signal })
@@ -203,7 +209,7 @@ export function Inspecciones() {
     setLoadError('')
     loadData()
     return () => cargaInspecciones.current?.abort()
-  }, [currentPage, itemsPerPage, debouncedSearch, filterResultado, filterVigencia, sortBy, sortDir])
+  }, [currentPage, itemsPerPage, debouncedSearch, filterResultado, filterVigencia, filterHistorial, sortBy, sortDir])
 
   const [stats, setStats] = useState({ totales: 0, aprobados: 0, observados: 0, desaprobados: 0 })
 
@@ -221,10 +227,10 @@ export function Inspecciones() {
   useEffect(() => {
     Promise.all([
       apiFetch('/inspeccion-criterios').catch(() => ({ ok: false })),
-      apiFetch('/vehiculos?porPagina=100&ligero=1').catch(() => ({ ok: false })),
+      apiFetch('/vehiculos?page=1&porPagina=100&ligero=1').catch(() => ({ ok: false })),
       apiFetch('/personal?page=1&porPagina=100&estado=ACTIVO&tipoInspector=TECNICO').catch(() => ({ ok: false })),
       apiFetch('/asociaciones?porPagina=100').catch(() => ({ ok: false })),
-      apiFetch('/personas?porPagina=100&ligero=1').catch(() => ({ ok: false })),
+      apiFetch('/personas?page=1&porPagina=100&ligero=1').catch(() => ({ ok: false })),
     ]).then(async ([critRes, vehRes, persRes, asocRes, personasRes]) => {
       if (critRes.ok) {
         const critPayload = await critRes.json()
@@ -291,6 +297,21 @@ export function Inspecciones() {
   }, [searchTerm, filterResultado, filterVigencia])
 
   const paginatedInspecciones = inspecciones
+
+  // Los conductores se buscan en el servidor mientras se escribe (antes solo se buscaba entre las primeras 100 personas)
+  const sumarPersonas = (lista) => setPersonas((prev) => [...prev.filter((p) => !lista.some((n) => n.id === p.id)), ...lista])
+  useEffect(() => {
+    const termino = (formData.conductorNombre || '').trim()
+    if (termino.length < 3) return undefined
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      apiFetch(`/personas?page=1&porPagina=15&ligero=1&buscar=${encodeURIComponent(termino)}`, { signal: controller.signal })
+        .then((res) => (res.ok ? res.json() : { data: [] }))
+        .then((payload) => { if (!controller.signal.aborted) sumarPersonas(payload.data || []) })
+        .catch(() => {})
+    }, 300)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [formData.conductorNombre]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredConductores = (() => {
     const termino = (formData.conductorNombre || '').trim().toLowerCase()
@@ -404,9 +425,7 @@ export function Inspecciones() {
 
   // Busca el DNI ingresado contra el padrón de personas ya registradas.
   // Si existe, autocompleta nombre/licencia y evita crear un duplicado en el backend.
-  const handleConductorDniChange = (value) => {
-    const dni = value.trim()
-    const match = personas.find((p) => (p.numeroDocumento || '').trim() === dni)
+  const aplicarPersonaConductor = (match, dni) => {
     if (match) {
       const nombreCompleto = `${match.nombres || ''} ${match.apellidoPaterno || ''} ${match.apellidoMaterno || ''}`.trim()
       setFormData((prev) => ({
@@ -419,6 +438,24 @@ export function Inspecciones() {
     } else {
       setFormData((prev) => ({ ...prev, conductorDni: dni }))
       setConductorEsRegistrado(false)
+    }
+  }
+
+  const handleConductorDniChange = (value) => {
+    const dni = value.trim()
+    const match = personas.find((p) => (p.numeroDocumento || '').trim() === dni)
+    aplicarPersonaConductor(match, dni)
+    // Si no está entre las ya cargadas, se consulta al servidor (el padrón tiene miles de personas)
+    if (!match && /^[A-Za-z0-9]{8,15}$/.test(dni)) {
+      apiFetch(`/personas?page=1&porPagina=5&ligero=1&buscar=${encodeURIComponent(dni)}`)
+        .then((res) => (res.ok ? res.json() : { data: [] }))
+        .then((payload) => {
+          const lista = payload.data || []
+          sumarPersonas(lista)
+          const encontrado = lista.find((p) => (p.numeroDocumento || '').trim() === dni)
+          if (encontrado) aplicarPersonaConductor(encontrado, dni)
+        })
+        .catch(() => {})
     }
   }
 
@@ -466,11 +503,11 @@ export function Inspecciones() {
       fecha: fechaLocalActual(),
       inspector: '',
       tecnicoId: '',
-      primeraEvaluacion: 'APROBADO',
+      primeraEvaluacion: 'PENDIENTE',
       segundaEvaluacion: '',
-      resultado: 'APROBADO',
+      resultado: 'PENDIENTE',
       observaciones: '',
-      detalles: criteriosInspeccion.map((c) => ({ criterioId: c.id, estado: 'BIEN', obs: '' })),
+      detalles: criteriosInspeccion.map((c) => ({ criterioId: c.id, estado: '', obs: '' })),
     })
     setSelectedInspeccion(null)
     busquedaPlacaRef.current?.abort()
@@ -512,7 +549,7 @@ export function Inspecciones() {
       observaciones: inspeccion.observaciones || '',
       detalles: criteriosInspeccion.map((c) => {
         const found = (inspeccion.detalles || []).find((d) => Number(d.criterioId) === c.id)
-        return found || { criterioId: c.id, estado: 'BIEN', obs: '' }
+        return found || { criterioId: c.id, estado: '', obs: '' }
       }),
     })
     setSelectedInspeccion(inspeccion)
@@ -524,6 +561,18 @@ export function Inspecciones() {
     setChecklistModificado(false)
     setIsModalOpen(true)
   }
+
+  useEffect(() => {
+    setInspeccionPendiente(null)
+    if (!isModalOpen || selectedInspeccion || normalizarPlaca(formData.vehiculoPlaca || '').length !== 6) return
+    const controller = new AbortController()
+    apiFetch(`/inspecciones?buscar=${encodeURIComponent(formData.vehiculoPlaca)}&historial=ACTUALES&page=1&porPagina=20`, { signal: controller.signal })
+      .then(res => res.ok ? res.json() : null)
+      .then(payload => {
+        if (!controller.signal.aborted) setInspeccionPendiente(payload?.data?.find(i => normalizarPlaca(i.vehiculoPlaca) === normalizarPlaca(formData.vehiculoPlaca) && i.resultado === 'OBSERVADO' && !i.segundaEvaluacion) || null)
+      }).catch(() => {})
+    return () => controller.abort()
+  }, [isModalOpen, selectedInspeccion, formData.vehiculoPlaca])
 
   const handleOpenDetail = (inspeccion) => {
     setSelectedInspeccion(inspeccion)
@@ -655,6 +704,10 @@ export function Inspecciones() {
     if (selectedInspeccion && !checklistModificado) {
       delete payload.detalles
     }
+    if (payload.detalles && (!payload.detalles.length || payload.detalles.some(d => !d.estado))) {
+      showToast('Evalúa todos los ítems antes de guardar.', 'error')
+      return
+    }
 
     try {
       const esEdicion = Boolean(selectedInspeccion)
@@ -697,6 +750,7 @@ export function Inspecciones() {
       buscar: searchTerm,
       resultado: filterResultado === 'TODOS' ? '' : filterResultado,
       vigencia: filterVigencia === 'TODOS' ? '' : filterVigencia,
+      historial: filterHistorial,
       sortBy,
       sortDir: sortBy ? sortDir : '',
     }, { mensaje: 'Preparando la descarga de inspecciones...' })
@@ -971,6 +1025,11 @@ export function Inspecciones() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <RoundedSelect value={filterHistorial} onChange={value => { setFilterHistorial(value); setCurrentPage(1) }} options={[
+              { value: 'ACTUALES', label: 'Actuales' },
+              { value: 'TODOS', label: 'Todo el historial' },
+              { value: 'HISTORICAS', label: 'Históricas' },
+            ]} />
             <RoundedSelect
               value={filterResultado}
               onChange={(val) => {
@@ -1041,20 +1100,22 @@ export function Inspecciones() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1050px] table-fixed text-left text-xs">
             <colgroup>
-              <col className="w-[18%]" />
-              <col className="w-[14%]" />
-              <col className="w-[26%]" />
               <col className="w-[16%]" />
-              <col className="w-[14%]" />
+              <col className="w-[12%]" />
+              <col className="w-[21%]" />
+              <col className="w-[16%]" />
+              <col className="w-[11%]" />
+              <col className="w-[12%]" />
               <col className="w-[12%]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 "><SortableHeader column="numeroRegistro" label="N° Registro / Serie" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 "><SortableHeader column="vehiculoPlaca" label="Placa Vehicular" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="px-4 py-3 ">Vehículo y Titular</th>
+                <th className="px-4 py-3 ">Propietario</th>
                 <th className="px-4 py-3 "><SortableHeader column="fecha" label="Fechas" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 "><SortableHeader column="resultado" label="Resultado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3">Vigencia</th>
                 <th className="sticky right-0 z-20 px-4 py-3 text-right bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                   Acciones
                 </th>
@@ -1079,6 +1140,9 @@ export function Inspecciones() {
                     <td className="px-4 py-3">
                       <div className="h-5 w-20 rounded-full" style={{ backgroundColor: 'var(--bg-subtle)' }} />
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="h-5 w-20 rounded-full" style={{ backgroundColor: 'var(--bg-subtle)' }} />
+                    </td>
                     <td
                       className="sticky right-0 z-10 px-4 py-3 text-right"
                       style={{ backgroundColor: 'var(--bg-surface)' }}
@@ -1089,7 +1153,7 @@ export function Inspecciones() {
                 ))
               ) : filteredInspecciones.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="p-12 text-center">
+                  <td colSpan="7" className="p-12 text-center">
                     <Icon name="inspection" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
                     <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron inspecciones</p>
                   </td>
@@ -1108,6 +1172,7 @@ export function Inspecciones() {
                           <span className="font-mono font-bold text-slate-900 dark:text-white text-xs block">
                             {i.numeroRegistro || i.numeroInspeccion}
                           </span>
+                          <span className={`block text-[10px] font-semibold ${Number(i.esActual) === 1 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>{Number(i.esActual) === 1 ? 'Actual' : 'Histórica'}</span>
                           {numSerie && (
                             <span className="inline-flex items-center font-mono text-[10.5px] font-bold text-sky-700 bg-sky-50 dark:text-sky-300 dark:bg-sky-950/60 px-2 py-0.5 rounded border border-sky-200/80 dark:border-sky-800">
                               Serie: {numSerie}
@@ -1118,7 +1183,7 @@ export function Inspecciones() {
 
                       <td className="px-4 py-3 ">
                         <div className="space-y-0.5">
-                          <PlacaBadge placa={i.vehiculoPlaca} />
+                          <PlacaVehiculo placa={i.vehiculoPlaca} vehiculoId={i.vehiculoId} />
                           {(vehiculo?.marca || i.vehiculoMarca || vehiculo?.modelo || i.vehiculoModelo) && (
                             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                               {[vehiculo?.marca || i.vehiculoMarca, vehiculo?.modelo || i.vehiculoModelo].filter(Boolean).join(' ')}
@@ -1141,11 +1206,6 @@ export function Inspecciones() {
                                 DNI: {vehiculo?.propietarioDni || i.propietarioDni}
                               </span>
                             )}
-                            {(vehiculo?.asociacion || i.transportador) && (
-                              <span className="truncate" title={vehiculo?.asociacion || i.transportador}>
-                                · {vehiculo?.asociacion || i.transportador}
-                              </span>
-                            )}
                           </div>
                         </div>
                       </td>
@@ -1163,6 +1223,17 @@ export function Inspecciones() {
 
                       <td className="px-4 py-3 ">
                         {getResultadoBadge(i.resultado)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {i.estadoVigencia === 'OBSERVADO' ? (
+                          <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Pendiente de subsanar</span>
+                        ) : i.estadoVigencia === 'DESAPROBADO' ? (
+                          <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300">No habilitado</span>
+                        ) : i.estadoVigencia === 'VIGENTE' && Number(i.diasRestantes) <= 30 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">Por vencer</span>
+                        ) : i.estadoVigencia ? (
+                          <StatusBadge status={i.estadoVigencia} />
+                        ) : <span className="text-slate-400">—</span>}
                       </td>
 
                       <td
@@ -1211,7 +1282,7 @@ export function Inspecciones() {
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(i)}
-                            title="Editar inspección"
+                            title={i.resultado === 'OBSERVADO' && !i.segundaEvaluacion && Number(i.esActual) === 1 ? 'Continuar segunda evaluación' : 'Editar inspección'}
                             className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
                             style={{
                               backgroundColor: 'var(--action-edit-bg)',
@@ -1231,11 +1302,11 @@ export function Inspecciones() {
                               e.currentTarget.style.color = 'var(--action-edit-text)'
                             }}
                           >
-                            <Icon name="pencil" className="size-4" />
+                            {i.resultado === 'OBSERVADO' && !i.segundaEvaluacion && Number(i.esActual) === 1 ? <span className="text-xs font-black">2ª</span> : <Icon name="pencil" className="size-4" />}
                           </button>
 
                           {/* ELIMINAR: Rojo */}
-                          <button
+                          <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
                             type="button"
                             onClick={() => handleDelete(i.id)}
                             title="Anular inspección"
@@ -1301,6 +1372,13 @@ export function Inspecciones() {
             </div>
 
             <form onSubmit={handleFormSubmit} autoComplete="off" className="flex flex-col">
+              {inspeccionPendiente && (
+                <div className="mx-5 mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  <p>Esta placa tiene una inspección observada pendiente: <strong>{inspeccionPendiente.numeroRegistro}</strong>. Si estás subsanando sus observaciones, continúa la segunda evaluación.</p>
+                  <button type="button" onClick={() => handleOpenEditModal(inspeccionPendiente)} className="mt-2 rounded-lg bg-blue-600 px-3 py-2 font-bold text-white">Continuar segunda evaluación</button>
+                  <p className="mt-2">Si corresponde a una revisión independiente, puedes continuar con este nuevo registro.</p>
+                </div>
+              )}
               <div className="p-4 sm:p-5 space-y-4 max-h-[75vh] overflow-y-auto">
                 {/* 1. Sección: Identificación del Documento y Talonario */}
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">

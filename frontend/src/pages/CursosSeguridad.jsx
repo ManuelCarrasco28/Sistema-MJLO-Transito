@@ -16,6 +16,7 @@ import { RoundedSelect, FloatingInput, FloatingSelect, FloatingTextarea } from '
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { CarnetCursoTab } from '../components/cursos/CarnetCursoTab'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
+import { puedeEliminarRegistros } from '../config/roles'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -128,7 +129,7 @@ export function CursosSeguridad() {
       setEstadoPendiente(null)
       handleFormSubmit({ preventDefault() {} })
     }
-  })
+  }, [estadoPendiente, formData.estado]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const abrirCancelacion = async () => {
     setCancelacion({ cargando: true, destinos: [], destinoId: '' })
@@ -635,7 +636,7 @@ export function CursosSeguridad() {
                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditModal(c); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar Curso">
                           <Icon name="pencil" className="size-4" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(c.uuid || c.id); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar Curso">
+                        <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }} onClick={(e) => { e.stopPropagation(); handleDelete(c.uuid || c.id); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white" title="Eliminar Curso">
                           <Icon name="trash" className="size-4" />
                         </button>
                       </div>

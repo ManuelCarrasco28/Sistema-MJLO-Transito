@@ -87,21 +87,29 @@ export function SuperAdminDashboard({ user }) {
   const [exportandoPdf, setExportandoPdf] = useState(false)
   const municipalidadRequestRef = useRef(0)
 
-  useEffect(() => { setAuditPage(1) }, [realAuditLogs])
+  const [auditTotal, setAuditTotal] = useState(0)
+  const auditRequestRef = useRef(0)
+
+  useEffect(() => { setAuditPage(1) }, [auditSearch, auditType, auditSeverity])
 
   const fetchAuditLogs = async () => {
+    const requestId = ++auditRequestRef.current
     setLoadingAudit(true)
     try {
       const params = new URLSearchParams()
       if (auditSearch.trim()) params.set('search', auditSearch.trim())
       if (auditType !== 'TODOS') params.set('modulo', auditType)
       if (auditSeverity !== 'TODOS') params.set('accion', auditSeverity)
-      params.set('limit', '100')
+      params.set('limit', String(auditPerPage))
+      params.set('page', String(auditPage))
 
       const res = await apiFetch(`/auditoria?${params.toString()}`)
       const data = await res.json()
+      // Si mientras tanto se pidió otra página o filtro, esta respuesta ya es vieja y se descarta
+      if (requestId !== auditRequestRef.current) return
       if (res.ok && data.data) {
         setRealAuditLogs(data.data)
+        setAuditTotal(Number(data.total) || data.data.length)
       }
 
       const resStats = await apiFetch('/auditoria/estadisticas')
@@ -112,7 +120,7 @@ export function SuperAdminDashboard({ user }) {
     } catch (_) {
       // Error silencioso en carga inicial de auditoría
     } finally {
-      setLoadingAudit(false)
+      if (requestId === auditRequestRef.current) setLoadingAudit(false)
     }
   }
 
@@ -142,7 +150,7 @@ export function SuperAdminDashboard({ user }) {
       title: 'Reporte de Auditoría del Sistema',
       subtitle: 'Registro de acciones críticas',
       metadata: [
-        { label: 'Generado por', value: user?.nombres + ' ' + user?.apellidoPaterno || 'Super Admin' },
+        { label: 'Generado por', value: [user?.nombres, user?.apellidoPaterno].filter(Boolean).join(' ') || 'Super Admin' },
         { label: 'Fecha', value: new Date().toLocaleString('es-PE') }
       ],
       columns: [
@@ -301,7 +309,7 @@ export function SuperAdminDashboard({ user }) {
       fetchAuditLogs()
     }, 250)
     return () => clearTimeout(timer)
-  }, [auditSearch, auditType, auditSeverity, activeModule])
+  }, [auditSearch, auditType, auditSeverity, auditPage, auditPerPage, activeModule])
 
   const saveMunicipalidad = async (event) => {
     event.preventDefault()
@@ -644,10 +652,10 @@ export function SuperAdminDashboard({ user }) {
         {activeModule === 'auditoria' && (
           <div className="space-y-4">
             <div className="kpi-grid">
-              <TarjetaKpi label="Total eventos" value={formatNumeroTarjeta(auditStats.total || realAuditLogs.length)} detail="Registros en base de datos" icon="document" color="indigo" />
+              <TarjetaKpi label="Total eventos" value={formatNumeroTarjeta(auditStats.total || auditTotal)} detail="Registros en base de datos" icon="document" color="indigo" />
               <TarjetaKpi label="Eventos hoy" value={formatNumeroTarjeta(auditStats.hoy || 0)} detail="Actividad de la jornada" icon="calendar" color="emerald" />
               <TarjetaKpi label="Módulos activos" value={(auditStats.porModulo || []).length || '6'} detail="Trazabilidad del sistema" icon="shieldCheck" color="cyan" />
-              <TarjetaKpi label="Mostrados" value={formatNumeroTarjeta(realAuditLogs.length)} detail="Coincidencias con filtros" icon="search" color="amber" />
+              <TarjetaKpi label="Mostrados" value={formatNumeroTarjeta(auditTotal)} detail="Coincidencias con filtros" icon="search" color="amber" />
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
@@ -740,7 +748,7 @@ export function SuperAdminDashboard({ user }) {
                           Cargando eventos de auditoría...
                         </td>
                       </tr>
-                    ) : realAuditLogs.length ? realAuditLogs.slice((auditPage - 1) * auditPerPage, auditPage * auditPerPage).map((event) => (
+                    ) : realAuditLogs.length ? realAuditLogs.map((event) => (
                       <tr key={event.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
                         <td className="px-4 py-3 text-center align-top">
                           <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
@@ -800,7 +808,7 @@ export function SuperAdminDashboard({ user }) {
 
               <Pagination
                 currentPage={auditPage}
-                totalItems={realAuditLogs.length}
+                totalItems={auditTotal}
                 itemsPerPage={auditPerPage}
                 onPageChange={setAuditPage}
                 onItemsPerPageChange={(size) => { setAuditPerPage(size); setAuditPage(1) }}

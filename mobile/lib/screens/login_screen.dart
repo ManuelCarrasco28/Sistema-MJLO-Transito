@@ -30,7 +30,6 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         if (hasCreds) {
           _usuarioController.text = creds['username']!;
-          _passwordController.text = creds['password']!;
           _recordarUsuario = true;
         }
       });
@@ -52,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await ApiService.login(
         _usuarioController.text.trim(),
-        _passwordController.text.trim(),
+        _passwordController.text,
       );
 
       if (_recordarUsuario) {
