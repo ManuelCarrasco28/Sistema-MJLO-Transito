@@ -52,6 +52,16 @@ export function CursosSeguridad() {
   const [totalFiltrado, setTotalFiltrado] = useState(0)
   const [estadisticas, setEstadisticas] = useState(getCachedData('/cursos-estadisticas') || {})
   const [revision, setRevision] = useState(0)
+  // Personas con el carnet de curso vencido (más de un año desde su último curso aprobado)
+  const [carnetsVencidos, setCarnetsVencidos] = useState(null)
+  useEffect(() => {
+    let vigente = true
+    apiFetch('/cursos/vigencias?page=1&porPagina=1&estado=VENCIDO')
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((payload) => { if (vigente) setCarnetsVencidos(Number(payload.meta?.total || 0)) })
+      .catch(() => { if (vigente) setCarnetsVencidos(null) })
+    return () => { vigente = false }
+  }, [revision])
   const debouncedSearch = useDebounce(searchTerm)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedCurso, setSelectedCurso] = useState(null)
@@ -386,7 +396,7 @@ export function CursosSeguridad() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">TOTAL CURSOS</span>
-            <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60">
+            <span className="grid size-6 place-items-center rounded-md text-purple-600 dark:text-purple-400">
               <Icon name="course" className="size-3.5" />
             </span>
           </div>
@@ -398,7 +408,7 @@ export function CursosSeguridad() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">CURSOS ACTIVOS</span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60">
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400">
               <Icon name="office" className="size-3.5" />
             </span>
           </div>
@@ -410,7 +420,7 @@ export function CursosSeguridad() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">TOTAL INSCRITOS</span>
-            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60">
+            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="people" className="size-3.5" />
             </span>
           </div>
@@ -422,7 +432,7 @@ export function CursosSeguridad() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">CULMINADOS</span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60">
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400">
               ✓
             </span>
           </div>
@@ -430,12 +440,24 @@ export function CursosSeguridad() {
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{cursosFinalizados}</p>
           </div>
         </div>
+
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">CARNETS VENCIDOS</span>
+            <span className="grid size-6 place-items-center rounded-md text-rose-600 dark:text-rose-400">
+              <Icon name="alert" className="size-3.5" />
+            </span>
+          </div>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{carnetsVencidos == null ? '—' : carnetsVencidos.toLocaleString('es-PE')}</p>
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center gap-1 border-b border-slate-200 dark:border-[var(--border)]">
         {[
           { id: 'CURSOS', label: 'Cursos', icono: 'course' },
-          { id: 'CARNET', label: 'Carnet de curso', icono: 'idCard' },
+          { id: 'CARNET', label: 'Personas con carnet', icono: 'idCard' },
         ].map((tab) => (
           <button
             key={tab.id}

@@ -635,7 +635,7 @@ export function Operativos({ user }) {
           <div key={label} className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">{label}</span>
-              <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60">
+              <span className="grid size-6 place-items-center rounded-md text-purple-600 dark:text-purple-400">
                 <Icon name={icon} className="size-3.5" />
               </span>
             </div>

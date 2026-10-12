@@ -35,14 +35,10 @@ const FILTER_VIGENCIA_OPTIONS = [
 ]
 
 // Primera evaluación: se deriva del checklist, no se elige a mano.
-// "No tiene" solo desaprueba en criterios obligatorios: la razón social, por
-// ejemplo, no aplica a unidades independientes.
-function calcularPrimeraEvaluacion(detalles, criterios = []) {
+// Cualquier ítem en "Mal estado" o "No tiene" desaprueba la primera evaluación.
+function calcularPrimeraEvaluacion(detalles) {
   if (detalles.some(d => !d.estado)) return 'PENDIENTE'
-  const obligatorio = (criterioId) => criterios.find((c) => c.id === criterioId)?.obligatorio !== false
-  const hayProblema = detalles.some(
-    (d) => d.estado === 'MAL_ESTADO' || (d.estado === 'NO_TIENE' && obligatorio(d.criterioId))
-  )
+  const hayProblema = detalles.some((d) => d.estado === 'MAL_ESTADO' || d.estado === 'NO_TIENE')
   return hayProblema ? 'DESAPROBADO' : 'APROBADO'
 }
 
@@ -661,7 +657,7 @@ export function Inspecciones() {
   const handleDetalleChange = (criterioId, field, value) => {
     setFormData((prev) => {
       const newDetalles = prev.detalles.map((d) => (d.criterioId === criterioId ? { ...d, [field]: value } : d))
-      const evalChecklist = calcularPrimeraEvaluacion(newDetalles, criteriosInspeccion)
+      const evalChecklist = calcularPrimeraEvaluacion(newDetalles)
 
       // Editando una inspección ya DESAPROBADA: la Primera Evaluación queda
       // fija (es historia); volver a llenar el checklist ahora define la
@@ -915,7 +911,7 @@ export function Inspecciones() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Total registros
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="inspection" className="size-3.5" />
             </span>
           </div>
@@ -932,7 +928,7 @@ export function Inspecciones() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Aprobados
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400 font-bold text-xs">
               ✓
             </span>
           </div>
@@ -949,7 +945,7 @@ export function Inspecciones() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
               Observados
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400 font-bold text-xs">
               <Icon name="alert" className="size-3.5" />
             </span>
           </div>
@@ -966,7 +962,7 @@ export function Inspecciones() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
               Desaprobados
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-rose-600 dark:text-rose-400 font-bold text-xs">
               ✕
             </span>
           </div>
@@ -983,7 +979,7 @@ export function Inspecciones() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
               Aptitud Técnica
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-cyan-600 dark:text-cyan-400 font-bold text-xs">
               %
             </span>
           </div>
@@ -1719,7 +1715,7 @@ export function Inspecciones() {
                                       <span className="font-mono text-[9px] font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1 py-0.5 rounded border border-indigo-200/60 dark:border-indigo-800 shrink-0">
                                         {crit.codigo}
                                       </span>
-                                      <span className="font-bold text-slate-800 dark:text-white truncate block text-[11.5px]" title={crit.nombre}>
+                                      <span className="font-bold text-slate-800 dark:text-white block break-words leading-snug text-[11.5px]" title={crit.nombre}>
                                         {crit.nombre}
                                       </span>
                                     </div>
@@ -2056,7 +2052,7 @@ export function Inspecciones() {
                     </span>
                   </div>
 
-                  <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                  <div className="space-y-3">
                     {/* Se muestran los criterios con que se evaluó esta inspección, no el
                         catálogo actual: las antiguas se evaluaron con otro formato. */}
                     {Object.entries(
@@ -2072,7 +2068,7 @@ export function Inspecciones() {
                             <span className="size-1 rounded-full bg-slate-400" />
                             {seccion}
                           </h6>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                             {items.map((det) => {
                               const estadoVal = det.estado
                               const isBien = estadoVal === 'BIEN'
@@ -2084,7 +2080,7 @@ export function Inspecciones() {
                                   className="flex items-center justify-between gap-1.5 p-2 rounded-xl bg-white dark:bg-[var(--bg-subtle)] border border-slate-200/80 dark:border-slate-700/80 text-[11px] shadow-2xs"
                                 >
                                   <div className="min-w-0 flex-1">
-                                    <span className="font-medium text-slate-800 dark:text-slate-200 block truncate" title={nombre}>
+                                    <span className="font-medium text-slate-800 dark:text-slate-200 block break-words leading-snug" title={nombre}>
                                       {nombre}
                                     </span>
                                   </div>

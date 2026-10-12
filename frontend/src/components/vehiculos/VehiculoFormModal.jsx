@@ -327,6 +327,17 @@ export function VehiculoFormModal({
                     inputClassName="font-mono uppercase"
                   />
                 </div>
+
+                {/* Fila 5: Partida Registral (SUNARP) */}
+                <FloatingInput
+                  id="veh_partida"
+                  label="Partida Registral"
+                  maxLength={40}
+                  optional
+                  value={formData.partidaRegistral || ''}
+                  onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '') })}
+                  inputClassName="font-mono uppercase"
+                />
               </div>
             </fieldset>
 

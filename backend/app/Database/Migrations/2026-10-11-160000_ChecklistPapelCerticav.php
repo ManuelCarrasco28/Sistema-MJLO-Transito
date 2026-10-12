@@ -14,8 +14,9 @@ class ChecklistPapelCerticav extends Migration
         foreach ($electricos as $i => $nombre) $rows[] = ['codigo' => sprintf('CV-%02d', $i + 1), 'nombre' => $nombre, 'seccion' => 'SISTEMA ELECTRICO', 'orden' => ($i + 1) * 10, 'obligatorio' => 1];
         $rows[] = ['codigo' => 'CV-18', 'nombre' => 'Tapiz del asiento', 'seccion' => 'ASPECTOS INTERIORES', 'orden' => 180, 'obligatorio' => 1];
         foreach ($mecanicos as $i => $nombre) $rows[] = ['codigo' => sprintf('CV-%02d', $i + 19), 'nombre' => $nombre, 'seccion' => 'ESPECIFICACIONES MECANICAS', 'orden' => ($i + 19) * 10, 'obligatorio' => 1];
-        foreach ($exteriores as $i => $nombre) $rows[] = ['codigo' => sprintf('CV-%02d', $i + 25), 'nombre' => $nombre, 'seccion' => 'ASPECTOS EXTERIORES', 'orden' => ($i + 25) * 10, 'obligatorio' => $i < 11 ? 1 : 0];
-        foreach ([['CV-G01', 'Luces direccionales', 'SISTEMA ELECTRICO', 35], ['CV-G02', 'Luces de faro delantero', 'SISTEMA ELECTRICO', 75], ['CV-G03', 'Luces de freno', 'SISTEMA ELECTRICO', 95], ['CV-G04', 'Luces de faro delantero', 'SISTEMA ELECTRICO', 135], ['CV-G05', 'Sistema de frenos', 'ESPECIFICACIONES MECANICAS', 225], ['CV-G06', 'Cinta reflectiva', 'ASPECTOS EXTERIORES', 295], ['CV-G07', 'Pintado', 'ASPECTOS EXTERIORES', 325]] as [$codigo, $nombre, $seccion, $orden]) $rows[] = compact('codigo', 'nombre', 'seccion', 'orden') + ['obligatorio' => 1];
+        foreach ($exteriores as $i => $nombre) $rows[] = ['codigo' => sprintf('CV-%02d', $i + 25), 'nombre' => $nombre, 'seccion' => 'ASPECTOS EXTERIORES', 'orden' => ($i + 25) * 10, 'obligatorio' => 1];
+        // Los títulos de grupo del formato en papel (Luces direccionales, Cinta reflectiva...) no son ítems que se evalúen:
+        // solo ordenan la hoja impresa, así que no se crean como criterios del checklist.
         $this->db->transStart();
         foreach ($rows as $row) {
             $row['estado'] = 'ACTIVO';

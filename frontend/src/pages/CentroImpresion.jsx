@@ -110,7 +110,7 @@ export function CentroImpresion() {
               <p className={`text-[10px] font-bold uppercase tracking-wide ${['text-indigo-600 dark:text-indigo-400', 'text-amber-600 dark:text-amber-400', 'text-cyan-600 dark:text-cyan-400'][i]}`}>
                 {['Carnets del curso', 'Tarjetas de operatividad', 'Vehículos para QR'][i]}
               </p>
-              <span className={`grid size-6 shrink-0 place-items-center rounded-md ${['bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400', 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400', 'bg-cyan-50 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400'][i]}`}>
+              <span className={`grid size-6 shrink-0 place-items-center rounded-md ${['text-indigo-600 dark:text-indigo-400', 'text-amber-600 dark:text-amber-400', 'text-cyan-600 dark:text-cyan-400'][i]}`}>
                 <Icon name={t.icono} className="size-4" />
               </span>
             </div>

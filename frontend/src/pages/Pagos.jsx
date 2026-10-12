@@ -465,7 +465,7 @@ export function Pagos() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total Recaudado</span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400 text-xs">
               <Icon name="payment" className="size-3.5" />
             </span>
           </div>
@@ -482,7 +482,7 @@ export function Pagos() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-sky-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Operaciones</span>
-            <span className="grid size-6 place-items-center rounded-md bg-sky-50 text-sky-600 dark:bg-sky-950/60 text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-sky-600 dark:text-sky-400 text-xs">
               <Icon name="receiptCheck" className="size-3.5" />
             </span>
           </div>
@@ -499,7 +499,7 @@ export function Pagos() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Pagos de Hoy</span>
-            <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60 text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-purple-600 dark:text-purple-400 text-xs">
               <Icon name="calendar" className="size-3.5" />
             </span>
           </div>

@@ -782,7 +782,7 @@ export function Papeletas({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Total Impuestas</span>
-            <span className="grid size-6 place-items-center rounded-md bg-slate-50 text-slate-600 dark:bg-slate-950/60">
+            <span className="grid size-6 place-items-center rounded-md text-slate-600 dark:text-slate-400">
               <Icon name="ticket" className="size-3.5" />
             </span>
           </div>
@@ -794,7 +794,7 @@ export function Papeletas({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pendientes</span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400 font-bold text-xs">
               ⏳
             </span>
           </div>
@@ -806,7 +806,7 @@ export function Papeletas({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Pagadas</span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400 font-bold text-xs">
               ✓
             </span>
           </div>
@@ -818,7 +818,7 @@ export function Papeletas({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Anuladas</span>
-            <span className="grid size-6 place-items-center rounded-md bg-slate-50 text-slate-600 dark:bg-slate-950/60 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-slate-600 dark:text-slate-400 font-bold text-xs">
               ✕
             </span>
           </div>

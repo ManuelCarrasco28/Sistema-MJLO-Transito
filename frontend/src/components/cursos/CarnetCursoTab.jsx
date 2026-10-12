@@ -65,7 +65,7 @@ export function CarnetCursoTab() {
     return () => { vigente = false }
   }, [pagina, porPagina, buscar, estado])
 
-  if (error) return <PageLoadError message="No se pudo cargar el carnet de curso de las personas." />
+  if (error) return <PageLoadError message="No se pudo cargar la lista de personas con carnet." />
 
   return (
     <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">

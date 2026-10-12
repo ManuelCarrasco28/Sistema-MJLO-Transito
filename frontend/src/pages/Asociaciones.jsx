@@ -622,13 +622,13 @@ export function Asociaciones() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total registros</span>
-            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="building" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(stats.total)}</p>
-            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">Padrón 2026</span>
+            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Padrón 2026</span>
           </div>
         </div>
 
@@ -636,13 +636,13 @@ export function Asociaciones() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Asociaciones</span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400">
               <Icon name="vehicle" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(asociacionesCount)}</p>
-            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">Trimóviles</span>
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Trimóviles</span>
           </div>
         </div>
 
@@ -650,13 +650,13 @@ export function Asociaciones() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Particulares</span>
-            <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
+            <span className="grid size-6 place-items-center rounded-md text-cyan-600 dark:text-cyan-400">
               <Icon name="building" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(particulares)}</p>
-            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 px-1.5 py-0.5 rounded-md">Independientes</span>
+            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400">Independientes</span>
           </div>
         </div>
 
@@ -664,13 +664,13 @@ export function Asociaciones() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Flota Registrada</span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400 font-bold text-xs">✓</span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {formatNumeroTarjeta(flotaAcumulada)}
             </p>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
               Vehículos
             </span>
           </div>

@@ -82,12 +82,12 @@ export function BotonAccion({ tipo = 'eye', onClick, title, disabled = false }) 
 }
 
 const COLORES_KPI = {
-  indigo: { borde: 'border-indigo-400', texto: 'text-indigo-600 dark:text-indigo-400', icono: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400' },
-  emerald: { borde: 'border-emerald-400', texto: 'text-emerald-600 dark:text-emerald-400', icono: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400' },
-  amber: { borde: 'border-amber-400', texto: 'text-amber-600 dark:text-amber-400', icono: 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400' },
-  cyan: { borde: 'border-cyan-400', texto: 'text-cyan-600 dark:text-cyan-400', icono: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400' },
-  rose: { borde: 'border-rose-400', texto: 'text-rose-600 dark:text-rose-400', icono: 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400' },
-  violet: { borde: 'border-violet-400', texto: 'text-violet-600 dark:text-violet-400', icono: 'bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400' },
+  indigo: { borde: 'border-indigo-400', texto: 'text-indigo-600 dark:text-indigo-400', icono: 'text-indigo-600 dark:text-indigo-400' },
+  emerald: { borde: 'border-emerald-400', texto: 'text-emerald-600 dark:text-emerald-400', icono: 'text-emerald-600 dark:text-emerald-400' },
+  amber: { borde: 'border-amber-400', texto: 'text-amber-600 dark:text-amber-400', icono: 'text-amber-600 dark:text-amber-400' },
+  cyan: { borde: 'border-cyan-400', texto: 'text-cyan-600 dark:text-cyan-400', icono: 'text-cyan-600 dark:text-cyan-400' },
+  rose: { borde: 'border-rose-400', texto: 'text-rose-600 dark:text-rose-400', icono: 'text-rose-600 dark:text-rose-400' },
+  violet: { borde: 'border-violet-400', texto: 'text-violet-600 dark:text-violet-400', icono: 'text-violet-600 dark:text-violet-400' },
 }
 
 export function TarjetaKpi({ label, value, detail, icon, color = 'indigo' }) {

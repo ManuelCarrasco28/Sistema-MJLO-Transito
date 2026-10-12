@@ -587,7 +587,7 @@ export function Retenciones({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Total Internamientos</span>
-            <span className="grid size-6 place-items-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60">
+            <span className="grid size-6 place-items-center rounded-md text-blue-600 dark:text-blue-400">
               <Icon name="retention" className="size-3.5" />
             </span>
           </div>
@@ -599,7 +599,7 @@ export function Retenciones({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">En Depósito</span>
-            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60">
+            <span className="grid size-6 place-items-center rounded-md text-rose-600 dark:text-rose-400">
               <Icon name="lock" className="size-3.5" />
             </span>
           </div>
@@ -611,7 +611,7 @@ export function Retenciones({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Liberados</span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60">
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400">
               <Icon name="check" className="size-3.5" />
             </span>
           </div>
@@ -623,7 +623,7 @@ export function Retenciones({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Días Promedio</span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60">
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400">
               <Icon name="clock" className="size-3.5" />
             </span>
           </div>

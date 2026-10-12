@@ -355,7 +355,7 @@ export function Permisos() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Total</span>
-            <span className="grid size-6 place-items-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+            <span className="grid size-6 place-items-center rounded-md text-blue-600 dark:text-blue-400">
               <Icon name="routePermit" className="size-3.5" />
             </span>
           </div>
@@ -370,7 +370,7 @@ export function Permisos() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Ctrl Vehicular</span>
-            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="truck" className="size-3.5" />
             </span>
           </div>
@@ -385,7 +385,7 @@ export function Permisos() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Carga/Desc.</span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400">
               <Icon name="motoTaxi" className="size-3.5" />
             </span>
           </div>
@@ -400,7 +400,7 @@ export function Permisos() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Uso de Vías</span>
-            <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
+            <span className="grid size-6 place-items-center rounded-md text-cyan-600 dark:text-cyan-400">
               <Icon name="permit" className="size-3.5" />
             </span>
           </div>
@@ -415,7 +415,7 @@ export function Permisos() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Zonas Reserv.</span>
-            <span className="grid size-6 place-items-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
+            <span className="grid size-6 place-items-center rounded-md text-purple-600 dark:text-purple-400">
               <Icon name="parking" className="size-3.5" />
             </span>
           </div>
@@ -430,7 +430,7 @@ export function Permisos() {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Vigentes</span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400 font-bold text-xs">
               ✓
             </span>
           </div>

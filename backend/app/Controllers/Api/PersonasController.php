@@ -29,6 +29,10 @@ class PersonasController extends ResourceController
         if (str_starts_with($valor, 'data:image')) {
             return (new \App\Services\FileStorageService())->guardarImagenBase64($valor, 'personas');
         }
+        // Foto de RENIEC (URL firmada de PIDE que caduca): se descarga y se guarda como archivo propio
+        if (str_starts_with($valor, 'https://')) {
+            return (new \App\Services\FileStorageService())->guardarFotoPide($valor, 'personas');
+        }
         // Solo imágenes propias: la URL que arma el servidor se guarda como ruta relativa; cualquier otra URL
         // (externa) se descarta para no guardar enlaces a sitios de terceros.
         $pos = strpos($valor, '/api/files/');

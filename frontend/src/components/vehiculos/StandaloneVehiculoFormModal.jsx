@@ -7,7 +7,7 @@ import { useOficinaRegistral } from '../../hooks/useOficinaRegistral'
 export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial = '' }) {
   const [formData, setFormData] = useState({
     placa: placaInicial, tipo: 'Mototaxi', marca: '', modelo: '', color: '', anio: '',
-    categoria: '', carroceria: '', sedeRegistro: 'CHICLAYO', tipoCarroceria: '', numeroSerie: '', serieMotor: '',
+    categoria: '', carroceria: '', sedeRegistro: 'CHICLAYO', tipoCarroceria: '', numeroSerie: '', serieMotor: '', partidaRegistral: '',
     asociacion: '', propietario: '', propietarioDni: '', estado: 'ACTIVO', soatEstado: 'VIGENTE',
     tucNumero: `TUC-2026-${Math.floor(100 + Math.random() * 900)}`
   })
@@ -112,6 +112,7 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
         anio: sunarpData.anioFabricacion || sunarpData.anio_fabricacion || prev.anio,
         numeroSerie: sunarpData.serie || sunarpData.numero_serie || prev.numeroSerie,
         serieMotor: sunarpData.motor || sunarpData.numero_motor || prev.serieMotor,
+        partidaRegistral: sunarpData.partida || sunarpData.partida_registral || prev.partidaRegistral,
         sedeRegistro: sunarpData.sede || sunarpData.sede_registro || prev.sedeRegistro,
         tipo: sunarpData.clase || prev.tipo
       }))
@@ -164,6 +165,7 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
         tipoCarroceria: formData.tipoCarroceria,
         numeroSerie: formData.numeroSerie,
         serieMotor: formData.serieMotor,
+        partidaRegistral: formData.partidaRegistral,
         asociacion: formData.asociacion,
         propietario: formData.propietario,
         propietarioDni: formData.propietarioDni,

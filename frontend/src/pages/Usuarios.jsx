@@ -586,7 +586,7 @@ export function Usuarios({ user }) {
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Total usuarios
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="people" className="size-3.5" />
             </span>
           </div>
@@ -603,7 +603,7 @@ export function Usuarios({ user }) {
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
               Administración
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400">
               <Icon name="shieldCheck" className="size-3.5" />
             </span>
           </div>
@@ -620,7 +620,7 @@ export function Usuarios({ user }) {
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
               Inspectores
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
+            <span className="grid size-6 place-items-center rounded-md text-cyan-600 dark:text-cyan-400">
               <Icon name="deviceMobile" className="size-3.5" />
             </span>
           </div>
@@ -637,7 +637,7 @@ export function Usuarios({ user }) {
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Activos
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400 font-bold text-xs">
               ✓
             </span>
           </div>
@@ -654,7 +654,7 @@ export function Usuarios({ user }) {
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
               Inactivos
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-rose-600 dark:text-rose-400 font-bold text-xs">
               ✕
             </span>
           </div>

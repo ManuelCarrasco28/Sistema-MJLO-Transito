@@ -461,6 +461,7 @@ export function Vehiculos({ user }) {
     tipoCarroceria: '',
     numeroSerie: '',
     serieMotor: '',
+    partidaRegistral: '',
     asociacion: '',
     propietario: '',
     propietarioDni: '',
@@ -710,6 +711,7 @@ export function Vehiculos({ user }) {
         numeroSerie: sunarpData.serie || sunarpData.vin || sunarpData.numero_serie || sunarpData.nro_serie || prev.numeroSerie,
         serieMotor: sunarpData.numero_motor || sunarpData.nro_motor || prev.serieMotor,
         partidaRegistral: sunarpData.partida || sunarpData.partida_registral || prev.partidaRegistral,
+        partidaRegistral: sunarpData.partida || sunarpData.partida_registral || prev.partidaRegistral,
       }))
     } catch (err) {
       showWarning('Advertencia', sanitizarMensaje(err.message, 'No se pudo consultar la información del vehículo.'))
@@ -778,6 +780,7 @@ export function Vehiculos({ user }) {
           { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 150 },
           { header: 'SERIE DEL MOTOR', key: 'serieMotor', isText: true, width: 150 },
           { header: 'PARTIDA REGISTRAL', key: 'partidaRegistral', isText: true, width: 140 },
+          { header: 'PARTIDA REGISTRAL', key: 'partidaRegistral', isText: true, width: 140 },
           { header: 'N° TUC', key: 'tucNumero', isText: true, width: 130 },
           { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 270 },
           { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
@@ -845,6 +848,7 @@ export function Vehiculos({ user }) {
       tipoCarroceria: '',
       numeroSerie: '',
       serieMotor: '',
+      partidaRegistral: '',
       asociacion: '',
       propietario: '',
       propietarioDni: '',
@@ -1137,13 +1141,13 @@ export function Vehiculos({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total Unidades</span>
-            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="vehicle" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(totalVehiculos)}</p>
-            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">Padrón 2026</span>
+            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Padrón 2026</span>
           </div>
         </div>
 
@@ -1151,11 +1155,11 @@ export function Vehiculos({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-emerald-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Formales</span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">✓</span>
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400 font-bold text-xs">✓</span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(formales)}</p>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md">{porcentajeFormales}% En Asoc.</span>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{porcentajeFormales}% En Asoc.</span>
           </div>
         </div>
 
@@ -1163,11 +1167,11 @@ export function Vehiculos({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Informales</span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 font-bold text-xs"><Icon name="alert" className="size-3.5" /></span>
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400 font-bold text-xs"><Icon name="alert" className="size-3.5" /></span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(informales)}</p>
-            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">Sin Asoc.</span>
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Sin Asoc.</span>
           </div>
         </div>
 
@@ -1175,11 +1179,11 @@ export function Vehiculos({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Inhabilitados</span>
-            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">✕</span>
+            <span className="grid size-6 place-items-center rounded-md text-rose-600 dark:text-rose-400 font-bold text-xs">✕</span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(suspendidos)}</p>
-            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-1.5 py-0.5 rounded-md">Susp. o Baja</span>
+            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">Susp. o Baja</span>
           </div>
         </div>
       </div>

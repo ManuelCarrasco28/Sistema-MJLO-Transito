@@ -496,22 +496,22 @@ export function SuperAdminDashboard({ user }) {
   const dashboardStats = [
     {
       label: 'Usuarios activos', value: moduleStats[0].value, detail: 'Cuentas habilitadas', icon: 'people',
-      borderColor: 'border-emerald-400', textColor: 'text-emerald-600 dark:text-emerald-400', tone: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
+      borderColor: 'border-emerald-400', textColor: 'text-emerald-600 dark:text-emerald-400', tone: 'text-emerald-600 dark:text-emerald-400',
     },
     {
       label: 'Usuarios inactivos', value: moduleStats[1].value, detail: 'Cuentas bloqueadas', icon: 'lock',
-      borderColor: 'border-rose-400', textColor: 'text-rose-600 dark:text-rose-400', tone: 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
+      borderColor: 'border-rose-400', textColor: 'text-rose-600 dark:text-rose-400', tone: 'text-rose-600 dark:text-rose-400',
     },
     {
       label: 'Roles registrados', value: moduleStats[2].value, detail: 'Perfiles administrativos', icon: 'shieldCheck',
-      borderColor: 'border-indigo-400', textColor: 'text-indigo-600 dark:text-indigo-400', tone: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400',
+      borderColor: 'border-indigo-400', textColor: 'text-indigo-600 dark:text-indigo-400', tone: 'text-indigo-600 dark:text-indigo-400',
     },
     {
       label: 'Permiso móvil',
       value: mobilePermitePapeleta === null ? '...' : mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO',
       detail: mobilePermitePapeleta === null ? 'Cargando configuración...' : mobilePermitePapeleta ? 'Móvil aplica papeletas' : 'Solo reportes/evidencias',
       icon: 'deviceMobile',
-      borderColor: 'border-violet-400', textColor: 'text-violet-600 dark:text-violet-400', tone: 'bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400',
+      borderColor: 'border-violet-400', textColor: 'text-violet-600 dark:text-violet-400', tone: 'text-violet-600 dark:text-violet-400',
       isToggle: true
     }
   ]

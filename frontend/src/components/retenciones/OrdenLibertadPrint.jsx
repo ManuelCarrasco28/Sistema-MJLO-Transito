@@ -13,19 +13,18 @@ export const OrdenLibertadPrint = ({ item }) => {
   return createPortal(
     <div id="seccion-impresion" className="seccion-impresion-portal orden-libertad-a4 font-sans text-[15px] box-border">
       
-      {/* Header */}
-      <div className="text-center relative mb-3 pt-2 pb-5 pl-28 pr-28">
-        <img src="/img/logo-mjlo.png" alt="Municipalidad de José Leonardo Ortiz" className="absolute left-0 top-0 w-28 h-24 object-contain object-left" />
-        <h2 className="text-2xl font-black tracking-widest text-blue-900">
-          DIVISIÓN DE TRÁNSITO
-        </h2>
-        <h2 className="text-2xl font-black tracking-widest text-blue-900 mb-1">
-          Y TRANSPORTE
-        </h2>
-        <div className="absolute right-0 bottom-0 text-red-600 font-bold text-xl tracking-widest font-sans [font-variant-numeric:lining-nums_tabular-nums]">
+      {/* Header: el logo va arriba y centrado; ya trae el nombre de la municipalidad, no se repite en texto */}
+      <div className="relative mb-3 pt-1">
+        <div className="flex justify-center">
+          <img src="/img/logo-mjlo.png" alt="Municipalidad José Leonardo Ortiz" className="h-24 w-64 object-contain" />
+        </div>
+        <div className="absolute right-0 top-0 text-red-600 font-bold text-xl tracking-widest font-sans [font-variant-numeric:lining-nums_tabular-nums]">
           <div className="text-[9px] font-bold uppercase tracking-normal text-slate-700">Registro digital</div>
           Nº {String(item?.numeroOrdenLibertad || 'S/N').replace(/^[A-Za-z]+-/, '')}
         </div>
+        <h2 className="mt-1 text-center text-xl font-black tracking-widest text-blue-900">
+          DIVISIÓN DE TRÁNSITO Y TRANSPORTE
+        </h2>
       </div>
 
       <div className="text-center mb-3">

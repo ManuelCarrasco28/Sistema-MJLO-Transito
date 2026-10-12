@@ -902,7 +902,7 @@ export function Documentos() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Total registros
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="document" className="size-3.5" />
             </span>
           </div>
@@ -919,7 +919,7 @@ export function Documentos() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
               Tarjeta de Operatividad
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400">
               <Icon name="permit" className="size-3.5" />
             </span>
           </div>
@@ -936,7 +936,7 @@ export function Documentos() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
               SOAT
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
+            <span className="grid size-6 place-items-center rounded-md text-cyan-600 dark:text-cyan-400">
               <Icon name="vehicle" className="size-3.5" />
             </span>
           </div>
@@ -953,7 +953,7 @@ export function Documentos() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Tarjeta de Propiedad
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="vehicle" className="size-3.5" />
             </span>
           </div>
@@ -970,7 +970,7 @@ export function Documentos() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Vigentes
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-emerald-600 dark:text-emerald-400 font-bold text-xs">
               ✓
             </span>
           </div>
@@ -987,7 +987,7 @@ export function Documentos() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
               Vencidos
             </span>
-            <span className="grid size-6 place-items-center rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 font-bold text-xs">
+            <span className="grid size-6 place-items-center rounded-md text-rose-600 dark:text-rose-400 font-bold text-xs">
               ✕
             </span>
           </div>

@@ -132,6 +132,10 @@ export function VehiculoDetalleModal({
                   <p className="font-mono text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.tipoCarroceria || 'N/A'}</p>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Partida registral</p>
+                  <p className="font-mono text-sm font-black text-slate-800 dark:text-slate-100">{selectedVehiculo.partidaRegistral || 'N/A'}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-[var(--border)] dark:bg-slate-950">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Vinculación a asociación</p>
                   <StatusBadge status={isVehiculoFormal(selectedVehiculo) ? 'FORMAL' : 'INFORMAL'} className="mt-1" />
                 </div>
