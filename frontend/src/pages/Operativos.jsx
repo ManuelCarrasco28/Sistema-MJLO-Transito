@@ -144,7 +144,8 @@ export function Operativos({ user }) {
 
   useEffect(() => setPage(1), [estado, fechaFiltro])
 
-  const [stats, setStats] = useState({ total: 0, activos: 0, finalizados: 0, papeletas: 0 })
+  const [stats, setStats] = useState({ total: 0, activos: 0, finalizados: 0, papeletas: 0, reportes: 0 })
+  const [detailTab, setDetailTab] = useState('papeletas')
 
   const loadStats = () => {
     apiFetch('/operativos/estadisticas')
@@ -194,6 +195,7 @@ export function Operativos({ user }) {
           { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 100, align: 'center' },
           { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 110, align: 'center' },
           { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 100, align: 'center' },
+          { header: 'REPORTES', render: (_, o) => String(o.total_reportes ?? 0), width: 100, align: 'center' },
           { header: 'ESTADO', render: (_, o) => String(o.estado || '').replace(/_/g, ' '), width: 120, align: 'center' },
           { header: 'REGISTRADO POR', render: (_, o) => o.usuario_registra || '—', width: 160 },
           { header: 'FECHA DE REGISTRO', render: (_, o) => o.created_at || '—', width: 150, align: 'center' },
@@ -227,6 +229,7 @@ export function Operativos({ user }) {
           { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 20, align: 'center' },
           { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 25, align: 'center' },
           { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 20, align: 'center' },
+          { header: 'REPORTES', render: (_, o) => String(o.total_reportes ?? 0), width: 20, align: 'center' },
           { header: 'ESTADO', render: (_, o) => String(o.estado || '').replace(/_/g, ' '), width: 25, align: 'center' }
         ],
         data
@@ -397,6 +400,7 @@ export function Operativos({ user }) {
   }
 
   const openDetail = async (op) => {
+    setDetailTab('papeletas')
     const response = await apiFetch(`/operativos/${op.id}`)
     if (!response.ok) return
     const result = await response.json()
@@ -620,12 +624,13 @@ export function Operativos({ user }) {
         </div>
       </div>
 
-      <div className="kpi-grid">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           ['Total operativos', stats.total ?? 0, 'mapPin'],
           ['Activos', activos, 'operations'],
           ['Finalizados', finalizados, 'shieldCheck'],
           ['Papeletas vinculadas', papeletas, 'ticket'],
+          ['Reportes vinculados', stats.reportes ?? 0, 'camera'],
         ].map(([label, value, icon]) => (
           <div key={label} className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between">
@@ -714,14 +719,15 @@ export function Operativos({ user }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] table-fixed text-left text-xs">
+          <table className="w-full min-w-[950px] table-fixed text-left text-xs">
             <colgroup>
-              <col className="w-[26%]" />
-              <col className="w-[20%]" />
-              <col className="w-[12%]" />
-              <col className="w-[12%]" />
-              <col className="w-[14%]" />
-              <col className="w-[16%]" />
+              <col className="w-[24%]" />
+              <col className="w-[18%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[13%]" />
+              <col className="w-[15%]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
@@ -729,6 +735,7 @@ export function Operativos({ user }) {
                 <th className="px-4 py-3 "><SortableHeader column="fecha" label="Fecha / hora" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 text-center">Inspectores</th>
                 <th className="px-4 py-3 text-center">Papeletas</th>
+                <th className="px-4 py-3 text-center">Reportes</th>
                 <th className="px-4 py-3 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3 text-center">Acciones</th>
               </tr>
@@ -746,6 +753,7 @@ export function Operativos({ user }) {
                   </td>
                   <td className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">{op.total_inspectores || 0}</td>
                   <td className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">{op.total_papeletas || 0}</td>
+                  <td className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">{op.total_reportes || 0}</td>
                   <td className="px-4 py-3 text-center"><StatusBadge status={op.estado} /></td>
                   <td className="px-4 py-3">
                     <div className="flex justify-center gap-1.5">
@@ -909,9 +917,10 @@ export function Operativos({ user }) {
               </div>
             )}
 
-            <div className="mb-3 shrink-0 grid gap-3 sm:grid-cols-4">
+            <div className="mb-3 shrink-0 grid gap-3 grid-cols-2 sm:grid-cols-5">
               {[
                 ['Papeletas', detail.reporte?.total_papeletas ?? detail.papeletas?.length ?? 0],
+                ['Reportes', detail.reporte?.total_reportes ?? detail.reportes?.length ?? 0],
                 ['Monto total', money(detail.reporte?.monto_total)],
                 ['Pendientes', detail.reporte?.pendientes ?? 0],
                 ['Pagadas', detail.reporte?.pagadas ?? 0],
@@ -948,81 +957,156 @@ export function Operativos({ user }) {
 
             <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-[var(--border-strong)] shadow-xs">
               <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-black text-slate-900 dark:text-white">Reporte de papeletas del operativo</p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDetailTab('papeletas')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${detailTab === 'papeletas' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+                  >
+                    Papeletas ({detail.papeletas?.length || 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDetailTab('reportes')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${detailTab === 'reportes' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+                  >
+                    Reportes de campo ({detail.reportes?.length || 0})
+                  </button>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => exportOperativoExcel(detail)}
-                    className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white dark:bg-emerald-950/50 dark:text-emerald-300"
+                    className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white dark:bg-emerald-950/50 dark:text-emerald-300 cursor-pointer"
                   >
                     Excel
                   </button>
                   <button
                     type="button"
                     onClick={() => exportOperativoPdf(detail)}
-                    className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-black text-rose-700 transition-colors hover:bg-rose-600 hover:text-white dark:bg-rose-950/50 dark:text-rose-300"
+                    className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-black text-rose-700 transition-colors hover:bg-rose-600 hover:text-white dark:bg-rose-950/50 dark:text-rose-300 cursor-pointer"
                   >
                     PDF
                   </button>
                   <span className="rounded-lg bg-slate-200/70 px-2.5 py-1 text-xs font-bold text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                    Total: {detail.papeletas?.length || 0}
+                    Total: {detailTab === 'papeletas' ? (detail.papeletas?.length || 0) : (detail.reportes?.length || 0)}
                   </span>
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-[#1C2438] border-b border-slate-100 dark:border-[var(--border)]">
-                    <tr>
-                      <th className="px-4 py-2 ">Papeleta</th>
-                      <th className="px-4 py-2 ">Fecha / Lugar</th>
-                      <th className="px-4 py-2 ">Inspector</th>
-                      <th className="px-4 py-2 ">Intervenido</th>
-                      <th className="px-4 py-2 text-center">Placa</th>
-                      <th className="px-4 py-2 text-center">Infracción</th>
-                      <th className="px-4 py-2 text-right">Monto</th>
-                      <th className="px-4 py-2 text-center">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
-                    {(detail.papeletas || []).map((p) => (
-                      <tr key={p.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-[var(--bg-subtle)]">
-                        <td className="px-4 py-2.5 font-mono font-black text-slate-900 dark:text-white">
-                          {p.numero_papeleta}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <p className="font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200">{formatFechaHora(p.fecha_hora)}</p>
-                          <p className="text-[11px] text-slate-500">{p.lugar || detail.lugar}</p>
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-medium">
-                          {p.inspector || 'Inspector Municipal'}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <p className="font-semibold text-slate-800 dark:text-slate-200">{p.intervenido || 'No identificado'}</p>
-                          <p className="text-[11px] text-slate-500 font-mono">DNI: {p.conductor_dni || 'S/D'}</p>
-                        </td>
-                        <td className="px-4 py-2.5 text-center">
-                          <PlacaBadge placa={p.placa} />
-                        </td>
-                        <td className="px-4 py-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                          {p.infracciones || '—'}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-black text-slate-900 dark:text-white">
-                          {money(p.monto_total)}
-                        </td>
-                        <td className="px-4 py-2.5 text-center">
-                          <StatusBadge status={p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado} />
-                        </td>
-                      </tr>
-                    ))}
-                    {!detail.papeletas?.length && (
+                {detailTab === 'papeletas' ? (
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-[#1C2438] border-b border-slate-100 dark:border-[var(--border)]">
                       <tr>
-                        <td colSpan="8" className="px-5 py-10 text-center text-slate-500">Aún no hay papeletas vinculadas a este operativo.</td>
+                        <th className="px-4 py-2 ">Papeleta</th>
+                        <th className="px-4 py-2 ">Fecha / Lugar</th>
+                        <th className="px-4 py-2 ">Inspector</th>
+                        <th className="px-4 py-2 ">Intervenido</th>
+                        <th className="px-4 py-2 text-center">Placa</th>
+                        <th className="px-4 py-2 text-center">Infracción</th>
+                        <th className="px-4 py-2 text-right">Monto</th>
+                        <th className="px-4 py-2 text-center">Estado</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+                      {(detail.papeletas || []).map((p) => (
+                        <tr key={p.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-[var(--bg-subtle)]">
+                          <td className="px-4 py-2.5 font-mono font-black text-slate-900 dark:text-white">
+                            {p.numero_papeleta}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <p className="font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200">{formatFechaHora(p.fecha_hora)}</p>
+                            <p className="text-[11px] text-slate-500">{p.lugar || detail.lugar}</p>
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-medium">
+                            {p.inspector || 'Inspector Municipal'}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <p className="font-semibold text-slate-800 dark:text-slate-200">{p.intervenido || 'No identificado'}</p>
+                            <p className="text-[11px] text-slate-500 font-mono">DNI: {p.conductor_dni || 'S/D'}</p>
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <PlacaBadge placa={p.placa} />
+                          </td>
+                          <td className="px-4 py-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {p.infracciones || '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-black text-slate-900 dark:text-white">
+                            {money(p.monto_total)}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <StatusBadge status={p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado} />
+                          </td>
+                        </tr>
+                      ))}
+                      {!detail.papeletas?.length && (
+                        <tr>
+                          <td colSpan="8" className="px-5 py-10 text-center text-slate-500">Aún no hay papeletas vinculadas a este operativo.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-[#1C2438] border-b border-slate-100 dark:border-[var(--border)]">
+                      <tr>
+                        <th className="px-4 py-2 text-center">N° / Código</th>
+                        <th className="px-4 py-2 ">Fecha / Lugar</th>
+                        <th className="px-4 py-2 ">Inspector</th>
+                        <th className="px-4 py-2 ">Conductor</th>
+                        <th className="px-4 py-2 text-center">Vehículo / Placa</th>
+                        <th className="px-4 py-2 ">Observaciones</th>
+                        <th className="px-4 py-2 text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+                      {(detail.reportes || []).map((r) => (
+                        <tr key={r.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-[var(--bg-subtle)]">
+                          <td className="px-4 py-2.5 font-mono font-black text-center text-slate-900 dark:text-white">
+                            #{r.id}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <p className="font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200">{formatFechaHora(r.fecha_hora)}</p>
+                            <p className="text-[11px] text-slate-500">{r.lugar || detail.lugar}</p>
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-medium">
+                            {r.inspector || 'Inspector Municipal'}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <p className="font-semibold text-slate-800 dark:text-slate-200">{r.conductor_nombre || 'No identificado'}</p>
+                            <p className="text-[11px] text-slate-500 font-mono">DNI: {r.conductor_dni || 'S/D'}</p>
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <PlacaBadge placa={r.placa} />
+                            {(r.vehiculo_marca || r.vehiculo_modelo || r.vehiculo_color) && (
+                              <p className="mt-0.5 text-[10px] text-slate-400 truncate max-w-[120px] mx-auto">
+                                {[r.vehiculo_marca, r.vehiculo_modelo, r.vehiculo_color].filter(Boolean).join(' ')}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-medium">
+                            <p className="line-clamp-2">{r.observaciones || 'Sin observaciones'}</p>
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <StatusBadge status={r.estado === 'CONVERTIDO_PAPELETA' ? 'FINALIZADO' : r.estado} />
+                              {r.numero_papeleta && (
+                                <span className="inline-block rounded-md bg-rose-50 border border-rose-200/70 px-1.5 py-0.5 font-mono text-[10px] font-black text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/60" title="Papeleta generada">
+                                  {r.numero_papeleta}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {!detail.reportes?.length && (
+                        <tr>
+                          <td colSpan="7" className="px-5 py-10 text-center text-slate-500">Aún no hay reportes de intervención vinculados a este operativo.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           </div>

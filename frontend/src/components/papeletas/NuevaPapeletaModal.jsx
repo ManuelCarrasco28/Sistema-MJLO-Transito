@@ -5,8 +5,11 @@ import { apiFetch, leerMensajeError } from '../../config/api'
 import { showError, showToast } from '../../utils/SwalUtil'
 import { toTitleCase, normalizarPlaca } from '../../utils/formatters'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
+import { useOficinaRegistral } from '../../hooks/useOficinaRegistral'
+import { OficinaRegistralSelect } from '../vehiculos/OficinaRegistralSelect'
 
 export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, creandoPapeleta, onSubmit, onClose }) {
+  const oficinaReg = useOficinaRegistral()
   const [isSearchingSunarp, setIsSearchingSunarp] = useState(false)
   const [isSearchingReniec, setIsSearchingReniec] = useState(false)
 
@@ -26,8 +29,8 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           placa: cleanPlaca,
-          codeZona: '11',
-          codeOficina: '01'
+          codeZona: oficinaReg.codeZona,
+          codeOficina: oficinaReg.codeOficina
         })
       })
 
@@ -39,7 +42,7 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
       const data = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
 
       if (!data) {
-        throw new Error(res.message || 'No se encontraron registros para la placa.')
+        throw new Error(res.message || 'No se encontró la placa en la sede de registro seleccionada. Verifica que la placa esté escrita correctamente o prueba con otra sede.')
       }
 
       const cat = (data.categoria || '').toUpperCase().trim()
@@ -128,6 +131,12 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
         <div className="sin-scrollbar min-h-0 min-w-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
           <fieldset className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
             <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Vehículo</legend>
+            <OficinaRegistralSelect
+              oficinas={oficinaReg.oficinas}
+              valor={oficinaReg.valor}
+              onChange={oficinaReg.setValor}
+              className="mb-3"
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex gap-2">
                 <div className="min-w-0 flex-1">

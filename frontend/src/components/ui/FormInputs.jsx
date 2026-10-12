@@ -78,7 +78,7 @@ function CampoFecha({ id, value, onChange, required, disabled, readOnly, onFocus
         maxLength={10}
         pattern="\d{2}/\d{2}/\d{4}"
         title="Escriba la fecha como dd/mm/aaaa"
-        className={`${inputClassName} pr-9`}
+        className={`${inputClassName} pr-11`}
       />
       <input
         ref={selectorRef}
@@ -98,7 +98,8 @@ function CampoFecha({ id, value, onChange, required, disabled, readOnly, onFocus
         onClick={abrirCalendario}
         disabled={disabled || readOnly}
         aria-label="Abrir calendario"
-        className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 cursor-pointer place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"
+        title="Abrir calendario"
+        className="absolute right-1.5 top-1/2 grid size-7 -translate-y-1/2 cursor-pointer place-items-center rounded-lg border border-slate-200 bg-slate-100/90 text-slate-600 shadow-xs transition-all hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700/80 dark:bg-slate-800/90 dark:text-slate-300 dark:hover:bg-blue-950/60 dark:hover:border-blue-500/60 dark:hover:text-blue-400"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4" aria-hidden="true">
           <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -337,7 +338,7 @@ function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocu
         onBlur={alPerderFoco}
         autoComplete="off"
         placeholder="hh:mm am/pm"
-        className={`${inputClassName} ${value ? 'pr-14' : 'pr-9'}`}
+        className={`${inputClassName} ${value ? 'pr-17' : 'pr-11'}`}
       />
       {value && !disabled && !readOnly && (
         <button
@@ -349,7 +350,7 @@ function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocu
           }}
           aria-label="Limpiar hora"
           title="Borrar hora"
-          className="absolute right-8 top-1/2 grid size-5 -translate-y-1/2 cursor-pointer place-items-center rounded text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition"
+          className="absolute right-9 top-1/2 grid size-6 -translate-y-1/2 cursor-pointer place-items-center rounded-md border border-slate-200/80 bg-slate-100 text-slate-500 text-xs font-bold shadow-2xs transition-all hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 active:scale-95 dark:border-slate-700/70 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-rose-950/50 dark:hover:border-rose-800 dark:hover:text-rose-400"
         >
           ✕
         </button>
@@ -361,10 +362,10 @@ function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocu
         disabled={disabled || readOnly}
         aria-label="Abrir selector de hora"
         title="Seleccionar hora (AM/PM)"
-        className={`absolute right-2 top-1/2 grid size-6 -translate-y-1/2 cursor-pointer place-items-center rounded-md transition disabled:cursor-not-allowed disabled:opacity-40 ${
+        className={`absolute right-1.5 top-1/2 grid size-7 -translate-y-1/2 cursor-pointer place-items-center rounded-lg border shadow-xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
           abierto
-            ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/60'
-            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'
+            ? 'border-blue-500 bg-blue-50 text-blue-600 ring-2 ring-blue-500/20 dark:border-blue-400 dark:bg-blue-950/80 dark:text-blue-300'
+            : 'border-slate-200 bg-slate-100/90 text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 dark:border-slate-700/80 dark:bg-slate-800/90 dark:text-slate-300 dark:hover:bg-blue-950/60 dark:hover:border-blue-500/60 dark:hover:text-blue-400'
         }`}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4" aria-hidden="true">

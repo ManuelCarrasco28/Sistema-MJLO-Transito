@@ -95,13 +95,16 @@ class PideService
         return $data;
     }
 
-    public static function sunarp($placa)
+    public static function sunarp($placa, $codeZona = '11', $codeOficina = '01')
     {
         $placa = strtoupper(str_replace([' ', '-'], '', trim($placa)));
         if (empty($placa)) {
             return null;
         }
-        if (self::bloqueada('CONSULTA_SUNARP', 'placa ' . $placa)) {
+        $codeZona = trim((string)$codeZona) ?: '11';
+        $codeOficina = trim((string)$codeOficina) ?: '01';
+
+        if (self::bloqueada('CONSULTA_SUNARP', "placa {$placa} (zona: {$codeZona}, oficina: {$codeOficina})")) {
             return null;
         }
 
@@ -112,8 +115,8 @@ class PideService
 
         $data = [
             "placa" => $placa,
-            "codeZona" => "11",
-            "codeOficina" => "01"
+            "codeZona" => $codeZona,
+            "codeOficina" => $codeOficina
         ];
 
         $sslVerify = filter_var(env('app.pideSslVerify', true), FILTER_VALIDATE_BOOLEAN);

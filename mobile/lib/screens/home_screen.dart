@@ -12,6 +12,7 @@ import 'history_screen.dart';
 import 'vehicle_details_screen.dart';
 import 'person_details_screen.dart';
 import 'settings_screen.dart';
+import '../utils/oficinas_registrales.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -202,108 +203,150 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _showSearchDialog(BuildContext context, String searchType) {
-    final controller = TextEditingController();
+  void _showSearchDialog(
+    BuildContext parentContext,
+    String searchType, {
+    String? initialQuery,
+    OficinaRegistral? initialOficina,
+  }) {
+    final controller = TextEditingController(text: initialQuery ?? '');
     String title = searchType == 'PLACA' ? 'Buscar Placa' : 'Buscar Documento';
     String label = searchType == 'PLACA'
         ? 'Número de Placa'
         : 'Número de Documento';
     String hint = searchType == 'PLACA' ? '' : '';
+    OficinaRegistral selectedOficina = initialOficina ?? kOficinaChiclayo;
 
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppTheme.primaryBlue,
+      context: parentContext,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (builderCtx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryBlue,
+            ),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (searchType != 'PLACA')
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12.0),
-                child: Text(
-                  'Ingrese el número de DNI, Carnet de Extranjería o Pasaporte.',
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (searchType != 'PLACA')
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12.0),
+                  child: Text(
+                    'Ingrese el número de DNI, Carnet de Extranjería o Pasaporte.',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
                 ),
+              TextField(
+                controller: controller,
+                maxLength: searchType == 'PLACA' ? 8 : 15,
+                keyboardType: searchType == 'PLACA'
+                    ? TextInputType.text
+                    : TextInputType.number,
+                inputFormatters: searchType == 'PLACA'
+                    ? []
+                    : [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: label,
+                  hintText: hint,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
+                textCapitalization: TextCapitalization.characters,
               ),
-            TextField(
-              controller: controller,
-              maxLength: searchType == 'PLACA' ? 8 : 15,
-              keyboardType: searchType == 'PLACA'
-                  ? TextInputType.text
-                  : TextInputType.number,
-              inputFormatters: searchType == 'PLACA'
-                  ? []
-                  : [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                labelText: label,
-                hintText: hint,
-                border: OutlineInputBorder(
+              if (searchType == 'PLACA') ...[
+                const SizedBox(height: 8),
+                SedeRegistralField(
+                  selected: selectedOficina,
+                  onChanged: (nueva) {
+                    setDialogState(() {
+                      selectedOficina = nueva;
+                    });
+                  },
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
               ),
-              textCapitalization: TextCapitalization.characters,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancelar',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryBlue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () {
-              final value = controller.text.trim().toUpperCase();
-              if (value.isEmpty) return;
-              Navigator.pop(context);
-              if (searchType == 'PLACA') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => VehicleDetailsScreen(
-                      searchQuery: value,
-                      searchType: searchType,
+              onPressed: () async {
+                final value = controller.text.trim().toUpperCase();
+                if (value.isEmpty) return;
+                Navigator.pop(dialogCtx);
+                if (searchType == 'PLACA') {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => VehicleDetailsScreen(
+                        searchQuery: value,
+                        searchType: searchType,
+                        codeZona: selectedOficina.codeZona,
+                        codeOficina: selectedOficina.codeOficina,
+                        sedeNombre: selectedOficina.descripcion,
+                      ),
                     ),
-                  ),
-                ).then((_) {
-                  if (mounted) _loadDashboardData();
-                });
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PersonDetailsScreen(dni: value),
-                  ),
-                ).then((_) {
-                  if (mounted) _loadDashboardData();
-                });
-              }
-            },
+                  );
+                  if (mounted) {
+                    _loadDashboardData();
+                    if (result is Map && result['reintentar'] == true) {
+                      OficinaRegistral oficinaReintento = selectedOficina;
+                      if (result['codeZona'] != null && result['codeOficina'] != null) {
+                        try {
+                          oficinaReintento = kOficinasRegistrales.firstWhere(
+                            (o) =>
+                                o.codeZona == result['codeZona'] &&
+                                o.codeOficina == result['codeOficina'],
+                            orElse: () => selectedOficina,
+                          );
+                        } catch (_) {}
+                      }
+                      _showSearchDialog(
+                        context,
+                        'PLACA',
+                        initialQuery: result['placa']?.toString() ?? value,
+                        initialOficina: oficinaReintento,
+                      );
+                    }
+                  }
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PersonDetailsScreen(dni: value),
+                    ),
+                  ).then((_) {
+                    if (mounted) _loadDashboardData();
+                  });
+                }
+              },
             child: const Text(
               'Buscar',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
+      ),
       ),
     );
   }

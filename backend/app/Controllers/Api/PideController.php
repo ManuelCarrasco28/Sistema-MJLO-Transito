@@ -112,6 +112,13 @@ class PideController extends ResourceController
             ->get()
             ->getResultArray();
 
+        foreach ($rows as &$r) {
+            if (isset($r['descripcion'])) {
+                $r['descripcion'] = str_replace('CA??ETE', 'CAÑETE', $r['descripcion']);
+            }
+        }
+        unset($r);
+
         return $this->respond(['status' => 200, 'data' => $rows]);
     }
 

@@ -99,12 +99,14 @@ class OperativosController extends ResourceController
             ->get()->getRowArray();
 
         $papeletas = (int) $db->table('papeletas')->where('id_operativo IS NOT NULL', null, false)->countAllResults();
+        $reportes = (int) $db->table('reportes_intervencion')->where('id_operativo IS NOT NULL', null, false)->countAllResults();
 
         return $this->respond(['data' => [
             'total' => (int) ($row['total'] ?? 0),
             'activos' => (int) ($row['activos'] ?? 0),
             'finalizados' => (int) ($row['finalizados'] ?? 0),
             'papeletas' => $papeletas,
+            'reportes' => $reportes,
         ]]);
     }
 
@@ -120,12 +122,14 @@ class OperativosController extends ResourceController
                     ''
                 ) AS usuario_registra,
                 COUNT(DISTINCT oi.id_inspector) AS total_inspectores,
-                COUNT(DISTINCT p.id) AS total_papeletas
+                COUNT(DISTINCT p.id) AS total_papeletas,
+                COUNT(DISTINCT rep.id) AS total_reportes
             ", false)
             ->join('usuarios u', 'u.id = o.id_usuario_registra', 'left')
             ->join('ciudadanos cu', 'cu.id_persona = u.id_persona', 'left')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id AND oi.estado = "ASIGNADO"', 'left')
             ->join('papeletas p', 'p.id_operativo = o.id', 'left')
+            ->join('reportes_intervencion rep', 'rep.id_operativo = o.id', 'left')
             ->where('o.id', $id)
             ->groupBy('o.id')
             ->get()
@@ -190,6 +194,42 @@ class OperativosController extends ResourceController
             'anuladas' => count(array_filter($row['papeletas'], static fn ($p) => ($p['estado'] ?? '') === 'ANULADA')),
         ];
 
+        $row['reportes'] = $db->table('reportes_intervencion r')
+            ->select("
+                r.id,
+                r.fecha_hora,
+                r.lugar,
+                r.coordenadas,
+                r.observaciones,
+                r.estado,
+                COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa,
+                COALESCE(NULLIF(v.marca, ''), r.vehiculo_marca, '') AS vehiculo_marca,
+                COALESCE(v.modelo, '') AS vehiculo_modelo,
+                COALESCE(NULLIF(v.color, ''), r.vehiculo_color, '') AS vehiculo_color,
+                COALESCE(cond_per.numero, r.conductor_informal_dni, 'S/D') AS conductor_dni,
+                COALESCE(
+                    NULLIF(TRIM(CONCAT(c_cond.nombres, ' ', c_cond.apellido_paterno, ' ', COALESCE(c_cond.apellido_materno, ''))), ''),
+                    r.conductor_informal_nombres,
+                    'No identificado'
+                ) AS conductor_nombre,
+                COALESCE(CONCAT(ci.nombres, ' ', ci.apellido_paterno, ' ', COALESCE(ci.apellido_materno, '')), 'Inspector Municipal') AS inspector,
+                p.numero_papeleta
+            ", false)
+            ->join('vehiculos v', 'v.id = r.id_vehiculo', 'left')
+            ->join('trabajadores t', 't.id_persona = r.id_inspector', 'left')
+            ->join('ciudadanos ci', 'ci.id_persona = t.id_persona', 'left')
+            ->join('personas cond_per', 'cond_per.id = r.id_conductor', 'left')
+            ->join('ciudadanos c_cond', 'c_cond.id_persona = cond_per.id', 'left')
+            ->join('papeletas p', 'p.id = r.id_papeleta', 'left')
+            ->where('r.id_operativo', $id)
+            ->orderBy('r.fecha_hora', 'DESC')
+            ->get()
+            ->getResultArray();
+
+        $row['reporte']['total_reportes'] = count($row['reportes']);
+        $row['reporte']['reportes_pendientes'] = count(array_filter($row['reportes'], static fn ($r) => ($r['estado'] ?? '') === 'PENDIENTE'));
+        $row['reporte']['reportes_convertidos'] = count(array_filter($row['reportes'], static fn ($r) => in_array($r['estado'] ?? '', ['CONVERTIDO_PAPELETA', 'FINALIZADO'], true)));
+
         return $row;
     }
     public function activo($idInspector = null)
@@ -232,12 +272,14 @@ class OperativosController extends ResourceController
                     ''
                 ) AS usuario_registra,
                 COUNT(DISTINCT oi.id_inspector) AS total_inspectores,
-                COUNT(DISTINCT p.id) AS total_papeletas
+                COUNT(DISTINCT p.id) AS total_papeletas,
+                COUNT(DISTINCT rep.id) AS total_reportes
             ", false)
             ->join('usuarios u', 'u.id = o.id_usuario_registra', 'left')
             ->join('ciudadanos cu', 'cu.id_persona = u.id_persona', 'left')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id AND oi.estado = "ASIGNADO"', 'left')
-            ->join('papeletas p', 'p.id_operativo = o.id', 'left');
+            ->join('papeletas p', 'p.id_operativo = o.id', 'left')
+            ->join('reportes_intervencion rep', 'rep.id_operativo = o.id', 'left');
 
         $buscar = trim((string)$this->request->getGet('buscar'));
         if ($buscar !== '') {

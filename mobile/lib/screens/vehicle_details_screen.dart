@@ -8,11 +8,17 @@ import 'person_details_screen.dart';
 class VehicleDetailsScreen extends StatefulWidget {
   final String searchQuery;
   final String searchType;
+  final String? codeZona;
+  final String? codeOficina;
+  final String? sedeNombre;
 
   const VehicleDetailsScreen({
     super.key,
     required this.searchQuery,
     required this.searchType,
+    this.codeZona,
+    this.codeOficina,
+    this.sedeNombre,
   });
 
   @override
@@ -42,11 +48,21 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
     });
 
     try {
-      final matched = await ApiService.buscarVehiculo(widget.searchType, widget.searchQuery);
+      final matched = await ApiService.buscarVehiculo(
+        widget.searchType,
+        widget.searchQuery,
+        codeZona: widget.codeZona,
+        codeOficina: widget.codeOficina,
+      );
 
       if (matched == null) {
         setState(() {
-          _errorMessage = 'No se encontró información para:\n${widget.searchQuery}';
+          if (widget.searchType == 'PLACA') {
+            final sede = widget.sedeNombre ?? 'la sede seleccionada';
+            _errorMessage = 'No se encontró ningún vehículo con la placa ${widget.searchQuery} en $sede.\n\nVerifique si la placa está bien escrita o intente seleccionando otra sede de registro (SUNARP).';
+          } else {
+            _errorMessage = 'No se encontró información para:\n${widget.searchQuery}';
+          }
           _isLoading = false;
         });
         return;
@@ -107,38 +123,243 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
   Widget _buildErrorState() {
     return Center(
       child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
-              child: Icon(Icons.search_off_rounded, size: 80, color: Colors.red.shade300),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+          child: Container(
+            padding: const EdgeInsets.all(24.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-            Text(
-              _errorMessage!,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, color: Colors.grey.shade800, fontWeight: FontWeight.w500),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryBlue.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppTheme.primaryBlue.withOpacity(0.15),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.search_off_rounded,
+                    size: 48,
+                    color: AppTheme.primaryBlue,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  widget.searchType == 'PLACA'
+                      ? 'Vehículo No Encontrado'
+                      : 'Registro No Localizado',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.primaryBlue,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                if (widget.searchType == 'PLACA') ...[
+                  // Representación visual de placa vehicular
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.black87, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'PERÚ',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.searchQuery.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3,
+                            fontFamily: 'monospace',
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.account_balance_outlined,
+                          size: 14,
+                          color: AppTheme.primaryBlue,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Sede consultada: ${widget.sedeNombre ?? 'CHICLAYO'}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryBlue,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+
+                // Caja de recomendaciones para el usuario
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.lightbulb_outline, size: 16, color: Colors.amber.shade800),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Sugerencias de búsqueda:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _buildErrorTip(
+                        Icons.edit_outlined,
+                        'Verifique si la placa fue digitada correctamente sin errores tipográficos.',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildErrorTip(
+                        Icons.swap_horiz_rounded,
+                        'Si el vehículo fue matriculado en otra región, seleccione la sede SUNARP correspondiente.',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildErrorTip(
+                        Icons.fact_check_outlined,
+                        'Si la unidad no cuenta con placa o está ilegible, use la opción "Registrar sin placa".',
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Botón principal: Volver a buscar con la placa pre-cargada
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.pop(context, {
+                      'reintentar': true,
+                      'placa': widget.searchQuery,
+                      'codeZona': widget.codeZona,
+                      'codeOficina': widget.codeOficina,
+                    }),
+                    icon: const Icon(Icons.edit_note_rounded, size: 22),
+                    label: const Text(
+                      'VOLVER A BUSCAR / EDITAR PLACA',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Botón secundario: Volver al dashboard
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, size: 16),
+                  label: const Text('Volver al panel principal'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey.shade600,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Volver a buscar'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-              ),
-            )
-          ],
+          ),
         ),
       ),
-      ),
+    );
+  }
+
+  Widget _buildErrorTip(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: AppTheme.primaryBlue),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade700,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -463,6 +463,8 @@ class VehiculosController extends ResourceController
     {
         $tipo = strtoupper(trim((string)$this->request->getGet('tipo')));
         $valor = trim((string)$this->request->getGet('valor'));
+        $codeZona = trim((string)($this->request->getGet('codeZona') ?? '11')) ?: '11';
+        $codeOficina = trim((string)($this->request->getGet('codeOficina') ?? '01')) ?: '01';
         $normalizado = $this->normalizeSearchValue($valor);
 
         if ($normalizado === '') {
@@ -492,8 +494,8 @@ class VehiculosController extends ResourceController
         if (empty($rows)) {
             if ($tipo === 'PLACA') {
                 // Consulta externa hecha por el sistema: queda registrada igual que las consultas directas a SUNARP.
-                \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_SUNARP', "Consulta de placa en SUNARP (búsqueda móvil): {$normalizado}", ['placa' => $normalizado, 'origen' => 'buscarMobile']);
-                $sunarpData = \App\Services\PideService::sunarp($normalizado);
+                \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_SUNARP', "Consulta de placa en SUNARP (búsqueda móvil): {$normalizado} (zona {$codeZona}, oficina {$codeOficina})", ['placa' => $normalizado, 'origen' => 'buscarMobile', 'codeZona' => $codeZona, 'codeOficina' => $codeOficina]);
+                $sunarpData = \App\Services\PideService::sunarp($normalizado, $codeZona, $codeOficina);
                 if ($sunarpData && !isset($sunarpData['error'])) {
                     $rawProps = $sunarpData['propietarios'] ?? [];
                     $propNames = array_filter(array_map(function($p) {
@@ -551,7 +553,7 @@ class VehiculosController extends ResourceController
                 }
             }
 
-            return $this->failNotFound('No se encontró vehículo con el dato ingresado.');
+            return $this->failNotFound('No se encontró vehículo con esa placa en la sede seleccionada. Verifica que la placa esté bien escrita o prueba seleccionando otra sede de registro.');
         }
 
         $data = $this->appendVehiculoRelations($rows)[0];
@@ -559,8 +561,8 @@ class VehiculosController extends ResourceController
         // Si existe en BD pero no tiene dueño asignado, intentamos consultar a Sunarp para mostrarlo visualmente
         if ($tipo === 'PLACA' && ($data['formalidad'] ?? '') === 'INFORMAL' && (empty($data['propietario']) || $data['propietario'] === 'Sin Propietario Asignado' || $data['propietario'] === 'No Registrado' || $data['propietario'] === 'Sin Propietario')) {
             // Consulta externa hecha por el sistema: queda registrada igual que las consultas directas a SUNARP.
-            \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_SUNARP', "Consulta de placa en SUNARP (búsqueda móvil): {$normalizado}", ['placa' => $normalizado, 'origen' => 'buscarMobile']);
-            $sunarpData = \App\Services\PideService::sunarp($normalizado);
+            \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_SUNARP', "Consulta de placa en SUNARP (búsqueda móvil): {$normalizado} (zona {$codeZona}, oficina {$codeOficina})", ['placa' => $normalizado, 'origen' => 'buscarMobile', 'codeZona' => $codeZona, 'codeOficina' => $codeOficina]);
+            $sunarpData = \App\Services\PideService::sunarp($normalizado, $codeZona, $codeOficina);
             if ($sunarpData && !isset($sunarpData['error'])) {
                 $rawProps = $sunarpData['propietarios'] ?? [];
                 $propNames = array_filter(array_map(function($p) {

@@ -165,7 +165,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
     });
 
     try {
-      final position = await obtenerPosicionActual();
+      final position = await obtenerPosicionActualConContexto(context);
       final address = await obtenerDireccionDesdePosicion(position);
 
       setState(() {

@@ -17,8 +17,12 @@ export function useOficinaRegistral() {
       .then((r) => (r.ok ? r.json() : null))
       .then((res) => {
         if (!activo || !Array.isArray(res?.data)) return
-        cacheOficinas = res.data
-        setOficinas(res.data)
+        const limpias = res.data.map((item) => ({
+          ...item,
+          descripcion: (item.descripcion || '').replace(/CA\?\?ETE/gi, 'CAÑETE'),
+        }))
+        cacheOficinas = limpias
+        setOficinas(limpias)
       })
       .catch(() => {})
     return () => { activo = false }

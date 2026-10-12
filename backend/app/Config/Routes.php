@@ -8,7 +8,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->options('(:any)', 'AuthController::options');
     $routes->post('login', 'AuthController::login');
     $routes->get('status', 'StatusController::index');
-    $routes->get('files/(:segment)/(:segment)', 'FilesController::ver/$1/$2');
+    $routes->match(['get', 'head'], 'files/(:segment)/(:segment)', 'FilesController::ver/$1/$2');
 
     // Eliminaciones y anulaciones: solo la jefatura (Super Admin, Gerente y Subgerente). Secretaría cobra y registra,
     // pero no borra ni anula; el frontend oculta estas acciones y aquí se exige también en el servidor.

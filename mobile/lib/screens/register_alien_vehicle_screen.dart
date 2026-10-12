@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 import '../utils/location_helper.dart';
+import '../utils/oficinas_registrales.dart';
 import 'issue_ticket_informal_screen.dart';
 
 class RegisterAlienVehicleScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _RegisterAlienVehicleScreenState
   // Vehículo
   String _estadoPlaca = 'CON_PLACA'; // 'CON_PLACA', 'SIN_PLACA'
   final _placaController = TextEditingController();
+  OficinaRegistral _selectedOficina = kOficinaChiclayo;
 
   // Características
   final _claseController = TextEditingController();
@@ -81,7 +83,12 @@ class _RegisterAlienVehicleScreenState
       _isSearching = true;
     });
     try {
-      final vehiculo = await ApiService.buscarVehiculo('placa', placa);
+      final vehiculo = await ApiService.buscarVehiculo(
+        'placa',
+        placa,
+        codeZona: _selectedOficina.codeZona,
+        codeOficina: _selectedOficina.codeOficina,
+      );
       if (vehiculo != null) {
         setState(() {
           _vehiculoEncontrado = true;
@@ -116,11 +123,11 @@ class _RegisterAlienVehicleScreenState
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                'Vehículo no registrado en la municipalidad JLO ni en Chiclayo.',
+                'No se encontró la placa en ${_selectedOficina.descripcion}. Verifique si está bien escrita o intente cambiando la sede de registro (SUNARP).',
               ),
-              duration: Duration(seconds: 4),
+              duration: const Duration(seconds: 4),
             ),
           );
         }
@@ -169,7 +176,7 @@ class _RegisterAlienVehicleScreenState
     });
 
     try {
-      final position = await obtenerPosicionActual();
+      final position = await obtenerPosicionActualConContexto(context);
       final address = await obtenerDireccionDesdePosicion(position);
 
       final bool wasNull = _currentPosition == null;
@@ -413,6 +420,15 @@ class _RegisterAlienVehicleScreenState
                 hasSearch: true,
                 onSearch: _searchVehiculo,
                 maxLength: 8,
+              ),
+              const SizedBox(height: 10),
+              SedeRegistralField(
+                selected: _selectedOficina,
+                onChanged: (nueva) {
+                  setState(() {
+                    _selectedOficina = nueva;
+                  });
+                },
               ),
               const SizedBox(height: 16),
             ],

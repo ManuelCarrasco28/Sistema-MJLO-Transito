@@ -40,6 +40,9 @@ class ApiService {
   static const _sessionCookieKey = 'session_cookie';
   static const _savedUsernameKey = 'saved_username';
   static const _savedPasswordKey = 'saved_password';
+  static const _keyHistorialUsuarios = 'historial_usuarios_login';
+  static const _keyRecordarUsuario = 'recordar_usuario_activo';
+  static const _keyUsuarioRecordado = 'usuario_recordado_login';
 
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
@@ -58,26 +61,105 @@ class ApiService {
   static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api/?$'), '');
   static const Duration _requestTimeout = Duration(seconds: 20);
 
-  // --- MÉTODOS DE CREDENCIALES GUARDADAS (BIOMETRÍA) ---
-  // Solo se recuerda el usuario: la contraseña no se guarda (ni se autocompleta) en el teléfono.
+  // --- GESTIÓN SEGURA Y PROFESIONAL DE USUARIOS Y LOGIN ---
+  /// Registra el inicio de sesión exitoso.
+  /// - Guarda el usuario en el historial de cuentas válidas (sin importar el estado del checkbox).
+  /// - Si recordar == true, almacena este usuario como predeterminado para el próximo inicio.
+  /// - Si recordar == false, borra el usuario predeterminado pero conserva el historial de cuentas.
+  /// - NUNCA se guardan contraseñas.
+  static Future<void> registrarLoginExitoso(String username, bool recordar) async {
+    final clean = username.trim();
+    if (clean.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    // 1. Historial de usuarios que han iniciado sesión correctamente
+    List<String> historial = prefs.getStringList(_keyHistorialUsuarios) ?? [];
+    historial.removeWhere((u) => u.trim().toLowerCase() == clean.toLowerCase());
+    historial.insert(0, clean);
+    if (historial.length > 10) {
+      historial = historial.sublist(0, 10);
+    }
+    await prefs.setStringList(_keyHistorialUsuarios, historial);
+
+    // 2. Opción "Recordar mi usuario"
+    await prefs.setBool(_keyRecordarUsuario, recordar);
+    if (recordar) {
+      await prefs.setString(_keyUsuarioRecordado, clean);
+      try {
+        await _secureStorage.write(key: _savedUsernameKey, value: clean);
+      } catch (_) {}
+    } else {
+      await prefs.remove(_keyUsuarioRecordado);
+      try {
+        await _secureStorage.delete(key: _savedUsernameKey);
+      } catch (_) {}
+    }
+    try {
+      await _secureStorage.delete(key: _savedPasswordKey);
+    } catch (_) {}
+  }
+
+  /// Obtiene la configuración de login (si recordar está activo, el usuario guardado y el historial)
+  static Future<Map<String, dynamic>> obtenerConfiguracionLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool recordar = prefs.getBool(_keyRecordarUsuario) ?? false;
+    String? usuario = prefs.getString(_keyUsuarioRecordado);
+
+    if (recordar && (usuario == null || usuario.isEmpty)) {
+      try {
+        usuario = await _secureStorage.read(key: _savedUsernameKey);
+      } catch (_) {}
+    }
+
+    final List<String> historial = prefs.getStringList(_keyHistorialUsuarios) ?? [];
+
+    return {
+      'recordar': recordar,
+      'usuario': (recordar && usuario != null && usuario.isNotEmpty) ? usuario : null,
+      'historial': historial,
+    };
+  }
+
+  /// Elimina un usuario del historial y del recordatorio si coincide
+  static Future<void> eliminarUsuarioDeHistorial(String username) async {
+    final clean = username.trim();
+    final prefs = await SharedPreferences.getInstance();
+    List<String> historial = prefs.getStringList(_keyHistorialUsuarios) ?? [];
+    historial.removeWhere((u) => u.trim().toLowerCase() == clean.toLowerCase());
+    await prefs.setStringList(_keyHistorialUsuarios, historial);
+
+    final usuarioRecordado = prefs.getString(_keyUsuarioRecordado);
+    if (usuarioRecordado != null && usuarioRecordado.trim().toLowerCase() == clean.toLowerCase()) {
+      await prefs.remove(_keyUsuarioRecordado);
+      await prefs.setBool(_keyRecordarUsuario, false);
+      try {
+        await _secureStorage.delete(key: _savedUsernameKey);
+      } catch (_) {}
+    }
+  }
+
+  // Métodos de compatibilidad
   static Future<void> saveSavedCredentials(String username, String password) async {
-    await _secureStorage.write(key: _savedUsernameKey, value: username);
-    await _secureStorage.delete(key: _savedPasswordKey);
+    await registrarLoginExitoso(username, true);
   }
 
   static Future<Map<String, String>?> getSavedCredentials() async {
-    final username = await _secureStorage.read(key: _savedUsernameKey);
-    // Limpia contraseñas guardadas por versiones anteriores de la app
-    await _secureStorage.delete(key: _savedPasswordKey);
-    if (username != null && username.isNotEmpty) {
-      return {'username': username, 'password': ''};
+    final conf = await obtenerConfiguracionLogin();
+    if (conf['recordar'] == true && conf['usuario'] != null) {
+      return {'username': conf['usuario'] as String, 'password': ''};
     }
     return null;
   }
 
   static Future<void> clearSavedCredentials() async {
-    await _secureStorage.delete(key: _savedUsernameKey);
-    await _secureStorage.delete(key: _savedPasswordKey);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyRecordarUsuario, false);
+    await prefs.remove(_keyUsuarioRecordado);
+    try {
+      await _secureStorage.delete(key: _savedUsernameKey);
+      await _secureStorage.delete(key: _savedPasswordKey);
+    } catch (_) {}
   }
   // ----------------------------------------------------
 
@@ -186,9 +268,15 @@ class ApiService {
 
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    // Limpiar exclusivamente datos de la sesión activa para NO borrar el historial ni la preferencia de usuario
+    await prefs.remove('id_persona');
+    await prefs.remove('nombres');
+    await prefs.remove('apellidos');
+    await prefs.remove('usuario');
     _cookieEnMemoria = null;
-    await _secureStorage.delete(key: _sessionCookieKey);
+    try {
+      await _secureStorage.delete(key: _sessionCookieKey);
+    } catch (_) {}
   }
 
   static Future<List<dynamic>> getPapeletas({
@@ -403,14 +491,24 @@ class ApiService {
 
   static Future<Map<String, dynamic>?> buscarVehiculo(
     String tipo,
-    String valor,
-  ) async {
+    String valor, {
+    String? codeZona,
+    String? codeOficina,
+  }) async {
+    final Map<String, String> qParams = {
+      'tipo': tipo,
+      'valor': valor,
+      '_': DateTime.now().millisecondsSinceEpoch.toString(),
+    };
+    if (codeZona != null && codeZona.isNotEmpty) {
+      qParams['codeZona'] = codeZona;
+    }
+    if (codeOficina != null && codeOficina.isNotEmpty) {
+      qParams['codeOficina'] = codeOficina;
+    }
+
     final uri = Uri.parse('$baseUrl/mobile/vehiculos/buscar').replace(
-      queryParameters: {
-        'tipo': tipo,
-        'valor': valor,
-        '_': DateTime.now().millisecondsSinceEpoch.toString(),
-      },
+      queryParameters: qParams,
     );
     final response = await _http
         .get(

@@ -6,7 +6,7 @@ import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { PageLoadError } from '../components/ui/PageLoadError'
-import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
+import { sanitizarMensaje, apiFetch, getCachedData, setCachedData, resolverUrlArchivo } from '../config/api'
 import { showError, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
 import { exportToPdf } from '../utils/exportToPdf'
@@ -1628,12 +1628,12 @@ export function Papeletas({ user }) {
                   {fotosModalReporte.fotos.map((foto, idx) => (
                     <div
                       key={foto.id || idx}
-                      onClick={() => setSelectedImage(foto.foto)}
+                      onClick={() => setSelectedImage(resolverUrlArchivo(foto.foto))}
                       className="group relative aspect-4/3 cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900 transition-all hover:scale-[1.02] hover:shadow-md"
                       title="Clic para ampliar"
                     >
                       <img
-                        src={foto.foto}
+                        src={resolverUrlArchivo(foto.foto)}
                         alt={`Evidencia ${idx + 1}`}
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
@@ -1667,7 +1667,7 @@ export function Papeletas({ user }) {
             <button type="button" onClick={() => setSelectedImage(null)} className="absolute -top-12 right-0 flex size-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-md">
               <Icon name="x" className="size-5" />
             </button>
-            <img src={selectedImage} alt="Evidencia ampliada" className="max-h-[85vh] max-w-[95vw] rounded-lg object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+            <img src={resolverUrlArchivo(selectedImage)} alt="Evidencia ampliada" className="max-h-[85vh] max-w-[95vw] rounded-lg object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
           </div>
         </div>
       )}

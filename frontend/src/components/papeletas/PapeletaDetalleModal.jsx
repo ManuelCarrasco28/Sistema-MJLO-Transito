@@ -2,6 +2,7 @@ import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
 import { PlacaBadge } from '../ui/PlacaBadge'
 import { BotonCancelar, BotonCerrarModal } from '../ui/ModalControls'
+import { resolverUrlArchivo } from '../../config/api'
 
 export function PapeletaDetalleModal({
   selectedPapeleta,
@@ -183,8 +184,8 @@ export function PapeletaDetalleModal({
                 ) : selectedPapeletaFotos.length > 0 ? (
                   <div className="flex gap-4 overflow-x-auto pb-3 custom-scrollbar">
                     {selectedPapeletaFotos.map((foto) => (
-                      <button type="button" key={foto.id} onClick={() => onVerImagen(foto.foto)} className="shrink-0 relative group block overflow-hidden rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-black/5 cursor-pointer">
-                        <img src={foto.foto} alt="Evidencia" className="h-40 w-60 object-cover transition-transform duration-300 group-hover:scale-105" />
+                      <button type="button" key={foto.id} onClick={() => onVerImagen(resolverUrlArchivo(foto.foto))} className="shrink-0 relative group block overflow-hidden rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-black/5 cursor-pointer">
+                        <img src={resolverUrlArchivo(foto.foto)} alt="Evidencia" className="h-40 w-60 object-cover transition-transform duration-300 group-hover:scale-105" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center backdrop-blur-[0px] group-hover:backdrop-blur-[2px]">
                           <Icon name="maximize" className="text-white opacity-0 group-hover:opacity-100 drop-shadow-lg size-8 transition-opacity duration-300" />
                         </div>

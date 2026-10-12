@@ -2,6 +2,19 @@ import { limpiarDatosLocales } from '../utils/sesionLocal'
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const DEFAULT_TIMEOUT_MS = 25000
 
+export function resolverUrlArchivo(url) {
+  if (!url) return ''
+  const str = String(url).trim()
+  if (str.startsWith('data:')) return str
+  // Si viene con el hostname interno de docker http://backend o http://localhost:8080
+  const idx = str.indexOf('/api/files/')
+  if (idx !== -1) {
+    return str.substring(idx)
+  }
+  return str
+}
+
+
 const memoryCache = new Map()
 const pendingReads = new Map()
 const peticionesActivas = new Set()

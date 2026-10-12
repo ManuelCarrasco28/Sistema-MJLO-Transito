@@ -4,6 +4,7 @@ import { PlacaBadge } from '../ui/PlacaBadge'
 import { StandaloneVehiculoFormModal } from '../vehiculos/StandaloneVehiculoFormModal'
 import { FloatingSelect } from '../ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal } from '../ui/ModalControls'
+import { resolverUrlArchivo } from '../../config/api'
 
 export function ConvertirReporteModal({
   reporteToConvert,
@@ -116,8 +117,8 @@ export function ConvertirReporteModal({
                 </div>
                 <div className="flex gap-4 overflow-x-auto pb-3 custom-scrollbar">
                   {reporteToConvert.fotos.map((foto) => (
-                    <button type="button" key={foto.id} onClick={() => onVerImagen(foto.foto)} className="shrink-0 relative group block overflow-hidden rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-black/5 cursor-pointer">
-                      <img src={foto.foto} alt="Evidencia" className="h-32 w-48 object-cover transition-transform duration-300 group-hover:scale-105" />
+                    <button type="button" key={foto.id} onClick={() => onVerImagen(resolverUrlArchivo(foto.foto))} className="shrink-0 relative group block overflow-hidden rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-black/5 cursor-pointer">
+                      <img src={resolverUrlArchivo(foto.foto)} alt="Evidencia" className="h-32 w-48 object-cover transition-transform duration-300 group-hover:scale-105" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center backdrop-blur-[0px] group-hover:backdrop-blur-[2px]">
                         <Icon name="maximize" className="text-white opacity-0 group-hover:opacity-100 drop-shadow-lg size-8 transition-opacity duration-300" />
                       </div>

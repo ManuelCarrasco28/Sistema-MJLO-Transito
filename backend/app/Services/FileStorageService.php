@@ -115,16 +115,24 @@ class FileStorageService
             return null;
         }
         if (str_starts_with($ruta, 'http://') || str_starts_with($ruta, 'https://') || str_starts_with($ruta, 'data:')) {
+            // Si por alguna razón la BD o la respuesta tiene http://backend/..., limpiarlo a relativo
+            if (str_contains($ruta, '://backend/')) {
+                return preg_replace('#^https?://backend#', '', $ruta);
+            }
             return $ruta;
         }
 
         $request = \Config\Services::request();
-        $host = $request->getServer('HTTP_HOST');
-        if (!empty($host)) {
-            $scheme = ($request->getServer('HTTPS') === 'on' || (int)$request->getServer('SERVER_PORT') === 443) ? 'https' : 'http';
-            return "{$scheme}://{$host}/api/files/" . ltrim($ruta, '/');
+        $forwarded = $request->getHeaderLine('X-Forwarded-Host');
+        $host = !empty($forwarded) ? $forwarded : (string) $request->getServer('HTTP_HOST');
+
+        // Si la petición viene desde Docker interno ("backend") o no tiene host,
+        // devolver ruta relativa /api/files/... para que cualquier navegador resuelva contra su propio dominio
+        if (empty($host) || $host === 'backend') {
+            return '/api/files/' . ltrim($ruta, '/');
         }
 
-        return rtrim(base_url('api/files'), '/') . '/' . ltrim($ruta, '/');
+        $scheme = ($request->getServer('HTTPS') === 'on' || (int)$request->getServer('SERVER_PORT') === 443 || $request->getHeaderLine('X-Forwarded-Proto') === 'https') ? 'https' : 'http';
+        return "{$scheme}://{$host}/api/files/" . ltrim($ruta, '/');
     }
 }
