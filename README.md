@@ -101,3 +101,12 @@ cd frontend && npx vitest run                      # pruebas del frontend
 ## Licencia
 
 Desarrollado para la **Subgerencia de Tránsito y Transporte** — *Municipalidad Distrital de José Leonardo Ortiz*. Todos los derechos reservados.
+
+---
+
+## Equipo de desarrollo
+
+| | Rol | Nombre | Contacto |
+| :---: | :--- | :--- | :--- |
+| 💻 | ![Full Stack Developer](https://img.shields.io/badge/ROL-FULL%20STACK%20DEVELOPER-0EA5E9?style=for-the-badge&labelColor=4a4a4a) | ![Carrasco Millan Jose Manuel](https://img.shields.io/badge/CARRASCO%20MILLAN-JOSE%20MANUEL-7C3AED?style=for-the-badge&labelColor=4a4a4a) | [![LinkedIn](https://img.shields.io/badge/LINKEDIN-PERFIL-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white&labelColor=4a4a4a)](https://www.linkedin.com/in/jose-manuel-carrasco-millan-0a2b91323/) |
+| 📱 | ![Mobile Developer](https://img.shields.io/badge/ROL-MOBILE%20DEVELOPER-02569B?style=for-the-badge&logo=flutter&logoColor=white&labelColor=4a4a4a) | ![Saavedra Benavides Juan Angelo](https://img.shields.io/badge/SAAVEDRA%20BENAVIDES-JUAN%20ANGELO-F97316?style=for-the-badge&labelColor=4a4a4a) | [![LinkedIn](https://img.shields.io/badge/LINKEDIN-PERFIL-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white&labelColor=4a4a4a)](https://www.linkedin.com/in/juan-angelo-jhosep-saavedra-benavides-b97890387/) |
