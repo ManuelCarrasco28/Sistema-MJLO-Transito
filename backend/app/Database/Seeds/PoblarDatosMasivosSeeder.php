@@ -25,17 +25,17 @@ use Faker\Factory as FakerFactory;
 class PoblarDatosMasivosSeeder extends Seeder
 {
     // ------ Metas de cantidad (ajustables) ------
-    private const META_PERSONAS = 30000;
-    private const META_ASOCIACIONES = 250;
-    private const META_VEHICULOS = 14000;
-    private const META_CURSOS = 50;
-    private const META_INSCRIPCIONES = 9000;
-    private const META_CERTICAV = 9000;
-    private const META_OPERATIVOS = 120;
-    private const META_PAPELETAS = 6500;
-    private const META_REPORTES_INTERVENCION = 1500;
-    private const META_INTERNAMIENTOS = 400;
-    private const META_TRAMITES = 800;
+    private const META_PERSONAS = 600;
+    private const META_ASOCIACIONES = 20;
+    private const META_VEHICULOS = 350;
+    private const META_CURSOS = 25;
+    private const META_INSCRIPCIONES = 300;
+    private const META_CERTICAV = 250;
+    private const META_OPERATIVOS = 20;
+    private const META_PAPELETAS = 250;
+    private const META_REPORTES_INTERVENCION = 100;
+    private const META_INTERNAMIENTOS = 40;
+    private const META_TRAMITES = 80;
 
     private const BATCH_SIZE = 500;
 
@@ -410,22 +410,43 @@ class PoblarDatosMasivosSeeder extends Seeder
 
         $maxAntes = (int) ($this->db->table('cursos_seguridad_vial')->selectMax('id')->get()->getRow()->id ?? 0);
         $filas = [];
+        $instructores = [
+            'Ing. Carlos Mendoza Rivas',
+            'Lic. Roberto Tapia Huamán',
+            'My. PNP (r) Luis Alberto Farfán',
+            'Dra. Patricia Salazar Vega',
+            'Cap. PNP Marco Antonio Silva',
+        ];
         for ($i = 0; $i < $faltan; $i++) {
-            $inicio = $this->fechaAleatoria(1095);
+            $tipoFecha = random_int(1, 4);
+            if ($tipoFecha === 1) {
+                $inicio = date('Y-m-d', strtotime('+' . random_int(5, 25) . ' days'));
+                $estado = 'PROGRAMADO';
+            } elseif ($tipoFecha === 2) {
+                $inicio = date('Y-m-d', strtotime('-' . random_int(0, 1) . ' days'));
+                $estado = 'EN_CURSO';
+            } else {
+                $inicio = $this->fechaAleatoria(365);
+                $estado = 'FINALIZADO';
+            }
+            $fin = date('Y-m-d', strtotime($inicio . ' +2 days'));
             $filas[] = [
                 'fecha_inicio' => $inicio,
-                'fecha_fin' => date('Y-m-d', strtotime($inicio . ' +2 days')),
+                'fecha_fin' => $fin,
                 'fecha_inscripcion_inicio' => date('Y-m-d', strtotime($inicio . ' -14 days')),
                 'fecha_inscripcion_fin' => date('Y-m-d', strtotime($inicio . ' -1 day')),
                 'hora_inicio' => '09:00:00', 'hora_fin' => '12:00:00',
-                'codigo' => 'CSV-' . str_pad((string) ($maxAntes + $i + 1), 4, '0', STR_PAD_LEFT),
-                'nombre' => 'Curso de Seguridad Vial N° ' . ($maxAntes + $i + 1),
-                'descripcion' => 'Programa municipal de capacitación en seguridad vial y normas de tránsito.',
-                'resolucion' => 'R.A. N° ' . random_int(100, 999) . '-MDJLO',
+                'codigo' => 'CSV-' . date('Y', strtotime($inicio)) . '-' . str_pad((string) ($maxAntes + $i + 1), 3, '0', STR_PAD_LEFT),
+                'nombre' => 'Curso de Capacitación Vial ' . date('Y', strtotime($inicio)) . ' - Grupo ' . ($maxAntes + $i + 1),
+                'descripcion' => 'Programa municipal de capacitación y sensibilización en seguridad vial y normas de tránsito.',
+                'resolucion' => 'R.A. N° ' . random_int(100, 999) . '-' . date('Y', strtotime($inicio)) . '-MDJLO',
+                'instructor' => $instructores[array_rand($instructores)],
                 'lugar' => 'Auditorio Municipal - MDJLO',
                 'costo_inscripcion' => [0, 20, 30, 50][array_rand([0, 20, 30, 50])],
-                'cupos' => random_int((int)ceil(self::META_INSCRIPCIONES / self::META_CURSOS), (int)ceil(self::META_INSCRIPCIONES / self::META_CURSOS) + 100),
-                'estado' => 'FINALIZADO',
+                'cupos' => random_int(40, 80),
+                'estado' => $estado,
+                'carnet_expedicion' => $fin,
+                'carnet_vencimiento' => date('Y-m-d', strtotime($fin . ' +2 years')),
             ];
         }
         $this->insertarPorLotes('cursos_seguridad_vial', $filas);
@@ -704,8 +725,8 @@ class PoblarDatosMasivosSeeder extends Seeder
                 'lugar' => $lugares[array_rand($lugares)],
                 'unidad_autoridad' => 'Subgerencia de Tránsito y Transporte',
                 'nombre_autoridad' => 'Inspector Municipal',
-                'observacion_autoridad' => null,
-                'observaciones_conductor' => null,
+                'observacion_autoridad' => 'Vehículo intervenido por infracción al reglamento de tránsito municipal.',
+                'observaciones_conductor' => random_int(1, 100) <= 60 ? 'El conductor manifestó encontrarse de paso por la zona y solicitó consideraciones.' : null,
                 'firma_conductor_img' => null,
                 'firma_conductor_estado' => 'PENDIENTE',
                 'firma_conductor_observacion' => null,
@@ -783,7 +804,8 @@ class PoblarDatosMasivosSeeder extends Seeder
                 'fecha_hora' => $this->fechaAleatoria(1095) . ' ' . sprintf('%02d:%02d:00', random_int(6, 21), random_int(0, 59)),
                 'lugar' => $lugares[array_rand($lugares)],
                 'coordenadas' => $this->faker->latitude(-6.78, -6.72) . ',' . $this->faker->longitude(-79.86, -79.80),
-                'observaciones' => 'Intervención registrada en campo.',
+                'observaciones' => 'Intervención registrada en campo por inspector municipal.',
+                'observaciones_conductor' => random_int(1, 100) <= 55 ? 'El conductor indicó que subsanará la observación de inmediato.' : null,
                 'estado' => $estado,
                 'motivo_rechazo' => $estado === 'RECHAZADO' ? 'Foto insuficiente o placa ilegible.' : null,
             ];
@@ -963,16 +985,35 @@ class PoblarDatosMasivosSeeder extends Seeder
 
     private function seedPagos(array $papeletasPagadas, array $tramitesPagados, array $inscripcionesPagadas): void
     {
-        $actuales = (int) $this->db->table('pagos_transito')->countAllResults();
+        $maxRecibo = 0;
+        $existentes = $this->db->table('pagos_transito')->select('numero_recibo')->get()->getResultArray();
+        foreach ($existentes as $pr) {
+            if (!empty($pr['numero_recibo']) && preg_match('/(?:REC-)?(\d+)/', (string)$pr['numero_recibo'], $m)) {
+                $maxRecibo = max($maxRecibo, (int)$m[1]);
+            }
+        }
+        $numeroBase = $maxRecibo + 1;
         $filas = [];
-        $numeroBase = $actuales + 1;
         $mediosPago = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'YAPE', 'PLIN'];
 
-        foreach ($papeletasPagadas as $idPapeleta) {
+        $papeletasConPago = array_flip(array_column(
+            $this->db->table('pagos_transito')->select('id_papeleta')->where('id_papeleta IS NOT NULL')->get()->getResultArray(),
+            'id_papeleta'
+        ));
+        $tramitesConPago = array_flip(array_column(
+            $this->db->table('pagos_transito')->select('id_tramite')->where('id_tramite IS NOT NULL')->get()->getResultArray(),
+            'id_tramite'
+        ));
+        $inscripcionesConPago = array_flip(array_column(
+            $this->db->table('pagos_transito')->select('id_inscripcion')->where('id_inscripcion IS NOT NULL')->get()->getResultArray(),
+            'id_inscripcion'
+        ));
+
+        foreach (array_unique($papeletasPagadas) as $idPapeleta) {
+            if (isset($papeletasConPago[$idPapeleta])) continue;
             $fecha = $this->fechaAleatoria(1095);
             $filas[] = [
                 'id_papeleta' => $idPapeleta,
-                'id_operativo' => null,
                 'id_tramite' => null,
                 'id_inscripcion' => null,
                 'fecha_pago' => $fecha,
@@ -986,13 +1027,14 @@ class PoblarDatosMasivosSeeder extends Seeder
                 'estado' => 'PAGADO',
             ];
             $numeroBase++;
+            $papeletasConPago[$idPapeleta] = true;
         }
 
-        foreach ($tramitesPagados as $idTramite) {
+        foreach (array_unique($tramitesPagados) as $idTramite) {
+            if (isset($tramitesConPago[$idTramite])) continue;
             $fecha = $this->fechaAleatoria(900);
             $filas[] = [
                 'id_papeleta' => null,
-                'id_operativo' => null,
                 'id_tramite' => $idTramite,
                 'id_inscripcion' => null,
                 'fecha_pago' => $fecha,
@@ -1006,13 +1048,14 @@ class PoblarDatosMasivosSeeder extends Seeder
                 'estado' => 'PAGADO',
             ];
             $numeroBase++;
+            $tramitesConPago[$idTramite] = true;
         }
 
-        foreach ($inscripcionesPagadas as $idInscripcion) {
+        foreach (array_unique($inscripcionesPagadas) as $idInscripcion) {
+            if (isset($inscripcionesConPago[$idInscripcion])) continue;
             $fecha = $this->fechaAleatoria(1095);
             $filas[] = [
                 'id_papeleta' => null,
-                'id_operativo' => null,
                 'id_tramite' => null,
                 'id_inscripcion' => $idInscripcion,
                 'fecha_pago' => $fecha,
@@ -1026,9 +1069,12 @@ class PoblarDatosMasivosSeeder extends Seeder
                 'estado' => 'PAGADO',
             ];
             $numeroBase++;
+            $inscripcionesConPago[$idInscripcion] = true;
         }
 
-        $this->insertarPorLotes('pagos_transito', $filas);
+        if (!empty($filas)) {
+            $this->insertarPorLotes('pagos_transito', $filas);
+        }
         echo '  ' . count($filas) . " pagos creados.\n";
     }
 }
