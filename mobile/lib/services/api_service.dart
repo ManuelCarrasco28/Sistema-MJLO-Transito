@@ -52,7 +52,7 @@ class ApiService {
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
   static const String _defaultUrl =
-      'http://192.168.0.10:8080/api'; // Cambiado a IP local para celular físico
+      'http://192.168.137.1:8080/api'; // Conectado al punto de acceso del compañero
   // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
   static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
   static const String _configuredUrl = String.fromEnvironment(
@@ -217,8 +217,9 @@ class ApiService {
     final r = ruta.trim();
     if (r.startsWith('data:')) return r;
     final i = r.indexOf('/api/files/');
-    if (i >= 0)
+    if (i >= 0) {
       return '$baseUrl/files/${r.substring(i + '/api/files/'.length)}';
+    }
     if (r.startsWith('http://') || r.startsWith('https://')) return r;
     return '$baseUrl/files/${r.replaceFirst(RegExp(r'^/+'), '')}';
   }
