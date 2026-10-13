@@ -189,10 +189,16 @@ class PapeletasController extends ResourceController
                 $builder->groupStart()
                         ->where('per.numero', $dni)
                         ->orWhere('prop_per.numero', $dni)
+                        ->orWhere('p.conductor_informal_dni', $dni)
+                        ->orWhere('p.dueño_informal_dni', $dni)
                         ->groupEnd();
             }
             if (!empty($placa)) {
-                $builder->where('v.placa', $placa);
+                $builder->groupStart()
+                        ->where('v.placa', $placa)
+                        ->orWhere('p.placa', $placa)
+                        ->orWhere("REPLACE(REPLACE(p.placa, '-', ''), ' ', '') =", $placa)
+                        ->groupEnd();
             }
             if ($estado !== '' && $estado !== 'TODOS') {
                 $builder->where('p.estado', $estado);
@@ -225,7 +231,10 @@ class PapeletasController extends ResourceController
                 $builder->groupStart()
                     ->like('p.numero_papeleta', $buscar)
                     ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
+                    ->orLike('p.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                     ->orLike('per.numero', $buscar)
+                    ->orLike('p.conductor_informal_dni', $buscar)
+                    ->orLike('p.dueño_informal_dni', $buscar)
                     ->orLike('c_per.nombres', $buscar)
                     ->orLike('c_per.apellido_paterno', $buscar)
                     ->orLike('c_per.apellido_materno', $buscar)

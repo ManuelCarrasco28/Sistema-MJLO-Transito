@@ -50,4 +50,13 @@ final class AccesoTest extends TestCase
         $this->assertNotNull(Acceso::errorDePassword('admin12345', 'ADMIN12345'));
         $this->assertNull(Acceso::errorDePassword('Clave12345', 'admin'));
     }
+
+    public function testVerificaTipoDeInspectorDeTransito(): void
+    {
+        $this->assertTrue(Acceso::esInspectorTransito(['tipo_inspector' => 'TRANSITO']));
+        $this->assertTrue(Acceso::esInspectorTransito(['tipo_inspector' => 'transito']));
+        $this->assertFalse(Acceso::esInspectorTransito(['tipo_inspector' => 'TECNICO']));
+        $this->assertFalse(Acceso::esInspectorTransito(['tipo_inspector' => null]));
+        $this->assertFalse(Acceso::esInspectorTransito([]));
+    }
 }

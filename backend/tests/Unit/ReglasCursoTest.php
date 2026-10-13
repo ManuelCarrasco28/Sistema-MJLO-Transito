@@ -23,7 +23,7 @@ final class ReglasCursoTest extends TestCase
     public function testReprobacionExplicitaImpideEmitirCarnetPorAsistencia(): void
     {
         $sql = ReglasCurso::condicionAprobado();
-        $this->assertStringContainsString("ic.estado = 'APROBADO'", $sql);
+        $this->assertStringContainsString("ic.asistio = 1", $sql);
         $this->assertStringContainsString("ic.estado NOT IN ('DESAPROBADO','ANULADO','CANCELADO')", $sql);
     }
 

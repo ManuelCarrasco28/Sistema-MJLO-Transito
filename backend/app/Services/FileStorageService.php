@@ -16,48 +16,7 @@ class FileStorageService
     // Una foto de 64 megapíxeles ocupa ~256 MB al decodificarse: se limita la superficie total (50 MP cubre los celulares actuales; la app debe reducir las fotos antes de enviarlas)
     private const PIXELES_MAXIMOS = 50000000;
 
-    /** Servidor PIDE del que se aceptan fotos de RENIEC (URL firmada que caduca a la hora). */
-    private const HOST_PIDE = 'pide.munijlo.gob.pe';
 
-    /**
-     * Descarga la foto de RENIEC que entrega PIDE (URL firmada con vencimiento) y la guarda como archivo propio, para
-     * no depender de un enlace que caduca. Solo acepta https del servidor PIDE y la ruta de fotos de RENIEC (evita que
-     * se use para pedir direcciones internas). Devuelve la ruta relativa o null si no se pudo.
-     */
-    public function guardarFotoPide(string $url, string $subcarpeta): ?string
-    {
-        $partes = parse_url(trim($url));
-        if (!$partes || ($partes['scheme'] ?? '') !== 'https' || strtolower($partes['host'] ?? '') !== self::HOST_PIDE
-            || !empty($partes['port']) || !empty($partes['user'])
-            || !preg_match('#^/api/v1/services/reniec/photo/[A-Za-z0-9-]+$#', $partes['path'] ?? '')) {
-            return null;
-        }
-
-        $sslVerify = filter_var(env('app.pideSslVerify', true), FILTER_VALIDATE_BOOLEAN);
-        $curl = curl_init();
-        curl_setopt_array($curl, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_TIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => $sslVerify,
-            CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0,
-            CURLOPT_MAXFILESIZE => 2 * 1024 * 1024,
-            CURLOPT_HTTPHEADER => ['Accept: image/*'],
-        ]);
-        $cuerpo = curl_exec($curl);
-        $codigo = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $tipo = (string) curl_getinfo($curl, CURLINFO_CONTENT_TYPE);
-        curl_close($curl);
-
-        if ($cuerpo === false || $codigo !== 200 || $cuerpo === '' || strlen($cuerpo) > 2 * 1024 * 1024 || !str_starts_with(strtolower($tipo), 'image/')) {
-            log_message('warning', 'No se pudo descargar la foto de RENIEC (HTTP ' . $codigo . ').');
-            return null;
-        }
-
-        return $this->guardarImagenBase64('data:image/jpeg;base64,' . base64_encode($cuerpo), $subcarpeta);
-    }
 
     /**
      * Decodifica una imagen en base64 (con o sin prefijo data:image/...) y la

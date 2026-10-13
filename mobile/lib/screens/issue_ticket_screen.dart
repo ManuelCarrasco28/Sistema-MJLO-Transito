@@ -38,6 +38,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   
   String _lugar = '';
   String _observaciones = '';
+  String _observacionesConductor = '';
   
   final List<XFile> _fotos = [];
   Position? _currentPosition;
@@ -294,6 +295,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'lugar': _lugar,
         'infraccionesIds': infraccionesInts,
         'observacionesAutoridad': _observaciones,
+        'observacionesConductor': _observacionesConductor,
         'inspectorId': inspectorId,
         'fotos': fotosBase64,
         'claseVehiculo': widget.vehicleData['tipo'] ?? '',
@@ -354,6 +356,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'placa': placa,
         'lugar': _lugar,
         'observaciones': _observaciones,
+        'observacionesConductor': _observacionesConductor,
         'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : '',
         'fotos': fotosBase64,
         'infraccionesIds': _selectedInfraccionesIds.where((id) => id != null).toList(),
@@ -676,7 +679,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                         const SizedBox(height: 16),
                         TextFormField(
                           decoration: InputDecoration(
-                            labelText: 'Observaciones',
+                            labelText: 'Observaciones del Inspector',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             filled: true,
                             fillColor: Colors.grey.shade50,
@@ -684,6 +687,19 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                           ),
                           maxLines: 3,
                           onChanged: (val) => _observaciones = val,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          decoration: InputDecoration(
+                            labelText: 'Observaciones del Conductor (Opcional)',
+                            hintText: 'Manifestación, descargo o comentarios del conductor...',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            alignLabelWithHint: true,
+                          ),
+                          maxLines: 3,
+                          onChanged: (val) => _observacionesConductor = val,
                         ),
                         const SizedBox(height: 16),
                         Container(

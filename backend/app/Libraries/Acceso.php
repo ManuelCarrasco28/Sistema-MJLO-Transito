@@ -77,6 +77,27 @@ class Acceso
     }
 
     /**
+     * Comprueba si el usuario tiene asignado el Tipo de Inspector "Tránsito (acceso móvil)" (tipo_inspector = 'TRANSITO').
+     */
+    public static function esInspectorTransito(?array $usuario = null): bool
+    {
+        $usuario ??= self::usuario();
+        if (isset($usuario['tipo_inspector'])) {
+            return strtoupper(trim((string) $usuario['tipo_inspector'])) === 'TRANSITO';
+        }
+
+        $idPersona = (int) ($usuario['id_persona'] ?? 0);
+        if ($idPersona <= 0) {
+            return false;
+        }
+
+        $db = \Config\Database::connect();
+        $fila = $db->table('trabajadores')->select('tipo_inspector')->where('id_persona', $idPersona)->get()->getRowArray();
+
+        return strtoupper(trim((string) ($fila['tipo_inspector'] ?? ''))) === 'TRANSITO';
+    }
+
+    /**
      * Interruptor "Permiso móvil" de Configuración (configuracion_sistema.mobile_permite_aplicar_papeleta):
      * activo = el móvil puede emitir papeletas; inactivo = solo reportes/evidencias. Sin registro, se permite.
      */

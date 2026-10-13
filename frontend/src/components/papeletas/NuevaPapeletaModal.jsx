@@ -258,9 +258,21 @@ export function NuevaPapeletaModal({ nuevaForm, setNuevaForm, tiposInfraccion, c
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1.5">Observación de autoridad</label>
                 <textarea
-                  value={nuevaForm.observacionesAutoridad}
+                  value={nuevaForm.observacionesAutoridad || ''}
                   onChange={(e) => setNuevaForm({ ...nuevaForm, observacionesAutoridad: e.target.value })}
                   rows={3}
+                  placeholder="Detalles de la intervención observados por la autoridad..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1.5">Observaciones del conductor (Opcional)</label>
+                <textarea
+                  value={nuevaForm.observacionesConductor || ''}
+                  onChange={(e) => setNuevaForm({ ...nuevaForm, observacionesConductor: e.target.value })}
+                  rows={3}
+                  placeholder="Manifestación o descargos expresados por el conductor..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
                 />
               </div>
