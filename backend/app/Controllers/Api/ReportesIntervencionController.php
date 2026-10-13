@@ -26,6 +26,7 @@ class ReportesIntervencionController extends ResourceController
         $query = $db->table('reportes_intervencion r')
             ->select("r.uuid AS uuid, 
                 r.*,
+                r.observaciones_conductor AS observacionesConductor,
                 COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa_visual,
                 COALESCE(NULLIF(v.marca, ''), '') AS vehiculo_marca,
                 COALESCE(v.modelo, '') AS vehiculo_modelo,
@@ -65,10 +66,16 @@ class ReportesIntervencionController extends ResourceController
             $query->groupStart()
                   ->where('cond_per.numero', $dni)
                   ->orWhere('prop_per.numero', $dni)
+                  ->orWhere('r.conductor_informal_dni', $dni)
+                  ->orWhere('r.dueno_informal_dni', $dni)
                   ->groupEnd();
         }
         if (!empty($placa)) {
-            $query->where('v.placa', $placa);
+            $query->groupStart()
+                  ->where('v.placa', $placa)
+                  ->orWhere('r.placa', $placa)
+                  ->orWhere("REPLACE(REPLACE(r.placa, '-', ''), ' ', '') =", $placa)
+                  ->groupEnd();
         }
 
         // Modo paginado (pantalla de Papeletas): filtros y página en el servidor, para no traer todo el historial
@@ -206,6 +213,7 @@ class ReportesIntervencionController extends ResourceController
         $placa = \App\Libraries\Placa::normalizar((string)($input['placa'] ?? $input['vehiculoPlaca'] ?? ''));
         $lugar = trim((string)($input['lugar'] ?? ''));
         $observaciones = trim((string)($input['observaciones'] ?? $input['observacionesAutoridad'] ?? ''));
+        $observacionesConductor = trim((string)($input['observacionesConductor'] ?? $input['observaciones_conductor'] ?? ''));
         $coordenadas = trim((string)($input['coordenadas'] ?? ''));
         $idOperativo = !empty($input['id_operativo']) ? (int)$input['id_operativo'] : null;
         $fotos = $input['fotos'] ?? [];
@@ -261,7 +269,10 @@ class ReportesIntervencionController extends ResourceController
             return $this->failValidationErrors('El lugar de la intervención no puede superar los 250 caracteres.');
         }
         if (mb_strlen($observaciones) > 500) {
-            return $this->failValidationErrors('La observación no puede superar los 500 caracteres.');
+            return $this->failValidationErrors('La observación de la autoridad no puede superar los 500 caracteres.');
+        }
+        if (mb_strlen($observacionesConductor) > 500) {
+            return $this->failValidationErrors('La observación del conductor no puede superar los 500 caracteres.');
         }
 
 
@@ -318,6 +329,7 @@ class ReportesIntervencionController extends ResourceController
                 'lugar' => $lugar,
                 'coordenadas' => $coordenadas !== '' ? $coordenadas : null,
                 'observaciones' => $observaciones,
+                'observaciones_conductor' => $observacionesConductor !== '' ? $observacionesConductor : null,
                 'estado' => 'PENDIENTE',
             ]);
             $id = (int)$db->insertID();
@@ -457,20 +469,23 @@ class ReportesIntervencionController extends ResourceController
 
             $tempNumero = 'TEMP-' . uniqid('', true);
 
-            $nombreAutoridad = $personaId
-                ? trim((string)($input['infractor'] ?? ''))
-                : 'CONDUCTOR NO PRESENTE';
-            if ($personaId && $nombreAutoridad === '') {
-                $ciudadano = $db->table('ciudadanos')->where('id_persona', $personaId)->get()->getRowArray();
-                $nombreAutoridad = $ciudadano
-                    ? trim($ciudadano['nombres'] . ' ' . $ciudadano['apellido_paterno'] . ' ' . ($ciudadano['apellido_materno'] ?? ''))
-                    : 'INFRACTOR';
+            $nombreAutoridad = trim((string)($input['infractor'] ?? ''));
+            if ($nombreAutoridad === '') {
+                if ($personaId) {
+                    $ciudadano = $db->table('ciudadanos')->where('id_persona', $personaId)->get()->getRowArray();
+                    $nombreAutoridad = $ciudadano
+                        ? trim($ciudadano['nombres'] . ' ' . $ciudadano['apellido_paterno'] . ' ' . ($ciudadano['apellido_materno'] ?? ''))
+                        : 'INFRACTOR';
+                } elseif (!empty($conductorInformalNombres)) {
+                    $nombreAutoridad = $conductorInformalNombres;
+                } else {
+                    $nombreAutoridad = 'CONDUCTOR NO IDENTIFICADO';
+                }
             }
 
-            $observacion = trim((string)($input['observacionesAutoridad'] ?? $reporte['observaciones']));
-            if (!$personaId) {
-                $observacion = trim($observacion . ' Responsable administrativo: propietario del vehículo.');
-            }
+            $observacion = trim((string)($input['observacionesAutoridad'] ?? $reporte['observaciones'] ?? ''));
+            $tieneConductor = (bool)($personaId || !empty($conductorInformalNombres) || !empty($conductorInformalDni));
+            $obsConductor = trim((string)($input['observacionesConductor'] ?? $input['observaciones_conductor'] ?? $reporte['observaciones_conductor'] ?? ''));
 
             $db->table('papeletas')->insert([
                 'uuid' => \App\Libraries\Identificador::nuevo(),
@@ -483,9 +498,9 @@ class ReportesIntervencionController extends ResourceController
                 'lugar' => $reporte['lugar'],
                 'nombre_autoridad' => $nombreAutoridad,
                 'observacion_autoridad' => $observacion,
-                'observaciones_conductor' => $personaId ? trim((string)($input['observacionesConductor'] ?? '')) : 'Conductor no presente durante la intervención.',
-                'firma_conductor_estado' => $personaId ? 'PENDIENTE' : 'NO_PRESENTE',
-                'firma_conductor_observacion' => $personaId ? null : 'Papeleta generada desde reporte de evidencia.',
+                'observaciones_conductor' => $obsConductor,
+                'firma_conductor_estado' => $tieneConductor ? 'PENDIENTE' : 'NO_PRESENTE',
+                'firma_conductor_observacion' => $tieneConductor ? null : 'Papeleta generada desde reporte de evidencia.',
                 'monto_total' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
                 'dueño_informal_nombres' => $reporte['dueno_informal_nombres'] ?? null,

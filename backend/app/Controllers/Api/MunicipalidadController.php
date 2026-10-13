@@ -93,6 +93,7 @@ class MunicipalidadController extends ResourceController
                     ->where('id_inspector', $inspectorId)
                     ->where('fecha_hora >=', $hoy . ' 00:00:00')
                     ->where('fecha_hora <=', $hoy . ' 23:59:59')
+                    ->where('estado !=', 'CONVERTIDO_PAPELETA')
                     ->countAllResults();
             }
         }

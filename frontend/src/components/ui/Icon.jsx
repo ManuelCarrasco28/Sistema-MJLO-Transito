@@ -185,6 +185,7 @@ const iconPaths = {
     </>
   ),
   chevronDown: <path d="m6 9 6 6 6-6" />,
+  chevronUp: <path d="m18 15-6-6-6 6" />,
   chevronRight: <path d="m9 18 6-6-6-6" />,
   calendar: (
     <>
@@ -226,6 +227,19 @@ const iconPaths = {
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </>
+  ),
+  checkCircle: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
+  'check-circle': (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
   ),
   alert: (
     <>
@@ -476,6 +490,9 @@ const aliasMap = {
   edit: 'pencil',
   car: 'vehicle',
   refresh: 'rotateCcw',
+  'rotate-ccw': 'rotateCcw',
+  'chevron-down': 'chevronDown',
+  'chevron-up': 'chevronUp',
   x: 'close',
   chart: 'chartBar',
 }

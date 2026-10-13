@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
-import { apiFetch, sanitizarMensaje } from '../config/api'
-import { showError, showToast } from '../utils/SwalUtil'
+import { apiFetch, sanitizarMensaje, leerMensajeError } from '../config/api'
+import { showError, showToast, showWarning, showConfirm } from '../utils/SwalUtil'
 
 const FORM_VACIO = {
   tipoDocumento: 'DNI', numeroDocumento: '', nombres: '', apellidoPaterno: '', apellidoMaterno: '', celular: '',
@@ -23,12 +23,44 @@ const ESTADOS = ['ACTIVO', 'INACTIVO', 'FALLECIDO', 'RETIRADO']
 export function usePersonaRapida({ alCrear }) {
   const [abierto, setAbierto] = useState(false)
   const [formData, setFormData] = useState(FORM_VACIO)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [buscandoReniec, setBuscandoReniec] = useState(false)
   const [buscandoFoto, setBuscandoFoto] = useState(false)
 
-  const abrir = (documentoInicial = '') => {
-    const soloDigitos = String(documentoInicial || '').replace(/\D/g, '').slice(0, 8)
-    setFormData({ ...FORM_VACIO, numeroDocumento: soloDigitos })
+  const abrir = (paramInicial = '') => {
+    setFieldErrors({})
+    let soloDigitos = ''
+    let inicial = {}
+    if (typeof paramInicial === 'object' && paramInicial !== null) {
+      soloDigitos = String(paramInicial.documento || paramInicial.numeroDocumento || paramInicial.dni || '').replace(/\D/g, '').slice(0, 8)
+      const rawName = (paramInicial.nombre || '').trim()
+      let paterno = paramInicial.apellidoPaterno || ''
+      let materno = paramInicial.apellidoMaterno || ''
+      let nombres = paramInicial.nombres || ''
+      if (rawName && !paterno && !nombres) {
+        const parts = rawName.split(/\s+/)
+        if (parts.length >= 3) {
+          paterno = parts[0]
+          materno = parts[1]
+          nombres = parts.slice(2).join(' ')
+        } else if (parts.length === 2) {
+          paterno = parts[0]
+          nombres = parts[1]
+        } else if (parts.length === 1) {
+          nombres = parts[0]
+        }
+      }
+      inicial = {
+        numeroDocumento: soloDigitos,
+        apellidoPaterno: paterno,
+        apellidoMaterno: materno,
+        nombres: nombres,
+      }
+    } else {
+      soloDigitos = String(paramInicial || '').replace(/\D/g, '').slice(0, 8)
+      inicial = { numeroDocumento: soloDigitos }
+    }
+    setFormData({ ...FORM_VACIO, ...inicial })
     setAbierto(true)
   }
 
@@ -40,8 +72,39 @@ export function usePersonaRapida({ alCrear }) {
     }
     soloFoto ? setBuscandoFoto(true) : setBuscandoReniec(true)
     try {
+      if (!soloFoto) {
+        // Verificar si la persona ya existe en el padrón municipal
+        try {
+          const resLocal = await apiFetch(`/personas?numeroDocumento=${dni}&soloRegistrados=1`)
+          if (resLocal.ok) {
+            const dataLocal = await resLocal.json()
+            const personaLocal = (dataLocal.data || []).find((p) => Number(p.id) > 0)
+            if (personaLocal) {
+              const nombreCompleto = personaLocal.nombreCompleto || `${personaLocal.nombres || ''} ${personaLocal.apellidoPaterno || ''} ${personaLocal.apellidoMaterno || ''}`.trim()
+              setFieldErrors({ numeroDocumento: `Ya registrada a nombre de ${nombreCompleto}` })
+              showWarning('Persona ya registrada', `El DNI ${dni} ya se encuentra registrado en el sistema a nombre de ${nombreCompleto}.`)
+              setFormData((p) => ({
+                ...p,
+                nombres: personaLocal.nombres || p.nombres,
+                apellidoPaterno: personaLocal.apellidoPaterno || p.apellidoPaterno,
+                apellidoMaterno: personaLocal.apellidoMaterno || p.apellidoMaterno,
+                direccion: personaLocal.direccion || p.direccion,
+                numeroLicencia: personaLocal.numeroLicencia || p.numeroLicencia,
+                fotoImg: personaLocal.fotoUrl || personaLocal.foto || p.fotoImg,
+              }))
+              return
+            }
+          }
+        } catch (eLocal) {
+          console.warn('No se pudo verificar padrón local:', eLocal)
+        }
+      }
+
       const respuesta = await apiFetch(`/pide/reniec/${dni}`)
-      if (!respuesta.ok) throw new Error('No se pudo consultar el documento.')
+      if (!respuesta.ok) {
+        const msg = await leerMensajeError(respuesta, 'No se pudo consultar el documento en RENIEC.')
+        throw new Error(msg)
+      }
       const payload = await respuesta.json()
       const datos = payload.data || payload
       if (soloFoto) {
@@ -56,7 +119,7 @@ export function usePersonaRapida({ alCrear }) {
         direccion: datos.direccion || p.direccion,
         estadoCivil: datos.estadoCivil || datos.estado_civil || p.estadoCivil,
       }))
-      showToast('Datos cargados')
+      showToast('Datos cargados desde RENIEC')
     } catch (err) {
       showError('Error', sanitizarMensaje(err.message, 'No se pudo consultar el documento.'))
     } finally {
@@ -94,10 +157,76 @@ export function usePersonaRapida({ alCrear }) {
 
   const guardar = async (evento) => {
     evento.preventDefault()
+    setFieldErrors({})
     try {
       const respuesta = await apiFetch('/personas', { method: 'POST', body: formData })
       const resultado = await respuesta.json().catch(() => ({}))
-      if (!respuesta.ok) throw new Error(resultado.messages?.error || resultado.message || 'No se pudo registrar la persona.')
+      
+      if (!respuesta.ok) {
+        const rawMessages = resultado?.messages || {}
+        let errorMsg = ''
+        const fieldErrObj = {}
+
+        if (typeof rawMessages === 'object' && Object.keys(rawMessages).length > 0) {
+          const errorList = []
+          for (const [campo, mensaje] of Object.entries(rawMessages)) {
+            const msgStr = Array.isArray(mensaje) ? mensaje.join(', ') : String(mensaje)
+            fieldErrObj[campo] = msgStr
+            errorList.push(msgStr)
+          }
+          setFieldErrors(fieldErrObj)
+          errorMsg = errorList.join('\n')
+        } else if (typeof rawMessages === 'string') {
+          errorMsg = rawMessages
+        } else if (typeof resultado?.message === 'string') {
+          errorMsg = resultado.message
+        }
+
+        if (!errorMsg) {
+          errorMsg = 'No se pudo registrar la persona.'
+        }
+
+        const esDuplicado = /duplicad|ya se encuentra registrado/i.test(errorMsg)
+
+        // Si es duplicado, consultar quién es la persona para darle opción de asignarla directamente
+        if (esDuplicado && formData.numeroDocumento) {
+          try {
+            const resBusqueda = await apiFetch(`/personas?numeroDocumento=${encodeURIComponent(formData.numeroDocumento.trim())}&soloRegistrados=1`)
+            if (resBusqueda.ok) {
+              const payloadBusq = await resBusqueda.json()
+              const encontrada = (payloadBusq.data || []).find((p) => Number(p.id) > 0)
+              if (encontrada) {
+                const nombreCompleto = encontrada.nombreCompleto || `${encontrada.nombres || ''} ${encontrada.apellidoPaterno || ''} ${encontrada.apellidoMaterno || ''}`.trim()
+                const confirmacion = await showConfirm(
+                  'Persona ya registrada',
+                  `El documento ${formData.numeroDocumento} ya está registrado en el sistema a nombre de:\n\n${nombreCompleto}\n\n¿Desea seleccionarla directamente?`,
+                  'Sí, seleccionar persona',
+                  'Corregir datos'
+                )
+                if (confirmacion.isConfirmed) {
+                  setAbierto(false)
+                  alCrear({
+                    id: encontrada.id,
+                    numeroDocumento: encontrada.numeroDocumento || encontrada.numero || formData.numeroDocumento,
+                    nombres: encontrada.nombres,
+                    apellidoPaterno: encontrada.apellidoPaterno,
+                    apellidoMaterno: encontrada.apellidoMaterno,
+                  })
+                  showToast('Persona seleccionada correctamente')
+                  return
+                }
+                return
+              }
+            }
+          } catch (errBusq) {
+            console.warn('No se pudo buscar persona duplicada:', errBusq)
+          }
+        }
+
+        showError(esDuplicado ? 'Persona ya registrada' : 'Error al registrar', sanitizarMensaje(errorMsg, 'No se pudo registrar la persona.'))
+        return
+      }
+
       const creada = resultado.data || {}
       showToast('Persona registrada correctamente', 'crear')
       setAbierto(false)
@@ -118,6 +247,8 @@ export function usePersonaRapida({ alCrear }) {
       isEditing={false}
       formData={formData}
       setFormData={setFormData}
+      fieldErrors={fieldErrors}
+      onClearFieldError={(campo) => setFieldErrors((p) => ({ ...p, [campo]: '' }))}
       handlePhotoUpload={subirFoto}
       handleClearPhoto={() => setFormData((p) => ({ ...p, fotoImg: '' }))}
       tipoDocOptions={TIPOS_DOC}

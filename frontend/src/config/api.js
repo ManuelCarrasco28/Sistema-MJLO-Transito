@@ -68,7 +68,7 @@ export function sanitizarMensaje(mensaje, fallback = 'Ocurrió un error en el se
 // cualquier traza técnica que se haya colado en la respuesta.
 export async function leerMensajeError(response, fallback = 'Ocurrió un error en el servidor.') {
   try {
-    const data = await response.json()
+    const data = typeof response?.json === 'function' ? await response.json() : response
     const mensajes = data?.messages
     if (mensajes && typeof mensajes === 'object') {
       const detalles = Object.values(mensajes).flat().filter(value => typeof value === 'string' && value.trim())

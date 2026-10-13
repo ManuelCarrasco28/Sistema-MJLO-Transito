@@ -135,6 +135,11 @@ export function PapeletaDetalleModal({
                       {selectedPapeleta.observacionesAutoridad ? `“${selectedPapeleta.observacionesAutoridad}”` : 'Sin observaciones por parte de la autoridad.'}
                     </span>
                   </Dato>
+                  <Dato etiqueta="Observaciones del conductor" className="col-span-2">
+                    <span className="font-medium italic text-slate-600 dark:text-slate-300">
+                      {selectedPapeleta.observacionesConductor ? `“${selectedPapeleta.observacionesConductor}”` : 'Sin observaciones registradas por el conductor.'}
+                    </span>
+                  </Dato>
                 </div>
               </Seccion>
 
