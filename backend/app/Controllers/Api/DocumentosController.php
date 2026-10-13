@@ -214,6 +214,7 @@ class DocumentosController extends ResourceController
                 COALESCE(c.foto, '') AS fotoConductor,
                 COALESCE(c.numero_licencia, '') AS conductorLicencia,
                 COALESCE(p.numero, '') AS propietarioDni,
+                p.uuid AS propietarioPersonaId,
                 COALESCE(p.celular, '') AS propietarioCelular,
                 COALESCE(p.email, '') AS propietarioEmail,
                 COALESCE(p.direccion, '') AS direccion

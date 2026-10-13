@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { PersonaDetalleModal } from '../personas/PersonaDetalleModal'
+import { SmartPersonaFormModal } from '../personas/SmartPersonaFormModal'
 import { ListaImpresion } from './ListaImpresion'
 import { StatusBadge } from '../ui/StatusBadge'
 import { CarnetCursoVialLotePrint, precargarPlantillasCarnet } from '../documentos/TarjetaOperatividadPrint'
@@ -80,15 +83,50 @@ function BotonEntrega({ participante: p, actualizarFila }) {
   )
 }
 
+function ParticipantePersona({ participante: p }) {
+  const [persona, setPersona] = useState(null)
+  const [editando, setEditando] = useState(false)
+  const [cargando, setCargando] = useState(false)
+  const abrir = async (event) => {
+    event.stopPropagation()
+    if (cargando) return
+    setCargando(true)
+    try {
+      if (!p.personaId) throw new Error('Actualiza la página para cargar la ficha del participante.')
+      const response = await apiFetch(`/personas/${encodeURIComponent(p.personaId)}`)
+      if (!response.ok) throw new Error('No se pudo cargar la ficha de persona.')
+      const payload = await response.json()
+      if (!payload.data) throw new Error('No se encontró la persona.')
+      setPersona(payload.data)
+    } catch (error) {
+      showError('Ficha de persona', error.message)
+    } finally {
+      setCargando(false)
+    }
+  }
+  return <>
+    <button type="button" onClick={abrir} disabled={cargando} title="Ver persona" className="text-left rounded focus-visible:outline-2 focus-visible:outline-blue-500 hover:underline disabled:opacity-60">
+      <span className="block text-xs font-semibold leading-snug text-slate-900 dark:text-white">{nombreDe(p) || 'Sin nombre'}</span>
+      <span className="block mt-0.5 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">{cargando ? 'Cargando…' : `DNI: ${p.dni || ''}`}</span>
+    </button>
+    {persona && createPortal(editando
+      ? <SmartPersonaFormModal initialPersona={persona} onClose={() => setEditando(false)} onSuccess={async () => {
+        const response = await apiFetch(`/personas/${encodeURIComponent(p.personaId)}`)
+        if (response.ok) {
+          const payload = await response.json()
+          if (payload.data) setPersona(payload.data)
+        }
+      }} />
+      : <PersonaDetalleModal selectedPersona={persona} onClose={() => setPersona(null)} onEdit={() => setEditando(true)} />, document.body)}
+  </>
+}
+
 const COLUMNAS_LISTA = [
   {
     titulo: 'Participante',
     ancho: '31%',
     celda: (p) => (
-      <>
-        <p className="text-xs font-semibold leading-snug text-slate-900 dark:text-white" title={nombreDe(p)}>{nombreDe(p) || 'Sin nombre'}</p>
-        <p className="mt-0.5 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">DNI: {p.dni || 'N/A'}</p>
-      </>
+      <ParticipantePersona participante={p} />
     ),
   },
   {

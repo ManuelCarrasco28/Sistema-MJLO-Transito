@@ -110,6 +110,8 @@ export function Personas({ user, onUserUpdate }) {
     numeroLicencia: '',
     estado: 'ACTIVO',
     estadoCivil: '',
+    sexo: '',
+    fechaNacimiento: '',
     fotoImg: '',
   })
 
@@ -260,6 +262,8 @@ export function Personas({ user, onUserUpdate }) {
       numeroLicencia: '',
       estado: 'ACTIVO',
       estadoCivil: '',
+      sexo: '',
+      fechaNacimiento: '',
       fotoImg: '',
     })
     setIsEditing(false)
@@ -275,6 +279,8 @@ export function Personas({ user, onUserUpdate }) {
       tipoDocumento: normalizedTipo,
       celular: persona.celular || '',
       telefono: persona.telefono || '',
+      sexo: persona.sexo || '',
+      fechaNacimiento: persona.fechaNacimiento ? String(persona.fechaNacimiento).slice(0, 10) : '',
       fotoImg: persona.fotoImg || '',
     })
     setIsEditing(true)
@@ -855,7 +861,7 @@ export function Personas({ user, onUserUpdate }) {
                             {p.nombres?.[0] || '?'}{p.apellidoPaterno?.[0] || ''}
                           </div>
                         )}
-                        <div>
+                        <div className="min-w-0 max-w-[26rem]">
                           <p
                             className="text-xs font-semibold text-slate-900 dark:text-white whitespace-nowrap"
                             title={`${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.trim()}
@@ -863,7 +869,7 @@ export function Personas({ user, onUserUpdate }) {
                             {`${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.trim() || '—'}
                           </p>
                           <p
-                            className="text-[11px] whitespace-nowrap mt-0.5"
+                            className="text-[11px] leading-snug break-words mt-0.5"
                             style={{ color: 'var(--text-muted)' }}
                             title={p.direccion}
                           >
@@ -1049,7 +1055,10 @@ export function Personas({ user, onUserUpdate }) {
       )}
 
       {isDetailModalOpen && (
-        <PersonaDetalleModal selectedPersona={selectedPersona} onClose={() => setIsDetailModalOpen(false)} />
+        <PersonaDetalleModal selectedPersona={selectedPersona} onClose={() => setIsDetailModalOpen(false)} onEdit={(persona) => {
+          setIsDetailModalOpen(false)
+          handleOpenEditModal(persona)
+        }} />
       )}
     </div>
   )

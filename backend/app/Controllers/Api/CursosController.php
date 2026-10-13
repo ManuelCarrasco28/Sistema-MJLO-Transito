@@ -661,7 +661,7 @@ class CursosController extends ResourceController
                 'apellido_materno' => $persona['apellido_materno'],
                 'dni' => $dni,
                 'licencia' => $persona['numero_licencia'],
-                'fotoUrl' => $persona['foto'],
+                'fotoUrl' => (new \App\Services\FileStorageService())->urlPublica($persona['foto'] ?? null) ?? '',
                 'estado' => 'INSCRITO',
                 'estado_pago' => $estadoPago,
                 'fechaInscripcion' => date('Y-m-d'),
@@ -950,6 +950,7 @@ class CursosController extends ResourceController
             ->where('cu.estado', 'FINALIZADO')
             ->where(\App\Libraries\ReglasCurso::condicionAprobado(), null, false);
 
+        $builder->select('p.uuid AS personaId');
         $cursoId = (int) \App\Libraries\Identificador::resolverId($db, 'cursos_seguridad_vial', $this->request->getGet('cursoId'));
         if ($cursoId > 0) {
             $builder->where('cu.id', $cursoId);

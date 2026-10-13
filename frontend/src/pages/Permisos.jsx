@@ -116,6 +116,17 @@ export function Permisos() {
     },
   })
 
+  // Trámites disponibles para emitir: se consultan cada vez que se abre el formulario (así siempre están al día)
+  useEffect(() => {
+    if (!isCreateModalOpen) return undefined
+    let vigente = true
+    apiFetch('/permisos/tramites-disponibles')
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .catch(() => ({ data: [] }))
+      .then((res) => { if (vigente) setTramitesDisponibles(Array.isArray(res?.data) ? res.data : []) })
+    return () => { vigente = false }
+  }, [isCreateModalOpen])
+
   // Los listeners de ventana (message/storage) se registran una sola vez: la ref
   // les entrega siempre la versión de loadData con los filtros actuales.
   const loadDataRef = useRef(loadData)
@@ -135,15 +146,11 @@ export function Permisos() {
   }, [])
 
   useEffect(() => {
-    Promise.all([
-      apiFetch('/procedimientos-admin').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
-      apiFetch('/permisos/tramites-disponibles').then((r) => (r.ok ? r.json() : { data: [] })).catch(() => ({ data: [] })),
-    ]).then(([procRes, tramRes]) => {
-      const prData = Array.isArray(procRes?.data) ? procRes.data : []
-      const trData = Array.isArray(tramRes?.data) ? tramRes.data : []
-      setProcedimientos(prData)
-      setTramitesDisponibles(trData)
-    })
+    // Los trámites disponibles (más de mil filas) ya no se piden al abrir la pantalla: solo al abrir el formulario
+    apiFetch('/procedimientos-admin')
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .catch(() => ({ data: [] }))
+      .then((procRes) => setProcedimientos(Array.isArray(procRes?.data) ? procRes.data : []))
 
     const handleMessage = (e) => {
       if (e.origin !== window.location.origin) return
@@ -813,7 +820,7 @@ export function Permisos() {
       )}
 
       {/* MODAL CREAR / EDITAR - EXACTO A PERSONAS.JSX */}
-      {/* MODAL DE TRÁMITE / EMISIÓN Y EDICIÓN CON EDITOR TINYMCE */}
+      {/* MODAL DE TRÁMITE / EMISIÓN Y EDICIÓN CON EDITOR DE TEXTO */}
       <TramiteFormularioModal
         isOpen={isCreateModalOpen}
         onClose={() => {

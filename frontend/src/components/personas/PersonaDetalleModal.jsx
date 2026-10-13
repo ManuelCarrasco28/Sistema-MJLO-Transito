@@ -18,19 +18,19 @@ function calcularEdad(fechaNacStr) {
 }
 
 function formatSexo(val) {
-  if (!val) return '—'
+  if (!val) return ''
   const v = val.toUpperCase().trim()
   if (v === 'M' || v === 'MASCULINO') return 'Masculino'
   if (v === 'F' || v === 'FEMENINO') return 'Femenino'
   return val
 }
 
-export function PersonaDetalleModal({ selectedPersona, onClose }) {
+export function PersonaDetalleModal({ selectedPersona, onClose, onEdit }) {
   if (!selectedPersona) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter">
-      <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+      <div className="w-full max-w-4xl max-h-[92dvh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
         <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-2.5">
             <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
@@ -40,10 +40,15 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
               Ficha del Administrado
             </h3>
           </div>
-          <BotonCerrarModal onClick={onClose} title="Cerrar ficha" />
+          <div className="flex items-center gap-3">
+            {onEdit && <button type="button" onClick={() => onEdit(selectedPersona)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
+              <Icon name="edit" className="size-4" />Editar persona
+            </button>}
+            <BotonCerrarModal onClick={onClose} title="Cerrar ficha" />
+          </div>
         </div>
 
-        <div className="p-5 pb-6 space-y-3">
+        <div className="min-h-0 overflow-y-auto p-4 sm:p-5 space-y-3">
           <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 flex flex-col sm:flex-row items-center gap-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-xs">
             {selectedPersona.fotoImg ? (
               <img
@@ -88,19 +93,19 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Nombres</span>
                   <span className="font-bold text-slate-800 dark:text-white text-right">
-                    {selectedPersona.nombres || '—'}
+                    {selectedPersona.nombres || ''}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Apellido paterno</span>
                   <span className="font-bold text-slate-800 dark:text-white text-right">
-                    {selectedPersona.apellidoPaterno || '—'}
+                    {selectedPersona.apellidoPaterno || ''}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Apellido materno</span>
                   <span className="font-bold text-slate-800 dark:text-white text-right">
-                    {selectedPersona.apellidoMaterno || '—'}
+                    {selectedPersona.apellidoMaterno || ''}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
@@ -112,19 +117,19 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Nacimiento</span>
                   <span className="font-bold text-slate-800 dark:text-white text-right">
-                    {formatFecha(selectedPersona.fechaNacimiento)} {calcularEdad(selectedPersona.fechaNacimiento)}
+                    {selectedPersona.fechaNacimiento ? formatFecha(selectedPersona.fechaNacimiento) : ''} {calcularEdad(selectedPersona.fechaNacimiento)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Estado civil</span>
                   <span className="font-bold text-slate-800 dark:text-white">
-                    {selectedPersona.estadoCivil || '—'}
+                    {selectedPersona.estadoCivil || ''}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Ocupación</span>
                   <span className="font-bold text-slate-800 dark:text-white text-right break-words" title={selectedPersona.profesion}>
-                    {selectedPersona.profesion || '—'}
+                    {selectedPersona.profesion || ''}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-0.5">
@@ -135,7 +140,7 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
                     </span>
                   ) : (
                     <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                      Sin licencia
+                      {''}
                     </span>
                   )}
                 </div>
@@ -150,25 +155,25 @@ export function PersonaDetalleModal({ selectedPersona, onClose }) {
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Celular</span>
                   <span className="font-bold text-slate-800 dark:text-white">
-                    {selectedPersona.celular || '—'}
+                    {selectedPersona.celular || ''}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Teléfono fijo</span>
                   <span className="font-semibold text-slate-800 dark:text-white">
-                    {selectedPersona.telefono || '—'}
+                    {selectedPersona.telefono || ''}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50 dark:border-slate-800/80">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Email</span>
                   <span className="font-semibold text-indigo-600 dark:text-indigo-400 text-right break-all select-all" title={selectedPersona.email}>
-                    {selectedPersona.email || '—'}
+                    {selectedPersona.email || ''}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-0.5">
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-400 shrink-0 mr-2">Dirección</span>
                   <span className="font-semibold text-slate-800 dark:text-white text-right break-words" title={selectedPersona.direccion}>
-                    {selectedPersona.direccion || '—'}
+                    {selectedPersona.direccion || ''}
                   </span>
                 </div>
               </div>

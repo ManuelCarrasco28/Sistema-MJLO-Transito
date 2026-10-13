@@ -1,4 +1,4 @@
-import { apiFetch } from '../config/api'
+import { apiFetch, API_BASE_URL, resolverUrlArchivo } from '../config/api'
 import { recomprimirImagen } from '../components/documentos/TarjetaOperatividadPrint'
 
 // Las fotos de los conductores se sirven desde un endpoint que exige la sesión (cookie) del usuario.
@@ -18,7 +18,11 @@ export async function resolverFotoParaCarnet(fotoUrl) {
 
   const promesa = (async () => {
     try {
-      const respuesta = await apiFetch(url, { timeoutMs: 8000 })
+      // apiFetch antepone la base de la API a las rutas relativas: una foto "/api/files/..." quedaba
+      // como "/api/api/files/..." (404) y el carnet salía sin foto. Se pasa la ruta sin esa base.
+      let ruta = resolverUrlArchivo(url)
+      if (ruta.startsWith(`${API_BASE_URL}/`)) ruta = ruta.slice(API_BASE_URL.length)
+      const respuesta = await apiFetch(ruta, { timeoutMs: 8000 })
       if (!respuesta.ok) return ''
       const blob = await respuesta.blob()
       const dataUri = await new Promise((resolve) => {

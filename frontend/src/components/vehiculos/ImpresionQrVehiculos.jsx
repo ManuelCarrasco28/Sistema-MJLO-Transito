@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Icon } from '../ui/Icon'
 import { Pagination } from '../ui/Pagination'
 import { PlacaVehiculo } from './PlacaVehiculo'
+import { PersonaEnlace } from '../personas/PersonaEnlace'
 import { RoundedSelect } from '../ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal } from '../ui/ModalControls'
 import { apiFetch } from '../../config/api'
@@ -566,14 +567,7 @@ export function ImpresionQrVehiculos({ asociaciones }) {
                   <td className="px-3.5 py-2.5"><PlacaVehiculo placa={v.placa} vehiculoId={v.id} /></td>
 
                   <td className="px-3.5 py-2.5">
-                    <p className="text-xs font-semibold leading-snug text-slate-900 dark:text-white" title={v.propietario}>
-                      {v.propietario || 'Sin Propietario'}
-                    </p>
-                    {v.propietarioDni ? (
-                      <p className="mt-0.5 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">DNI: {v.propietarioDni}</p>
-                    ) : (
-                      <p className="mt-0.5 font-mono text-[11px] text-slate-400">Sin DNI</p>
-                    )}
+                    <PersonaEnlace personaId={v.propietarioPersonaId} nombre={v.propietario} dni={v.propietarioDni} />
                   </td>
 
                   <td className="px-3.5 py-2.5">

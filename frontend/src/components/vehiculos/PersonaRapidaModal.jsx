@@ -337,7 +337,7 @@ export function PersonaRapidaModal({
           <FloatingInput
             id="rapida_licencia"
             label="N° Licencia de Conducir (Opcional)"
-            maxLength={9}
+            maxLength={11}
             value={formData.numeroLicencia}
             onChange={(e) => setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() })}
             inputClassName="uppercase font-mono"

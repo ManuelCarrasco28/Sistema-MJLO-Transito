@@ -94,6 +94,7 @@ cd frontend && npx vitest run                      # pruebas del frontend
 
 - Los registros llevan un `uuid` público (v7) además del `id`; el QR del vehículo es ese `uuid`. Todo insert nuevo debe usar `Identificador::nuevo()`.
 - Estados de cursos, documentos y permisos se actualizan solos; puedes programar `php spark cursos:sincronizar-estados` una vez al día.
+- El editor de permisos es **TinyMCE 8 autohospedado** (`frontend/public/tinymce`, licencia GPL v2+): no usa claves ni servicios externos. Para actualizarlo, reemplaza esa carpeta con la nueva versión y conserva `langs/es.js`.
 - Las migraciones están en `backend/app/Database/Migrations/`; `init-db/transitomunicipal.sql` trae el esquema completo.
 
 ---

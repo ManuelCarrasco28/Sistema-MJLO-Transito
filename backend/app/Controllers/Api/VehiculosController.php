@@ -265,7 +265,7 @@ class VehiculosController extends ResourceController
     {
         $db = \Config\Database::connect();
         $builder = $db->table('vehiculos v')
-            ->select("v.id, v.placa, COALESCE(tv.nombre, 'Mototaxi') AS tipo, COALESCE(v.codigo_qr, '') AS codigoQr, v.id_asociacion AS asociacionId, o.razon_social AS asociacion, COALESCE(v.marca, '') AS marca, COALESCE(v.modelo, '') AS modelo, COALESCE(p.numero, '') AS propietarioDni, TRIM(CONCAT_WS(' ', c.nombres, c.apellido_paterno, c.apellido_materno)) AS propietario", false)
+            ->select("v.id, v.placa, COALESCE(tv.nombre, 'Mototaxi') AS tipo, COALESCE(v.codigo_qr, '') AS codigoQr, v.id_asociacion AS asociacionId, o.razon_social AS asociacion, COALESCE(v.marca, '') AS marca, COALESCE(v.modelo, '') AS modelo, COALESCE(p.numero, '') AS propietarioDni, p.uuid AS propietarioPersonaId, TRIM(CONCAT_WS(' ', c.nombres, c.apellido_paterno, c.apellido_materno)) AS propietario", false)
             ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
             ->join('asociaciones o', 'o.id = v.id_asociacion', 'left')
             ->join('vehiculo_propietarios vp', 'vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL', 'left')

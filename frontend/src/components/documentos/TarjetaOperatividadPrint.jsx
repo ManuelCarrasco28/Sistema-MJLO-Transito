@@ -12,6 +12,14 @@ const sanitizarHtml = (html) => DOMPurify.sanitize(html, {
   ALLOWED_ATTR: ['style', 'href', 'target', 'rel'],
 })
 
+// Cuerpo del documento tal como se editó (incluye tablas, cuadros y listas): se permiten también las etiquetas
+// de tabla y los atributos de borde y celdas, que el sanitizador anterior eliminaba.
+const sanitizarDocumento = (html) => DOMPurify.sanitize(html, {
+  ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'sub', 'sup', 'ul', 'ol', 'li', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'blockquote', 'a', 'hr', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'colgroup', 'col', 'caption'],
+  ALLOWED_ATTR: ['style', 'href', 'target', 'rel', 'border', 'colspan', 'rowspan', 'width', 'align', 'cellpadding', 'cellspacing'],
+})
+
 // Las plantillas del carnet de curso (curso-adelante.png / curso-atras.png) son archivos públicos,
 // sin sesión de por medio, pero igual se quedaban en blanco al imprimir: la ventana de impresión del
 // navegador se renderiza en un proceso aparte que no siempre llega a cargar imágenes por su ruta de
@@ -1754,8 +1762,40 @@ export function AutorizacionZonasReservadasPrint({ data }) {
  * 3. Zonas Reservadas de Estacionamiento (ZONAS_RESERVADAS)
  * 4. Permiso de Control Vehicular (CONTROL_VEHICULAR / OPERACION)
  */
+/**
+ * Hoja A4 con el documento tal como se redactó en el editor: encabezado institucional y el cuerpo guardado
+ * (lo que se ve en el editor es lo que se imprime). Sirve para los cuatro tipos de autorización.
+ */
+export function AutorizacionDocumentoPrint({ data }) {
+  return (
+    <PrintWrapper>
+      <div className="hoja-documento-a4 hoja-editor">
+        <div className="hoja-editor__encabezado">
+          <img src="/escudo-jlo.png" alt="Escudo de la Municipalidad" className="hoja-editor__escudo" />
+          <div className="hoja-editor__titulos">
+            <div className="hoja-editor__municipalidad">MUNICIPALIDAD DISTRITAL DE JOSE LEONARDO ORTIZ</div>
+            <div className="hoja-editor__subgerencia">SUB GERENCIA DE TRANSITO, TRANSPORTE Y SEGURIDAD VIAL</div>
+            <div className="hoja-editor__lema">“Año de la Esperanza y el Fortalecimiento de la Democracia”</div>
+          </div>
+        </div>
+        <div
+          className="hoja-editor__contenido"
+          dangerouslySetInnerHTML={{ __html: sanitizarDocumento(data.contenido || '') }}
+        />
+      </div>
+    </PrintWrapper>
+  )
+}
+
+const tieneContenidoRico = (contenido) => typeof contenido === 'string' && /<\s*(p|table|ul|ol|div|h[1-6])[\s>]/i.test(contenido)
+
 export function ResolucionPermisoPrint({ data }) {
   if (!data) return null
+
+  // Si el documento tiene cuerpo redactado en el editor, se imprime ese mismo cuerpo
+  if (tieneContenidoRico(data.contenido)) {
+    return <AutorizacionDocumentoPrint data={data} />
+  }
 
   const tipo = (data.tipoPermiso || '').toUpperCase()
 

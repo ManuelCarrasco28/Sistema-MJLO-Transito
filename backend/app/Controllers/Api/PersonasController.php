@@ -20,6 +20,44 @@ class PersonasController extends ResourceController
      *   (base64) y se convierte a archivo real vía FileStorageService.
      * - Una foto de RENIEC/PIDE ya es una URL servible y se guarda tal cual.
      */
+    /** Valida sexo y fecha de nacimiento antes de abrir la transacción (devuelve el mensaje de error o null). */
+    private function errorSexoNacimiento(array $input): ?array
+    {
+        try {
+            $this->normalizarSexo($input['sexo'] ?? null);
+        } catch (\DomainException $e) {
+            return ['sexo' => $e->getMessage()];
+        }
+        try {
+            $this->normalizarFechaNacimiento($input['fechaNacimiento'] ?? null);
+        } catch (\DomainException $e) {
+            return ['fechaNacimiento' => $e->getMessage()];
+        }
+        return null;
+    }
+
+    /** Sexo como lo guarda la base: 'M' o 'F' (acepta también Masculino/Femenino); vacío = sin dato. */
+    private function normalizarSexo($valor): ?string
+    {
+        $v = strtoupper(trim((string) $valor));
+        if ($v === '') return null;
+        if (in_array($v, ['M', 'MASCULINO'], true)) return 'M';
+        if (in_array($v, ['F', 'FEMENINO'], true)) return 'F';
+        throw new \DomainException('El sexo debe ser Masculino o Femenino.');
+    }
+
+    /** Fecha de nacimiento válida (AAAA-MM-DD), no futura y posterior a 1900; vacío = sin dato. */
+    private function normalizarFechaNacimiento($valor): ?string
+    {
+        $v = substr(trim((string) $valor), 0, 10);
+        if ($v === '') return null;
+        $f = \DateTimeImmutable::createFromFormat('!Y-m-d', $v);
+        if (!$f || $f->format('Y-m-d') !== $v || $v < '1900-01-01' || $v > date('Y-m-d')) {
+            throw new \DomainException('La fecha de nacimiento no es válida.');
+        }
+        return $v;
+    }
+
     private function resolverFotoParaGuardar(?string $valor): ?string
     {
         $valor = trim((string) $valor);
@@ -161,9 +199,9 @@ class PersonasController extends ResourceController
                 'errors' => ['required' => 'El apellido materno es requerido.']
             ],
             'numeroLicencia' => [
-                'rules' => 'permit_empty|max_length[9]',
+                'rules' => 'permit_empty|max_length[11]',
                 'errors' => [
-                    'max_length' => 'El número de licencia no puede exceder los 9 caracteres.'
+                    'max_length' => 'El número de licencia no puede exceder los 11 caracteres.'
                 ]
             ],
             'direccion' => [
@@ -462,6 +500,7 @@ class PersonasController extends ResourceController
         try {
             $duplicados = $this->camposDuplicados($db, $input);
             if ($duplicados) return $this->failValidationErrors($duplicados);
+            if ($errorPersonal = $this->errorSexoNacimiento($input)) return $this->failValidationErrors($errorPersonal);
 
             $db->transStart();
 
@@ -487,6 +526,8 @@ class PersonasController extends ResourceController
                 'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
                 'numero_licencia'  => strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null,
                 'estado_civil'     => trim($input['estadoCivil'] ?? '') ?: null,
+                'sexo'             => $this->normalizarSexo($input['sexo'] ?? null),
+                'fecha_nacimiento' => $this->normalizarFechaNacimiento($input['fechaNacimiento'] ?? null),
                 'foto'             => $this->resolverFotoParaGuardar($input['fotoImg'] ?? $input['fotoUrl'] ?? null),
             ];
             $db->table('ciudadanos')->insert($cData);
@@ -565,6 +606,7 @@ class PersonasController extends ResourceController
             if (!$this->validateData($input, $this->personaValidationRules(false))) {
                 return $this->failValidationErrors($this->validator->getErrors());
             }
+            if ($errorPersonal = $this->errorSexoNacimiento($input)) return $this->failValidationErrors($errorPersonal);
 
             $db->transStart();
 
@@ -589,6 +631,8 @@ class PersonasController extends ResourceController
             if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = trim($input['apellidoMaterno']);
             if (array_key_exists('numeroLicencia', $input)) $cData['numero_licencia'] = strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null;
             if (array_key_exists('estadoCivil', $input)) $cData['estado_civil'] = trim($input['estadoCivil'] ?? '') ?: null;
+            if (array_key_exists('sexo', $input)) $cData['sexo'] = $this->normalizarSexo($input['sexo']);
+            if (array_key_exists('fechaNacimiento', $input)) $cData['fecha_nacimiento'] = $this->normalizarFechaNacimiento($input['fechaNacimiento']);
             if (array_key_exists('fotoUrl', $input) || array_key_exists('fotoImg', $input)) $cData['foto'] = $this->resolverFotoParaGuardar($input['fotoImg'] ?? $input['fotoUrl'] ?? null);
 
             if (!empty($cData)) {

@@ -22,14 +22,14 @@ const ESTADO_OPTIONS = [
 ]
 
 const ESTADO_CIVIL_OPTIONS = [
-  { value: '', label: 'Seleccionar...' },
+  { value: '', label: '' },
   { value: 'SOLTERO', label: 'SOLTERO(A)' },
   { value: 'CASADO', label: 'CASADO(A)' },
   { value: 'DIVORCIADO', label: 'DIVORCIADO(A)' },
   { value: 'VIUDO', label: 'VIUDO(A)' },
 ]
 
-export function SmartPersonaFormModal({ onClose, onSuccess, initialDni = '', initialNombres = '', initialApellidos = '' }) {
+export function SmartPersonaFormModal({ onClose, onSuccess, initialPersona = null, initialDni = '', initialNombres = '', initialApellidos = '' }) {
   const cachedTipos = getCachedData('/tipo-documentos')
   const [tipoDocOptions, setTipoDocOptions] = useState(() => {
     if (cachedTipos && Array.isArray(cachedTipos) && cachedTipos.length > 0) {
@@ -55,6 +55,8 @@ export function SmartPersonaFormModal({ onClose, onSuccess, initialDni = '', ini
     estado: 'ACTIVO',
     estadoCivil: '',
     fotoImg: '',
+    ...(initialPersona || {}),
+    tipoDocumento: initialPersona?.tipoDocumento === 'DOCUMENTO NACIONAL DE IDENTIDAD' ? 'DNI' : (initialPersona?.tipoDocumento || 'DNI'),
   })
 
   const [isSearchingReniec, setIsSearchingReniec] = useState(false)
@@ -195,15 +197,16 @@ export function SmartPersonaFormModal({ onClose, onSuccess, initialDni = '', ini
 
     setIsSubmitting(true)
     try {
-      const response = await apiFetch('/personas', {
-        method: 'POST',
+      if (isSubmitting) return
+      const response = await apiFetch(initialPersona ? `/personas/${encodeURIComponent(initialPersona.uuid || initialPersona.id)}` : '/personas', {
+        method: initialPersona ? 'PUT' : 'POST',
         body: JSON.stringify(formData),
       })
       if (!response.ok) {
         throw new Error(await leerMensajeError(response))
       }
       const data = await response.json()
-      showSuccess('Creado', 'Persona registrada correctamente.')
+      showSuccess(initialPersona ? 'Actualizado' : 'Creado', initialPersona ? 'Persona actualizada correctamente.' : 'Persona registrada correctamente.')
       if (onSuccess) onSuccess(data.data || data)
       onClose()
     } catch (err) {
@@ -215,7 +218,7 @@ export function SmartPersonaFormModal({ onClose, onSuccess, initialDni = '', ini
 
   return (
     <PersonaFormModal
-      isEditing={false}
+      isEditing={Boolean(initialPersona)}
       formData={formData}
       setFormData={setFormData}
       handlePhotoUpload={handlePhotoUpload}

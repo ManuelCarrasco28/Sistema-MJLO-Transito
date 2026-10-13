@@ -1,4 +1,5 @@
 import { PlacaVehiculo } from '../vehiculos/PlacaVehiculo'
+import { PersonaEnlace } from '../personas/PersonaEnlace'
 import { StatusBadge } from '../ui/StatusBadge'
 import { ListaImpresion } from './ListaImpresion'
 import { TarjetaOperatividadLotePrint, precargarPlantillasOperatividad } from '../documentos/TarjetaOperatividadPrint'
@@ -31,10 +32,7 @@ const COLUMNAS_LISTA = [
     titulo: 'Titular',
     ancho: '25%',
     celda: (d) => (
-      <>
-        <p className="text-xs font-semibold leading-snug text-slate-900 dark:text-white" title={d.propietario}>{d.propietario || 'Sin Propietario'}</p>
-        <p className="mt-0.5 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">DNI: {d.propietarioDni || 'N/A'}</p>
-      </>
+      <PersonaEnlace personaId={d.propietarioPersonaId} nombre={d.propietario} dni={d.propietarioDni || 'N/A'} />
     ),
   },
   {

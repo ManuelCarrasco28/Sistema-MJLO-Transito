@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fechaLocalActual, fechaLocalMasDias } from '../../utils/calendarioCurso'
 import { normalizarPlaca } from '../../utils/formatters'
 import { Icon } from '../ui/Icon'
@@ -16,6 +17,7 @@ export function TramiteFormularioModal({
   onSave,
   tramitesDisponibles = []
 }) {
+  const navigate = useNavigate()
   const initialFormState = {
     id: null,
     tipoPermiso: 'CARGA_DESCARGA',
@@ -213,28 +215,12 @@ export function TramiteFormularioModal({
       showError('Almacenamiento local', 'No se pudo guardar el borrador en memoria temporal de su navegador.')
     }
 
-    const width = Math.min(1380, window.screen.availWidth - 40)
-    const height = Math.min(920, window.screen.availHeight - 60)
-    const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2))
-    const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2))
-
+    // La redacción se abre en la misma ventana (el borrador ya quedó guardado en el navegador)
     const targetUrl = effectiveId
       ? `/permisos-formulario?id=${effectiveId}&draft=1&screen=CUERPO`
       : `/permisos-formulario?draft=1&screen=CUERPO`
-
-    const popup = window.open(
-      targetUrl,
-      'MJLO_Redaccion_Resolucion',
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no`
-    )
-
-    if (popup) {
-      popup.focus()
-      showToast('Abriendo segunda ventana para redacción de resolución...')
-      onClose()
-    } else {
-      showError('Ventana bloqueada', 'Por favor habilita las ventanas emergentes en tu navegador para continuar a la redacción.')
-    }
+    onClose()
+    navigate(targetUrl)
   }
 
   // Guardar directamente sin abrir segunda ventana

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fechaLocalActual, fechaLocalMasDias } from '../utils/calendarioCurso'
 import { Editor } from '@tinymce/tinymce-react'
 import { Icon } from '../components/ui/Icon'
@@ -9,12 +10,14 @@ import { showError } from '../utils/SwalUtil'
 import { normalizarPlaca } from '../utils/formatters'
 import { BuscadorAdministrados } from '../components/permisos/BuscadorAdministrados'
 import { generarPlantillaCuerpo } from '../utils/permisosPlantilla'
+import { normalizarFormatoEnLinea } from '../utils/formatoEditor'
 import { BotonCancelar, BotonGuardar } from '../components/ui/ModalControls'
 
-// La clave de TinyMCE va en el .env del frontend (VITE_TINYMCE_API_KEY); no se deja escrita en el código.
-const TINYMCE_API_KEY = import.meta.env.VITE_TINYMCE_API_KEY || 'no-api-key'
+// TinyMCE autohospedado (licencia GPL): los archivos están en /public/tinymce; no usa claves ni servicios externos.
+const TINYMCE_SCRIPT = '/tinymce/tinymce.min.js'
 
 export function PermisoFormularioVentana() {
+  const navigate = useNavigate()
   const [searchParams] = useState(() => new URLSearchParams(window.location.search))
   const permitId = searchParams.get('id')
   const draftParam = searchParams.get('draft')
@@ -237,14 +240,8 @@ export function PermisoFormularioVentana() {
 
     guardarBorradorPermiso(dataToSave)
 
-    // Notificar a la ventana principal / modal opener
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage({ type: 'VOLVER_A_DATOS_MODAL', draft: dataToSave }, window.location.origin)
-      window.opener.focus()
-      window.close()
-    } else {
-      window.location.href = `/permisos?reopenDraft=1${effectiveId ? `&id=${effectiveId}` : ''}`
-    }
+    // Vuelve a la lista de permisos (misma ventana) y reabre los datos del trámite con el borrador
+    navigate(`/permisos?reopenDraft=1${effectiveId ? `&id=${effectiveId}` : ''}`)
   }
 
   // Navegar entre pantallas con scroll al inicio
@@ -296,23 +293,15 @@ export function PermisoFormularioVentana() {
         throw new Error(await leerMensajeError(res, 'Error al procesar la autorización municipal.'))
       }
 
-      const resData = await res.json()
+      await res.json()
       setSuccessMsg('¡Autorización municipal guardada exitosamente!')
 
       limpiarBorradorPermiso()
 
-      // Notificar a la ventana principal / pestaña padre
-      if (window.opener) {
-        window.opener.postMessage({ type: 'PERMISO_GUARDADO', id: resData.id || effectiveId }, window.location.origin)
-      }
       avisarPermisoActualizado()
 
-      // Cerrar ventana tras breve confirmación
-      setTimeout(() => {
-        if (window.opener) {
-          window.close()
-        }
-      }, 1200)
+      // Tras la breve confirmación se vuelve a la lista de permisos
+      setTimeout(() => navigate('/permisos'), 1200)
     } catch (err) {
       showError('Error', sanitizarMensaje(err.message, 'Ocurrió un error al guardar la autorización.'))
     } finally {
@@ -321,11 +310,7 @@ export function PermisoFormularioVentana() {
   }
 
   const handleCerrar = () => {
-    if (window.opener) {
-      window.close()
-    } else {
-      window.history.back()
-    }
+    navigate('/permisos')
   }
 
   if (isLoading) {
@@ -361,57 +346,14 @@ export function PermisoFormularioVentana() {
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-2.5">
-          {activeScreen === 'CUERPO' ? (
-            <button
-              type="button"
-              onClick={() => goToScreen('DATOS')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-indigo-200 dark:border-[var(--border-strong)] bg-indigo-50 dark:bg-[var(--bg-subtle)] text-indigo-700 dark:text-slate-200 hover:bg-indigo-100 dark:hover:bg-slate-700 transition cursor-pointer"
-              title="Ver y editar los datos del trámite y administrado"
-            >
-              <span>← Volver a Datos del Trámite</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => goToScreen('CUERPO')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-violet-200 dark:border-[var(--border-strong)] bg-violet-50 dark:bg-[var(--bg-subtle)] text-violet-700 dark:text-slate-200 hover:bg-violet-100 dark:hover:bg-slate-700 transition cursor-pointer"
-              title="Continuar al editor de redacción de la resolución"
-            >
-              <span>Continuar a Redacción →</span>
-            </button>
-          )}
-
-          <BotonCancelar onClick={handleCerrar}>Cerrar ventana</BotonCancelar>
-
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-5 py-2 text-xs font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <>
-                <span className="animate-spin text-sm">⟳</span>
-                <span>Guardando...</span>
-              </>
-            ) : (
-              <>
-                <Icon name="check" className="size-4" />
-                <span>Guardar Documento</span>
-              </>
-            )}
-          </button>
-        </div>
       </header>
 
       {/* Contenido Principal con Formulario */}
-      <main className="flex-1 max-w-6xl mx-auto w-full p-4 sm:p-6 space-y-5">
+      <main className={`flex-1 mx-auto w-full p-4 sm:p-6 space-y-4 ${activeScreen === 'CUERPO' ? 'max-w-[1600px]' : 'max-w-6xl'}`}>
         {/* Banner de Éxito si guardó */}
         {successMsg && (
           <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 flex items-center justify-between text-xs font-bold animate-enter">
-            <span>✓ {successMsg} (Cerrando ventana automáticamente...)</span>
+            <span>✓ {successMsg} (Volviendo a la lista de permisos...)</span>
             <button type="button" onClick={() => setSuccessMsg('')} className="text-emerald-600">✕</button>
           </div>
         )}
@@ -691,14 +633,6 @@ export function PermisoFormularioVentana() {
             {/* Barra Superior de Redacción: Información de contexto y controles */}
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => goToScreen('DATOS')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[var(--border-strong)] bg-slate-50 dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer"
-                >
-                  <span>← Volver a Datos del Trámite</span>
-                </button>
-
                 <div className="text-xs">
                   <span className="font-extrabold text-slate-900 dark:text-white">
                     {formData.solicitanteNombre || 'Sin administrado'}
@@ -720,10 +654,11 @@ export function PermisoFormularioVentana() {
                 <button
                   type="button"
                   onClick={handleRecargarPlantilla}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-indigo-300 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20 text-sm font-semibold transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
                   title="Regenera el texto y la tabla de resolución incorporando los datos ingresados en el Paso 1"
                 >
-                  <span>↺ Regenerar plantilla con datos</span>
+                  <Icon name="refresh" className="size-4 shrink-0" />
+                  <span>Regenerar plantilla con datos</span>
                 </button>
               </div>
             </div>
@@ -747,48 +682,64 @@ export function PermisoFormularioVentana() {
 
               <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-[var(--border-strong)] shadow-xs">
                 <Editor
-                  apiKey={TINYMCE_API_KEY}
+                  tinymceScriptSrc={TINYMCE_SCRIPT}
+                  licenseKey="gpl"
                   value={formData.contenido}
                   onEditorChange={handleEditorChange}
+                  // Negrita, cursiva y subrayado en línea pasan a etiquetas para que los botones de la barra los reconozcan
+                  onBeforeSetContent={(evento) => { if (evento.format !== 'raw') evento.content = normalizarFormatoEnLinea(evento.content) }}
                   init={{
-                    height: 640,
-                    min_height: 520,
+                    // Estilo "hoja de Word" de una sola página A4: el editor crece con el documento (sin barra de desplazamiento propia)
+                    // y la página completa es la que se desplaza.
+                    min_height: 1123,
+                    autoresize_bottom_margin: 40,
+                    toolbar_sticky: true,
+                    toolbar_sticky_offset: 0,
                     menubar: true,
                     language: 'es',
+                    promotion: false,
+                    branding: false,
                     plugins: [
                       'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
                       'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-                      'insertdatetime', 'media', 'table', 'help', 'wordcount'
+                      'insertdatetime', 'media', 'table', 'help', 'wordcount', 'autoresize'
                     ],
                     toolbar:
                       'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor | ' +
                       'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | ' +
                       'table link code fullscreen | removeformat',
+                    font_family_formats: 'Times New Roman=times new roman,times,serif; Arial=arial,helvetica,sans-serif; Calibri=calibri,sans-serif; Courier New=courier new,courier,monospace; Georgia=georgia,serif; Verdana=verdana,sans-serif',
+                    font_size_formats: '8pt 9pt 10pt 11pt 12pt 13pt 14pt 16pt 18pt 20pt 24pt 28pt',
                     content_style:
-                      'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13.5px; line-height: 1.6; color: #0f172a; padding: 24px; max-width: 900px; margin: 0 auto; } table { border-collapse: collapse; width: 100%; margin: 12px 0; } th, td { border: 1px solid #cbd5e1; padding: 8px 12px; } th { background-color: #f8fafc; font-weight: bold; }'
+                      'html { background: #cbd5e1; padding: 28px 0; } ' +
+                      'body { background: #ffffff; box-sizing: border-box; width: 794px; min-height: 1123px !important; margin: 0 auto !important; padding: 56px 64px !important; ' +
+                      'box-shadow: 0 2px 10px rgba(15,23,42,0.35); font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.3; color: #000; } ' +
+                      'p { margin: 0 0 8pt; } table { border-collapse: collapse; } img { max-width: 100%; }',
                   }}
                 />
               </div>
             </div>
 
             {/* Barra Inferior de Acciones en Pantalla 2 */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-8">
+            <div className="sticky bottom-0 z-10 flex flex-col items-stretch justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center dark:border-[var(--border)] dark:bg-[#1C2438]/95">
               <button
                 type="button"
-                onClick={() => goToScreen('DATOS')}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
+                onClick={handleVolverADatosModal}
+                className="min-h-11 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               >
-                <span>← Volver a Datos del Trámite</span>
+                <span aria-hidden="true">←</span><span>Volver a datos del trámite</span>
               </button>
 
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <BotonCancelar onClick={handleCerrar} />
+              <div className="flex flex-col sm:flex-row items-stretch gap-3 sm:w-auto">
+                <button type="button" onClick={handleCerrar} disabled={isSubmitting} className="min-h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 transition disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500">
+                  Cancelar
+                </button>
 
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
-                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-6 py-2.5 text-xs font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
+                  className="min-h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition cursor-pointer disabled:opacity-50 disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                 >
                   {isSubmitting ? (
                     <>

@@ -634,12 +634,34 @@ export function FloatingTextarea({
 
   const isFloating = isFocused || Boolean(error) || (value !== undefined && value !== null && String(value).trim() !== '')
 
+  // Ajusta el alto al contenido (entre 42 y 160 px; si hay más texto aparece barra de desplazamiento). Se recalcula
+  // también cuando cambia el ancho del campo: medido con el ancho aún sin asentar (p. ej. al abrirse una ventana)
+  // daba alturas enormes.
+  const ajustarAlto = () => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(160, Math.max(42, el.scrollHeight))}px`
+    el.style.overflowY = el.scrollHeight > 160 ? 'auto' : 'hidden'
+  }
+
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = `${Math.max(42, textareaRef.current.scrollHeight)}px`
-    }
+    ajustarAlto()
   }, [value])
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    let ancho = el.clientWidth
+    const observador = new ResizeObserver(() => {
+      if (el.clientWidth !== ancho) {
+        ancho = el.clientWidth
+        ajustarAlto()
+      }
+    })
+    observador.observe(el)
+    return () => observador.disconnect()
+  }, [])
 
   return (
     <div className={`relative ${className}`}>
@@ -651,10 +673,7 @@ export function FloatingTextarea({
         rows={rows}
         value={value ?? ''}
         onChange={(e) => {
-          if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'
-            textareaRef.current.style.height = `${Math.max(42, textareaRef.current.scrollHeight)}px`
-          }
+          ajustarAlto()
           onChange?.(e)
         }}
         onFocus={() => setIsFocused(true)}
