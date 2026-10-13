@@ -265,6 +265,12 @@ class ApiService {
         await prefs.setString('nombres', data['data']['nombres']);
         await prefs.setString('apellidos', data['data']['apellidos']);
         await prefs.setString('usuario', username);
+        if (data['data']['tipo_inspector'] != null) {
+          await prefs.setString('tipo_inspector', data['data']['tipo_inspector'].toString());
+        }
+        if (data['data']['cargo'] != null) {
+          await prefs.setString('cargo', data['data']['cargo'].toString());
+        }
         return data;
       }
     }
@@ -274,6 +280,16 @@ class ApiService {
   static Future<int?> getPersonalId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('id_persona');
+  }
+
+  static Future<String?> getCargo() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('cargo');
+  }
+
+  static Future<String?> getTipoInspector() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('tipo_inspector');
   }
 
   /// Cierra la sesión también en el servidor (mejor esfuerzo) y luego borra lo local.
@@ -293,6 +309,8 @@ class ApiService {
     await prefs.remove('nombres');
     await prefs.remove('apellidos');
     await prefs.remove('usuario');
+    await prefs.remove('cargo');
+    await prefs.remove('tipo_inspector');
     _cookieEnMemoria = null;
     try {
       await _secureStorage.delete(key: _sessionCookieKey);

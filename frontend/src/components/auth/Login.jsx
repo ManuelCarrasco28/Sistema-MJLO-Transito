@@ -115,8 +115,10 @@ export function Login({ onLogin }) {
         return
       }
 
-      if (data.data?.rol?.toUpperCase() === 'TRABAJADOR') {
-        setError('El acceso al sistema web está restringido para este rol. Por favor, utilice la aplicación móvil.')
+      const userRol = String(data.data?.rol || '').toUpperCase()
+      const userTipoInspector = String(data.data?.tipo_inspector || '').toUpperCase()
+      if (userRol === 'TRABAJADOR' || userTipoInspector === 'TRANSITO') {
+        setError('El acceso al sistema web está reservado para el personal administrativo y de oficina. Por favor, utilice la aplicación móvil.')
         setIsShaking(true)
         resetCaptcha()
         setIsLoading(false)

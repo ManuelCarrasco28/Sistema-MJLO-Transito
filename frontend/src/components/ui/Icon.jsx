@@ -185,6 +185,7 @@ const iconPaths = {
     </>
   ),
   chevronDown: <path d="m6 9 6 6 6-6" />,
+  chevronUp: <path d="m18 15-6-6-6 6" />,
   chevronRight: <path d="m9 18 6-6-6-6" />,
   calendar: (
     <>
@@ -221,6 +222,18 @@ const iconPaths = {
     </>
   ),
   check: <polyline points="20 6 9 17 4 12" />,
+  checkCircle: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
+  'check-circle': (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
   alert: (
     <>
       <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
@@ -470,6 +483,9 @@ const aliasMap = {
   edit: 'pencil',
   car: 'vehicle',
   refresh: 'rotateCcw',
+  'rotate-ccw': 'rotateCcw',
+  'chevron-down': 'chevronDown',
+  'chevron-up': 'chevronUp',
   x: 'close',
   chart: 'chartBar',
 }

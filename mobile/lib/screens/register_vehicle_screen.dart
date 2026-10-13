@@ -38,6 +38,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
   final _lugarController = TextEditingController();
   final _coordenadasController = TextEditingController();
   final _observacionesController = TextEditingController();
+  final _observacionesConductorController = TextEditingController();
 
   bool? _permitePapeleta;
   
@@ -186,6 +187,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
       'motor_vehiculo': _motorController.text.trim().toUpperCase(),
       'lugar': _lugarController.text.trim(),
       'observaciones': _observacionesController.text.trim(),
+      'observacionesConductor': _observacionesConductorController.text.trim(),
       'fotos': _fotos,
       'coordenadas': _currentPosition != null ? '${_currentPosition!.latitude},${_currentPosition!.longitude}' : null,
     };
@@ -216,6 +218,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
     _lugarController.dispose();
     _coordenadasController.dispose();
     _observacionesController.dispose();
+    _observacionesConductorController.dispose();
     _dniConductorController.dispose();
     _nombresConductorController.dispose();
     _apellidosConductorController.dispose();
@@ -371,7 +374,20 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
             TextField(
               controller: _observacionesController,
               decoration: InputDecoration(
-                labelText: 'Observaciones',
+                labelText: 'Observaciones del Inspector',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.white,
+                alignLabelWithHint: true,
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _observacionesConductorController,
+              decoration: InputDecoration(
+                labelText: 'Observaciones del Conductor (Opcional)',
+                hintText: 'Manifestación, descargo o comentarios del conductor...',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: Colors.white,

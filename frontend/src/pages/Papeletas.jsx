@@ -414,9 +414,15 @@ export function Papeletas({ user }) {
     }
   }
 
-  const loadVehiculos = () => {
+  const loadVehiculos = (nuevoVehiculo = null) => {
+    if (nuevoVehiculo && nuevoVehiculo.id) {
+      setVehiculos((prev) => [nuevoVehiculo, ...prev.filter((v) => v.id !== nuevoVehiculo.id)])
+      setConvertForm((prev) => ({ ...prev, vehiculoId: String(nuevoVehiculo.id) }))
+    }
     const placa = reporteToConvert?.placa || reporteToConvert?.placa_visual
-    if (placa) cargarVehiculoPorPlaca(placa)
+    if (placa && !placa.toUpperCase().startsWith('SIN-PLACA')) {
+      cargarVehiculoPorPlaca(placa)
+    }
   }
 
   const handleVerFotosReporte = async (reporte) => {
@@ -611,7 +617,8 @@ export function Papeletas({ user }) {
       vehiculoId: String(reporte.id_vehiculo || matchVehiculo?.id || ''),
       conductorDni: reporte.conductorDni && reporte.conductorDni !== 'S/D' ? reporte.conductorDni : '',
       // Observaciones de la oficina: empiezan vacías (la del inspector ya se ve en la tarjeta del reporte)
-      observacionesAutoridad: ''
+      observacionesAutoridad: '',
+      observacionesConductor: reporte.observaciones_conductor || reporte.observacionesConductor || ''
     })
     try {
       const res = await apiFetch(`/reportes-intervencion/${reporte.id}/fotos`)
@@ -646,7 +653,8 @@ export function Papeletas({ user }) {
           infraccionesIds: validInfracciones,
           vehiculoId: Number(convertForm.vehiculoId),
           conductorDni: convertForm.conductorDni,
-          observacionesAutoridad: convertForm.observacionesAutoridad
+          observacionesAutoridad: convertForm.observacionesAutoridad,
+          observacionesConductor: convertForm.observacionesConductor
         }
       })
       const data = await res.json().catch(() => ({}))
@@ -675,7 +683,7 @@ export function Papeletas({ user }) {
     setNuevaForm({
       vehiculoPlaca: '', claseVehiculo: '', marcaVehiculo: '', colorVehiculo: '', motorVehiculo: '',
       conductorDni: '', conductorNombres: '', conductorApellidos: '', lugar: '',
-      infraccionesIds: [''], observacionesAutoridad: ''
+      infraccionesIds: [''], observacionesAutoridad: '', observacionesConductor: ''
     })
     setIsNuevaModalOpen(true)
   }
@@ -716,6 +724,7 @@ export function Papeletas({ user }) {
           lugar: nuevaForm.lugar.trim(),
           infraccionesIds: validInfracciones,
           observacionesAutoridad: nuevaForm.observacionesAutoridad,
+          observacionesConductor: nuevaForm.observacionesConductor,
           inspectorId: user.id_persona
         }
       })
@@ -1049,6 +1058,11 @@ export function Papeletas({ user }) {
                         <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug line-clamp-2 font-medium" title={reporte.observaciones}>
                           {reporte.observaciones || <span className="text-slate-400 italic">Sin observaciones</span>}
                         </p>
+                        {(reporte.observaciones_conductor || reporte.observacionesConductor) && (
+                          <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300 line-clamp-1 italic" title={`Obs. Conductor: ${reporte.observaciones_conductor || reporte.observacionesConductor}`}>
+                            <span className="font-bold text-slate-700 dark:text-slate-200 not-italic">Obs. Cond:</span> “{reporte.observaciones_conductor || reporte.observacionesConductor}”
+                          </p>
+                        )}
                         {reporte.conductorNombre && reporte.conductorNombre !== 'No identificado' && (
                           <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 truncate" title={`${reporte.conductorNombre} (${reporte.conductorDni || 'S/D'})`}>
                             <span className="font-bold text-slate-600 dark:text-slate-300">Cond:</span> {reporte.conductorNombre}

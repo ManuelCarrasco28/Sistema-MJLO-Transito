@@ -232,8 +232,26 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
     );
   }
 
+  String get _nombreCompleto {
+    if (_persona == null) return '';
+    final nombres = (_persona!['nombres'] ?? '').toString().trim();
+    final paterno = (_persona!['apellidoPaterno'] ?? '').toString().trim();
+    final materno = (_persona!['apellidoMaterno'] ?? '').toString().trim();
+    final partes = [nombres, paterno, materno].where((p) => p.isNotEmpty).toList();
+    if (partes.isNotEmpty) {
+      return partes.join(' ');
+    }
+    return (_persona!['nombreCompleto'] ?? _persona!['nombre'] ?? '').toString().trim();
+  }
+
   Widget _buildPhotoSection() {
-    final hasPhoto = _persona!['fotoUrl'] != null && _persona!['fotoUrl'].toString().isNotEmpty;
+    final photoRaw = _persona!['fotoUrl'] ?? _persona!['fotoImg'] ?? _persona!['foto'];
+    final photoStr = photoRaw?.toString().trim() ?? '';
+    final hasPhoto = photoStr.isNotEmpty;
+    final photoFullUrl = hasPhoto ? ApiService.urlArchivo(photoStr) : '';
+    final nombre = _nombreCompleto;
+    final fontSize = nombre.length > 30 ? 15.0 : (nombre.length > 20 ? 17.0 : 19.0);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -242,24 +260,65 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(12),
-              image: hasPhoto ? DecorationImage(image: NetworkImage(ApiService.urlArchivo(_persona!['fotoUrl'].toString()), headers: ApiService.headersImagen), fit: BoxFit.cover) : null,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 80,
+              height: 80,
+              child: hasPhoto
+                  ? Image.network(
+                      photoFullUrl,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      headers: ApiService.headersImagen,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          color: Colors.white24,
+                          child: const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.white24,
+                        child: const Icon(Icons.person, size: 40, color: Colors.white),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.white24,
+                      child: const Icon(Icons.person, size: 40, color: Colors.white),
+                    ),
             ),
-            child: !hasPhoto ? const Icon(Icons.person, size: 40, color: Colors.white) : null,
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Fotografía de la Persona Consultada', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('${_persona!['nombres']} ${_persona!['apellidoPaterno']}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Fotografía de la Persona Consultada',
+                  style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  nombre,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.bold,
+                    height: 1.15,
+                  ),
+                ),
               ],
             ),
           )

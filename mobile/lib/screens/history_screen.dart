@@ -530,8 +530,9 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                   _buildFormattedObservaciones('Obs. Inspector:', data['observacionesAutoridad'] ?? 'Ninguna'),
                 if (esReporte)
                   _buildFormattedObservaciones('Observaciones:', data['observaciones'] ?? 'Ninguna'),
-                if (!esReporte && (data['observacionesConductor'] != null && data['observacionesConductor'].toString().trim().isNotEmpty))
-                  _buildFormattedObservaciones('Obs. Conductor:', data['observacionesConductor']),
+                if ((data['observacionesConductor'] != null && data['observacionesConductor'].toString().trim().isNotEmpty) ||
+                    (data['observaciones_conductor'] != null && data['observaciones_conductor'].toString().trim().isNotEmpty))
+                  _buildFormattedObservaciones('Obs. Conductor:', (data['observacionesConductor'] ?? data['observaciones_conductor']).toString()),
                 const Divider(height: 24),
                 if (data['conductorNombre'] != null && data['conductorNombre'].toString().trim().isNotEmpty)
                   _buildDetailRow('Conductor:', '${data['conductorNombre']}$condDniText')

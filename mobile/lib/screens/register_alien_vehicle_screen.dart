@@ -48,6 +48,7 @@ class _RegisterAlienVehicleScreenState
   final _lugarController = TextEditingController();
   final _coordenadasController = TextEditingController();
   final _observacionesController = TextEditingController();
+  final _observacionesConductorController = TextEditingController();
 
   final _duenioDniController = TextEditingController();
   final _duenioNombresController = TextEditingController();
@@ -263,6 +264,7 @@ class _RegisterAlienVehicleScreenState
 
       'lugar': _lugarController.text.trim(),
       'observaciones': _observacionesController.text.trim(),
+      'observacionesConductor': _observacionesConductorController.text.trim(),
       'fotos': _fotos,
       'coordenadas': _currentPosition != null
           ? '${_currentPosition!.latitude},${_currentPosition!.longitude}'
@@ -297,6 +299,7 @@ class _RegisterAlienVehicleScreenState
     _lugarController.dispose();
     _coordenadasController.dispose();
     _observacionesController.dispose();
+    _observacionesConductorController.dispose();
     super.dispose();
   }
 
@@ -619,7 +622,22 @@ class _RegisterAlienVehicleScreenState
             TextField(
               controller: _observacionesController,
               decoration: InputDecoration(
-                labelText: 'Observaciones',
+                labelText: 'Observaciones del Inspector',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                alignLabelWithHint: true,
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _observacionesConductorController,
+              decoration: InputDecoration(
+                labelText: 'Observaciones del Conductor (Opcional)',
+                hintText: 'Manifestación, descargo o comentarios del conductor...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
