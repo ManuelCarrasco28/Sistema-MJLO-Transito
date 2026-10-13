@@ -355,6 +355,27 @@ class PagosController extends ResourceController
         ]]);
     }
 
+    public function origen()
+    {
+        $db = \Config\Database::connect();
+        $tipo = strtoupper((string)$this->request->getGet('tipo'));
+        $id = (int)$this->request->getGet('id');
+        if ($id < 1) return $this->failValidationErrors('Referencia no válida.');
+        if ($tipo === 'CURSO') {
+            $row = $db->table('inscripciones_curso i')->select('c.uuid AS uuid')->join('cursos_seguridad_vial c', 'c.id=i.id_curso')->where('i.id', $id)->get()->getRowArray();
+            if ($row) return $this->respond(['data' => ['endpoint' => '/cursos/' . $row['uuid']]]);
+        } elseif ($tipo === 'TRAMITE') {
+            $row = $db->table('permisos_circulacion')->select('uuid')->where('id_tramite', $id)->orderBy('id', 'DESC')->get()->getRowArray();
+            if ($row) return $this->respond(['data' => ['endpoint' => '/permisos/' . $row['uuid']]]);
+            $row = $db->table('tramites_documentarios t')->select('t.numero_expediente AS expediente, t.fecha_solicitud AS fechaSolicitud, t.estado, pa.nombre AS procedimientoNombre')->join('procedimientos_administrativos pa', 'pa.id=t.id_procedimiento_admin', 'left')->where('t.id', $id)->get()->getRowArray();
+            if ($row) return $this->respond(['data' => ['registro' => $row]]);
+        } elseif ($tipo === 'INTERNAMIENTO') {
+            $row = $db->table('ordenes_internamiento')->select('id')->where('id', $id)->get()->getRowArray();
+            if ($row) return $this->respond(['data' => ['endpoint' => '/internamientos?internamientoId=' . $id . '&page=1&porPagina=1', 'lista' => true]]);
+        }
+        return $this->failNotFound('No se encontró el registro relacionado.');
+    }
+
     private const COLUMNAS_REFERENCIA_PAGO = ['id_papeleta', 'id_tramite', 'id_inscripcion'];
 
     private function idsConRecibo($db, string $columna): array
@@ -377,6 +398,7 @@ class PagosController extends ResourceController
             'id' => $idPrefix . $row['id'],
             'tipoPago' => $row['tipo_pago'],
             'papeletaId' => null, 'tramiteId' => null, 'inscripcionId' => null,
+            'internamientoId' => (int)($row['id_internamiento'] ?? $row['id']),
             'numeroRecibo' => $row['numero_recibo'],
             'numeroVoucher' => $row['numero_voucher'],
             'metodo' => $row['medio_pago'],

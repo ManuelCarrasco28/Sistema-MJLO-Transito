@@ -5,7 +5,6 @@ import { Pagination } from '../components/ui/Pagination'
 import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { exportToExcel } from '../utils/exportToExcel'
-import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
@@ -183,7 +182,6 @@ export function Trabajadores() {
   const [personaSearch, setPersonaSearch] = useState('')
   const [personaDropdownOpen, setPersonaDropdownOpen] = useState(false)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -234,7 +232,7 @@ export function Trabajadores() {
     await new Promise(r => setTimeout(r, 50))
     try {
       await exportToExcel({
-        filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}.xls`,
+        filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}.xlsx`,
         sheetName: 'Personal',
         title: 'PADRÓN INSTITUCIONAL DE TRABAJADORES Y FISCALIZADORES',
         subtitle: 'Subgerencia de Tránsito y Transporte - Gestión de Personal',
@@ -255,7 +253,7 @@ export function Trabajadores() {
           { header: 'DOC. DESIGNACIÓN', key: 'documento', width: 150 },
           { header: 'FECHA ALTA', key: 'fecha_documento', width: 110, align: 'center' },
           { header: 'VENCIMIENTO', render: (_, r) => r.fecha_termino || 'INDETERMINADO', width: 120, align: 'center' },
-          { header: 'TIENE ACCESO', render: (_, r) => (r.tiene_cuenta ? 'SÍ' : 'NO'), width: 110, align: 'center' },
+          { header: 'TIENE ACCESO', render: (_, r) => (Number(r.tiene_cuenta) === 1 ? 'SÍ' : 'NO'), width: 110, align: 'center' },
           { header: 'ESTADO', key: 'estado', width: 100, align: 'center' }
         ],
         data: filtered
@@ -265,30 +263,6 @@ export function Trabajadores() {
     }
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      await exportToPdf({
-        filename: `Padron_Trabajadores_${new Date().toISOString().slice(0, 10)}`,
-        subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Personal Municipal',
-        summaryItems: [
-          { label: 'Total registrados', value: rows.length },
-          { label: 'Exportando', value: `${filtered.length} trabajadores` },
-        ],
-        columns: [
-          { header: 'NOMBRES Y APELLIDOS', render: (_, r) => `${r.nombres || ''} ${r.apellidos || ''}`.trim(), width: 200 },
-          { header: 'DOCUMENTO', render: (_, r) => `${r.tipo_documento || 'DNI'} ${r.numero_documento || ''}`.trim(), width: 110, align: 'center' },
-          { header: 'CARGO', key: 'cargo', width: 160 },
-          { header: 'UNIDAD ORGÁNICA', key: 'unidad_organica', width: 180 },
-          { header: 'FUNCIÓN', key: 'tipo_funcion', width: 90, align: 'center' },
-          { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
-        ],
-        data: filtered
-      })
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   const openForm = (record) => {
     setForm({ ...emptyForm, ...record, id_persona: record?.id_persona || record?.id || '' })
@@ -468,22 +442,13 @@ export function Trabajadores() {
             <button
               type="button"
               onClick={handleExportExcel}
-              title="Descargar padrón en Excel (.xls)"
+              title="Descargar padrón en Excel (.xlsx)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
               disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              title="Descargar o imprimir padrón en PDF"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-              disabled={isExportingPdf}>
-              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-            </button>
 
             <button
               type="button"

@@ -52,7 +52,9 @@ class AuthController extends ResourceController
             'id_rol'       => (int) $userRecord['id_rol'],
             'cargo'        => $userRecord['cargo'],
             'id_persona'   => (int) $userRecord['id_persona'],
-            'foto_img'     => $userRecord['foto_img'] ?? '',
+            // La foto se guarda como ruta relativa ("personas/xxx.jpg"): sin convertirla a URL pública el navegador
+            // la pedía contra la página actual y salía rota.
+            'foto_img'     => (new \App\Services\FileStorageService())->urlPublica($userRecord['foto_img'] ?? null) ?? '',
             'sv'           => (int) $userRecord['session_version'],
             'preferencias' => json_decode((string) ($userRecord['preferencias'] ?? ''), true) ?: new \stdClass(),
         ];

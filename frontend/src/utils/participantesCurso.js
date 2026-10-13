@@ -1,8 +1,11 @@
 export function estadoParticipante(participante, estadoCurso) {
   const estado = String(participante.estado || '').toUpperCase()
-  if (['DESAPROBADO', 'ANULADO', 'CANCELADO', 'APROBADO'].includes(estado)) return estado
-  if (estadoCurso === 'FINALIZADO') return Number(participante.asistio) === 1 ? 'APROBADO' : 'DESAPROBADO'
-  return estado || 'PENDIENTE'
+  if (['ANULADO', 'CANCELADO'].includes(estado)) return estado
+  if (['EN_CURSO', 'FINALIZADO'].includes(estadoCurso)) {
+    if (Number(participante.asistio) !== 1) return 'DESAPROBADO'
+    return estado === 'DESAPROBADO' ? 'DESAPROBADO' : 'APROBADO'
+  }
+  return 'INSCRITO'
 }
 
 export function actualizarParticipante(participantes, participante, cambios) {

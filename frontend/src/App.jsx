@@ -8,7 +8,7 @@ import { NotFound } from './pages/NotFound'
 import { PREFETCH_MAP } from './config/navigation'
 import { apiFetch } from './config/api'
 import { limpiarDatosLocales } from './utils/sesionLocal'
-import { esRolOficina } from './config/roles'
+import { esRolOficina, definirRolActual } from './config/roles'
 
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000
 
@@ -298,6 +298,8 @@ function ProtectedApp({ user, onLogout, onUserUpdate }) {
 function App() {
   const [user, setUser] = useState(null)
   const [checkingSession, setCheckingSession] = useState(true)
+  // Los botones de eliminar consultan el rol desde fuera de React; la sesión ya no se guarda en localStorage.
+  definirRolActual(user?.rol)
   const inactivityTimerRef = useRef(null)
 
   useEffect(() => {

@@ -1,12 +1,10 @@
 import { exportToPdf } from './exportToPdf'
 import { exportToExcel } from './exportToExcel'
 
-// Exporta el padrón de personas a un .xls descargable (formato Excel/HTML,
-// no usa la librería exportToExcel genérica porque necesita columnas y
-// formato mso-number-format específicos para documentos/teléfonos).
+// Exporta el padrón como XLSX nativo y conserva documentos/teléfonos como texto.
 export function exportPersonasExcel({ listToExport, filterEstado }) {
   return exportToExcel({
-    filename: `Padron_Personas_MJLO_${new Date().toISOString().slice(0, 10)}.xls`,
+    filename: `Padron_Personas_MJLO_${new Date().toISOString().slice(0, 10)}.xlsx`,
     sheetName: 'Padron Personas',
     subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Conductores y Propietarios',
     metadata: [{ label: 'Estado', value: filterEstado }],

@@ -9,7 +9,7 @@ import { apiFetch, getCachedData, setCachedData, invalidateCache, leerMensajeErr
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { formatFecha, formatNumeroTarjeta, toTitleCase } from '../utils/formatters'
-import { exportPersonasExcel, exportPersonasPdf } from '../utils/exportPersonas'
+import { exportPersonasExcel } from '../utils/exportPersonas'
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import { PersonaDetalleModal } from '../components/personas/PersonaDetalleModal'
 import { SortableHeader } from '../components/ui/SortableHeader'
@@ -51,7 +51,6 @@ export function Personas({ user, onUserUpdate }) {
   const [personas, setPersonas] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState('TODOS')
@@ -459,21 +458,6 @@ export function Personas({ user, onUserUpdate }) {
     }
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const listToExport = await fetchTodoElFiltro(10000)
-          if (listToExport.length === 0) {
-            showError('Atención', 'No hay registros de personas para exportar.')
-            return
-          }
-          await exportPersonasPdf({ listToExport, totalPersonas, conductores, propietarios, activos })
-    } catch (err) {
-      if (err.name !== 'AbortError') showError('Descarga no completada', err.message || 'No se pudo preparar el PDF.')
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
@@ -711,22 +695,13 @@ export function Personas({ user, onUserUpdate }) {
             <button
               type="button"
               onClick={handleExportExcel}
-              title="Descargar padrón en Excel (.xls)"
+              title="Descargar padrón en Excel (.xlsx)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
              disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              title="Descargar o imprimir padrón en PDF"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-             disabled={isExportingPdf}>
-              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-            </button>
 
             <button
               type="button"
@@ -873,7 +848,7 @@ export function Personas({ user, onUserUpdate }) {
                             style={{ color: 'var(--text-muted)' }}
                             title={p.direccion}
                           >
-                            {p.direccion || '—'}
+                            {p.direccion || 'Sin dirección registrada'}
                           </p>
                         </div>
                       </div>
@@ -891,9 +866,15 @@ export function Personas({ user, onUserUpdate }) {
                     </td>
 
                     <td className="px-4 py-3 ">
-                      <p className="text-xs font-medium" style={{ color: 'var(--text)' }}>
-                        {p.celular || p.telefono || '—'}
-                      </p>
+                      {p.celular || p.telefono ? (
+                        <p className="text-xs font-medium" style={{ color: 'var(--text)' }}>
+                          {p.celular || p.telefono}
+                        </p>
+                      ) : (
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Sin teléfono
+                        </p>
+                      )}
                       {p.email && (
                         <p
                           className="mt-0.5 text-[11px] whitespace-nowrap"

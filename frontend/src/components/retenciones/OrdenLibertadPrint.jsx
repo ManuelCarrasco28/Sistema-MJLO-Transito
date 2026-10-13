@@ -2,6 +2,13 @@ import { createPortal } from 'react-dom';
 import { fechaInternamiento, fechaInternamientoTexto } from '../../utils/fechaInternamiento';
 import { textoInfraccion } from '../../utils/infraccionInternamiento';
 
+// N° de la orden de libertad: solo la parte numérica, con 6 dígitos (LIB-51 -> 000051)
+const numeroOrden6 = (numero) => {
+  const digitos = String(numero || '').replace(/^[A-Za-z]+-/, '')
+  if (!digitos) return 'S/N'
+  return /^[0-9]+$/.test(digitos) ? digitos.padStart(6, '0') : digitos
+}
+
 export const OrdenLibertadPrint = ({ item }) => {
   const fecha = fechaInternamiento(item?.fechaLiberacion || item?.fechaSalida);
   const day = fecha ? String(fecha.getDate()).padStart(2, '0') : '';
@@ -20,7 +27,7 @@ export const OrdenLibertadPrint = ({ item }) => {
         </div>
         <div className="absolute right-0 top-0 text-red-600 font-bold text-xl tracking-widest font-sans [font-variant-numeric:lining-nums_tabular-nums]">
           <div className="text-[9px] font-bold uppercase tracking-normal text-slate-700">Registro digital</div>
-          Nº {String(item?.numeroOrdenLibertad || 'S/N').replace(/^[A-Za-z]+-/, '')}
+          Nº {numeroOrden6(item?.numeroOrdenLibertad)}
         </div>
         <h2 className="mt-1 text-center text-xl font-black tracking-widest text-blue-900">
           DIVISIÓN DE TRÁNSITO Y TRANSPORTE
@@ -101,7 +108,7 @@ export const OrdenLibertadPrint = ({ item }) => {
 
         <div className="flex items-end text-[15px]">
           <span className="mr-2">N° de Papeleta u Oficio:</span>
-          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.numeroPapeleta || item?.documentoReferencia || ''}</div>
+          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.numeroPapeleta || ''}</div>
         </div>
       </div>
 

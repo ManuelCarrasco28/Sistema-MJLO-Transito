@@ -96,7 +96,6 @@ class InternamientosController extends ResourceController
                     oi.grado_remisor as gradoRemisor,
                     oi.carnet_remisor as carnetRemisor,
                     oi.autoridad_que_dispone as autoridadQueDispone,
-                    oi.documento_referencia as documentoReferencia,
                     oi.estado_carroceria as estadoCarroceria,
                     COALESCE(CONCAT(rem_c.nombres, ' ', rem_c.apellido_paterno, ' ', COALESCE(rem_c.apellido_materno, '')), 'Inspector Remisor') as remisorNombre,
                     COALESCE(CONCAT(inte_c.nombres, ' ', inte_c.apellido_paterno, ' ', COALESCE(inte_c.apellido_materno, '')), 'Conductor / Interesado') as interesadoNombre,
@@ -140,6 +139,8 @@ class InternamientosController extends ResourceController
                 ->join('personas aut', 'aut.id = ol.id_persona_autorizada', 'left')
                 ->join('ciudadanos aut_c', 'aut_c.id_persona = aut.id', 'left');
 
+            $internamientoId = (int)$this->request->getGet('internamientoId');
+            if ($internamientoId > 0) $builder->where('oi.id', $internamientoId);
             $buscar = trim((string)$this->request->getGet('buscar'));
             if ($buscar !== '') {
                 $builder->groupStart()
@@ -196,8 +197,7 @@ class InternamientosController extends ResourceController
                         ic.nombre,
                         ic.seccion,
                         oii.cantidad,
-                        oii.estado,
-                        oii.observacion
+                        oii.estado
                     ", false)
                     ->join('inventario_criterios ic', 'ic.id = oii.id_criterio', 'inner')
                     ->whereIn('oii.id_orden_internamiento', $internamientoIds)
@@ -308,9 +308,9 @@ class InternamientosController extends ResourceController
             if ($papeleta['estado'] === 'ANULADA') {
                 return $this->failValidationErrors('La papeleta está anulada: no se puede internar un vehículo por una papeleta anulada.');
             }
-            $yaRetenido = $db->table('ordenes_internamiento')->select('numero_orden')->where('id_vehiculo', (int)$papeleta['id_vehiculo'])->where('estado', 'RETENIDO')->get()->getRowArray();
+            $yaRetenido = $db->table('ordenes_internamiento')->select('numero_boleta')->where('id_vehiculo', (int)$papeleta['id_vehiculo'])->where('estado', 'RETENIDO')->get()->getRowArray();
             if ($yaRetenido) {
-                return $this->failValidationErrors('Este vehículo ya está retenido en el depósito (orden ' . ($yaRetenido['numero_orden'] ?? 's/n') . '). Libérelo antes de registrar otro internamiento.');
+                return $this->failValidationErrors('Este vehículo ya está retenido en el depósito (boleta ' . ($yaRetenido['numero_boleta'] ?? 's/n') . '). Libérelo antes de registrar otro internamiento.');
             }
 
             $existe = $db->table('ordenes_internamiento')->where('id_papeleta', $idPapeleta)->countAllResults();
@@ -343,15 +343,12 @@ class InternamientosController extends ResourceController
             if (!$candadoNumero) {
                 return $this->failServerError('El sistema está generando otro internamiento. Intente nuevamente.');
             }
-            $ultimaOrden = (int) ($db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(numero_orden, 5) AS UNSIGNED)), 0) AS m FROM ordenes_internamiento WHERE numero_orden REGEXP '^INT-[0-9]+$'")->getRowArray()['m'] ?? 0);
             $ultimaBoleta = (int) ($db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(numero_boleta, 5) AS UNSIGNED)), 0) AS m FROM ordenes_internamiento WHERE numero_boleta REGEXP '^BOL-[0-9]+$'")->getRowArray()['m'] ?? 0);
-            $numeroOrden = 'INT-' . str_pad((string)($ultimaOrden + 1), 6, '0', STR_PAD_LEFT);
-            $numeroBoleta = 'BOL-' . str_pad((string)($ultimaBoleta + 1), 5, '0', STR_PAD_LEFT);
+            $numeroBoleta = 'BOL-' . str_pad((string)($ultimaBoleta + 1), 6, '0', STR_PAD_LEFT);
 
             $record = [
                 'id_papeleta' => $idPapeleta,
                 'id_vehiculo' => (int)$papeleta['id_vehiculo'],
-                'numero_orden' => $numeroOrden,
                 'numero_boleta' => $numeroBoleta,
                 'id_remisor' => $idRemisor,
                 'id_interesado' => $idInteresado,
@@ -365,7 +362,6 @@ class InternamientosController extends ResourceController
                 // El N° de carné no se digita: sale del inspector que emitió la papeleta.
                 'carnet_remisor' => $this->carneDelInspector($db, $papeleta),
                 'autoridad_que_dispone' => $this->cargoDelInspector($db, $papeleta),
-                'documento_referencia' => trim($input['documentoReferencia'] ?? ''),
                 'estado_carroceria' => $this->carroceriaDelVehiculo($db, (int)$papeleta['id_vehiculo']),
                 'observaciones' => trim($input['observaciones'] ?? ''),
                 'estado' => 'RETENIDO',
@@ -409,14 +405,13 @@ class InternamientosController extends ResourceController
                 \App\Services\AuditoriaService::registrar(
                     'INTERNAMIENTOS',
                     'REGISTRAR',
-                    "Se registró el internamiento {$numeroOrden} para el vehículo de la papeleta #{$idPapeleta}",
-                    ['id' => $insertId, 'numeroOrden' => $numeroOrden, 'idPapeleta' => $idPapeleta]
+                    "Se registró el internamiento {$numeroBoleta} para el vehículo de la papeleta #{$idPapeleta}",
+                    ['id' => $insertId, 'numeroBoleta' => $numeroBoleta, 'idPapeleta' => $idPapeleta]
                 );
             }
 
             return $this->respondCreated(['status' => 201, 'message' => 'Internamiento registrado exitosamente.', 'data' => [
                 'id' => $insertId,
-                'numeroOrden' => $numeroOrden,
                 'numeroBoleta' => $numeroBoleta,
             ]]);
         } catch (\Throwable $e) {
@@ -610,7 +605,6 @@ class InternamientosController extends ResourceController
             $cambios = [];
             $mapa = [
                 'motivo' => 'motivo',
-                'documentoReferencia' => 'documento_referencia',
                 'observaciones' => 'observaciones',
             ];
             foreach ($mapa as $clave => $columna) {

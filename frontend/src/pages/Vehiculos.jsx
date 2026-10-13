@@ -10,10 +10,10 @@ import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
+import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { sanitizarMensaje, leerMensajeError, apiFetch, getCachedData, setCachedData } from '../config/api'
-import { showError, showWarning, showConfirm, showToast } from '../utils/SwalUtil'
+import { showError, showWarning, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
-import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta, toTitleCase, normalizarPlaca } from '../utils/formatters'
 import { isVehiculoFormal, getVehiculoDocumento, buildVehiculoQrValue } from '../utils/vehiculos'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
@@ -22,7 +22,6 @@ import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleMod
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { esRolOficina } from '../config/roles'
-import { puedeEliminarRegistros } from '../config/roles'
 
 function formatTipoDocLabel(t) {
   const code = (t.codigo || '').toUpperCase().trim()
@@ -470,7 +469,6 @@ export function Vehiculos({ user }) {
     tucNumero: 'TUC-2026-000',
   })
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const loadStats = () => {
     apiFetch('/vehiculos/estadisticas')
@@ -724,7 +722,6 @@ export function Vehiculos({ user }) {
   const formales = stats.formales ?? 0
   const informales = stats.informales ?? 0
   const suspendidos = stats.suspendidos ?? 0
-  const porcentajeFormales = totalVehiculos > 0 ? Math.round((formales / totalVehiculos) * 100) : 0
 
   const handleSort = (column, dir) => {
     setSortBy(column)
@@ -757,7 +754,7 @@ export function Vehiculos({ user }) {
         }
       }
       await exportToExcel({
-        filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.xls`,
+        filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}.xlsx`,
         sheetName: 'Vehículos',
         title: 'PADRÓN VEHICULAR MUNICIPAL',
         subtitle: 'Subgerencia de Tránsito y Transporte - Registro Oficial',
@@ -780,7 +777,6 @@ export function Vehiculos({ user }) {
           { header: 'SERIE / CHASIS', key: 'numeroSerie', isText: true, width: 150 },
           { header: 'SERIE DEL MOTOR', key: 'serieMotor', isText: true, width: 150 },
           { header: 'PARTIDA REGISTRAL', key: 'partidaRegistral', isText: true, width: 140 },
-          { header: 'PARTIDA REGISTRAL', key: 'partidaRegistral', isText: true, width: 140 },
           { header: 'N° TUC', key: 'tucNumero', isText: true, width: 130 },
           { header: 'CÓDIGO QR', key: 'codigoQr', isText: true, width: 270 },
           { header: 'ASOCIACIÓN', render: (_, r) => r.asociacion || 'PARTICULAR / SIN ASOC.', width: 220 },
@@ -798,36 +794,6 @@ export function Vehiculos({ user }) {
     }
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const dataToExport = await fetchTodoElFiltro(10000)
-      await exportToPdf({
-        filename: `Padron_Vehicular_${new Date().toISOString().slice(0, 10)}`,
-        subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial Vehicular',
-        summaryItems: [
-          { label: 'Total en padrón', value: totalVehiculos },
-          { label: 'Exportando', value: `${dataToExport.length} vehículos` },
-          { label: 'Formales', value: formales },
-          { label: 'Informales', value: informales },
-          { label: 'Inhabilitados', value: suspendidos },
-        ],
-        columns: [
-          { header: 'Placa', key: 'placa' },
-          { header: 'Tipo', key: 'tipo' },
-          { header: 'Marca/Modelo', render: (_, r) => `${r.marca} ${r.modelo}` },
-          { header: 'Asociación', render: (_, r) => r.asociacion || 'Particular' },
-          { header: 'Propietario', key: 'propietario' },
-          { header: 'Estado', key: 'estado' },
-        ],
-        data: dataToExport
-      })
-    } catch (err) {
-      showError('Descarga no completada', sanitizarMensaje(err.message, 'No se pudo preparar el PDF.'))
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   const handleOpenCreateModal = () => {
     setPropietarioSearch('')
@@ -893,7 +859,11 @@ export function Vehiculos({ user }) {
     setErroresForm({}); setIsModalOpen(true)
   }
 
+  const [abriendoFicha, setAbriendoFicha] = useState(false)
   const handleOpenDetail = async (vehiculo) => {
+    // Sin esta guarda, cada clic extra mientras carga la ficha lanzaba otra petición y otra apertura.
+    if (abriendoFicha) return
+    setAbriendoFicha(true)
     try {
       const res = await apiFetch(`/vehiculos/${vehiculo.uuid || vehiculo.id}`)
       if (!res.ok) throw new Error('No se pudo cargar la ficha completa del vehículo.')
@@ -902,27 +872,7 @@ export function Vehiculos({ user }) {
       setSelectedVehiculo(full.data)
       setIsDetailModalOpen(true)
     } catch (err) { showError('No se pudo abrir la ficha', err.message) }
-  }
-
-  const handleDelete = async (id) => {
-    const result = await showConfirm(
-      '¿Eliminar vehículo?',
-      '¿Está seguro de eliminar este vehículo del registro municipal?',
-      'Sí, eliminar',
-      'Cancelar',
-      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' }
-    )
-    if (result.isConfirmed) {
-      try {
-        const response = await apiFetch(`/vehiculos/${id}`, { method: 'DELETE' })
-        if (!response.ok) throw new Error(await leerMensajeError(response, 'No se pudo eliminar el vehículo.'))
-        loadVehiculos()
-        loadStats()
-        showToast('Vehículo eliminado correctamente')
-      } catch (err) {
-        showError('Error', sanitizarMensaje(err.message, 'No se pudo eliminar el vehículo.'))
-      }
-    }
+    finally { setAbriendoFicha(false) }
   }
 
   const handleFormSubmit = async (e) => {
@@ -1147,7 +1097,6 @@ export function Vehiculos({ user }) {
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(totalVehiculos)}</p>
-            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Padrón 2026</span>
           </div>
         </div>
 
@@ -1159,7 +1108,6 @@ export function Vehiculos({ user }) {
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(formales)}</p>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{porcentajeFormales}% En Asoc.</span>
           </div>
         </div>
 
@@ -1171,7 +1119,6 @@ export function Vehiculos({ user }) {
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(informales)}</p>
-            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Sin Asoc.</span>
           </div>
         </div>
 
@@ -1183,16 +1130,15 @@ export function Vehiculos({ user }) {
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(suspendidos)}</p>
-            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">Susp. o Baja</span>
           </div>
         </div>
       </div>
 
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
-        <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)]">
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] 2xl:flex-nowrap">
 
-          <div className="relative min-w-[340px] flex-1">
+          <div className="relative order-1 min-w-[240px] flex-1">
             <Icon
               name={isLoading ? "refresh" : "search"}
               className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-blue-500' : 'text-slate-400'}`}
@@ -1219,28 +1165,19 @@ export function Vehiculos({ user }) {
           </div>
 
 
-          <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+          <div className="order-3 flex shrink-0 items-center gap-2.5">
             {isOffice && (
               <>
                 <button
                   type="button"
                   onClick={handleExportExcel}
-                  title="Descargar padrón en Excel (.xls)"
+                  title="Descargar padrón en Excel (.xlsx)"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
                   disabled={isExportingExcel}>
                   <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
                   <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleExportPdf}
-                  title="Descargar o imprimir padrón en PDF"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs "
-                  disabled={isExportingPdf}>
-                  <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-                  <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-                </button>
 
                 <button
                   type="button"
@@ -1255,7 +1192,7 @@ export function Vehiculos({ user }) {
             )}
           </div>
 
-          <div className="order-last flex w-full flex-wrap items-center gap-2.5">
+          <div className="order-2 flex shrink-0 flex-wrap items-center gap-2.5 2xl:flex-nowrap">
             <RoundedSelect
               value={filterEstado}
               align="start"
@@ -1377,7 +1314,7 @@ export function Vehiculos({ user }) {
                   >
 
                     <td className="px-3.5 py-2.5 ">
-                      <PlacaBadge placa={v.placa} />
+                      <PlacaVehiculo placa={v.placa} vehiculoId={v.uuid || v.id} />
                     </td>
 
 
@@ -1452,8 +1389,9 @@ export function Vehiculos({ user }) {
                         <button
                           type="button"
                           onClick={() => handleOpenDetail(v)}
+                          disabled={abriendoFicha}
                           title="Ver Ficha Técnica"
-                          className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
+                          className="disabled:cursor-wait disabled:opacity-60 size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white"
                         >
                           <Icon name="eye" className="size-4" />
                         </button>
@@ -1466,14 +1404,6 @@ export function Vehiculos({ user }) {
                               className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white"
                             >
                               <Icon name="pencil" className="size-4" />
-                            </button>
-                            <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
-                              type="button"
-                              onClick={() => handleDelete(v.id)}
-                              title="Eliminar Vehículo"
-                              className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white"
-                            >
-                              <Icon name="trash" className="size-4" />
                             </button>
                           </>
                         )}

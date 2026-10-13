@@ -1,10 +1,11 @@
+import { formatRangoHoras12, formatTextoHorario12 } from '../utils/formatters'
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { estadoParticipante, actualizarParticipante } from '../utils/participantesCurso'
 import { inscripcionCursoAbierta, fechaLocalActual } from '../utils/calendarioCurso'
 import { useParams, useNavigate } from 'react-router-dom'
-import { apiFetch, getCachedData } from '../config/api'
-import { showError, showToast } from '../utils/SwalUtil'
+import { apiFetch, getCachedData, leerMensajeError } from '../config/api'
+import { showError, showWarning, showToast } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
@@ -103,6 +104,7 @@ export default function CursoDetalleVentana() {
   const [retirando, setRetirando] = useState(null)
 
   const handleRetirar = async (participante) => {
+    if (curso?.estado === 'FINALIZADO') return
     const clave = participante.uuid || participante.idInscripcion || participante.dni
     setRetirando(clave)
     try {
@@ -289,8 +291,8 @@ export default function CursoDetalleVentana() {
       <div className="curso-detalle__scroll">
         <div className="curso-detalle__container">
           <div className="curso-detalle__hero">
-            <button onClick={() => navigate('/cursos')} className="curso-detalle__back" type="button">
-              <Icon name="arrowLeft" className="size-4" /> Volver a cursos
+            <button onClick={() => navigate('/cursos')} className="curso-detalle__salir" type="button" title="Salir y volver a cursos" aria-label="Salir y volver a cursos">
+              <Icon name="logout" className="size-4" /><span>Volver a cursos</span>
             </button>
             <div className="curso-detalle__heading">
               <span className="curso-detalle__symbol"><Icon name="course" className="size-7" /></span>
@@ -314,7 +316,7 @@ export default function CursoDetalleVentana() {
                 <div><small>Inicio</small><strong>{fechaLegible(curso.fecha)}</strong></div>
                 <div><small>Finalización</small><strong>{fechaLegible(curso.fechaFin || curso.fecha_fin)}</strong></div>
               </div>
-              <p className="curso-detalle__card-footer">Horario: <strong>{curso.horario || 'Por confirmar'}</strong></p>
+              <p className="curso-detalle__card-footer">Horario: <strong>{formatRangoHoras12(curso.horaInicio, curso.horaFin) || formatTextoHorario12(curso.horario) || 'Por confirmar'}</strong></p>
             </div>
             <div className="curso-detalle__card">
               <div className="curso-detalle__card-title"><Icon name="idCard" className="size-5" /><h2>Inscripciones</h2></div>
@@ -497,7 +499,7 @@ export default function CursoDetalleVentana() {
                         {curso.estado === 'FINALIZADO' && estadoReal === 'APROBADO' && (
                           <p className={`text-xs font-semibold ${p.carnetEntregado ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                             {p.carnetEntregado
-                              ? `Carnet entregado${p.carnetFechaEntrega ? ` el ${String(p.carnetFechaEntrega).slice(0, 10).split('-').reverse().join('/')}` : ''}${p.carnetEntregadoPor ? ` · ${p.carnetEntregadoPor}` : ''}`
+                              ? `Carnet entregado${p.carnetFechaEntrega ? ` el ${String(p.carnetFechaEntrega).slice(0, 10).split('-').reverse().join('/')}` : ''}`
                               : 'Carnet por entregar'}
                           </p>
                         )}
@@ -519,14 +521,21 @@ export default function CursoDetalleVentana() {
                                 try {
                                   const res = await apiFetch(`/cursos/${curso.id}/participantes/${p.dni || p.numero}`, {
                                     method: 'PUT',
-                                    body: { asistio }
+                                    body: { asistio, estado: asistio ? 'APROBADO' : 'DESAPROBADO' }
                                   });
-                                  if (!res.ok) throw new Error('Error al guardar asistencia');
+                                  if (!res.ok) {
+                                    const mensaje = await leerMensajeError(res, 'No se pudo guardar la asistencia. Intente nuevamente.');
+                                    if ([400, 409, 422].includes(res.status)) {
+                                      showWarning('No se puede registrar la aprobación', mensaje);
+                                      return;
+                                    }
+                                    throw new Error(mensaje);
+                                  }
                                 
-                                  setCurso(actual => ({ ...actual, participantes: actualizarParticipante(actual.participantes, p, { asistio }) }));
+                                  setCurso(actual => ({ ...actual, participantes: actualizarParticipante(actual.participantes, p, { asistio, estado: asistio ? 'APROBADO' : 'DESAPROBADO' }) }));
                                   showToast(asistio ? 'Marcado como asistente' : 'Desmarcado como asistente');
                                 } catch (err) {
-                                  showError('Error', sanitizarMensaje(err.message, 'No se pudo guardar.'));
+                                  showError('No se pudo guardar', err.message || 'No se pudo guardar la asistencia. Intente nuevamente.');
                                 }
                               }}
                               className="rounded size-4 text-purple-600 focus:ring-purple-500 cursor-pointer"
@@ -534,32 +543,6 @@ export default function CursoDetalleVentana() {
                             Asistió
                           </label>
                         
-                          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700"></div>
-                        
-                          <select 
-                            value={p.estado || 'INSCRITO'}
-                            onChange={async (e) => {
-                              const nuevoEstado = e.target.value;
-                              try {
-                                const res = await apiFetch(`/cursos/${curso.id}/participantes/${p.dni || p.numero}`, {
-                                  method: 'PUT',
-                                  body: { estado: nuevoEstado }
-                                });
-                                if (!res.ok) throw new Error('Error al guardar estado');
-                              
-                                setCurso(actual => ({ ...actual, participantes: actualizarParticipante(actual.participantes, p, { estado: nuevoEstado }) }));
-                                showToast('Estado actualizado', 'editar');
-                              } catch (err) {
-                                showError('Error', 'No se pudo actualizar.');
-                              }
-                            }}
-                            className={`text-xs font-bold bg-transparent outline-none cursor-pointer ${(p.estado === 'APROBADO' || estadoReal === 'APROBADO') ? 'text-emerald-600 dark:text-emerald-400' : (p.estado === 'DESAPROBADO' || estadoReal === 'DESAPROBADO') ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`}
-                          >
-                            <option value="INSCRITO">Inscrito</option>
-                            <option value="CONFIRMADO">Confirmado</option>
-                            <option value="APROBADO">Aprobado</option>
-                            <option value="DESAPROBADO">Desaprobado</option>
-                          </select>
                         </div>
                       )}
                       {(() => {
@@ -578,7 +561,7 @@ export default function CursoDetalleVentana() {
                           </span>
                         )
                       })()}
-                      <div className="w-24 shrink-0 flex justify-end">
+                      <div className="curso-detalle__resultado shrink-0 flex justify-end">
                         {estadoReal === 'APROBADO' ? (
                           <span className="text-emerald-600 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/50 dark:border-emerald-800/50 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase w-full text-center tracking-wider shadow-xs">Aprobado</span>
                         ) : estadoReal === 'DESAPROBADO' ? (
@@ -591,11 +574,11 @@ export default function CursoDetalleVentana() {
                           <span className="text-slate-600 bg-slate-50 border border-slate-200 dark:bg-slate-800/50 dark:border-slate-700/50 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase w-full text-center tracking-wider shadow-xs">{estadoReal}</span>
                         )}
                       </div>
-                      <button type="button" onClick={() => handleRetirar(p)} disabled={retirando !== null || inscribiendo}
+                      {curso.estado !== 'FINALIZADO' && <button type="button" onClick={() => handleRetirar(p)} disabled={retirando !== null || inscribiendo}
                         title="Retirar del curso" aria-label={`Retirar del curso a ${p.nombres || p.dni}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+                        className="curso-detalle__retirar">
                         <Icon name="trash" className="size-4" /> {retirando === (p.uuid || p.idInscripcion || p.dni) ? 'Retirando…' : 'Retirar'}
-                      </button>
+                      </button>}
                     </div>
                   </li>
                   )

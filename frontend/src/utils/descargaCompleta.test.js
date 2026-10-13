@@ -22,7 +22,10 @@ describe('descargas por páginas', () => {
   })
 
   it('procesa por bloques sin devolver ni acumular el padrón completo', async () => {
-    apiFetch.mockResolvedValue(respuesta([1, 2]))
+    apiFetch.mockImplementation(async url => {
+      const pagina = Number(new URL(url, 'http://local').searchParams.get('page'))
+      return respuesta([pagina * 2 - 1, pagina * 2])
+    })
     const procesarPagina = vi.fn()
     expect(await fetchTodasLasFilas('/personas', {}, { procesarPagina, concurrencia: 1, silencioso: true })).toEqual([])
     expect(procesarPagina.mock.calls.map(c => c[1])).toEqual([1, 2, 3])
@@ -55,5 +58,17 @@ describe('descargas por páginas', () => {
     loading.mockImplementationOnce((_titulo, _texto, opciones) => opciones.onCancel())
     await expect(fetchTodasLasFilas('/personas')).rejects.toMatchObject({ name: 'AbortError' })
     expect(apiFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('rechaza páginas vacías antes de alcanzar el total anunciado', async () => {
+    apiFetch.mockResolvedValueOnce(respuesta([1, 2], 4)).mockResolvedValueOnce(respuesta([], 4))
+    await expect(fetchTodasLasFilas('/personas', {}, { silencioso: true })).rejects.toThrow('incompleta')
+  })
+
+  it('rechaza una primera página recortada y un total que cambia', async () => {
+    apiFetch.mockResolvedValueOnce(respuesta([1], 4))
+    await expect(fetchTodasLasFilas('/personas', {}, { silencioso: true })).rejects.toThrow('incompleta')
+    apiFetch.mockResolvedValueOnce(respuesta([1, 2], 4)).mockResolvedValueOnce(respuesta([3, 4], 5))
+    await expect(fetchTodasLasFilas('/personas', {}, { silencioso: true })).rejects.toThrow('cambiaron')
   })
 })

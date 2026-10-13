@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { apiFetch } from '../../config/api'
+import { formatoNumeroPapeleta } from '../../utils/numeroPapeleta'
 
 const dato = (valor) => {
   const texto = String(valor ?? '').trim()
@@ -67,7 +68,7 @@ export function PapeletaOficialPrint({ papeleta, onClose }) {
             <p className="text-xs font-bold uppercase">Subgerencia de Tránsito, Transportes y Seguridad Vial</p>
             <p className="text-xs">RUC: {dato(municipalidad?.ruc)}</p>
           </div>
-          <div className="papeleta-numero min-w-0 text-center"><div className="text-[10px] font-bold uppercase">N° papeleta</div><div className="break-words font-mono text-sm font-black text-red-700">{dato(p.numeroPapeleta)}</div></div>
+          <div className="papeleta-numero min-w-0 text-center font-mono text-sm font-black text-red-700"><span className="whitespace-nowrap">N° {formatoNumeroPapeleta(p.numeroPapeleta)}</span></div>
           <h2 className="papeleta-titulo rounded bg-[#17365d] px-2 py-1 text-center text-base font-black uppercase tracking-wide text-white print:bg-[#17365d]">Papeleta de infracción</h2>
         </header>
 

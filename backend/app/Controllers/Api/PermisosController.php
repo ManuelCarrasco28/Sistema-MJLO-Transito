@@ -66,7 +66,7 @@ class PermisosController extends ResourceController
                 COALESCE(v.placa, '') as vehiculoPlaca,
                 COALESCE(o.razon_social, NULLIF($nombreCiudadano, ''), '') as solicitanteNombre,
                 COALESCE(o.ruc, p.numero, '') as solicitanteDocumento,
-                pc.representante_legal as representanteLegal,
+                COALESCE(NULLIF(TRIM(CONCAT(rc.nombres, ' ', rc.apellido_paterno, ' ', COALESCE(rc.apellido_materno, ''))), ''), '') as representanteLegal,
                 pc.tipo_permiso as tipoPermiso,
                 pc.asunto,
                 pc.referencia_sisgedo as referenciaSisgedo,
@@ -76,7 +76,6 @@ class PermisosController extends ResourceController
                 pc.zona_circulacion as zonaCirculacion,
                 pc.ubicacion,
                 pc.recorrido_ingreso as recorridoIngreso,
-                pc.recorrido_salida as recorridoSalida,
                 pc.flota_placas as flotaPlacas,
                 COALESCE(pt.numero_recibo, '') as reciboIngresoNumero,
                 pt.total as reciboIngresoMonto,
@@ -104,6 +103,7 @@ class PermisosController extends ResourceController
             ->join('asociaciones o', 'o.id = COALESCE(pc.id_asociacion, td.id_asociacion)', 'left', false)
             ->join('personas p', 'p.id = COALESCE(pc.id_persona, td.id_persona)', 'left', false)
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->join('ciudadanos rc', 'rc.id_persona = o.id_representante_legal', 'left')
             ->join('vehiculos v', 'v.id = COALESCE(pc.id_vehiculo, td.id_vehiculo)', 'left', false)
             ->join('(SELECT id_tramite, MAX(id) AS id FROM pagos_transito WHERE id_tramite IS NOT NULL GROUP BY id_tramite) pm', 'pm.id_tramite = pc.id_tramite', 'left', false)
             ->join('pagos_transito pt', 'pt.id = pm.id', 'left');
@@ -331,7 +331,6 @@ class PermisosController extends ResourceController
             $data = array_merge([
                 'id_tramite'             => $idTramite,
                 'numero_autorizacion'    => $numeroAutorizacion,
-                'representante_legal'    => !empty($payload['representanteLegal']) ? strtoupper(trim($payload['representanteLegal'])) : null,
                 'tipo_permiso'           => $tipoPermiso,
                 'asunto'                 => !empty($payload['asunto']) ? trim($payload['asunto']) : match($tipoPermiso) {
                     'CARGA_DESCARGA'                     => 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
@@ -345,7 +344,6 @@ class PermisosController extends ResourceController
                 'zona_circulacion'       => !empty($payload['zonaCirculacion']) ? trim($payload['zonaCirculacion']) : 'Anillo Vial - Distrito de José Leonardo Ortiz',
                 'ubicacion'              => !empty($payload['ubicacion']) ? trim($payload['ubicacion']) : null,
                 'recorrido_ingreso'      => !empty($payload['recorridoIngreso']) ? trim($payload['recorridoIngreso']) : null,
-                'recorrido_salida'       => !empty($payload['recorridoSalida']) ? trim($payload['recorridoSalida']) : null,
                 'flota_placas'           => !empty($payload['flotaPlacas']) ? trim($payload['flotaPlacas']) : null,
                 'tonelaje'               => !empty($payload['tonelaje']) ? trim($payload['tonelaje']) : null,
                 'numero_seguridad'       => !empty($payload['numeroSeguridad']) ? trim($payload['numeroSeguridad']) : str_pad((string)mt_rand(10000, 99999), 5, '0', STR_PAD_LEFT),
@@ -398,7 +396,6 @@ class PermisosController extends ResourceController
             $allowedFields = [
                 'id_tramite'            => 'tramiteId',
                 'numero_autorizacion'   => 'numeroAutorizacion',
-                'representante_legal'   => 'representanteLegal',
                 'tipo_permiso'          => 'tipoPermiso',
                 'asunto'                => 'asunto',
                 'registro_numero'       => 'registroNumero',
@@ -406,7 +403,6 @@ class PermisosController extends ResourceController
                 'zona_circulacion'      => 'zonaCirculacion',
                 'ubicacion'             => 'ubicacion',
                 'recorrido_ingreso'     => 'recorridoIngreso',
-                'recorrido_salida'      => 'recorridoSalida',
                 'flota_placas'          => 'flotaPlacas',
                 'tonelaje'              => 'tonelaje',
                 'numero_seguridad'      => 'numeroSeguridad',
@@ -423,7 +419,7 @@ class PermisosController extends ResourceController
             foreach ($allowedFields as $col => $jsonKey) {
                 if (array_key_exists($jsonKey, $payload)) {
                     $val = $payload[$jsonKey];
-                    if ($col === 'representante_legal' || $col === 'estado') {
+                    if ($col === 'estado') {
                         $val = !empty($val) ? strtoupper(trim((string)$val)) : null;
                     } elseif ($col === 'id_tramite') {
                         $val = !empty($val) ? (int)$val : null;

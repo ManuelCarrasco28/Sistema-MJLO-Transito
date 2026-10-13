@@ -15,12 +15,17 @@ describe('participantes de curso', () => {
       .toEqual({ ...persona, asistio: 1, estado: 'APROBADO' })
   })
   it.each([
-    [{ estado: 'APROBADO', asistio: 0 }, 'APROBADO'],
+    [{ estado: 'APROBADO', asistio: 0 }, 'DESAPROBADO'],
     [{ estado: 'DESAPROBADO', asistio: 1 }, 'DESAPROBADO'],
     [{ estado: 'INSCRITO', asistio: '1' }, 'APROBADO'],
     [{ estado: 'INSCRITO', asistio: '0' }, 'DESAPROBADO'],
     [{ estado: 'CANCELADO', asistio: 1 }, 'CANCELADO'],
   ])('respeta la aprobación explícita y la asistencia: %j', (persona, esperado) => {
     expect(estadoParticipante(persona, 'FINALIZADO')).toBe(esperado)
+  })
+  it('en curso solo muestra resultados y antes de empezar muestra inscrito', () => {
+    expect(estadoParticipante({ estado: 'CONFIRMADO', asistio: 0 }, 'EN_CURSO')).toBe('DESAPROBADO')
+    expect(estadoParticipante({ estado: 'INSCRITO', asistio: 1 }, 'EN_CURSO')).toBe('APROBADO')
+    expect(estadoParticipante({ estado: 'CONFIRMADO', asistio: 0 }, 'PROGRAMADO')).toBe('INSCRITO')
   })
 })

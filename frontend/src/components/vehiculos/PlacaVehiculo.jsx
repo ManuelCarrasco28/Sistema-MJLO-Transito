@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { PlacaBadge } from '../ui/PlacaBadge'
+import { CopiarPlaca } from '../ui/CopiarPlaca'
 import { VehiculoDetalleModal } from './VehiculoDetalleModal'
 import { apiFetch, leerMensajeError } from '../../config/api'
 import { showError } from '../../utils/SwalUtil'
@@ -43,10 +44,13 @@ export function PlacaVehiculo({ placa, vehiculoId, className = '', size = 'md' }
   }
 
   return <>
+    <span className="group/placa inline-flex items-center gap-0.5">
     <button type="button" onClick={abrir} disabled={cargando} title="Ver datos del vehículo" aria-label={`Ver vehículo ${placa || 'sin placa'}`} aria-busy={cargando}
       className="rounded-lg cursor-pointer transition hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 disabled:cursor-wait">
       <PlacaBadge placa={placa} className={className} size={size} />
     </button>
+    <CopiarPlaca placa={placa} />
+    </span>
     {vehiculo && createPortal(<div className="relative z-[120]" onClick={event => event.stopPropagation()}>
       <VehiculoDetalleModal selectedVehiculo={vehiculo} onClose={() => setVehiculo(null)} isVehiculoFormal={isVehiculoFormal} buildVehiculoQrValue={buildVehiculoQrValue} getVehiculoDocumento={getVehiculoDocumento} />
     </div>, document.body)}

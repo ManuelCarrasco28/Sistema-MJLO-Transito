@@ -14,7 +14,6 @@ import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/F
 import { abrirImpresionCuandoEsteListo } from '../utils/impresionCarnets'
 import { ActionToast, TOAST_DURACION_MS } from '../components/ui/ActionToast'
 import { formatFecha, formatNumeroTarjeta, normalizarPlaca } from '../utils/formatters'
-import { imprimirInspeccionesPdf } from '../utils/exportInspeccionesPdf'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { puedeEliminarRegistros } from '../config/roles'
@@ -112,7 +111,7 @@ export function Inspecciones() {
 
   const [filterResultado, setFilterResultado] = useState('TODOS')
   const [filterVigencia, setFilterVigencia] = useState('TODOS')
-  const [filterHistorial, setFilterHistorial] = useState('ACTUALES')
+  const filterHistorial = 'ACTUALES'
   const [inspeccionPendiente, setInspeccionPendiente] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
@@ -165,7 +164,6 @@ export function Inspecciones() {
 
   const [totalFiltrado, setTotalFiltrado] = useState(0)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
   const cargaInspecciones = useRef(null)
 
   const loadData = async () => {
@@ -762,7 +760,7 @@ export function Inspecciones() {
     try {
       const data = await fetchTodoElFiltro()
       await exportToExcel({
-        filename: `Inspecciones_Tecnicas_${fechaLocalActual()}.xls`,
+        filename: `Inspecciones_Tecnicas_${fechaLocalActual()}.xlsx`,
         sheetName: 'Inspecciones',
         title: 'REGISTRO DE INSPECCIONES TÉCNICAS VEHICULARES - CERTICAV',
         subtitle: 'Subgerencia de Tránsito y Transporte - Control de Seguridad Vial',
@@ -773,7 +771,7 @@ export function Inspecciones() {
         ],
         columns: [
           { header: 'N° REGISTRO', key: 'numeroRegistro', isText: true, width: 120, align: 'center' },
-          { header: 'SERIE CERTICAV', render: (_, i) => i.numeroSerieCerticav || ('CCV-2026-' + String(i.id || '').padStart(6, '0')), isText: true, width: 140, align: 'center' },
+          { header: 'SERIE CERTICAV', key: 'numeroSerieCerticav', isText: true, width: 140, align: 'center' },
           { header: 'N° INSPECCIÓN', key: 'numeroInspeccion', isText: true, width: 120, align: 'center' },
           { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 110, align: 'center' },
           { header: 'MARCA', key: 'vehiculoMarca', width: 110 },
@@ -802,25 +800,13 @@ export function Inspecciones() {
         ],
         data
       })
+    } catch (error) {
+      if (error.name !== 'AbortError') showError('Descarga no completada', error.message || 'No se pudo preparar el archivo completo.')
     } finally {
       setIsExportingExcel(false)
     }
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const listToExport = await fetchTodoElFiltro()
-      if (listToExport.length === 0) {
-        showError('Atención', 'No hay registros para exportar.')
-        return
-      }
-
-      await imprimirInspeccionesPdf({ listToExport, vehiculos, totales, aprobados, observados, desaprobados })
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   // Agrupación de criterios técnicos por sección
   const criteriosPorSeccion = criteriosInspeccion.reduce((acc, crit) => {
@@ -1021,11 +1007,6 @@ export function Inspecciones() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <RoundedSelect value={filterHistorial} onChange={value => { setFilterHistorial(value); setCurrentPage(1) }} options={[
-              { value: 'ACTUALES', label: 'Actuales' },
-              { value: 'TODOS', label: 'Todo el historial' },
-              { value: 'HISTORICAS', label: 'Históricas' },
-            ]} />
             <RoundedSelect
               value={filterResultado}
               onChange={(val) => {
@@ -1063,22 +1044,13 @@ export function Inspecciones() {
             <button
               type="button"
               onClick={handleExportExcel}
-              title="Descargar padrón en Excel (.xls)"
+              title="Descargar padrón en Excel (.xlsx)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
               disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              title="Descargar o imprimir padrón en PDF"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-              disabled={isExportingPdf}>
-              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-            </button>
 
             <button
               type="button"
@@ -1107,7 +1079,7 @@ export function Inspecciones() {
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 "><SortableHeader column="numeroRegistro" label="N° Registro / Serie" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="px-4 py-3 "><SortableHeader column="vehiculoPlaca" label="Placa Vehicular" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3 "><SortableHeader column="vehiculoPlaca" label="Placa" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 ">Propietario</th>
                 <th className="px-4 py-3 "><SortableHeader column="fecha" label="Fechas" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 "><SortableHeader column="resultado" label="Resultado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
@@ -1178,14 +1150,7 @@ export function Inspecciones() {
                       </td>
 
                       <td className="px-4 py-3 ">
-                        <div className="space-y-0.5">
-                          <PlacaVehiculo placa={i.vehiculoPlaca} vehiculoId={i.vehiculoId} />
-                          {(vehiculo?.marca || i.vehiculoMarca || vehiculo?.modelo || i.vehiculoModelo) && (
-                            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                              {[vehiculo?.marca || i.vehiculoMarca, vehiculo?.modelo || i.vehiculoModelo].filter(Boolean).join(' ')}
-                            </p>
-                          )}
-                        </div>
+                        <PlacaVehiculo placa={i.vehiculoPlaca} vehiculoId={i.vehiculoId} />
                       </td>
 
                       <td className="px-4 py-3 max-w-[210px]">

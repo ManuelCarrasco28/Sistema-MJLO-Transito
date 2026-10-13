@@ -48,7 +48,6 @@ export function PermisoFormularioVentana() {
     tonelaje: '',
     numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000)),
     recorridoIngreso: '',
-    recorridoSalida: '',
     flotaPlacas: '',
     observaciones: '',
     contenido: '',
@@ -123,7 +122,6 @@ export function PermisoFormularioVentana() {
               tonelaje: p.tonelaje || '03 A 07-TM',
               numeroSeguridad: p.numeroSeguridad || String(Math.floor(10000 + Math.random() * 90000)),
               recorridoIngreso: p.recorridoIngreso || '',
-              recorridoSalida: p.recorridoSalida || '',
               flotaPlacas: p.flotaPlacas || '',
               observaciones: p.observaciones || '',
               contenido: p.contenido || generarPlantillaCuerpo(p),
@@ -495,7 +493,9 @@ export function PermisoFormularioVentana() {
                     id="perm_representante_legal_win"
                     label="Representante Legal"
                     value={formData.representanteLegal}
-                    onChange={(e) => setFormData({ ...formData, representanteLegal: e.target.value })}
+                    readOnly
+                    inputClassName="read-only:bg-slate-100 read-only:text-slate-500 read-only:cursor-default dark:read-only:bg-slate-800/60 dark:read-only:text-slate-400"
+                    onChange={() => {}}
                   />
                 </div>
 
@@ -725,9 +725,9 @@ export function PermisoFormularioVentana() {
               <button
                 type="button"
                 onClick={handleVolverADatosModal}
-                className="min-h-11 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-300 dark:border-[var(--border-strong)] bg-white dark:bg-[var(--bg-subtle)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                className="inline-flex h-[34px] cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-rose-500/15 bg-rose-500/10 px-3 text-xs font-semibold text-rose-500 transition hover:border-rose-500/40 hover:bg-rose-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
               >
-                <span aria-hidden="true">←</span><span>Volver a datos del trámite</span>
+                <Icon name="logout" className="size-4" /><span>Volver a datos del trámite</span>
               </button>
 
               <div className="flex flex-col sm:flex-row items-stretch gap-3 sm:w-auto">

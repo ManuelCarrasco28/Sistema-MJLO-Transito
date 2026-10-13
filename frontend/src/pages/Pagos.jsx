@@ -2,13 +2,16 @@ import { useState, useEffect, useRef } from 'react'
 import { fechaLocalActual } from '../utils/calendarioCurso'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { PapeletaDetalleModal } from '../components/papeletas/PapeletaDetalleModal'
+import { PapeletaOficialPrint } from '../components/papeletas/PapeletaOficialPrint'
+import { PagoOrigenModal } from '../components/pagos/PagoOrigenModal'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
-import { exportToPdf } from '../utils/exportToPdf'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
@@ -68,6 +71,51 @@ export function Pagos() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [selectedPago, setSelectedPago] = useState(null)
+  const [papeletaVista, setPapeletaVista] = useState(null)
+  const [papeletaFotos, setPapeletaFotos] = useState([])
+  const [cargandoPapeleta, setCargandoPapeleta] = useState(null)
+  const [papeletaImprimir, setPapeletaImprimir] = useState(null)
+  const [fotoPapeleta, setFotoPapeleta] = useState(null)
+  const [vistaOrigen, setVistaOrigen] = useState(null)
+  const [cargandoOrigen, setCargandoOrigen] = useState(null)
+  const abrirOrigenPago = async (pago) => {
+    if (pago.tipoPago === 'PAPELETA') return abrirPapeleta(pago)
+    const id = pago.tipoPago === 'CURSO' ? pago.inscripcionId : pago.tipoPago === 'TRAMITE' ? pago.tramiteId : pago.internamientoId
+    if (!id || cargandoOrigen !== null) return
+    setCargandoOrigen(pago.id)
+    try {
+      const respuesta = await apiFetch(`/pagos/origen?tipo=${encodeURIComponent(pago.tipoPago)}&id=${encodeURIComponent(id)}`)
+      if (!respuesta.ok) throw new Error('No se encontró el registro relacionado.')
+      const { data: origen } = await respuesta.json()
+      let registro = origen.registro
+      if (origen.endpoint) {
+        const detalle = await apiFetch(origen.endpoint)
+        if (!detalle.ok) throw new Error('No se pudo cargar la vista del registro.')
+        const payload = await detalle.json()
+        registro = origen.lista ? payload.data?.[0] : payload.data
+      }
+      if (!registro) throw new Error('No se encontró el registro relacionado.')
+      setVistaOrigen({ tipo: pago.tipoPago, registro })
+    } catch (error) { showError('No se pudo abrir la vista', error.message) }
+    finally { setCargandoOrigen(null) }
+  }
+  const abrirPapeleta = async (pago) => {
+    if (!pago.papeletaId || cargandoPapeleta) return
+    setCargandoPapeleta(pago.id)
+    try {
+      const response = await apiFetch(`/papeletas?papeletaId=${encodeURIComponent(pago.papeletaId)}&page=1&porPagina=1`)
+      if (!response.ok) throw new Error('No se pudo cargar la papeleta.')
+      const payload = await response.json()
+      const papeleta = payload.data?.[0]
+      if (!papeleta) throw new Error('No se encontró la papeleta relacionada.')
+      const fotosResponse = await apiFetch(`/papeletas/${papeleta.id}/fotos`)
+      const fotosPayload = fotosResponse.ok ? await fotosResponse.json() : null
+      setPapeletaFotos(Array.isArray(fotosPayload?.data) ? fotosPayload.data : [])
+      setPapeletaVista(papeleta)
+    } catch (error) {
+      showError('No se pudo abrir la papeleta', error.message)
+    } finally { setCargandoPapeleta(null) }
+  }
   const [loadError, setLoadError] = useState('')
 
   // Estado para Arqueo de Caja Diario
@@ -142,7 +190,7 @@ export function Pagos() {
     setDeudaPersona(null)
     setDeudaLista([])
     setDeudaError('')
-    setOrigenPreseleccionado({ nombre: pago.referenciaPago, monto: pago.montoTotal })
+    setOrigenPreseleccionado({ nombre: pago.referenciaPago, monto: pago.montoTotal, persona: pago.pagadoPor, tipo: pago.tipoPago })
     setIsModalOpen(true)
   }
 
@@ -241,37 +289,6 @@ export function Pagos() {
     return fetchTodasLasFilas('/pagos', Object.fromEntries(params))
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const data = await fetchTodoElFiltroPagos()
-      await exportToPdf({
-        filename: `Pagos_${fechaLocalActual()}.pdf`,
-        title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
-        subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',
-        metadata: [
-          { label: 'Estado', value: filterEstado },
-          { label: 'Tipo', value: filterTipoPago },
-          { label: 'Método', value: filterMetodo },
-          { label: 'Búsqueda', value: debouncedSearch || '—' },
-          // Suma de lo exportado (pagos confirmados), no la recaudación total del sistema
-          { label: 'Recaudado en este listado', value: `S/ ${data.filter((p) => p.estado === 'PAGADO').reduce((s, p) => s + Number(p.montoTotal || 0), 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
-        ],
-        columns: [
-          { header: 'N° RECIBO', key: 'numeroRecibo' },
-          { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente' },
-          { header: 'TIPO PAGO', key: 'tipoPago' },
-          { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—' },
-          { header: 'MÉTODO DE PAGO', key: 'metodo' },
-          { header: 'MONTO', render: (_, r) => `S/ ${(r.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
-          { header: 'ESTADO', key: 'estado' }
-        ],
-        data
-      })
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
@@ -284,7 +301,7 @@ export function Pagos() {
         }
       }
       await exportToExcel({
-        filename: `Pagos_${fechaLocalActual()}.xls`,
+        filename: `Pagos_${fechaLocalActual()}.xlsx`,
         sheetName: 'Pagos',
         title: 'REGISTRO GENERAL DE PAGOS Y RECAUDACIÓN',
         subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Caja de Tránsito',
@@ -318,7 +335,7 @@ export function Pagos() {
       return
     }
     await exportToExcel({
-      filename: `Arqueo_Caja_${arqueoData.fecha}.xls`,
+      filename: `Arqueo_Caja_${arqueoData.fecha}.xlsx`,
       sheetName: 'Arqueo',
       title: `ARQUEO Y CIERRE DE CAJA DIARIA - ${arqueoData.fecha}`,
       subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Subgerencia de Tránsito',
@@ -345,7 +362,6 @@ export function Pagos() {
 
   const [stats, setStats] = useState({ totalPagos: 0, totalMonto: 0, pagosHoy: 0 })
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
   const totalPagos = stats.totalPagos ?? 0
   const totalMonto = stats.totalMonto ?? 0
   const pagosHoy = stats.pagosHoy ?? 0
@@ -473,9 +489,6 @@ export function Pagos() {
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight tracking-tight">
               S/ {Number(totalMonto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </p>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-md shrink-0">
-              Caja Total
-            </span>
           </div>
         </div>
 
@@ -490,9 +503,6 @@ export function Pagos() {
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight tracking-tight">
               {formatNumeroTarjeta(totalPagos)}
             </p>
-            <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.5 rounded-md shrink-0">
-              Emitidos
-            </span>
           </div>
         </div>
 
@@ -507,9 +517,6 @@ export function Pagos() {
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight tracking-tight">
               {formatNumeroTarjeta(pagosHoy)}
             </p>
-            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded-md shrink-0">
-              Jornada
-            </span>
           </div>
         </div>
       </div>
@@ -556,22 +563,13 @@ export function Pagos() {
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-emerald-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer shadow-2xs whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
               title="Descargar reporte de pagos en Excel"
               disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-rose-300 dark:hover:bg-[var(--bg-subtle)] transition-all cursor-pointer shadow-2xs whitespace-nowrap"
-              title="Imprimir o exportar PDF"
-              disabled={isExportingPdf}>
-              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-            </button>
 
             <button
               type="button"
@@ -633,23 +631,25 @@ export function Pagos() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1080px] table-fixed text-left text-xs">
             <colgroup>
-              <col className="w-[140px]" />
-              <col className="w-[125px]" />
-              <col className="w-[130px]" />
-              <col className="w-[160px]" />
-              <col className="w-[120px]" />
-              <col className="w-[110px]" />
-              <col className="w-[210px]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
+              <col className="w-[19%]" />
+              <col className="w-[18%]" />
+              <col className="w-[10%]" />
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
+              <col className="w-[12%]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="numeroRecibo" label="N° RECIBO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="fecha" label="FECHA / HORA" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="px-4 py-3.5 whitespace-nowrap">TIPO / OPERACIÓN</th>
+                <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="fecha" label="FECHA DE PAGO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                <th className="px-4 py-3.5 whitespace-nowrap">CONCEPTO / REFERENCIA</th>
                 <th className="px-4 py-3.5">PAGADO POR</th>
                 <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="metodoPago" label="MÉTODO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3.5 whitespace-nowrap text-center"><SortableHeader column="montoTotal" label="MONTO TOTAL" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="sticky right-0 z-20 bg-slate-50/95 dark:bg-[#1C2438] px-4 py-3.5 text-center border-l border-slate-100 dark:border-[var(--border)] shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] whitespace-nowrap">ACCIONES</th>
+                <th className="px-4 py-3.5 text-center">ESTADO</th>
+                <th className="bg-slate-50/95 dark:bg-[#1C2438] px-2 py-3.5 text-center border-l border-slate-100 dark:border-[var(--border)] whitespace-nowrap">ACCIONES</th>
               </tr>
             </thead>
             <tbody className={`divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#1C2438] transition-opacity ${isLoading && pagos.length > 0 ? 'opacity-50' : ''}`}>
@@ -667,12 +667,13 @@ export function Pagos() {
                     </td>
                     <td className="px-4 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-4 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] px-4 py-4 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="px-4 py-4"><div className="h-5 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
+                    <td className="bg-white dark:bg-[#1C2438] px-4 py-4 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : filteredPagos.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="p-12 text-center">
+                  <td colSpan="8" className="p-12 text-center">
                     <Icon name="payment" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
                     <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron pagos registrados</p>
                   </td>
@@ -682,22 +683,17 @@ export function Pagos() {
                   <tr key={p.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-[var(--bg-subtle)]">
                     <td className="px-4 py-3.5">
                       <p className="font-bold text-xs text-slate-900 dark:text-white">{p.numeroRecibo || 'Pendiente de recibo'}</p>
-                      <span className="mt-0.5 inline-block rounded-md bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                        CAJA MUNICIPAL
-                      </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.fecha ? new Date(String(p.fecha).slice(0, 10) + 'T00:00:00').toLocaleDateString() : 'Sin fecha de pago'}</p>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                        {p.tipoPago} #{p.papeletaId || p.tramiteId || p.inscripcionId}
-                      </p>
+                      <p className="font-medium text-xs text-slate-800 dark:text-slate-200">{p.fecha && p.estado !== 'PENDIENTE' ? new Date(String(p.fecha).slice(0, 10) + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sin fecha de pago'}</p>
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-bold text-xs text-slate-900 dark:text-white">{p.tipoPago || 'TRAMITE'}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">{p.numeroVoucher ? `Operación ${p.numeroVoucher}` : '—'}</p>
+                      <p className="font-semibold text-xs text-slate-900 dark:text-white">{p.tipoPago || 'TRAMITE'}</p>
+                      {(p.papeletaId || p.inscripcionId || p.tramiteId || p.internamientoId) ? <button type="button" onClick={() => abrirOrigenPago(p)} disabled={cargandoPapeleta !== null || cargandoOrigen !== null} title="Ver registro relacionado" className="mt-1 text-left text-[11px] leading-snug text-sky-700 dark:text-sky-300 hover:underline focus-visible:outline-2 focus-visible:outline-sky-500 disabled:opacity-60 break-words">{(cargandoPapeleta === p.id || cargandoOrigen === p.id) ? 'Cargando…' : p.referenciaPago}</button> : <p className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400 break-words">{p.referenciaPago || ''}</p>}
+                      {p.numeroVoucher && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Operación: {p.numeroVoucher}</p>}
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.pagadoPor || '—'}</p>
+                      <p className="font-medium text-xs leading-relaxed text-slate-800 dark:text-slate-200 break-words">{p.pagadoPor || ''}</p>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${p.metodo === 'EFECTIVO'
@@ -711,19 +707,15 @@ export function Pagos() {
                     </td>
                     <td className="px-4 py-3.5 text-center whitespace-nowrap">
                       <p className="font-black text-xs text-slate-900 dark:text-white">
-                        S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                      </p>
-                      <p className={`text-[10px] font-bold uppercase tracking-wider ${p.estado === 'PAGADO'
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : p.estado === 'PENDIENTE'
-                            ? 'text-amber-600 dark:text-amber-400'
-                            : 'text-rose-600 dark:text-rose-400'
-                        }`}>
-                        {p.estado}
+                        S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </td>
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-emerald-50/40 dark:bg-[#1C2438] dark:group-hover:bg-slate-800/60 px-4 py-3.5 text-center border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] whitespace-nowrap min-w-[210px]">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td className="px-2 py-3.5 text-center whitespace-nowrap">
+                      <StatusBadge status={p.estado} />
+                    </td>
+                    <td className="bg-white group-hover:bg-emerald-50/40 dark:bg-[#1C2438] dark:group-hover:bg-slate-800/60 px-2 py-3.5 text-center border-l border-slate-100 dark:border-slate-800/80 whitespace-nowrap">
+                      <div className="grid grid-cols-[32px_32px] items-center justify-center gap-1.5">
+                        <div className="col-span-2 flex justify-center empty:hidden">
                         {p.estado === 'PENDIENTE' && p.tipoPago !== 'INTERNAMIENTO' && (
                           typeof p.id === 'string' && (p.id.startsWith('pap_pend_') || p.id.startsWith('cur_pend_'))
                             ? (
@@ -734,7 +726,7 @@ export function Pagos() {
                                 title="Generar recibo oficial de pago"
                               >
                                 <Icon name="payment" className="size-3.5" />
-                                <span>Generar recibo</span>
+                                <span>Cobrar</span>
                               </button>
                             ) : (
                               <button
@@ -744,21 +736,14 @@ export function Pagos() {
                                 title="Confirmar recibo de pago"
                               >
                                 <Icon name="receiptCheck" className="size-3.5" />
-                                <span>Confirmar recibo</span>
+                                <span>Confirmar</span>
                               </button>
                             )
                         )}
-                        <button onClick={() => { setSelectedPago(p); setIsDetailModalOpen(true); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver Detalle">
-                          <Icon name="eye" className="size-4" />
-                        </button>
-                        <button disabled={p.estado !== 'PAGADO'} onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title="Imprimir Ticket">
+                        </div>
+                        {p.estado === 'PAGADO' && <button disabled={p.estado !== 'PAGADO'} onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title={p.estado === 'PAGADO' ? 'Imprimir recibo' : 'Solo se pueden imprimir pagos confirmados'} aria-label="Imprimir recibo">
                           <Icon name="print" className="size-4" />
-                        </button>
-                        {p.tipoPago !== 'INTERNAMIENTO' && typeof p.id === 'number' && (
-                          <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }} disabled={p.estado === 'ANULADO'} onClick={() => handleDelete(p.id)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title="Anular Pago">
-                            <Icon name="trash" className="size-4" />
-                          </button>
-                        )}
+                        </button>}
                       </div>
                     </td>
                   </tr>
@@ -826,7 +811,8 @@ export function Pagos() {
                 ) : (
                   <>
                     <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
-                      <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Buscar deudas de una persona</legend>
+                      <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">{origenPreseleccionado ? 'Datos del registro a cobrar' : 'Buscar deudas de una persona'}</legend>
+                      {!origenPreseleccionado && <>
                       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3">Busca por DNI para ver todas sus papeletas, trámites y cursos pendientes de pago, y elige cuál cobrar.</p>
                       <div className="flex gap-2">
                         <input
@@ -896,11 +882,13 @@ export function Pagos() {
                         </div>
                       )}
 
+                      </>}
                       {origenPreseleccionado && (
-                        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Registro a cobrar</p>
+                        <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                          {origenPreseleccionado.persona && <div><p className="text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Persona</p><p className="text-sm font-semibold text-slate-900 dark:text-white">{origenPreseleccionado.persona}</p></div>}
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Concepto · {origenPreseleccionado.tipo}</p>
                           <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{origenPreseleccionado.nombre}</p>
-                          <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">S/ {Number(origenPreseleccionado.monto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                          <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">S/ {Number(origenPreseleccionado.monto || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         </div>
                       )}
                     </fieldset>
@@ -941,6 +929,10 @@ export function Pagos() {
         </div>
       )}
 
+      {papeletaVista && <PapeletaDetalleModal selectedPapeleta={papeletaVista} onClose={() => setPapeletaVista(null)} onImprimir={() => { setPapeletaImprimir(papeletaVista); setPapeletaVista(null) }} renderOrigen={p => <StatusBadge status={p.operativoId ? 'OPERATIVO' : 'RUTINA'} />} loadingPapeletaFotos={false} selectedPapeletaFotos={papeletaFotos} onVerImagen={setFotoPapeleta} />}
+      {papeletaImprimir && <PapeletaOficialPrint papeleta={papeletaImprimir} onClose={() => setPapeletaImprimir(null)} />}
+      {fotoPapeleta && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-6" onClick={() => setFotoPapeleta(null)}><button type="button" className="absolute right-6 top-6 rounded-xl bg-white px-3 py-2 text-black" onClick={() => setFotoPapeleta(null)}>Cerrar</button><img src={fotoPapeleta} alt="Evidencia de la papeleta" className="max-h-[85vh] max-w-full object-contain" onClick={e => e.stopPropagation()} /></div>}
+      {vistaOrigen && <PagoOrigenModal tipo={vistaOrigen.tipo} registro={vistaOrigen.registro} onClose={() => setVistaOrigen(null)} />}
       {isDetailModalOpen && selectedPago && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter">
           <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] p-6">

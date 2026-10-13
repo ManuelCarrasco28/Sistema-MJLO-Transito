@@ -22,11 +22,11 @@ describe('campos de los documentos de internamiento', () => {
   it('imprime la fecha de ingreso, carrocería, carné, documento e inventario real', () => {
     const doc = render(BoletaInternamientoPrint, {
       fechaIngreso: '2026-09-02 12:05:00', estadoCarroceria: 'Sin abolladuras',
-      carnetRemisor: 'REM-45', documentoReferencia: 'OF-26',
+      carnetRemisor: 'REM-45', numeroPapeleta: 'PAP-77',
       inventario: [{ nombre: 'Veh. Gr. Ab.', cantidad: 2 }, { nombre: 'Llantas', cantidad: 0 }],
     })
     expect(doc.textContent).toContain('020926')
-    for (const value of ['12:05', 'Sin abolladuras', 'REM-45', 'OF-26', 'VEH. GR. AB.2', 'LLANTAS0']) {
+    for (const value of ['12:05', 'Sin abolladuras', 'REM-45', 'PAP-77', 'VEH. GR. AB.2', 'LLANTAS0']) {
       expect(doc.textContent).toContain(value)
     }
   })
@@ -37,7 +37,7 @@ describe('campos de los documentos de internamiento', () => {
       numeroBoleta: 'BOL-19', montoRemolque: 0, totalDias: 0,
     })
     // El número del encabezado se imprime sin el prefijo (LIB-)
-    expect(doc.textContent).toContain('Nº 51')
+    expect(doc.textContent).toContain('Nº 000051')
     expect(doc.textContent).not.toContain('LIB-51')
     expect(doc.textContent).toContain('Fecha de internamiento:2/9/2026')
     expect(doc.textContent).toContain('03-09-2026')

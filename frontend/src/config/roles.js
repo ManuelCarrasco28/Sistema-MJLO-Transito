@@ -7,11 +7,8 @@ export const esRolOficina = (rol) => ROLES_OFICINA.includes(String(rol || '').to
 // Solo la jefatura elimina o anula registros (Secretaría registra y cobra, pero no borra). Lo exige también el servidor.
 export const ROLES_JEFATURA = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE']
 
-export const puedeEliminarRegistros = () => {
-  try {
-    const rol = String(JSON.parse(localStorage.getItem('user') || '{}')?.rol || '').toUpperCase()
-    return ROLES_JEFATURA.includes(rol)
-  } catch {
-    return false
-  }
-}
+// Rol de la sesión actual. App lo fija al cargar o cambiar el usuario (la sesión ya no se guarda en el navegador).
+let rolActual = ''
+export const definirRolActual = (rol) => { rolActual = String(rol || '').toUpperCase() }
+
+export const puedeEliminarRegistros = () => ROLES_JEFATURA.includes(rolActual)

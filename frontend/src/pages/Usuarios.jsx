@@ -13,7 +13,7 @@ import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../con
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { errorPasswordUsuario } from '../utils/passwordPolicy'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
-import { escapeExcelCell } from '../utils/exportHelpers'
+import { exportToExcel } from '../utils/exportToExcel'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -74,7 +74,6 @@ export function Usuarios({ user }) {
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   // Carga de datos
   const loadData = async () => {
@@ -349,196 +348,29 @@ export function Usuarios({ user }) {
     setIsDetailModalOpen(true)
   }
 
-  // Exportar Excel
+  // Reutiliza el exportador XLSX para conservar documentos y filtros.
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
-    await new Promise(r => setTimeout(r, 50))
     try {
-      const listToExport = sortedUsuarios
-      if (listToExport.length === 0) {
-        showToast('No hay usuarios para exportar con los filtros actuales', 'warning')
-        return
-      }
-
-      const rowsHtml = listToExport
-        .map(
-          (u, idx) => `
-              <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-                <td style="text-align: center; font-weight: bold; color: #64748b;">${idx + 1}</td>
-                <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">@${escapeExcelCell(u.nombre_usuario)}</td>
-                <td><strong>${escapeExcelCell(u.nombre_completo || '—')}</strong></td>
-                <td style="text-align: center; font-family: monospace;">${escapeExcelCell(u.numero_documento || '—')}</td>
-                <td>${escapeExcelCell(u.rol || 'Sin rol')}</td>
-                <td style="text-align: center;">
-                  <span style="font-weight: bold; color: ${u.usuario_estado === 'ACTIVO' ? '#047857' : '#be123c'};">
-                    ${escapeExcelCell(u.usuario_estado || 'ACTIVO')}
-                  </span>
-                </td>
-              </tr>
-            `
-        )
-        .join('')
-
-      const excelTemplate = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-              <head>
-                <meta charset="utf-8"/>
-                <style>
-                  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
-                  table { border-collapse: collapse; width: 100%; }
-                  th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; text-align: left; padding: 8px 10px; border: 1px solid #94a3b8; font-size: 10pt; text-transform: uppercase; }
-                  td { padding: 6px 10px; border: 1px solid #cbd5e1; font-size: 10pt; vertical-align: middle; }
-                  .header-title { font-size: 15pt; font-weight: bold; color: #1e3a8a; }
-                  .header-subtitle { font-size: 10.5pt; color: #475569; margin-bottom: 6px; }
-                  .header-meta { font-size: 9.5pt; color: #64748b; margin-bottom: 12px; }
-                </style>
-              </head>
-              <body>
-                <div class="header-title">MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ</div>
-                <div class="header-subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Usuarios del Sistema</div>
-                <div class="header-meta">
-                  Fecha de emisión: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')} | 
-                  Total usuarios: ${listToExport.length}
-                </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th style="text-align: center; width: 45px;">N°</th>
-                      <th style="width: 140px;">Nombre de Usuario</th>
-                      <th style="width: 260px;">Colaborador Asignado</th>
-                      <th style="text-align: center; width: 100px;">DNI</th>
-                      <th style="width: 220px;">Rol / Cargo en Sistema</th>
-                      <th style="text-align: center; width: 100px;">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${rowsHtml}
-                  </tbody>
-                </table>
-              </body>
-            </html>
-          `
-
-      const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `Padron_Usuarios_MJLO_${new Date().toISOString().slice(0, 10)}.xls`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
+      await exportToExcel({
+        filename: 'Padron_Usuarios_MJLO.xlsx', sheetName: 'Usuarios',
+        subtitle: 'Padrón Oficial de Usuarios del Sistema',
+        columns: [
+          { header: 'N°', render: (_, __, i) => i + 1, width: 45 },
+          { header: 'USUARIO', key: 'nombre_usuario', isText: true, width: 140 },
+          { header: 'COLABORADOR', key: 'nombre_completo', width: 260 },
+          { header: 'DNI', key: 'numero_documento', isText: true, width: 110 },
+          { header: 'ROL', key: 'rol', width: 200 },
+          { header: 'ESTADO', key: 'usuario_estado', width: 100 },
+        ],
+        data: sortedUsuarios,
+      })
     } finally {
       setIsExportingExcel(false)
     }
   }
 
   // Exportar PDF
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const listToExport = sortedUsuarios
-      if (listToExport.length === 0) {
-        showToast('No hay usuarios para imprimir con los filtros actuales', 'warning')
-        return
-      }
-
-      const printWin = window.open('', '_blank', 'width=1100,height=750')
-      if (!printWin) {
-        showError('Bloqueador emergente', 'Por favor habilita las ventanas emergentes en tu navegador para imprimir.')
-        return
-      }
-
-      const rowsHtml = listToExport
-        .map(
-          (u, idx) => `
-              <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-                <td style="text-align: center; font-weight: bold; color: #64748b;">${idx + 1}</td>
-                <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">@${escapeXml(u.nombre_usuario)}</td>
-                <td><strong>${escapeXml(u.nombre_completo || '—')}</strong></td>
-                <td style="text-align: center; font-family: monospace;">${escapeXml(u.numero_documento || '—')}</td>
-                <td>${escapeXml(u.rol || 'Sin rol')}</td>
-                <td style="text-align: center;">
-                  <span style="display:inline-block; padding:2px 7px; font-size:9.5px; font-weight:bold; border-radius:4px; ${u.usuario_estado === 'ACTIVO'
-              ? 'background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;'
-              : 'background:#fff1f2; color:#be123c; border:1px solid #fecdd3;'
-            }">
-                    ${escapeXml(u.usuario_estado || 'ACTIVO')}
-                  </span>
-                </td>
-              </tr>
-            `
-        )
-        .join('')
-
-      const pdfHtml = `
-            <!doctype html>
-            <html lang="es">
-              <head>
-                <meta charset="utf-8"/>
-                <title>Padron_Usuarios_MJLO_${new Date().toISOString().slice(0, 10)}</title>
-                <style>
-                  @page { size: A4 landscape; margin: 10mm 12mm 10mm 12mm; }
-                  * { box-sizing: border-box; }
-                  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; font-size: 11px; }
-                  .header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
-                  .title { font-size: 15px; font-weight: 900; text-transform: uppercase; color: #1e3a8a; }
-                  .subtitle { font-size: 11px; color: #475569; margin-top: 2px; }
-                  .meta { font-size: 9.5px; color: #64748b; text-align: right; }
-                  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-                  thead { display: table-header-group; }
-                  tr { page-break-inside: avoid; break-inside: avoid; }
-                  th { background-color: #0f172a; color: #ffffff; text-transform: uppercase; font-size: 9.5px; font-weight: 800; padding: 6px 8px; border: 1px solid #0f172a; text-align: left; }
-                  td { border: 1px solid #e2e8f0; padding: 6px 8px; vertical-align: middle; font-size: 10px; }
-                  .footer { margin-top: 14px; font-size: 9px; color: #94a3b8; display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 6px; }
-                  @media print { .no-print { display: none !important; } }
-                </style>
-              </head>
-              <body>
-                <div class="header">
-                  <div>
-                    <div class="title">Municipalidad Distrital José Leonardo Ortiz</div>
-                    <div class="subtitle">Subgerencia de Tránsito y Transporte · Padrón Oficial de Usuarios del Sistema</div>
-                  </div>
-                  <div class="meta">
-                    Fecha de emisión: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}<br/>
-                    Total usuarios: <strong>${listToExport.length}</strong>
-                  </div>
-                </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th style="text-align: center; width: 35px;">N°</th>
-                      <th style="width: 140px;">Usuario</th>
-                      <th>Colaborador Asignado</th>
-                      <th style="text-align: center; width: 90px;">DNI</th>
-                      <th>Rol / Privilegio</th>
-                      <th style="text-align: center; width: 85px;">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${rowsHtml}
-                  </tbody>
-                </table>
-                <div class="footer">
-                  <span>Sistema MJLO - Control de Acceso y Seguridad</span>
-                  <span>Página 1 de 1</span>
-                </div>
-                <script>
-                  window.onload = function() {
-                    window.print();
-                  };
-                </script>
-              </body>
-            </html>
-          `
-      printWin.document.open()
-      printWin.document.write(pdfHtml)
-      printWin.document.close()
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   // Estilos y badges de roles
   const getRoleBadge = (rol) => {
@@ -724,22 +556,13 @@ export function Usuarios({ user }) {
             <button
               type="button"
               onClick={handleExportExcel}
-              title="Descargar padrón de usuarios en Excel (.xls)"
+              title="Descargar padrón de usuarios en Excel (.xlsx)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
               disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              title="Descargar o imprimir padrón de usuarios en PDF"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-              disabled={isExportingPdf}>
-              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-            </button>
 
             <button
               type="button"

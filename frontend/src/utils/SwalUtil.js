@@ -73,7 +73,7 @@ const ACTION_CONFIG = {
     tagStyle: 'color: #be123c;',
     iconWrapClass: 'bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-700',
     iconWrapStyle: 'background-color: #fff1f2; border-color: #fda4af; color: #be123c;',
-    iconSvg: '<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+    iconSvg: '<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="6" x2="12" y2="13"></line><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>',
   },
   info: {
     etiqueta: 'Información',
@@ -83,7 +83,7 @@ const ACTION_CONFIG = {
     tagStyle: 'color: #1d4ed8;',
     iconWrapClass: 'bg-blue-50 text-blue-600 border border-blue-200/80 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800/60',
     iconWrapStyle: 'background-color: #eff6ff; border-color: #bfdbfe; color: #2563eb;',
-    iconSvg: '<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>',
+    iconSvg: '<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="11" x2="12" y2="18"></line><line x1="12" y1="6" x2="12.01" y2="6"></line></svg>',
   }
 };
 
@@ -132,14 +132,14 @@ export const showToast = (title, iconOrType = null, duration = 3200) => {
 
   toastEl.innerHTML = `
     <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-      <div class="${cfg.iconWrapClass}" style="width: 2rem; height: 2rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; ${cfg.iconWrapStyle}">
+      <div style="width: 1.75rem; height: 1.75rem; margin-top: 0.125rem; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #ffffff; background-color: ${cfg.barColor}; box-shadow: 0 2px 6px ${cfg.barColor}55;">
         ${cfg.iconSvg}
       </div>
       <div style="flex: 1; min-width: 0; text-align: left; padding-right: 0.25rem;">
         <span class="${cfg.tagColor}" style="display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; ${cfg.tagStyle}">${cfg.etiqueta}</span>
         <p style="margin: 0.125rem 0 0; font-size: 0.75rem; font-weight: 600; line-height: 1.35; color: inherit; word-break: break-word;">${escapeHtml(title)}</p>
       </div>
-      <button type="button" class="mjlo-toast-close" style="border: none; background: transparent; cursor: pointer; padding: 0.25rem; display: flex; align-items: center; justify-content: center; color: #94a3b8; border-radius: 0.5rem;" aria-label="Cerrar notificación">
+      <button type="button" class="mjlo-toast-close" style="border: none; background: transparent; cursor: pointer; padding: 0.25rem; display: flex; align-items: center; justify-content: center; border-radius: 0.5rem;" aria-label="Cerrar notificación">
         <svg style="width: 0.875rem; height: 0.875rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
@@ -207,13 +207,26 @@ showToast.deleted = (title, timer) => showToast(title, 'eliminar', timer);
 showToast.error = (title, timer) => showToast(title, 'error', timer);
 showToast.info = (title, timer) => showToast(title, 'info', timer);
 
+// Colores del diálogo según el tema actual (Swal pinta blanco por defecto, también en modo oscuro).
+const temaDialogo = () => {
+    const oscuro = document.documentElement.classList.contains('dark');
+    return {
+        oscuro,
+        background: oscuro ? '#1C2438' : '#ffffff',
+        color: oscuro ? '#f1f5f9' : '#1e293b',
+        texto: oscuro ? 'text-sm font-medium !text-slate-300 mt-2' : 'text-sm font-medium !text-slate-700 mt-2',
+    };
+};
+
 /**
  * options.confirmColor / options.cancelColor: color sólido (ej. un valor
  * oklch(...)) para aplicar como estilo inline al botón, sin tocar el estilo
  * por defecto (bg-rose-600 con sombra) que usan los demás módulos.
  */
 export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelText = 'Cancelar', options = {}) => {
-    const { confirmColor, cancelColor } = options;
+    // Los colores sueltos que pasaban algunas pantallas (rosados distintos entre sí) se ignoran: todos los
+    // diálogos usan el mismo botón rojo de confirmar y el gris de cancelar.
+    const confirmColor = null, cancelColor = null;
     const oscuro = document.documentElement.classList.contains('dark');
     return Swal.fire({
         title: title,
@@ -252,8 +265,22 @@ export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelT
     });
 };
 
+// Avisos que no son un fallo del sistema sino algo que el usuario debe corregir o que no existe (validaciones,
+// datos faltantes, búsquedas sin resultado): se muestran con el triángulo de advertencia. Un error real
+// ("Error…", "No se pudo…", "Consulta fallida") lleva la X roja, para poder distinguirlos de un vistazo.
+const ES_ADVERTENCIA = /^(atenci[oó]n|validaci[oó]n|revisa|falta|sin |motivo requerido|consulta de (documento|foto)|no se puede|.*(inv[aá]lid|no disponible|requerid|pendiente))/i
+const ES_FALLO_REAL = /^(error|no se pudo|consulta fallida|sesi[oó]n)/i
+
 export const showError = (title, text) => {
+    const titulo = String(title || '').trim()
+    // Un borrado rechazado por tener registros vinculados no es un fallo del sistema: es una regla.
+    if (/^no se puede/i.test(String(text || '').trim()) || (ES_ADVERTENCIA.test(titulo) && !ES_FALLO_REAL.test(titulo))) {
+        return showWarning(title, text);
+    }
+    const tema = temaDialogo();
     return Swal.fire({
+        background: tema.background,
+        color: tema.color,
         icon: 'error',
         title: title,
         text: text,
@@ -261,8 +288,8 @@ export const showError = (title, text) => {
         buttonsStyling: false,
         customClass: {
             popup: 'rounded-3xl shadow-2xl border border-rose-100 dark:border-rose-900/30 dark:bg-slate-900',
-            title: 'text-xl font-black text-slate-800 mt-2',
-            htmlContainer: 'text-sm font-medium !text-slate-700 mt-2',
+            title: 'text-xl font-black mt-2',
+            htmlContainer: tema.texto,
             confirmButton: 'rounded-xl bg-slate-900 dark:bg-white px-8 py-2.5 text-sm font-bold text-white dark:text-slate-900 shadow-md transition-all hover:scale-[1.02] active:scale-95 mt-4',
             icon: 'border-rose-500 text-rose-500 scale-110',
         }
@@ -279,24 +306,30 @@ const ICONO_ADVERTENCIA = `<svg viewBox="0 0 100 90" width="92" height="83" aria
 
 // Advertencia: algo no salió como se esperaba pero no es un error del sistema (ej. una búsqueda sin resultados).
 export const showWarning = (title, text) => {
+    const tema = temaDialogo();
     return Swal.fire({
+        background: tema.background,
+        color: tema.color,
         iconHtml: ICONO_ADVERTENCIA,
         title: title,
         text: text,
         confirmButtonText: 'Entendido',
         buttonsStyling: false,
         customClass: {
-            popup: 'rounded-3xl shadow-2xl border border-amber-100',
+            popup: 'rounded-3xl shadow-2xl border border-amber-100 dark:border-amber-900/30',
             icon: '!border-0 !bg-transparent',
-            title: 'text-xl font-black text-slate-800 mt-2',
-            htmlContainer: 'text-sm font-medium !text-slate-700 mt-2',
-            confirmButton: 'rounded-xl bg-slate-900 px-8 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-[1.02] active:scale-95 mt-4',
+            title: 'text-xl font-black mt-2',
+            htmlContainer: tema.texto,
+            confirmButton: 'rounded-xl bg-slate-900 dark:bg-white px-8 py-2.5 text-sm font-bold text-white dark:text-slate-900 shadow-md transition-all hover:scale-[1.02] active:scale-95 mt-4',
         }
     });
 };
 
 export const showSuccess = (title, text) => {
+    const tema = temaDialogo();
     return Swal.fire({
+        background: tema.background,
+        color: tema.color,
         icon: 'success',
         title: title,
         text: text,
@@ -304,8 +337,8 @@ export const showSuccess = (title, text) => {
         buttonsStyling: false,
         customClass: {
             popup: 'rounded-3xl shadow-2xl border border-emerald-100 dark:border-emerald-900/30 dark:bg-slate-900 p-6',
-            title: 'text-2xl font-black text-slate-800 mt-3',
-            htmlContainer: 'text-sm font-medium !text-slate-700 mt-2',
+            title: 'text-2xl font-black mt-3',
+            htmlContainer: tema.texto,
             confirmButton: 'rounded-xl bg-emerald-600 px-8 py-2.5 text-sm font-extrabold text-white shadow-md transition-all hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 mt-5',
             icon: 'border-emerald-500 text-emerald-500 scale-125 mb-2',
         }

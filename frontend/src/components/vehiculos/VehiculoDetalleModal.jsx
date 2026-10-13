@@ -237,7 +237,7 @@ export function VehiculoDetalleModal({
                         return (
                           <div key={papeleta.numeroPapeleta} className="grid gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 dark:border-[var(--border)] sm:grid-cols-[140px_1fr_110px_120px] sm:items-center">
                             <div>
-                              <p className="font-mono text-xs font-black text-rose-700 dark:text-rose-300">{papeleta.numeroPapeleta}</p>
+                              <p className="font-mono text-xs font-black text-rose-700 dark:text-rose-300">N° {formatoNumeroPapeleta(papeleta.numeroPapeleta)}</p>
                               <p className="text-[10px] font-bold text-slate-400">{papeleta.fechaHora ? formatFecha(papeleta.fechaHora) : 'Sin fecha'}</p>
                             </div>
                             <div className="min-w-0">
@@ -358,3 +358,4 @@ export function VehiculoDetalleModal({
     </div>
   )
 }
+import { formatoNumeroPapeleta } from '../../utils/numeroPapeleta'

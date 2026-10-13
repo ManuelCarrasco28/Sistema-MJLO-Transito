@@ -6,7 +6,7 @@ import { apiFetch } from '../../config/api'
 import { showError } from '../../utils/SwalUtil'
 
 // Nombre + DNI de una persona que, al hacer clic, abre su ficha (con opción de editarla) sin salir de la lista.
-export function PersonaEnlace({ personaId, nombre, dni, sinDniTexto = 'Sin DNI' }) {
+export function PersonaEnlace({ personaId, nombre, dni, sinDniTexto = 'Sin DNI', children = null, className = '' }) {
   const [persona, setPersona] = useState(null)
   const [editando, setEditando] = useState(false)
   const [cargando, setCargando] = useState(false)
@@ -33,7 +33,7 @@ export function PersonaEnlace({ personaId, nombre, dni, sinDniTexto = 'Sin DNI' 
     }
   }
 
-  const contenido = (
+  const contenido = children ?? (
     <>
       <span className="block text-xs font-semibold leading-snug text-slate-900 dark:text-white">{nombre || 'Sin Propietario'}</span>
       {dni
@@ -42,10 +42,10 @@ export function PersonaEnlace({ personaId, nombre, dni, sinDniTexto = 'Sin DNI' 
     </>
   )
 
-  if (!personaId) return <div className="text-left">{contenido}</div>
+  if (!personaId) return <div className={`text-left ${className}`}>{contenido}</div>
 
   return <>
-    <button type="button" onClick={abrir} disabled={cargando} title="Ver persona" className="text-left rounded focus-visible:outline-2 focus-visible:outline-blue-500 hover:underline disabled:opacity-60">
+    <button type="button" onClick={abrir} disabled={cargando} title="Ver persona" className={`min-w-0 text-left rounded focus-visible:outline-2 focus-visible:outline-blue-500 hover:underline disabled:opacity-60 ${className}`}>
       {contenido}
     </button>
     {persona && createPortal(editando

@@ -44,7 +44,13 @@ SELECT pt.id, CONVERT(pt.uuid USING utf8mb4) COLLATE utf8mb4_unicode_ci AS uuid,
  CONVERT(pt.numero_recibo USING utf8mb4) COLLATE utf8mb4_unicode_ci AS numero_recibo,
  CONVERT(pt.numero_voucher USING utf8mb4) COLLATE utf8mb4_unicode_ci AS numero_voucher,
  CONVERT(pt.medio_pago USING utf8mb4) COLLATE utf8mb4_unicode_ci AS medio_pago,
- CONVERT(pt.referencia_pago USING utf8mb4) COLLATE utf8mb4_unicode_ci AS referencia_pago, pt.total,
+ CONVERT(CASE WHEN pt.tipo_pago = 'PAPELETA' AND pt.id_papeleta IS NOT NULL
+ THEN COALESCE((SELECT CONCAT('Papeleta N° ', pnum.numero_papeleta) FROM papeletas pnum WHERE pnum.id = pt.id_papeleta), pt.referencia_pago)
+ WHEN pt.tipo_pago = 'CURSO' AND pt.id_inscripcion IS NOT NULL AND COALESCE(pt.referencia_pago, '') = ''
+ THEN (SELECT CONCAT('Curso ', cur.nombre, ' — ', TRIM(CONCAT(COALESCE(cir.nombres, ''), ' ', COALESCE(cir.apellido_paterno, '')))) FROM inscripciones_curso insr JOIN cursos_seguridad_vial cur ON cur.id = insr.id_curso LEFT JOIN ciudadanos cir ON cir.id_persona = insr.id_persona WHERE insr.id = pt.id_inscripcion)
+ WHEN pt.tipo_pago = 'TRAMITE' AND pt.id_tramite IS NOT NULL AND COALESCE(pt.referencia_pago, '') = ''
+ THEN (SELECT CONCAT('Trámite ', COALESCE(NULLIF(trr.numero_expediente, ''), CONCAT('N° ', trr.id))) FROM tramites_documentarios trr WHERE trr.id = pt.id_tramite)
+ ELSE pt.referencia_pago END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS referencia_pago, pt.total,
  CONVERT(pt.estado USING utf8mb4) COLLATE utf8mb4_unicode_ci AS estado
 FROM pagos_transito pt
 WHERE NOT (pt.estado = 'ANULADO' AND pt.tipo_pago = 'CURSO' AND COALESCE(pt.referencia_pago, '') = 'Inscripción retirada sin pago')
@@ -67,7 +73,7 @@ UNION ALL
 SELECT p.id AS id, NULL AS uuid, p.id AS id_papeleta, NULL AS id_tramite, NULL AS id_inscripcion, NULL AS id_internamiento,
  'pap_pend_' AS prefijo, p.fecha_hora AS fecha_pago, NULL AS hora_pago, 'PAPELETA' AS tipo_pago,
  NULL AS numero_recibo, NULL AS numero_voucher, 'SIN CONFIRMAR' AS medio_pago,
- CONCAT('Papeleta ', p.numero_papeleta, COALESCE(CONCAT(' — ', v.placa), '')) AS referencia_pago, p.monto_total AS total, 'PENDIENTE' AS estado
+ CONCAT('Papeleta N° ', p.numero_papeleta, COALESCE(CONCAT(' — ', v.placa), '')) AS referencia_pago, p.monto_total AS total, 'PENDIENTE' AS estado
 FROM papeletas p LEFT JOIN vehiculos v ON v.id = p.id_vehiculo
 WHERE p.estado = 'PENDIENTE_PAGO' AND NOT EXISTS
  (SELECT 1 FROM pagos_transito pt WHERE pt.id_papeleta = p.id AND pt.estado <> 'ANULADO')

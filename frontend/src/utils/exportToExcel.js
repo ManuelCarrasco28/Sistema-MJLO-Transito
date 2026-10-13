@@ -1,143 +1,105 @@
 import { showError } from './SwalUtil'
-import { escapeXml, escapeExcelCell } from './exportHelpers'
 import { fetchTodasLasFilas } from './descargaCompleta'
 
-/**
- * Exporta una lista de datos a un archivo Excel (.xls) compatible con Microsoft Excel,
- * preservando estilos corporativos institucionales, ancho de columnas y formato de texto (DNI/RUC/Placas).
- *
- * @param {Object} options
- * @param {string} options.filename Nombre del archivo a descargar (e.g. 'Padron_Vehiculos.xls')
- * @param {string} [options.sheetName] Nombre de la hoja de cálculo
- * @param {string} [options.title] Título institucional
- * @param {string} [options.subtitle] Subtítulo del módulo
- * @param {Array<{label: string, value: string}>|string} [options.metadata] Metadatos de cabecera
- * @param {Array<{header: string, key?: string, width?: string|number, align?: 'left'|'center'|'right', isText?: boolean, render?: (value: any, row: any, index: number) => string}>} options.columns
- * @param {Array<any>|{endpoint: string, params?: Object, opciones?: Object, transformar?: Function}} options.data Registros o fuente paginada
- */
+// XLSX strings are literal values, never formula objects.
+export function valorCeldaExcel(value, column) {
+  if (value === null || value === undefined || value === '') return null
+  if (column.isText) return String(value)
+  if (/\(S\/\)/i.test(column.header || '')) {
+    const number = typeof value === 'number' ? value : Number(String(value).replace(/^S\/\s*/, '').replace(/,/g, '').trim())
+    return Number.isFinite(number) ? number : String(value)
+  }
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'boolean') return value ? 'SÍ' : 'NO'
+  return String(value)
+}
+
+/** Native XLSX with typed numbers, text identifiers and validated paged sources. */
 export async function exportToExcel({
-  filename = 'Reporte.xls',
-  sheetName = 'Datos',
+  filename = 'Reporte.xlsx', sheetName = 'Datos',
   title = 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
-  subtitle = 'Subgerencia de Tránsito y Transporte',
-  metadata = [],
-  columns = [],
-  data = []
+  subtitle = 'Subgerencia de Tránsito y Transporte', metadata = [], columns = [], data = [],
 }) {
-  const fuentePaginada = !Array.isArray(data) && data?.endpoint ? data : null
-  if (!fuentePaginada && (!data || data.length === 0)) {
+  const source = !Array.isArray(data) && data?.endpoint ? data : null
+  if (!columns.length || (!source && !data?.length)) {
     showError('Sin registros', 'No hay registros para exportar.')
     return
   }
-
-  const partesFilas = []
-  let totalFilas = 0
-  const procesarFilas = async (filas) => {
-    // Conservar bloques binarios, no duplicar el padrón completo como objetos + HTML gigante.
-    for (let inicio = 0; inicio < filas.length; inicio += 200) {
-      const html = filas.slice(inicio, inicio + 200).map((row, indice) => {
-        const index = totalFilas + indice
-        const cells = columns.map(col => {
-          let val = col.key ? row[col.key] : ''
-          if (col.render) val = col.render(val, row, index)
-          else if (val === null || val === undefined || val === '') val = '—'
-          const align = col.align || 'left'
-          const textFormat = col.isText ? `mso-number-format:'\\@';` : ''
-          return `<td style="text-align: ${align}; ${textFormat}">${escapeExcelCell(val)}</td>`
-        }).join('')
-        return `<tr>${cells}</tr>`
-      }).join('')
-      partesFilas.push(new Blob([html]))
-      totalFilas += Math.min(200, filas.length - inicio)
-      await new Promise(resolve => setTimeout(resolve, 0))
+  try {
+    const { default: ExcelJS } = await import('exceljs')
+    const workbook = new ExcelJS.Workbook()
+    workbook.creator = 'Municipalidad Distrital José Leonardo Ortiz'
+    const safeName = String(sheetName).replace(/[\\/*?:[\]]/g, ' ').replace(/^'+|'+$/g, '').slice(0, 31).trim() || 'Datos'
+    const sheet = workbook.addWorksheet(safeName)
+    sheet.columns = columns.map(col => ({ width: Math.min(55, Math.max(12, (Number.parseFloat(col.width) || 140) / 7)) }))
+    const addHeading = (text, size, bold) => {
+      const row = sheet.addRow([text])
+      if (columns.length > 1) sheet.mergeCells(row.number, 1, row.number, columns.length)
+      row.font = { name: 'Calibri', size, bold, color: { argb: 'FF1E3A8A' } }
+      row.alignment = { wrapText: true, vertical: 'middle' }
+      row.height = size === 16 ? 30 : 24
+      return row
     }
-  }
-  if (fuentePaginada) {
-    try {
-    await fetchTodasLasFilas(fuentePaginada.endpoint, fuentePaginada.params, {
-      ...fuentePaginada.opciones, concurrencia: 1,
-      procesarPagina: filas => procesarFilas(fuentePaginada.transformar ? fuentePaginada.transformar(filas) : filas),
+    addHeading(title, 16, true)
+    addHeading(subtitle, 11, false)
+    const metaRow = addHeading('', 10, false)
+    sheet.addRow([])
+    const header = sheet.addRow(columns.map(col => col.header))
+    header.height = 34
+    header.eachCell(cell => {
+      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } }
+      cell.alignment = { vertical: 'middle', wrapText: true }
     })
-    } catch (error) {
-      if (error.name === 'AbortError') return
-      showError('Descarga no completada', 'No se pudo preparar el archivo completo. Intente nuevamente.')
-      return
+    sheet.views = [{ state: 'frozen', ySplit: header.number }]
+    let total = 0
+    const processRows = async rows => {
+      for (const record of rows) {
+        if (sheet.rowCount >= 1048576) throw new Error('El reporte supera el límite de filas de Excel. Aplique filtros.')
+        let lines = 1
+        const values = columns.map(col => {
+          let value = col.key ? record[col.key] : null
+          if (col.render) value = col.render(value, record, total)
+          const normalized = valorCeldaExcel(value, col)
+          if (typeof normalized === 'string') {
+            if (normalized.length > 32767) throw new Error('Un campo supera el límite de texto de Excel. Aplique filtros.')
+            lines = Math.max(lines, normalized.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 45)), 0))
+          }
+          return normalized
+        })
+        const row = sheet.addRow(values)
+        row.height = Math.min(409, Math.max(20, lines * 15))
+        row.eachCell({ includeEmpty: true }, (cell, index) => {
+          const col = columns[index - 1]
+          cell.font = { name: 'Calibri', size: 11 }
+          cell.alignment = { vertical: 'top', wrapText: true, horizontal: col.align || 'left' }
+          if (col.isText) cell.numFmt = '@'
+          else if (/\(S\/\)/i.test(col.header || '')) cell.numFmt = '"S/ "#,##0.00'
+        })
+        total++
+        if (total % 200 === 0) await new Promise(resolve => setTimeout(resolve, 0))
+      }
     }
-  } else await procesarFilas(data)
-  if (!totalFilas) { showError('Sin registros', 'No hay registros para exportar.'); return }
-
-  const now = new Date()
-  const fechaEmision = `${now.toLocaleDateString('es-PE')} ${now.toLocaleTimeString('es-PE')}`
-
-  let metaText = `Fecha de emisión: ${fechaEmision} | Total registros: ${totalFilas}`
-  if (Array.isArray(metadata) && metadata.length > 0) {
-    metaText += ' | ' + metadata.map(m => `${m.label}: ${m.value}`).join(' | ')
-  } else if (typeof metadata === 'string' && metadata.trim()) {
-    metaText += ' | ' + metadata
+    if (source) {
+      await fetchTodasLasFilas(source.endpoint, source.params, {
+        ...source.opciones, concurrencia: 1,
+        procesarPagina: rows => processRows(source.transformar ? source.transformar(rows) : rows),
+      })
+    } else await processRows(data)
+    if (!total) { showError('Sin registros', 'No hay registros para exportar.'); return }
+    const meta = Array.isArray(metadata) ? metadata.map(m => m.label + ': ' + m.value).join(' | ') : String(metadata || '')
+    metaRow.getCell(1).value = 'Fecha de emisión: ' + new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' }) + ' | Total registros: ' + total + (meta ? ' | ' + meta : '')
+    metaRow.height = 42
+    sheet.autoFilter = { from: { row: header.number, column: 1 }, to: { row: sheet.rowCount, column: columns.length } }
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename.replace(/\.(xlsx?|xml)$/i, '') + '.xlsx'
+    document.body.appendChild(link)
+    try { link.click() } finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  } catch (error) {
+    if (error.name !== 'AbortError') showError('Descarga no completada', error.message || 'No se pudo preparar el archivo completo. Intente nuevamente.')
   }
-
-  const headersHtml = columns
-    .map(col => {
-      const align = col.align || 'left'
-      const width = col.width ? `width: ${typeof col.width === 'number' ? col.width + 'px' : col.width};` : ''
-      return `<th style="text-align: ${align}; ${width}">${escapeXml(col.header)}</th>`
-    })
-    .join('')
-
-  const excelTemplate = `
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="utf-8">
-        <!--[if gte mso 9]>
-        <xml>
-          <x:ExcelWorkbook>
-            <x:ExcelWorksheets>
-              <x:ExcelWorksheet>
-                <x:Name>${escapeXml(sheetName.slice(0, 31))}</x:Name>
-                <x:WorksheetOptions>
-                  <x:DisplayGridlines/>
-                </x:WorksheetOptions>
-              </x:ExcelWorksheet>
-            </x:ExcelWorksheets>
-          </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
-        <style>
-          body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #1e293b; }
-          table { border-collapse: collapse; width: 100%; }
-          th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; padding: 8px 10px; border: 1px solid #94a3b8; font-size: 11pt; }
-          td { padding: 6px 10px; border: 1px solid #cbd5e1; font-size: 10.5pt; vertical-align: middle; }
-          .header-title { font-size: 16pt; font-weight: bold; color: #1e3a8a; }
-          .header-subtitle { font-size: 11pt; color: #475569; margin-bottom: 6px; }
-          .header-meta { font-size: 9.5pt; color: #64748b; margin-bottom: 14px; }
-        </style>
-      </head>
-      <body>
-        <div class="header-title">${escapeXml(title)}</div>
-        <div class="header-subtitle">${escapeXml(subtitle)}</div>
-        <div class="header-meta">${escapeXml(metaText)}</div>
-        <table>
-          <thead>
-            <tr>
-              ${headersHtml}
-            </tr>
-          </thead>
-          <tbody>
-            <!--FILAS_EXPORTADAS-->
-          </tbody>
-        </table>
-      </body>
-    </html>
-  `
-
-  const [cabecera, pie] = excelTemplate.split('<!--FILAS_EXPORTADAS-->')
-  const blob = new Blob([cabecera, ...partesFilas, pie], { type: 'application/vnd.ms-excel;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename.endsWith('.xls') ? filename : `${filename}.xls`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

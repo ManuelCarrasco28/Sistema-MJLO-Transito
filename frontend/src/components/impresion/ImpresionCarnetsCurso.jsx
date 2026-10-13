@@ -17,7 +17,7 @@ const OPCIONES_ENTREGA = [
 
 const nombreDe = (p) => `${p.nombres || ''} ${p.apellido_paterno || ''} ${p.apellido_materno || ''}`.trim()
 
-// Un año después del curso, igual que en la vista de Cursos de Seguridad Vial.
+// Un año después de la expedición (si el curso no trae su fecha de vencimiento).
 const vencimientoDe = (fecha) => {
   const dt = new Date(fecha)
   if (Number.isNaN(dt.getTime())) return ''
@@ -26,7 +26,8 @@ const vencimientoDe = (fecha) => {
 }
 
 const aItemCarnet = (p) => {
-  const vencimiento = vencimientoDe(p.cursoFecha)
+  const expedicion = p.cursoCarnetExpedicion || p.cursoFecha
+  const vencimiento = p.cursoCarnetVencimiento || vencimientoDe(expedicion)
   return {
     codigo: p.cursoCodigo,
     tucNumero: p.cursoCodigo,
@@ -36,7 +37,8 @@ const aItemCarnet = (p) => {
     licencia: p.licencia || '',
     numeroLicencia: p.licencia || '',
     fotoUrl: p.fotoUrl || '',
-    fechaExpedicion: p.cursoFecha,
+    resolucion: p.cursoResolucion || '',
+    fechaExpedicion: expedicion,
     fechaExpiracion: vencimiento,
     fechaVencimiento: vencimiento,
     asociacion: 'INDEPENDIENTE',
@@ -161,6 +163,9 @@ const compactar = (p) => ({
   cursoCodigo: p.cursoCodigo,
   cursoTitulo: p.cursoTitulo,
   cursoFecha: p.cursoFecha,
+  cursoResolucion: p.cursoResolucion,
+  cursoCarnetExpedicion: p.cursoCarnetExpedicion,
+  cursoCarnetVencimiento: p.cursoCarnetVencimiento,
   nombres: p.nombres,
   apellido_paterno: p.apellido_paterno,
   apellido_materno: p.apellido_materno,

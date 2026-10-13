@@ -167,7 +167,9 @@ class PapeletasController extends ResourceController
             }
             $dni = $this->request->getGet('dni');
             $placa = \App\Libraries\Placa::normalizar($this->request->getGet('placa'));
-            $buscar = trim((string)$this->request->getGet('buscar'));
+        $papeletaId = (int)$this->request->getGet('papeletaId');
+        if ($papeletaId > 0) $builder->where('p.id', $papeletaId);
+        $buscar = trim((string)$this->request->getGet('buscar'));
             $estado = strtoupper(trim((string)$this->request->getGet('estado')));
             $origen = strtoupper(trim((string)$this->request->getGet('origen')));
             $formalidad = strtoupper(trim((string)$this->request->getGet('formalidad')));
@@ -498,7 +500,7 @@ class PapeletasController extends ResourceController
             $papeletaId = (int)$db->insertID();
 
             // Actualizar el número de papeleta basado en el ID para asegurar unicidad absoluta
-            $numeroPapeletaDefinitivo = 'PAP-' . date('Y') . '-' . str_pad((string)$papeletaId, 6, '0', STR_PAD_LEFT);
+            $numeroPapeletaDefinitivo = str_pad((string)$papeletaId, 7, '0', STR_PAD_LEFT);
             $db->table('papeletas')->where('id', $papeletaId)->update(['numero_papeleta' => $numeroPapeletaDefinitivo]);
 
             foreach ($detallesToInsert as $detalle) {

@@ -45,7 +45,12 @@ class CursosController extends ResourceController
                     c.codigo,
                     c.nombre as titulo,
                     c.descripcion,
-                    c.resolucion as instructor,
+                    c.instructor,
+                    c.resolucion,
+                    c.id_instructor AS idInstructor,
+                    c.carnet_expedicion AS carnetExpedicion,
+                    c.carnet_vencimiento AS carnetVencimiento,
+                    pi.numero AS instructorDni,
                     c.fecha_inicio as fecha,
                     c.fecha_inicio,
                     c.fecha_fin,
@@ -59,6 +64,7 @@ class CursosController extends ResourceController
                     c.costo_inscripcion as costo
                 ");
 
+            $builder->join('personas pi', 'pi.id = c.id_instructor', 'left');
             if ($this->cursoDetalleId !== null) $builder->where('c.id', $this->cursoDetalleId);
             $resumen = $this->cursoDetalleId === null && $this->request->getGet('resumen') === '1';
             $buscar = trim((string)$this->request->getGet('buscar'));
@@ -66,6 +72,7 @@ class CursosController extends ResourceController
                 $builder->groupStart()
                     ->like('c.codigo', $buscar)
                     ->orLike('c.nombre', $buscar)
+                    ->orLike('c.instructor', $buscar)
                     ->orLike('c.resolucion', $buscar)
                     ->orLike('c.lugar', $buscar)
                     ->groupEnd();
@@ -88,13 +95,14 @@ class CursosController extends ResourceController
                 $total = (clone $builder)->countAllResults(false);
                 $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, [
                     'codigo' => 'c.codigo', 'titulo' => 'c.nombre', 'fecha' => 'c.fecha_inicio',
-                    'estado' => 'c.estado', 'capacidad' => 'c.cupos', 'instructor' => 'c.resolucion',
-                ], 'c.id')
+                    'estado' => 'c.estado', 'capacidad' => 'c.cupos', 'instructor' => 'c.instructor',
+                ], 'c.fecha_inicio')
+                    ->orderBy('c.id', 'DESC')
                     ->limit($porPagina, ($page - 1) * $porPagina)
                     ->get()
                     ->getResultArray();
             } else {
-                $rows = $builder->orderBy('c.id', 'DESC')
+                $rows = $builder->orderBy('c.fecha_inicio', 'DESC')->orderBy('c.id', 'DESC')
                     ->get()
                     ->getResultArray();
             }
@@ -265,8 +273,19 @@ class CursosController extends ResourceController
         if ($error = \App\Libraries\ReglasCurso::validarCalendario($input)) return $this->failValidationErrors($error);
         $titulo = trim($input['titulo'] ?? '');
         $descripcion = trim($input['descripcion'] ?? '');
-        $instructor = trim($input['instructor'] ?? 'Instructor Certificado');
+        $resolucion = mb_strtoupper(trim((string)($input['resolucion'] ?? '')), 'UTF-8');
+        if (mb_strlen($resolucion) > 150) return $this->failValidationErrors('La resolución no puede superar los 150 caracteres.');
+        try {
+            [$instructor, $idInstructor] = $this->resolverInstructor($db, $input);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        }
         $fecha = trim($input['fecha'] ?? date('Y-m-d'));
+        try {
+            [$carnetExpedicion, $carnetVencimiento] = $this->resolverFechasCarnet(null, $fecha, $input['fechaFin'] ?? $fecha);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        }
         $lugar = trim($input['lugar'] ?? 'Auditorio Municipal JLO');
         $cuposTotales = (int)($input['cuposTotales'] ?? 50);
         $costo = (float)($input['costo'] ?? 0);
@@ -276,7 +295,11 @@ class CursosController extends ResourceController
             'codigo' => $codigo,
             'nombre' => $titulo ?: 'Curso de Capacitación Vial',
             'descripcion' => $descripcion,
-            'resolucion' => $instructor,
+            'resolucion' => $resolucion !== '' ? $resolucion : null,
+            'instructor' => $instructor,
+            'id_instructor' => $idInstructor,
+            'carnet_expedicion' => $carnetExpedicion,
+            'carnet_vencimiento' => $carnetVencimiento,
             'fecha_inicio' => $fecha,
             'fecha_fin' => $input['fechaFin'],
             'fecha_inscripcion_inicio' => $input['fechaInscripcionInicio'],
@@ -295,7 +318,7 @@ class CursosController extends ResourceController
             if (!$candado) return $this->failValidationErrors('No se pudo asignar el código. Intente nuevamente.');
             if ($codigo === '') {
                 $anio = (int)date('Y');
-                $prefijo = 'CUR-' . $anio . '-';
+                $prefijo = 'CSV-' . $anio . '-';
                 $ultimo = (int)$db->query("SELECT MAX(CAST(SUBSTRING(codigo, ?) AS UNSIGNED)) AS ultimo FROM cursos_seguridad_vial WHERE codigo REGEXP ?", [strlen($prefijo) + 1, '^' . $prefijo . '[0-9]+$'])->getRow('ultimo');
                 $codigo = \App\Libraries\ReglasCurso::siguienteCodigo($ultimo, $anio);
             }
@@ -313,6 +336,10 @@ class CursosController extends ResourceController
                 'titulo' => $data['nombre'],
                 'descripcion' => $data['descripcion'],
                 'instructor' => $instructor,
+                'idInstructor' => $idInstructor,
+                'resolucion' => $data['resolucion'],
+                'carnetExpedicion' => $carnetExpedicion,
+                'carnetVencimiento' => $carnetVencimiento,
                 'fecha' => $data['fecha_inicio'],
                 'fechaFin' => $data['fecha_fin'],
                 'fechaInscripcionInicio' => $data['fecha_inscripcion_inicio'],
@@ -368,14 +395,33 @@ class CursosController extends ResourceController
         }
 
         $data = [];
+        if (array_key_exists('codigo', $input)) {
+            $codigoNuevo = strtoupper(trim((string)$input['codigo']));
+            if ($codigoNuevo === '' || strlen($codigoNuevo) > 50 || !preg_match('/^[A-Z0-9-]+$/', $codigoNuevo)) {
+                return $this->failValidationErrors('El código solo puede llevar letras, números y guiones (máximo 50 caracteres).');
+            }
+            if ($db->table('cursos_seguridad_vial')->where('codigo', $codigoNuevo)->where('id !=', (int)$id)->countAllResults() > 0) {
+                return $this->failValidationErrors('Ya existe un curso con ese código.');
+            }
+            $data['codigo'] = $codigoNuevo;
+        }
         if (isset($input['titulo'])) {
             $data['nombre'] = trim($input['titulo']);
         }
         if (isset($input['descripcion'])) {
             $data['descripcion'] = trim($input['descripcion']);
         }
-        if (isset($input['instructor'])) {
-            $data['resolucion'] = trim($input['instructor']);
+        if (array_key_exists('resolucion', $input)) {
+            $resolucion = mb_strtoupper(trim((string)$input['resolucion']), 'UTF-8');
+            if (mb_strlen($resolucion) > 150) return $this->failValidationErrors('La resolución no puede superar los 150 caracteres.');
+            $data['resolucion'] = $resolucion !== '' ? $resolucion : null;
+        }
+        if (array_key_exists('idInstructor', $input) || array_key_exists('instructor', $input)) {
+            try {
+                [$data['instructor'], $data['id_instructor']] = $this->resolverInstructor($db, $input);
+            } catch (\DomainException $e) {
+                return $this->failValidationErrors($e->getMessage());
+            }
         }
         if (isset($input['fecha'])) {
             $data['fecha_inicio'] = trim($input['fecha']);
@@ -408,6 +454,12 @@ class CursosController extends ResourceController
                     $db->transRollback(); return $this->failValidationErrors($error);
                 }
                 foreach ($camposCalendario as $clave=>$columna) $data[$columna] = $calendario[$clave];
+            }
+            // Los carnets se expiden al terminar el curso y vencen un año después: se recalculan si cambian las fechas
+            if (isset($data['fecha_inicio']) || isset($data['fecha_fin'])) {
+                $inicioFinal = $data['fecha_inicio'] ?? $cursoActual['fecha_inicio'];
+                $finFinal = $data['fecha_fin'] ?? $cursoActual['fecha_fin'] ?? $inicioFinal;
+                [$data['carnet_expedicion'], $data['carnet_vencimiento']] = $this->resolverFechasCarnet(null, (string)$inicioFinal, (string)$finFinal);
             }
             if (isset($data['cupos'])) {
                 $inscritos = $db->table('inscripciones_curso')->where('id_curso', $id)->whereNotIn('estado', ['ANULADO','CANCELADO'])->countAllResults();
@@ -449,6 +501,42 @@ class CursosController extends ResourceController
             $db->transRollback();
             return $this->failServerError('Error actualizando el curso.');
         }
+    }
+
+    /**
+     * Fecha de expedición de los carnets del curso y su vencimiento (un año después).
+     * Los carnets se expiden al terminar el curso (o en la fecha indicada, que no puede ser anterior al inicio).
+     *
+     * @return array{0:string,1:string} [expedición, vencimiento] en formato Y-m-d
+     */
+    private function resolverFechasCarnet($expedicion, string $inicio, string $fin): array
+    {
+        $texto = trim((string)($expedicion ?? ''));
+        if ($texto === '') $texto = $fin !== '' ? $fin : $inicio;
+        $fecha = \DateTimeImmutable::createFromFormat('!Y-m-d', $texto);
+        if (!$fecha || $fecha->format('Y-m-d') !== $texto) throw new \DomainException('La fecha de expedición del carnet no es válida.');
+        if ($inicio !== '' && $texto < $inicio) throw new \DomainException('La expedición del carnet no puede ser anterior al inicio del curso.');
+        return [$texto, $fecha->modify('+1 year')->format('Y-m-d')];
+    }
+
+    /**
+     * Instructor del curso: una persona del padrón (idInstructor) o, en cursos antiguos, solo un nombre.
+     * Devuelve [nombre, idPersona|null]; el nombre sale siempre del padrón cuando hay persona.
+     *
+     * @return array{0:string,1:?int}
+     */
+    private function resolverInstructor($db, array $input): array
+    {
+        $idPersona = (int)($input['idInstructor'] ?? 0);
+        if ($idPersona > 0) {
+            $persona = $db->table('ciudadanos')->select('nombres, apellido_paterno, apellido_materno')->where('id_persona', $idPersona)->get()->getRowArray();
+            if (!$persona) throw new \DomainException('El instructor elegido no está registrado en Personas.');
+            $nombre = trim(implode(' ', array_filter([$persona['nombres'], $persona['apellido_paterno'], $persona['apellido_materno']])));
+            return [$nombre, $idPersona];
+        }
+        $nombre = mb_strtoupper(trim((string)($input['instructor'] ?? '')), 'UTF-8');
+        if (mb_strlen($nombre) > 150) throw new \DomainException('El nombre del instructor no puede superar los 150 caracteres.');
+        return [$nombre, null];
     }
 
     /**
@@ -685,7 +773,12 @@ class CursosController extends ResourceController
         if (!$registro) return $this->failNotFound('No se encontró la inscripción.');
         $db->transBegin();
         try {
-            $db->query('SELECT id FROM cursos_seguridad_vial WHERE id = ? FOR UPDATE', [$registro['id_curso']]);
+            $curso = $db->query('SELECT id, estado, fecha_fin FROM cursos_seguridad_vial WHERE id = ? FOR UPDATE', [$registro['id_curso']])->getRowArray();
+            if (!$curso) { $db->transRollback(); return $this->failNotFound('No se encontró el curso.'); }
+            if ($curso['estado'] === 'FINALIZADO' || (!empty($curso['fecha_fin']) && substr($curso['fecha_fin'], 0, 10) < \App\Libraries\ReglasCurso::hoy())) {
+                $db->transRollback();
+                return $this->failValidationErrors('No se puede retirar participantes de un curso culminado.');
+            }
             $registro = $db->query('SELECT * FROM inscripciones_curso WHERE id = ? FOR UPDATE', [$id])->getRowArray();
             if (!$registro) { $db->transRollback(); return $this->failNotFound('No se encontró la inscripción.'); }
             if (!in_array($registro['estado'], ['ANULADO', 'CANCELADO'], true)) {
@@ -736,7 +829,7 @@ class CursosController extends ResourceController
             $asistio = $mapa[is_bool($crudo) ? (int) $crudo : $crudo];
         }
 
-        if ($estado !== '' && !in_array($estado, ['INSCRITO', 'CONFIRMADO', 'APROBADO', 'DESAPROBADO', 'CULMINADO'], true)) {
+        if ($estado !== '' && !in_array($estado, ['APROBADO', 'DESAPROBADO'], true)) {
             return $this->failValidationErrors('Estado de participante no válido.');
         }
 
@@ -778,10 +871,16 @@ class CursosController extends ResourceController
                 ->where('id_curso', $idCurso)
                 ->where('id_persona', $idPersona)
                 ->whereNotIn('estado', ['ANULADO', 'CANCELADO'])
-                ->countAllResults();
-            if ($inscrito === 0) {
+                ->get()->getRowArray();
+            if (!$inscrito) {
                 return $this->failNotFound('La persona no está inscrita en este curso.');
             }
+
+            $asistenciaFinal = $asistio ?? (int)($inscrito['asistio'] ?? 0);
+            if ($estado === 'APROBADO' && $asistenciaFinal !== 1) {
+                return $this->failValidationErrors('Debe marcar la asistencia antes de aprobar al participante.');
+            }
+            if ($asistenciaFinal !== 1) $data['estado'] = 'DESAPROBADO';
 
             $db->table('inscripciones_curso')
                 ->where('id_curso', $idCurso)
@@ -872,7 +971,7 @@ class CursosController extends ResourceController
         }
 
         $base = "FROM (
-                SELECT ic.id_persona, MAX(cu.fecha_inicio) AS ultima_fecha
+                SELECT ic.id_persona, MAX(COALESCE(cu.carnet_expedicion, cu.fecha_inicio)) AS ultima_fecha
                 FROM inscripciones_curso ic
                 JOIN cursos_seguridad_vial cu ON cu.id = ic.id_curso
                 WHERE $aprobado
@@ -943,7 +1042,7 @@ class CursosController extends ResourceController
         $db = \Config\Database::connect();
         $this->sincronizarEstadosPorFecha($db);
         $builder = $db->table('inscripciones_curso ic')
-            ->select("ic.id AS idInscripcion, ic.uuid, cu.id AS cursoId, cu.codigo AS cursoCodigo, cu.nombre AS cursoTitulo, cu.fecha_inicio AS cursoFecha, c.nombres, c.apellido_paterno, c.apellido_materno, p.numero AS dni, c.numero_licencia AS licencia, c.foto AS fotoUrl, ic.carnet_entregado AS carnetEntregado, ic.carnet_fecha_entrega AS carnetFechaEntrega", false)
+            ->select("ic.id AS idInscripcion, ic.uuid, cu.id AS cursoId, cu.codigo AS cursoCodigo, cu.nombre AS cursoTitulo, cu.resolucion AS cursoResolucion, cu.carnet_expedicion AS cursoCarnetExpedicion, cu.carnet_vencimiento AS cursoCarnetVencimiento, cu.fecha_inicio AS cursoFecha, c.nombres, c.apellido_paterno, c.apellido_materno, p.numero AS dni, c.numero_licencia AS licencia, c.foto AS fotoUrl, ic.carnet_entregado AS carnetEntregado, ic.carnet_fecha_entrega AS carnetFechaEntrega", false)
             ->join('cursos_seguridad_vial cu', 'cu.id = ic.id_curso')
             ->join('personas p', 'p.id = ic.id_persona', 'left')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')

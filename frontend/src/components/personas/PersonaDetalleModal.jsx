@@ -192,7 +192,7 @@ export function PersonaDetalleModal({ selectedPersona, onClose, onEdit }) {
                   selectedPersona.historialPapeletas.map((pap, i) => (
                     <div key={i} className="bg-white dark:bg-[var(--bg-subtle)] p-2 rounded-xl border border-slate-200 dark:border-[var(--border-strong)] text-xs">
                       <div className="flex justify-between items-center mb-1">
-                        <strong className="text-rose-600 dark:text-rose-400 font-mono">{pap.numero_papeleta}</strong>
+                        <strong className="text-rose-600 dark:text-rose-400 font-mono">N° {formatoNumeroPapeleta(pap.numero_papeleta)}</strong>
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#1C2438] text-slate-600 dark:text-slate-400">{pap.estado}</span>
                       </div>
                       <div className="flex items-center gap-1.5 my-1">
@@ -236,3 +236,4 @@ export function PersonaDetalleModal({ selectedPersona, onClose, onEdit }) {
     </div>
   )
 }
+import { formatoNumeroPapeleta } from '../../utils/numeroPapeleta'

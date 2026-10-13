@@ -32,6 +32,11 @@ export async function fetchTodasLasFilas(endpoint, params = {}, opciones = {}) {
   if (total > maxFilas) throw new Error(`Hay ${total.toLocaleString('es-PE')} registros. Aplique filtros para descargar hasta ${maxFilas.toLocaleString('es-PE')} registros o use Excel.`)
   const tamano = Number(primera.meta?.porPagina ?? primera.limit ?? porPagina) || porPagina
   const paginas = Math.max(1, Math.ceil(total / tamano))
+  const validarPagina = (filas, pagina) => {
+    const esperadas = Math.max(0, Math.min(tamano, total - (pagina - 1) * tamano))
+    if (filas.length !== esperadas) throw new Error('La descarga está incompleta o los datos cambiaron. Vuelva a intentarlo.')
+  }
+  validarPagina(primerasFilas, 1)
   if (procesarPagina) await procesarPagina(primerasFilas, 1, total)
   if (controller.signal.aborted) throw new DOMException('Descarga cancelada', 'AbortError')
   if (paginas <= 1) return procesarPagina ? [] : primerasFilas
@@ -52,6 +57,9 @@ export async function fetchTodasLasFilas(endpoint, params = {}, opciones = {}) {
         siguiente += 1
         const cuerpo = await pedir(pagina)
         const filas = Array.isArray(cuerpo.data) ? cuerpo.data : []
+        const totalPagina = Number(cuerpo.meta?.total ?? cuerpo.total ?? total)
+        if (totalPagina !== total) throw new Error('Los datos cambiaron durante la descarga. Vuelva a intentarlo.')
+        validarPagina(filas, pagina)
         if (procesarPagina) await procesarPagina(filas, pagina, total)
         else porPaginaResultado[pagina] = filas
         hechas += filas.length

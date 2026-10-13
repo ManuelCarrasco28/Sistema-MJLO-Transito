@@ -5,6 +5,18 @@ import { FloatingInput, FloatingSelect } from '../ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
 import { OficinaRegistralSelect } from './OficinaRegistralSelect'
 
+// Posición del desplegable: debajo del campo si cabe; si no, arriba, y siempre con la altura que quede libre
+// (así no se sale de la pantalla cuando el campo está cerca del borde inferior)
+function posicionDesplegable(rect) {
+  const margen = 12
+  const ideal = 208
+  const abajo = window.innerHeight - rect.bottom - margen
+  const arriba = rect.top - margen
+  const base = { left: rect.left, width: rect.width }
+  if (abajo >= ideal || abajo >= arriba) return { ...base, top: rect.bottom + 4, maxHeight: Math.max(96, Math.min(ideal, abajo)) }
+  return { ...base, bottom: window.innerHeight - rect.top + 4, maxHeight: Math.max(96, Math.min(ideal, arriba)) }
+}
+
 export function VehiculoFormModal({
   isEditing,
   formData,
@@ -68,7 +80,7 @@ export function VehiculoFormModal({
   useEffect(() => {
     if (showPropietarioResults && propietarioRef.current) {
       const rect = propietarioRef.current.getBoundingClientRect()
-      setPropietarioDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+      setPropietarioDropdownPos(posicionDesplegable(rect))
     } else {
       setPropietarioDropdownPos(null)
     }
@@ -77,7 +89,7 @@ export function VehiculoFormModal({
   useEffect(() => {
     if (showAsociacionResults && asociacionRef.current) {
       const rect = asociacionRef.current.getBoundingClientRect()
-      setAsociacionDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+      setAsociacionDropdownPos(posicionDesplegable(rect))
     } else {
       setAsociacionDropdownPos(null)
     }
@@ -401,8 +413,8 @@ export function VehiculoFormModal({
                   {showPropietarioResults && propietarioDropdownPos && createPortal(
                     <div
                       data-dropdown="propietario"
-                      style={{ position: 'fixed', top: propietarioDropdownPos.top, left: propietarioDropdownPos.left, width: propietarioDropdownPos.width }}
-                      className="z-[100] max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]"
+                      style={{ position: 'fixed', ...propietarioDropdownPos }}
+                      className="z-[100] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]"
                     >
                       {propietarioResults.length ? (
                         propietarioResults.map((persona) => {
@@ -466,8 +478,8 @@ export function VehiculoFormModal({
                   {showAsociacionResults && asociacionDropdownPos && createPortal(
                     <div
                       data-dropdown="asociacion"
-                      style={{ position: 'fixed', top: asociacionDropdownPos.top, left: asociacionDropdownPos.left, width: asociacionDropdownPos.width }}
-                      className="z-[100] max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]"
+                      style={{ position: 'fixed', ...asociacionDropdownPos }}
+                      className="z-[100] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]"
                     >
                       {asociacionResults.length ? (
                         asociacionResults.map((org) => (

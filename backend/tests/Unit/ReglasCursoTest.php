@@ -15,9 +15,9 @@ final class ReglasCursoTest extends TestCase
 
     public function testCodigoUsaCorrelativoExistenteYAnioActual(): void
     {
-        $this->assertSame('CUR-2026-001', ReglasCurso::siguienteCodigo(0, 2026));
-        $this->assertSame('CUR-2026-053', ReglasCurso::siguienteCodigo(52, 2026));
-        $this->assertSame('CUR-2027-1001', ReglasCurso::siguienteCodigo(1000, 2027));
+        $this->assertSame('CSV-2026-001', ReglasCurso::siguienteCodigo(0, 2026));
+        $this->assertSame('CSV-2026-053', ReglasCurso::siguienteCodigo(52, 2026));
+        $this->assertSame('CSV-2027-1001', ReglasCurso::siguienteCodigo(1000, 2027));
     }
 
     public function testReprobacionExplicitaImpideEmitirCarnetPorAsistencia(): void

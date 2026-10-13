@@ -8,6 +8,31 @@ use DomainException;
 /** Borra solo registros sin dependencias; nunca deja eliminaciones parciales. */
 class EliminacionSegura
 {
+    /** Nombre legible (singular, plural) de las tablas que pueden impedir un borrado. */
+    private const ETIQUETAS = [
+        'permisos_circulacion' => ['permiso de circulación', 'permisos de circulación'],
+        'papeletas' => ['papeleta', 'papeletas'],
+        'reportes_intervencion' => ['reporte de intervención', 'reportes de intervención'],
+        'inspecciones' => ['inspección', 'inspecciones'],
+        'internamientos' => ['internamiento', 'internamientos'],
+        'retenciones' => ['retención', 'retenciones'],
+        'documentos_vehiculo' => ['documento', 'documentos'],
+        'vehiculo_propietarios' => ['propietario registrado', 'propietarios registrados'],
+        'vehiculos' => ['vehículo', 'vehículos'],
+        'inscripciones_curso' => ['inscripción a curso', 'inscripciones a cursos'],
+        'pagos' => ['pago', 'pagos'],
+        'operativos' => ['operativo', 'operativos'],
+        'trabajadores' => ['trabajador', 'trabajadores'],
+        'usuarios' => ['usuario', 'usuarios'],
+        'administrados' => ['administrado', 'administrados'],
+        'certicav' => ['inspección CERTICAV', 'inspecciones CERTICAV'],
+        'ordenes_internamiento' => ['orden de internamiento', 'órdenes de internamiento'],
+        'ordenes_libertad' => ['orden de libertad', 'órdenes de libertad'],
+        'tramites_documentarios' => ['trámite documentario', 'trámites documentarios'],
+        'ciudadanos' => ['ciudadano', 'ciudadanos'],
+        'asociaciones' => ['asociación', 'asociaciones'],
+    ];
+
     public static function eliminar(BaseConnection $db, string $tabla, int $id, array $hijas = []): void
     {
         // Los nombres proceden del código/metadata, nunca de la petición.
@@ -30,9 +55,11 @@ class EliminacionSegura
                 $hija = $relacion['TABLE_NAME'];
                 $columna = $relacion['COLUMN_NAME'];
                 if (($hijas[$hija] ?? null) === $columna) continue;
-                if ($db->query('SELECT 1 FROM ' . $identificador($hija) . ' WHERE ' . $identificador($columna) . ' = ? LIMIT 1', [$id])->getRowArray()) {
-                    $etiqueta = str_replace('_', ' ', $hija);
-                    throw new DomainException("No se puede eliminar: tiene registros vinculados en {$etiqueta}. No se ha borrado ningún dato.");
+                $total = (int) ($db->query('SELECT COUNT(*) AS total FROM ' . $identificador($hija) . ' WHERE ' . $identificador($columna) . ' = ?', [$id])->getRowArray()['total'] ?? 0);
+                if ($total > 0) {
+                    [$singular, $plural] = self::ETIQUETAS[$hija] ?? [str_replace('_', ' ', $hija), str_replace('_', ' ', $hija)];
+                    $detalle = $total === 1 ? "1 {$singular} asociado" : "{$total} {$plural} asociados";
+                    throw new DomainException("No se puede eliminar porque tiene {$detalle}. Elimina o reasigna esos registros primero; no se ha borrado ningún dato.");
                 }
             }
             foreach ($hijas as $hija => $columna) {

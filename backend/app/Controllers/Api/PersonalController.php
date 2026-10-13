@@ -43,7 +43,7 @@ class PersonalController extends ResourceController
                 c.apellido_paterno,
                 c.apellido_materno,
                 CONCAT(c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')) AS apellidos,
-                '' as email,
+                COALESCE(p.email, '') as email,
                 ca.nombre as cargo,
                 dof.id_unidad_organica,
                 uo.nombre as unidad_organica,

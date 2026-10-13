@@ -2,6 +2,13 @@ import { createPortal } from 'react-dom';
 import { fechaInternamiento } from '../../utils/fechaInternamiento';
 import { textoInfraccion } from '../../utils/infraccionInternamiento';
 
+// N° de la boleta: solo la parte numérica, con 6 dígitos (BOL-00051 -> 000051)
+const numeroBoleta6 = (numero) => {
+  const digitos = String(numero || '').replace(/^[A-Za-z]+-/, '')
+  if (!digitos) return '000000'
+  return /^[0-9]+$/.test(digitos) ? digitos.padStart(6, '0') : digitos
+}
+
 export const BoletaInternamientoPrint = ({ item }) => {
   const fecha = fechaInternamiento(item?.fechaIngreso);
   const day = fecha ? String(fecha.getDate()).padStart(2, '0') : '';
@@ -56,7 +63,7 @@ export const BoletaInternamientoPrint = ({ item }) => {
         <img src="/img/logo-mjlo.png" alt="Municipalidad José Leonardo Ortiz" className="h-24 w-64 object-contain" />
         <div className="absolute right-0 top-0 text-red-600 font-bold text-xl tracking-widest font-sans [font-variant-numeric:lining-nums_tabular-nums]">
           <div className="text-[9px] font-bold uppercase tracking-normal text-slate-700">Registro digital</div>
-          Nº {String(item?.numeroBoleta || '000000').replace(/^[A-Za-z]+-/, '')}
+          Nº {numeroBoleta6(item?.numeroBoleta)}
         </div>
       </div>
 
@@ -87,7 +94,7 @@ export const BoletaInternamientoPrint = ({ item }) => {
           </div>
           <div className="flex items-end">
             <span className="text-[12.5px] font-bold uppercase w-24">PAPELETA O N° DE DOC</span>
-            <div className="border-b border-black flex-1 font-bold text-[15px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.numeroPapeleta || item?.documentoReferencia || ''}</div>
+            <div className="border-b border-black flex-1 font-bold text-[15px] text-center uppercase pb-0.5 leading-tight min-h-[23px]">{item?.numeroPapeleta || ''}</div>
           </div>
           <div className="flex items-end">
             <span className="text-[12.5px] font-bold uppercase w-24">GRADO DEL REMISOR</span>

@@ -10,7 +10,6 @@ import { InfraccionDetalleModal } from '../components/papeletas/InfraccionDetall
 import { BoletaInternamientoPrint } from '../components/retenciones/BoletaInternamientoPrint'
 import { OrdenLibertadPrint } from '../components/retenciones/OrdenLibertadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
-import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
@@ -51,14 +50,13 @@ export function Retenciones({ user }) {
   }, [searchTerm])
 
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const location = useLocation()
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const s = params.get('search')
     setSearchTerm(s || '')
-  }, [location.search])
+  }, [location.key, location.search])
 
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [currentPage, setCurrentPage] = useState(1)
@@ -84,8 +82,6 @@ export function Retenciones({ user }) {
   const [pagoItem, setPagoItem] = useState(null)
   // Tarifas del depósito (guardianía por día y remolque): el servidor valida que el cobro las respete
   const [tarifas, setTarifas] = useState({ guardianiaDia: 0, remolque: 0, puedeEditar: false })
-  const [tarifasForm, setTarifasForm] = useState(null)
-  const [guardandoTarifas, setGuardandoTarifas] = useState(false)
   const cargarTarifas = () => {
     apiFetch('/internamientos/tarifas')
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
@@ -93,25 +89,6 @@ export function Retenciones({ user }) {
       .catch(() => {})
   }
   useEffect(() => { cargarTarifas() }, [])
-  const guardarTarifas = async (e) => {
-    e.preventDefault()
-    setGuardandoTarifas(true)
-    try {
-      const res = await apiFetch('/internamientos/tarifas', {
-        method: 'PUT',
-        body: { guardianiaDia: Number(tarifasForm.guardianiaDia || 0), remolque: Number(tarifasForm.remolque || 0) },
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudieron guardar las tarifas.')
-      setTarifas(data.data)
-      setTarifasForm(null)
-      showToast('Tarifas actualizadas')
-    } catch (err) {
-      showError('Error', sanitizarMensaje(err.message, 'No se pudieron guardar las tarifas.'))
-    } finally {
-      setGuardandoTarifas(false)
-    }
-  }
   const [pagoForm, setPagoForm] = useState({})
   const [pagando, setPagando] = useState(false)
   const [criteriosInventario, setCriteriosInventario] = useState([])
@@ -410,7 +387,7 @@ export function Retenciones({ user }) {
       setEditandoItem(null)
       loadInternamientos()
       loadStats()
-      showToast(editandoItem ? 'Internamiento actualizado correctamente' : `Internamiento ${data.data?.numeroOrden || ''} registrado correctamente`.trim())
+      showToast(editandoItem ? 'Internamiento actualizado correctamente' : `Internamiento ${data.data?.numeroBoleta || ''} registrado correctamente`.trim())
     } catch (err) {
       showError('Error', sanitizarMensaje(err.message, 'No se pudo registrar el internamiento.'))
     } finally {
@@ -447,7 +424,7 @@ export function Retenciones({ user }) {
     try {
       const data = await fetchTodoElFiltro()
           await exportToExcel({
-            filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.xls`,
+            filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.xlsx`,
             sheetName: 'Internamientos',
             title: 'REGISTRO DE INTERNAMIENTOS EN DEPÓSITO MUNICIPAL DE VEHÍCULOS',
             subtitle: 'Subgerencia de Tránsito y Transporte - Custodia y Órdenes de Libertad',
@@ -471,7 +448,6 @@ export function Retenciones({ user }) {
               { header: 'MONTO PAPELETA (S/)', render: (_, i) => `S/ ${Number(i.montoPapeleta || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 130 },
               { header: 'MOTIVO INTERNAMIENTO', key: 'motivo', width: 220 },
               { header: 'AUTORIDAD QUE DISPONE', key: 'autoridadQueDispone', width: 180 },
-              { header: 'DOCUMENTO DE REFERENCIA', key: 'documentoReferencia', width: 160 },
               { header: 'REMISOR', key: 'remisorNombre', width: 170 },
               { header: 'GRADO REMISOR', key: 'gradoRemisor', width: 110 },
               { header: 'CARNET REMISOR', key: 'carnetRemisor', isText: true, width: 110, align: 'center' },
@@ -498,36 +474,13 @@ export function Retenciones({ user }) {
             ],
             data
           })
+    } catch (error) {
+      if (error.name !== 'AbortError') showError('Descarga no completada', error.message || 'No se pudo preparar el archivo completo.')
     } finally {
       setIsExportingExcel(false)
     }
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const data = await fetchTodoElFiltro()
-          await exportToPdf({
-            filename: `Internamientos_Deposito_${new Date().toISOString().slice(0, 10)}.pdf`,
-            title: 'REGISTRO DE INTERNAMIENTOS EN DEPÓSITO MUNICIPAL DE VEHÍCULOS',
-            subtitle: 'Subgerencia de Tránsito y Transporte - Custodia y Órdenes de Libertad',
-            metadata: [
-              { label: 'Estado', value: filterEstado === 'TODOS' ? 'Todos' : filterEstado },
-              { label: 'Total Registros', value: String(data.length) }
-            ],
-            columns: [
-              { header: 'N° BOLETA', key: 'numeroBoleta', width: 20, align: 'center' },
-              { header: 'PLACA', key: 'vehiculoPlaca', width: 15, align: 'center' },
-              { header: 'MOTIVO', key: 'motivo', width: 30 },
-              { header: 'INTERESADO', key: 'interesadoNombre', width: 35 },
-              { header: 'ESTADO', key: 'estado', width: 15, align: 'center' }
-            ],
-            data
-          })
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   const handleOpenDetail = (item) => {
     setSelectedItem(item)
@@ -635,33 +588,33 @@ export function Retenciones({ user }) {
 
       <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col print:hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
-          <div className="relative w-full sm:max-w-xs">
-            <Icon
-              name={isLoading ? "refresh" : "search"}
-              className={`absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-rose-500' : 'text-slate-400'}`}
-            />
-            <input
-              type="text"
-              placeholder="Buscar por placa, boleta o conductor"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-rose-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 dark:placeholder-slate-500"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('')
-                  setCurrentPage(1)
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-              >
-                ✕
-              </button>
-            )}
-          </div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+          <div className="relative w-full sm:w-72 sm:shrink-0">
+              <Icon
+                name={isLoading ? "refresh" : "search"}
+                className={`absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-rose-500' : 'text-slate-400'}`}
+              />
+              <input
+                type="text"
+                placeholder="Buscar por placa, boleta o conductor"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-rose-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-rose-500 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 dark:placeholder-slate-500"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('')
+                    setCurrentPage(1)
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
             <RoundedSelect
               value={filterEstado}
               onChange={(val) => {
@@ -685,20 +638,14 @@ export function Retenciones({ user }) {
                 <Icon name="filterX" className="size-4" />
               </button>
             )}
+          </div>
 
-            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-emerald-400 dark:hover:bg-[var(--bg-subtle)] transition-colors" disabled={isExportingExcel}>
+          <div className="flex flex-wrap items-center gap-2">
+
+            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-colors" disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
-            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-rose-400 dark:hover:bg-[var(--bg-subtle)] transition-colors" disabled={isExportingPdf}>
-              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-            </button>
-            {tarifas.puedeEditar && (
-              <button onClick={() => setTarifasForm({ guardianiaDia: String(tarifas.guardianiaDia || ''), remolque: String(tarifas.remolque || '') })} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-300 transition-colors" title="Tarifas de guardianía y remolque">
-                <span>Tarifas</span>
-              </button>
-            )}
             <button onClick={handleOpenNuevo} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
               <span className="text-base leading-none font-black">+</span>
               <span>Nuevo</span>
@@ -722,7 +669,7 @@ export function Retenciones({ user }) {
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3.5 text-center"><SortableHeader column="numeroBoleta" label="Boleta" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="px-4 py-3.5 text-center">Vehículo y placa</th>
+                <th className="px-4 py-3.5 text-center">Placa</th>
                 <th className="px-4 py-3.5 text-center">Infracción</th>
                 <th className="px-4 py-3.5 text-center">Conductor</th>
                 <th className="px-4 py-3.5 text-center"><SortableHeader column="fechaIngreso" label="Ingreso y custodia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
@@ -754,12 +701,9 @@ export function Retenciones({ user }) {
                       </div>
                     </td>
 
-                    <td data-label="Vehículo y placa" className="px-4 py-2.5 text-center print:px-1 print:py-1">
+                    <td data-label="Placa" className="px-4 py-2.5 text-center print:px-1 print:py-1">
                       <div className="flex items-center justify-center gap-2 print:gap-1">
                         <PlacaVehiculo placa={item.vehiculoPlaca} vehiculoId={item.vehiculoId} />
-                      </div>
-                      <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                        {item.vehiculoMarca} {item.vehiculoModelo} ({item.vehiculoColor})
                       </div>
                     </td>
 
@@ -862,15 +806,16 @@ export function Retenciones({ user }) {
                             >
                               <Icon name="pencil" className="size-4" />
                             </button>
+                            {item.estado !== 'LIBERADO' && !item.numeroOrdenLibertad && (
                             <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
                               type="button"
                               onClick={() => handleEliminar(item)}
-                              disabled={item.estado === 'LIBERADO' || Boolean(item.numeroOrdenLibertad)}
                               className="size-8 shrink-0 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                              title={item.estado === 'LIBERADO' || item.numeroOrdenLibertad ? 'Historial protegido: tiene orden de libertad' : 'Eliminar internamiento'}
+                              title="Eliminar internamiento"
                             >
                               <Icon name="trash" className="size-4" />
                             </button>
+                            )}
                           </>
                         )}
                         <button
@@ -907,7 +852,7 @@ export function Retenciones({ user }) {
 
       {isNuevoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsNuevoModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
-          <form onSubmit={handleRegistrarInternamiento} className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+          <form onSubmit={handleRegistrarInternamiento} className="flex max-h-[96dvh] min-h-[min(46rem,96dvh)] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-9 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
@@ -1042,7 +987,6 @@ export function Retenciones({ user }) {
 
               <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Inventario del vehículo</legend>
-                <p className="mb-3 text-[10.5px] text-slate-400">Haz clic en la casilla para marcar (✓) lo que ingresa con el vehículo. Si hay más de uno (p. ej. llantas), sigue haciendo clic: ✓ → 2 → 3 → … → vacío. Se imprime igual en la boleta.</p>
                 {criteriosInventario.length === 0 ? (
                   <p className="text-xs text-slate-400">Cargando ítems del inventario...</p>
                 ) : (
@@ -1099,25 +1043,6 @@ export function Retenciones({ user }) {
               <BotonGuardar disabled={registrando}>
                 {registrando ? 'Guardando...' : (editandoItem ? 'Guardar cambios' : 'Registrar Internamiento')}
               </BotonGuardar>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {tarifasForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget && !guardandoTarifas) setTarifasForm(null) }}>
-          <form onSubmit={guardarTarifas} className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
-            <div className="border-b border-slate-100 px-5 py-3.5 dark:border-[var(--border)]">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Tarifas del depósito</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Con 0 no se valida ese concepto y el cajero escribe el monto.</p>
-            </div>
-            <div className="grid gap-4 p-5">
-              <FloatingInput id="tarifa_guardiania" label="Guardianía por día (S/)" type="number" min="0" step="0.01" value={tarifasForm.guardianiaDia} onChange={(e) => setTarifasForm({ ...tarifasForm, guardianiaDia: e.target.value })} />
-              <FloatingInput id="tarifa_remolque" label="Remolque (S/)" type="number" min="0" step="0.01" value={tarifasForm.remolque} onChange={(e) => setTarifasForm({ ...tarifasForm, remolque: e.target.value })} />
-            </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3 dark:border-[var(--border)]">
-              <BotonCancelar onClick={() => setTarifasForm(null)} />
-              <BotonGuardar disabled={guardandoTarifas}>{guardandoTarifas ? 'Guardando...' : 'Guardar'}</BotonGuardar>
             </div>
           </form>
         </div>

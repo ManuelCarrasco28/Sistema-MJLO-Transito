@@ -7,9 +7,11 @@ import { RoundedSelect } from '../ui/FormInputs'
 import { useDebounce } from '../../hooks/useDebounce'
 import { apiFetch } from '../../config/api'
 import { formatFecha } from '../../utils/formatters'
+import { PersonaEnlace } from '../personas/PersonaEnlace'
 
+// Nombres primero y luego los apellidos, como en el resto del sistema
 function nombreCompleto(p) {
-  return [p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' ') + (p.nombres ? `, ${p.nombres}` : '')
+  return [p.nombres, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' ')
 }
 
 function iniciales(p) {
@@ -105,7 +107,7 @@ export function CarnetCursoTab() {
           </colgroup>
           <thead className="bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:bg-[var(--bg-subtle)]">
             <tr>
-              <th className="px-3 py-3">Persona</th>
+              <th className="px-3 py-3">Nombres y apellidos</th>
               <th className="px-3 py-3">Licencia</th>
               <th className="px-3 py-3">Último curso</th>
               <th className="px-3 py-3 text-center">Realizado</th>
@@ -135,10 +137,10 @@ export function CarnetCursoTab() {
                     ) : (
                       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-purple-100 text-[11px] font-black text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">{iniciales(p)}</span>
                     )}
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-slate-900 dark:text-white" title={nombreCompleto(p)}>{nombreCompleto(p)}</p>
-                      <p className="font-mono text-[11px] text-slate-500 dark:text-slate-400">DNI: {p.dni}</p>
-                    </div>
+                    <PersonaEnlace personaId={p.idPersona}>
+                      <span className="block truncate font-bold text-slate-900 dark:text-white" title={nombreCompleto(p)}>{nombreCompleto(p)}</span>
+                      <span className="block font-mono text-[11px] text-slate-500 dark:text-slate-400">DNI: {p.dni}</span>
+                    </PersonaEnlace>
                   </div>
                 </td>
                 <td className="px-3 py-3 font-mono text-slate-600 dark:text-slate-300">{p.licencia || '—'}</td>

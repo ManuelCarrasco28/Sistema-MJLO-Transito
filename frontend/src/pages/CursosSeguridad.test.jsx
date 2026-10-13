@@ -15,7 +15,7 @@ const { CursosSeguridad } = await import('./CursosSeguridad')
 let root
 let rows
 let rechazar
-const curso = { id: 7, uuid: 'uuid-curso', codigo: 'CUR-TEST', titulo: 'Curso de prueba', fecha: '2040-01-20', fechaFin: '2040-01-21', fechaInscripcionInicio: '2040-01-01', fechaInscripcionFin: '2040-01-19', horaInicio: '09:00', horaFin: '12:00', cuposTotales: 5, cuposInscritos: 0, costo: 0, estado: 'PROGRAMADO', tipo: 'SEGURIDAD_VIAL' }
+const curso = { id: 7, uuid: 'uuid-curso', codigo: 'CUR-TEST', titulo: 'Curso de prueba', instructor: 'JUAN PEREZ', idInstructor: 3, instructorDni: '12345678', resolucion: 'R.A. N° 001-2040-MDJLO', fecha: '2040-01-20', fechaFin: '2040-01-21', fechaInscripcionInicio: '2040-01-01', fechaInscripcionFin: '2040-01-19', horaInicio: '09:00', horaFin: '12:00', cuposTotales: 5, cuposInscritos: 0, costo: 0, estado: 'PROGRAMADO', tipo: 'SEGURIDAD_VIAL' }
 beforeEach(() => {
   rows = [curso]
   rechazar = false
@@ -75,5 +75,22 @@ describe('Cursos: botones y registro de carnet centralizado', () => {
     expect(apiFetch).toHaveBeenCalledWith('/cursos/uuid-curso', { method: 'DELETE' })
     expect(document.querySelector('[title="Editar Curso"]')).toBeNull()
     expect(showToast).toHaveBeenCalledWith('Curso eliminado correctamente')
+  })
+})
+
+describe('Cursos: instructor obligatorio', () => {
+  it('no guarda un curso sin instructor y pide buscarlo por DNI', async () => {
+    const { instructor, idInstructor, instructorDni, ...sinInstructor } = curso
+    void instructor; void idInstructor; void instructorDni
+    const original = { ...curso }
+    Object.keys(curso).forEach((k) => delete curso[k])
+    Object.assign(curso, sinInstructor)
+    try {
+      await editar()
+      expect(apiFetch).not.toHaveBeenCalledWith('/cursos/uuid-curso', expect.objectContaining({ method: 'PUT' }))
+      expect(showError).toHaveBeenCalledWith('Falta el instructor', expect.any(String))
+    } finally {
+      Object.assign(curso, original)
+    }
   })
 })

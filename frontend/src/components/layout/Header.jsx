@@ -4,6 +4,7 @@ import { Icon } from '../ui/Icon'
 import { apiFetch } from '../../config/api'
 import { errorPasswordUsuario } from '../../utils/passwordPolicy'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
+import { CalendarioEventosModal } from '../dashboard/CalendarioEventos'
 
 export function Header({
   onOpenMobile,
@@ -32,6 +33,7 @@ export function Header({
   const currentDate = rawDate.charAt(0).toUpperCase() + rawDate.slice(1)
   
   const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [calendarioAbierto, setCalendarioAbierto] = useState(false)
   const [profileForm, setProfileForm] = useState({
     password_actual: '',
     password_nuevo: '',
@@ -163,15 +165,21 @@ export function Header({
       <div className="ml-auto flex items-center gap-2 bg-white dark:bg-[#1C2438] px-2.5 py-1.5 rounded-2xl shadow-xs border border-slate-200/80 dark:border-white/10 shrink-0">
 
         {/* Date and Time Pill */}
-        <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-xl border border-slate-200/60 dark:border-white/10 bg-slate-50/70 dark:bg-white/5">
-          <Icon name="calendar" className="size-3.5 text-slate-400 dark:text-white/60" />
-          <span className="text-[11.5px] font-semibold text-slate-600 dark:text-white/70">{currentDate}</span>
-          <div className="w-[1px] h-3 bg-slate-200 dark:bg-white/10 mx-0.5"></div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#01B574]"></span>
-            <div className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-[#5B6EE1]/20">
-              <span className="text-[10px] font-bold text-[#5B6EE1] dark:text-blue-300 tracking-wide tabular-nums">{currentTime}</span>
-            </div>
+        <div className="hidden xl:flex items-center gap-2.5 h-8 pl-3 pr-1 rounded-xl border border-slate-200/60 dark:border-white/10 bg-slate-50/70 dark:bg-white/5">
+          <button
+            type="button"
+            onClick={() => setCalendarioAbierto(true)}
+            title="Ver calendario"
+            aria-label="Ver calendario"
+            className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-slate-400 transition hover:bg-slate-200/70 hover:text-slate-700 dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
+          >
+            <Icon name="calendar" className="size-3.5" />
+          </button>
+          {calendarioAbierto && <CalendarioEventosModal onClose={() => setCalendarioAbierto(false)} />}
+          <span className="text-[11.5px] font-semibold leading-none text-slate-600 dark:text-white/70 whitespace-nowrap">{currentDate}</span>
+          <div className="inline-flex h-6 min-w-[7.75rem] items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-2 dark:bg-[#5B6EE1]/20">
+            <span className="size-1.5 shrink-0 rounded-full bg-[#01B574]"></span>
+            <span className="text-[11.5px] font-bold leading-none tracking-wide tabular-nums text-[#5B6EE1] dark:text-blue-300 whitespace-nowrap">{currentTime}</span>
           </div>
         </div>
 
@@ -199,15 +207,19 @@ export function Header({
           </button>
           
           {notifOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2.5 w-[28rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl animate-enter dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
-              <div className="flex items-center justify-between px-4 pb-2 pt-3.5">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-extrabold text-slate-800 dark:text-white">Notificaciones</h4>
-                  {unreadCount > 0 && (
-                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-                      {unreadCount} nuevas
-                    </span>
-                  )}
+            <div className="absolute right-0 top-full z-50 mt-2.5 w-[29rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-enter dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
+              {/* Cabecera */}
+              <div className="flex items-center justify-between gap-3 px-4 pb-3 pt-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-500 dark:bg-amber-500/15 dark:text-amber-400">
+                    <Icon name="bell" className="size-[18px]" />
+                  </span>
+                  <div className="leading-tight">
+                    <h4 className="text-sm font-black text-slate-800 dark:text-white">Notificaciones</h4>
+                    <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                      {unreadCount > 0 ? `${unreadCount} sin leer` : 'Todo al día'}
+                    </p>
+                  </div>
                 </div>
                 {unreadCount > 0 && (
                   <button
@@ -216,32 +228,41 @@ export function Header({
                       recordarLeidas(notifications.map((n) => n.id))
                       setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
                     }}
-                    className="cursor-pointer text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 transition hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25"
                   >
+                    <Icon name="check" className="size-3" />
                     Marcar leídas
                   </button>
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar border-b border-slate-100 px-3 pb-2.5 pt-0.5 dark:border-[var(--border)]">
-                {CATEGORIAS_NOTIF.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setNotifFiltro(c.id)}
-                    className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition whitespace-nowrap ${notifFiltro === c.id
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
-                      : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10'}`}
-                  >
-                    <span>{c.label}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${notifFiltro === c.id ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900' : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400'}`}>
-                      {contarNotif(c.id)}
-                    </span>
-                  </button>
-                ))}
+              {/* Categorías: todas caben sin desplazarse */}
+              <div className="px-3 pb-3">
+                <div className="grid gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/5" style={{ gridTemplateColumns: `repeat(${CATEGORIAS_NOTIF.length}, minmax(0, 1fr))` }}>
+                  {CATEGORIAS_NOTIF.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setNotifFiltro(c.id)}
+                      className={`flex cursor-pointer items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] font-bold transition ${notifFiltro === c.id
+                        ? 'bg-white text-slate-900 shadow-sm dark:bg-[#2A3550] dark:text-white'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}
+                    >
+                      <span className="whitespace-nowrap">{c.label}</span>
+                      {contarNotif(c.id) > 0 && (
+                        <span className={`rounded-full px-1.5 text-[10px] font-black leading-4 ${contarNotif(c.id) > 0
+                          ? (notifFiltro === c.id ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300')
+                          : 'bg-transparent text-slate-300 dark:text-slate-600'}`}>
+                          {contarNotif(c.id)}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="custom-scrollbar max-h-[22rem] overflow-y-auto">
+              {/* Lista */}
+              <div className="custom-scrollbar max-h-[22rem] space-y-1 overflow-y-auto border-t border-slate-100 px-2 py-2 dark:border-[var(--border)]">
                 {notifVisibles.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
                     <div className="mb-3 flex size-11 items-center justify-center rounded-full bg-slate-50 dark:bg-white/5">
@@ -258,29 +279,49 @@ export function Header({
                       amber: 'bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300',
                       blue: 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300',
                     }
+                    // Aviso general (sin búsqueda): se destaca como resumen, no como un registro más
+                    const esResumen = n.link === '/papeletas?vista=reportes'
+                    const abrir = () => {
+                      recordarLeidas([n.id])
+                      setNotifications((prev) => prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item)))
+                      setNotifOpen(false)
+                      if (n.link) navigate(n.link)
+                    }
+                    if (esResumen) {
+                      return (
+                        <button
+                          key={n.id}
+                          type="button"
+                          onClick={abrir}
+                          className="mb-1 flex w-full cursor-pointer items-center gap-3 rounded-xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2.5 text-left transition hover:shadow-sm dark:border-amber-500/25 dark:from-amber-500/15 dark:to-orange-500/10"
+                        >
+                          <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${tones.amber}`}>
+                            <Icon name={n.icon} className="size-[18px]" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-xs font-black text-slate-800 dark:text-white">{n.title}</span>
+                            <span className="block text-[11px] font-semibold text-amber-700 dark:text-amber-300">{n.description}</span>
+                          </span>
+                          <Icon name="chevronRight" className="size-4 shrink-0 text-amber-500" />
+                        </button>
+                      )
+                    }
                     return (
                       <button
                         key={n.id}
                         type="button"
-                        onClick={() => {
-                          recordarLeidas([n.id])
-                          setNotifications((prev) => prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item)))
-                          setNotifOpen(false)
-                          if (n.link) navigate(n.link)
-                        }}
-                        className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                        onClick={abrir}
+                        className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5 ${n.unread ? 'bg-blue-50/50 dark:bg-blue-500/10' : ''}`}
                       >
-                        <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${tones[n.tone] || tones.blue}`}>
+                        {n.unread && <span className="absolute left-0.5 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-blue-600" />}
+                        <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${tones[n.tone] || tones.blue}`}>
                           <Icon name={n.icon} className="size-4" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className={`block text-xs leading-snug text-slate-800 dark:text-white ${n.unread ? 'font-extrabold' : 'font-semibold'}`}>{n.title}</span>
-                          <span className="block text-[11px] leading-snug text-slate-500 dark:text-slate-400">{n.description}</span>
+                          <span className={`block break-words text-xs leading-snug text-slate-800 dark:text-white ${n.categoria === 'reportes' ? 'font-mono tracking-wide' : ''} ${n.unread ? 'font-extrabold' : 'font-bold'}`}>{n.title}</span>
+                          <span className="block break-words text-[11px] leading-snug text-slate-500 dark:text-slate-400">{n.description}</span>
                         </span>
-                        <span className="flex shrink-0 flex-col items-end gap-1">
-                          <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">{n.time}</span>
-                          {n.unread && <span className="size-1.5 rounded-full bg-blue-600" />}
-                        </span>
+                        <span className="shrink-0 whitespace-nowrap rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">{n.time}</span>
                       </button>
                     )
                   })

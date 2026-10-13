@@ -831,7 +831,6 @@ class PoblarDatosMasivosSeeder extends Seeder
             $filas[] = [
                 'id_papeleta' => $idPapeleta,
                 'id_vehiculo' => $idVehiculo,
-                'numero_orden' => 'INT-' . str_pad((string) ($maxAntes + $i + 1), 6, '0', STR_PAD_LEFT),
                 'id_remisor' => $this->inspectorPersonaIds[array_rand($this->inspectorPersonaIds)],
                 'id_interesado' => $personaIds[array_rand($personaIds)],
                 'fecha_ingreso' => $ingreso . ' ' . sprintf('%02d:00:00', random_int(7, 20)),
@@ -846,10 +845,7 @@ class PoblarDatosMasivosSeeder extends Seeder
                 'grado_remisor' => 'Inspector Municipal',
                 'carnet_remisor' => 'C-' . random_int(1000, 9999),
                 'autoridad_que_dispone' => 'Subgerencia de Tránsito y Transporte',
-                'documento_referencia' => $idPapeleta ? ('PAP-REF-' . $idPapeleta) : null,
                 'estado_carroceria' => 'Buen estado general, sin daños visibles.',
-                'firma_remisor_img' => null,
-                'firma_interesado_img' => null,
             ];
         }
 
@@ -932,7 +928,6 @@ class PoblarDatosMasivosSeeder extends Seeder
                     'id_persona' => $filas[$idx]['id_persona'],
                     'id_asociacion' => $filas[$idx]['id_asociacion'],
                     'id_vehiculo' => $filas[$idx]['id_vehiculo'],
-                    'representante_legal' => null,
                     'horario_inicio' => '06:00:00',
                     'horario_fin' => '22:00:00',
                     'fecha_emision' => $emision,
@@ -947,7 +942,6 @@ class PoblarDatosMasivosSeeder extends Seeder
                     'zona_circulacion' => 'Anillo Vial y Cuadrantes Autorizados - Distrito de José Leonardo Ortiz',
                     'ubicacion' => 'José Leonardo Ortiz',
                     'recorrido_ingreso' => null,
-                    'recorrido_salida' => null,
                     'flota_placas' => null,
                     'tonelaje' => null,
                     'numero_seguridad' => null,

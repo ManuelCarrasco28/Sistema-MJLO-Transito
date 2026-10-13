@@ -32,8 +32,9 @@ export function TramiteFormularioModal({
     asunto: 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
     zonaCirculacion: '',
     ubicacion: '',
-    horarioInicio: '',
-    horarioFin: '',
+    // Carga y descarga (tipo inicial) es nocturno; al cambiar de tipo se ajusta
+    horarioInicio: '16:00',
+    horarioFin: '05:00',
     fechaEmision: fechaLocalActual(),
     fechaInicioVigencia: fechaLocalActual(),
     fechaFinVigencia: fechaLocalMasDias(365),
@@ -43,7 +44,6 @@ export function TramiteFormularioModal({
     tonelaje: '',
     numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000)),
     recorridoIngreso: '',
-    recorridoSalida: '',
     flotaPlacas: '',
     observaciones: '',
     contenido: '',
@@ -88,7 +88,6 @@ export function TramiteFormularioModal({
         tonelaje: initialData.tonelaje || '',
         numeroSeguridad: initialData.numeroSeguridad || String(Math.floor(10000 + Math.random() * 90000)),
         recorridoIngreso: initialData.recorridoIngreso || '',
-        recorridoSalida: initialData.recorridoSalida || '',
         flotaPlacas: initialData.flotaPlacas || '',
         observaciones: initialData.observaciones || '',
         contenido: initialData.contenido || generarPlantillaCuerpo(initialData),
@@ -134,6 +133,10 @@ export function TramiteFormularioModal({
     }
   }, [isOpen, onSave, onClose, initialData])
 
+  // Con un trámite o administrado vinculado, estos datos salen de sus documentos y no se digitan
+  const vinculado = Boolean(formData.tramiteId)
+  const claseDeterminado = 'read-only:bg-slate-100 read-only:text-slate-500 read-only:cursor-default dark:read-only:bg-slate-800/60 dark:read-only:text-slate-400'
+
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
@@ -158,8 +161,13 @@ export function TramiteFormularioModal({
       monto = '450'
     }
 
+    // El horario lo determina el tipo: carga y descarga es nocturno; los demás rigen todo el día
+    const horario = newTipo === 'CARGA_DESCARGA'
+      ? { horarioInicio: '16:00', horarioFin: '05:00' }
+      : { horarioInicio: '00:00', horarioFin: '23:59' }
     const updated = {
       ...formData,
+      ...(formData.id ? {} : horario),
       tipoPermiso: newTipo,
       asunto,
       reciboIngresoMonto: formData.reciboIngresoMonto || monto
@@ -446,6 +454,12 @@ export function TramiteFormularioModal({
               <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
               Datos del Solicitante, Vehículo y Expediente
             </legend>
+            {vinculado && (
+              <p className="flex items-center justify-between gap-2 rounded-xl bg-indigo-50 px-3 py-1.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                <span>Solicitante, expediente y recibo salen del documento vinculado y no se editan.</span>
+                <button type="button" onClick={() => setFormData({ ...formData, tramiteId: undefined })} className="shrink-0 cursor-pointer font-bold underline">Quitar vínculo</button>
+              </p>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {/* Administrado / Razón Social */}
@@ -456,7 +470,8 @@ export function TramiteFormularioModal({
                   required
                   value={formData.solicitanteNombre}
                   onChange={(e) => setFormData({ ...formData, solicitanteNombre: e.target.value })}
-                  inputClassName="font-bold"
+                  readOnly={vinculado}
+                  inputClassName={`font-bold ${claseDeterminado}`}
                 />
               </div>
 
@@ -469,7 +484,8 @@ export function TramiteFormularioModal({
                   maxLength={15}
                   value={formData.solicitanteDocumento}
                   onChange={(e) => setFormData({ ...formData, solicitanteDocumento: e.target.value })}
-                  inputClassName="font-mono font-bold"
+                  readOnly={vinculado}
+                  inputClassName={`font-mono font-bold ${claseDeterminado}`}
                 />
               </div>
 
@@ -479,7 +495,9 @@ export function TramiteFormularioModal({
                   id="perm_representante_legal"
                   label="Representante Legal"
                   value={formData.representanteLegal}
-                  onChange={(e) => setFormData({ ...formData, representanteLegal: e.target.value })}
+                  readOnly
+                  inputClassName={claseDeterminado}
+                  onChange={() => {}}
                 />
               </div>
 
@@ -501,7 +519,8 @@ export function TramiteFormularioModal({
                   label="Expediente UTD / SISGEDO"
                   value={formData.expediente}
                   onChange={(e) => setFormData({ ...formData, expediente: e.target.value })}
-                  inputClassName="font-mono"
+                  readOnly={vinculado}
+                  inputClassName={`font-mono ${claseDeterminado}`}
                 />
               </div>
 
@@ -532,16 +551,16 @@ export function TramiteFormularioModal({
                 <FloatingInput
                   id="perm_horario_inicio"
                   label="Horario Inicio"
+                  type="time"
                   value={formData.horarioInicio}
                   onChange={(e) => setFormData({ ...formData, horarioInicio: e.target.value })}
-                  inputClassName="font-mono text-center"
                 />
                 <FloatingInput
                   id="perm_horario_fin"
                   label="Horario Fin"
+                  type="time"
                   value={formData.horarioFin}
                   onChange={(e) => setFormData({ ...formData, horarioFin: e.target.value })}
-                  inputClassName="font-mono text-center"
                 />
               </div>
 
@@ -552,7 +571,8 @@ export function TramiteFormularioModal({
                   label="N° Recibo de Pago"
                   value={formData.reciboIngresoNumero}
                   onChange={(e) => setFormData({ ...formData, reciboIngresoNumero: e.target.value })}
-                  inputClassName="font-mono font-bold"
+                  readOnly={vinculado && Boolean(formData.reciboIngresoNumero)}
+                  inputClassName={`font-mono font-bold ${claseDeterminado}`}
                 />
               </div>
 
@@ -565,7 +585,8 @@ export function TramiteFormularioModal({
                   step="0.01"
                   value={formData.reciboIngresoMonto}
                   onChange={(e) => setFormData({ ...formData, reciboIngresoMonto: e.target.value })}
-                  inputClassName="font-mono font-bold"
+                  readOnly={vinculado && Boolean(formData.reciboIngresoMonto)}
+                  inputClassName={`font-mono font-bold ${claseDeterminado}`}
                 />
               </div>
 
@@ -596,10 +617,13 @@ export function TramiteFormularioModal({
                 <span>Guardar directamente</span>
               </BotonGuardar>
 
-              <BotonGuardar className="inline-flex items-center justify-center gap-2">
-                <span>Continuar a Redacción de Resolución (Cuerpo Oficial)</span>
-                <span className="text-sm font-bold">↗</span>
-              </BotonGuardar>
+              <button
+                type="submit"
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-1.5 text-xs font-bold text-white transition hover:bg-indigo-700 active:scale-95 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              >
+                <span>Continuar a redacción</span>
+                <span className="text-sm font-bold">→</span>
+              </button>
             </div>
           </div>
         </form>

@@ -187,6 +187,71 @@ function parsearEntradaHora(crudo) {
   return null
 }
 
+// Columna desplazable tipo "rueda" (como el selector de hora de iOS): el elemento que queda en el centro es el elegido.
+const ALTO_ITEM_RUEDA = 36
+const ITEMS_VISIBLES_RUEDA = 5
+function RuedaHora({ items, indice, onElegir, etiqueta }) {
+  const columna = useRef(null)
+  const temporizador = useRef(null)
+
+  // Mantiene la rueda alineada con el valor elegido (también cuando cambia desde fuera: escribir, "Restablecer"…)
+  useEffect(() => {
+    const el = columna.current
+    if (!el) return
+    const destino = indice * ALTO_ITEM_RUEDA
+    if (Math.abs(el.scrollTop - destino) > 1) el.scrollTo({ top: destino })
+  }, [indice])
+
+  useEffect(() => () => window.clearTimeout(temporizador.current), [])
+
+  const alDesplazar = () => {
+    window.clearTimeout(temporizador.current)
+    temporizador.current = window.setTimeout(() => {
+      const el = columna.current
+      if (!el) return
+      const nuevo = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / ALTO_ITEM_RUEDA)))
+      if (nuevo !== indice) onElegir(nuevo)
+    }, 90)
+  }
+
+  const relleno = ALTO_ITEM_RUEDA * Math.floor(ITEMS_VISIBLES_RUEDA / 2)
+  return (
+    <div className="min-w-0 flex-1">
+      <span className="mb-1 block min-h-[15px] text-center text-[10px] font-bold uppercase leading-[15px] tracking-wider text-slate-500 dark:text-slate-400">{etiqueta || ' '}</span>
+      <div
+        ref={columna}
+        onScroll={alDesplazar}
+        role="listbox"
+        aria-label={etiqueta}
+        className="no-scrollbar overflow-y-auto"
+        style={{ height: ALTO_ITEM_RUEDA * ITEMS_VISIBLES_RUEDA, scrollSnapType: 'y mandatory', paddingTop: relleno, paddingBottom: relleno }}
+      >
+        {items.map((texto, i) => {
+          const activo = i === indice
+          const distancia = Math.abs(i - indice)
+          return (
+            <button
+              key={texto}
+              type="button"
+              role="option"
+              aria-selected={activo}
+              onClick={() => { onElegir(i); columna.current?.scrollTo({ top: i * ALTO_ITEM_RUEDA, behavior: 'smooth' }) }}
+              style={{ height: ALTO_ITEM_RUEDA, scrollSnapAlign: 'center', opacity: activo ? 1 : distancia === 1 ? 0.6 : 0.3 }}
+              className={`flex w-full cursor-pointer items-center justify-center text-base tabular-nums transition-all ${activo ? 'font-black text-blue-600 dark:text-blue-300' : 'font-semibold text-slate-600 dark:text-slate-300'}`}
+            >
+              {texto}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+const HORAS_RUEDA = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
+const MINUTOS_RUEDA = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+const PERIODOS_RUEDA = ['AM', 'PM']
+
 function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocus, onBlur, inputClassName, name }) {
   const inicial = desglosarHora24(value)
   const [texto, setTexto] = useState(() => inicial?.texto12 || '')
@@ -222,11 +287,19 @@ function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocu
     })
   }
 
+  const valorAlAbrir = useRef('')
+  const restablecer = () => {
+    const d = desglosarHora24(valorAlAbrir.current)
+    if (d) aplicarCambio(d.h12, d.min, d.periodo)
+    else { setTexto(''); emitir('') }
+  }
+
   const alternarPicker = () => {
     if (disabled || readOnly) return
+    if (!abierto) valorAlAbrir.current = value || ''
     if (!abierto && inputRef.current) {
       const rect = inputRef.current.getBoundingClientRect()
-      const pickerHeight = 310
+      const pickerHeight = 270
       const spaceBelow = window.innerHeight - rect.bottom
       const openUpwards = spaceBelow < pickerHeight + 8 && rect.top > spaceBelow
       setPosicion({
@@ -281,12 +354,6 @@ function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocu
     aplicarCambio(h12, min, p)
   }
 
-  const limpiar = () => {
-    setTexto('')
-    emitir('')
-    setAbierto(false)
-  }
-
   const alEscribir = (e) => {
     const nuevo = e.target.value
     setTexto(nuevo)
@@ -338,23 +405,8 @@ function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocu
         onBlur={alPerderFoco}
         autoComplete="off"
         placeholder="hh:mm am/pm"
-        className={`${inputClassName} ${value ? 'pr-17' : 'pr-11'}`}
+        className={`${inputClassName} pr-11`}
       />
-      {value && !disabled && !readOnly && (
-        <button
-          type="button"
-          tabIndex={-1}
-          onClick={(e) => {
-            e.stopPropagation()
-            limpiar()
-          }}
-          aria-label="Limpiar hora"
-          title="Borrar hora"
-          className="absolute right-9 top-1/2 grid size-6 -translate-y-1/2 cursor-pointer place-items-center rounded-md border border-slate-200/80 bg-slate-100 text-slate-500 text-xs font-bold shadow-2xs transition-all hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 active:scale-95 dark:border-slate-700/70 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-rose-950/50 dark:hover:border-rose-800 dark:hover:text-rose-400"
-        >
-          ✕
-        </button>
-      )}
       <button
         type="button"
         tabIndex={-1}
@@ -383,137 +435,37 @@ function CampoHora12({ id, value, onChange, required, disabled, readOnly, onFocu
             left: posicion.left,
             top: posicion.top,
             bottom: posicion.bottom,
-            width: '286px',
+            width: '250px',
           }}
           className="z-[110] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-[var(--border-strong)] dark:bg-[#1C2438] animate-in fade-in zoom-in-95 duration-150 select-none text-slate-800 dark:text-slate-100"
         >
-          <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100 dark:border-[var(--border-strong)]">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-black tracking-tight text-blue-600 dark:text-blue-400">
-                {String(selHora || 12).padStart(2, '0')}:{String(selMin ?? 0).padStart(2, '0')}
-              </span>
-              <span className="text-xs font-black text-slate-600 dark:text-slate-300 uppercase">
-                {selPeriodo}
-              </span>
-            </div>
-
-            <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-100 dark:border-[var(--border-strong)] dark:bg-slate-900">
-              <button
-                type="button"
-                onClick={() => aplicarCambio(selHora || 12, selMin ?? 0, 'AM')}
-                className={`px-2.5 py-0.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
-                  selPeriodo === 'AM'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                }`}
-              >
-                AM
-              </button>
-              <button
-                type="button"
-                onClick={() => aplicarCambio(selHora || 12, selMin ?? 0, 'PM')}
-                className={`px-2.5 py-0.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
-                  selPeriodo === 'PM'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                }`}
-              >
-                PM
-              </button>
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 rounded-lg border border-blue-500/30 bg-blue-500/10"
+              style={{ top: 18 + ALTO_ITEM_RUEDA * Math.floor(ITEMS_VISIBLES_RUEDA / 2), height: ALTO_ITEM_RUEDA }}
+            />
+            <div className="flex gap-1">
+              <RuedaHora etiqueta="Hora" items={HORAS_RUEDA} indice={Math.max(0, (selHora || 12) - 1)} onElegir={(i) => aplicarCambio(i + 1, selMin ?? 0, selPeriodo)} />
+              <RuedaHora etiqueta="Min" items={MINUTOS_RUEDA} indice={selMin ?? 0} onElegir={(i) => aplicarCambio(selHora || 12, i, selPeriodo)} />
+              <RuedaHora etiqueta="" items={PERIODOS_RUEDA} indice={selPeriodo === 'PM' ? 1 : 0} onElegir={(i) => aplicarCambio(selHora || 12, selMin ?? 0, PERIODOS_RUEDA[i])} />
             </div>
           </div>
 
-          <div className="mb-2.5">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-              Hora
-            </span>
-            <div className="grid grid-cols-6 gap-1">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => {
-                const activo = (selHora || 12) === h
-                return (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() => aplicarCambio(h, selMin ?? 0, selPeriodo)}
-                    className={`h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      activo
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-800 dark:text-slate-300'
-                    }`}
-                  >
-                    {h}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="mb-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Minuto
-              </span>
-              <div className="flex items-center gap-1 text-[11px]">
-                <span className="text-slate-400 text-[10px]">Exacto:</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={59}
-                  value={selMin}
-                  onChange={(e) => {
-                    const v = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
-                    aplicarCambio(selHora || 12, v, selPeriodo)
-                  }}
-                  className="w-10 rounded border border-slate-200 bg-white px-1 py-0.5 text-center text-[11px] font-bold text-slate-800 dark:border-[var(--border-strong)] dark:bg-slate-900 dark:text-white outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-6 gap-1">
-              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => {
-                const activo = selMin === m
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => aplicarCambio(selHora || 12, m, selPeriodo)}
-                    className={`h-7 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                      activo
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-800 dark:text-slate-300'
-                    }`}
-                  >
-                    {String(m).padStart(2, '0')}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-[var(--border-strong)] text-[11px]">
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={ponerAhora}
-                className="rounded-md px-2 py-1 font-bold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50 cursor-pointer transition-colors"
-              >
-                Ahora
-              </button>
-              {value && (
-                <button
-                  type="button"
-                  onClick={limpiar}
-                  className="rounded-md px-2 py-1 font-bold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50 cursor-pointer transition-colors"
-                >
-                  Limpiar
-                </button>
-              )}
-            </div>
+          <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-[12px] dark:border-[var(--border-strong)]">
+            <button
+              type="button"
+              onClick={restablecer}
+              className="cursor-pointer rounded-md px-2 py-1 font-bold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50"
+            >
+              Restablecer
+            </button>
             <button
               type="button"
               onClick={() => setAbierto(false)}
-              className="rounded-lg bg-slate-900 px-3 py-1 font-bold text-white hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500 cursor-pointer transition-colors"
+              className="cursor-pointer rounded-lg bg-blue-600 px-4 py-1 font-bold text-white transition-colors hover:bg-blue-700 dark:hover:bg-blue-500"
             >
-              Listo
+              OK
             </button>
           </div>
         </div>,
@@ -989,7 +941,7 @@ export function RoundedSelect({
   }
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative min-w-0 ${className}`}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -999,7 +951,7 @@ export function RoundedSelect({
             : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
         } ${buttonClassName}`}
       >
-        <span className="whitespace-nowrap">{selectedOption?.label || placeholder}</span>
+        <span className="min-w-0 flex-1 truncate text-left" title={selectedOption?.label || placeholder}>{selectedOption?.label || placeholder}</span>
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"

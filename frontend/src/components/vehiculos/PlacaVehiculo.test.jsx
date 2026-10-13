@@ -5,6 +5,7 @@ import { PlacaVehiculo } from './PlacaVehiculo'
 import { apiFetch } from '../../config/api'
 
 vi.mock('../../config/api', () => ({ apiFetch: vi.fn(), leerMensajeError: vi.fn() }))
+vi.mock('../ui/Icon', () => ({ Icon: () => null }))
 vi.mock('./VehiculoDetalleModal', () => ({ VehiculoDetalleModal: ({ selectedVehiculo }) => <div role="dialog">{selectedVehiculo.placa}</div> }))
 globalThis.React = React
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -21,5 +22,19 @@ it('abre la ficha por ID sin activar la selección de la fila', async () => {
   await act(async () => document.querySelector('button').click())
   expect(apiFetch).toHaveBeenCalledWith('/vehiculos/7', expect.objectContaining({ signal: expect.any(AbortSignal) }))
   expect(document.querySelector('[role="dialog"]').textContent).toBe('ABC123')
+  expect(seleccionarFila).not.toHaveBeenCalled()
+})
+
+it('ofrece copiar la placa sin abrir la ficha ni activar la fila', async () => {
+  const escribir = vi.fn().mockResolvedValue()
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: escribir }, configurable: true })
+  const host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+  const seleccionarFila = vi.fn()
+  act(() => root.render(<div onClick={seleccionarFila}><PlacaVehiculo placa="abc123" vehiculoId={7} /></div>))
+  await act(async () => document.querySelector('button[title="Copiar placa"]').click())
+  expect(escribir).toHaveBeenCalledWith('ABC123')
+  expect(apiFetch).not.toHaveBeenCalled()
   expect(seleccionarFila).not.toHaveBeenCalled()
 })

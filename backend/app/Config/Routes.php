@@ -62,6 +62,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('documentos/vehiculo/(:segment)', 'DocumentosController::resumenVehiculo/$1');
         $routes->resource('documentos', ['controller' => 'DocumentosController']);
 
+        $routes->get('pagos/origen', 'PagosController::origen');
         $routes->get('permisos/tramites-disponibles', 'PermisosController::tramitesDisponibles');
         $routes->get('permisos/buscar-administrados', 'PermisosController::buscarAdministrados');
         $routes->get('permisos/estadisticas', 'PermisosController::estadisticas');

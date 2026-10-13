@@ -7,13 +7,13 @@ import { sanitizarMensaje, apiFetch, getCachedData, setCachedData, invalidateCac
 import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { ResolucionPermisoPrint } from '../components/documentos/TarjetaOperatividadPrint'
 import { exportToExcel } from '../utils/exportToExcel'
+import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { TramiteFormularioModal } from '../components/permisos/TramiteFormularioModal'
-import { exportToPdf } from '../utils/exportToPdf'
 import { leerBorradorPermiso, limpiarBorradorPermiso } from '../utils/borradorPermiso'
 import { useListaServidor } from '../hooks/useListaServidor'
-import { formatNumeroTarjeta } from '../utils/formatters'
+import { formatNumeroTarjeta, formatRangoHoras12, formatTextoHorario12 } from '../utils/formatters'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { PlacaBadge } from '../components/ui/PlacaBadge'
+import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal } from '../components/ui/ModalControls'
 import { puedeEliminarRegistros } from '../config/roles'
@@ -45,7 +45,7 @@ export function Permisos() {
     const params = new URLSearchParams(location.search)
     const s = params.get('search')
     setSearchTerm(s || '')
-  }, [location.search])
+  }, [location.key, location.search])
 
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [filterTipo, setFilterTipo] = useState('TODOS')
@@ -56,7 +56,6 @@ export function Permisos() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
   const previewScrollRef = useRef(null)
 
   useEffect(() => {
@@ -227,10 +226,7 @@ export function Permisos() {
       params.set('sortBy', sortBy)
       params.set('sortDir', sortDir)
     }
-    const res = await apiFetch(`/permisos?${params.toString()}`)
-    if (!res.ok) return permisos
-    const payload = await res.json()
-    return Array.isArray(payload?.data) ? payload.data : []
+    return fetchTodasLasFilas('/permisos', Object.fromEntries(params), { mensaje: 'Preparando la descarga de permisos...' })
   }
 
   const handleExportExcel = async () => {
@@ -239,7 +235,7 @@ export function Permisos() {
     try {
       const data = await fetchTodoElFiltro()
       await exportToExcel({
-        filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.xls`,
+        filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}.xlsx`,
         sheetName: 'Autorizaciones',
         title: 'PADRÓN OFICIAL DE AUTORIZACIONES DE CARGA, DESCARGA Y USO DE VÍAS',
         subtitle: 'Subgerencia de Tránsito y Transporte - Resoluciones y Permisos Especiales',
@@ -263,7 +259,6 @@ export function Permisos() {
           { header: 'ZONA', key: 'zonaCirculacion', width: 180 },
           { header: 'UBICACIÓN', key: 'ubicacion', width: 200 },
           { header: 'RECORRIDO DE INGRESO', key: 'recorridoIngreso', width: 200 },
-          { header: 'RECORRIDO DE SALIDA', key: 'recorridoSalida', width: 200 },
           { header: 'TONELAJE', key: 'tonelaje', width: 90, align: 'center' },
           { header: 'N° DE SEGURIDAD', key: 'numeroSeguridad', isText: true, width: 120, align: 'center' },
           { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 130, align: 'center' },
@@ -278,44 +273,13 @@ export function Permisos() {
         ],
         data
       })
+    } catch (error) {
+      if (error.name !== 'AbortError') showError('Descarga no completada', error.message || 'No se pudo preparar el archivo completo.')
     } finally {
       setIsExportingExcel(false)
     }
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const data = await fetchTodoElFiltro()
-      await exportToPdf({
-        filename: `Autorizaciones_Permisos_${new Date().toISOString().slice(0, 10)}`,
-        subtitle: 'Subgerencia de Tránsito y Transporte · Padrón de Autorizaciones y Permisos',
-        summaryItems: [
-          { label: 'Total autorizaciones', value: totalPermisos },
-          { label: 'Exportando', value: `${data.length} registros` },
-          { label: 'Carga y Descarga', value: totalCarga },
-          { label: 'Uso de Vías', value: totalVias },
-          { label: 'Vigentes', value: vigentes },
-          { label: 'Vencidos', value: vencidos },
-        ],
-        columns: [
-          { header: 'N° AUTORIZACIÓN', key: 'numeroAutorizacion', width: 110, align: 'center' },
-          { header: 'TIPO PERMISO', key: 'tipoPermiso', width: 120 },
-          { header: 'PLACA / FLOTA', render: (_, p) => p.vehiculoPlaca || p.flotaPlacas || '—', width: 100, align: 'center' },
-          { header: 'SOLICITANTE', key: 'solicitanteNombre', width: 180 },
-          { header: 'DNI / RUC', key: 'solicitanteDocumento', width: 100, align: 'center' },
-          { header: 'ZONA', key: 'zonaCirculacion', width: 150 },
-          { header: 'HORARIO', render: (_, p) => `${p.horarioInicio || ''} - ${p.horarioFin || ''}`, width: 100, align: 'center' },
-          { header: 'INICIO', key: 'fechaInicioVigencia', width: 85, align: 'center' },
-          { header: 'FIN', key: 'fechaFinVigencia', width: 85, align: 'center' },
-          { header: 'ESTADO', key: 'estado', width: 80, align: 'center' },
-        ],
-        data
-      })
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   const handleOpenDetail = (p) => {
     setSelectedPermiso(p)
@@ -376,7 +340,7 @@ export function Permisos() {
         {/* 2. Control Vehicular */}
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Ctrl Vehicular</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Control Vehicular</span>
             <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="truck" className="size-3.5" />
             </span>
@@ -391,7 +355,7 @@ export function Permisos() {
         {/* 3. Carga y Descarga */}
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Carga/Desc.</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Carga y Descarga</span>
             <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400">
               <Icon name="motoTaxi" className="size-3.5" />
             </span>
@@ -421,7 +385,7 @@ export function Permisos() {
         {/* 5. Zonas Reservadas */}
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Zonas Reserv.</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Zonas Reservadas</span>
             <span className="grid size-6 place-items-center rounded-md text-purple-600 dark:text-purple-400">
               <Icon name="parking" className="size-3.5" />
             </span>
@@ -533,22 +497,13 @@ export function Permisos() {
                 <button
                   type="button"
                   onClick={handleExportExcel}
-                  title="Descargar padrón en Excel (.xls)"
+                  title="Descargar padrón en Excel (.xlsx)"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
                   disabled={isExportingExcel}>
                   <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
                   <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleExportPdf}
-                  title="Descargar o imprimir padrón en PDF"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-                  disabled={isExportingPdf}>
-                  <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-                  <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-                </button>
 
                 <button
                   type="button"
@@ -564,16 +519,18 @@ export function Permisos() {
 
             {/* Tabla de Autorizaciones */}
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1050px] table-fixed text-left text-xs">
+              <table className="w-full min-w-[1180px] table-fixed text-left text-xs">
                 <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <tr>
-                    <th className="px-4 py-3 w-[150px]"><SortableHeader column="numeroAutorizacion" label="N° Autorización" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                    <th className="px-4 py-3 w-[28%]"><SortableHeader column="solicitanteNombre" label="Solicitante" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                    <th className="px-4 py-3 w-[110px]">Vehículo</th>
-                    <th className="px-4 py-3 w-[25%]">Zona / Horario</th>
-                    <th className="px-4 py-3 w-[120px]">Vigencia</th>
-                    <th className="px-4 py-3 text-center w-[110px]"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                    <th className="sticky right-0 z-20 px-4 py-3 text-center bg-slate-50/75 dark:bg-[var(--bg-subtle)] w-[120px]">
+                    <th className="px-3 py-3 w-[200px]"><SortableHeader column="numeroAutorizacion" label="N° Autorización" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-3 py-3 w-[140px]"><SortableHeader column="tipoPermiso" label="Tipo" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-3 py-3 w-[22%]"><SortableHeader column="solicitanteNombre" label="Solicitante" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-3 py-3 w-[110px]">Placa</th>
+                    <th className="px-3 py-3 w-[16%]">Zona</th>
+                    <th className="px-3 py-3 w-[165px]">Horario</th>
+                    <th className="px-3 py-3 w-[105px]">Vigencia</th>
+                    <th className="px-3 py-3 text-center w-[120px]"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                    <th className="sticky right-0 z-20 px-3 py-3 text-center bg-slate-50/75 dark:bg-[var(--bg-subtle)] w-[140px]">
                       Acciones
                     </th>
                   </tr>
@@ -581,13 +538,13 @@ export function Permisos() {
                 <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && permisos.length > 0 ? 'opacity-50' : ''}`}>
                   {isLoading && permisos.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                      <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                         Cargando autorizaciones municipales...
                       </td>
                     </tr>
                   ) : permisos.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-12 text-center">
+                      <td colSpan={9} className="p-12 text-center">
                         <Icon name="permit" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
                         <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron autorizaciones</p>
                       </td>
@@ -601,10 +558,20 @@ export function Permisos() {
 
                       return (
                         <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
-                          {/* Solicitante / Titular */}
-                          <td className="px-4 py-3 align-top">
+                          {/* N° de autorización y expediente (una sola línea cada uno) */}
+                          <td className="px-3 py-3 align-middle">
+                            <div className="truncate text-xs font-bold text-slate-700 dark:text-slate-200 font-mono" title={p.numeroAutorizacion}>
+                              {p.numeroAutorizacion}
+                            </div>
+                            <div className="truncate text-[10px] text-slate-400 font-mono" title={`Exp. ${p.expediente || p.expedienteNumero || 'S/N'}`}>
+                              Exp. {p.expediente || p.expedienteNumero || 'S/N'}
+                            </div>
+                          </td>
+
+                          {/* Tipo */}
+                          <td className="px-3 py-3 align-middle">
                             <span
-                              className={`inline-block rounded-md px-2 py-0.5 text-[9px] font-black uppercase mb-0.5 tracking-widest ${isCarga
+                              className={`inline-block whitespace-nowrap rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${isCarga
                                   ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
                                   : isVias
                                     ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
@@ -615,16 +582,10 @@ export function Permisos() {
                             >
                               {isCarga ? 'Carga y Descarga' : isVias ? 'Uso de Vías' : isZonas ? 'Zonas Reservadas' : 'Control Vehicular'}
                             </span>
-                            <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-mono">
-                              {p.numeroAutorizacion}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              Exp. {p.expediente || p.expedienteNumero || 'S/N'}
-                            </div>
                           </td>
 
                           {/* Vehículo / Flota */}
-                          <td className="px-4 py-3 align-top">
+                          <td className="px-3 py-3 align-middle">
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-slate-900 dark:text-white">
                                 {solicitanteText}
@@ -636,32 +597,36 @@ export function Permisos() {
                           </td>
 
                           {/* Nº Autorización & Tipo Badge */}
-                          <td className="px-4 py-3 align-top">
+                          <td className="px-3 py-3 align-middle">
                             {p.vehiculoPlaca && p.vehiculoPlaca !== '—' ? (
-                              <PlacaBadge placa={p.vehiculoPlaca} />
+                              <PlacaVehiculo placa={p.vehiculoPlaca} vehiculoId={p.vehiculoId} />
                             ) : p.flotaPlacas ? (
                               <div className="flex flex-wrap gap-1 max-w-[200px]">
                                 {p.flotaPlacas.split(/[\s,]+/).filter(Boolean).map((placa, idx) => (
-                                  <PlacaBadge key={idx} placa={placa.trim()} size="sm" />
+                                  <PlacaVehiculo key={idx} placa={placa.trim()} size="sm" />
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-slate-400 dark:text-slate-500 italic text-xs">No especificado</span>
+                              <span className="text-slate-400 dark:text-slate-500 italic text-xs">Sin placa</span>
                             )}
                           </td>
 
-                          {/* Zona / Horario */}
-                          <td className="px-4 py-3 text-xs align-top">
+                          {/* Zona */}
+                          <td className="px-3 py-3 text-xs align-middle">
                             <div className="font-semibold text-slate-800 dark:text-slate-200">
                               {p.zonaCirculacion || p.zonaPermitida || '—'}
                             </div>
-                            <div className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
-                              {p.horarioPermitido || (p.horarioInicio && p.horarioFin ? `${p.horarioInicio.slice(0, 5)} - ${p.horarioFin.slice(0, 5)}` : '—')}
+                          </td>
+
+                          {/* Horario */}
+                          <td className="px-3 py-3 text-xs align-middle whitespace-nowrap">
+                            <div className="font-semibold text-indigo-600 dark:text-indigo-400">
+                              {p.horarioInicio && p.horarioFin ? formatRangoHoras12(p.horarioInicio, p.horarioFin) : (p.horarioPermitido ? formatTextoHorario12(p.horarioPermitido) : '—')}
                             </div>
                           </td>
 
                           {/* Vigencia */}
-                          <td className="px-4 py-3 text-xs align-top">
+                          <td className="px-3 py-3 text-xs align-middle">
                             <div className="font-bold text-slate-800 dark:text-slate-200">
                               {p.fechaInicioVigencia || p.fechaInicio || '—'}
                             </div>
@@ -671,12 +636,12 @@ export function Permisos() {
                           </td>
 
                           {/* Estado */}
-                          <td className="px-4 py-3 text-center align-top">
+                          <td className="px-3 py-3 text-center align-middle">
                             <StatusBadge status={p.estado} />
                           </td>
 
                           {/* Acciones - Estilo Personas.jsx */}
-                          <td className="sticky right-0 z-20 px-4 py-3 text-center align-top bg-white/95 dark:bg-[#1C2438]/95">
+                          <td className="sticky right-0 z-20 px-3 py-3 text-center align-middle bg-white/95 dark:bg-[#1C2438]/95">
                             <div className="flex items-center justify-center gap-1.5">
                               <button
                                 type="button"

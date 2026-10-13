@@ -27,9 +27,9 @@ class ReportesIntervencionController extends ResourceController
             ->select("r.uuid AS uuid, 
                 r.*,
                 COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa_visual,
-                COALESCE(NULLIF(v.marca, ''), r.vehiculo_marca, '') AS vehiculo_marca,
+                COALESCE(NULLIF(v.marca, ''), '') AS vehiculo_marca,
                 COALESCE(v.modelo, '') AS vehiculo_modelo,
-                COALESCE(NULLIF(v.color, ''), r.vehiculo_color, '') AS vehiculo_color,
+                COALESCE(NULLIF(v.color, ''), '') AS vehiculo_color,
                 COALESCE(CONCAT(ci.nombres, ' ', ci.apellido_paterno, ' ', COALESCE(ci.apellido_materno, '')), 'Inspector Municipal') AS inspector_nombre,
                 p.numero_papeleta,
                 CASE WHEN v.id_asociacion IS NOT NULL THEN 'FORMAL' ELSE 'INFORMAL' END as tipoInfractor,
@@ -310,9 +310,6 @@ class ReportesIntervencionController extends ResourceController
                 'id_vehiculo' => $vehiculoId,
                 'id_conductor' => $conductorId,
                 'placa' => $placa !== '' ? $placa : null,
-                'vehiculo_clase' => mb_substr(trim((string)($input['claseVehiculo'] ?? '')), 0, 60) ?: null,
-                'vehiculo_marca' => mb_substr(trim((string)($input['marcaVehiculo'] ?? '')), 0, 60) ?: null,
-                'vehiculo_color' => mb_substr(trim((string)($input['colorVehiculo'] ?? '')), 0, 40) ?: null,
                 'dueno_informal_nombres' => $duenoNombresInformal,
                 'dueno_informal_dni' => $duenoDniInformal,
                 'conductor_informal_nombres' => $conductorNombresInformal,
@@ -499,7 +496,7 @@ class ReportesIntervencionController extends ResourceController
             ]);
             $papeletaId = (int)$db->insertID();
 
-            $numeroPapeletaDefinitivo = 'PAP-' . date('Y') . '-' . str_pad((string)$papeletaId, 6, '0', STR_PAD_LEFT);
+            $numeroPapeletaDefinitivo = str_pad((string)$papeletaId, 7, '0', STR_PAD_LEFT);
             $db->table('papeletas')->where('id', $papeletaId)->update(['numero_papeleta' => $numeroPapeletaDefinitivo]);
 
             foreach ($detalles as $detalle) {

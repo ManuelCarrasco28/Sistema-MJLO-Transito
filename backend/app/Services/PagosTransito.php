@@ -66,22 +66,22 @@ class PagosTransito
     }
 
     /**
-     * Genera un número de recibo correlativo del sistema (REC-AÑO-NNNNN),
-     * para cuando el cajero no tiene un talonario físico propio y quiere
-     * que el sistema lo registre automáticamente.
+     * Genera un número de recibo correlativo del sistema (REC-NNNNNNN), una sola serie cronológica para todos los
+     * cobros, para cuando el cajero no tiene un talonario físico propio y quiere que el sistema lo registre.
      */
     private function generarNumeroRecibo(): string
     {
-        $anio = date('Y');
-        $prefijo = "REC-{$anio}-";
         // Siguiente = mayor correlativo existente + 1 (contar filas repetía números cuando había huecos).
+        // La serie incluye los recibos de guardianía y remolque de las órdenes de libertad.
         $fila = $this->db->query(
-            'SELECT MAX(CAST(SUBSTRING(numero_recibo, ?) AS UNSIGNED)) AS ultimo FROM pagos_transito WHERE numero_recibo LIKE ?',
-            [strlen($prefijo) + 1, $prefijo . '%']
+            "SELECT GREATEST(
+                COALESCE((SELECT MAX(CAST(SUBSTRING(numero_recibo, 5) AS UNSIGNED)) FROM pagos_transito WHERE numero_recibo REGEXP '^REC-[0-9]+$'), 0),
+                COALESCE((SELECT MAX(CAST(SUBSTRING(numero_recibo_guardiania, 5) AS UNSIGNED)) FROM ordenes_libertad WHERE numero_recibo_guardiania REGEXP '^REC-[0-9]+$'), 0),
+                COALESCE((SELECT MAX(CAST(SUBSTRING(numero_recibo_remolque, 5) AS UNSIGNED)) FROM ordenes_libertad WHERE numero_recibo_remolque REGEXP '^REC-[0-9]+$'), 0)
+            ) AS ultimo"
         )->getRowArray();
-        $siguiente = ((int) ($fila['ultimo'] ?? 0)) + 1;
 
-        return $prefijo . str_pad((string) $siguiente, 5, '0', STR_PAD_LEFT);
+        return 'REC-' . str_pad((string) (((int) ($fila['ultimo'] ?? 0)) + 1), 7, '0', STR_PAD_LEFT);
     }
 
     public function confirmar(int $id, array $input): array

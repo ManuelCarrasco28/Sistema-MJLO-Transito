@@ -4,7 +4,7 @@ export function StatusBadge({ status, label, className = '' }) {
   // Mapeo semántico según la skill rediseno-sobrio
   let tokenType = 'neutral' // default
 
-  if (['ACTIVO', 'VIGENTE', 'FORMAL', 'PAGADO', 'LIBERADO', 'FINALIZADO', 'APROBADO', 'COMPLETADO', 'ENTREGADO'].includes(norm)) {
+  if (['ACTIVO', 'VIGENTE', 'FORMAL', 'PAGADO', 'PAGADA', 'LIBERADO', 'FINALIZADO', 'APROBADO', 'COMPLETADO', 'ENTREGADO'].includes(norm)) {
     tokenType = 'ok'
   } else if (['EN_CURSO', 'EN CURSO'].includes(norm)) {
     tokenType = 'info'

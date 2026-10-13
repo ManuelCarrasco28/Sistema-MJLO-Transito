@@ -2,7 +2,7 @@ import { Icon } from './Icon'
 
 // Botones y tarjetas con el mismo aspecto que usan Personas, Vehículos, Papeletas, etc.
 
-export function BotonExcel({ onClick, disabled = false, cargando = false, title = 'Descargar en Excel (.xls)' }) {
+export function BotonExcel({ onClick, disabled = false, cargando = false, title = 'Descargar en Excel (.xlsx)' }) {
   return (
     <button
       type="button"

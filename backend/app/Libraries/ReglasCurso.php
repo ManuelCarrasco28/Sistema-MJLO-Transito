@@ -17,7 +17,7 @@ final class ReglasCurso
      */
     public static function condicionAprobado(string $alias = 'ic'): string
     {
-        return "(($alias.estado = 'APROBADO' OR ($alias.asistio = 1 AND $alias.estado NOT IN ('DESAPROBADO','ANULADO','CANCELADO')))"
+        return "(($alias.asistio = 1 AND $alias.estado NOT IN ('DESAPROBADO','ANULADO','CANCELADO'))"
             . " AND ($alias.estado_pago = 'PAGADO' OR NOT EXISTS (SELECT 1 FROM cursos_seguridad_vial cpg WHERE cpg.id = $alias.id_curso AND cpg.costo_inscripcion > 0))"
             . " AND NOT EXISTS (SELECT 1 FROM cursos_seguridad_vial ccx WHERE ccx.id = $alias.id_curso AND ccx.estado = 'CANCELADO'))";
     }
@@ -38,7 +38,7 @@ final class ReglasCurso
 
     public static function siguienteCodigo(int $ultimo, int $anio): string
     {
-        return 'CUR-' . $anio . '-' . str_pad((string)($ultimo + 1), 3, '0', STR_PAD_LEFT);
+        return 'CSV-' . $anio . '-' . str_pad((string)($ultimo + 1), 3, '0', STR_PAD_LEFT);
     }
 
     public static function fechaFin(string $inicio): string

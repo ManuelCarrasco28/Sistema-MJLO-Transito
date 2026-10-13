@@ -6,18 +6,17 @@ import { Pagination }
 from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { PlacaBadge } from '../components/ui/PlacaBadge'
+import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { sanitizarMensaje, leerMensajeError, apiFetch } from '../config/api'
 import { useListaServidor } from '../hooks/useListaServidor'
 import { usePersonaRapida } from '../hooks/usePersonaRapida'
 import { exportToExcel } from '../utils/exportToExcel'
-import { exportToPdf } from '../utils/exportToPdf'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { formatNumeroTarjeta } from '../utils/formatters'
 
 import { FloatingInput, FloatingSelect, FloatingTextarea, RoundedSelect } from '../components/ui/FormInputs'
 import { MapaCoordenadasPicker } from '../components/ui/MapaCoordenadasPicker'
-import { MapaInline, MapaPreviewModal } from '../components/ui/MapaVisualizador'
+import { MapaInline, MapaPreviewModal, MapaTodasUbicacionesModal } from '../components/ui/MapaVisualizador'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { puedeEliminarRegistros } from '../config/roles'
 
@@ -91,7 +90,7 @@ export function Asociaciones() {
   const [showRepResults, setShowRepResults] = useState(false)
   const [isSearchingRep, setIsSearchingRep] = useState(false)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const [mapaGeneral, setMapaGeneral] = useState({ abierto: false, cargando: false, items: [] })
   const repDropdownRef = useRef(null)
 
   useEffect(() => {
@@ -321,20 +320,39 @@ export function Asociaciones() {
     return fetchTodasLasFilas('/asociaciones/socios', filtrosSocios)
   }
 
+  // Mapa general: todas las ubicaciones del padrón (con el filtro actual), no solo la página visible
+  const abrirMapaGeneral = async () => {
+    setMapaGeneral({ abierto: true, cargando: true, items: [] })
+    try {
+      const filas = await fetchTodasLasFilas('/asociaciones', filtrosOrgs, { silencioso: true })
+      const items = filas.map((o) => ({
+        id: o.id,
+        title: o.razonSocial || o.razon_social || 'Sin nombre',
+        coordenadas: o.coordenadas || '',
+        direccion: o.direccion || '',
+        tipo: o.tipo,
+      }))
+      setMapaGeneral({ abierto: true, cargando: false, items })
+    } catch (err) {
+      setMapaGeneral({ abierto: false, cargando: false, items: [] })
+      showError('No se pudo cargar el mapa', sanitizarMensaje(err.message, 'No se pudieron obtener las ubicaciones.'))
+    }
+  }
+
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
     await new Promise(r => setTimeout(r, 50))
     try {
       const listToExport = await fetchTodasOrgs()
           await exportToExcel({
-            filename: `Padron_Asociaciones_${new Date().getFullYear()}.xls`,
+            filename: `Padron_Asociaciones_${new Date().getFullYear()}.xlsx`,
             sheetName: 'Asociaciones',
             title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
             subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
             metadata: [
               { label: 'Filtro Tipo', value: filterTipo },
               { label: 'Filtro Estado', value: filterEstado },
-              { label: 'Flota Total Registrada', value: `${flotaAcumulada} unidades` },
+              { label: 'Flota de asociaciones exportadas', value: `${listToExport.reduce((total, org) => total + Number(org.flotaTotal || 0), 0)} unidades` },
             ],
             columns: [
               { header: 'N°', align: 'center', width: 45, render: (_, __, i) => i + 1 },
@@ -362,41 +380,13 @@ export function Asociaciones() {
             ],
             data: listToExport,
           })
+    } catch (error) {
+      if (error.name !== 'AbortError') showError('Descarga no completada', error.message || 'No se pudo preparar el archivo completo.')
     } finally {
       setIsExportingExcel(false)
     }
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const listToExport = await fetchTodasOrgs()
-          await exportToPdf({
-            filename: `Padron_Asociaciones_${new Date().getFullYear()}`,
-            subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Asociaciones y Empresas',
-            summaryItems: [
-              { label: "Total registros", value: stats.total },
-              { label: 'Exportando', value: `${listToExport.length} registros` },
-              { label: 'Asociaciones', value: asociacionesCount },
-              { label: 'Particulares', value: particulares },
-              { label: 'Flota registrada', value: `${flotaAcumulada} vehículos` },
-            ],
-            columns: [
-              { header: 'RAZÓN SOCIAL', key: 'razonSocial', width: 220 },
-              { header: 'RUC', key: 'ruc', width: 100, align: 'center' },
-              { header: 'REPRESENTANTE', key: 'representanteNombre', width: 180 },
-              { header: 'DNI REP.', key: 'representanteDni', width: 90, align: 'center' },
-              { header: 'TIPO', key: 'tipo', width: 110, align: 'center' },
-              { header: 'FLOTA', key: 'flotaTotal', width: 60, align: 'center' },
-              { header: 'RESOLUCIÓN', key: 'resolucionAlcaldia', width: 110, align: 'center' },
-              { header: 'ESTADO', key: 'estado', width: 90, align: 'center' },
-            ],
-            data: listToExport
-          })
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   const handleExportSociosExcel = async () => {
     setIsExportingExcel(true)
@@ -414,7 +404,7 @@ export function Asociaciones() {
         email: socio.email,
       }))) }
       await exportToExcel({
-        filename: `Padron_Socios_${new Date().getFullYear()}.xls`,
+        filename: `Padron_Socios_${new Date().getFullYear()}.xlsx`,
         sheetName: 'Socios',
         title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
         subtitle: 'Subgerencia de Tránsito y Transporte · Padrón Oficial de Socios',
@@ -628,7 +618,6 @@ export function Asociaciones() {
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(stats.total)}</p>
-            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Padrón 2026</span>
           </div>
         </div>
 
@@ -642,7 +631,6 @@ export function Asociaciones() {
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(asociacionesCount)}</p>
-            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Trimóviles</span>
           </div>
         </div>
 
@@ -656,7 +644,6 @@ export function Asociaciones() {
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(particulares)}</p>
-            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400">Independientes</span>
           </div>
         </div>
 
@@ -670,9 +657,6 @@ export function Asociaciones() {
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {formatNumeroTarjeta(flotaAcumulada)}
             </p>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-              Vehículos
-            </span>
           </div>
         </div>
       </div>
@@ -764,23 +748,24 @@ export function Asociaciones() {
 
             <button
               type="button"
+              onClick={abrirMapaGeneral}
+              title="Ver todas las ubicaciones en un solo mapa"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200/80 bg-indigo-50/70 px-2.5 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+            >
+              <Icon name="mapPin" className="size-3.5" />
+              <span>Mapa</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleExportExcel}
-              title="Descargar padrón en Excel (.xls)"
+              title="Descargar padrón en Excel (.xlsx)"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
              disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              title="Descargar o imprimir padrón en PDF"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-             disabled={isExportingPdf}>
-              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} />
-              <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-            </button>
 
             <button
               type="button"
@@ -1062,8 +1047,8 @@ export function Asociaciones() {
                 type="button"
                 onClick={handleExportSociosExcel}
                 disabled={isExportingExcel}
-                title="Descargar padrón de socios en Excel (.xls)"
-                className="group flex h-9 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 cursor-pointer shadow-2xs"
+                title="Descargar padrón de socios en Excel (.xlsx)"
+                className="group flex h-9 items-center gap-2 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-3 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 cursor-pointer shadow-2xs"
               >
                 <Icon
                   name={isExportingExcel ? "refresh" : "fileSpreadsheet"}
@@ -1147,7 +1132,7 @@ export function Asociaciones() {
                               </div>
                               <div className="flex flex-wrap items-center gap-1">
                                 {v.placas.map((placa) => (
-                                  <PlacaBadge key={placa} placa={placa.trim()} size="sm" />
+                                  <PlacaVehiculo key={placa} placa={placa.trim()} size="sm" />
                                 ))}
                               </div>
                             </div>
@@ -1191,7 +1176,7 @@ export function Asociaciones() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-slate-950/70 backdrop-blur-xs animate-enter">
-          <div className="flex max-h-[98dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
+          <div className="flex max-h-[98dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
             {/* Cabecera del Modal */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <div className="flex items-center gap-2.5">
@@ -1212,7 +1197,7 @@ export function Asociaciones() {
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Identificación Institucional
                 </legend>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-4">
                   <FloatingSelect
                     id="org_tipo"
                     label="Tipo de Registro"
@@ -1222,7 +1207,6 @@ export function Asociaciones() {
                       setFormData({
                         ...formData,
                         tipo,
-                        fechaCreacion: tipo === 'PARTICULAR' ? '' : formData.fechaCreacion,
                         coordenadas: tipo === 'PARTICULAR' ? '' : formData.coordenadas,
                         tipoAmbiente: tipo === 'ASOCIACION' ? '' : formData.tipoAmbiente,
                         numeroLicencia: tipo === 'ASOCIACION' ? '' : formData.numeroLicencia,
@@ -1265,7 +1249,15 @@ export function Asociaciones() {
                     </button>
                   </div>
 
-                  <div className="sm:col-span-3">
+                  <FloatingInput
+                    id="org_partida"
+                    label="Partida Registral"
+                    value={formData.partidaRegistral || ''}
+                    onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
+                    inputClassName="font-mono uppercase"
+                  />
+
+                  <div className="sm:col-span-4">
                     <FloatingTextarea
                       id="org_razon"
                       label="Razón Social / Nombre"
@@ -1367,15 +1359,7 @@ export function Asociaciones() {
                     )}
                   </div>
 
-                  <FloatingInput
-                    id="org_partida"
-                    label="Partida Registral"
-                    value={formData.partidaRegistral || ''}
-                    onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
-                    inputClassName="font-mono uppercase"
-                  />
-
-                  {formData.tipo === 'ASOCIACION' && (
+                  <div className="self-end">
                     <FloatingInput
                       id="org_fecha_creacion"
                       type="date"
@@ -1383,7 +1367,7 @@ export function Asociaciones() {
                       value={formData.fechaCreacion || ''}
                       onChange={(e) => setFormData({ ...formData, fechaCreacion: e.target.value })}
                     />
-                  )}
+                  </div>
                 </div>
               </fieldset>
 
@@ -1392,7 +1376,7 @@ export function Asociaciones() {
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Contacto, ubicación y autorización
                 </legend>
-                <div className="grid gap-3 sm:grid-cols-3 items-start">
+                <div className="grid gap-3 sm:grid-cols-4 items-start">
                   <div className="sm:col-span-2">
                     <FloatingTextarea
                       id="org_dir"
@@ -1434,19 +1418,11 @@ export function Asociaciones() {
                     />
                   )}
 
-                  <div className="sm:col-span-2">
-                    <FloatingInput
-                      id="org_resolucion_alcaldia"
-                      label="Resolución de alcaldía"
-                      value={formData.resolucionAlcaldia}
-                      onChange={(e) => setFormData({ ...formData, resolucionAlcaldia: e.target.value.toUpperCase() })}
-                      inputClassName="font-mono"
-                    />
-                  </div>
 
 
 
-                  {formData.tipo === 'ASOCIACION' && (
+
+                  {formData.tipo === 'ASOCIACION' ? (
                     <FloatingInput
                       id="org_tel_asoc"
                       label="Teléfono de Contacto"
@@ -1458,25 +1434,46 @@ export function Asociaciones() {
                         setFormData({ ...formData, telefono: val });
                       }}
                     />
-                  )}
+                  ) : (
+                    <div className={formData.tipo === 'ASOCIACION' ? 'sm:col-span-2' : 'sm:col-span-1'}>
+                      <FloatingInput
+                        id="org_email"
+                        type="email"
+                        label="Email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      />
+                    </div>
+                    )}
 
-                  <div className={formData.tipo === 'ASOCIACION' ? 'sm:col-span-3' : 'sm:col-span-1'}>
+                  <div className={formData.tipo === 'ASOCIACION' ? 'sm:col-span-2' : 'sm:col-span-1'}>
                     <FloatingInput
-                      id="org_email"
-                      type="email"
-                      label="Email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      id="org_resolucion_alcaldia"
+                      label="Resolución de alcaldía"
+                      value={formData.resolucionAlcaldia}
+                      onChange={(e) => setFormData({ ...formData, resolucionAlcaldia: e.target.value.toUpperCase() })}
+                      inputClassName="font-mono"
                     />
                   </div>
+                  {formData.tipo === 'ASOCIACION' && (
+                    <div className={formData.tipo === 'ASOCIACION' ? 'sm:col-span-2' : 'sm:col-span-1'}>
+                      <FloatingInput
+                        id="org_email"
+                        type="email"
+                        label="Email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      />
+                    </div>
+                    )}
 
                   {formData.tipo === 'PARTICULAR' && (
                     <>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 transition-all hover:border-slate-300 dark:border-[var(--border-strong)] dark:bg-slate-800/80">
-                        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-1.5 transition-all hover:border-slate-300 dark:border-[var(--border-strong)] dark:bg-slate-800/80 sm:col-span-2">
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                           Tipo ambiente
                         </p>
-                        <div className="space-y-1.5">
+                        <div className="flex flex-wrap gap-x-5 gap-y-1">
                           {[
                             ['PUESTO DE MERCADO', 'Puesto de mercado'],
                             ['LOCAL COMERCIAL', 'Local comercial'],
@@ -1496,7 +1493,7 @@ export function Asociaciones() {
                         </div>
                       </div>
 
-                      <div className="sm:col-span-2">
+                      <div className="sm:col-span-1">
                         <FloatingInput
                           id="org_numero_licencia"
                           label="Número licencia"
@@ -1511,7 +1508,7 @@ export function Asociaciones() {
               </fieldset>
 
               {isEditing && (
-                <fieldset className="rounded-xl border border-slate-200 p-3.5 dark:border-[var(--border)]">
+                <fieldset className="rounded-xl border border-slate-200 p-2.5 dark:border-[var(--border)]">
                   <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Control y Estado
                   </legend>
@@ -1694,6 +1691,14 @@ export function Asociaciones() {
           </div>
         </div>
       )}
+
+      <MapaTodasUbicacionesModal
+        isOpen={mapaGeneral.abierto}
+        onClose={() => setMapaGeneral({ abierto: false, cargando: false, items: [] })}
+        items={mapaGeneral.items}
+        cargando={mapaGeneral.cargando}
+        titulo="Ubicaciones de asociaciones y particulares"
+      />
 
       <MapaPreviewModal
         isOpen={Boolean(mapPreview)}

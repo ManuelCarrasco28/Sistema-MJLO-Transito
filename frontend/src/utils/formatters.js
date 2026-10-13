@@ -60,3 +60,27 @@ export function normalizarPlaca(valor) {
 export function esPlacaValida(valor) {
   return /^[A-Z0-9]{6}$/.test(String(valor ?? ''))
 }
+
+// Hora en formato de 12 horas con AM/PM: "09:00" -> "09:00 AM", "13:30:00" -> "01:30 PM". Si no se reconoce, se devuelve tal cual.
+export function formatHora12(valor) {
+  const texto = String(valor ?? '').trim()
+  if (!texto) return ''
+  if (/\b(AM|PM)\b/i.test(texto)) return texto.toUpperCase()
+  const m = texto.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/)
+  if (!m) return texto
+  const h = parseInt(m[1], 10)
+  if (h < 0 || h > 23) return texto
+  return `${String(h % 12 || 12).padStart(2, '0')}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`
+}
+
+// Rango de horas: "09:00" y "12:00" -> "09:00 AM - 12:00 PM"
+export function formatRangoHoras12(inicio, fin) {
+  const a = formatHora12(inicio)
+  const b = formatHora12(fin)
+  return a && b ? `${a} - ${b}` : (a || b)
+}
+
+// Convierte las horas de un texto libre a 12 horas con AM/PM: "09:00 - 12:00" -> "09:00 AM - 12:00 PM"
+export function formatTextoHorario12(texto) {
+  return String(texto ?? '').replace(/(\d{1,2}):(\d{2})(?::\d{2})?(?!\s*[AaPp]\.?\s*[Mm])/g, (coincidencia, h, m) => formatHora12(`${h}:${m}`))
+}

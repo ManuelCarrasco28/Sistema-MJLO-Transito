@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Icon } from './Icon'
@@ -171,6 +171,109 @@ export function MapaPreviewModal({ isOpen, onClose, coordenadas, title, direccio
         {/* Mapa interactivo instantáneo */}
         <div className="h-[68vh] w-full bg-slate-100 dark:bg-[#1C2438]">
           <MapaInline coordenadas={coordenadas} title={title} className="h-full w-full" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const COLOR_TIPO_MAPA = { ASOCIACION: '#d97706', PARTICULAR: '#0891b2' }
+
+function pinPorTipo(tipo) {
+  const color = COLOR_TIPO_MAPA[tipo] || '#5B6EE1'
+  // Marca de ubicación (gota con punto blanco); la punta inferior queda sobre la coordenada
+  return L.divIcon({
+    className: 'custom-map-marker',
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38" style="filter:drop-shadow(0 2px 3px rgba(15,23,42,.45))">
+      <path d="M15 1C7.8 1 2 6.8 2 14c0 9.6 13 23 13 23s13-13.4 13-23C28 6.8 22.2 1 15 1Z" fill="${color}" stroke="white" stroke-width="2"/>
+      <circle cx="15" cy="14" r="5" fill="white"/>
+    </svg>`,
+    iconSize: [30, 38],
+    iconAnchor: [15, 37],
+    popupAnchor: [0, -34],
+  })
+}
+
+const escaparHtml = (texto) => String(texto ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+// Mapa con todos los puntos a la vez; se ajusta para que todos queden a la vista
+function MapaVarios({ puntos }) {
+  const mapElRef = useRef(null)
+
+  useEffect(() => {
+    if (!mapElRef.current || puntos.length === 0) return undefined
+    const map = L.map(mapElRef.current, { zoomControl: true, attributionControl: false })
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
+    const grupo = L.featureGroup()
+    puntos.forEach((p) => {
+      L.marker(p.coords, { icon: pinPorTipo(p.tipo) })
+        .bindPopup(
+          `<div style="font-family:inherit;font-size:12px;line-height:1.4;color:#0f172a;padding:2px;max-width:220px">
+             <div style="font-weight:700">${escaparHtml(p.title)}</div>
+             <div style="font-size:11px;color:#64748b;margin-top:2px">${escaparHtml(p.direccion)}</div>
+             <div style="font-size:10px;font-weight:800;margin-top:3px;color:${COLOR_TIPO_MAPA[p.tipo] || '#5B6EE1'}">${p.tipo === 'PARTICULAR' ? 'PARTICULAR' : 'ASOCIACIÓN'}</div>
+           </div>`
+        )
+        .addTo(grupo)
+    })
+    grupo.addTo(map)
+    const ajustar = () => map.fitBounds(grupo.getBounds(), { padding: [30, 30], maxZoom: 16 })
+    ajustar()
+    const t1 = setTimeout(() => map.invalidateSize(), 50)
+    const t2 = setTimeout(() => { map.invalidateSize(); ajustar() }, 250)
+    return () => { clearTimeout(t1); clearTimeout(t2); map.remove() }
+  }, [puntos])
+
+  return <div ref={mapElRef} className="h-full w-full" />
+}
+
+/**
+ * Modal con todas las ubicaciones registradas en un solo mapa.
+ * `items`: [{ id, title, coordenadas, direccion, tipo }]
+ */
+export function MapaTodasUbicacionesModal({ isOpen, onClose, items = [], cargando = false, titulo = 'Todas las ubicaciones' }) {
+  const puntos = useMemo(() => items
+    .map((i) => ({ ...i, coords: parseCoordenadas(i.coordenadas) }))
+    .filter((i) => i.coords), [items])
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const tecla = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', tecla)
+    return () => document.removeEventListener('keydown', tecla)
+  }, [isOpen, onClose])
+
+  if (!isOpen) return null
+  const asociaciones = puntos.filter((p) => p.tipo !== 'PARTICULAR').length
+  const particulares = puntos.length - asociaciones
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter">
+      <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5 dark:border-[var(--border)]">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+              <Icon name="mapPin" className="size-4.5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="truncate text-base font-bold text-slate-900 dark:text-white">{titulo}</h3>
+              <p className="flex flex-wrap items-center gap-x-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <span>{cargando ? 'Cargando ubicaciones…' : `${puntos.length} ubicaciones`}</span>
+                <span className="inline-flex items-center gap-1"><span style={{ color: COLOR_TIPO_MAPA.ASOCIACION }}><Icon name="mapPin" className="size-3.5" /></span>Asociaciones ({asociaciones})</span>
+                <span className="inline-flex items-center gap-1"><span style={{ color: COLOR_TIPO_MAPA.PARTICULAR }}><Icon name="mapPin" className="size-3.5" /></span>Particulares ({particulares})</span>
+              </p>
+            </div>
+          </div>
+          <BotonCerrarModal onClick={onClose} title="Cerrar mapa" />
+        </div>
+        <div className="h-[72vh] w-full bg-slate-100 dark:bg-[#1C2438]">
+          {cargando ? (
+            <div className="grid h-full place-items-center text-sm font-semibold text-slate-400">Cargando mapa…</div>
+          ) : puntos.length === 0 ? (
+            <div className="grid h-full place-items-center text-sm font-semibold text-slate-400">No hay ubicaciones con coordenadas para mostrar.</div>
+          ) : (
+            <MapaVarios puntos={puntos} />
+          )}
         </div>
       </div>
     </div>

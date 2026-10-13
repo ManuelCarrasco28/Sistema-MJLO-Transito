@@ -9,7 +9,6 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { sanitizarMensaje, apiFetch, getCachedData, setCachedData, resolverUrlArchivo } from '../config/api'
 import { showError, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
-import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
@@ -70,6 +69,7 @@ export function Papeletas({ user }) {
     const operativoId = p.operativoId ?? p.id_operativo ?? null
     return {
       ...p,
+      numeroPapeleta: formatoNumeroPapeleta(p.numeroPapeleta),
       operativoId,
       origen: operativoId ? 'OPERATIVO' : 'RUTINA',
     }
@@ -103,16 +103,24 @@ export function Papeletas({ user }) {
   }, [searchTerm])
 
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const location = useLocation()
   useEffect(() => {
     const params = new URLSearchParams(location.search)
-    const s = params.get('search')
-    setSearchTerm(s || '')
-    // Una notificación puede llevar a la pestaña de reportes estando ya en Papeletas
-    if (params.get('vista') === 'reportes') setActiveView('REPORTES')
-  }, [location.search])
+    const s = params.get('search') || ''
+    // Una notificación puede llevar a cualquiera de las dos pestañas estando ya en Papeletas:
+    // cada una recibe su propia búsqueda (la de la otra no se toca) y los filtros del vínculo se aplican de nuevo.
+    if (params.get('vista') === 'reportes') {
+      setActiveView('REPORTES')
+      setReportesSearch(s)
+      setReportesFilterEstado('TODOS')
+      setReportesPage(1)
+    } else {
+      setActiveView('PAPELETAS')
+      setSearchTerm(s)
+    }
+    // location.key cambia con cada navegación, también cuando el vínculo es igual al actual
+  }, [location.key, location.search])
 
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [filterOrigen, setFilterOrigen] = useState('TODOS')
@@ -174,37 +182,6 @@ export function Papeletas({ user }) {
   const [selectedPapeleta, setSelectedPapeleta] = useState(null)
 
   const tableContainerRef = useRef(null)
-  const [isDragging, setIsDragging] = useState(false)
-
-  const handleMouseDown = (e) => {
-    // Si hace click en botones, enlaces o controles, no iniciar arrastre
-    if (e.target.closest('button, a, input, select, textarea, [role="button"]')) {
-      return
-    }
-    const container = tableContainerRef.current
-    if (!container) return
-    if (e.button !== 0) return // Solo clic izquierdo
-
-    const startX = e.pageX - container.offsetLeft
-    const scrollLeft = container.scrollLeft
-    setIsDragging(true)
-
-    const onMouseMove = (moveEvent) => {
-      moveEvent.preventDefault()
-      const x = moveEvent.pageX - container.offsetLeft
-      const walk = (x - startX) * 1.5
-      container.scrollLeft = scrollLeft - walk
-    }
-
-    const onMouseUp = () => {
-      setIsDragging(false)
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }
 
   const totales = stats.total ?? 0
   const reportesPendientes = reportesPendientesTotal ?? reportes.filter((r) => r.estado === 'PENDIENTE').length
@@ -258,35 +235,6 @@ export function Papeletas({ user }) {
     return filas.map(normalizePapeleta)
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const data = await fetchTodoElFiltro()
-          await exportToPdf({
-            filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.pdf`,
-            title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
-            subtitle: 'Subgerencia de Tránsito y Transporte - Fiscalización Municipal',
-            metadata: [
-              { label: 'Estado', value: filterEstado },
-              { label: 'Formalidad', value: filterFormalidad },
-              { label: 'Total Papeletas', value: String(data.length) }
-            ],
-            columns: [
-              { header: 'N° PAPELETA', key: 'numeroPapeleta', isText: true, width: 80, align: 'center' },
-              { header: 'PLACA', key: 'vehiculoPlaca', isText: true, width: 60, align: 'center' },
-              { header: 'INFRACCIÓN', key: 'tipoInfraccionCodigo', isText: true, width: 70, align: 'center' },
-              { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 80 },
-              { header: 'CONDUCTOR', key: 'conductorNombre', width: 120 },
-              { header: 'INSPECTOR', render: (_, p) => p.inspectorNombre || p.inspector || '—', width: 120 },
-              { header: 'FECHA', key: 'fechaHora', render: (_, p) => (p.fechaHora ? new Date(String(p.fechaHora).replace(' ', 'T')).toLocaleDateString('es-PE') : '—'), width: 80, align: 'center' },
-              { header: 'ESTADO', key: 'estado', width: 80, align: 'center' }
-            ],
-            data
-          })
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   const handleExportExcel = async () => {
     setIsExportingExcel(true)
@@ -294,7 +242,7 @@ export function Papeletas({ user }) {
     try {
       const data = await fetchTodoElFiltro()
           await exportToExcel({
-            filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.xls`,
+            filename: `Papeletas_Infraccion_${new Date().toISOString().slice(0, 10)}.xlsx`,
             sheetName: 'Papeletas',
             title: 'REGISTRO DE PAPELETAS DE INFRACCIÓN AL TRÁNSITO Y TRANSPORTE',
             subtitle: 'Subgerencia de Tránsito y Transporte - Fiscalización Municipal',
@@ -312,9 +260,9 @@ export function Papeletas({ user }) {
               { header: 'AÑO', key: 'vehiculoAnio', width: 70, align: 'center' },
               { header: 'FORMALIDAD VEHÍCULO', key: 'vehiculoEstadoFormalizacion', width: 130, align: 'center' },
               { header: 'ASOCIACIÓN', render: (_, p) => p.vehiculoAsociacion || 'PARTICULAR / SIN ASOC.', width: 200 },
-              { header: 'CÓDIGO INFRACCIÓN', key: 'tipoInfraccionCodigo', isText: true, width: 140, align: 'center' },
-              { header: 'DESCRIPCIÓN INFRACCIÓN', key: 'tipoInfraccionDescripcion', width: 260 },
-              { header: 'GRAVEDAD', key: 'tipoInfraccionGravedad', width: 110, align: 'center' },
+              { header: 'CÓDIGOS DE INFRACCIÓN', render: (_, p) => p.detalles?.length ? p.detalles.map(d => d.codigo || '').join('\n') : p.tipoInfraccionCodigo || '', isText: true, width: 140, align: 'center' },
+              { header: 'DESCRIPCIONES DE INFRACCIÓN', render: (_, p) => p.detalles?.length ? p.detalles.map(d => `${d.codigo || ''}: ${d.descripcion || ''}`).join('\n') : p.tipoInfraccionDescripcion || '', width: 300 },
+              { header: 'GRAVEDAD', render: (_, p) => p.detalles?.length ? p.detalles.map(d => `${d.codigo || ''}: ${d.gravedad || ''}`).join('\n') : p.tipoInfraccionGravedad || '', width: 130, align: 'center' },
               { header: 'MONTO (S/)', render: (_, p) => `S/ ${Number(p.montoTotal || p.monto || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 120 },
               { header: 'TIPO DE INFRACTOR', key: 'tipoInfractor', width: 120, align: 'center' },
               { header: 'CONDUCTOR / INFRACTOR', render: (_, p) => p.conductorNombre || p.infractor || '—', width: 180 },
@@ -330,12 +278,14 @@ export function Papeletas({ user }) {
               { header: 'OBSERVACIONES AUTORIDAD', key: 'observacionesAutoridad', width: 240 },
               { header: 'OBSERVACIONES CONDUCTOR', key: 'observacionesConductor', width: 240 },
               { header: 'FIRMA DEL CONDUCTOR', key: 'firmaConductorEstado', width: 120, align: 'center' },
-              { header: 'VEHÍCULO RETENIDO', render: (_, p) => (p.vehiculoRetenido ? 'SÍ' : 'NO'), width: 110, align: 'center' },
+              { header: 'VEHÍCULO RETENIDO', render: (_, p) => ([true, 1, '1', 'SI', 'SÍ'].includes(p.vehiculoRetenido) ? 'SÍ' : 'NO'), width: 110, align: 'center' },
               { header: 'ESTADO DE RETENCIÓN', render: (_, p) => p.retencionEstado || '—', width: 130, align: 'center' },
               { header: 'ESTADO', key: 'estado', width: 120, align: 'center' }
             ],
             data
           })
+    } catch (error) {
+      if (error.name !== 'AbortError') showError('Descarga no completada', error.message || 'No se pudo preparar el archivo completo.')
     } finally {
       setIsExportingExcel(false)
     }
@@ -349,7 +299,7 @@ export function Papeletas({ user }) {
           : 'bg-slate-100 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
         }`}>
         <span className="size-1 rounded-full bg-current" />
-        {isOperativo ? (p.operativoNombre ? `OPERATIVO: ${p.operativoNombre}` : 'OPERATIVO') : 'RUTINA'}
+        {isOperativo ? 'Operativo' : 'RUTINA'}
       </span>
     )
   }
@@ -779,10 +729,10 @@ export function Papeletas({ user }) {
       </div>
 
       <div className="kpi-grid print:hidden">
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Total Impuestas</span>
-            <span className="grid size-6 place-items-center rounded-md text-slate-600 dark:text-slate-400">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Total Impuestas</span>
+            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
               <Icon name="ticket" className="size-3.5" />
             </span>
           </div>
@@ -794,8 +744,8 @@ export function Papeletas({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-amber-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pendientes</span>
-            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400 font-bold text-xs">
-              ⏳
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400 ">
+              <Icon name="clock" className="size-3.5" />
             </span>
           </div>
           <div className="mt-1">
@@ -815,10 +765,10 @@ export function Papeletas({ user }) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-slate-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-rose-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Anuladas</span>
-            <span className="grid size-6 place-items-center rounded-md text-slate-600 dark:text-slate-400 font-bold text-xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Anuladas</span>
+            <span className="grid size-6 place-items-center rounded-md text-rose-600 dark:text-rose-400 font-bold text-xs">
               ✕
             </span>
           </div>
@@ -1014,7 +964,7 @@ export function Papeletas({ user }) {
 
                       {/* Vehículo / Placa */}
                       <td className="px-3.5 py-3.5 text-center">
-                        <PlacaBadge placa={reporte.placa_visual} />
+                        <PlacaVehiculo placa={reporte.placa_visual} />
                         {(reporte.vehiculo_marca || reporte.vehiculo_modelo || reporte.vehiculo_color) ? (
                           <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[130px] mx-auto" title={[reporte.vehiculo_marca, reporte.vehiculo_modelo, reporte.vehiculo_color].filter(Boolean).join(' ')}>
                             {[reporte.vehiculo_marca, reporte.vehiculo_modelo, reporte.vehiculo_color].filter(Boolean).join(' ')}
@@ -1185,30 +1135,23 @@ export function Papeletas({ user }) {
                 <button
                   type="button"
                   onClick={handleClearFilters}
-                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors"
+                  title="Limpiar filtros"
+                  aria-label="Limpiar filtros"
+                  className="grid size-[38px] shrink-0 place-items-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors"
                 >
-                  Limpiar Filtros
+                  <Icon name="filterX" className="size-4" />
                 </button>
               )}
               <button
                 type="button"
                 onClick={handleExportExcel}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all cursor-pointer whitespace-nowrap"
                 title="Descargar padrón de papeletas en Excel"
                disabled={isExportingExcel}>
                 <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 ${isExportingExcel ? 'animate-spin' : ''}`} />
                 <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
               </button>
               
-              <button 
-                type="button"
-                onClick={handleExportPdf} 
-                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 dark:hover:bg-rose-900/60 transition-all cursor-pointer whitespace-nowrap"
-                title="Exportar a PDF"
-               disabled={isExportingPdf}>
-                <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 ${isExportingPdf ? 'animate-spin' : ''}`} />
-                <span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-              </button>
 
               {puedeAdministrarInfracciones && (
                 <button
@@ -1264,6 +1207,7 @@ export function Papeletas({ user }) {
               className="w-full"
               buttonClassName="w-full"
                 value={filterTipoInfraccion}
+                align="start"
                 onChange={setFilterTipoInfraccion}
                 options={tipoInfraccionOptions}
               />
@@ -1289,36 +1233,32 @@ export function Papeletas({ user }) {
 
         <div
           ref={tableContainerRef}
-          onMouseDown={handleMouseDown}
-          className={`overflow-x-auto overscroll-x-contain transition-colors ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
-            }`}
+          className="overflow-x-auto overscroll-x-contain cursor-auto select-text"
           role="region"
           aria-label="Listado de papeletas"
           tabIndex={0}
         >
-          <table className="w-full table-fixed text-left text-xs">
+          <table className="w-full min-w-[1200px] table-fixed text-left text-xs">
             <colgroup>
-              <col className="w-[110px]" />
-              <col className="w-[150px]" />
-              <col className="w-[150px]" />
-              <col className="w-[110px]" />
-              <col className="w-[100px]" />
-              <col className="w-[140px]" />
-              <col className="w-[110px]" />
-              <col className="w-[90px]" />
-              <col className="w-[100px]" />
-              <col className="w-[90px]" />
+              <col className="w-[10%]" />
+              <col className="w-[15%]" />
+              <col className="w-[15%]" />
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[11%]" />
             </colgroup>
             <thead className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-400">
               <tr>
                 <th className="px-3.5 py-3.5 text-center"><SortableHeader column="numeroPapeleta" label="N° Papeleta" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5">Propietario</th>
                 <th className="px-3.5 py-3.5">Infractor</th>
-                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="vehiculoPlaca" label="Vehículo" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="vehiculoPlaca" label="Placa" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5 text-center">Condición</th>
                 <th className="px-3.5 py-3.5 text-center">Infracción</th>
                 <th className="px-3.5 py-3.5 text-center"><SortableHeader column="fechaHora" label="Fecha y hora" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="px-3.5 py-3.5 text-center"><SortableHeader column="montoTotal" label="Monto" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5 text-center"><SortableHeader column="estado" label="Estado de pago" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3.5 py-3.5 text-center">Acciones</th>
               </tr>
@@ -1334,14 +1274,13 @@ export function Papeletas({ user }) {
                     <td className="px-3.5 py-4 text-center"><div className="h-5 w-16 mx-auto rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-4 text-right"><div className="h-4 w-16 ml-auto rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3.5 py-4 text-center"><div className="h-5 w-16 mx-auto rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                     <td className="px-3.5 py-4 text-right"><div className="h-7 w-28 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
                   </tr>
                 ))
               ) : filteredPapeletas.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-5 py-12 text-center text-slate-400">
+                  <td colSpan="9" className="px-5 py-12 text-center text-slate-400">
                     <Icon name="ticket" className="size-8 mx-auto mb-1 text-slate-300 dark:text-slate-600" />
                     <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron papeletas</p>
                   </td>
@@ -1350,9 +1289,9 @@ export function Papeletas({ user }) {
                 paginatedPapeletas.map((p) => {
                   const tipoInf = tiposInfraccion.find((t) => t.id === p.detalles?.[0]?.tipoInfraccionId)
                   return (
-                    <tr key={p.id} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-[var(--bg-subtle)]">
+                    <tr key={p.id} style={{ cursor: 'default' }} className="group transition-colors hover:bg-rose-50/30 dark:hover:bg-[var(--bg-subtle)]">
                       <td className="px-3.5 py-3.5 text-center ">
-                        <span className="whitespace-nowrap font-mono text-xs font-extrabold text-rose-700 dark:text-rose-400">{p.numeroPapeleta}</span>
+                        <span className="whitespace-nowrap font-mono text-xs font-extrabold text-rose-700 dark:text-rose-400">N° {formatoNumeroPapeleta(p.numeroPapeleta)}</span>
                         <div className="mt-0.5">{renderOrigen(p)}</div>
                       </td>
                       <td className="px-3.5 py-3.5">
@@ -1442,17 +1381,12 @@ export function Papeletas({ user }) {
                         <p className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-xs">{new Date(p.fechaHora).toLocaleDateString()}</p>
                         <p className="text-[11px] text-slate-400">{new Date(p.fechaHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </td>
-                      <td className="px-3.5 py-3.5 text-center ">
-                        <span className="font-mono font-black text-slate-800 dark:text-white text-xs">S/ {p.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                      </td>
                       <td className="px-3 py-3.5 text-center">
                         <StatusBadge status={p.estado === 'PENDIENTE_PAGO' ? 'PENDIENTE' : p.estado} />
                       </td>
                       <td className="px-3 py-3.5 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {puedeCobrar && p.estado !== 'ANULADA' && <>
-                          </>}
-                          {!puedeCobrar ? null : p.estado === 'ANULADA' ? (
+                        <div className="flex items-center justify-center gap-1.5 [&>button]:shrink-0">
+                          {!puedeCobrar || p.estado === 'PAGADA' ? null : p.estado === 'ANULADA' ? (
                             <button
                               type="button"
                               disabled
@@ -1675,3 +1609,4 @@ export function Papeletas({ user }) {
   )
 }
 export default Papeletas
+import { formatoNumeroPapeleta } from '../utils/numeroPapeleta'

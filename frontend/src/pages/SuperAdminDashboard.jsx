@@ -5,7 +5,6 @@ import { Icon } from '../components/ui/Icon'
 import { apiFetch } from '../config/api'
 import { showConfirm, showSuccess, showError } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
-import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { errorPasswordUsuario } from '../utils/passwordPolicy'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
@@ -17,7 +16,7 @@ import { BotonCancelar, BotonGuardar } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { Pagination } from '../components/ui/Pagination'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { BotonExcel, BotonPdf, TarjetaKpi, CLASE_TABLA_ENCABEZADO } from '../components/ui/ToolbarButtons'
+import { BotonExcel, TarjetaKpi, CLASE_TABLA_ENCABEZADO } from '../components/ui/ToolbarButtons'
 
 const DEFAULT_USER_FORM = {
   id_trabajador: '',
@@ -84,7 +83,6 @@ export function SuperAdminDashboard({ user }) {
   const [auditPage, setAuditPage] = useState(1)
   const [auditPerPage, setAuditPerPage] = useState(10)
   const [exportandoExcel, setExportandoExcel] = useState(false)
-  const [exportandoPdf, setExportandoPdf] = useState(false)
   const municipalidadRequestRef = useRef(0)
 
   const [auditTotal, setAuditTotal] = useState(0)
@@ -133,42 +131,6 @@ export function SuperAdminDashboard({ user }) {
       accion: auditSeverity === 'TODOS' ? '' : auditSeverity,
     }, { campoPorPagina: 'limit', mensaje: 'Preparando la descarga de auditoría...' })
 
-  const handleExportAuditoriaPdf = async () => {
-    let eventos
-    setExportandoPdf(true)
-    try {
-      eventos = await fetchTodaLaAuditoria()
-    } catch (err) {
-      console.warn('No se pudo descargar la auditoría:', err)
-      showError('Error', 'No se pudo preparar la descarga de auditoría.')
-      return
-    } finally {
-      setExportandoPdf(false)
-    }
-    exportToPdf({
-      filename: `Auditoria_Sistema_${new Date().getFullYear()}.pdf`,
-      title: 'Reporte de Auditoría del Sistema',
-      subtitle: 'Registro de acciones críticas',
-      metadata: [
-        { label: 'Generado por', value: [user?.nombres, user?.apellidoPaterno].filter(Boolean).join(' ') || 'Super Admin' },
-        { label: 'Fecha', value: new Date().toLocaleString('es-PE') }
-      ],
-      columns: [
-        { header: 'FECHA Y HORA', key: 'fecha_hora' },
-        { header: 'MÓDULO', key: 'modulo' },
-        { header: 'ACCIÓN', key: 'accion' },
-        { header: 'DESCRIPCIÓN', key: 'descripcion' },
-        { header: 'USUARIO', key: 'nombre_usuario' },
-        { header: 'ROL', key: 'rol' },
-        { header: 'IP', key: 'ip' }
-      ],
-      data: eventos.map(log => ({
-        ...log,
-        fecha_hora: new Date(log.fecha_hora).toLocaleString('es-PE')
-      }))
-    })
-  }
-
   const handleExportAuditoria = async () => {
     let eventos
     setExportandoExcel(true)
@@ -182,7 +144,7 @@ export function SuperAdminDashboard({ user }) {
       setExportandoExcel(false)
     }
     await exportToExcel({
-      filename: `Auditoria_Sistema_${new Date().getFullYear()}.xls`,
+      filename: `Auditoria_Sistema_${new Date().getFullYear()}.xlsx`,
       sheetName: 'Auditoria',
       title: 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ',
       subtitle: 'Subgerencia de Tránsito y Transporte · Registro Oficial de Auditoría y Trazabilidad',
@@ -722,8 +684,7 @@ export function SuperAdminDashboard({ user }) {
                       <Icon name="filterX" className="size-4" />
                     </button>
                   )}
-                  <BotonExcel onClick={handleExportAuditoria} cargando={exportandoExcel} disabled={exportandoExcel} title="Descargar la auditoría en Excel (.xls)" />
-                  <BotonPdf onClick={handleExportAuditoriaPdf} cargando={exportandoPdf} disabled={exportandoPdf || loadingAudit || realAuditLogs.length === 0} title="Descargar o imprimir la auditoría en PDF" />
+                  <BotonExcel onClick={handleExportAuditoria} cargando={exportandoExcel} disabled={exportandoExcel} title="Descargar la auditoría en Excel (.xlsx)" />
                 </div>
               </div>
 

@@ -521,9 +521,9 @@ class PersonasController extends ResourceController
 
             $cData = [
                 'id_persona'       => $insertId,
-                'nombres'          => trim($input['nombres']),
-                'apellido_paterno' => trim($input['apellidoPaterno']),
-                'apellido_materno' => trim($input['apellidoMaterno'] ?? ''),
+                'nombres'          => mb_strtoupper(trim($input['nombres']), 'UTF-8'),
+                'apellido_paterno' => mb_strtoupper(trim($input['apellidoPaterno']), 'UTF-8'),
+                'apellido_materno' => mb_strtoupper(trim($input['apellidoMaterno'] ?? ''), 'UTF-8'),
                 'numero_licencia'  => strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null,
                 'estado_civil'     => trim($input['estadoCivil'] ?? '') ?: null,
                 'sexo'             => $this->normalizarSexo($input['sexo'] ?? null),
@@ -626,9 +626,9 @@ class PersonasController extends ResourceController
             }
 
             $cData = [];
-            if (isset($input['nombres'])) $cData['nombres'] = trim($input['nombres']);
-            if (isset($input['apellidoPaterno'])) $cData['apellido_paterno'] = trim($input['apellidoPaterno']);
-            if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = trim($input['apellidoMaterno']);
+            if (isset($input['nombres'])) $cData['nombres'] = mb_strtoupper(trim($input['nombres']), 'UTF-8');
+            if (isset($input['apellidoPaterno'])) $cData['apellido_paterno'] = mb_strtoupper(trim($input['apellidoPaterno']), 'UTF-8');
+            if (isset($input['apellidoMaterno'])) $cData['apellido_materno'] = mb_strtoupper(trim($input['apellidoMaterno']), 'UTF-8');
             if (array_key_exists('numeroLicencia', $input)) $cData['numero_licencia'] = strtoupper(trim($input['numeroLicencia'] ?? '')) ?: null;
             if (array_key_exists('estadoCivil', $input)) $cData['estado_civil'] = trim($input['estadoCivil'] ?? '') ?: null;
             if (array_key_exists('sexo', $input)) $cData['sexo'] = $this->normalizarSexo($input['sexo']);

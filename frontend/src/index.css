@@ -1244,3 +1244,40 @@ table thead th {
 /* Textos secundarios más legibles sobre fondo oscuro */
 html.dark .text-slate-400 { color: #a9b6c9; }
 html.dark .text-slate-500 { color: #b8c3d4; }
+
+/* SweetAlert2: el icono de éxito dibuja "parches" blancos para simular el trazo; en modo oscuro se ven como cuadros claros. */
+html.dark .swal2-popup .swal2-icon.swal2-success [class^='swal2-success-circular-line'],
+html.dark .swal2-popup .swal2-icon.swal2-success .swal2-success-fix {
+  background: transparent !important;
+}
+
+/* Botón de cerrar de las notificaciones: X roja, con fondo rojizo al pasar el mouse. */
+.mjlo-toast-close {
+  color: #f43f5e;
+  transition: background-color 0.15s, color 0.15s, transform 0.15s;
+}
+.mjlo-toast-close:hover {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  color: #e11d48;
+}
+.mjlo-toast-close:active {
+  transform: scale(0.92);
+}
+
+/* Botones de acción de las tablas (ver, editar, eliminar, imprimir…): cuando la columna era angosta se
+   achicaban en ancho y algunos quedaban más delgados que otros. Todos mantienen su tamaño de 2rem. */
+td button.size-8,
+td a.size-8 {
+  flex-shrink: 0;
+  min-width: 2rem;
+  min-height: 2rem;
+}
+
+/* Filas del menú lateral: crecen o se achican según el alto de la pantalla para aprovechar el espacio sin que
+   aparezca scroll (cada fila mide 2 × padding + 19 px; el resto del menú ocupa unos 136 px). */
+.nav-fila { padding-block: 0.75rem; }
+@media (max-height: 919px) { .nav-fila { padding-block: 0.625rem; } }
+@media (max-height: 849px) { .nav-fila { padding-block: 0.5rem; } }
+@media (max-height: 769px) { .nav-fila { padding-block: 0.375rem; } }
+@media (max-height: 699px) { .nav-fila { padding-block: 0.25rem; } }
+@media (max-height: 619px) { .nav-fila { padding-block: 3px; } }

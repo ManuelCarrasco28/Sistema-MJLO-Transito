@@ -74,7 +74,7 @@ export function PapeletaDetalleModal({
         {/* Cabecera: número, estado de pago y total siempre a la vista */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-rose-600/20 bg-rose-50 px-5 py-3.5 dark:bg-rose-950/30">
           <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
-            <h3 className="text-xl font-black text-rose-700 dark:text-rose-400">{selectedPapeleta.numeroPapeleta}</h3>
+            <h3 className="text-xl font-black text-rose-700 dark:text-rose-400">N° {formatoNumeroPapeleta(selectedPapeleta.numeroPapeleta)}</h3>
             <StatusBadge status={estadoPago} />
           </div>
           <div className="flex items-center gap-4">
@@ -227,3 +227,4 @@ export function PapeletaDetalleModal({
     </div>
   )
 }
+import { formatoNumeroPapeleta } from '../../utils/numeroPapeleta'

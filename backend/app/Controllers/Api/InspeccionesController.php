@@ -630,9 +630,9 @@ class InspeccionesController extends ResourceController
 
         $db->table('ciudadanos')->insert([
             'id_persona'       => $conductorId,
-            'nombres'          => $nombres,
-            'apellido_paterno' => $apellidoPaterno,
-            'apellido_materno' => $apellidoMaterno,
+            'nombres'          => mb_strtoupper($nombres, 'UTF-8'),
+            'apellido_paterno' => mb_strtoupper($apellidoPaterno, 'UTF-8'),
+            'apellido_materno' => $apellidoMaterno === null ? null : mb_strtoupper($apellidoMaterno, 'UTF-8'),
             'numero_licencia'  => ($licencia !== '' && $licencia !== $dni) ? $licencia : null,
         ]);
 

@@ -203,9 +203,9 @@ class OperativosController extends ResourceController
                 r.observaciones,
                 r.estado,
                 COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa,
-                COALESCE(NULLIF(v.marca, ''), r.vehiculo_marca, '') AS vehiculo_marca,
+                COALESCE(NULLIF(v.marca, ''), '') AS vehiculo_marca,
                 COALESCE(v.modelo, '') AS vehiculo_modelo,
-                COALESCE(NULLIF(v.color, ''), r.vehiculo_color, '') AS vehiculo_color,
+                COALESCE(NULLIF(v.color, ''), '') AS vehiculo_color,
                 COALESCE(cond_per.numero, r.conductor_informal_dni, 'S/D') AS conductor_dni,
                 COALESCE(
                     NULLIF(TRIM(CONCAT(c_cond.nombres, ' ', c_cond.apellido_paterno, ' ', COALESCE(c_cond.apellido_materno, ''))), ''),
@@ -243,7 +243,7 @@ class OperativosController extends ResourceController
         $db = \Config\Database::connect();
         
         $operativo = $db->table('operativos o')
-            ->select('o.uuid AS uuid, o.id, o.nombre, o.lugar, o.fecha, o.hora_inicio, o.fecha_fin, o.hora_fin, o.estado, ca.nombre as cargo_inspector')
+            ->select('o.uuid AS uuid, o.id, o.nombre, o.lugar, o.fecha, o.hora_inicio, o.fecha AS fecha_fin, o.hora_fin, o.estado, ca.nombre as cargo_inspector')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id', 'inner')
             ->join('desplazamiento_oficina dof', 'dof.id_trabajador = oi.id_inspector AND (dof.fecha_termino IS NULL OR dof.fecha_termino > CURDATE())', 'left')
             ->join('cargos ca', 'ca.id = dof.id_cargo', 'left')
@@ -412,7 +412,6 @@ class OperativosController extends ResourceController
             'lugar' => trim($input['lugar']),
             'fecha' => $input['fecha'],
             'hora_inicio' => $input['hora_inicio'],
-            'fecha_fin' => !empty($input['fecha_fin']) ? $input['fecha_fin'] : $input['fecha'],
             'hora_fin' => $horaFin,
             'estado' => $estado,
             'observacion' => trim($input['observacion'] ?? ''),
@@ -479,7 +478,7 @@ class OperativosController extends ResourceController
         }
 
         $data = [];
-        foreach (['nombre', 'lugar', 'fecha', 'hora_inicio', 'fecha_fin', 'hora_fin', 'observacion'] as $field) {
+        foreach (['nombre', 'lugar', 'fecha', 'hora_inicio', 'hora_fin', 'observacion'] as $field) {
             if (array_key_exists($field, $input)) {
                 $data[$field] = $input[$field] === '' ? null : $input[$field];
             }

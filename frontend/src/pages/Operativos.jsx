@@ -5,11 +5,10 @@ import { SortableHeader } from '../components/ui/SortableHeader'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { PlacaBadge } from '../components/ui/PlacaBadge'
+import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { sanitizarMensaje, apiFetch, setCachedData } from '../config/api'
 import { showError, showConfirm, showToast } from '../utils/SwalUtil'
 import { exportToExcel } from '../utils/exportToExcel'
-import { exportToPdf } from '../utils/exportToPdf'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { SearchableMultiSelect } from '../components/ui/SearchableMultiSelect'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
@@ -36,6 +35,15 @@ const initialForm = {
   hora_fin: '',
   observacion: '',
   inspectores: [],
+}
+
+// Cada tarjeta de resumen lleva su propio color (clases completas para que Tailwind las detecte).
+const COLOR_KPI_OPERATIVO = {
+  purple: { borde: 'border-purple-400', texto: 'text-purple-600 dark:text-purple-400' },
+  amber: { borde: 'border-amber-400', texto: 'text-amber-600 dark:text-amber-400' },
+  emerald: { borde: 'border-emerald-400', texto: 'text-emerald-600 dark:text-emerald-400' },
+  indigo: { borde: 'border-indigo-400', texto: 'text-indigo-600 dark:text-indigo-400' },
+  cyan: { borde: 'border-cyan-400', texto: 'text-cyan-600 dark:text-cyan-400' },
 }
 
 const FILTER_ESTADO_OPTIONS = [
@@ -92,7 +100,6 @@ export function Operativos({ user }) {
   const [totalFiltrado, setTotalFiltrado] = useState(0)
   const cargaOperativos = useRef(null)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   const loadOperativos = async () => {
     cargaOperativos.current?.abort()
@@ -178,7 +185,7 @@ export function Operativos({ user }) {
     try {
       const data = await fetchTodoElFiltro()
       await exportToExcel({
-        filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.xls`,
+        filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.xlsx`,
         sheetName: 'Operativos',
         title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
         subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
@@ -203,41 +210,13 @@ export function Operativos({ user }) {
         ],
         data
       })
+    } catch (error) {
+      if (error.name !== 'AbortError') showError('Descarga no completada', error.message || 'No se pudo preparar el archivo completo.')
     } finally {
       setIsExportingExcel(false)
     }
   }
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true)
-    try {
-      const data = await fetchTodoElFiltro()
-      await exportToPdf({
-        filename: `Operativos_Fiscalizacion_${new Date().toISOString().slice(0, 10)}.pdf`,
-        title: 'REGISTRO DE OPERATIVOS DE CONTROL Y FISCALIZACIÓN DE TRÁNSITO',
-        subtitle: 'Subgerencia de Tránsito y Transporte - Intervenciones en Vía Pública',
-        metadata: [
-          { label: 'Estado', value: String(estado || '').replace(/_/g, ' ') },
-          { label: 'Total Operativos', value: String(data.length) }
-        ],
-        columns: [
-          { header: 'N° / CÓDIGO', render: (_, o) => `OP-${String(o.id).padStart(4, '0')}`, width: 25, align: 'center' },
-          { header: 'NOMBRE DEL OPERATIVO', key: 'nombre', width: 40 },
-          { header: 'LUGAR / ZONA', key: 'lugar', width: 40 },
-          { header: 'FECHA', key: 'fecha', width: 20, align: 'center' },
-          { header: 'HORA INICIO', key: 'hora_inicio', width: 20, align: 'center' },
-          { header: 'HORA FIN', render: (_, o) => o.hora_fin || '—', width: 20, align: 'center' },
-          { header: 'INSPECTORES', render: (_, o) => String(o.total_inspectores ?? o.inspectores?.length ?? 0), width: 25, align: 'center' },
-          { header: 'PAPELETAS', render: (_, o) => String(o.total_papeletas ?? 0), width: 20, align: 'center' },
-          { header: 'REPORTES', render: (_, o) => String(o.total_reportes ?? 0), width: 20, align: 'center' },
-          { header: 'ESTADO', render: (_, o) => String(o.estado || '').replace(/_/g, ' '), width: 25, align: 'center' }
-        ],
-        data
-      })
-    } finally {
-      setIsExportingPdf(false)
-    }
-  }
 
   const activos = stats.activos ?? 0
   const finalizados = stats.finalizados ?? 0
@@ -264,6 +243,8 @@ export function Operativos({ user }) {
   }
 
   const openEdit = async (op) => {
+    if (abriendoOperativo) return
+    setAbriendoOperativo(true)
     try {
       const response = await apiFetch(`/operativos/${op.id}`)
       if (!response.ok) throw response
@@ -271,6 +252,8 @@ export function Operativos({ user }) {
       fillFormFromOperativo(result.data || op)
     } catch (_) {
       fillFormFromOperativo(op)
+    } finally {
+      setAbriendoOperativo(false)
     }
   }
 
@@ -399,12 +382,21 @@ export function Operativos({ user }) {
     }
   }
 
+  const [abriendoOperativo, setAbriendoOperativo] = useState(false)
   const openDetail = async (op) => {
+    if (abriendoOperativo) return
+    setAbriendoOperativo(true)
     setDetailTab('papeletas')
-    const response = await apiFetch(`/operativos/${op.id}`)
-    if (!response.ok) return
-    const result = await response.json()
-    setDetail(result.data)
+    try {
+      const response = await apiFetch(`/operativos/${op.id}`)
+      if (!response.ok) return
+      const result = await response.json()
+      setDetail(result.data)
+    } catch {
+      showError('No se pudo abrir el operativo', 'Revisa tu conexión e inténtalo de nuevo.')
+    } finally {
+      setAbriendoOperativo(false)
+    }
   }
 
   const badgeClass = (value) => ({
@@ -533,27 +525,25 @@ export function Operativos({ user }) {
     `
   }
 
-  const exportOperativoExcel = (op) => {
-    const html = `
-      <html>
-        <head><meta charset="UTF-8" /></head>
-        <body>
-          <h2>${safeText(op.nombre)}</h2>
-          <p><strong>Lugar:</strong> ${safeText(op.lugar)} | <strong>Fecha:</strong> ${safeText(formatFecha(op.fecha))} | <strong>Hora:</strong> ${safeText(formatHora(op.hora_inicio))}${op.hora_fin ? ` - ${safeText(formatHora(op.hora_fin))}` : ''}</p>
-          <p><strong>Total:</strong> ${op.papeletas?.length || 0} | <strong>Monto total:</strong> ${safeText(money(op.reporte?.monto_total))} | <strong>Registrado por:</strong> ${safeText(op.usuario_registra || 'No especificado')}</p>
-          ${buildReportTableHtml(op)}
-        </body>
-      </html>
-    `
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = reportFileName(op, 'xls')
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+  const exportOperativoExcel = async (op) => {
+    await exportToExcel({
+      filename: reportFileName(op, 'xlsx'), sheetName: 'Reporte operativo',
+      title: op.nombre, subtitle: 'Reporte de papeletas del operativo',
+      metadata: [{ label: 'Lugar', value: op.lugar }, { label: 'Fecha', value: formatFecha(op.fecha) }],
+      columns: [
+        { header: 'PAPELETA', key: 'papeleta', isText: true, width: 150 },
+        { header: 'FECHA / HORA', key: 'fecha', width: 150 },
+        { header: 'LUGAR', key: 'lugar', width: 200 },
+        { header: 'INSPECTOR', key: 'inspector', width: 180 },
+        { header: 'INTERVENIDO', key: 'intervenido', width: 180 },
+        { header: 'DNI', key: 'dni', isText: true, width: 110 },
+        { header: 'PLACA', key: 'placa', isText: true, width: 110 },
+        { header: 'INFRACCIONES', key: 'infraccion', width: 260 },
+        { header: 'MONTO (S/)', key: 'monto', width: 120 },
+        { header: 'ESTADO', key: 'estado', width: 120 },
+      ],
+      data: reportRows(op),
+    })
   }
 
   const exportOperativoPdf = (op) => {
@@ -626,16 +616,16 @@ export function Operativos({ user }) {
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          ['Total operativos', stats.total ?? 0, 'mapPin'],
-          ['Activos', activos, 'operations'],
-          ['Finalizados', finalizados, 'shieldCheck'],
-          ['Papeletas vinculadas', papeletas, 'ticket'],
-          ['Reportes vinculados', stats.reportes ?? 0, 'camera'],
-        ].map(([label, value, icon]) => (
-          <div key={label} className="relative overflow-hidden rounded-xl border-[1.5px] border-purple-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
+          ['Total operativos', stats.total ?? 0, 'mapPin', 'purple'],
+          ['Activos', activos, 'operations', 'amber'],
+          ['Finalizados', finalizados, 'shieldCheck', 'emerald'],
+          ['Papeletas vinculadas', papeletas, 'ticket', 'indigo'],
+          ['Reportes vinculados', stats.reportes ?? 0, 'camera', 'cyan'],
+        ].map(([label, value, icon, color]) => (
+          <div key={label} className={`relative overflow-hidden rounded-xl border-[1.5px] ${COLOR_KPI_OPERATIVO[color].borde} bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1`}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">{label}</span>
-              <span className="grid size-6 place-items-center rounded-md text-purple-600 dark:text-purple-400">
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${COLOR_KPI_OPERATIVO[color].texto}`}>{label}</span>
+              <span className={`grid size-6 place-items-center rounded-md ${COLOR_KPI_OPERATIVO[color].texto}`}>
                 <Icon name={icon} className="size-3.5" />
               </span>
             </div>
@@ -704,13 +694,10 @@ export function Operativos({ user }) {
               </button>
             )}
 
-            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition-colors" disabled={isExportingExcel}>
+            <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-colors" disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} /><span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
 
-            <button onClick={handleExportPdf} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors" disabled={isExportingPdf}>
-              <Icon name={isExportingPdf ? "refresh" : "filePdf"} className={`size-3.5 text-rose-600 dark:text-rose-400 ${isExportingPdf ? 'animate-spin' : ''}`} /><span>{isExportingPdf ? 'Generando...' : 'PDF'}</span>
-            </button>
 
             <button onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
               <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
@@ -757,8 +744,8 @@ export function Operativos({ user }) {
                   <td className="px-4 py-3 text-center"><StatusBadge status={op.estado} /></td>
                   <td className="px-4 py-3">
                     <div className="flex justify-center gap-1.5">
-                      <button onClick={() => openDetail(op)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver detalle"><Icon name="eye" className="size-4" /></button>
-                      <button onClick={() => openEdit(op)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar"><Icon name="pencil" className="size-4" /></button>
+                      <button onClick={() => openDetail(op)} disabled={abriendoOperativo} className="disabled:cursor-wait disabled:opacity-60 size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver detalle"><Icon name="eye" className="size-4" /></button>
+                      <button onClick={() => openEdit(op)} disabled={abriendoOperativo} className="disabled:cursor-wait disabled:opacity-60 size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar"><Icon name="pencil" className="size-4" /></button>
                       {(op.estado === 'PROGRAMADO' || op.estado === 'EN_CURSO') && (
                         <button
                           onClick={() => openCancelar(op)}
@@ -1026,7 +1013,7 @@ export function Operativos({ user }) {
                             <p className="text-[11px] text-slate-500 font-mono">DNI: {p.conductor_dni || 'S/D'}</p>
                           </td>
                           <td className="px-4 py-2.5 text-center">
-                            <PlacaBadge placa={p.placa} />
+                            <PlacaVehiculo placa={p.placa} />
                           </td>
                           <td className="px-4 py-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
                             {p.infracciones || '—'}
@@ -1077,7 +1064,7 @@ export function Operativos({ user }) {
                             <p className="text-[11px] text-slate-500 font-mono">DNI: {r.conductor_dni || 'S/D'}</p>
                           </td>
                           <td className="px-4 py-2.5 text-center">
-                            <PlacaBadge placa={r.placa} />
+                            <PlacaVehiculo placa={r.placa} />
                             {(r.vehiculo_marca || r.vehiculo_modelo || r.vehiculo_color) && (
                               <p className="mt-0.5 text-[10px] text-slate-400 truncate max-w-[120px] mx-auto">
                                 {[r.vehiculo_marca, r.vehiculo_modelo, r.vehiculo_color].filter(Boolean).join(' ')}

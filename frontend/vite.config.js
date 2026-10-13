@@ -15,6 +15,13 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port: 5173,
+      // En Docker sobre Windows los cambios se detectan por sondeo (CHOKIDAR_USEPOLLING): cada archivo
+      // vigilado cuesta CPU. TinyMCE (public/tinymce) y los builds (dist) no se editan, no hace falta vigilarlos.
+      watch: {
+        ignored: ['**/public/tinymce/**', '**/dist/**'],
+        interval: 400,
+        binaryInterval: 1500,
+      },
       proxy: {
         '/api': {
           target: backendTarget,
