@@ -26,7 +26,6 @@ class ReportesIntervencionController extends ResourceController
         $query = $db->table('reportes_intervencion r')
             ->select("r.uuid AS uuid, 
                 r.*,
-                r.observaciones_conductor AS observacionesConductor,
                 COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa_visual,
                 COALESCE(NULLIF(v.marca, ''), '') AS vehiculo_marca,
                 COALESCE(v.modelo, '') AS vehiculo_modelo,
@@ -66,16 +65,10 @@ class ReportesIntervencionController extends ResourceController
             $query->groupStart()
                   ->where('cond_per.numero', $dni)
                   ->orWhere('prop_per.numero', $dni)
-                  ->orWhere('r.conductor_informal_dni', $dni)
-                  ->orWhere('r.dueno_informal_dni', $dni)
                   ->groupEnd();
         }
         if (!empty($placa)) {
-            $query->groupStart()
-                  ->where('v.placa', $placa)
-                  ->orWhere('r.placa', $placa)
-                  ->orWhere("REPLACE(REPLACE(r.placa, '-', ''), ' ', '') =", $placa)
-                  ->groupEnd();
+            $query->where('v.placa', $placa);
         }
 
         // Modo paginado (pantalla de Papeletas): filtros y página en el servidor, para no traer todo el historial
@@ -116,7 +109,15 @@ class ReportesIntervencionController extends ResourceController
         }
 
         $query->groupBy('r.id');
-        $rows = $query->orderBy('r.id', 'DESC')->get()->getResultArray();
+        // Orden pedido por la tabla (lista blanca de columnas); sin pedido, el más reciente primero
+        $rows = \App\Libraries\QuerySort::aplicar($query, $this->request, [
+            'numero' => 'r.id',
+            'placa' => 'placa_visual',
+            'lugar' => 'r.lugar',
+            'inspector' => 'inspector_nombre',
+            'fecha' => 'r.fecha_hora',
+            'estado' => 'r.estado',
+        ], 'r.id')->get()->getResultArray();
 
         // Infracciones de todos los reportes de la página en dos consultas (antes eran 1 o 2 por cada reporte)
         $porReporte = [];
@@ -213,7 +214,6 @@ class ReportesIntervencionController extends ResourceController
         $placa = \App\Libraries\Placa::normalizar((string)($input['placa'] ?? $input['vehiculoPlaca'] ?? ''));
         $lugar = trim((string)($input['lugar'] ?? ''));
         $observaciones = trim((string)($input['observaciones'] ?? $input['observacionesAutoridad'] ?? ''));
-        $observacionesConductor = trim((string)($input['observacionesConductor'] ?? $input['observaciones_conductor'] ?? ''));
         $coordenadas = trim((string)($input['coordenadas'] ?? ''));
         $idOperativo = !empty($input['id_operativo']) ? (int)$input['id_operativo'] : null;
         $fotos = $input['fotos'] ?? [];
@@ -269,10 +269,7 @@ class ReportesIntervencionController extends ResourceController
             return $this->failValidationErrors('El lugar de la intervención no puede superar los 250 caracteres.');
         }
         if (mb_strlen($observaciones) > 500) {
-            return $this->failValidationErrors('La observación de la autoridad no puede superar los 500 caracteres.');
-        }
-        if (mb_strlen($observacionesConductor) > 500) {
-            return $this->failValidationErrors('La observación del conductor no puede superar los 500 caracteres.');
+            return $this->failValidationErrors('La observación no puede superar los 500 caracteres.');
         }
 
 
@@ -329,7 +326,6 @@ class ReportesIntervencionController extends ResourceController
                 'lugar' => $lugar,
                 'coordenadas' => $coordenadas !== '' ? $coordenadas : null,
                 'observaciones' => $observaciones,
-                'observaciones_conductor' => $observacionesConductor !== '' ? $observacionesConductor : null,
                 'estado' => 'PENDIENTE',
             ]);
             $id = (int)$db->insertID();
@@ -469,23 +465,20 @@ class ReportesIntervencionController extends ResourceController
 
             $tempNumero = 'TEMP-' . uniqid('', true);
 
-            $nombreAutoridad = trim((string)($input['infractor'] ?? ''));
-            if ($nombreAutoridad === '') {
-                if ($personaId) {
-                    $ciudadano = $db->table('ciudadanos')->where('id_persona', $personaId)->get()->getRowArray();
-                    $nombreAutoridad = $ciudadano
-                        ? trim($ciudadano['nombres'] . ' ' . $ciudadano['apellido_paterno'] . ' ' . ($ciudadano['apellido_materno'] ?? ''))
-                        : 'INFRACTOR';
-                } elseif (!empty($conductorInformalNombres)) {
-                    $nombreAutoridad = $conductorInformalNombres;
-                } else {
-                    $nombreAutoridad = 'CONDUCTOR NO IDENTIFICADO';
-                }
+            $nombreAutoridad = $personaId
+                ? trim((string)($input['infractor'] ?? ''))
+                : 'CONDUCTOR NO PRESENTE';
+            if ($personaId && $nombreAutoridad === '') {
+                $ciudadano = $db->table('ciudadanos')->where('id_persona', $personaId)->get()->getRowArray();
+                $nombreAutoridad = $ciudadano
+                    ? trim($ciudadano['nombres'] . ' ' . $ciudadano['apellido_paterno'] . ' ' . ($ciudadano['apellido_materno'] ?? ''))
+                    : 'INFRACTOR';
             }
 
-            $observacion = trim((string)($input['observacionesAutoridad'] ?? $reporte['observaciones'] ?? ''));
-            $tieneConductor = (bool)($personaId || !empty($conductorInformalNombres) || !empty($conductorInformalDni));
-            $obsConductor = trim((string)($input['observacionesConductor'] ?? $input['observaciones_conductor'] ?? $reporte['observaciones_conductor'] ?? ''));
+            $observacion = trim((string)($input['observacionesAutoridad'] ?? $reporte['observaciones']));
+            if (!$personaId) {
+                $observacion = trim($observacion . ' Responsable administrativo: propietario del vehículo.');
+            }
 
             $db->table('papeletas')->insert([
                 'uuid' => \App\Libraries\Identificador::nuevo(),
@@ -498,9 +491,9 @@ class ReportesIntervencionController extends ResourceController
                 'lugar' => $reporte['lugar'],
                 'nombre_autoridad' => $nombreAutoridad,
                 'observacion_autoridad' => $observacion,
-                'observaciones_conductor' => $obsConductor,
-                'firma_conductor_estado' => $tieneConductor ? 'PENDIENTE' : 'NO_PRESENTE',
-                'firma_conductor_observacion' => $tieneConductor ? null : 'Papeleta generada desde reporte de evidencia.',
+                'observaciones_conductor' => $personaId ? trim((string)($input['observacionesConductor'] ?? '')) : 'Conductor no presente durante la intervención.',
+                'firma_conductor_estado' => $personaId ? 'PENDIENTE' : 'NO_PRESENTE',
+                'firma_conductor_observacion' => $personaId ? null : 'Papeleta generada desde reporte de evidencia.',
                 'monto_total' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
                 'dueño_informal_nombres' => $reporte['dueno_informal_nombres'] ?? null,
@@ -521,6 +514,10 @@ class ReportesIntervencionController extends ResourceController
 
             (new \App\Services\PagosTransito($db))->generar('PAPELETA', $papeletaId);
 
+            // Al generarse la papeleta se genera también su internamiento (si hay vehículo y no está ya retenido)
+            $internamientoAuto = new \App\Services\InternamientoAutomatico($db);
+            $internamiento = $internamientoAuto->generar($papeletaId);
+
             $db->table('reportes_intervencion')->where('id', $id)->update([
                 'id_vehiculo' => $vehiculoId,
                 'id_papeleta' => $papeletaId,
@@ -528,7 +525,7 @@ class ReportesIntervencionController extends ResourceController
             ]);
 
             $db->transCommit();
-            return $this->respond(['message' => 'Reporte convertido a papeleta.', 'data' => ['id' => $papeletaId, 'numeroPapeleta' => $numeroPapeletaDefinitivo]]);
+            return $this->respond(['message' => 'Reporte convertido a papeleta.', 'data' => ['id' => $papeletaId, 'numeroPapeleta' => $numeroPapeletaDefinitivo, 'internamiento' => $internamiento]]);
         } catch (\DomainException $e) {
             $db->transRollback();
             return $this->failValidationErrors($e->getMessage());

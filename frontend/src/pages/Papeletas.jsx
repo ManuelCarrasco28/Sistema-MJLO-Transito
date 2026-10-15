@@ -140,6 +140,13 @@ export function Papeletas({ user }) {
   const [reportesSearch, setReportesSearch] = useState(() => (vistaInicial === 'REPORTES' ? new URLSearchParams(window.location.search).get('search') || '' : ''))
   const [reportesFilterEstado, setReportesFilterEstado] = useState('TODOS')
   const [reportesPage, setReportesPage] = useState(1)
+  const [reportesSortBy, setReportesSortBy] = useState('')
+  const [reportesSortDir, setReportesSortDir] = useState('DESC')
+  const handleSortReportes = (column, dir) => {
+    setReportesSortBy(column)
+    setReportesSortDir(dir)
+    setReportesPage(1)
+  }
   const reportesBusqueda = useDebounce(reportesSearch.trim(), 300)
   const [reportesPerPage, setReportesPerPage] = useState(8)
   const [loadingReportes, setLoadingReportes] = useState(false)
@@ -334,6 +341,7 @@ export function Papeletas({ user }) {
     const params = new URLSearchParams({ page: String(reportesPage), porPagina: String(reportesPerPage) })
     if (reportesFilterEstado !== 'TODOS') params.set('estado', reportesFilterEstado)
     if (reportesBusqueda) params.set('buscar', reportesBusqueda)
+    if (reportesSortBy) { params.set('sortBy', reportesSortBy); params.set('sortDir', reportesSortDir) }
     apiFetch(`/reportes-intervencion?${params}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((reportesRes) => {
@@ -364,15 +372,9 @@ export function Papeletas({ user }) {
     }
   }
 
-  const loadVehiculos = (nuevoVehiculo = null) => {
-    if (nuevoVehiculo && nuevoVehiculo.id) {
-      setVehiculos((prev) => [nuevoVehiculo, ...prev.filter((v) => v.id !== nuevoVehiculo.id)])
-      setConvertForm((prev) => ({ ...prev, vehiculoId: String(nuevoVehiculo.id) }))
-    }
+  const loadVehiculos = () => {
     const placa = reporteToConvert?.placa || reporteToConvert?.placa_visual
-    if (placa && !placa.toUpperCase().startsWith('SIN-PLACA')) {
-      cargarVehiculoPorPlaca(placa)
-    }
+    if (placa) cargarVehiculoPorPlaca(placa)
   }
 
   const handleVerFotosReporte = async (reporte) => {
@@ -465,7 +467,7 @@ export function Papeletas({ user }) {
   // Reportes: se piden al servidor ya filtrados y paginados (solo la página visible)
   useEffect(() => {
     if (movilAplicaPapeleta === false) loadReportes()
-  }, [movilAplicaPapeleta, reportesPage, reportesPerPage, reportesFilterEstado, reportesBusqueda])
+  }, [movilAplicaPapeleta, reportesPage, reportesPerPage, reportesFilterEstado, reportesBusqueda, reportesSortBy, reportesSortDir])
 
   useEffect(() => {
     loadStats()
@@ -567,8 +569,7 @@ export function Papeletas({ user }) {
       vehiculoId: String(reporte.id_vehiculo || matchVehiculo?.id || ''),
       conductorDni: reporte.conductorDni && reporte.conductorDni !== 'S/D' ? reporte.conductorDni : '',
       // Observaciones de la oficina: empiezan vacías (la del inspector ya se ve en la tarjeta del reporte)
-      observacionesAutoridad: '',
-      observacionesConductor: reporte.observaciones_conductor || reporte.observacionesConductor || ''
+      observacionesAutoridad: ''
     })
     try {
       const res = await apiFetch(`/reportes-intervencion/${reporte.id}/fotos`)
@@ -603,8 +604,7 @@ export function Papeletas({ user }) {
           infraccionesIds: validInfracciones,
           vehiculoId: Number(convertForm.vehiculoId),
           conductorDni: convertForm.conductorDni,
-          observacionesAutoridad: convertForm.observacionesAutoridad,
-          observacionesConductor: convertForm.observacionesConductor
+          observacionesAutoridad: convertForm.observacionesAutoridad
         }
       })
       const data = await res.json().catch(() => ({}))
@@ -613,7 +613,7 @@ export function Papeletas({ user }) {
       loadData()
       loadStats()
       loadReportes()
-      showToast(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}`.trim(), 'success')
+      showToast(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}${data.data?.internamiento?.numeroBoleta ? ' · internamiento ' + data.data.internamiento.numeroBoleta : ''}`.trim(), 'success')
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'Error al convertir reporte.'))
       // Si el reporte ya fue atendido (convertido o rechazado desde otra pantalla o un envío anterior), la ventana
@@ -633,7 +633,7 @@ export function Papeletas({ user }) {
     setNuevaForm({
       vehiculoPlaca: '', claseVehiculo: '', marcaVehiculo: '', colorVehiculo: '', motorVehiculo: '',
       conductorDni: '', conductorNombres: '', conductorApellidos: '', lugar: '',
-      infraccionesIds: [''], observacionesAutoridad: '', observacionesConductor: ''
+      infraccionesIds: [''], observacionesAutoridad: ''
     })
     setIsNuevaModalOpen(true)
   }
@@ -674,7 +674,6 @@ export function Papeletas({ user }) {
           lugar: nuevaForm.lugar.trim(),
           infraccionesIds: validInfracciones,
           observacionesAutoridad: nuevaForm.observacionesAutoridad,
-          observacionesConductor: nuevaForm.observacionesConductor,
           inspectorId: user.id_persona
         }
       })
@@ -683,7 +682,7 @@ export function Papeletas({ user }) {
       setIsNuevaModalOpen(false)
       loadData()
       loadStats()
-      showToast(`Papeleta ${data.data?.numeroPapeleta || ''} registrada correctamente`.trim())
+      showToast(`Papeleta ${data.data?.numeroPapeleta || ''} registrada correctamente${data.data?.internamiento?.numeroBoleta ? ' · internamiento ' + data.data.internamiento.numeroBoleta : ''}`.trim())
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'No se pudo registrar la papeleta.'))
     } finally {
@@ -920,11 +919,11 @@ export function Papeletas({ user }) {
               </colgroup>
               <thead className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-400">
                 <tr>
-                  <th className="px-3.5 py-3.5 text-center">N° / Estado</th>
-                  <th className="px-3.5 py-3.5 text-center">Vehículo / Placa</th>
-                  <th className="px-3.5 py-3.5">Infracción / Lugar</th>
+                  <th className="px-3.5 py-3.5 text-center"><SortableHeader column="numero" label="N° / Estado" sortBy={reportesSortBy} sortDir={reportesSortDir} onSort={handleSortReportes} align="center" /></th>
+                  <th className="px-3.5 py-3.5 text-center"><SortableHeader column="placa" label="Placa" sortBy={reportesSortBy} sortDir={reportesSortDir} onSort={handleSortReportes} align="center" /></th>
+                  <th className="px-3.5 py-3.5"><SortableHeader column="lugar" label="Infracción / Lugar" sortBy={reportesSortBy} sortDir={reportesSortDir} onSort={handleSortReportes} /></th>
                   <th className="px-3.5 py-3.5">Observaciones de Campo</th>
-                  <th className="px-3.5 py-3.5">Inspector & Fecha</th>
+                  <th className="px-3.5 py-3.5"><SortableHeader column="fecha" label="Inspector & Fecha" sortBy={reportesSortBy} sortDir={reportesSortDir} onSort={handleSortReportes} /></th>
                   <th className="px-3.5 py-3.5 text-center">Evidencias</th>
                   <th className="px-3.5 py-3.5 text-center">Acciones</th>
                 </tr>
@@ -971,16 +970,9 @@ export function Papeletas({ user }) {
                         </div>
                       </td>
 
-                      {/* Vehículo / Placa */}
+                      {/* Placa */}
                       <td className="px-3.5 py-3.5 text-center">
                         <PlacaVehiculo placa={reporte.placa_visual} />
-                        {(reporte.vehiculo_marca || reporte.vehiculo_modelo || reporte.vehiculo_color) ? (
-                          <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[130px] mx-auto" title={[reporte.vehiculo_marca, reporte.vehiculo_modelo, reporte.vehiculo_color].filter(Boolean).join(' ')}>
-                            {[reporte.vehiculo_marca, reporte.vehiculo_modelo, reporte.vehiculo_color].filter(Boolean).join(' ')}
-                          </p>
-                        ) : (
-                          <p className="mt-1 text-[11px] text-slate-400">Sin datos veh.</p>
-                        )}
                       </td>
 
                       {/* Infracción / Lugar */}
@@ -994,10 +986,10 @@ export function Papeletas({ user }) {
                         )}
                         <div className="mt-1 flex items-start gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
                           <Icon name="mapPin" className="size-3.5 text-slate-400 shrink-0 mt-0.5" />
-                          <span className="line-clamp-2 leading-tight" title={reporte.lugar}>{reporte.lugar || 'Lugar no especificado'}</span>
+                          <span className="leading-tight" title={reporte.lugar}>{reporte.lugar || 'Lugar no especificado'}</span>
                         </div>
                         {reporte.coordenadas && (
-                          <p className="mt-0.5 font-mono text-[10px] text-slate-400 truncate" title={`GPS: ${reporte.coordenadas}`}>
+                          <p className="mt-0.5 font-mono text-[10px] text-slate-400 break-all" title={`GPS: ${reporte.coordenadas}`}>
                             GPS: {reporte.coordenadas}
                           </p>
                         )}
@@ -1005,16 +997,11 @@ export function Papeletas({ user }) {
 
                       {/* Observaciones de Campo */}
                       <td className="px-3.5 py-3.5">
-                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug line-clamp-2 font-medium" title={reporte.observaciones}>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug break-words font-medium" title={reporte.observaciones}>
                           {reporte.observaciones || <span className="text-slate-400 italic">Sin observaciones</span>}
                         </p>
-                        {(reporte.observaciones_conductor || reporte.observacionesConductor) && (
-                          <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300 line-clamp-1 italic" title={`Obs. Conductor: ${reporte.observaciones_conductor || reporte.observacionesConductor}`}>
-                            <span className="font-bold text-slate-700 dark:text-slate-200 not-italic">Obs. Cond:</span> “{reporte.observaciones_conductor || reporte.observacionesConductor}”
-                          </p>
-                        )}
                         {reporte.conductorNombre && reporte.conductorNombre !== 'No identificado' && (
-                          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 truncate" title={`${reporte.conductorNombre} (${reporte.conductorDni || 'S/D'})`}>
+                          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 break-words" title={`${reporte.conductorNombre} (${reporte.conductorDni || 'S/D'})`}>
                             <span className="font-bold text-slate-600 dark:text-slate-300">Cond:</span> {reporte.conductorNombre}
                             {reporte.conductorDni && ` (${reporte.conductorDni})`}
                           </p>
@@ -1031,7 +1018,7 @@ export function Papeletas({ user }) {
 
                       {/* Inspector & Fecha */}
                       <td className="px-3.5 py-3.5">
-                        <p className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate" title={reporte.inspector_nombre}>
+                        <p className="font-bold text-xs text-slate-800 dark:text-slate-100 break-words" title={reporte.inspector_nombre}>
                           {reporte.inspector_nombre || 'Inspector S/D'}
                         </p>
                         {reporte.operativoNombre && (
@@ -1178,15 +1165,6 @@ export function Papeletas({ user }) {
                   <span>Infracciones</span>
                 </button>
               )}
-
-              <button
-                type="button"
-                onClick={handleOpenNuevaPapeleta}
-                className="inline-flex h-[38px] items-center justify-center gap-1.5 rounded-xl px-3.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
-                style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
-              >
-                <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
-              </button>
             </div>
           </div>
 
@@ -1255,9 +1233,9 @@ export function Papeletas({ user }) {
           <table className="w-full min-w-[1200px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[10%]" />
-              <col className="w-[15%]" />
-              <col className="w-[15%]" />
-              <col className="w-[9%]" />
+              <col className="w-[14%]" />
+              <col className="w-[14%]" />
+              <col className="w-[11%]" />
               <col className="w-[10%]" />
               <col className="w-[10%]" />
               <col className="w-[10%]" />
@@ -1318,7 +1296,7 @@ export function Papeletas({ user }) {
                         <p className="font-bold text-slate-800 dark:text-slate-100 text-xs">{p.conductorNombre || p.infractor || 'No Identificado'}</p>
                         <p className="font-mono text-xs text-slate-400">DNI: {p.conductorDni || 'S/D'}</p>
                       </td>
-                      <td className="px-3.5 py-3.5 ">
+                      <td className="px-3.5 py-3.5 text-center">
                         {p.vehiculoPlaca && p.vehiculoPlaca !== 'SIN PLACA' ? (
                           <PlacaVehiculo placa={p.vehiculoPlaca} vehiculoId={p.vehiculoId} />
                         ) : (

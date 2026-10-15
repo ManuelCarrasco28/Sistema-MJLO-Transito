@@ -189,16 +189,10 @@ class PapeletasController extends ResourceController
                 $builder->groupStart()
                         ->where('per.numero', $dni)
                         ->orWhere('prop_per.numero', $dni)
-                        ->orWhere('p.conductor_informal_dni', $dni)
-                        ->orWhere('p.dueño_informal_dni', $dni)
                         ->groupEnd();
             }
             if (!empty($placa)) {
-                $builder->groupStart()
-                        ->where('v.placa', $placa)
-                        ->orWhere('p.placa', $placa)
-                        ->orWhere("REPLACE(REPLACE(p.placa, '-', ''), ' ', '') =", $placa)
-                        ->groupEnd();
+                $builder->where('v.placa', $placa);
             }
             if ($estado !== '' && $estado !== 'TODOS') {
                 $builder->where('p.estado', $estado);
@@ -231,10 +225,7 @@ class PapeletasController extends ResourceController
                 $builder->groupStart()
                     ->like('p.numero_papeleta', $buscar)
                     ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
-                    ->orLike('p.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                     ->orLike('per.numero', $buscar)
-                    ->orLike('p.conductor_informal_dni', $buscar)
-                    ->orLike('p.dueño_informal_dni', $buscar)
                     ->orLike('c_per.nombres', $buscar)
                     ->orLike('c_per.apellido_paterno', $buscar)
                     ->orLike('c_per.apellido_materno', $buscar)
@@ -519,6 +510,10 @@ class PapeletasController extends ResourceController
 
             (new \App\Services\PagosTransito($db))->generar('PAPELETA', (int)$papeletaId);
 
+            // Al generarse la papeleta se genera también su internamiento (si hay vehículo y no está ya retenido)
+            $internamientoAuto = new \App\Services\InternamientoAutomatico($db);
+            $internamiento = $internamientoAuto->generar((int)$papeletaId);
+
             $fotos = $input['fotos'] ?? [];
             if (!empty($fotos) && is_array($fotos)) {
                 // Máximo 5 fotos por papeleta y límite de tamaño (~7MB base64 ~= 5MB binario)
@@ -554,6 +549,7 @@ class PapeletasController extends ResourceController
                 'observacionesConductor' => $obsConductor,
                 'montoTotal' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
+                'internamiento' => $internamiento,
             ];
 
             return $this->respondCreated(['status' => 201, 'data' => $response]);

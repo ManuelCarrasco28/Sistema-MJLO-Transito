@@ -30,14 +30,13 @@ class AuthController extends ResourceController
     {
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()
-            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, COALESCE(ciudadanos.foto, "") as foto_img, roles.nombre as rol, cargos.nombre as cargo, trabajadores.tipo_inspector')
+            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, COALESCE(ciudadanos.foto, "") as foto_img, roles.nombre as rol, cargos.nombre as cargo')
             ->join('ciudadanos', 'ciudadanos.id_persona = usuarios.id_persona', 'inner')
             ->join('roles', 'roles.id = usuarios.id_rol', 'inner')
             ->join('trabajadores', 'trabajadores.id_persona = usuarios.id_persona', 'left')
             ->join('desplazamiento_oficina', 'desplazamiento_oficina.id_trabajador = usuarios.id_persona AND (desplazamiento_oficina.fecha_termino IS NULL OR desplazamiento_oficina.fecha_termino > CURDATE())', 'left')
             ->join('cargos', 'cargos.id = desplazamiento_oficina.id_cargo', 'left')
             ->where('usuarios.id', $userId)
-            ->orderBy('desplazamiento_oficina.id', 'DESC')
             ->first();
 
         if (!$userRecord || ($userRecord['estado'] ?? '') !== 'ACTIVO') {
@@ -45,20 +44,19 @@ class AuthController extends ResourceController
         }
 
         return [
-            'id'             => $userRecord['id'],
-            'nombres'        => $userRecord['nombres'],
-            'apellidos'      => $userRecord['apellidos'],
-            'usuario'        => $userRecord['usuario'],
-            'rol'            => $userRecord['rol'],
-            'id_rol'         => (int) $userRecord['id_rol'],
-            'cargo'          => $userRecord['cargo'],
-            'tipo_inspector' => $userRecord['tipo_inspector'] ?? null,
-            'id_persona'     => (int) $userRecord['id_persona'],
+            'id'           => $userRecord['id'],
+            'nombres'      => $userRecord['nombres'],
+            'apellidos'    => $userRecord['apellidos'],
+            'usuario'      => $userRecord['usuario'],
+            'rol'          => $userRecord['rol'],
+            'id_rol'       => (int) $userRecord['id_rol'],
+            'cargo'        => $userRecord['cargo'],
+            'id_persona'   => (int) $userRecord['id_persona'],
             // La foto se guarda como ruta relativa ("personas/xxx.jpg"): sin convertirla a URL pública el navegador
             // la pedía contra la página actual y salía rota.
-            'foto_img'       => (new \App\Services\FileStorageService())->urlPublica($userRecord['foto_img'] ?? null) ?? '',
-            'sv'             => (int) $userRecord['session_version'],
-            'preferencias'   => json_decode((string) ($userRecord['preferencias'] ?? ''), true) ?: new \stdClass(),
+            'foto_img'     => (new \App\Services\FileStorageService())->urlPublica($userRecord['foto_img'] ?? null) ?? '',
+            'sv'           => (int) $userRecord['session_version'],
+            'preferencias' => json_decode((string) ($userRecord['preferencias'] ?? ''), true) ?: new \stdClass(),
         ];
     }
 
@@ -385,21 +383,9 @@ class AuthController extends ResourceController
             return $this->failUnauthorized('El usuario se encuentra inactivo.');
         }
 
-        $rol = strtoupper((string) ($userData['rol'] ?? ''));
-        $esInspectorTransito = \App\Libraries\Acceso::esInspectorTransito($userData);
-        $esClienteMovil = \App\Libraries\Acceso::esClienteMovil($this->request);
-
-        // Control de acceso según entorno (Web vs. Móvil)
-        if (!$esClienteMovil) {
-            // En el sistema web: reservado para el personal administrativo y de oficina.
-            if ($rol === 'TRABAJADOR' || $esInspectorTransito) {
-                return $this->failForbidden('El acceso al sistema web está reservado para el personal administrativo y de oficina. Por favor, utilice la aplicación móvil.');
-            }
-        } else {
-            // En la aplicación móvil: uso exclusivo para inspectores con Tipo de inspector "Tránsito (acceso móvil)" (y SuperAdmin).
-            if (!$esInspectorTransito && $rol !== 'SUPERADMIN') {
-                return $this->failForbidden('El acceso a la aplicación móvil está reservado únicamente para inspectores de tránsito con acceso móvil autorizado.');
-            }
+        // Los inspectores (rol Trabajador) solo usan la app móvil: desde el navegador no se les crea la sesión
+        if (strtoupper((string) ($userData['rol'] ?? '')) === 'TRABAJADOR' && !\App\Libraries\Acceso::esClienteMovil($this->request)) {
+            return $this->failForbidden('El acceso al sistema web está restringido para este rol. Por favor, utilice la aplicación móvil.');
         }
 
         $this->clearFailedLogins($usuario);

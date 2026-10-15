@@ -52,7 +52,8 @@ class PagosTransito
             } elseif ($tipo === 'TRAMITE') {
                 $procedure = $this->db->table('procedimientos_administrativos')->where('id', $origin['id_procedimiento_admin'])->get()->getRowArray();
                 if (!$procedure) throw new DomainException('El trámite necesita un procedimiento administrativo con costo definido.');
-                $total = $procedure['costo'];
+                $total = \App\Libraries\TupaCosto::vigente($this->db, (int) $procedure['id']);
+                if ($total === null) throw new DomainException('El procedimiento no tiene un costo vigente definido.');
             } else {
                 $course = $this->db->table('cursos_seguridad_vial')->where('id', $origin['id_curso'])->get()->getRowArray();
                 if (!$course || $course['costo_inscripcion'] === null) throw new DomainException('El curso no tiene costo definido.');
@@ -166,6 +167,9 @@ class PagosTransito
                     [(int) $pago['id_papeleta']]
                 )->getRowArray();
                 if ($liberado) throw new DomainException('Esta papeleta se cobró al liberar un vehículo del depósito. Regularice primero la orden de libertad antes de anular el pago.');
+            }
+            if ($this->db->table('certicav')->where('id_pago', $id)->countAllResults() > 0) {
+                throw new DomainException('Este pago de CERTICAV ya se usó en una inspección técnica: no se puede anular.');
             }
             $this->db->table('pagos_transito')->where('id', $id)->update(['estado' => 'ANULADO']);
             $otherPaid = $this->db->table('pagos_transito')->where('estado', 'PAGADO')->where($pago['tipo_pago'] === 'PAPELETA' ? 'id_papeleta' : ($pago['tipo_pago'] === 'CURSO' ? 'id_inscripcion' : 'id_tramite'), $origin['id'])->countAllResults();

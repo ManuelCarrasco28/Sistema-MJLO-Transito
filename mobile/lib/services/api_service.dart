@@ -15,11 +15,8 @@ class _ClienteAutenticado {
   Future<http.Response> get(Uri url, {Map<String, String>? headers}) async =>
       _revisar(await http.get(url, headers: headers));
 
-  Future<http.Response> post(
-    Uri url, {
-    Map<String, String>? headers,
-    Object? body,
-  }) async => _revisar(await http.post(url, headers: headers, body: body));
+  Future<http.Response> post(Uri url, {Map<String, String>? headers, Object? body}) async =>
+      _revisar(await http.post(url, headers: headers, body: body));
 
   Future<http.Response> _revisar(http.Response r) async {
     if (r.statusCode == 401) {
@@ -51,8 +48,7 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl =
-      'http://192.168.137.1:8080/api'; // Conectado al punto de acceso del compañero
+  static const String _defaultUrl = 'http://10.24.31.109:8080/api'; // Cambiado a IP local para celular físico
   // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
   static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
   static const String _configuredUrl = String.fromEnvironment(
@@ -129,17 +125,12 @@ class ApiService {
       }
     }
 
-    final List<String> historial =
-        prefs.getStringList(_keyHistorialUsuarios) ?? [];
+    final List<String> historial = prefs.getStringList(_keyHistorialUsuarios) ?? [];
 
     return {
       'recordar': recordar,
-      'usuario': (recordar && usuario != null && usuario.isNotEmpty)
-          ? usuario
-          : null,
-      'password': (recordar && password != null && password.isNotEmpty)
-          ? password
-          : null,
+      'usuario': (recordar && usuario != null && usuario.isNotEmpty) ? usuario : null,
+      'password': (recordar && password != null && password.isNotEmpty) ? password : null,
       'historial': historial,
     };
   }
@@ -153,8 +144,7 @@ class ApiService {
     await prefs.setStringList(_keyHistorialUsuarios, historial);
 
     final usuarioRecordado = prefs.getString(_keyUsuarioRecordado);
-    if (usuarioRecordado != null &&
-        usuarioRecordado.trim().toLowerCase() == clean.toLowerCase()) {
+    if (usuarioRecordado != null && usuarioRecordado.trim().toLowerCase() == clean.toLowerCase()) {
       await prefs.remove(_keyUsuarioRecordado);
       await prefs.remove(_keyPasswordRecordado);
       await prefs.setBool(_keyRecordarUsuario, false);
@@ -166,10 +156,7 @@ class ApiService {
   }
 
   // Métodos de compatibilidad
-  static Future<void> saveSavedCredentials(
-    String username,
-    String password,
-  ) async {
+  static Future<void> saveSavedCredentials(String username, String password) async {
     await registrarLoginExitoso(username, password, true);
   }
 
@@ -205,11 +192,10 @@ class ApiService {
 
   /// Encabezados para cargar fotos y firmas: el servidor las entrega solo con sesión iniciada.
   static Map<String, String> get headersImagen => {
-    'X-Mobile-App': 'MJLO-TRANSITO',
-    if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
-    if (_cookieEnMemoria != null && _cookieEnMemoria!.isNotEmpty)
-      'Cookie': _cookieEnMemoria!,
-  };
+        'X-Mobile-App': 'MJLO-TRANSITO',
+        if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
+        if (_cookieEnMemoria != null && _cookieEnMemoria!.isNotEmpty) 'Cookie': _cookieEnMemoria!,
+      };
 
   /// URL de un archivo guardado en el servidor (foto, firma). Acepta la ruta relativa ('papeletas/abc.jpg')
   /// o la URL completa que arma el servidor, y siempre apunta al servidor que usa la app.
@@ -217,9 +203,7 @@ class ApiService {
     final r = ruta.trim();
     if (r.startsWith('data:')) return r;
     final i = r.indexOf('/api/files/');
-    if (i >= 0) {
-      return '$baseUrl/files/${r.substring(i + '/api/files/'.length)}';
-    }
+    if (i >= 0) return '$baseUrl/files/${r.substring(i + '/api/files/'.length)}';
     if (r.startsWith('http://') || r.startsWith('https://')) return r;
     return '$baseUrl/files/${r.replaceFirst(RegExp(r'^/+'), '')}';
   }
@@ -261,10 +245,7 @@ class ApiService {
         if (rawCookie != null) {
           final match = RegExp(r'session_user=[^;]+').firstMatch(rawCookie);
           if (match != null) {
-            await _secureStorage.write(
-              key: _sessionCookieKey,
-              value: match.group(0)!,
-            );
+            await _secureStorage.write(key: _sessionCookieKey, value: match.group(0)!);
             _cookieEnMemoria = match.group(0)!;
           }
         }
@@ -284,15 +265,6 @@ class ApiService {
         await prefs.setString('nombres', data['data']['nombres']);
         await prefs.setString('apellidos', data['data']['apellidos']);
         await prefs.setString('usuario', username);
-        if (data['data']['tipo_inspector'] != null) {
-          await prefs.setString(
-            'tipo_inspector',
-            data['data']['tipo_inspector'].toString(),
-          );
-        }
-        if (data['data']['cargo'] != null) {
-          await prefs.setString('cargo', data['data']['cargo'].toString());
-        }
         return data;
       }
     }
@@ -302,16 +274,6 @@ class ApiService {
   static Future<int?> getPersonalId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('id_persona');
-  }
-
-  static Future<String?> getCargo() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('cargo');
-  }
-
-  static Future<String?> getTipoInspector() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('tipo_inspector');
   }
 
   /// Cierra la sesión también en el servidor (mejor esfuerzo) y luego borra lo local.
@@ -331,8 +293,6 @@ class ApiService {
     await prefs.remove('nombres');
     await prefs.remove('apellidos');
     await prefs.remove('usuario');
-    await prefs.remove('cargo');
-    await prefs.remove('tipo_inspector');
     _cookieEnMemoria = null;
     try {
       await _secureStorage.delete(key: _sessionCookieKey);
@@ -352,11 +312,13 @@ class ApiService {
     }
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
-    final uri = Uri.parse('$baseUrl/papeletas')
-        .replace(queryParameters: params);
-
+    final uri = Uri.parse('$baseUrl/papeletas').replace(queryParameters: params);
+    
     final response = await _http
-        .get(uri, headers: await _getHeaders(isJson: false))
+        .get(
+          uri,
+          headers: await _getHeaders(isJson: false),
+        )
         .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -375,11 +337,13 @@ class ApiService {
     }
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
-    final uri = Uri.parse('$baseUrl/reportes-intervencion')
-        .replace(queryParameters: params);
-
+    final uri = Uri.parse('$baseUrl/reportes-intervencion').replace(queryParameters: params);
+    
     final response = await _http
-        .get(uri, headers: await _getHeaders(isJson: false))
+        .get(
+          uri,
+          headers: await _getHeaders(isJson: false),
+        )
         .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -563,8 +527,9 @@ class ApiService {
       qParams['codeOficina'] = codeOficina;
     }
 
-    final uri = Uri.parse('$baseUrl/mobile/vehiculos/buscar')
-        .replace(queryParameters: qParams);
+    final uri = Uri.parse('$baseUrl/mobile/vehiculos/buscar').replace(
+      queryParameters: qParams,
+    );
     final response = await _http
         .get(
           uri,

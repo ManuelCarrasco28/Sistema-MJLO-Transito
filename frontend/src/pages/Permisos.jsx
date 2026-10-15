@@ -525,7 +525,7 @@ export function Permisos() {
                     <th className="px-3 py-3 w-[200px]"><SortableHeader column="numeroAutorizacion" label="N° Autorización" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                     <th className="px-3 py-3 w-[140px]"><SortableHeader column="tipoPermiso" label="Tipo" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                     <th className="px-3 py-3 w-[22%]"><SortableHeader column="solicitanteNombre" label="Solicitante" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                    <th className="px-3 py-3 w-[110px]">Placa</th>
+                    <th className="px-3 py-3 w-[110px]"><SortableHeader column="vehiculoPlaca" label="Placa" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                     <th className="px-3 py-3 w-[16%]">Zona</th>
                     <th className="px-3 py-3 w-[165px]">Horario</th>
                     <th className="px-3 py-3 w-[105px]">Vigencia</th>
@@ -776,7 +776,7 @@ export function Permisos() {
               <div className="mt-4 border-t border-slate-100 pt-3 dark:border-[var(--border)] flex items-center justify-between">
                 <span className="text-[11px] font-medium text-slate-400">Derecho de trámite</span>
                 <span className="text-sm font-black text-slate-900 dark:text-white">
-                  S/ {Number(proc.costo || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  S/ {Number(proc.costo || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>

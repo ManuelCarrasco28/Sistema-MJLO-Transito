@@ -669,9 +669,9 @@ export function Retenciones({ user }) {
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3.5 text-center"><SortableHeader column="numeroBoleta" label="Boleta" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                <th className="px-4 py-3.5 text-center">Placa</th>
+                <th className="px-4 py-3.5 text-center"><SortableHeader column="vehiculoPlaca" label="Placa" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3.5 text-center">Infracción</th>
-                <th className="px-4 py-3.5 text-center">Conductor</th>
+                <th className="px-4 py-3.5 text-center"><SortableHeader column="conductorNombre" label="Conductor" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3.5 text-center"><SortableHeader column="fechaIngreso" label="Ingreso y custodia" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-3 py-3.5 text-center print:hidden">Documento</th>
                 <th className="px-4 py-3.5 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>

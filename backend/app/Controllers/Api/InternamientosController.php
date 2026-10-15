@@ -7,7 +7,7 @@ use CodeIgniter\RESTful\ResourceController;
 class InternamientosController extends ResourceController
 {
     /** Depósito oficial donde quedan internados los vehículos (único). */
-    private const DEPOSITO_OFICIAL = 'Depósito Oficial José L. Ortiz';
+    private const DEPOSITO_OFICIAL = \App\Services\InternamientoAutomatico::DEPOSITO_OFICIAL;
 
     use \App\Libraries\ResuelveUuid;
 
@@ -167,6 +167,8 @@ class InternamientosController extends ResourceController
 
             $columnasOrdenables = [
                 'numeroBoleta' => 'oi.numero_boleta',
+                'vehiculoPlaca' => 'vehiculoPlaca',
+                'conductorNombre' => 'conductorNombre',
                 'fechaIngreso' => 'oi.fecha_ingreso',
                 'estado' => 'oi.estado',
                 'totalDias' => 'oi.total_dias',

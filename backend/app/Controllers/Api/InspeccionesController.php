@@ -63,6 +63,46 @@ class InspeccionesController extends ResourceController
      * Vista previa de los correlativos que se asignarán al registrar. Se muestra
      * bloqueada en el formulario; el valor definitivo se reasigna al guardar.
      */
+    /** Situación del CERTICAV de una placa: formal o no, costo, y si ya está pagado para poder inspeccionar. */
+    public function certicavEstado()
+    {
+        $db = \Config\Database::connect();
+        $placa = \App\Libraries\Placa::normalizar((string) $this->request->getGet('placa'));
+        $vehiculo = $placa !== '' ? $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray() : null;
+        if (!$vehiculo) {
+            return $this->respond(['data' => null]);
+        }
+        try {
+            $servicio = new \App\Services\CerticavPago($db);
+            $estado = $servicio->estado($vehiculo);
+            return $this->respond(['data' => $estado + ['mensaje' => $servicio->bloqueo($estado)]]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        }
+    }
+
+    /** Solicita el CERTICAV de un vehículo formal: crea el trámite y su cobro pendiente (se cobra en Pagos). */
+    public function certicavSolicitar()
+    {
+        $db = \Config\Database::connect();
+        $input = $this->request->getJSON(true) ?: [];
+        $placa = \App\Libraries\Placa::normalizar((string) ($input['placa'] ?? $input['vehiculoPlaca'] ?? ''));
+        $vehiculo = $placa !== '' ? $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray() : null;
+        if (!$vehiculo) {
+            return $this->failNotFound('La placa no está registrada en el padrón vehicular.');
+        }
+        try {
+            $servicio = new \App\Services\CerticavPago($db);
+            $estado = $servicio->solicitar($vehiculo);
+            return $this->respondCreated(['data' => $estado + ['mensaje' => $servicio->bloqueo($estado)]]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            log_message('error', 'No se pudo solicitar el CERTICAV: ' . $e->getMessage());
+            return $this->failServerError('No se pudo solicitar el CERTICAV. Intente nuevamente.');
+        }
+    }
+
     public function siguienteCorrelativo()
     {
         $db = \Config\Database::connect();
@@ -279,6 +319,14 @@ class InspeccionesController extends ResourceController
             }
             $vehiculoId = (int)$vehiculo['id'];
 
+            // Solo vehículos formales, y con el CERTICAV pagado (cada pago sirve para una sola inspección)
+            $certicavPago = new \App\Services\CerticavPago($db);
+            $mensajeBloqueo = $certicavPago->bloqueo($certicavPago->estado($vehiculo));
+            if ($mensajeBloqueo !== null) {
+                throw new \DomainException($mensajeBloqueo);
+            }
+            $pagoCerticav = $certicavPago->pagoDisponible($vehiculoId);
+
             // Un solo registro a la vez: los correlativos se calculan con MAX()+1 y se validan antes de insertar
             $candado = (int)($db->query("SELECT GET_LOCK('mjlo_certicav', 10) AS l")->getRowArray()['l'] ?? 0) === 1;
             if (!$candado) {
@@ -332,6 +380,7 @@ class InspeccionesController extends ResourceController
                 'segunda_evaluacion'    => $segundaEvaluacion,
                 'id_conductor'          => $conductorId,
                 'id_vehiculo'           => $vehiculoId,
+                'id_pago'               => (int) $pagoCerticav['id'],
                 'id_tecnico'            => $tecnicoId,
                 'nombre_tecnico'        => $inspectorNombre,
                 'fecha'                 => $fecha,

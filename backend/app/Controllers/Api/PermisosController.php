@@ -211,6 +211,7 @@ class PermisosController extends ResourceController
             $columnasOrdenables = [
                 'tipoPermiso' => 'pc.tipo_permiso',
                 'numeroAutorizacion' => 'pc.numero_autorizacion',
+                'vehiculoPlaca' => 'vehiculoPlaca',
                 'solicitanteNombre' => 'solicitanteNombre',
                 'estado' => 'pc.estado',
             ];
@@ -507,7 +508,7 @@ class PermisosController extends ResourceController
                     td.id_procedimiento_admin as procedimientoAdminId,
                     pa.codigo as procedimientoCodigo,
                     pa.nombre as procedimientoNombre,
-                    pa.costo as procedimientoCosto,
+                    " . \App\Libraries\TupaCosto::sql('pa') . " as procedimientoCosto,
                     COALESCE(o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as solicitanteNombre,
                     COALESCE(o.ruc, p.numero, '') as solicitanteDocumento,
                     o.razon_social as asociacionNombre,
@@ -712,10 +713,10 @@ class PermisosController extends ResourceController
     {
         $db = \Config\Database::connect();
         try {
-            $rows = $db->table('procedimientos_administrativos')
-                ->select('id, codigo, nombre, descripcion, costo, estado')
-                ->where('estado', 'ACTIVO')
-                ->orderBy('id', 'ASC')
+            $rows = $db->table('procedimientos_administrativos pa')
+                ->select('pa.id, pa.codigo, pa.nombre, pa.descripcion, pa.plazo_atencion AS plazoAtencion, pa.vigencia, pa.tipo_tramite AS tipoTramite, ' . \App\Libraries\TupaCosto::sql('pa') . ' AS costo, pa.estado', false)
+                ->where('pa.estado', 'ACTIVO')
+                ->orderBy('pa.id', 'ASC')
                 ->get()
                 ->getResultArray();
             return $this->respond(['data' => $rows]);

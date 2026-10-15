@@ -67,10 +67,9 @@ class PersonasController extends ResourceController
         if (str_starts_with($valor, 'data:image')) {
             return (new \App\Services\FileStorageService())->guardarImagenBase64($valor, 'personas');
         }
-        // Si es una URL externa (ej. RENIEC/PIDE), no se descarga nada al servidor; se deja vacía
-        // en BD para que siempre se consulte la foto fresca en vivo a la API.
+        // Foto de RENIEC (URL firmada de PIDE que caduca): se descarga y se guarda como archivo propio
         if (str_starts_with($valor, 'https://')) {
-            return null;
+            return (new \App\Services\FileStorageService())->guardarFotoPide($valor, 'personas');
         }
         // Solo imágenes propias: la URL que arma el servidor se guarda como ruta relativa; cualquier otra URL
         // (externa) se descarta para no guardar enlaces a sitios de terceros.
@@ -340,8 +339,7 @@ class PersonasController extends ResourceController
 
         $rows = $builder->orderBy('p.id', 'DESC')->get()->getResultArray();
 
-        $soloRegistrados = (bool)($this->request->getGet('soloRegistrados') || $this->request->getGet('sinPide'));
-        if (!$soloRegistrados && empty($rows) && $numero && strlen(trim($numero)) === 8 && ctype_digit(trim($numero))) {
+        if (empty($rows) && $numero && strlen(trim($numero)) === 8 && ctype_digit(trim($numero))) {
             $pideData = \App\Services\PideService::reniec(trim($numero));
             if ($pideData && !isset($pideData['error'])) {
                 $rows[] = [
@@ -369,17 +367,6 @@ class PersonasController extends ResourceController
                     'fotoImg' => $pideData['foto_url'] ?? '',
                     'estado' => 'ACTIVO',
                 ];
-            }
-        } elseif (!empty($rows) && $numero && strlen(trim($numero)) === 8 && ctype_digit(trim($numero))) {
-            // Si la persona ya está en BD pero su foto está vacía (o es una URL expirada de PIDE),
-            // se consulta la API de RENIEC en vivo solo para responderla al cliente, sin descargar nada.
-            $fotoActual = trim((string)($rows[0]['fotoUrl'] ?? ''));
-            if ($fotoActual === '' || str_starts_with($fotoActual, 'https://pide.munijlo.gob.pe')) {
-                $pideData = \App\Services\PideService::reniec(trim($numero));
-                if (!empty($pideData['foto_url'])) {
-                    $rows[0]['fotoUrl'] = $pideData['foto_url'];
-                    $rows[0]['fotoImg'] = $pideData['foto_url'];
-                }
             }
         }
 
@@ -427,18 +414,6 @@ class PersonasController extends ResourceController
             return $this->failNotFound('Persona no encontrada.');
         }
 
-        $doc = trim((string)($row['numeroDocumento'] ?? ''));
-        if (strlen($doc) === 8 && ctype_digit($doc)) {
-            $fotoActual = trim((string)($row['fotoUrl'] ?? ''));
-            if ($fotoActual === '' || str_starts_with($fotoActual, 'https://pide.munijlo.gob.pe')) {
-                $pideData = \App\Services\PideService::reniec($doc);
-                if (!empty($pideData['foto_url'])) {
-                    $row['fotoUrl'] = $pideData['foto_url'];
-                    $row['fotoImg'] = $pideData['foto_url'];
-                }
-            }
-        }
-
         $papeletas = $db->table('papeletas pap')
             ->select("
                 pap.numero_papeleta,
@@ -478,33 +453,18 @@ class PersonasController extends ResourceController
         $errores = [];
         $documento = trim((string)($input['numeroDocumento'] ?? ''));
         if ($documento !== '') {
-            $consulta = $db->table('personas p')
-                ->select("p.id, p.numero, TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) as nombre_completo", false)
-                ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-                ->where('p.numero', $documento);
-            if ($id !== null) {
-                $consulta->where('p.id !=', $id);
-            }
-            $existente = $consulta->get()->getRowArray();
-            if ($existente) {
-                $nombre = trim($existente['nombre_completo'] ?? '');
-                $detalle = $nombre !== '' ? " a nombre de {$nombre}" : '';
-                $errores['numeroDocumento'] = "El documento {$documento} ya se encuentra registrado en el sistema{$detalle}.";
+            $consulta = $db->table('personas')->where('numero', $documento);
+            if ($id !== null) $consulta->where('id !=', $id);
+            if ($consulta->countAllResults() > 0) {
+                $errores['numeroDocumento'] = 'Documento duplicado.';
             }
         }
         $licencia = strtoupper(trim((string)($input['numeroLicencia'] ?? '')));
         if ($licencia !== '') {
-            $consulta = $db->table('ciudadanos c')
-                ->select("c.id_persona, c.numero_licencia, TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) as nombre_completo", false)
-                ->where('c.numero_licencia', $licencia);
-            if ($id !== null) {
-                $consulta->where('c.id_persona !=', $id);
-            }
-            $existente = $consulta->get()->getRowArray();
-            if ($existente) {
-                $nombre = trim($existente['nombre_completo'] ?? '');
-                $detalle = $nombre !== '' ? " a nombre de {$nombre}" : '';
-                $errores['numeroLicencia'] = "La licencia {$licencia} ya se encuentra registrada en el sistema{$detalle}.";
+            $consulta = $db->table('ciudadanos')->where('numero_licencia', $licencia);
+            if ($id !== null) $consulta->where('id_persona !=', $id);
+            if ($consulta->countAllResults() > 0) {
+                $errores['numeroLicencia'] = 'Licencia duplicada.';
             }
         }
         return $errores;
@@ -526,10 +486,10 @@ class PersonasController extends ResourceController
         $isDni = in_array(strtoupper($tipoDocName), ['DNI', 'DOCUMENTO NACIONAL DE IDENTIDAD', '1'], true);
 
         if ($isDni && ($docLen !== 8 || !ctype_digit($numeroDoc))) {
-            return $this->failValidationErrors(['numeroDocumento' => 'El DNI debe tener exactamente 8 dígitos numéricos.']);
+            return $this->failValidationErrors('El DNI debe tener exactamente 8 dígitos numéricos.');
         }
         if (!$isDni && ($docLen < 8 || $docLen > 15)) {
-            return $this->failValidationErrors(['numeroDocumento' => 'El número de documento debe tener entre 8 y 15 caracteres.']);
+            return $this->failValidationErrors('El número de documento debe tener entre 8 y 15 caracteres.');
         }
 
         try {
@@ -626,10 +586,10 @@ class PersonasController extends ResourceController
             $esDni = in_array(strtoupper($currentTipoDoc), ['DNI', 'DOCUMENTO NACIONAL DE IDENTIDAD', '1'], true);
 
             if ($esDni && ($docLen !== 8 || !ctype_digit($numeroDoc))) {
-                return $this->failValidationErrors(['numeroDocumento' => 'El DNI debe tener exactamente 8 dígitos numéricos.']);
+                return $this->failValidationErrors('El DNI debe tener exactamente 8 dígitos numéricos.');
             }
             if (!$esDni && ($docLen < 8 || $docLen > 15)) {
-                return $this->failValidationErrors(['numeroDocumento' => 'El número de documento debe tener entre 8 y 15 caracteres.']);
+                return $this->failValidationErrors('El número de documento debe tener entre 8 y 15 caracteres.');
             }
 
         }

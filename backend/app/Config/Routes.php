@@ -112,6 +112,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('operativos', ['controller' => 'OperativosController', 'placeholder' => '(:segment)']);
         $routes->get('inspecciones/siguiente-correlativo', 'InspeccionesController::siguienteCorrelativo');
         $routes->get('inspecciones/estadisticas', 'InspeccionesController::estadisticas');
+        $routes->get('inspecciones/certicav-estado', 'InspeccionesController::certicavEstado');
+        $routes->post('inspecciones/certicav-solicitar', 'InspeccionesController::certicavSolicitar');
         $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
         $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
         $routes->get('internamientos/estadisticas', 'InternamientosController::estadisticas');

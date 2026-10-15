@@ -509,7 +509,7 @@ class DashboardController extends ResourceController
                 t.numero_expediente as codigo,
                 t.fecha_solicitud as fecha,
                 t.estado,
-                pa.costo as monto,
+                " . \App\Libraries\TupaCosto::sql('pa') . " as monto,
                 v.placa,
                 c.nombres,
                 c.apellido_paterno,

@@ -22,6 +22,7 @@ import { VehiculoDetalleModal } from '../components/vehiculos/VehiculoDetalleMod
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { esRolOficina } from '../config/roles'
+import { obtenerAnioFormularioVehiculo } from '../utils/anioSunarp'
 
 function formatTipoDocLabel(t) {
   const code = (t.codigo || '').toUpperCase().trim()
@@ -143,10 +144,8 @@ export function Vehiculos({ user }) {
     fotoUrl: '',
   }
   const [personaFormData, setPersonaFormData] = useState(initialPersonaForm)
-  const [personaFieldErrors, setPersonaFieldErrors] = useState({})
 
   const handleOpenPersonaRapida = (titular) => {
-    setPersonaFieldErrors({})
     let dni = ''
     let nombres = ''
     let paterno = ''
@@ -205,35 +204,6 @@ export function Vehiculos({ user }) {
 
     setIsSearchingReniecPersona(true)
     try {
-      // 1. Verificar si ya está registrada en el padrón local
-      try {
-        const resLocal = await apiFetch(`/personas?numeroDocumento=${dni}&soloRegistrados=1`)
-        if (resLocal.ok) {
-          const dataLocal = await resLocal.json()
-          const personaLocal = (dataLocal.data || []).find((p) => Number(p.id) > 0)
-          if (personaLocal) {
-            const nombreCompleto = personaLocal.nombreCompleto || `${personaLocal.nombres || ''} ${personaLocal.apellidoPaterno || ''} ${personaLocal.apellidoMaterno || ''}`.trim()
-            setPersonaFieldErrors({ numeroDocumento: `Ya registrada a nombre de ${nombreCompleto}` })
-            showWarning('Persona ya registrada', `El DNI ${dni} ya se encuentra registrado en el sistema a nombre de ${nombreCompleto}.`)
-            setPersonaFormData((prev) => ({
-              ...prev,
-              numeroDocumento: dni,
-              nombres: (personaLocal.nombres || prev.nombres || '').toUpperCase(),
-              apellidoPaterno: (personaLocal.apellidoPaterno || prev.apellidoPaterno || '').toUpperCase(),
-              apellidoMaterno: (personaLocal.apellidoMaterno || prev.apellidoMaterno || '').toUpperCase(),
-              direccion: personaLocal.direccion || prev.direccion,
-              numeroLicencia: personaLocal.numeroLicencia || prev.numeroLicencia,
-              fotoImg: personaLocal.fotoUrl || personaLocal.foto || prev.fotoImg,
-              fotoUrl: personaLocal.fotoUrl || personaLocal.foto || prev.fotoUrl,
-            }))
-            return
-          }
-        }
-      } catch (eLocal) {
-        console.warn('Error al verificar padrón local:', eLocal)
-      }
-
-      // 2. Consultar RENIEC
       const response = await apiFetch(`/pide/reniec/${dni}`)
       if (!response.ok) {
         throw new Error(await leerMensajeError(response, 'El servicio de consulta no responde en este momento. Ingrese los datos manualmente.'))
@@ -309,7 +279,6 @@ export function Vehiculos({ user }) {
 
   const handlePersonaFormSubmit = async (e) => {
     e.preventDefault()
-    setPersonaFieldErrors({})
     const docLen = (personaFormData.numeroDocumento || '').trim().length
     if (
       !personaFormData.numeroDocumento.trim() ||
@@ -346,73 +315,8 @@ export function Vehiculos({ user }) {
       })
       const resData = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const rawMessages = resData?.messages || {}
-        let errorMsg = ''
-        const fieldErrObj = {}
-        if (typeof rawMessages === 'object' && Object.keys(rawMessages).length > 0) {
-          const errorList = []
-          for (const [campo, mensaje] of Object.entries(rawMessages)) {
-            const msgStr = Array.isArray(mensaje) ? mensaje.join(', ') : String(mensaje)
-            fieldErrObj[campo] = msgStr
-            errorList.push(msgStr)
-          }
-          setPersonaFieldErrors(fieldErrObj)
-          errorMsg = errorList.join('\n')
-        } else if (typeof rawMessages === 'string') {
-          errorMsg = rawMessages
-        } else if (typeof resData?.message === 'string') {
-          errorMsg = resData.message
-        }
-        if (!errorMsg) {
-          errorMsg = 'No se pudo registrar la persona.'
-        }
-
-        const esDuplicado = /duplicad|ya se encuentra registrado|ya está registrado/i.test(errorMsg)
-        if (esDuplicado && personaFormData.numeroDocumento) {
-          try {
-            const resBusq = await apiFetch(`/personas?numeroDocumento=${encodeURIComponent(personaFormData.numeroDocumento.trim())}&soloRegistrados=1`)
-            if (resBusq.ok) {
-              const payloadBusq = await resBusq.json()
-              const encontrada = (payloadBusq.data || []).find((p) => Number(p.id) > 0)
-              if (encontrada) {
-                const nombreCompleto = encontrada.nombreCompleto || `${encontrada.nombres || ''} ${encontrada.apellidoPaterno || ''} ${encontrada.apellidoMaterno || ''}`.trim()
-                const confirmacion = await showConfirm(
-                  'Persona ya registrada',
-                  `El documento ${personaFormData.numeroDocumento} ya se encuentra registrado en el sistema a nombre de:\n\n${nombreCompleto}\n\n¿Desea seleccionarla directamente como propietario del vehículo?`,
-                  'Sí, seleccionar persona',
-                  'Corregir datos'
-                )
-                if (confirmacion.isConfirmed) {
-                  const standardizedPersona = {
-                    ...encontrada,
-                    id: Number(encontrada.id),
-                    numeroDocumento: String(encontrada.numeroDocumento || encontrada.numero || personaFormData.numeroDocumento).trim(),
-                    nombres: (encontrada.nombres || '').trim(),
-                    apellidoPaterno: (encontrada.apellidoPaterno || encontrada.apellido_paterno || '').trim(),
-                    apellidoMaterno: (encontrada.apellidoMaterno || encontrada.apellido_materno || '').trim(),
-                  }
-                  selectPropietario(standardizedPersona)
-                  setPropietarioResults((prev) => [standardizedPersona, ...prev.filter((p) => String(p.numeroDocumento || p.numero || '').trim() !== standardizedPersona.numeroDocumento)])
-                  setTitularDetectado({
-                    nombre: nombreCompleto,
-                    documento: standardizedPersona.numeroDocumento,
-                    matchedPersona: standardizedPersona,
-                  })
-                  setIsPersonaModalOpen(false)
-                  showToast('Persona seleccionada y asignada como propietario.')
-                  return
-                }
-                return
-              }
-            }
-          } catch (eBusq) {
-            console.warn('Error al verificar duplicado:', eBusq)
-          }
-        }
-
-        throw new Error(errorMsg)
+        throw new Error(resData.messages?.error || resData.message || 'Error al registrar la persona.')
       }
-
       const newPersona = resData.data || { ...personaFormData, id: Date.now() }
       const standardizedPersona = {
         ...newPersona,
@@ -433,7 +337,7 @@ export function Vehiculos({ user }) {
       setIsPersonaModalOpen(false)
       showToast('Persona registrada y asignada como propietario.')
     } catch (err) {
-      showError('Error al registrar persona', sanitizarMensaje(err.message, 'No se pudo guardar la persona.'))
+      showError('Error', sanitizarMensaje(err.message, 'No se pudo guardar la persona.'))
     }
   }
 
@@ -770,26 +674,7 @@ export function Vehiculos({ user }) {
         }
       }
 
-      let rawModalAnio = sunarpData.ano_fabricacion ?? sunarpData.anio_fabricacion ?? sunarpData.anio ?? ''
-      let detectedModalAnio = parseInt(String(rawModalAnio).trim(), 10)
-      if (!detectedModalAnio || detectedModalAnio < 1900 || detectedModalAnio > 2100) {
-        const vin = (sunarpData.serie || sunarpData.vin || sunarpData.numero_serie || '').toUpperCase().trim()
-        if (vin.length >= 10) {
-          const vinCode = vin.charAt(9)
-          const vinYears = {
-            '1': 2001, '2': 2002, '3': 2003, '4': 2004, '5': 2005, '6': 2006, '7': 2007, '8': 2008, '9': 2009,
-            'A': 2010, 'B': 2011, 'C': 2012, 'D': 2013, 'E': 2014, 'F': 2015, 'G': 2016, 'H': 2017,
-            'J': 2018, 'K': 2019, 'L': 2020, 'M': 2021, 'N': 2022, 'P': 2023, 'R': 2024, 'S': 2025,
-            'T': 2026, 'V': 2027, 'W': 2028, 'X': 2029, 'Y': 2030
-          }
-          if (vinYears[vinCode]) {
-            detectedModalAnio = vinYears[vinCode]
-          }
-        }
-      }
-      if (!detectedModalAnio || detectedModalAnio < 1900 || detectedModalAnio > 2100) {
-        detectedModalAnio = ''
-      }
+      const detectedModalAnio = obtenerAnioFormularioVehiculo(sunarpData)
 
       setFormData((prev) => ({
         ...prev,
@@ -1567,8 +1452,6 @@ export function Vehiculos({ user }) {
           isEditing={false}
           formData={personaFormData}
           setFormData={setPersonaFormData}
-          fieldErrors={personaFieldErrors}
-          onClearFieldError={(campo) => setPersonaFieldErrors((prev) => ({ ...prev, [campo]: null }))}
           handlePhotoUpload={handlePhotoUploadPersona}
           handleClearPhoto={handleClearPhotoPersona}
           tipoDocOptions={tipoDocOptions}
