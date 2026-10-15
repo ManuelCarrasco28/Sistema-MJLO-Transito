@@ -4,19 +4,12 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * `usuarios` pasa a apuntar directo a `personas` (id_persona) y gana
- * `id_rol` (FK a roles), reemplazando el pseudo-rol que antes se sacaba
- * del `cargo` del trabajador. También agrega `session_version`, usado
- * para poder invalidar sesiones activas (logout real, cambio de clave,
- * cambio de rol) sin depender de un almacén de sesiones con estado.
- */
 class RestructureUsuariosTable extends Migration
 {
     public function up()
     {
         if ($this->db->fieldExists('id_persona', 'usuarios')) {
-            // Ya migrada (por ejemplo, la base vino del dump de init-db).
+
             return;
         }
 
@@ -42,8 +35,6 @@ class RestructureUsuariosTable extends Migration
             return;
         }
 
-        // Tabla en el esquema viejo (id_trabajador / nombre_usuario / password_hash):
-        // renombrar columnas y agregar las nuevas, preservando los datos.
         $this->db->query('ALTER TABLE usuarios DROP FOREIGN KEY IF EXISTS fk_usuarios_trabajador');
         $this->db->query('ALTER TABLE usuarios DROP KEY IF EXISTS uq_usuarios_personal');
 
@@ -60,8 +51,8 @@ class RestructureUsuariosTable extends Migration
               ADD COLUMN fecha_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ");
 
-        // Todo usuario existente queda como 'Trabajador' por defecto; ajustar
-        // manualmente los que deban ser SuperAdmin/Gerente/SubGerente/Secretaria.
+// Todo usuario existente queda como 'Trabajador' por defecto; ajustar
+
         $trabajadorRol = $this->db->table('roles')->select('id')->where('nombre', 'Trabajador')->get()->getRow();
         if ($trabajadorRol) {
             $this->db->table('usuarios')->where('id_rol', null)->update(['id_rol' => $trabajadorRol->id]);

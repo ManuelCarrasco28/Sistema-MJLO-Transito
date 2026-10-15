@@ -4,7 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/** Índices para la actualización de estados por fecha y los listados de cursos y permisos. Idempotente. */
 class IndicesCursosPermisos extends Migration
 {
     public function up()

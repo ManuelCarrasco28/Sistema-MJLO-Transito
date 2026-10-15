@@ -15,10 +15,6 @@ class AsociacionesController extends ResourceController
 
     protected $format = 'json';
 
-    /**
-     * Consulta base de asociaciones con datos del representante legal y
-     * conteo de flota, compartida por index() y show().
-     */
     private function asociacionSelectQuery($db)
     {
         return $db->table('asociaciones o')
@@ -52,10 +48,6 @@ class AsociacionesController extends ResourceController
             ->join('vehiculos v', 'v.id_asociacion = o.id', 'left');
     }
 
-    /**
-     * Normaliza tipos y calcula los indicadores de cupo (disponibles,
-     * porcentaje de ocupación, estado) a partir de flotaTotal/flotaAutorizada.
-     */
     private function calcularCupo(array $r): array
     {
         $r['id'] = (int)$r['id'];
@@ -132,7 +124,7 @@ class AsociacionesController extends ResourceController
         ];
 
         if ($page > 0) {
-            // Con groupBy activo, CodeIgniter cuenta las filas agrupadas envolviendo la consulta.
+
             $total = (clone $builder)->countAllResults(false);
 
             $rows = \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'o.id')
@@ -231,11 +223,6 @@ class AsociacionesController extends ResourceController
         ]);
     }
 
-    /**
-     * Lista global de socios: propietarios con vehículos registrados en
-     * cualquier asociación, junto con el nombre de la asociación a la que
-     * pertenecen. Usado por la pestaña "Socios" del padrón.
-     */
     public function opciones()
     {
         $db = \Config\Database::connect();
@@ -249,13 +236,6 @@ class AsociacionesController extends ResourceController
         return $this->respond(['data' => $filas]);
     }
 
-    /**
-     * Padrón de socios: UNA fila por persona. Una persona puede ser socia de varias
-     * asociaciones o empresas particulares y tener varios vehículos en cada una, así que
-     * cada fila trae sus "vinculos" (organización + los vehículos que tiene en ella).
-     * Los filtros de organización y de tipo también recortan los vínculos y los totales,
-     * para que lo que se ve y lo que se descarga siempre sea coherente con el filtro.
-     */
     public function socios()
     {
         $db = \Config\Database::connect();
@@ -312,7 +292,7 @@ class AsociacionesController extends ResourceController
         $condicionBusqueda = null;
         if ($buscar !== '') {
             $like = $db->escapeLikeString($buscar);
-            // Filtra personas con EXISTS sin recortar su flota ni agrupar todas las placas para buscar.
+
             $organizacionesBusqueda = $aplicarFiltros($base($db))
                 ->select('vp.id_persona')->groupStart()->like('v.placa', $buscar)->orLike('o.razon_social', $buscar)->groupEnd()
                 ->getCompiledSelect();
@@ -371,7 +351,6 @@ class AsociacionesController extends ResourceController
             $filas = $socios->orderBy('nombre', 'ASC')->orderBy('idPersona', 'ASC')->get()->getResultArray();
         }
 
-        // Vínculos de las personas de esta página: organización + vehículos que tiene en ella
         $ids = array_map('intval', array_column($filas, 'idPersona'));
         $vinculos = [];
         foreach (array_chunk($ids, 1000) as $lote) {
@@ -398,7 +377,6 @@ class AsociacionesController extends ResourceController
             }
         }
 
-        // Solo contar documentos vencidos de las personas visibles, sin multiplicar el JOIN principal.
         $vencidos = [];
         foreach (array_chunk($ids, 1000) as $lote) {
             $q = $aplicarFiltros($base($db))->join('documentos_vehiculo d', 'd.id_vehiculo = v.id', 'inner')
@@ -622,7 +600,7 @@ class AsociacionesController extends ResourceController
             }
             $record['id_representante_legal'] = !empty($repVal) ? (int)$repVal : null;
         }
-        
+
         if (isset($input['ruc'])) {
             $ruc = trim($input['ruc']);
             if ($ruc !== '') {

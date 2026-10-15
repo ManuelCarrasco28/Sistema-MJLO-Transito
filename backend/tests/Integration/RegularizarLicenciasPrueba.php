@@ -1,5 +1,5 @@
 <?php
-// Ejecutar únicamente con autorización explícita para los datos de prueba.
+
 if (($argv[1] ?? '') !== '--confirmar-datos-de-prueba') exit("Requiere --confirmar-datos-de-prueba\n");
 define('FCPATH', dirname(__DIR__, 2) . '/public/');
 define('ENVIRONMENT', 'development');

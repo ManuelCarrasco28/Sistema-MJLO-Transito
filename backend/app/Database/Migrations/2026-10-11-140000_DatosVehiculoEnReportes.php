@@ -4,10 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Guarda en el reporte de intervención los datos del vehículo que el inspector capturó cuando el vehículo no
- * está en el padrón (clase, marca, color). Antes se descartaban. Idempotente.
- */
 class DatosVehiculoEnReportes extends Migration
 {
     public function up()

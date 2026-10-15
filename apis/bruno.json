@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "name": "MJLO - Transito API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git",
+    "examples"
+  ]
+}
+

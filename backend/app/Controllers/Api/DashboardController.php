@@ -10,18 +10,16 @@ class DashboardController extends ResourceController
 
     public function index()
     {
-        // Todo el dashboard (mes, año y dias) sigue la hora de Peru, no la del servidor (UTC)
+// Todo el dashboard (mes, año y dias) sigue la hora de Peru, no la del servidor (UTC)
         date_default_timezone_set('America/Lima');
         $db = \Config\Database::connect();
         $currentYear = (int) date('Y');
 
-        
         $vehTotal = (int) $db->table('vehiculos')->countAllResults();
         $vehMes = (int) $db->table('vehiculos')
             ->where('anio_fabricacion', (int) date('Y'))
             ->countAllResults();
 
-        
         $docRow = $db->table('documentos_vehiculo')
             ->select("
                 COUNT(*) as total,
@@ -36,12 +34,10 @@ class DashboardController extends ResourceController
         $documentosObservados = (int) ($docRow['observados'] ?? 0);
         $documentosPorVencer = (int) ($docRow['por_vencer'] ?? 0);
 
-        
         $inspeccionesPendientes = (int) $db->table('certicav')
             ->whereIn('estado', ['PENDIENTE', 'EN_TRAMITE', 'EN TRÁMITE', 'EN TRAMITE'])
             ->countAllResults();
 
-        
         $papRow = $db->table('papeletas')
             ->select("
                 SUM(CASE WHEN estado IN ('PENDIENTE', 'POR_PAGAR', 'PENDIENTE_PAGO') THEN 1 ELSE 0 END) as pendientes,
@@ -57,7 +53,6 @@ class DashboardController extends ResourceController
             ->whereNotIn('estado', ['ANULADO', 'ANULADA', 'CANCELADO', 'CANCELADA'])
             ->countAllResults();
 
-        
         $retRow = $db->table('ordenes_internamiento')
             ->select("
                 SUM(CASE WHEN estado IN ('RETENIDO', 'EN_DEPOSITO', 'EN DEPÓSITO', 'EN DEPOSITO', 'ACTIVO') THEN 1 ELSE 0 END) as retenidos,
@@ -68,9 +63,6 @@ class DashboardController extends ResourceController
         $retenidos = (int) ($retRow['retenidos'] ?? 0);
         $liberados = (int) ($retRow['liberados'] ?? 0);
 
-        // Expedientes = Tarjeta de Operatividad + SOAT + Tarjeta de Propiedad + CERTICAV + Cursos de Seguridad Vial.
-        // Documentos: por su fecha de expiracion. CERTICAV: ultima inspeccion APROBADA de cada vehiculo (valida 6 meses).
-        // Cursos: vigente mientras no haya llegado su fecha de fin.
         $exp = ['vigentes' => 0, 'por_vencer' => 0, 'vencidos' => 0];
         $detalleExp = [];
         $clasificar = static function (string $nombre, ?array $r) use (&$exp, &$detalleExp) {
@@ -125,10 +117,8 @@ class DashboardController extends ResourceController
             ['label' => 'Vencidos', 'value' => $exp['vencidos'], 'color' => 'bg-rose-500'],
         ];
 
-        // Cálculo de alertas de vencimiento (TUC, SOAT, CERTICAV)
         $alertas = [];
-        
-        // 1. Alertas de Documentos (SOAT, TUC)
+
         $docsAlertas = $db->table('documentos_vehiculo d')
             ->select("
                 d.tipo_documento,
@@ -155,7 +145,6 @@ class DashboardController extends ResourceController
             ];
         }
 
-        // 2. Alertas de Inspecciones (CERTICAV) - asumiendo validez de 6 meses desde fecha
         $certAlertas = $db->table('certicav c')
             ->select("
                 c.numero_registro,
@@ -182,13 +171,10 @@ class DashboardController extends ResourceController
             ];
         }
 
-        // Ordenar alertas por días restantes (ascendente)
         usort($alertas, function($a, $b) {
             return $a['dias'] <=> $b['dias'];
         });
 
-        // Graficos de las tarjetas: acumulado del anio en curso, mes a mes (enero hasta el mes actual).
-        // Al cambiar de anio se reinicia solo. El mes y el anio siguen la hora de Peru.
         date_default_timezone_set('America/Lima');
         $anio = (int) date('Y');
         $mesActual = (int) date('n');
@@ -243,9 +229,7 @@ class DashboardController extends ResourceController
     private function vehiculosMensuales($db, int $year): array
     {
         $months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        
-        // Simular o extraer los datos de registros vehiculares por mes según su formalidad
-        // Usamos documentos_vehiculo como un proxy histórico, cruzando con la formalidad del vehículo
+
         $rows = $db->table('documentos_vehiculo d')
             ->select("
                 MONTH(d.fecha_expedicion) as mes,
@@ -256,7 +240,7 @@ class DashboardController extends ResourceController
             ->where('YEAR(d.fecha_expedicion)', $year)
             ->groupBy('MONTH(d.fecha_expedicion)')
             ->get()->getResultArray();
-            
+
         $formalMes = [];
         $informalMes = [];
         foreach ($rows as $r) {
@@ -265,7 +249,7 @@ class DashboardController extends ResourceController
         }
 
         $data = [];
-        // Solo hasta el mes actual (hora de Peru) y sin datos inventados
+
         $limite = $year === (int) date('Y') ? (int) date('n') : 12;
         for ($month = 1; $month <= $limite; $month++) {
             $data[] = [
@@ -291,8 +275,6 @@ class DashboardController extends ResourceController
         $months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         $limit = $year === (int) date('Y') ? (int) date('n') : 12;
 
-        
-        // Papeletas registradas por mes: de operativo (con id_operativo) y de rutina (sin operativo)
         $rows = $db->table('papeletas')
             ->select('MONTH(fecha_hora) as mes, SUM(CASE WHEN id_operativo IS NOT NULL THEN 1 ELSE 0 END) as operativos, SUM(CASE WHEN id_operativo IS NULL THEN 1 ELSE 0 END) as rutina', false)
             ->where('YEAR(fecha_hora)', $year)
@@ -318,7 +300,7 @@ class DashboardController extends ResourceController
 
     private function multasPagosPorAnio($db): array
     {
-        
+
         $papeletasRows = $db->table('papeletas')
             ->select("
                 YEAR(fecha_hora) as anio,
@@ -330,7 +312,6 @@ class DashboardController extends ResourceController
             ->groupBy('YEAR(fecha_hora), MONTH(fecha_hora)')
             ->get()->getResultArray();
 
-        
         $pagosRows = $db->table('pagos_transito')
             ->select('YEAR(fecha_pago) as anio, MONTH(fecha_pago) as mes, COUNT(*) as total', false)
             ->where('fecha_pago IS NOT NULL', null, false)
@@ -390,7 +371,7 @@ class DashboardController extends ResourceController
         return $result;
     }
 
-    // Dinero cobrado por concepto (papeletas, cursos, tramites), mes a mes y para todos los anios con pagos
+// Dinero cobrado por concepto (papeletas, cursos, tramites), mes a mes y para todos los anios con pagos
     private function recaudacionConcepto($db, int $currentYear): array
     {
         $rows = $db->table('pagos_transito')
@@ -440,7 +421,6 @@ class DashboardController extends ResourceController
         return $this->withPercents($items);
     }
 
-    // Resultado de las inspecciones CERTICAV (sin las anuladas)
     private function inspeccionesResultado($db): array
     {
         return $this->conteoPorCampo($db, 'certicav', 'resultado', [
@@ -450,7 +430,6 @@ class DashboardController extends ResourceController
         ], ['estado <>' => 'ANULADO']);
     }
 
-    // Papeletas según su estado de pago
     private function papeletasEstado($db): array
     {
         return $this->conteoPorCampo($db, 'papeletas', 'estado', [

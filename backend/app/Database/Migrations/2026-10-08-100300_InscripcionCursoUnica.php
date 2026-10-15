@@ -18,6 +18,6 @@ class InscripcionCursoUnica extends Migration
 
     public function down()
     {
-        // La restricción puede venir del esquema inicial; no retirarla al revertir.
+
     }
 }

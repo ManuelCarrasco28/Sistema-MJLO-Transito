@@ -4,11 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Limpieza de la base: índices que otro índice ya cubre (cada uno encarece cada escritura), un índice que faltaba
- * en la auditoría, la columna sin uso pagos_transito.id_operativo y collation uniforme (utf8mb4_general_ci) para
- * que los JOIN entre textos no mezclen reglas de comparación. Idempotente.
- */
 class LimpiezaIndicesYCollations extends Migration
 {
     private function existeIndice(string $tabla, string $indice): bool
@@ -21,7 +16,7 @@ class LimpiezaIndicesYCollations extends Migration
 
     public function up()
     {
-        // [tabla, índice redundante, índice que lo cubre]
+
         $redundantes = [
             ['ciudadanos', 'idx_ciudadanos_licencia', 'uq_ciudadanos_licencia'],
             ['documentos_vehiculo', 'idx_docveh_tipo', 'uq_docveh_tipo_codigo'],
@@ -59,6 +54,6 @@ class LimpiezaIndicesYCollations extends Migration
 
     public function down()
     {
-        // Limpieza sin vuelta atrás: no se recrean índices redundantes ni collations antiguas.
+
     }
 }

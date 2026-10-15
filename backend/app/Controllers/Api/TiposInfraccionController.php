@@ -4,10 +4,6 @@ namespace App\Controllers\Api;
 
 use CodeIgniter\RESTful\ResourceController;
 
-/**
- * Catálogo de infracciones (tipos_infraccion): alta, edición y baja. Cambiar el porcentaje de UIT solo afecta a las
- * papeletas NUEVAS: las ya emitidas conservan el monto con el que se registraron (papeleta_detalles).
- */
 class TiposInfraccionController extends ResourceController
 {
     protected $format = 'json';
@@ -71,7 +67,6 @@ class TiposInfraccionController extends ResourceController
         return $this->respond(['status' => 200, 'message' => 'Infracción actualizada.']);
     }
 
-    /** Si la infracción ya se usó en alguna papeleta no se borra (se perdería el historial): se desactiva. */
     public function delete($id = null)
     {
         $db = \Config\Database::connect();
@@ -94,7 +89,7 @@ class TiposInfraccionController extends ResourceController
         return $this->respondDeleted(['status' => 200, 'desactivada' => false, 'message' => 'Infracción eliminada.']);
     }
 
-    /** @return array|string Campos listos para guardar, o el mensaje de error. */
+/** @return array|string Campos listos para guardar, o el mensaje de error. */
     private function validar($db, array $input, ?int $idActual): array|string
     {
         $codigo = strtoupper(trim((string) ($input['codigo'] ?? '')));

@@ -53,7 +53,6 @@ export function TramiteFormularioModal({
   const [formData, setFormData] = useState(initialFormState)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Carga o reseteo de datos al abrir (soporta datos existentes o borrador devuelto de la segunda ventana)
   useEffect(() => {
     if (!isOpen) return
 
@@ -287,7 +286,7 @@ export function TramiteFormularioModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter overflow-y-auto" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") onClose(); e.currentTarget.dataset.downOnOverlay = "" }}>
       <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] my-auto w-full max-w-4xl max-h-[92vh] transition-all duration-200">
-        
+
         {/* Cabecera del Modal Estilo /personas */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-2.5 min-w-0">

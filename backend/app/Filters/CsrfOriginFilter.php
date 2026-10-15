@@ -6,12 +6,6 @@ use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 
-/**
- * Defensa CSRF para una API con sesión por cookie: las peticiones que
- * modifican datos y vienen de un navegador deben declarar un Origin permitido
- * (los mismos orígenes de CORS) o el mismo host del backend. Los clientes sin
- * Origin (app móvil, curl) no son vulnerables a CSRF y pasan sin cambios.
- */
 class CsrfOriginFilter implements FilterInterface
 {
     private const METODOS_SEGUROS = ['get', 'head', 'options'];

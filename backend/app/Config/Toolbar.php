@@ -11,19 +11,9 @@ use CodeIgniter\Debug\Toolbar\Collectors\Routes;
 use CodeIgniter\Debug\Toolbar\Collectors\Timers;
 use CodeIgniter\Debug\Toolbar\Collectors\Views;
 
-/**
- * --------------------------------------------------------------------------
- * Debug Toolbar
- * --------------------------------------------------------------------------
- *
- * The Debug Toolbar provides a way to see information about the performance
- * and state of your application during that page display. By default it will
- * NOT be displayed under production environments, and will only display if
- * `CI_DEBUG` is true, since if it's not, there's not much to display anyway.
- */
 class Toolbar extends BaseConfig
 {
-    /**
+/**
      * --------------------------------------------------------------------------
      * Toolbar Collectors
      * --------------------------------------------------------------------------
@@ -38,23 +28,15 @@ class Toolbar extends BaseConfig
         Database::class,
         Logs::class,
         Views::class,
-        // \CodeIgniter\Debug\Toolbar\Collectors\Cache::class,
+
         Files::class,
         Routes::class,
         Events::class,
     ];
 
-    /**
-     * --------------------------------------------------------------------------
-     * Collect Var Data
-     * --------------------------------------------------------------------------
-     *
-     * If set to false var data from the views will not be collected. Useful to
-     * avoid high memory usage when there are lots of data passed to the view.
-     */
     public bool $collectVarData = true;
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Max History
      * --------------------------------------------------------------------------
@@ -65,17 +47,9 @@ class Toolbar extends BaseConfig
      */
     public int $maxHistory = 20;
 
-    /**
-     * --------------------------------------------------------------------------
-     * Toolbar Views Path
-     * --------------------------------------------------------------------------
-     *
-     * The full path to the the views that are used by the toolbar.
-     * This MUST have a trailing slash.
-     */
     public string $viewsPath = SYSTEMPATH . 'Debug/Toolbar/Views/';
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Max Queries
      * --------------------------------------------------------------------------
@@ -89,7 +63,7 @@ class Toolbar extends BaseConfig
      */
     public int $maxQueries = 100;
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Watched Directories
      * --------------------------------------------------------------------------
@@ -106,7 +80,7 @@ class Toolbar extends BaseConfig
         'app',
     ];
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Watched File Extensions
      * --------------------------------------------------------------------------
@@ -120,7 +94,7 @@ class Toolbar extends BaseConfig
         'php', 'css', 'js', 'html', 'svg', 'json', 'env',
     ];
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Ignored HTTP Headers
      * --------------------------------------------------------------------------
@@ -140,8 +114,8 @@ class Toolbar extends BaseConfig
      * @var array<string, string|null>
      */
     public array $disableOnHeaders = [
-        'X-Requested-With' => 'xmlhttprequest', // AJAX requests
-        'HX-Request'       => 'true',           // HTMX requests
-        'X-Up-Version'     => null,             // Unpoly partial requests
+        'X-Requested-With' => 'xmlhttprequest',
+        'HX-Request'       => 'true',
+        'X-Up-Version'     => null,
     ];
 }

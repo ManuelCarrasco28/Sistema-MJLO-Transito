@@ -39,7 +39,6 @@ const ETIQUETA_ESTADO_CURSO = {
   EN_CURSO: 'EN CURSO', FINALIZADO: 'CULMINADO', CANCELADO: 'CANCELADO',
 }
 
-// Estado de la inscripción: se deduce de las fechas de apertura y cierre, y se cierra cuando el curso ya empezó, terminó o se canceló.
 function estadoInscripcion({ estado, fechaInscripcionInicio, fechaInscripcionFin }) {
   if (estado && !['PROGRAMADO', 'ABIERTO', 'ACTIVO'].includes(estado)) return { texto: 'Cerrada', clase: 'text-rose-600 dark:text-rose-400' }
   const hoy = fechaLocalActual()
@@ -79,7 +78,6 @@ export function CursosSeguridad() {
     instructor: '', idInstructor: null, instructorDni: '', resolucion: '', carnetExpedicion: '', lugar: '', capacidad: 50, costo: 0, estado: 'PROGRAMADO', tipo: 'SEGURIDAD_VIAL'
   })
 
-  // Instructor: se busca por DNI entre las personas registradas; si no existe, se registra desde aquí mismo.
   const [instructorBusqueda, setInstructorBusqueda] = useState('')
   const [buscandoInstructor, setBuscandoInstructor] = useState(false)
   const [instructorNoEncontrado, setInstructorNoEncontrado] = useState(false)
@@ -249,7 +247,6 @@ export function CursosSeguridad() {
 
     const payload = {
       ...formData,
-      // Los carnets se expiden al terminar el curso y vencen un año después (el servidor calcula el vencimiento)
       carnetExpedicion: formData.fechaFin,
       cuposTotales: formData.capacidad,
       costo: formData.costo || 0,
@@ -304,7 +301,7 @@ export function CursosSeguridad() {
 
   const [sortBy, setSortBy] = useState('')
   const [sortDir, setSortDir] = useState('DESC')
-  
+
   useEffect(() => {
     const bc = new BroadcastChannel('cursos_channel')
     bc.onmessage = (e) => {
@@ -557,11 +554,11 @@ export function CursosSeguridad() {
                 <Icon name="filterX" className="size-4" />
               </button>
             )}
-            
+
             <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-colors" disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} /><span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
             </button>
-            
+
             <button onClick={handleOpenCreateModal} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 whitespace-nowrap hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
               <span className="text-base leading-none font-black">+</span><span>Nuevo</span>
             </button>
@@ -698,7 +695,7 @@ export function CursosSeguridad() {
                             <Icon name="print" className="size-4" />
                           </button>
                         )}
-                        
+
                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditModal(c); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white" title="Editar Curso">
                           <Icon name="pencil" className="size-4" />
                         </button>
@@ -791,7 +788,7 @@ export function CursosSeguridad() {
             </div>
             <form onSubmit={handleFormSubmit} className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3">
-              
+
               <fieldset className="border border-slate-200 rounded-xl p-3 dark:border-[var(--border-strong)]">
                 <legend className="text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white px-2">DATOS GENERALES</legend>
                 <div className="grid gap-2.5 sm:grid-cols-3">

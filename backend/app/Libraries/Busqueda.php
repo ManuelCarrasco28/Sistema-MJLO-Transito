@@ -2,17 +2,9 @@
 
 namespace App\Libraries;
 
-/**
- * Ayudas para las búsquedas de los listados.
- */
 class Busqueda
 {
-    /**
-     * Condición SQL (para usar con orWhere($sql, null, false)) que encuentra a una persona por su nombre
-     * completo, escrito en cualquier orden y con cualquier parte: "Juan Olmos", "olmos regalado juan".
-     * Cada palabra escrita debe aparecer en "nombres + apellido paterno + apellido materno".
-     * Las búsquedas por campo suelto (LIKE en cada columna) no la encuentran cuando se mezclan campos.
-     */
+
     public static function nombreCompleto(string $buscar, string $nombres, string $paterno, string $materno): string
     {
         $db = \Config\Database::connect();

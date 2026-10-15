@@ -4,10 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Los carnets del curso se expiden al terminar el curso (antes se tomaba el inicio) y vencen un año después.
- * Idempotente.
- */
 class CarnetExpedicionAlFinDelCurso extends Migration
 {
     public function up()

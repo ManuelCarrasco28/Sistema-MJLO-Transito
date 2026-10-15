@@ -16,11 +16,9 @@ class VehiculosController extends ResourceController
 
     private function normalizeSearchValue(string $value): string
     {
-        // Primero se pasa a mayúsculas: antes se quitaban las letras minúsculas (un UUID o una placa en minúsculas quedaba sin letras).
         return preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($value))) ?? '';
     }
 
-    /** Contadores agregados vía COUNT() en SQL (ver PersonasController::estadisticas para el motivo). */
     public function estadisticas()
     {
         $db = \Config\Database::connect();
@@ -36,10 +34,6 @@ class VehiculosController extends ResourceController
         ]]);
     }
 
-    /**
-     * Resuelve el id de asociaciones a partir del nombre escrito en el
-     * formulario, descartando las etiquetas de "sin asociación / particular".
-     */
     private function resolverAsociacionId($db, string $orgName): ?int
     {
         $sinAsociacion = ['Sin Asociación (Informal)', 'Sin Asociación', 'Independiente', 'Independiente / Particular'];
@@ -177,7 +171,7 @@ class VehiculosController extends ResourceController
                 }
             }
 
-            // Historial de Internamientos
+// Historial de Internamientos
             $internamientos = $db->table('ordenes_internamiento')
                 ->select("
                     id_vehiculo,
@@ -199,9 +193,8 @@ class VehiculosController extends ResourceController
                 $internamientosPorVehiculo[$vehiculoId][] = $int;
             }
 
-            // Historial de propietarios: todos los registros (activos e
-            // históricos ya cerrados con fecha_fin), del más reciente al más
-            // antiguo, para ver quién tuvo el vehículo antes que el dueño actual.
+// Historial de propietarios: todos los registros (activos e
+
             $propietarios = $db->table('vehiculo_propietarios vp')
                 ->select("
                     vp.id_vehiculo,
@@ -257,10 +250,6 @@ class VehiculosController extends ResourceController
         return $data;
     }
 
-    /**
-     * Listado liviano para la impresión de QR: solo lo que lleva la plantilla (placa, tipo, asociación y
-     * código QR), sin propietario ni historial, para que paginar sea instantáneo incluso con 14,000 unidades.
-     */
     public function listarParaQr()
     {
         $db = \Config\Database::connect();
@@ -281,7 +270,6 @@ class VehiculosController extends ResourceController
             $builder->groupEnd();
         }
 
-        // Los vehículos informales (sin asociación) no generan QR.
         $builder->where('v.id_asociacion IS NOT NULL', null, false);
 
         $asociacionId = (int) $this->request->getGet('asociacionId');
@@ -325,13 +313,12 @@ class VehiculosController extends ResourceController
         $db = \Config\Database::connect();
         $builder = $this->vehiculosBaseQuery($db);
 
-        // Búsqueda en SQL (antes se traía TODO el padrón y se filtraba en el
-        // navegador; con 14,000+ vehículos eso, sumado al WHERE IN masivo de
-        // abajo, era el cuello de botella principal del módulo).
+// Búsqueda en SQL (antes se traía TODO el padrón y se filtraba en el
+
         $buscar = trim((string) $this->request->getGet('buscar'));
         if ($buscar !== '') {
             $builder->groupStart()
-                // Un uuid pegado completo (el código QR del vehículo) se busca exacto, con el índice único.
+
                 ->where('v.uuid', \App\Libraries\Identificador::esValido($buscar) ? strtolower($buscar) : '__no_es_uuid__')
                 ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                 ->orLike('v.marca', $buscar)
@@ -351,7 +338,6 @@ class VehiculosController extends ResourceController
             $builder->where('v.estado', $estadoFiltro);
         }
 
-        // Formal = tiene asociación/empresa asignada; informal = independiente.
         $formalidad = strtoupper((string) $this->request->getGet('formalidad'));
         if ($formalidad === 'FORMAL') {
             $builder->where('v.id_asociacion IS NOT NULL', null, false);
@@ -361,7 +347,7 @@ class VehiculosController extends ResourceController
 
         $tipoFiltro = trim((string) $this->request->getGet('tipo'));
         if ($tipoFiltro !== '' && strtoupper($tipoFiltro) !== 'TODOS') {
-            // Admite varios tipos separados por coma (p. ej. "Mototaxi,Motocarguera").
+
             $tipos = array_filter(array_map('trim', explode(',', $tipoFiltro)));
             $builder->groupStart();
             foreach ($tipos as $tipoItem) {
@@ -411,8 +397,7 @@ class VehiculosController extends ResourceController
             ]);
         }
 
-        // Modo legacy (sin "page"): usado por las exportaciones a Excel/PDF,
-        // que solo necesitan columnas planas, no el historial por vehículo.
+// que solo necesitan columnas planas, no el historial por vehículo.
         $rows = $builder->orderBy('v.id', 'DESC')->get()->getResultArray();
         $data = array_map(static function (array $row): array {
             $propietario = trim(($row['propietarioNombres'] ?? '') . ' ' . ($row['propietarioPaterno'] ?? '') . ' ' . ($row['propietarioMaterno'] ?? ''));
@@ -420,7 +405,6 @@ class VehiculosController extends ResourceController
             return $row + ['propietario' => $propietario ?: 'Sin Propietario Asignado'];
         }, $rows);
 
-        // ?ligero=1: solo lo que usan los autocompletados de placa de los formularios.
         if ($this->request->getGet('ligero')) {
             $campos = array_flip(['id', 'uuid', 'placa', 'tipo', 'marca', 'modelo', 'color', 'anio', 'serieMotor', 'asociacionId', 'asociacion', 'propietarioDni', 'propietario', 'estado', 'formalidad', 'tucNumero']);
             $data = array_map(static fn (array $r) => array_intersect_key($r, $campos), $data);
@@ -429,12 +413,10 @@ class VehiculosController extends ResourceController
         return $this->respond(['data' => $data]);
     }
 
-    /** Detalle de un vehículo con su historial completo (documentos, papeletas, CERTICAV, internamientos). */
     public function show($id = null)
     {
         $db = \Config\Database::connect();
 
-        // Se acepta el uuid público (/vehiculos/{uuid}) además del id numérico interno.
         if (\App\Libraries\Identificador::esValido($id)) {
             $rows = $this->vehiculosBaseQuery($db)->where('v.uuid', strtolower((string) $id))->get()->getResultArray();
             if (empty($rows)) {
@@ -479,8 +461,7 @@ class VehiculosController extends ResourceController
         } elseif ($tipo === 'DNI') {
             $builder->where("REPLACE(REPLACE(UPPER(p.numero), '-', ''), ' ', '') =", $normalizado);
         } else {
-            // El código QR es un uuid: búsqueda exacta con el índice único (antes se normalizaba la columna con REPLACE/UPPER
-            // y se recorría toda la tabla en cada escaneo). Un valor que no sea un uuid no puede coincidir.
+
             $uuidBuscado = strtolower(trim($valor));
             $builder->where('v.codigo_qr', \App\Libraries\Identificador::esValido($uuidBuscado) ? $uuidBuscado : '__no_es_uuid__');
         }
@@ -493,7 +474,7 @@ class VehiculosController extends ResourceController
 
         if (empty($rows)) {
             if ($tipo === 'PLACA') {
-                // Consulta externa hecha por el sistema: queda registrada igual que las consultas directas a SUNARP.
+
                 \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_SUNARP', "Consulta de placa en SUNARP (búsqueda móvil): {$normalizado} (zona {$codeZona}, oficina {$codeOficina})", ['placa' => $normalizado, 'origen' => 'buscarMobile', 'codeZona' => $codeZona, 'codeOficina' => $codeOficina]);
                 $sunarpData = \App\Services\PideService::sunarp($normalizado, $codeZona, $codeOficina);
                 if ($sunarpData && !isset($sunarpData['error'])) {
@@ -558,9 +539,8 @@ class VehiculosController extends ResourceController
 
         $data = $this->appendVehiculoRelations($rows)[0];
 
-        // Si existe en BD pero no tiene dueño asignado, intentamos consultar a Sunarp para mostrarlo visualmente
         if ($tipo === 'PLACA' && ($data['formalidad'] ?? '') === 'INFORMAL' && (empty($data['propietario']) || $data['propietario'] === 'Sin Propietario Asignado' || $data['propietario'] === 'No Registrado' || $data['propietario'] === 'Sin Propietario')) {
-            // Consulta externa hecha por el sistema: queda registrada igual que las consultas directas a SUNARP.
+
             \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_SUNARP', "Consulta de placa en SUNARP (búsqueda móvil): {$normalizado} (zona {$codeZona}, oficina {$codeOficina})", ['placa' => $normalizado, 'origen' => 'buscarMobile', 'codeZona' => $codeZona, 'codeOficina' => $codeOficina]);
             $sunarpData = \App\Services\PideService::sunarp($normalizado, $codeZona, $codeOficina);
             if ($sunarpData && !isset($sunarpData['error'])) {
@@ -573,7 +553,6 @@ class VehiculosController extends ResourceController
                     $data['propietario'] = implode(', ', $propNames);
                 }
 
-                // Rellenar datos técnicos si están vacíos
                 $data['marca'] = $data['marca'] ?: ($sunarpData['marca'] ?? '');
                 $data['modelo'] = $data['modelo'] ?: ($sunarpData['modelo'] ?? '');
                 $data['color'] = $data['color'] ?: ($sunarpData['color'] ?? '');
@@ -648,7 +627,6 @@ class VehiculosController extends ResourceController
             return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
         }
 
-
         if (isset($input['anio']) && $input['anio'] !== '' && (!filter_var($input['anio'], FILTER_VALIDATE_INT) || (int)$input['anio'] < 1900 || (int)$input['anio'] > (int)date('Y') + 1)) {
             return $this->failValidationErrors('Año de fabricación no válido.');
         }
@@ -663,11 +641,9 @@ class VehiculosController extends ResourceController
             $tipoVehiculoId = $tipoRow['id'];
         }
 
-
         $orgName = trim($input['asociacion'] ?? '');
         $asociacionId = $this->resolverAsociacionId($db, $orgName);
 
-        // El código QR es siempre el uuid del vehículo y lo genera el servidor: el codigoQr que mande el cliente se ignora.
         $qrCode = \App\Libraries\Identificador::nuevo();
 
         $estadoInput = strtoupper(trim($input['estado'] ?? 'ACTIVO'));
@@ -703,7 +679,6 @@ class VehiculosController extends ResourceController
         }
         $personaId = (int)$personaRow['id'];
 
-        // Si el código QR es un UUID, el vehículo usa ese mismo valor como su uuid público.
         $db->transException(true)->transBegin();
         try {
             $record['uuid'] = $qrCode;
@@ -859,9 +834,7 @@ class VehiculosController extends ResourceController
                 }
                 $personaId = (int)$personaRow['id'];
 
-                // El propietario activo actual (si existe y es distinto al nuevo)
-                // se cierra con fecha_fin en vez de borrarse, para conservar el
-                // historial de quién tuvo el vehículo antes.
+// Cerrar el propietario anterior sin borrar su historial.
                 $propietarioActivo = $db->table('vehiculo_propietarios')
                     ->where('id_vehiculo', $id)
                     ->where('fecha_fin IS NULL')

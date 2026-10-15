@@ -8,7 +8,7 @@ class CreateTransitoTables extends Migration
 {
     public function up()
     {
-        // 1. Tabla: tipos_infraccion
+
         $this->forge->addField([
             'id'          => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'codigo'      => ['type' => 'VARCHAR', 'constraint' => 20],
@@ -22,7 +22,6 @@ class CreateTransitoTables extends Migration
         $this->forge->addKey('id', true);
         $this->forge->createTable('tipos_infraccion', true);
 
-        // 2. Tabla: papeletas
         $this->forge->addField([
             'id'                      => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'numero_papeleta'         => ['type' => 'VARCHAR', 'constraint' => 50],
@@ -47,7 +46,6 @@ class CreateTransitoTables extends Migration
         $this->forge->addForeignKey('id_inspector', 'personal', 'id', 'SET NULL', 'CASCADE');
         $this->forge->createTable('papeletas', true);
 
-        // 3. Tabla: papeleta_detalles
         $this->forge->addField([
             'id'                 => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'id_papeleta'        => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],
@@ -63,7 +61,6 @@ class CreateTransitoTables extends Migration
         $this->forge->addForeignKey('id_tipo_infraccion', 'tipos_infraccion', 'id', 'RESTRICT', 'CASCADE');
         $this->forge->createTable('papeleta_detalles', true);
 
-        // 4. Tabla: pagos
         $this->forge->addField([
             'id'                   => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'tipo_pago'            => ['type' => 'VARCHAR', 'constraint' => 50, 'default' => 'EFECTIVO'],
@@ -92,7 +89,6 @@ class CreateTransitoTables extends Migration
         $this->forge->addForeignKey('id_tramite', 'tramites_documentarios', 'id', 'SET NULL', 'CASCADE');
         $this->forge->createTable('pagos', true);
 
-        // 5. Tabla: retenciones_vehiculo
         $this->forge->addField([
             'id'            => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'id_papeleta'   => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'null' => true],
@@ -111,7 +107,6 @@ class CreateTransitoTables extends Migration
         $this->forge->addForeignKey('id_papeleta', 'papeletas', 'id', 'SET NULL', 'CASCADE');
         $this->forge->createTable('retenciones_vehiculo', true);
 
-        // 6. Tabla: ordenes_libertad
         $this->forge->addField([
             'id'                    => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'numero_orden'          => ['type' => 'VARCHAR', 'constraint' => 50],
@@ -130,7 +125,7 @@ class CreateTransitoTables extends Migration
         $this->forge->addForeignKey('id_persona_autorizada', 'personas', 'id', 'SET NULL', 'CASCADE');
         $this->forge->createTable('ordenes_libertad', true);
 
-        // 7. Tabla: permisos_circulacion
+// 7. Tabla: permisos_circulacion
         $this->forge->addField([
             'id'                    => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'id_tramite'            => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'null' => true],

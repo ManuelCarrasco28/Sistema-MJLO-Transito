@@ -4,27 +4,20 @@ import { QRCodeSVG } from 'qrcode.react'
 import DOMPurify from 'dompurify'
 import './TarjetasImpresion.css'
 
-// El contenido de la resolución se edita con un editor de texto enriquecido y
-// se guarda como HTML; se sanitiza antes de inyectarlo para evitar XSS
-// almacenado (scripts, manejadores onerror/onload, iframes, etc.).
+// Sanitizar el HTML de la resolución para evitar XSS.
 const sanitizarHtml = (html) => DOMPurify.sanitize(html, {
   ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'a'],
   ALLOWED_ATTR: ['style', 'href', 'target', 'rel'],
 })
 
-// Cuerpo del documento tal como se editó (incluye tablas, cuadros y listas): se permiten también las etiquetas
-// de tabla y los atributos de borde y celdas, que el sanitizador anterior eliminaba.
+// Conservar tablas y bordes al sanitizar el documento.
 const sanitizarDocumento = (html) => DOMPurify.sanitize(html, {
   ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'sub', 'sup', 'ul', 'ol', 'li', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'blockquote', 'a', 'hr', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'colgroup', 'col', 'caption'],
   ALLOWED_ATTR: ['style', 'href', 'target', 'rel', 'border', 'colspan', 'rowspan', 'width', 'align', 'cellpadding', 'cellspacing'],
 })
 
-// Las plantillas del carnet de curso (curso-adelante.png / curso-atras.png) son archivos públicos,
-// sin sesión de por medio, pero igual se quedaban en blanco al imprimir: la ventana de impresión del
-// navegador se renderiza en un proceso aparte que no siempre llega a cargar imágenes por su ruta de
-// red a tiempo (es el mismo problema que tenían las fotos de los conductores). La solución es la misma:
-// descargarlas una vez y dejarlas como "data:" embebido, para que imprimir no dependa de ninguna petición.
+// Embeber las plantillas para imprimir sin peticiones de red.
 const RUTAS_PLANTILLA_CARNET = {
   adelante: '/img/img-carnet-curso/curso-adelante.png',
   atras: '/img/img-carnet-curso/curso-atras.png',
@@ -44,12 +37,7 @@ function descargarComoDataUri(url) {
     .catch(() => null)
 }
 
-// Las plantillas pesan ~1.5 MB cada una porque son PNG (sin pérdida) a mayor resolución de la que
-// necesita una impresión a 300dpi del tamaño real del carnet (85.6×53.98mm). Con un lote de ~200
-// carnets, esos ~3 MB se repiten 194 veces en el documento a imprimir y el navegador tarda bastante
-// en preparar e imprimir las 49 hojas. Al volver a codificarlas una sola vez como JPEG y a un tamaño
-// ajustado al de impresión, el documento final pesa una fracción de eso y se prepara mucho más rápido,
-// sin que se note la diferencia de calidad en un carnet de bolsillo.
+// Comprimir las plantillas una sola vez para aligerar los lotes.
 export function recomprimirImagen(dataUriOriginal, anchoMaximo, calidad = 0.85) {
   return new Promise((resolve) => {
     if (!dataUriOriginal) return resolve(null)
@@ -61,7 +49,6 @@ export function recomprimirImagen(dataUriOriginal, anchoMaximo, calidad = 0.85) 
       canvas.height = Math.round(img.naturalHeight * escala)
       const ctx = canvas.getContext('2d')
       if (!ctx) return resolve(dataUriOriginal)
-      // El fondo blanco cubre el canal alfa del PNG original antes de pasar a JPEG (que no admite transparencia).
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
@@ -72,9 +59,7 @@ export function recomprimirImagen(dataUriOriginal, anchoMaximo, calidad = 0.85) 
   })
 }
 
-// Se llama antes de imprimir (y de paso al entrar a la pantalla, para adelantar trabajo) y deja el
-// resultado en plantillasCarnetDataUri; los componentes de abajo lo leen de forma síncrona al renderizar.
-// 1100px de ancho sigue por encima de los ~1011px que pide una impresión nítida a 300dpi del carnet.
+// Precargar plantillas a 1100 px para impresión nítida.
 export function precargarPlantillasCarnet() {
   if (!precargaPlantillasCarnetPromesa) {
     const prepararUna = (url, key) => descargarComoDataUri(url)
@@ -88,8 +73,7 @@ export function precargarPlantillasCarnet() {
   return precargaPlantillasCarnetPromesa
 }
 
-// Plantillas de la TARJETA DE OPERATIVIDAD (public/img/img-carnet-operatividad). Igual que las del carnet de curso:
-// se descargan una vez y se embeben como data: para que imprimir no dependa de peticiones de red.
+// Embeber también las plantillas de operatividad.
 const RUTAS_PLANTILLA_OPERATIVIDAD = {
   adelante: '/img/img-carnet-operatividad/operatividad-adelante.png',
   atras: '/img/img-carnet-operatividad/operatividad-atras.png',
@@ -164,7 +148,6 @@ const qrTarjetaOperatividad = (data) => {
   return { qrRaw, isImageQr }
 }
 
-// Tamaño de letra (en % del ancho de la tarjeta) para que el texto quepa en la casilla blanca de la plantilla
 const tamanoValorOperatividad = (texto, base = 4.2) => {
   const largo = String(texto || '').length
   if (largo > 38) return base * 0.5
@@ -652,7 +635,7 @@ export function CerticavFichaPrint({ data }) {
   return (
     <PrintWrapper>
       <div className="ficha-certicav-a4">
-        
+
         {/* CABECERA INSTITUCIONAL */}
         <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 130px', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
           <div />
@@ -705,7 +688,7 @@ export function CerticavFichaPrint({ data }) {
 
           {/* Cuerpo dividido en Izquierda (Transportador / Conductor) y Derecha (Fecha / Placa / Motor) */}
           <div style={{ display: 'grid', gridTemplateColumns: '62% 38%' }}>
-            
+
             {/* Lado Izquierdo */}
             <div style={{ borderRight: '1.5px solid #000' }}>
               <div style={{ padding: '2px 5px', borderBottom: '1px solid #000' }}>
@@ -804,7 +787,7 @@ export function CerticavFichaPrint({ data }) {
 
         {/* BLOQUE DE EVALUACIÓN Y LEYENDA */}
         <div style={{ display: 'grid', gridTemplateColumns: '32% 32% 36%', border: '1.5px solid #000', marginBottom: '5px', fontSize: '6.5pt', alignItems: 'center' }}>
-          
+
           {/* Primera Evaluación */}
           <div style={{ borderRight: '1.5px solid #000', padding: '3px 5px' }}>
             <div style={{ background: '#004b93', color: '#fff', padding: '1px 3px', fontWeight: 900, fontSize: '6.2pt', textAlign: 'center', marginBottom: '2px' }}>
@@ -843,7 +826,7 @@ export function CerticavFichaPrint({ data }) {
 
         {/* RESPONSABLES Y FIRMAS */}
         <div style={{ display: 'grid', gridTemplateColumns: '49.5% 49.5%', justifyContent: 'space-between', border: '1.5px solid #000', marginBottom: '5px', fontSize: '6.8pt' }}>
-          
+
           {/* Técnico Responsable */}
           <div style={{ borderRight: '1.5px solid #000', padding: '3px 5px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '52px' }}>
             <div style={{ background: '#004b93', color: '#fff', padding: '1px 4px', fontWeight: 900, fontSize: '6.2pt', textTransform: 'uppercase' }}>
@@ -1064,7 +1047,7 @@ export function SoatConstanciaPrint({ data }) {
  */
 export function AutorizacionCargaDescargaPrint({ data }) {
   const qrRaw = `https://munijlo.gob.pe/transito/validar?tipo=AUT_CARGA&nro=${encodeURIComponent(data.numeroAutorizacion || '')}&placa=${encodeURIComponent(data.vehiculoPlaca || '')}`
-  
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '—'
     const parts = String(dateStr).slice(0, 10).split('-')
@@ -1170,7 +1153,7 @@ export function AutorizacionCargaDescargaPrint({ data }) {
           <div style={{ textAlign: 'center', fontSize: '9pt', fontWeight: 900, textDecoration: 'underline', marginBottom: '3px' }}>
             AUTORIZA
           </div>
-          
+
           <div style={{ fontSize: '8pt', marginBottom: '2px' }}>
             <strong>A:</strong> <span style={{ fontWeight: 900, textTransform: 'uppercase' }}>{data.solicitanteNombre || data.solicitante}</span>
           </div>

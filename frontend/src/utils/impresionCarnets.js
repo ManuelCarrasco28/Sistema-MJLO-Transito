@@ -1,12 +1,7 @@
 import { apiFetch, API_BASE_URL, resolverUrlArchivo } from '../config/api'
 import { recomprimirImagen } from '../components/documentos/TarjetaOperatividadPrint'
 
-// Las fotos de los conductores se sirven desde un endpoint que exige la sesión (cookie) del usuario.
-// La ventana de impresión del navegador (window.print) se renderiza en un proceso aparte que a veces
-// no reenvía esa cookie, así que la foto cargaba bien en pantalla pero salía en blanco al imprimir.
-// Para evitarlo, antes de imprimir se descarga cada foto con la sesión incluida y se convierte en un
-// data URI (la imagen va embebida en el propio carnet, sin depender de ninguna petición de red al imprimir).
-// Se cachea por URL para no volver a descargar la misma foto en impresiones siguientes.
+// Embeber las fotos con sesión para evitar imágenes vacías al imprimir.
 const cacheFotosCarnet = new Map()
 const MAX_FOTOS_CACHE = 100
 window.addEventListener('mjlo:limpiar-sesion', () => cacheFotosCarnet.clear())
@@ -32,9 +27,7 @@ export async function resolverFotoParaCarnet(fotoUrl) {
         lector.readAsDataURL(blob)
       })
       if (!dataUri) return ''
-      // La casilla de foto del carnet es pequeña; algunas fotos (p. ej. de SUNARP) llegan mucho más
-      // grandes de lo que hace falta ahí, así que se reducen antes de embeberlas para que imprimir
-      // un lote con varias fotos no sea más lento de lo necesario.
+      // Reducir las fotos al tamaño necesario para imprimir.
       return (await recomprimirImagen(dataUri, 500)) || dataUri
     } catch {
       return ''
@@ -43,7 +36,7 @@ export async function resolverFotoParaCarnet(fotoUrl) {
 
   cacheFotosCarnet.set(url, promesa)
   while (cacheFotosCarnet.size > MAX_FOTOS_CACHE) cacheFotosCarnet.delete(cacheFotosCarnet.keys().next().value)
-  // Solo se recuerdan las descargas buenas: una foto que falló (red, 404 momentáneo) se vuelve a pedir la próxima vez.
+  // Cachear solo descargas correctas; reintentar las fallidas.
   promesa.then((resultado) => { if (!resultado && cacheFotosCarnet.get(url) === promesa) cacheFotosCarnet.delete(url) })
   return promesa
 }
@@ -70,9 +63,7 @@ export const abrirImpresionCuandoEsteListo = (limpiar) => {
     : (callback) => setTimeout(callback, 16)
 
   const ejecutar = () => {
-    // window.print() bloquea hasta que se cierra el diálogo, y "afterprint" se dispara dentro de esa
-    // llamada: el oyente tiene que estar puesto ANTES de imprimir. Antes se ponía después y la limpieza
-    // quedaba a un temporizador de 2,5 s que, si se mandaba otra impresión justo después, borraba la nueva.
+    // Registrar afterprint antes de imprimir para limpiar el lote correcto.
     let terminado = false
     const cleanup = () => {
       if (terminado) return

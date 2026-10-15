@@ -23,11 +23,6 @@ class CursosController extends ResourceController
         return $this->index();
     }
 
-    /**
-     * El estado del curso sigue sus fechas: programado antes del inicio, en curso entre el inicio y el fin,
-     * finalizado al pasar el fin. Si se editan las fechas, el estado se recalcula (también hacia atrás).
-     * No toca los cursos cancelados ni los marcados como finalizados a mano.
-     */
     private function sincronizarEstadosPorFecha($db): void
     {
         \App\Libraries\ReglasCurso::sincronizarEstados($db);
@@ -83,7 +78,7 @@ class CursosController extends ResourceController
                 if ($estado === 'ACTIVO') $builder->whereIn('c.estado', ['ACTIVO', 'PROGRAMADO', 'ABIERTO']);
                 else $builder->where('c.estado', $estado);
             }
-            // Los cursos actuales pertenecen al programa de seguridad vial.
+
             $tipo = strtoupper(trim((string) $this->request->getGet('tipo')));
             if ($tipo !== '' && !in_array($tipo, ['TODOS', 'SEGURIDAD_VIAL'], true)) $builder->where('c.id', -1);
 
@@ -132,8 +127,7 @@ class CursosController extends ResourceController
                 foreach ($inscripciones as $ic) {
                     $cid = (int)$ic['id_curso'];
                     unset($ic['id_curso']);
-                    // La foto se guarda como ruta relativa (p.ej. "personas/xxx.jpg") o como URL externa (SUNARP/PIDE);
-                    // urlPublica() la convierte a una URL absoluta que el navegador sí puede cargar en el carnet.
+
                     $ic['fotoUrl'] = $fileStorage->urlPublica($ic['fotoUrl'] ?? null) ?? '';
                     $ic['carnetEntregado'] = (bool) ($ic['carnetEntregado'] ?? false);
                     $ic['asistio'] = (int) ($ic['asistio'] ?? 0);
@@ -184,10 +178,6 @@ class CursosController extends ResourceController
         }
     }
 
-    /**
-     * Decodifica el body JSON de la petición; si CodeIgniter no pudo
-     * parsearlo (o vino vacío), reintenta manualmente y cae al POST clásico.
-     */
     private function parseInput(): array
     {
         try {
@@ -201,11 +191,6 @@ class CursosController extends ResourceController
         return is_array($input) ? $input : [];
     }
 
-    /**
-     * True si la persona ya aprobó o asistió a un curso vigente (último
-     * año), condición que aplica tanto para listar personas ya cubiertas
-     * como para bloquear una reinscripción individual.
-     */
     private function tieneCursoVigente($db, ?int $idPersona = null, ?string $select = null, ?int $idCurso = null)
     {
         $query = $db->table('inscripciones_curso ic');
@@ -220,7 +205,6 @@ class CursosController extends ResourceController
             $query->where('ic.id_persona', $idPersona);
         }
 
-        // Si se proporciona curso específico, acotar al mismo curso o curso con igual nombre
         if ($idCurso !== null) {
             $cursoBase = $db->table('cursos_seguridad_vial')->select('nombre')->where('id', $idCurso)->get()->getRowArray();
             if (!empty($cursoBase['nombre'])) {
@@ -329,7 +313,7 @@ class CursosController extends ResourceController
             $data['uuid'] = \App\Libraries\Identificador::nuevo();
             if (!$db->table('cursos_seguridad_vial')->insert($data)) throw new \RuntimeException('No se pudo guardar el curso.');
             $newId = $db->insertID();
-            
+
             $response = [
                 'id' => $newId,
                 'codigo' => $codigo,
@@ -455,7 +439,7 @@ class CursosController extends ResourceController
                 }
                 foreach ($camposCalendario as $clave=>$columna) $data[$columna] = $calendario[$clave];
             }
-            // Los carnets se expiden al terminar el curso y vencen un año después: se recalculan si cambian las fechas
+// El carnet vence un año después de finalizar el curso.
             if (isset($data['fecha_inicio']) || isset($data['fecha_fin'])) {
                 $inicioFinal = $data['fecha_inicio'] ?? $cursoActual['fecha_inicio'];
                 $finFinal = $data['fecha_fin'] ?? $cursoActual['fecha_fin'] ?? $inicioFinal;
@@ -465,7 +449,7 @@ class CursosController extends ResourceController
                 $inscritos = $db->table('inscripciones_curso')->where('id_curso', $id)->whereNotIn('estado', ['ANULADO','CANCELADO'])->countAllResults();
                 if ($data['cupos'] < $inscritos) { $db->transRollback(); return $this->failValidationErrors('La capacidad no puede ser menor que los participantes inscritos.'); }
             }
-            // Al cancelar un curso con participantes inscritos, estos se pasan a otro curso (con sus pagos).
+
             $movidos = 0;
             $yaEstaban = 0;
             $cancelando = ($data['estado'] ?? null) === 'CANCELADO' && ($cursoActual['estado'] ?? '') !== 'CANCELADO';
@@ -503,7 +487,7 @@ class CursosController extends ResourceController
         }
     }
 
-    /**
+/**
      * Fecha de expedición de los carnets del curso y su vencimiento (un año después).
      * Los carnets se expiden al terminar el curso (o en la fecha indicada, que no puede ser anterior al inicio).
      *
@@ -519,7 +503,7 @@ class CursosController extends ResourceController
         return [$texto, $fecha->modify('+1 year')->format('Y-m-d')];
     }
 
-    /**
+/**
      * Instructor del curso: una persona del padrón (idInstructor) o, en cursos antiguos, solo un nombre.
      * Devuelve [nombre, idPersona|null]; el nombre sale siempre del padrón cuando hay persona.
      *
@@ -539,7 +523,7 @@ class CursosController extends ResourceController
         return [$nombre, null];
     }
 
-    /**
+/**
      * Pasa los participantes inscritos de un curso cancelado a otro curso. Sus pagos los acompañan porque
      * están ligados a la inscripción. Quien ya estuviera inscrito en el curso destino queda cancelado en el origen.
      *
@@ -553,7 +537,7 @@ class CursosController extends ResourceController
         if (!\App\Libraries\ReglasCurso::admiteInscripcion($destino['estado'])) throw new \DomainException('El curso destino no admite inscripciones.');
 
         $inscritos = $db->table('inscripciones_curso')->where('id_curso', $origenId)->whereIn('estado', ['INSCRITO', 'CONFIRMADO'])->get()->getResultArray();
-        // Solo cuentan como "ya inscritas" las personas con inscripción vigente en el destino (no las retiradas o anuladas)
+
         $enDestino = array_column(
             $db->table('inscripciones_curso')->select('id_persona')->where('id_curso', $destinoId)->whereNotIn('estado', ['ANULADO', 'CANCELADO'])->get()->getResultArray(),
             'id_persona'
@@ -570,7 +554,7 @@ class CursosController extends ResourceController
         $costoDestino = $db->table('cursos_seguridad_vial')->select('costo_inscripcion')->where('id', $destinoId)->get()->getRowArray()['costo_inscripcion'] ?? null;
         foreach ($aMover as $i) {
             $idFinal = (int)$i['id'];
-            // Si la persona tuvo una inscripción retirada en el destino, esa misma fila se reactiva (el par curso-persona es único)
+
             $retirada = $db->table('inscripciones_curso')->where('id_curso', $destinoId)->where('id_persona', (int)$i['id_persona'])->whereIn('estado', ['ANULADO', 'CANCELADO'])->get()->getRowArray();
             if ($retirada) {
                 $db->table('inscripciones_curso')->where('id', (int)$retirada['id'])->update([
@@ -582,7 +566,7 @@ class CursosController extends ResourceController
             } else {
                 $db->table('inscripciones_curso')->where('id', (int)$i['id'])->update(['id_curso' => $destinoId]);
             }
-            // El cobro que aún no se hizo pasa a costar lo que cuesta el curso nuevo; lo ya cobrado no se modifica
+
             if ($costoDestino !== null) {
                 $db->table('pagos_transito')->where('id_inscripcion', $idFinal)->where('estado', 'PENDIENTE')->update(['total' => $costoDestino]);
             }
@@ -611,11 +595,6 @@ class CursosController extends ResourceController
         }
     }
 
-    /**
-     * Devuelve los IDs de personas que ya aprobaron o asistieron a un curso
-     * en el último año (vigencia del certificado y del carnet), para no ofrecerlas
-     * de nuevo al inscribir en un curso nuevo salvo que ya esté vencido.
-     */
     public function personasConCursoVigente()
     {
         $db = \Config\Database::connect();
@@ -652,7 +631,6 @@ class CursosController extends ResourceController
             return $this->failValidationErrors('El DNI es obligatorio para la inscripción.');
         }
 
-        // Buscar a la persona
         $persona = $db->table('personas p')
             ->select('p.id as id_persona, c.nombres, c.apellido_paterno, c.apellido_materno, c.numero_licencia, c.foto')
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
@@ -666,8 +644,8 @@ class CursosController extends ResourceController
 
         $idPersona = $persona['id_persona'];
 
-        // Todo bajo transacción y con la fila del curso bloqueada: dos inscripciones simultáneas no superan el cupo
-        // ni duplican a la misma persona.
+// Todo bajo transacción y con la fila del curso bloqueada: dos inscripciones simultáneas no superan el cupo
+
         $db->transBegin();
         try {
             $curso = $db->query('SELECT cupos, costo_inscripcion, estado, fecha_inscripcion_inicio, fecha_inscripcion_fin FROM cursos_seguridad_vial WHERE id = ? FOR UPDATE', [$idCurso])->getRowArray();
@@ -695,7 +673,6 @@ class CursosController extends ResourceController
                 return $this->failValidationErrors('Esta persona ya se encuentra inscrita en este curso.');
             }
 
-            // No permitir reinscribir a quien ya tiene un certificado vigente del mismo curso (último año)
             if ($this->tieneCursoVigente($db, $idPersona, null, $idCurso)->countAllResults() > 0) {
                 $db->transRollback();
                 return $this->failValidationErrors('Esta persona ya cuenta con un certificado vigente para este curso (menos de 1 año); no necesita volver a inscribirse.');
@@ -708,7 +685,6 @@ class CursosController extends ResourceController
                 return $this->failValidationErrors("El curso ya alcanzó su cupo máximo ({$cuposTotales} participantes).");
             }
 
-            // El pago queda pendiente si el curso tiene costo; se cobra luego desde Pagos.
             $costo = (float)($curso['costo_inscripcion'] ?? 0);
             $estadoPago = $costo > 0 ? 'PENDIENTE' : 'PAGADO';
 
@@ -764,7 +740,6 @@ class CursosController extends ResourceController
         }
     }
 
-    /** Retiro lógico: conserva la persona, la inscripción y sus referencias. */
     public function retirarInscripcion($identificador)
     {
         $db = \Config\Database::connect();
@@ -793,7 +768,7 @@ class CursosController extends ResourceController
                     $db->transRollback();
                     return $this->failValidationErrors('Esta inscripción tiene un carnet emitido o entregado. No se puede retirar sin regularizarlo primero.');
                 }
-                // No se elimina historial: se anulan únicamente los cobros todavía pendientes.
+// No se elimina historial: se anulan únicamente los cobros todavía pendientes.
                 $db->table('pagos_transito')->where('id_inscripcion', $id)->where('estado', 'PENDIENTE')
                     ->update(['estado' => 'ANULADO', 'referencia_pago' => 'Inscripción retirada sin pago']);
                 if (!$db->table('inscripciones_curso')->where('id', $id)->update(['estado' => 'CANCELADO', 'estado_pago' => 'ANULADO'])) {
@@ -820,7 +795,7 @@ class CursosController extends ResourceController
         $estado = strtoupper(trim($input['estado'] ?? ''));
         $asistio = null;
         if (array_key_exists('asistio', $input) && $input['asistio'] !== null && $input['asistio'] !== '') {
-            // Se valida el valor tal como llega: solo 0/1, true/false o "0"/"1" (no "texto" ni 1.8).
+
             $mapa = [true => 1, false => 0, 1 => 1, 0 => 0, '1' => 1, '0' => 0];
             $crudo = $input['asistio'];
             if (!is_bool($crudo) && !is_int($crudo) && !is_string($crudo) || !array_key_exists(is_bool($crudo) ? (int) $crudo : $crudo, $mapa)) {
@@ -836,7 +811,7 @@ class CursosController extends ResourceController
         if (!$estado && $asistio === null) {
             return $this->failValidationErrors('No se enviaron datos para actualizar.');
         }
-        // Aprobar o culminar exige que el curso esté pagado (o sea gratuito): el carnet depende de ello
+
         if (in_array($estado, ['APROBADO', 'CULMINADO'], true)) {
             $pendiente = $db->query(
                 "SELECT 1 FROM inscripciones_curso ic JOIN personas p ON p.id = ic.id_persona
@@ -849,12 +824,11 @@ class CursosController extends ResourceController
             }
         }
 
-        // Buscar persona por DNI para obtener su ID
         $persona = $db->table('personas')->where('numero', $dni)->get()->getRowArray();
         if (!$persona) {
             return $this->failNotFound('No se encontró a la persona con el DNI proporcionado.');
         }
-        
+
         $idPersona = $persona['id'];
 
         $data = [];
@@ -887,18 +861,14 @@ class CursosController extends ResourceController
                 ->where('id_persona', $idPersona)
                 ->whereNotIn('estado', ['ANULADO', 'CANCELADO'])
                 ->update($data);
-                
+
             return $this->respond(['status' => 200, 'message' => 'Nota/asistencia registrada correctamente.']);
         } catch (\Exception $e) {
             return $this->failServerError('Error al registrar nota.');
         }
     }
 
-    /**
-     * Marca (o desmarca) la entrega física del carnet de un participante: distingue "ya se
-     * imprimió" de "ya lo recogió el conductor". Queda quién lo marcó y cuándo, para el padrón.
-     */
-    /**
+/**
      * Cursos finalizados (para filtrar los carnets del Centro de impresión). Con miles de cursos no se
      * devuelve todo: solo las primeras coincidencias de "buscar" (código o nombre), hasta "limit".
      */
@@ -919,7 +889,6 @@ class CursosController extends ResourceController
                 ->groupEnd();
         }
 
-        // Se pide una fila de más para saber si hay más resultados que los mostrados.
         $rows = $builder->orderBy('cu.fecha_inicio', 'DESC')->orderBy('cu.id', 'DESC')
             ->limit($limite + 1)
             ->get()->getResultArray();
@@ -930,15 +899,11 @@ class CursosController extends ResourceController
         return $this->respond(['data' => $rows, 'meta' => ['hayMas' => $hayMas]]);
     }
 
-    /**
+/**
      * Carnets que se pueden imprimir: participantes aprobados (o con asistencia) de cursos finalizados.
      * Listado liviano y paginado para el Centro de impresión (no trae el curso completo con todos sus participantes).
      */
-    /**
-     * Vigencia del carnet de curso de cada persona: la fecha de su último curso aprobado (o asistido) más un año.
-     * Estados: VIGENTE, POR_VENCER (vence en 30 días o menos) y VENCIDO. Una persona que volvió a llevar el curso
-     * se evalúa por el más reciente.
-     */
+
     public function listarVigenciaCarnets()
     {
         $db = \Config\Database::connect();
@@ -984,7 +949,6 @@ class CursosController extends ResourceController
         $page = max(1, (int) $this->request->getGet('page'));
         $porPagina = max(1, min(200, (int) ($this->request->getGet('porPagina') ?: 5)));
 
-        // Una sola consulta trae la página y el total (COUNT OVER); el curso de cada fila se busca después solo para esas filas
         $rows = $db->query(
             "SELECT p.id AS idPersona, p.numero AS dni, ci.nombres, ci.apellido_paterno, ci.apellido_materno,
                     ci.numero_licencia AS licencia, ci.foto AS fotoUrl, v.ultima_fecha AS ultimoCurso,
@@ -1005,7 +969,6 @@ class CursosController extends ResourceController
             $total = 0;
         }
 
-        // Último curso de cada persona de la página (más reciente primero)
         $cursosPorPersona = [];
         if ($rows) {
             $ids = array_map(static fn($r) => (int) $r['idPersona'], $rows);

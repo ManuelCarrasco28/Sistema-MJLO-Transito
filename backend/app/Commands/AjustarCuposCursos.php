@@ -5,7 +5,6 @@ namespace App\Commands;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 
-/** Corrección manual de capacidad; nunca borra inscripciones ni toca pagos. */
 class AjustarCuposCursos extends BaseCommand
 {
     protected $group = 'Mantenimiento';

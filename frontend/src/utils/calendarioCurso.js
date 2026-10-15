@@ -1,6 +1,6 @@
 const formatoLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' })
 
-// Fecha de hoy (AAAA-MM-DD) en hora de Lima. No usar toISOString(): entre las 7 pm y las 12 am daría el día siguiente.
+// Usar la fecha de Lima; UTC adelanta el día desde las 19:00.
 export function fechaLocalActual() {
   return formatoLima.format(new Date())
 }

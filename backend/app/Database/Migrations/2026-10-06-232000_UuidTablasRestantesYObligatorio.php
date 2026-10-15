@@ -5,11 +5,6 @@ namespace App\Database\Migrations;
 use App\Libraries\Identificador;
 use CodeIgniter\Database\Migration;
 
-/**
- * Completa el uuid: agrega la columna a las tablas que se sumaron después (ordenes_libertad,
- * tramites_documentarios, certificados_curso), rellena lo que falte y vuelve la columna OBLIGATORIA en todas.
- * Con NOT NULL, un insert que olvide asignar el uuid falla a la vista en vez de dejar un registro sin identificador.
- */
 class UuidTablasRestantesYObligatorio extends Migration
 {
     public function up()

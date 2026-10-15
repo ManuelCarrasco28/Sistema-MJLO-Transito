@@ -5,9 +5,6 @@ import 'leaflet/dist/leaflet.css'
 import { Icon } from './Icon'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from './ModalControls'
 
-// Los iconos por defecto de Leaflet rompen con bundlers como Vite porque
-// referencian rutas relativas a assets que no se resuelven. Se reemplazan
-// por iconos servidos desde un CDN.
 const markerIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',

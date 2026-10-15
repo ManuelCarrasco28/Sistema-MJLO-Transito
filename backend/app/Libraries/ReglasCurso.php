@@ -11,10 +11,6 @@ final class ReglasCurso
         return in_array(strtoupper(trim($estado)), ['PROGRAMADO', 'ABIERTO', 'ACTIVO'], true);
     }
 
-    /**
-     * Inscripción que da derecho a carnet: aprobada (o con asistencia), con el curso pagado (o gratuito) y sin que el
-     * curso haya sido cancelado.
-     */
     public static function condicionAprobado(string $alias = 'ic'): string
     {
         return "(($alias.asistio = 1 AND $alias.estado NOT IN ('DESAPROBADO','ANULADO','CANCELADO'))"
@@ -22,11 +18,6 @@ final class ReglasCurso
             . " AND NOT EXISTS (SELECT 1 FROM cursos_seguridad_vial ccx WHERE ccx.id = $alias.id_curso AND ccx.estado = 'CANCELADO'))";
     }
 
-    /**
-     * El estado del curso sigue sus fechas: programado antes del inicio, en curso entre el inicio y el fin,
-     * finalizado al pasar el fin (también hacia atrás si se editan las fechas). No toca cursos cancelados ni los
-     * marcados como finalizados a mano. Se usa al abrir las listas y con `php spark cursos:sincronizar-estados`.
-     */
     public static function sincronizarEstados($db): void
     {
         $hoy = self::hoy();

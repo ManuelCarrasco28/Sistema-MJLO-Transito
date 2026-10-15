@@ -1,5 +1,5 @@
 <?php
-// Prueba de mapeo y filtro; cualquier actualización temporal se revierte.
+
 define('FCPATH', dirname(__DIR__, 2) . '/public/');
 define('ENVIRONMENT', 'development');
 require FCPATH . '../app/Config/Paths.php';
@@ -36,7 +36,7 @@ $registro = $db->table('certicav')->select('id')->get()->getRowArray();
 if (!$registro) throw new \RuntimeException('No hay inspecciones para probar el nombre guardado.');
 $db->transBegin();
 try {
-    // Tipo técnico con cargo administrativo distinto y sin cuenta: el cargo no decide la función.
+
     $persona = $db->table('personas p')->select('p.id')
         ->join('ciudadanos c', 'c.id_persona=p.id')
         ->join('trabajadores t', 't.id_persona=p.id', 'left')

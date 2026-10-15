@@ -14,13 +14,6 @@ class PersonasController extends ResourceController
 
     protected $format = 'json';
 
-    /**
-     * Decide cómo persistir el valor de foto recibido del formulario:
-     * - Una foto subida manualmente por el usuario llega como data URI
-     *   (base64) y se convierte a archivo real vía FileStorageService.
-     * - Una foto de RENIEC/PIDE ya es una URL servible y se guarda tal cual.
-     */
-    /** Valida sexo y fecha de nacimiento antes de abrir la transacción (devuelve el mensaje de error o null). */
     private function errorSexoNacimiento(array $input): ?array
     {
         try {
@@ -36,7 +29,6 @@ class PersonasController extends ResourceController
         return null;
     }
 
-    /** Sexo como lo guarda la base: 'M' o 'F' (acepta también Masculino/Femenino); vacío = sin dato. */
     private function normalizarSexo($valor): ?string
     {
         $v = strtoupper(trim((string) $valor));
@@ -46,7 +38,6 @@ class PersonasController extends ResourceController
         throw new \DomainException('El sexo debe ser Masculino o Femenino.');
     }
 
-    /** Fecha de nacimiento válida (AAAA-MM-DD), no futura y posterior a 1900; vacío = sin dato. */
     private function normalizarFechaNacimiento($valor): ?string
     {
         $v = substr(trim((string) $valor), 0, 10);
@@ -67,12 +58,11 @@ class PersonasController extends ResourceController
         if (str_starts_with($valor, 'data:image')) {
             return (new \App\Services\FileStorageService())->guardarImagenBase64($valor, 'personas');
         }
-        // Foto de RENIEC (URL firmada de PIDE que caduca): se descarga y se guarda como archivo propio
+
         if (str_starts_with($valor, 'https://')) {
             return (new \App\Services\FileStorageService())->guardarFotoPide($valor, 'personas');
         }
-        // Solo imágenes propias: la URL que arma el servidor se guarda como ruta relativa; cualquier otra URL
-        // (externa) se descarta para no guardar enlaces a sitios de terceros.
+
         $pos = strpos($valor, '/api/files/');
         if ($pos !== false) {
             $valor = substr($valor, $pos + strlen('/api/files/'));
@@ -83,11 +73,6 @@ class PersonasController extends ResourceController
         return null;
     }
 
-    /**
-     * Convierte la ruta relativa guardada (ej. "personas/abc.jpg") en una URL
-     * servible por la API antes de devolverla al frontend; una URL externa
-     * (RENIEC) se deja intacta.
-     */
     private function aplicarFotoPublica(array $r): array
     {
         $fileStorage = new \App\Services\FileStorageService();
@@ -109,7 +94,7 @@ class PersonasController extends ResourceController
         return $this->respond(['data' => $rows]);
     }
 
-    /**
+/**
      * Contadores agregados (total, con/sin licencia, activos/inactivos) vía
      * COUNT() en SQL. Antes esto se calculaba en el navegador recorriendo el
      * padrón completo ya cargado; con 30,000+ personas y paginación real, el
@@ -135,10 +120,6 @@ class PersonasController extends ResourceController
         ]]);
     }
 
-    /**
-     * Consulta base de personas + datos de ciudadano, compartida por
-     * findPersona() e index() para evitar duplicar el SELECT/JOIN.
-     */
     private function personaSelectQuery($db)
     {
         return $db->table('personas p')
@@ -179,10 +160,6 @@ class PersonasController extends ResourceController
         return $this->personaSelectQuery($db)->where('p.id', $id)->get()->getRowArray();
     }
 
-    /**
-     * Reglas de validación compartidas por create() y update(); en creación
-     * además se exige el número de documento.
-     */
     private function personaValidationRules(bool $esCreacion): array
     {
         $rules = [
@@ -233,10 +210,6 @@ class PersonasController extends ResourceController
         return $rules;
     }
 
-    /**
-     * Resuelve el id de tipo_documentos_identidad a partir del código,
-     * nombre o id escrito en el formulario; por defecto DNI (id 1).
-     */
     private function resolverTipoDocumentoId($db, string $tipoDocNombre): int
     {
         $tipoDocRow = $db->table('tipo_documentos_identidad')
@@ -252,8 +225,7 @@ class PersonasController extends ResourceController
 
     public function index()
     {
-        // Fuera de oficina (inspector) solo se admite la consulta exacta por un documento con formato válido;
-        // no hay listado ni búsqueda por texto (ni valores como "0" que no filtrarían nada).
+
         $numeroConsulta = trim((string) $this->request->getGet('numeroDocumento'));
         if (!\App\Libraries\Acceso::esOficina() && !preg_match('/^[A-Za-z0-9]{8,15}$/', $numeroConsulta)) {
             return $this->failForbidden('Solo se permite consultar por número de documento.');
@@ -276,8 +248,8 @@ class PersonasController extends ResourceController
             $builder->where('p.numero !=', '00000001');
         }
 
-        // Búsqueda por texto aplicada en SQL (antes se traía TODO y se filtraba
-        // en el navegador; con 30,000+ personas eso era el cuello de botella).
+// Búsqueda por texto aplicada en SQL (antes se traía TODO y se filtraba
+
         $buscar = trim((string) $this->request->getGet('buscar'));
         if ($buscar !== '') {
             $builder->groupStart()
@@ -296,12 +268,9 @@ class PersonasController extends ResourceController
             $builder->where('p.estado', $estadoFiltro);
         }
 
-        // Paginación real: si el cliente pide una página, solo se trae esa
-        // porción y NO se calcula el historial (eso queda para show($id)).
-        // Un tamaño explícito también pagina. El modo sin ambos parámetros
-        // se conserva para clientes antiguos; las exportaciones web usan páginas.
+// Paginar en servidor; cargar el historial solo en el detalle.
         $page = (int) $this->request->getGet('page');
-        // Un tamaño explícito siempre implica paginación, también en autocompletados antiguos.
+
         if ($this->request->getGet('porPagina') !== null) {
             $page = max(1, $page);
         }
@@ -370,10 +339,7 @@ class PersonasController extends ResourceController
             }
         }
 
-        // El historial de papeletas/cursos ya NO se calcula aquí: con un padrón
-        // grande, hacerlo para todas las filas a la vez (WHERE IN con miles de
-        // IDs) era el principal cuello de botella. Ahora se pide bajo demanda
-        // en show($id), que solo lo calcula para una persona a la vez.
+// Consultar el historial bajo demanda en show().
         $historialPapeletas = [];
         $historialCursos = [];
 
@@ -383,7 +349,6 @@ class PersonasController extends ResourceController
             return $this->aplicarFotoPublica($r);
         }, $rows);
 
-        // ?ligero=1: solo lo que usan los autocompletados de los formularios (el padrón completo pesaba decenas de MB).
         if ($this->request->getGet('ligero')) {
             $campos = array_flip(['id', 'uuid', 'tipoDocumento', 'numeroDocumento', 'nombres', 'apellidoPaterno', 'apellidoMaterno', 'numeroLicencia', 'direccion', 'celular', 'estado']);
             $data = array_map(static fn (array $r) => array_intersect_key($r, $campos), $data);
@@ -392,12 +357,6 @@ class PersonasController extends ResourceController
         return $this->respond(['data' => $data]);
     }
 
-    /**
-     * Detalle de una persona con su historial de papeletas y cursos (antes
-     * este historial se calculaba para el padrón completo en index(), lo
-     * cual era muy costoso con miles de personas; ahora se pide aquí, de a
-     * una, solo cuando el usuario abre la ficha de detalle).
-     */
     public function show($id = null)
     {
         if (!\App\Libraries\Acceso::esOficina()) {
@@ -532,7 +491,6 @@ class PersonasController extends ResourceController
             ];
             $db->table('ciudadanos')->insert($cData);
 
-            // Registrar como administrado
             $db->table('administrados')->insert(['id_persona' => $insertId]);
 
             $db->transComplete();
@@ -592,7 +550,7 @@ class PersonasController extends ResourceController
                 return $this->failValidationErrors('El número de documento debe tener entre 8 y 15 caracteres.');
             }
 
-        }
+            }
 
         try {
             \App\Services\CandadoPersona::adquirir($db);
@@ -676,7 +634,7 @@ class PersonasController extends ResourceController
         if (!$db->table('personas')->where('id', $id)->countAllResults()) return $this->failNotFound('Persona no encontrada.');
 
         try {
-            // Ambas fichas se crean con la persona; no son trámites ni historial independiente.
+// Ambas fichas se crean con la persona; no son trámites ni historial independiente.
             \App\Services\EliminacionSegura::eliminar($db, 'personas', (int)$id, [
                 'ciudadanos' => 'id_persona', 'administrados' => 'id_persona',
             ]);

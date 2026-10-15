@@ -5,10 +5,9 @@ namespace App\Services;
 use CodeIgniter\Database\BaseConnection;
 use DomainException;
 
-/** Borra solo registros sin dependencias; nunca deja eliminaciones parciales. */
 class EliminacionSegura
 {
-    /** Nombre legible (singular, plural) de las tablas que pueden impedir un borrado. */
+
     private const ETIQUETAS = [
         'permisos_circulacion' => ['permiso de circulación', 'permisos de circulación'],
         'papeletas' => ['papeleta', 'papeletas'],
@@ -35,7 +34,7 @@ class EliminacionSegura
 
     public static function eliminar(BaseConnection $db, string $tabla, int $id, array $hijas = []): void
     {
-        // Los nombres proceden del código/metadata, nunca de la petición.
+
         $identificador = static function (string $nombre): string {
             if (!preg_match('/^[a-zA-Z0-9_]+$/', $nombre)) {
                 throw new DomainException('Nombre de tabla no válido.');

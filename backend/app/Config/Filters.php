@@ -15,7 +15,7 @@ use CodeIgniter\Filters\SecureHeaders;
 
 class Filters extends BaseFilters
 {
-    /**
+/**
      * Configures aliases for Filter classes to
      * make reading things nicer and simpler.
      *
@@ -38,7 +38,7 @@ class Filters extends BaseFilters
         'performance'   => PerformanceMetrics::class,
     ];
 
-    /**
+/**
      * List of special required filters.
      *
      * The filters listed here are special. They are applied before and after
@@ -53,17 +53,17 @@ class Filters extends BaseFilters
      */
     public array $required = [
         'before' => [
-            'forcehttps', // Force Global Secure Requests
-            'pagecache',  // Web Page Caching
+            'forcehttps',
+            'pagecache',
         ],
         'after' => [
-            'pagecache',   // Web Page Caching
-            'performance', // Performance Metrics
-            // 'toolbar',  // Debug Toolbar (disabled for fast REST API)
+            'pagecache',
+            'performance',
+
         ],
     ];
 
-    /**
+/**
      * List of filter aliases that are always
      * applied before and after every request.
      *
@@ -76,18 +76,16 @@ class Filters extends BaseFilters
         'before' => [
             'cors',
             'csrforigin',
-            // 'honeypot',
-            // 'csrf',
-            // 'invalidchars',
+
         ],
         'after' => [
             'cors',
             'secureheaders',
-            // 'honeypot',
+
         ],
     ];
 
-    /**
+/**
      * List of filter aliases that works on a
      * particular HTTP method (GET, POST, etc.).
      *
@@ -102,7 +100,7 @@ class Filters extends BaseFilters
      */
     public array $methods = [];
 
-    /**
+/**
      * List of filter aliases that should run on any
      * before or after URI patterns.
      *

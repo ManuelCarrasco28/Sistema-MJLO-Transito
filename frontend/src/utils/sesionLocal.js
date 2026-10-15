@@ -1,5 +1,4 @@
-// Datos del navegador que contienen información de personas (carritos de impresión, borradores de trámites).
-// Se borran al cerrar sesión o al expirar, para que no queden en un equipo compartido.
+// Borrar los datos personales locales al cerrar o expirar la sesión.
 const PREFIJOS = ['impresion_carrito_', 'qr_carrito_', 'mjlo_permiso_', 'mjlo_volver_', 'mjlo_permisos_']
 const CLAVES = ['user', 'quickActions_v1', 'notif_leidas']
 

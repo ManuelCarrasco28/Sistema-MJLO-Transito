@@ -6,7 +6,7 @@ use CodeIgniter\Config\BaseConfig;
 
 class Pager extends BaseConfig
 {
-    /**
+/**
      * --------------------------------------------------------------------------
      * Templates
      * --------------------------------------------------------------------------
@@ -26,12 +26,5 @@ class Pager extends BaseConfig
         'default_head'   => 'CodeIgniter\Pager\Views\default_head',
     ];
 
-    /**
-     * --------------------------------------------------------------------------
-     * Items Per Page
-     * --------------------------------------------------------------------------
-     *
-     * The default number of results shown in a single page.
-     */
     public int $perPage = 20;
 }

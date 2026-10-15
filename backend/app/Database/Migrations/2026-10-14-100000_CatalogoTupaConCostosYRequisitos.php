@@ -4,16 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Catálogo de trámites (TUPA) con costos por vigencia y requisitos, siguiendo el esquema del área de habilitaciones.
- *
- * - procedimientos_administrativos gana: unidad orgánica, plazo de atención, vigencia (meses), tipo de trámite y
- *   base legal. La columna costo se traslada a procedimiento_administrativo_costo (tarifa con fecha de inicio y fin).
- * - requisito + procedimiento_requisito: catálogo de requisitos y su enlace con cada trámite.
- * - certicav.id_pago: pago que autorizó cada inspección (único: un pago sirve para una sola inspección).
- *
- * Idempotente: se puede ejecutar de nuevo sin duplicar nada.
- */
 class CatalogoTupaConCostosYRequisitos extends Migration
 {
     private function existeColumna(string $tabla, string $columna): bool
@@ -26,7 +16,7 @@ class CatalogoTupaConCostosYRequisitos extends Migration
 
     public function up()
     {
-        // 1) Datos nuevos del procedimiento
+
         $nuevas = [
             'id_unidad_organica' => 'INT NULL AFTER `id`',
             'plazo_atencion' => 'INT UNSIGNED NULL AFTER `descripcion`',
@@ -40,7 +30,7 @@ class CatalogoTupaConCostosYRequisitos extends Migration
             }
         }
 
-        // 2) Costos con vigencia
+// 2) Costos con vigencia
         $this->db->query(
             "CREATE TABLE IF NOT EXISTS procedimiento_administrativo_costo (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -57,7 +47,6 @@ class CatalogoTupaConCostosYRequisitos extends Migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
         );
 
-        // El costo que ya tenía cada procedimiento pasa a ser su tarifa vigente
         if ($this->existeColumna('procedimientos_administrativos', 'costo')) {
             $this->db->query(
                 "INSERT INTO procedimiento_administrativo_costo (id_proc_admin, fecha_inicio, costo, estado)
@@ -67,7 +56,6 @@ class CatalogoTupaConCostosYRequisitos extends Migration
             $this->db->query('ALTER TABLE procedimientos_administrativos DROP COLUMN costo');
         }
 
-        // 3) Requisitos
         $this->db->query(
             "CREATE TABLE IF NOT EXISTS requisito (
                 id INT NOT NULL AUTO_INCREMENT,
@@ -98,7 +86,6 @@ class CatalogoTupaConCostosYRequisitos extends Migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
         );
 
-        // 4) La inspección guarda el pago que la autorizó (un pago, una inspección)
         if (!$this->existeColumna('certicav', 'id_pago')) {
             $this->db->query('ALTER TABLE certicav ADD COLUMN id_pago BIGINT NULL AFTER id_vehiculo');
             $this->db->query('ALTER TABLE certicav ADD UNIQUE KEY uq_certicav_pago (id_pago)');

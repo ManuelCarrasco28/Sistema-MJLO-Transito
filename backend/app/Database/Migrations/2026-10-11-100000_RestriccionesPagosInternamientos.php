@@ -4,13 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Restricciones que antes solo cuidaba el código:
- *  - un solo pago activo (no anulado) por papeleta, inscripción o trámite;
- *  - quién cobró (id_usuario_cobra);
- *  - número de orden y de boleta únicos en internamientos y un solo internamiento RETENIDO por vehículo.
- * Es idempotente y no borra datos: si ya hay duplicados, se detiene y pide regularizarlos.
- */
 class RestriccionesPagosInternamientos extends Migration
 {
     private function existeColumna(string $tabla, string $columna): bool
@@ -31,7 +24,7 @@ class RestriccionesPagosInternamientos extends Migration
 
     public function up()
     {
-        // ---- pagos: un solo pago activo por origen
+
         foreach (['id_papeleta' => 'papeleta', 'id_inscripcion' => 'inscripcion', 'id_tramite' => 'tramite'] as $fk => $nombre) {
             $col = "pago_activo_{$nombre}";
             $idx = "uq_pago_activo_{$nombre}";
@@ -47,13 +40,11 @@ class RestriccionesPagosInternamientos extends Migration
             $this->db->query("ALTER TABLE pagos_transito ADD UNIQUE KEY $idx ($col)");
         }
 
-        // ---- pagos: quién cobró
         if (!$this->existeColumna('pagos_transito', 'id_usuario_cobra')) {
             $this->db->query('ALTER TABLE pagos_transito ADD COLUMN id_usuario_cobra INT NULL');
             $this->db->query('ALTER TABLE pagos_transito ADD CONSTRAINT fk_pagos_usuario_cobra FOREIGN KEY (id_usuario_cobra) REFERENCES usuarios (id) ON DELETE SET NULL');
         }
 
-        // ---- internamientos: números únicos y un solo RETENIDO por vehículo
         if (!$this->existeIndice('ordenes_internamiento', 'uq_internamientos_numero_orden')) {
             if ($this->db->query('SELECT numero_orden FROM ordenes_internamiento WHERE numero_orden IS NOT NULL GROUP BY numero_orden HAVING COUNT(*) > 1 LIMIT 1')->getRowArray()) {
                 throw new \RuntimeException('Hay números de orden de internamiento repetidos. Regularícelos antes de migrar.');
@@ -79,6 +70,6 @@ class RestriccionesPagosInternamientos extends Migration
 
     public function down()
     {
-        // Las restricciones se conservan al revertir (protegen datos); no se retiran.
+
     }
 }

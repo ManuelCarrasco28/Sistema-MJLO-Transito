@@ -66,14 +66,13 @@ class PagosTransito
         });
     }
 
-    /**
+/**
      * Genera un número de recibo correlativo del sistema (REC-NNNNNNN), una sola serie cronológica para todos los
      * cobros, para cuando el cajero no tiene un talonario físico propio y quiere que el sistema lo registre.
      */
     private function generarNumeroRecibo(): string
     {
-        // Siguiente = mayor correlativo existente + 1 (contar filas repetía números cuando había huecos).
-        // La serie incluye los recibos de guardianía y remolque de las órdenes de libertad.
+
         $fila = $this->db->query(
             "SELECT GREATEST(
                 COALESCE((SELECT MAX(CAST(SUBSTRING(numero_recibo, 5) AS UNSIGNED)) FROM pagos_transito WHERE numero_recibo REGEXP '^REC-[0-9]+$'), 0),
@@ -94,7 +93,7 @@ class PagosTransito
         if (!$date || $date->format('Y-m-d') !== $fecha || $fecha > date('Y-m-d')) throw new DomainException('Ingrese una fecha de pago válida, no futura.');
         if ($fecha < date('Y-m-d', strtotime('-90 days'))) throw new DomainException('La fecha de pago no puede tener más de 90 días de antigüedad.');
         $automatico = $recibo === '';
-        // El candado serializa a los cajeros: dos cobros simultáneos no calculan el mismo número. Se suelta después del commit.
+// Serializar los correlativos de cobro hasta el commit.
         if ($automatico) {
             $candado = (int) ($this->db->query("SELECT GET_LOCK('mjlo_numero_recibo', 10) AS ok")->getRowArray()['ok'] ?? 0);
             if ($candado !== 1) throw new DomainException('El sistema está generando otro recibo. Intente nuevamente.');
@@ -117,7 +116,7 @@ class PagosTransito
             if ($pago['estado'] !== 'PENDIENTE') throw new DomainException('Solo se puede confirmar un pago pendiente.');
             if (in_array($origin['estado'], ['ANULADA', 'ANULADO', 'CANCELADO'], true)) throw new DomainException('No se puede confirmar el pago de un registro anulado.');
             if ($this->db->table('pagos_transito')->where('numero_recibo', $recibo)->countAllResults()) throw new DomainException('Ese recibo ya está registrado.');
-            // N° de operación (Yape, transferencia, tarjeta...): obligatorio si no se paga en efectivo; en efectivo no existe.
+
             $medio = strtoupper(trim($input['metodoPago'] ?? ''));
             $operacion = trim($input['numeroVoucher'] ?? '');
             if ($medio !== '' && !in_array($medio, ['EFECTIVO', 'TARJETA'], true)) {
@@ -130,12 +129,12 @@ class PagosTransito
             if ($medio === '' || $medio === 'EFECTIVO') $operacion = '';
             $this->db->table('pagos_transito')->where('id', $id)->update([
                 'numero_recibo' => $recibo, 'fecha_pago' => $fecha,
-                // Hora y usuario que cobra (hora de Lima); el arqueo muestra quién hizo cada cobro
+
                 'hora_pago' => date('H:i:s'),
                 'id_usuario_cobra' => ((int) (\App\Libraries\Acceso::usuario()['id'] ?? 0)) ?: null,
                 'numero_voucher' => $operacion ?: null,
                 'medio_pago' => $medio ?: null,
-                // La referencia guarda la descripción del cobro; solo se cambia si llega una nueva
+
                 'referencia_pago' => trim($input['referenciaPago'] ?? '') ?: ($pago['referencia_pago'] ?? null),
                 'estado' => 'PAGADO',
             ]);
@@ -143,7 +142,7 @@ class PagosTransito
             if ($pago['tipo_pago'] === 'CURSO') $this->db->table('inscripciones_curso')->where('id', $pago['id_inscripcion'])->update(['estado_pago' => 'PAGADO']);
             $confirmado = $this->db->table('pagos_transito')->where('id', $id)->get()->getRowArray();
             if (!empty($confirmado['numero_voucher'])) {
-                // Aviso (no bloqueo): una misma operación puede pagar varias cosas a la vez
+// Aviso (no bloqueo): una misma operación puede pagar varias cosas a la vez
                 $confirmado['operacion_repetida'] = $this->db->table('pagos_transito')
                     ->where('numero_voucher', $confirmado['numero_voucher'])->where('medio_pago', $confirmado['medio_pago'])
                     ->where('estado', 'PAGADO')->where('id !=', $id)->countAllResults();
@@ -160,7 +159,7 @@ class PagosTransito
             [$origin] = $this->origin($pago['tipo_pago'], $this->originId($pago));
             $pago = $this->db->query('SELECT * FROM pagos_transito WHERE id = ? FOR UPDATE', [$id])->getRowArray();
             if ($pago['estado'] === 'ANULADO') throw new DomainException('Este pago ya está anulado.');
-            // Una papeleta cuyo vehículo ya salió del depósito no puede volver a "pendiente de pago"
+
             if ($pago['tipo_pago'] === 'PAPELETA' && $pago['estado'] === 'PAGADO') {
                 $liberado = $this->db->query(
                     "SELECT oi.id FROM ordenes_internamiento oi WHERE oi.id_papeleta = ? AND oi.estado = 'LIBERADO' LIMIT 1",

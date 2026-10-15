@@ -122,7 +122,7 @@ export function SuperAdminDashboard({ user }) {
     }
   }
 
-  
+
   // La exportación descarga todos los eventos que coinciden con los filtros, no solo los cargados en pantalla.
   const fetchTodaLaAuditoria = () =>
     fetchTodasLasFilas('/auditoria', {
@@ -228,11 +228,7 @@ export function SuperAdminDashboard({ user }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo cargar la municipalidad.')
 
-      // Si mientras esta petición estaba en vuelo se lanzó otra más nueva
-      // (p. ej. el doble efecto de montaje de StrictMode, o un toggle del
-      // usuario que ya disparó su propio refetch), esta respuesta llegó
-      // tarde: aplicarla pisaría un cambio más reciente (como el toggle de
-      // "permiso móvil") con datos desactualizados.
+      // Descartar respuestas anteriores a la última petición.
       if (requestId !== municipalidadRequestRef.current) return
 
       const payload = data.data || {}

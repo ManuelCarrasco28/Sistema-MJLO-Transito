@@ -2,17 +2,9 @@
 
 namespace Config;
 
-/**
- * Optimization Configuration.
- *
- * NOTE: This class does not extend BaseConfig for performance reasons.
- *       So you cannot replace the property values with Environment Variables.
- *
- * WARNING: Do not use these options when running the app in the Worker Mode.
- */
 class Optimize
 {
-    /**
+/**
      * --------------------------------------------------------------------------
      * Config Caching
      * --------------------------------------------------------------------------
@@ -21,7 +13,7 @@ class Optimize
      */
     public bool $configCacheEnabled = false;
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Config Caching
      * --------------------------------------------------------------------------

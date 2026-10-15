@@ -10,17 +10,17 @@ class PideController extends ResourceController
     {
         $db = \Config\Database::connect();
         $currentYear = date("Y");
-        
+
         $anio = $db->table("municipalidad_anio")
                    ->where("anio", $currentYear)
                    ->get()
                    ->getRowArray();
-                   
+
         if (!$anio || empty($anio["token"])) {
             return null;
         }
-        
-        // El token se guarda cifrado en la base: se descifra solo aquí, para la llamada a PIDE.
+
+// El token se guarda cifrado en la base: se descifra solo aquí, para la llamada a PIDE.
         return \App\Libraries\SecretoCifrado::descifrar($anio["token"]);
     }
 
@@ -39,7 +39,6 @@ class PideController extends ResourceController
             return $this->failValidationErrors("El DNI debe tener exactamente 8 digitos.");
         }
 
-        // Quién consulta datos personales de RENIEC queda registrado (el DNI va parcialmente oculto).
         \App\Services\AuditoriaService::registrar('PIDE', 'CONSULTA_RENIEC', 'Consulta de DNI en RENIEC: ' . substr($dni, 0, 2) . '****' . substr($dni, -2), ['dni' => substr($dni, 0, 2) . '****' . substr($dni, -2)]);
 
         if ($this->rateLimited()) {
@@ -155,8 +154,6 @@ class PideController extends ResourceController
 
         $sslVerify = filter_var(env('app.pideSslVerify', true), FILTER_VALIDATE_BOOLEAN);
 
-        // La placa solo se encuentra en la oficina donde fue registrada: se prueba primero la
-        // oficina indicada y luego el resto de oficinas de la misma zona.
         $candidatas = [[$codeZona, $codeOficina]];
         if ($codeZona !== '') {
             $otras = \Config\Database::connect()
@@ -212,7 +209,7 @@ class PideController extends ResourceController
 
             $ultimo = $decoded;
             $ultimoHttp = $httpCode;
-            // Un error distinto de "sin registros" (token, validación, etc.) no mejora probando otras oficinas.
+
             if (!is_array($decoded) || ($ultimoHttp >= 400 && $ultimoHttp !== 404)) {
                 break;
             }

@@ -15,8 +15,7 @@ class ChecklistPapelCerticav extends Migration
         $rows[] = ['codigo' => 'CV-18', 'nombre' => 'Tapiz del asiento', 'seccion' => 'ASPECTOS INTERIORES', 'orden' => 180, 'obligatorio' => 1];
         foreach ($mecanicos as $i => $nombre) $rows[] = ['codigo' => sprintf('CV-%02d', $i + 19), 'nombre' => $nombre, 'seccion' => 'ESPECIFICACIONES MECANICAS', 'orden' => ($i + 19) * 10, 'obligatorio' => 1];
         foreach ($exteriores as $i => $nombre) $rows[] = ['codigo' => sprintf('CV-%02d', $i + 25), 'nombre' => $nombre, 'seccion' => 'ASPECTOS EXTERIORES', 'orden' => ($i + 25) * 10, 'obligatorio' => 1];
-        // Los títulos de grupo del formato en papel (Luces direccionales, Cinta reflectiva...) no son ítems que se evalúen:
-        // solo ordenan la hoja impresa, así que no se crean como criterios del checklist.
+
         $this->db->transStart();
         foreach ($rows as $row) {
             $row['estado'] = 'ACTIVO';
@@ -30,7 +29,7 @@ class ChecklistPapelCerticav extends Migration
     }
     public function down()
     {
-        // No eliminar criterios que ya puedan tener resultados asociados.
+
         $this->db->table('inspeccion_criterios')->like('codigo', 'CV-G', 'after')->update(['estado' => 'INACTIVO']);
     }
 }

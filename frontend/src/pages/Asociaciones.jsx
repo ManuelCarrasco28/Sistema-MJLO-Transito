@@ -149,10 +149,6 @@ export function Asociaciones() {
       setFieldErrors(prev => ({ ...prev, ruc: 'Ingresa un RUC de 11 dígitos.' }))
       return
     }
-    if (!ruc.startsWith('20')) {
-      setFieldErrors(prev => ({ ...prev, ruc: 'La consulta admite RUC que empiezan en 20. Ingresa los datos manualmente.' }))
-      return
-    }
     const controller = new AbortController()
     rucRequestRef.current?.abort()
     rucRequestRef.current = controller

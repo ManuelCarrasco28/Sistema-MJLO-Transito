@@ -52,21 +52,13 @@ class AuthController extends ResourceController
             'id_rol'       => (int) $userRecord['id_rol'],
             'cargo'        => $userRecord['cargo'],
             'id_persona'   => (int) $userRecord['id_persona'],
-            // La foto se guarda como ruta relativa ("personas/xxx.jpg"): sin convertirla a URL pública el navegador
-            // la pedía contra la página actual y salía rota.
+
             'foto_img'     => (new \App\Services\FileStorageService())->urlPublica($userRecord['foto_img'] ?? null) ?? '',
             'sv'           => (int) $userRecord['session_version'],
             'preferencias' => json_decode((string) ($userRecord['preferencias'] ?? ''), true) ?: new \stdClass(),
         ];
     }
 
-    /**
-     * Guarda preferencias de interfaz del usuario logueado (ej. qué grupos
-     * del sidebar dejó abiertos), para que persistan en su cuenta sin
-     * importar desde qué dispositivo/navegador entre. Hace merge superficial
-     * con lo que ya tenía guardado, así distintas pantallas pueden guardar
-     * cada una su propia clave sin pisarse entre sí.
-     */
     public function guardarPreferencias()
     {
         $cookieUser = $this->decodeSessionCookie($this->request->getCookie('session_user'));
@@ -88,7 +80,6 @@ class AuthController extends ResourceController
         $actual = $usuarioModel->asArray()->select('preferencias')->find($userId);
         $actuales = json_decode((string) ($actual['preferencias'] ?? ''), true) ?: [];
 
-        // Fusión recursiva segura para conservar estructuras anidadas sin sobrescribirlas por completo
         $fusionadas = array_replace_recursive($actuales, $input);
         if (strlen(json_encode($fusionadas)) > 20000) {
             return $this->failValidationErrors('Las preferencias son demasiado grandes.');
@@ -106,9 +97,6 @@ class AuthController extends ResourceController
             mkdir($dir, 0775, true);
         }
 
-        // Purga oportunista (1% de las veces) de archivos de rate-limit con
-        // más de 24h de antigüedad, para que este directorio no crezca
-        // indefinidamente con entradas de IPs/usuarios que ya no reintentan.
         if (random_int(1, 100) === 1) {
             $this->purgeStaleRateLimitFiles($dir);
         }
@@ -133,10 +121,6 @@ class AuthController extends ResourceController
         return hash('sha256', $this->normalizarUsuario($usuario) . '|' . $ip);
     }
 
-    /**
-     * Misma regla que la base de datos al comparar el usuario (sin distinguir mayúsculas ni acentos, ignorando
-     * espacios sobrantes): así "ÁDMÍN" y "admin " no sirven para tener un contador de intentos nuevo.
-     */
     private function normalizarUsuario(string $usuario): string
     {
         $u = mb_strtolower(trim($usuario), 'UTF-8');
@@ -223,19 +207,18 @@ class AuthController extends ResourceController
 
     private function ensureLoginIsNotRateLimited(string $usuario)
     {
-        // 1. Protección contra password spraying / fuerza bruta: límite por IP (20 fallos globales)
+
         $ipCheck = $this->checkRateLimitByKey($this->rateLimitIpKey(), 'Demasiados intentos fallidos desde esta conexión.');
         if ($ipCheck) {
             return $ipCheck;
         }
 
-        // 2. Límite específico por cuenta + IP (5 fallos)
         return $this->checkRateLimitByKey($this->rateLimitKey($usuario), 'Demasiados intentos fallidos.');
     }
 
     private function recordFailedAttempt(string $key, int $maxAttempts, int $windowSeconds, int $blockSeconds): void
     {
-        // Leer, sumar y escribir bajo un mismo bloqueo: una ráfaga de intentos paralelos no se cuela entre medias
+// Actualizar el contador bajo un único bloqueo.
         $fp = @fopen($this->rateLimitPath($key), 'c+');
         if (!$fp) {
             log_message('warning', 'No se pudo abrir el contador de intentos de login.');
@@ -270,10 +253,10 @@ class AuthController extends ResourceController
 
     private function registerFailedLogin(string $usuario): void
     {
-        // 5 intentos por usuario e IP dentro de 5 minutos bloquean la cuenta para esa IP por 15 minutos
+
         $this->recordFailedAttempt($this->rateLimitKey($usuario), 5, 300, 900);
 
-        // 20 intentos globales por IP dentro de 5 minutos bloquean la IP por 15 minutos (mitiga password spraying)
+// Bloquear la IP tras 20 fallos en 5 minutos.
         $this->recordFailedAttempt($this->rateLimitIpKey(), 20, 300, 900);
     }
 
@@ -311,8 +294,7 @@ class AuthController extends ResourceController
         $isMobileApp = $this->request->getHeaderLine('X-Mobile-App') === 'MJLO-TRANSITO'
             || str_contains($userAgent, 'Dart/')
             || str_contains($userAgent, 'Dart ');
-        // Si hay app.mobileKey configurada, declararse "móvil" no basta (el encabezado y el agente se falsifican):
-        // solo se omite el captcha con la clave compartida de la app. Sin clave se conserva el comportamiento anterior.
+// Omitir captcha móvil solo con la clave compartida válida, si está configurada.
         $mobileKey = trim((string) env('app.mobileKey', ''));
         if ($isMobileApp && $mobileKey !== '') {
             $isMobileApp = hash_equals($mobileKey, $this->request->getHeaderLine('X-Mobile-Key'));
@@ -353,15 +335,13 @@ class AuthController extends ResourceController
             ->where('usuarios.usuario', $usuario)
             ->first();
 
-        // Mitigación de timing attack: si el usuario no existe, se calcula bcrypt contra un hash válido
-        // para que el tiempo de respuesta sea indistinguible entre usuarios existentes e inexistentes.
         $dummyHash = (string) env('auth.dummyBcryptHash', '$2y$10$uC6yLnBuSCPOiqRse39Ifupcrvx6zZJ5e/.sK.Pa340hQGwjbQFJG');
         $hashToCheck = $userRecord ? ($userRecord['clave'] ?? $dummyHash) : $dummyHash;
         $passwordMatches = password_verify($password, $hashToCheck);
 
         if (!$userRecord || !$passwordMatches) {
             $this->registerFailedLogin($usuario);
-            // Lo escrito como usuario puede ser una contraseña tecleada en el campo equivocado: se acota y se limpia
+
             $usuarioAuditoria = mb_substr(preg_replace('/[^\P{C}]/u', '', $usuario) ?? '', 0, 40);
             \App\Services\AuditoriaService::registrar(
                 'SEGURIDAD',
@@ -383,7 +363,6 @@ class AuthController extends ResourceController
             return $this->failUnauthorized('El usuario se encuentra inactivo.');
         }
 
-        // Los inspectores (rol Trabajador) solo usan la app móvil: desde el navegador no se les crea la sesión
         if (strtoupper((string) ($userData['rol'] ?? '')) === 'TRABAJADOR' && !\App\Libraries\Acceso::esClienteMovil($this->request)) {
             return $this->failForbidden('El acceso al sistema web está restringido para este rol. Por favor, utilice la aplicación móvil.');
         }
@@ -470,8 +449,8 @@ class AuthController extends ResourceController
 
     public function cambiarPassword()
     {
-        // Solo se permite cambiar la propia contraseña: el id de sesión manda,
-        // nunca un id_usuario arbitrario enviado por el cliente.
+// Solo se permite cambiar la propia contraseña: el id de sesión manda,
+
         $cookieUser = $this->decodeSessionCookie($this->request->getCookie('session_user'));
         if (!$cookieUser || empty($cookieUser['id'])) {
             return $this->failUnauthorized('Sesión no válida o expirada.');

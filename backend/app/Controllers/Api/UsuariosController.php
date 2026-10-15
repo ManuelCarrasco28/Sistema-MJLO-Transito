@@ -18,14 +18,14 @@ class UsuariosController extends ResourceController
     }
     protected $format = 'json';
 
-    /**
+/**
      * Usuario de sistema con protecciones especiales (no se puede eliminar,
      * ni modificar su rol/estado/contraseña salvo por otro SuperAdmin).
      * Único punto de verdad para no repetir el literal en cada método.
      */
     private const USUARIO_PROTEGIDO = 'superadmin';
 
-    /**
+/**
      * Jerarquía de roles: un usuario que no es SuperAdmin solo puede crear, modificar, restablecer la
      * contraseña o eliminar cuentas con un rol MÁS BAJO que el suyo, y solo asignar roles más bajos.
      * Antes un Gerente o SubGerente podía darse (o dar a otro) el rol SuperAdmin, o cambiarle la
@@ -125,7 +125,6 @@ class UsuariosController extends ResourceController
             ]
         ];
 
-        // Compatibilidad con campos alternativos enviados por clientes móviles o formularios legados
         if (!isset($input['id_persona']) && isset($input['id_trabajador'])) {
             $input['id_persona'] = $input['id_trabajador'];
         }
@@ -171,8 +170,6 @@ class UsuariosController extends ResourceController
 
         $db->transStart();
 
-        // Una persona del padrón que aún no es trabajador se registra como tal al crearle la cuenta
-        // (el cargo y la unidad se completan después en Trabajadores; los cargos no son lo mismo que los roles).
         if (!$db->table('trabajadores')->where('id_persona', $idPersona)->countAllResults()) {
             $db->table('trabajadores')->insert([
                 'id_persona'   => $idPersona,
@@ -270,7 +267,6 @@ class UsuariosController extends ResourceController
             return $this->fail('Solo un SuperAdmin puede modificar la cuenta superadmin principal.', 403);
         }
 
-        // Nadie cambia su propio rol ni su estado (evita auto-ascensos y quedarse sin acceso).
         if ($actor && (int) ($actor['id'] ?? 0) === (int) $id) {
             return $this->fail('No puede cambiar su propio rol ni su estado.', 403);
         }
@@ -307,8 +303,8 @@ class UsuariosController extends ResourceController
             return $this->failServerError('Error al actualizar el usuario.');
         }
 
-        // El rol o estado cambió: cualquier sesión activa de ese usuario con
-        // permisos anteriores queda invalidada de inmediato.
+// El rol o estado cambió: cualquier sesión activa de ese usuario con
+// permisos anteriores queda invalidada de inmediato.
         \App\Services\AuthSession::invalidateSessions((int)$id);
 
         \App\Services\AuditoriaService::registrar(
@@ -345,7 +341,7 @@ class UsuariosController extends ResourceController
 
         $esMismaCuenta = $actor && (int) ($actor['id'] ?? 0) === (int) $id;
         if ($esMismaCuenta) {
-            // La contraseña propia se cambia desde "Mi perfil", donde se exige la contraseña actual
+
             return $this->fail('Para cambiar su propia contraseña use "Mi perfil": allí se pide la contraseña actual.', 403);
         }
         if ($actor && !$esMismaCuenta && $this->sinJerarquia($actor, $this->rolDeUsuario($db, $id))) {
@@ -355,7 +351,7 @@ class UsuariosController extends ResourceController
         $db->table('usuarios')->where('id', $id)->update([
             'clave' => password_hash($input['password'], PASSWORD_DEFAULT)
         ]);
-        // Fuerza el cierre de cualquier sesión activa con la contraseña anterior.
+// Fuerza el cierre de cualquier sesión activa con la contraseña anterior.
         \App\Services\AuthSession::invalidateSessions((int)$id);
 
         \App\Services\AuditoriaService::registrar(

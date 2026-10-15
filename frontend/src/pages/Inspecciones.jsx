@@ -297,7 +297,6 @@ export function Inspecciones() {
 
   const paginatedInspecciones = inspecciones
 
-  // Los conductores se buscan en el servidor mientras se escribe (antes solo se buscaba entre las primeras 100 personas)
   const sumarPersonas = (lista) => setPersonas((prev) => [...prev.filter((p) => !lista.some((n) => n.id === p.id)), ...lista])
   useEffect(() => {
     const termino = (formData.conductorNombre || '').trim()
@@ -690,9 +689,7 @@ export function Inspecciones() {
       const newDetalles = prev.detalles.map((d) => (d.criterioId === criterioId ? { ...d, [field]: value } : d))
       const evalChecklist = calcularPrimeraEvaluacion(newDetalles)
 
-      // Editando una inspección ya DESAPROBADA: la Primera Evaluación queda
-      // fija (es historia); volver a llenar el checklist ahora define la
-      // Segunda Evaluación (subsanación), no la primera.
+      // La subsanación modifica la segunda evaluación, no la primera.
       if (selectedInspeccion && prev.primeraEvaluacion !== 'APROBADO') {
         return {
           ...prev,

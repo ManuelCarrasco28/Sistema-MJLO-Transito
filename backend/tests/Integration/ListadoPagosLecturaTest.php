@@ -1,5 +1,5 @@
 <?php
-// Solo SELECT: verifica paginación y búsqueda sin crear pagos ni modificar datos.
+
 define('FCPATH', dirname(__DIR__, 2) . '/public/');
 define('ENVIRONMENT', 'development');
 require FCPATH . '../app/Config/Paths.php';
@@ -36,7 +36,7 @@ foreach (['CURSO', 'TRAMITE'] as $tipo) {
         break;
     }
 }
-// Una anulación histórica no debe ocultar una deuda restaurada.
+
 foreach (['id_papeleta', 'id_inscripcion', 'id_tramite'] as $columna) {
     $metodo = new \ReflectionMethod($controller, 'idsConRecibo');
     $vigentes = $metodo->invoke($controller, $db, $columna);
@@ -57,7 +57,7 @@ $todos = json_decode($controller->index()->getBody(), true);
 $msLista = (microtime(true) - $inicioLista) * 1000;
 $estadisticas = json_decode($controller->estadisticas()->getBody(), true)['data'];
 if ($todos['meta']['total'] !== $estadisticas['totalPagos']) throw new \RuntimeException('Totales del listado y estadísticas no coinciden.');
-// Las peticiones inválidas se detienen antes del INSERT/UPDATE.
+
 foreach (['create','update'] as $accion) {
     foreach ([['titulo'=>'Prueba validación', 'fecha'=>'2026-10-10', 'costo'=>-1], ['titulo'=>'Prueba validación', 'fecha'=>'2026-10-10', 'estado'=>'OTRO']] as $entrada) {
         $peticion = \Config\Services::incomingrequest(null, false);

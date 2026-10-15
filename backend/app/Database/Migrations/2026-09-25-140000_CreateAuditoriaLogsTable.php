@@ -4,14 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * `AuditoriaService::registrar()` ya se llama desde AuthController, y los
- * controladores de Usuarios, Vehículos, Asociaciones, Pagos, etc., pero la
- * tabla `auditoria_logs` nunca se creó: cada llamada fallaba en silencio
- * (la propia guarda `tableExists()` de AuditoriaService lo permite), por lo
- * que el módulo "Auditoría y logs" del panel Super Admin siempre mostraba 0
- * eventos.
- */
 class CreateAuditoriaLogsTable extends Migration
 {
     public function up()

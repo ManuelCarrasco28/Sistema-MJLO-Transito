@@ -2,13 +2,9 @@
 
 namespace Config;
 
-/**
- * This configuration controls how CodeIgniter behaves when running
- * in worker mode (with FrankenPHP).
- */
 class WorkerMode
 {
-    /**
+/**
      * Persistent Services
      *
      * List of service names that should persist across requests.
@@ -40,7 +36,7 @@ class WorkerMode
         'cache',
     ];
 
-    /**
+/**
      * Reset Event Listeners
      *
      * List of event names whose listeners should be removed between requests.
@@ -52,11 +48,5 @@ class WorkerMode
      */
     public array $resetEventListeners = [];
 
-    /**
-     * Force Garbage Collection
-     *
-     * Whether to force garbage collection after each request.
-     * Helps prevent memory leaks at a small performance cost.
-     */
     public bool $forceGarbageCollection = true;
 }

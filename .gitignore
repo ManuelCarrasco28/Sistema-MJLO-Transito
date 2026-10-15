@@ -48,8 +48,10 @@ Database/
 !backend/app/Database/Seeds/
 !backend/app/Database/Seeds/*.php
 *.sql
-!init-db/transitomunicipal.sql
-!init-db/migraciones/*.sql
+!database/
+!database/migraciones/
+!database/transitomunicipal.sql
+!database/migraciones/*.sql
 
 *.img/
 

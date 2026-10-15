@@ -6,11 +6,6 @@ use App\Libraries\ReglasCurso;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 
-/**
- * php spark cursos:sincronizar-estados
- * Pone al día los estados que dependen de una fecha: cursos (programado, en curso, finalizado), documentos del vehículo y permisos (vigente, vencido). Conviene programarlo
- * una vez al día (cron o tarea programada), para que no dependa de que alguien abra la pantalla de cursos.
- */
 class SincronizarEstadosCursos extends BaseCommand
 {
     protected $group = 'Mantenimiento';

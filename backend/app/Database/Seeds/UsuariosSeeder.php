@@ -8,19 +8,18 @@ class UsuariosSeeder extends Seeder
 {
     public function run()
     {
-        $usersData = []; // Ya sembrado en BD
+        $usersData = [];
 
         foreach ($usersData as $u) {
-            // 1. Crear en `personas`
+
             $this->db->table('personas')->insert([
                 'uuid' => \App\Libraries\Identificador::nuevo(),
-                'id_tipo_documento' => 1, // Asumimos 1 = DNI
+                'id_tipo_documento' => 1,
                 'numero' => $u['numero'],
                 'estado' => 'ACTIVO'
             ]);
             $idPersona = $this->db->insertID();
 
-            // 2. Crear en `ciudadanos`
             $this->db->table('ciudadanos')->insert([
                 'id_persona' => $idPersona,
                 'nombres' => $u['nombres'],
@@ -28,7 +27,6 @@ class UsuariosSeeder extends Seeder
                 'apellido_materno' => $u['apellido_materno']
             ]);
 
-            // 3. Crear en `trabajadores`
             $this->db->table('trabajadores')->insert([
                 'id_persona' => $idPersona,
                 'tipo' => 'INTERNO',
@@ -36,7 +34,6 @@ class UsuariosSeeder extends Seeder
                 'estado' => 'ACTIVO'
             ]);
 
-            // 3b. Create cargo / desplazamiento
             $cargoRow = $this->db->table('cargos')->where('nombre', $u['cargo'])->get()->getRowArray();
             if (!$cargoRow) {
                 $this->db->table('cargos')->insert(['nombre' => $u['cargo'], 'estado' => 'ACTIVO']);
@@ -52,7 +49,6 @@ class UsuariosSeeder extends Seeder
                 'tipo_funcion' => 'Titular'
             ]);
 
-            // 4. Crear en `usuarios`
             $this->db->table('usuarios')->insert([
                 'id_trabajador' => $idPersona,
                 'nombre_usuario' => $u['usuario'],

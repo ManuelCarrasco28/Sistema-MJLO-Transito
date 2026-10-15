@@ -27,7 +27,6 @@ class OperativosController extends ResourceController
 
         $db = \Config\Database::connect();
 
-        // 1. Finalizar operativos cuya hora fin o fecha ya pasó (que no estén cancelados)
         $db->query("
             UPDATE operativos
             SET estado = 'FINALIZADO'
@@ -38,7 +37,6 @@ class OperativosController extends ResourceController
               )
         ", [$curDateLima, $curDateLima, $curTimeLima]);
 
-        // 2. Pasar a EN_CURSO operativos programados cuya hora inicio ya llegó y no han finalizado
         $db->query("
             UPDATE operativos
             SET estado = 'EN_CURSO'
@@ -48,7 +46,6 @@ class OperativosController extends ResourceController
               AND (hora_fin IS NULL OR hora_fin > ?)
         ", [$curDateLima, $curTimeLima, $curTimeLima]);
 
-        // 3. Regresar a PROGRAMADO si la fecha o inicio es en el futuro
         $db->query("
             UPDATE operativos
             SET estado = 'PROGRAMADO'
@@ -241,7 +238,7 @@ class OperativosController extends ResourceController
 
         $this->sincronizarEstados();
         $db = \Config\Database::connect();
-        
+
         $operativo = $db->table('operativos o')
             ->select('o.uuid AS uuid, o.id, o.nombre, o.lugar, o.fecha, o.hora_inicio, o.fecha AS fecha_fin, o.hora_fin, o.estado, ca.nombre as cargo_inspector')
             ->join('operativo_inspectores oi', 'oi.id_operativo = o.id', 'inner')
@@ -308,8 +305,7 @@ class OperativosController extends ResourceController
         $builder->groupBy('o.id');
 
         if ($page > 0) {
-            // El total solo depende de columnas del operativo: no necesita agrupar
-            // las tablas de inspectores y papeletas usadas para mostrar cada fila.
+
             $conteo = $db->table('operativos o');
             if ($buscar !== '') {
                 $conteo->groupStart()
@@ -600,4 +596,4 @@ class OperativosController extends ResourceController
         return $this->respondDeleted(['status' => true, 'message' => 'Operativo eliminado correctamente.']);
     }
 
-}
+    }

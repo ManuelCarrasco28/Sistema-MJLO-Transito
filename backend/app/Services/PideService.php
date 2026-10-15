@@ -8,24 +8,20 @@ class PideService
     {
         $db = \Config\Database::connect();
         $currentYear = date("Y");
-        
+
         $anio = $db->table("municipalidad_anio")
                    ->where("anio", $currentYear)
                    ->get()
                    ->getRowArray();
-                   
+
         if (!$anio || empty($anio["token"])) {
             return null;
         }
-        
-        // El token se guarda cifrado en la base: se descifra solo aquí, para la llamada a PIDE.
+
+// El token se guarda cifrado en la base: se descifra solo aquí, para la llamada a PIDE.
         return \App\Libraries\SecretoCifrado::descifrar($anio["token"]);
     }
 
-    /**
-     * Límite de consultas por usuario e IP (20 por minuto, igual que PideController) y registro en la auditoría.
-     * Devuelve true si la consulta debe bloquearse. Antes, estas rutas "de respaldo" no tenían ni límite ni rastro.
-     */
     private static function bloqueada(string $accion, string $detalle): bool
     {
         try {

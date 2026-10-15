@@ -13,7 +13,7 @@ import { generarPlantillaCuerpo } from '../utils/permisosPlantilla'
 import { normalizarFormatoEnLinea } from '../utils/formatoEditor'
 import { BotonCancelar, BotonGuardar } from '../components/ui/ModalControls'
 
-// TinyMCE autohospedado (licencia GPL): los archivos están en /public/tinymce; no usa claves ni servicios externos.
+// TinyMCE local bajo licencia GPL; sin servicios externos.
 const TINYMCE_SCRIPT = '/tinymce/tinymce.min.js'
 
 export function PermisoFormularioVentana() {
@@ -276,7 +276,6 @@ export function PermisoFormularioVentana() {
         id: effectiveId || undefined
       }
 
-      // Si es creación y no se especificó un número, omitir para que el backend autogenere el correlativo único
       if (!isEdit && !payload.numeroAutorizacion?.trim()) {
         delete payload.numeroAutorizacion
       }
@@ -686,11 +685,8 @@ export function PermisoFormularioVentana() {
                   licenseKey="gpl"
                   value={formData.contenido}
                   onEditorChange={handleEditorChange}
-                  // Negrita, cursiva y subrayado en línea pasan a etiquetas para que los botones de la barra los reconozcan
                   onBeforeSetContent={(evento) => { if (evento.format !== 'raw') evento.content = normalizarFormatoEnLinea(evento.content) }}
                   init={{
-                    // Estilo "hoja de Word" de una sola página A4: el editor crece con el documento (sin barra de desplazamiento propia)
-                    // y la página completa es la que se desplaza.
                     min_height: 1123,
                     autoresize_bottom_margin: 40,
                     toolbar_sticky: true,

@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 
 final class PlacaTest extends TestCase
 {
-    /**
+/**
      * @dataProvider placasProvider
      */
     public function testNormalizaALaFormaGuardada(string $entrada, string $esperada): void

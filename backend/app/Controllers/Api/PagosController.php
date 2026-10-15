@@ -29,7 +29,6 @@ class PagosController extends ResourceController
             ", false)
             ->get()->getRowArray();
 
-        // Solo guardianía y remolque: el importe de la papeleta ya está en su propio recibo de pagos_transito
         $liberados = $db->table('ordenes_libertad')
             ->select("
                 COUNT(*) as total,
@@ -79,9 +78,9 @@ class PagosController extends ResourceController
         $buscar = trim((string)$this->request->getGet('buscar'));
         $tipoFiltro = strtoupper(trim((string)$this->request->getGet('tipoPago')));
         $estadoFiltro = strtoupper(trim((string)$this->request->getGet('estado')));
-        $metodoFiltro = strtoupper(trim((string)$this->request->getGet('metodo'))); // EFECTIVO | TARJETA | SIN_CONFIRMAR
+        $metodoFiltro = strtoupper(trim((string)$this->request->getGet('metodo')));
 
-        // Todos los orígenes se filtran y paginan en SQL, sin cargar el listado completo.
+// Todos los orígenes se filtran y paginan en SQL, sin cargar el listado completo.
         if ($page > 0) {
             return $this->listarPagina($db, $page, $porPagina, $buscar, $tipoFiltro, $estadoFiltro, $metodoFiltro);
         }
@@ -93,9 +92,7 @@ class PagosController extends ResourceController
             ->where('oi.estado', 'RETENIDO')
             ->get()->getResultArray();
 
-        // El medio de pago se arma listando qué conceptos incluye la orden
-        // (guardianía, papeleta y/o remolque), ya que el sistema no registra
-        // un único método por cada recibo combinado.
+// un único método por cada recibo combinado.
         $pagados = $db->table('ordenes_libertad ol')
             ->select("ol.id, ol.id_internamiento, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_remolque, 'VARIOS') as numero_recibo, NULL as numero_voucher,
                 COALESCE(NULLIF(CONCAT_WS(' + ',
@@ -106,9 +103,6 @@ class PagosController extends ResourceController
             ->where('(ol.monto_guardiania + ol.monto_remolque) >', 0, false)
             ->get()->getResultArray();
 
-        // Papeletas pendientes de pago que aún no tienen un recibo generado
-        // en pagos_transito, para que se vean en Pagos sin esperar a que
-        // alguien las seleccione manualmente en "Registrar Pago".
         $idsPapeletasConRecibo = $this->idsConRecibo($db, 'id_papeleta');
 
         $papeletasPendientes = $db->table('papeletas p')
@@ -121,8 +115,6 @@ class PagosController extends ResourceController
             static fn ($p) => !in_array((int) $p['id'], $idsPapeletasConRecibo, true)
         ));
 
-        // Inscripciones a cursos con costo, pendientes de pago, que aún no
-        // tienen un recibo generado.
         $idsInscripcionesConRecibo = $this->idsConRecibo($db, 'id_inscripcion');
 
         $cursosPendientes = $db->table('inscripciones_curso i')
@@ -139,8 +131,8 @@ class PagosController extends ResourceController
             static fn ($c) => !in_array((int) $c['id'], $idsInscripcionesConRecibo, true)
         ));
 
-        // Resolución de "pagado por" en bloque (una consulta por tipo de
-        // origen, no una por fila) para evitar N+1 al construir el listado.
+// Resolución de "pagado por" en bloque (una consulta por tipo de
+
         $idsPapeletaPagador = array_values(array_unique(array_filter(array_merge(
             array_map(static fn ($r) => (int) ($r['id_papeleta'] ?? 0), $rows),
             array_map(static fn ($p) => (int) $p['id'], $papeletasPendientes)
@@ -213,7 +205,6 @@ class PagosController extends ResourceController
             ];
         }
 
-        // Filtrado en memoria unificado si se solicita búsqueda o filtros
         if ($buscar !== '' || $metodoFiltro !== '' || ($tipoFiltro !== '' && $tipoFiltro !== 'TODOS') || ($estadoFiltro !== '' && $estadoFiltro !== 'TODOS')) {
             $pagos = array_values(array_filter($pagos, function ($p) use ($buscar, $tipoFiltro, $estadoFiltro, $metodoFiltro) {
                 $medio = strtoupper((string)($p['metodo'] ?? ''));
@@ -241,12 +232,8 @@ class PagosController extends ResourceController
             }));
         }
 
-        // Ordenamiento: el listado de pagos es un array PHP en memoria (mezcla
-        // pagos_transito + pendientes sin recibo de 3 orígenes distintos), no
-        // una sola consulta SQL, así que el orden pedido por el cliente se
-        // aplica aquí con usort en vez de con QuerySort (que necesita un query builder).
         $columnasOrdenablesPago = ['numeroRecibo', 'referenciaPago', 'metodoPago', 'montoTotal', 'estado', 'fecha'];
-        // Admite varias columnas ("a,b" con "ASC,DESC"); solo cuentan las de la lista blanca.
+
         $claves = array_values(array_filter(
             array_map('trim', explode(',', (string) $this->request->getGet('sortBy'))),
             static fn($c) => in_array($c, $columnasOrdenablesPago, true)
@@ -301,11 +288,6 @@ class PagosController extends ResourceController
         return $this->respond(['data' => $pagos]);
     }
 
-    /**
-     * IDs de una columna de referencia (papeleta/trámite/inscripción) que ya
-     * tienen un recibo generado en pagos_transito, para excluirlos de las
-     * listas de "pendientes sin recibo".
-     */
     private function listarPagina($db, int $page, int $porPagina, string $buscar, string $tipo, string $estado, string $metodo = '')
     {
         $builder = \App\Libraries\PagosListado::builder($db);
@@ -317,7 +299,7 @@ class PagosController extends ResourceController
             $builder->where('listado.medio_pago', $metodo);
         }
         if ($buscar !== '') {
-            // La búsqueda usa los mismos pagadores que se muestran en la tabla.
+
             $nombre = "TRIM(CONCAT(COALESCE(c.nombres,''), ' ', COALESCE(c.apellido_paterno,''), ' ', COALESCE(c.apellido_materno,'')))";
             $patron = $db->escape('%' . $db->escapeLikeString($buscar) . '%');
             $coincide = "($nombre LIKE $patron ESCAPE '!' OR per.numero LIKE $patron ESCAPE '!')";
@@ -387,11 +369,6 @@ class PagosController extends ResourceController
         return array_map(static fn($r) => (int)$r[$columna], $rows);
     }
 
-    /**
-     * Da forma de fila de pago a una orden de internamiento (retenida o
-     * liberada), que no vive en pagos_transito pero debe listarse junto a los
-     * demás comprobantes.
-     */
     private function formatearPagoInternamiento(array $row, string $idPrefix, ?array $mapasPagador): array
     {
         return [
@@ -442,11 +419,6 @@ class PagosController extends ResourceController
         ];
     }
 
-    /**
-     * Resuelve el nombre de quien realizó cada pago con una sola consulta por
-     * tipo de origen (papeleta/trámite/curso/internamiento) en vez de una
-     * consulta por fila, evitando el patrón N+1 al construir el listado.
-     */
     private function resolverPagadoresEnBloque($db, array $idsPapeleta, array $idsTramite, array $idsCurso, array $idsInternamiento): array
     {
         $mapas = ['papeleta' => [], 'tramite' => [], 'curso' => [], 'internamiento' => []];
@@ -553,7 +525,7 @@ class PagosController extends ResourceController
 
             $tipo = strtoupper(trim($input['tipoPago'] ?? ''));
             $key = ['PAPELETA' => 'papeletaId', 'TRAMITE' => 'tramiteId', 'CURSO' => 'inscripcionId'][$tipo] ?? '';
-            
+
             $rulesId = [
                 $key => [
                     'rules' => 'required|is_natural_no_zero',
@@ -571,8 +543,6 @@ class PagosController extends ResourceController
             $service = new PagosTransito(\Config\Database::connect());
             $pago = $service->generar($tipo, (int)($input[$key] ?? 0));
 
-            // Si ya vienen los datos del recibo (flujo en un solo paso desde
-            // "Registrar Pago"), se confirma de inmediato como PAGADO.
             if (trim($input['fechaPago'] ?? '') !== '') {
                 $pago = $service->confirmar((int)$pago['id'], $input);
             }
@@ -591,7 +561,7 @@ class PagosController extends ResourceController
         try {
             $input = $this->request->getJSON(true) ?? [];
             $pago = (new PagosTransito(\Config\Database::connect()))->confirmar((int)$id, $input);
-            
+
             AuditoriaService::registrar(
                 'PAGOS',
                 'CONFIRMAR',
@@ -639,11 +609,6 @@ class PagosController extends ResourceController
         ]]);
     }
 
-    /**
-     * Busca a una persona por DNI y devuelve todas sus deudas pendientes
-     * (papeletas como infractor, trámites y cursos), para poder cobrarlas
-     * todas desde un mismo lugar en vez de buscar registro por registro.
-     */
     public function deudasPorPersona()
     {
         $db = \Config\Database::connect();
@@ -779,7 +744,7 @@ class PagosController extends ResourceController
         foreach ($todosPagos as $item) {
             $m = $item['monto'];
             $totalRecaudado += $m;
-            
+
             $metodo = $item['metodoPago'];
             if (str_contains($metodo, 'TARJETA') || str_contains($metodo, 'POS') || str_contains($metodo, 'DEBITO') || str_contains($metodo, 'CREDITO')) {
                 $totalTarjeta += $m;

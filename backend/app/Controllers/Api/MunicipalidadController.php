@@ -33,10 +33,7 @@ class MunicipalidadController extends ResourceController
 
         $anios = [];
         if ($municipalidad) {
-            // No seleccionar 'token': es un secreto (bearer de PIDE) y este
-            // endpoint lo consulta cualquier usuario autenticado, no solo superadmin.
-            // Se agrega 'tokenConfigurado' (booleano) para que la UI pueda
-            // mostrar si ya hay uno guardado sin revelar su valor.
+// No exponer el token PIDE; devolver solo tokenConfigurado.
             $anios = $db->table('municipalidad_anio')
                 ->select("id, id_municipalidad, fecha_created, fecha_updated, nombre, anio, uit, (token IS NOT NULL AND token != '') as tokenConfigurado", false)
                 ->where('id_municipalidad', $municipalidad['id'])
@@ -59,7 +56,7 @@ class MunicipalidadController extends ResourceController
         ]);
     }
 
-    /**
+/**
      * Endpoint ligero para el dashboard móvil.
      * Retorna sólo los conteos del día para el inspector + config de permisos.
      * Evita descargar todo el historial de papeletas y reportes.
@@ -70,8 +67,6 @@ class MunicipalidadController extends ResourceController
         $config = $this->configuracionSistema($db);
         $permitePapeleta = ($config['mobile_permite_aplicar_papeleta']['valor'] ?? '0') === '1';
 
-        // El inspector sale de la sesión: antes cualquier usuario podía ver el conteo de otro enviando su
-        // inspector_id. Solo el personal de oficina puede consultar a otro inspector.
         $usuarioSesion = \App\Libraries\Acceso::usuario();
         $inspectorId = \App\Libraries\Acceso::esOficina($usuarioSesion)
             ? (int) ($this->request->getGet('inspector_id') ?: ($usuarioSesion['id_persona'] ?? 0))
@@ -169,7 +164,7 @@ class MunicipalidadController extends ResourceController
         $uit = (float)($input['uit'] ?? 0);
         $token = trim((string)($input['token'] ?? ''));
 
-        // El token de PIDE es un secreto: solo el SuperAdmin puede ponerlo o cambiarlo.
+// El token de PIDE es un secreto: solo el SuperAdmin puede ponerlo o cambiarlo.
         if ($token !== '' && \App\Libraries\Acceso::rol() !== 'SUPERADMIN') {
             return $this->fail('Solo un SuperAdmin puede registrar o cambiar el token de PIDE.', 403);
         }
@@ -205,13 +200,9 @@ class MunicipalidadController extends ResourceController
             'uit' => $uit,
         ];
 
-        // El modal de edición nunca puede pre-cargar el token real (es un
-        // secreto que el endpoint de lectura no expone), así que llega vacío
-        // salvo que el usuario lo haya vuelto a escribir. Si viene vacío en
-        // una edición, se conserva el token que ya estaba guardado en vez de
-        // borrarlo sin querer.
+// Conservar el token guardado si la edición lo envía vacío.
         if ($token !== '' || !$existing) {
-            // Se guarda cifrado (AES-256 con encryption.key del .env): nunca en texto plano.
+// Se guarda cifrado (AES-256 con encryption.key del .env): nunca en texto plano.
             $data['token'] = $token === '' ? null : \App\Libraries\SecretoCifrado::cifrar($token);
         }
 
@@ -229,7 +220,7 @@ class MunicipalidadController extends ResourceController
             \App\Services\AuditoriaService::registrar('CONFIGURACION', 'CAMBIAR_TOKEN_PIDE', "Se registró o cambió el token de PIDE del año {$anio}", ['anio' => $anio]);
         }
 
-        // Nunca se devuelve el token (ni siquiera cifrado).
+// Nunca se devuelve el token (ni siquiera cifrado).
         unset($data['token']);
 
         return $this->respond([
@@ -238,7 +229,6 @@ class MunicipalidadController extends ResourceController
         ]);
     }
 
-    /** Quita el token de PIDE de un año fiscal (lo deja vacío) sin borrar el año ni su UIT. */
     public function quitarTokenAnio($id = null)
     {
         $db = \Config\Database::connect();

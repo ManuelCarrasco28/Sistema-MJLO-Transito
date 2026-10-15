@@ -59,7 +59,7 @@ const FILTER_REPORTES_ESTADOS = [
 ];
 
 export function Papeletas({ user }) {
-  // Los inspectores emiten papeletas pero no cobran: el pago es solo del personal de oficina (también se exige en el servidor).
+  // Solo oficina cobra papeletas; validar también en el servidor.
   const puedeCobrar = esRolOficina(String(user?.rol || '').toUpperCase())
   const cachedPapeletas = getCachedData('/papeletas')
   const cachedTipos = getCachedData('/tipos-infraccion')
@@ -79,7 +79,6 @@ export function Papeletas({ user }) {
   // Desde las notificaciones se puede abrir directamente la pestaña de reportes (?vista=reportes)
   const vistaInicial = new URLSearchParams(window.location.search).get('vista') === 'reportes' ? 'REPORTES' : 'PAPELETAS'
   const [activeView, setActiveView] = useState(vistaInicial)
-  // "Permiso móvil": activo = el inspector emite la papeleta directo (no hay reportes de evidencia); null = aún no se sabe
   const [movilAplicaPapeleta, setMovilAplicaPapeleta] = useState(null)
   const [reportes, setReportes] = useState([])
   const [reportesPendientesTotal, setReportesPendientesTotal] = useState(null)
@@ -108,8 +107,7 @@ export function Papeletas({ user }) {
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const s = params.get('search') || ''
-    // Una notificación puede llevar a cualquiera de las dos pestañas estando ya en Papeletas:
-    // cada una recibe su propia búsqueda (la de la otra no se toca) y los filtros del vínculo se aplican de nuevo.
+    // Aplicar los filtros del vínculo solo a la pestaña correspondiente.
     if (params.get('vista') === 'reportes') {
       setActiveView('REPORTES')
       setReportesSearch(s)
@@ -159,7 +157,6 @@ export function Papeletas({ user }) {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [isPagarModalOpen, setIsPagarModalOpen] = useState(false)
   const [selectedInfraccion, setSelectedInfraccion] = useState(null)
-  // Catálogo de infracciones (alta/edición/baja): { codigo } abre directamente la edición de esa infracción
   const [catalogoInfracciones, setCatalogoInfracciones] = useState(null)
   const recargarTiposInfraccion = () => {
     apiFetch('/tipos-infraccion')
@@ -434,8 +431,7 @@ export function Papeletas({ user }) {
     return () => cargaPapeletas.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha, sortBy, sortDir])
 
-  // El "Permiso móvil" se revisa al entrar, cada 10 s, al volver a esta ventana y cuando se cambia en otra pestaña:
-  // así la pestaña de reportes aparece o desaparece sola, sin recargar.
+  // Actualizar el permiso móvil periódicamente y al recuperar el foco.
   useEffect(() => {
     // La primera consulta se hace siempre; las siguientes solo si la pestaña está a la vista
     const revisar = (primera = false) => {
@@ -459,7 +455,7 @@ export function Papeletas({ user }) {
     }
   }, [])
 
-  // Los reportes solo existen si el móvil NO emite papeletas directo. Se cargan al entrar para mostrar cuántos hay pendientes.
+  // Los reportes solo existen si el móvil NO emite papeletas directo.
   useEffect(() => {
     if (movilAplicaPapeleta === true && activeView === 'REPORTES') setActiveView('PAPELETAS')
   }, [movilAplicaPapeleta])
@@ -616,8 +612,7 @@ export function Papeletas({ user }) {
       showToast(`Reporte convertido a papeleta ${data.data?.numeroPapeleta || ''}${data.data?.internamiento?.numeroBoleta ? ' · internamiento ' + data.data.internamiento.numeroBoleta : ''}`.trim(), 'success')
     } catch (error) {
       showError('Error', sanitizarMensaje(error.message, 'Error al convertir reporte.'))
-      // Si el reporte ya fue atendido (convertido o rechazado desde otra pantalla o un envío anterior), la ventana
-      // ya no sirve: se cierra y se refrescan las listas para que se vea su estado real.
+      // Cerrar el reporte y actualizar las listas si ya fue atendido.
       if (/ya se convirtió|ya no está pendiente/i.test(String(error.message))) {
         setReporteToConvert(null)
         loadData()
@@ -1152,7 +1147,7 @@ export function Papeletas({ user }) {
                 <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 ${isExportingExcel ? 'animate-spin' : ''}`} />
                 <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
               </button>
-              
+
 
               {puedeAdministrarInfracciones && (
                 <button

@@ -4,13 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * `vehiculos` no tenía un estado real de operatividad (Activo/Inactivo):
- * el campo `estado` que devolvía la API era en realidad la formalidad
- * (Formal/Informal, derivada de tener o no asociación). Se separan ambos
- * conceptos: `estado` ahora es el estado real del vehículo, y la
- * formalidad se sigue calculando aparte a partir de `id_asociacion`.
- */
 class AddEstadoToVehiculos extends Migration
 {
     public function up()

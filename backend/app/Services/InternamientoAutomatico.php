@@ -4,14 +4,6 @@ namespace App\Services;
 
 use CodeIgniter\Database\BaseConnection;
 
-/**
- * Genera el internamiento (boleta de internamiento al depósito) en el mismo momento en que se genera la papeleta,
- * tanto cuando el inspector la aplica directamente como cuando se convierte un reporte de evidencia.
- *
- * Se ejecuta dentro de la transacción de la papeleta: si algo falla, no queda ni la papeleta ni el internamiento.
- * Si no corresponde internar (papeleta sin vehículo identificado, vehículo ya retenido en el depósito o papeleta que
- * ya tiene internamiento) no falla: devuelve el motivo y la papeleta se genera igual.
- */
 class InternamientoAutomatico
 {
     public const DEPOSITO_OFICIAL = 'Depósito Oficial José L. Ortiz';
@@ -22,7 +14,6 @@ class InternamientoAutomatico
     {
     }
 
-    /** El candado de numeración se suelta al terminar la operación (la transacción ya quedó confirmada o deshecha). */
     public function __destruct()
     {
         if ($this->candado) {
@@ -31,7 +22,7 @@ class InternamientoAutomatico
         }
     }
 
-    /**
+/**
      * @return array{id?: int, numeroBoleta?: string, omitido?: string}
      */
     public function generar(int $idPapeleta): array
@@ -54,7 +45,6 @@ class InternamientoAutomatico
             return ['omitido' => 'El vehículo ya está retenido en el depósito (boleta ' . ($retenido['numero_boleta'] ?? 's/n') . ').'];
         }
 
-        // Boleta correlativa bajo candado, para que dos papeletas simultáneas no tomen el mismo número
         if (!$this->candado) {
             $this->candado = (int) ($this->db->query("SELECT GET_LOCK('mjlo_numero_internamiento', 10) AS ok")->getRowArray()['ok'] ?? 0) === 1;
             if (!$this->candado) {
@@ -64,7 +54,6 @@ class InternamientoAutomatico
         $ultima = (int) ($this->db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(numero_boleta, 5) AS UNSIGNED)), 0) AS m FROM ordenes_internamiento WHERE numero_boleta REGEXP '^BOL-[0-9]+$'")->getRowArray()['m'] ?? 0);
         $numeroBoleta = 'BOL-' . str_pad((string) ($ultima + 1), 6, '0', STR_PAD_LEFT);
 
-        // El inspector que emitió la papeleta es el remisor (si sigue activo); el interesado es el infractor identificado
         $idRemisor = null;
         if (!empty($papeleta['id_inspector'])) {
             $remisor = $this->db->table('trabajadores')->where('id_persona', (int) $papeleta['id_inspector'])->where('estado', 'ACTIVO')->get()->getRowArray();

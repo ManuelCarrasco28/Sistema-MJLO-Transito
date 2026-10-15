@@ -1,6 +1,6 @@
 <?php
-// Run: php tests/Integration/PagosTransitoTest.php
-// Every fixture is enclosed in an outer transaction and rolled back.
+
+
 define('FCPATH', dirname(__DIR__, 2) . '/public/');
 define('ENVIRONMENT', 'development');
 require FCPATH . '../app/Config/Paths.php';
@@ -27,7 +27,7 @@ function scenario(string $name, callable $operation): void {
         $operation($db, new \App\Services\PagosTransito($db), $ticket, $token);
         echo "PASS $name\n";
     } finally {
-        // Ensure even failed nested operations cannot leave fixture rows behind.
+
         $db->query('ROLLBACK');
         $db->close();
     }

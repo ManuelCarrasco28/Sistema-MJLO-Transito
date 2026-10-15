@@ -114,9 +114,7 @@ export function Personas({ user, onUserUpdate }) {
     fotoImg: '',
   })
 
-  // Trae solo la página actual desde el backend (antes se cargaba el padrón
-  // completo a memoria y se filtraba/paginaba en el navegador; con 30,000+
-  // personas eso era el cuello de botella real del módulo).
+  // Cargar únicamente la página actual desde el servidor.
   const solicitudPersonas = useRef(0)
   const loadPersonas = async () => {
     const solicitud = ++solicitudPersonas.current
@@ -303,10 +301,7 @@ export function Personas({ user, onUserUpdate }) {
       const data = res.data || (res.nombres ? res : null)
 
       if (data) {
-        // La foto de RENIEC nunca se autocompleta aquí: solo se usa si el
-        // usuario la pide explícitamente con "Usar foto de RENIEC" en la
-        // sección de foto. Al crear/editar, la foto es responsabilidad del
-        // funcionario (subida manual o ese botón explícito).
+        // Usar la foto RENIEC solo por elección explícita del funcionario.
         setFormData(prev => ({
           ...prev,
           nombres: (data.nombres || '').toUpperCase() || prev.nombres,

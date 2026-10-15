@@ -4,11 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Agrega la columna observaciones_conductor a la tabla reportes_intervencion para que
- * los reportes levantados en campo puedan almacenar el descargo o manifestaciones del
- * conductor, tal como se contempla en la papeleta oficial y en el módulo de tránsito.
- */
 class ObservacionesConductorEnReportes extends Migration
 {
     public function up()

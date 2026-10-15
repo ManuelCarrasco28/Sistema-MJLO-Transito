@@ -115,7 +115,6 @@ export function Permisos() {
     },
   })
 
-  // Trámites disponibles para emitir: se consultan cada vez que se abre el formulario (así siempre están al día)
   useEffect(() => {
     if (!isCreateModalOpen) return undefined
     let vigente = true
@@ -145,7 +144,6 @@ export function Permisos() {
   }, [])
 
   useEffect(() => {
-    // Los trámites disponibles (más de mil filas) ya no se piden al abrir la pantalla: solo al abrir el formulario
     apiFetch('/procedimientos-admin')
       .then((r) => (r.ok ? r.json() : { data: [] }))
       .catch(() => ({ data: [] }))

@@ -15,10 +15,7 @@ export function armarConsulta(params = {}) {
   return consulta
 }
 
-// Carga un listado paginado, filtrado y ordenado en el servidor. Descarta las
-// respuestas de peticiones antiguas (si el usuario cambia de filtro o de página
-// mientras otra carga sigue en vuelo) y conserva las filas anteriores mientras
-// llega la siguiente página, para que la tabla no parpadee.
+// Paginar en servidor y descartar respuestas antiguas sin vaciar la tabla.
 export function useListaServidor({ endpoint, params = {}, page, porPagina, activo = true, mapear = identidad, descripcion = 'el listado' }) {
   const [filas, setFilas] = useState([])
   const [total, setTotal] = useState(0)

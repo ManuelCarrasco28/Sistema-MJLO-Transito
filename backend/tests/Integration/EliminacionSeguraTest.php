@@ -1,5 +1,5 @@
 <?php
-// Ejecutar en desarrollo. Todas las filas temporales se revierten, incluso si falla una prueba.
+
 define('FCPATH', dirname(__DIR__, 2) . '/public/');
 define('ENVIRONMENT', 'development');
 require FCPATH . '../app/Config/Paths.php';

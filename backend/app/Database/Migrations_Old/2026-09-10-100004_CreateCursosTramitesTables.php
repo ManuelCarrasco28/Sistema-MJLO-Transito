@@ -8,7 +8,7 @@ class CreateCursosTramitesTables extends Migration
 {
     public function up()
     {
-        // 1. Tabla: cursos_seguridad_vial
+
         $this->forge->addField([
             'id'                => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'codigo'            => ['type' => 'VARCHAR', 'constraint' => 50],
@@ -27,7 +27,6 @@ class CreateCursosTramitesTables extends Migration
         $this->forge->addKey('id', true);
         $this->forge->createTable('cursos_seguridad_vial', true);
 
-        // 2. Tabla: inscripciones_curso
         $this->forge->addField([
             'id'                => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'id_curso'          => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],
@@ -47,7 +46,6 @@ class CreateCursosTramitesTables extends Migration
         $this->forge->addForeignKey('id_vehiculo', 'vehiculos', 'id', 'SET NULL', 'CASCADE');
         $this->forge->createTable('inscripciones_curso', true);
 
-        // 3. Tabla: tramites_documentarios
         $this->forge->addField([
             'id'                   => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'numero_formulario'    => ['type' => 'VARCHAR', 'constraint' => 50, 'null' => true],

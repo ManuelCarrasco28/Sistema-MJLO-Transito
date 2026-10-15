@@ -4,11 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Introduce la tabla `roles`, separada de `cargos` (que es solo para
- * trámites documentarios). `usuarios.id_rol` es lo que realmente controla
- * los permisos del sistema.
- */
 class CreateRolesTable extends Migration
 {
     public function up()

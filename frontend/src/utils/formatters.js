@@ -1,6 +1,4 @@
-// Formatea una fecha (string 'YYYY-MM-DD' o datetime) como dd/mm/aaaa en
-// hora local, evitando el corrimiento de un día que causa `new Date(iso)`
-// al interpretar la fecha como UTC.
+// Formatear fechas locales sin desplazarlas por UTC.
 export function formatFecha(fechaStr) {
   if (!fechaStr) return '—'
   try {
@@ -61,7 +59,6 @@ export function esPlacaValida(valor) {
   return /^[A-Z0-9]{6}$/.test(String(valor ?? ''))
 }
 
-// Hora en formato de 12 horas con AM/PM: "09:00" -> "09:00 AM", "13:30:00" -> "01:30 PM". Si no se reconoce, se devuelve tal cual.
 export function formatHora12(valor) {
   const texto = String(valor ?? '').trim()
   if (!texto) return ''

@@ -6,19 +6,10 @@ use CodeIgniter\Config\BaseConfig;
 
 class App extends BaseConfig
 {
-    /**
-     * --------------------------------------------------------------------------
-     * Base Site URL
-     * --------------------------------------------------------------------------
-     *
-     * URL to your CodeIgniter root. Typically, this will be your base URL,
-     * WITH a trailing slash:
-     *
-     * E.g., http://example.com/
-     */
+
     public string $baseURL = 'http://localhost:8080/';
 
-    /**
+/**
      * Allowed Hostnames in the Site URL other than the hostname in the baseURL.
      * If you want to accept multiple Hostnames, set this.
      *
@@ -31,18 +22,9 @@ class App extends BaseConfig
      */
     public array $allowedHostnames = [];
 
-    /**
-     * --------------------------------------------------------------------------
-     * Index File
-     * --------------------------------------------------------------------------
-     *
-     * Typically, this will be your `index.php` file, unless you've renamed it to
-     * something else. If you have configured your web server to remove this file
-     * from your site URIs, set this variable to an empty string.
-     */
     public string $indexPage = 'index.php';
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * URI PROTOCOL
      * --------------------------------------------------------------------------
@@ -59,55 +41,13 @@ class App extends BaseConfig
      */
     public string $uriProtocol = 'REQUEST_URI';
 
-    /*
-    |--------------------------------------------------------------------------
-    | Allowed URL Characters
-    |--------------------------------------------------------------------------
-    |
-    | This lets you specify which characters are permitted within your URLs.
-    | When someone tries to submit a URL with disallowed characters they will
-    | get a warning message.
-    |
-    | As a security measure you are STRONGLY encouraged to restrict URLs to
-    | as few characters as possible.
-    |
-    | By default, only these are allowed: `a-z 0-9~%.:_-`
-    |
-    | Set an empty string to allow all characters -- but only if you are insane.
-    |
-    | The configured value is actually a regular expression character group
-    | and it will be used as: '/\A[<permittedURIChars>]+\z/iu'
-    |
-    | DO NOT CHANGE THIS UNLESS YOU FULLY UNDERSTAND THE REPERCUSSIONS!!
-    |
-    */
     public string $permittedURIChars = 'a-z 0-9~%.:_\-';
 
-    /**
-     * --------------------------------------------------------------------------
-     * Default Locale
-     * --------------------------------------------------------------------------
-     *
-     * The Locale roughly represents the language and location that your visitor
-     * is viewing the site from. It affects the language strings and other
-     * strings (like currency markers, numbers, etc), that your program
-     * should run under for this request.
-     */
     public string $defaultLocale = 'en';
 
-    /**
-     * --------------------------------------------------------------------------
-     * Negotiate Locale
-     * --------------------------------------------------------------------------
-     *
-     * If true, the current Request object will automatically determine the
-     * language to use based on the value of the Accept-Language header.
-     *
-     * If false, no automatic detection will be performed.
-     */
     public bool $negotiateLocale = false;
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Supported Locales
      * --------------------------------------------------------------------------
@@ -122,7 +62,7 @@ class App extends BaseConfig
      */
     public array $supportedLocales = ['en'];
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Application Timezone
      * --------------------------------------------------------------------------
@@ -135,7 +75,7 @@ class App extends BaseConfig
      */
     public string $appTimezone = 'America/Lima';
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Default Character Set
      * --------------------------------------------------------------------------
@@ -147,19 +87,9 @@ class App extends BaseConfig
      */
     public string $charset = 'UTF-8';
 
-    /**
-     * --------------------------------------------------------------------------
-     * Force Global Secure Requests
-     * --------------------------------------------------------------------------
-     *
-     * If true, this will force every request made to this application to be
-     * made via a secure connection (HTTPS). If the incoming request is not
-     * secure, the user will be redirected to a secure version of the page
-     * and the HTTP Strict Transport Security (HSTS) header will be set.
-     */
     public bool $forceGlobalSecureRequests = false;
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Reverse Proxy IPs
      * --------------------------------------------------------------------------
@@ -182,7 +112,7 @@ class App extends BaseConfig
      */
     public array $proxyIPs = [];
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Content Security Policy
      * --------------------------------------------------------------------------

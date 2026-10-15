@@ -15,10 +15,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const isAdmin = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE'].includes(rolNormalizado)
   const isOffice = esRolOficina(rolNormalizado)
 
-  // Memoizado: antes se recalculaba en cada render con una referencia nueva,
-  // lo que el useEffect de auto-apertura (más abajo) no podía declarar como
-  // dependencia real sin re-ejecutarse de más. Al fijar la referencia, el
-  // efecto puede depender de esta lista de forma explícita y predecible.
+  // Mantener estable la lista usada por el efecto de apertura.
   const visibleNavigationGroups = useMemo(() => navigationGroups
     .map((group) => {
       if (group.superAdminOnly && !isSuperAdmin) return null
@@ -38,10 +35,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
     })
     .filter(Boolean), [isSuperAdmin, isAdmin, isOffice])
 
-  // Se compara solo contra la ruta actual (siempre exacta y sincronizada con
-  // el router). Antes también se comparaba contra "activeItem" y contra
-  // prefijos de ruta, lo que a veces marcaba como activo un grupo distinto
-  // al que realmente se estaba visitando.
+  // Marcar como activa solo la ruta exacta.
   const isItemSelected = (item) => {
     if (!item) return false
     if (location.pathname === item.path) return true
@@ -50,10 +44,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
     return false
   }
 
-  // Cada grupo se abre/cierra de forma independiente (se pueden tener varios
-  // abiertos a la vez). El estado inicial se restaura desde las preferencias
-  // guardadas en la cuenta del usuario, y cada cambio se persiste ahí mismo
-  // (con debounce) para que quede igual sin importar el dispositivo/navegador.
+  // Guardar por usuario la apertura independiente de cada grupo.
   const [expandedGroups, setExpandedGroups] = useState(() => user?.preferencias?.sidebarExpandedGroups || {})
   const isFirstRender = useRef(true)
   const savePreferenceTimeout = useRef(null)
@@ -152,9 +143,9 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
   const handleMouseEnter = (label, e, groupName) => {
     if (activeFlyoutGroup?.name === groupName) return
     const rect = e.currentTarget.getBoundingClientRect()
-    
+
     if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current)
-    
+
     tooltipTimeoutRef.current = setTimeout(() => {
       setTooltipPos({ 
         top: rect.top + rect.height / 2, 
@@ -213,7 +204,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
               </>
             )}
           </div>
-          
+
           {/* Mobile close button */}
           <button
             type="button"

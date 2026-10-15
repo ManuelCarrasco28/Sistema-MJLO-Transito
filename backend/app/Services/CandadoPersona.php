@@ -4,7 +4,6 @@ namespace App\Services;
 
 use CodeIgniter\Database\BaseConnection;
 
-/** Serializa la comprobación y el guardado de identidades, incluido el commit. */
 final class CandadoPersona
 {
     public static function adquirir(BaseConnection $db): void

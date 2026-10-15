@@ -45,7 +45,6 @@ const aItemCarnet = (p) => {
   }
 }
 
-// Marca o revierte la entrega del carnet con un clic en la etiqueta (igual que en Cursos de Seguridad Vial).
 function BotonEntrega({ participante: p, actualizarFila }) {
   const [guardando, setGuardando] = useState(false)
 
@@ -188,7 +187,6 @@ const FILTROS = [
   { clave: 'entrega', valorInicial: 'TODOS', opciones: OPCIONES_ENTREGA },
 ]
 
-// Pestaña "Carnet del curso": participantes aprobados de cursos finalizados, listos para imprimir sus carnets.
 export function ImpresionCarnetsCurso({ cursoInicial, alUsarCursoInicial }) {
   useEffect(() => { precargarPlantillasCarnet() }, [])
 

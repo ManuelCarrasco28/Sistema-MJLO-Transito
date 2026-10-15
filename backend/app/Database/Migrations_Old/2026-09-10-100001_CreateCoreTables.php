@@ -8,7 +8,7 @@ class CreateCoreTables extends Migration
 {
     public function up()
     {
-        // 1. Tabla: personal
+
         $this->forge->addField([
             'id'               => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'tipo_documento'   => ['type' => 'VARCHAR', 'constraint' => 20],
@@ -23,7 +23,6 @@ class CreateCoreTables extends Migration
         $this->forge->addKey('id', true);
         $this->forge->createTable('personal', true);
 
-        // 2. Tabla: usuarios
         $this->forge->addField([
             'id'             => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'id_personal'    => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],
@@ -37,7 +36,6 @@ class CreateCoreTables extends Migration
         $this->forge->addForeignKey('id_personal', 'personal', 'id', 'CASCADE', 'CASCADE');
         $this->forge->createTable('usuarios', true);
 
-        // 3. Tabla: personas
         $this->forge->addField([
             'id'                       => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'tipo_documento'           => ['type' => 'VARCHAR', 'constraint' => 20],
@@ -58,7 +56,6 @@ class CreateCoreTables extends Migration
         $this->forge->addKey('id', true);
         $this->forge->createTable('personas', true);
 
-        // 4. Tabla: organizaciones
         $this->forge->addField([
             'id'                  => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'tipo'                => ['type' => 'VARCHAR', 'constraint' => 50],

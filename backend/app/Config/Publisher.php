@@ -4,15 +4,9 @@ namespace Config;
 
 use CodeIgniter\Config\Publisher as BasePublisher;
 
-/**
- * Publisher Configuration
- *
- * Defines basic security restrictions for the Publisher class
- * to prevent abuse by injecting malicious files into a project.
- */
 class Publisher extends BasePublisher
 {
-    /**
+/**
      * A list of allowed destinations with a (pseudo-)regex
      * of allowed files for each destination.
      * Attempts to publish to directories not in this list will

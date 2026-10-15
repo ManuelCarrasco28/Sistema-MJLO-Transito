@@ -33,9 +33,7 @@ class ApiService {
   /// La pantalla raíz lo define para llevar al login cuando la sesión vence.
   static void Function()? onSesionExpirada;
 
-  // La cookie de sesión es una credencial: se guarda en almacenamiento
-  // cifrado (Keystore en Android / Keychain en iOS), no en SharedPreferences
-  // en texto plano.
+  // Guardar la cookie en almacenamiento cifrado, nunca en texto plano.
   static const _secureStorage = FlutterSecureStorage();
   static const _sessionCookieKey = 'session_cookie';
   static const _savedUsernameKey = 'saved_username';
@@ -183,7 +181,6 @@ class ApiService {
   }
   // ----------------------------------------------------
 
-  // Copia en memoria de la cookie de sesión para las imágenes (Image.network pide encabezados sin esperar)
   static String? _cookieEnMemoria;
 
   static Future<void> precargarSesion() async {
@@ -288,7 +285,7 @@ class ApiService {
 
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    // Limpiar exclusivamente datos de la sesión activa para NO borrar el historial ni la preferencia de usuario
+    // Limpiar la sesión sin borrar el historial ni las preferencias.
     await prefs.remove('id_persona');
     await prefs.remove('nombres');
     await prefs.remove('apellidos');
@@ -313,7 +310,7 @@ class ApiService {
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
     final uri = Uri.parse('$baseUrl/papeletas').replace(queryParameters: params);
-    
+
     final response = await _http
         .get(
           uri,
@@ -338,7 +335,7 @@ class ApiService {
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
     final uri = Uri.parse('$baseUrl/reportes-intervencion').replace(queryParameters: params);
-    
+
     final response = await _http
         .get(
           uri,

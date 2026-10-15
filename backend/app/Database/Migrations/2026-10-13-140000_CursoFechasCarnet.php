@@ -4,10 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Cada curso fija la fecha de expedición de sus carnets; el carnet vence un año después.
- * Los cursos existentes toman la fecha de inicio del curso (así se calculaba antes). Idempotente.
- */
 class CursoFechasCarnet extends Migration
 {
     public function up()

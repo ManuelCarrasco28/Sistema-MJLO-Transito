@@ -4,10 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Nombres y apellidos de las personas se guardan en MAYÚSCULAS (como los entrega RENIEC). Pasa a mayúsculas los
- * registros que se cargaron en minúsculas o con formato mixto. Idempotente; no se puede revertir.
- */
 class NombresCiudadanosEnMayusculas extends Migration
 {
     public function up()

@@ -6,17 +6,6 @@ use App\Libraries\TupaCosto;
 use CodeIgniter\Database\BaseConnection;
 use DomainException;
 
-/**
- * Pago del CERTICAV (constatación de características de vehículos menores, TUPA SE142251D4).
- *
- * Reglas:
- * - Solo los vehículos formales (con asociación) pueden hacer su inspección técnica (CERTICAV). Un informal no puede,
- *   salvo que primero se convierta en formal.
- * - La inspección exige un CERTICAV pagado y todavía sin usar: se solicita (trámite + cobro pendiente), se cobra en
- *   Pagos, y recién entonces se registra la revisión técnica, que queda ligada a ese pago (certicav.id_pago).
- * - Un pago sirve para una sola inspección. Las dos evaluaciones (primera y segunda) son de la misma inspección.
- * - El costo sale del TUPA vigente (procedimiento_administrativo_costo).
- */
 class CerticavPago
 {
     public const CODIGO = 'SE142251D4';
@@ -55,7 +44,6 @@ class CerticavPago
         return !empty($vehiculo['id_asociacion']);
     }
 
-    /** Pago del CERTICAV de ese vehículo, en el estado pedido, que aún no se usó en ninguna inspección. */
     private function pagoLibre(int $idVehiculo, string $estado): ?array
     {
         $fila = $this->db->query(
@@ -70,13 +58,12 @@ class CerticavPago
         return $fila ?: null;
     }
 
-    /** Pago cobrado y disponible para registrar la inspección (o null). */
     public function pagoDisponible(int $idVehiculo): ?array
     {
         return $this->pagoLibre($idVehiculo, 'PAGADO');
     }
 
-    /**
+/**
      * Situación del vehículo frente al CERTICAV.
      *
      * @return array{estado: string, formal: bool, costo: float, vigenciaMeses: int, pagoId?: int, numeroRecibo?: string, expediente?: string}
@@ -104,7 +91,6 @@ class CerticavPago
         return array_merge($base, ['estado' => self::SIN_SOLICITUD]);
     }
 
-    /** Mensaje cuando el vehículo no puede registrar su inspección todavía; null si ya puede. */
     public function bloqueo(array $estado): ?string
     {
         return match ($estado['estado']) {
@@ -115,10 +101,6 @@ class CerticavPago
         };
     }
 
-    /**
-     * Crea la solicitud del CERTICAV (trámite del TUPA + cobro pendiente). Si ya hay una solicitud pendiente o un
-     * pago disponible, devuelve esa misma y no crea otra.
-     */
     public function solicitar(array $vehiculo): array
     {
         if (!$this->esFormal($vehiculo)) {

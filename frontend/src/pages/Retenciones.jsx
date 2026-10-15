@@ -93,14 +93,12 @@ export function Retenciones({ user }) {
   const [pagando, setPagando] = useState(false)
   const [criteriosInventario, setCriteriosInventario] = useState([])
   const [inventarioMarcado, setInventarioMarcado] = useState({})
-  // Buscador de papeletas del formulario: se consulta en el servidor (hay miles) solo mientras se escribe.
   const [busquedaPapeleta, setBusquedaPapeleta] = useState('')
   const [papeletaElegida, setPapeletaElegida] = useState(null)
   const [resultadosPapeleta, setResultadosPapeleta] = useState([])
   const [buscandoPapeleta, setBuscandoPapeleta] = useState(false)
   const [listaPapeletaAbierta, setListaPapeletaAbierta] = useState(false)
   const textoBusquedaPapeleta = useDebounce(busquedaPapeleta.trim(), 250)
-  // Interesado (quien paga y retira el vehículo): se escribe el DNI y la lupa lo busca en Gestión de personas.
   const [busquedaInteresado, setBusquedaInteresado] = useState('')
   const [interesadoElegido, setInteresadoElegido] = useState(null)
   const [buscandoInteresado, setBuscandoInteresado] = useState(false)
@@ -159,7 +157,6 @@ export function Retenciones({ user }) {
     loadStats()
   }, [])
 
-  // Papeletas sin internamiento (las más recientes, o las que coincidan con lo escrito) para el buscador.
   useEffect(() => {
     if (!isNuevoModalOpen || papeletaElegida || !listaPapeletaAbierta) return undefined
     const controlador = new AbortController()

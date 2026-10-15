@@ -224,7 +224,6 @@ class PersonalController extends ResourceController
         return $row;
     }
 
-
     public function catalogos()
     {
         $db = \Config\Database::connect();
@@ -256,7 +255,7 @@ class PersonalController extends ResourceController
             return $this->failNotFound('Trabajador no encontrado.');
         }
         try {
-            // Conserva el historial y las cuentas: desactivar no significa borrar a la persona.
+// Conserva el historial y las cuentas: desactivar no significa borrar a la persona.
             $db->table('trabajadores')->where('id_persona', $id)->update(['estado' => 'INACTIVO']);
             \App\Services\AuditoriaService::registrar('TRABAJADORES', 'DESACTIVAR', 'Trabajador desactivado', ['id_persona' => (int)$id]);
             return $this->respond(['message' => 'Trabajador desactivado correctamente.']);
@@ -314,7 +313,6 @@ class PersonalController extends ResourceController
         $db->transException(true)->transBegin();
         try {
 
-            // 1. Cargo
             $cargoRow = $db->table('cargos')->where('nombre', $input['cargo'])->get()->getRowArray();
             if (!$cargoRow) {
                 $db->table('cargos')->insert(['nombre' => $input['cargo'], 'estado' => 'ACTIVO']);
@@ -342,7 +340,6 @@ class PersonalController extends ResourceController
                     return $this->failValidationErrors('La persona seleccionada ya está registrada como trabajador.');
                 }
 
-                // Insert Trabajador
                 $db->table('trabajadores')->insert([
                     'id_persona' => $id,
                     'tipo' => 'INTERNO',
@@ -351,7 +348,6 @@ class PersonalController extends ResourceController
                     'estado' => $input['estado']
                 ]);
 
-                // Insert Desplazamiento
                 $db->table('desplazamiento_oficina')->insert([
                     'id_unidad_organica' => $unidadId,
                     'id_trabajador' => $id,
@@ -370,13 +366,11 @@ class PersonalController extends ResourceController
                     return $this->failNotFound('Trabajador no encontrado.');
                 }
 
-                // Update Trabajador
                 $db->table('trabajadores')->where('id_persona', $id)->update([
                     'tipo_inspector' => $tipoInspector,
                     'estado' => $input['estado'],
                 ]);
 
-                // Update Desplazamiento
                 $existDof = $db->table('desplazamiento_oficina')
                     ->where('id_trabajador', $id)
                     ->groupStart()

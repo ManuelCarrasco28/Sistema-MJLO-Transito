@@ -4,11 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Columnas para registrar como TEXTO al dueño y al conductor informales (no registrados en Personas) en
- * papeletas y reportes de intervención. Los controladores las creaban en tiempo de ejecución con ALTER TABLE
- * (en cada petición se comprobaba si existían); con esta migración ya vienen con la base. Es repetible.
- */
 class ColumnasInformalesPapeletasReportes extends Migration
 {
     public function up()
@@ -40,6 +35,6 @@ class ColumnasInformalesPapeletasReportes extends Migration
 
     public function down()
     {
-        // No se quitan: contienen datos de papeletas ya emitidas.
+// No se quitan: contienen datos de papeletas ya emitidas.
     }
 }

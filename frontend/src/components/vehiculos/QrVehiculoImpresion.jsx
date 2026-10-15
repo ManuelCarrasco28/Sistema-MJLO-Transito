@@ -61,7 +61,6 @@ export const valorQrVehiculo = (vehiculo) => {
 
 const cacheDataUri = {}
 
-// La plantilla se embebe como data URI: así sale siempre al imprimir, sin depender de una petición de red.
 const cargarPlantilla = async (clave) => {
   if (cacheDataUri[clave]) return cacheDataUri[clave]
   const blob = await fetch(PLANTILLAS[clave].ruta).then((r) => r.blob())
@@ -100,8 +99,6 @@ export function HojaQr({ vehiculo }) {
   )
 }
 
-// Imprime los vehículos indicados en hojas A4 de 4 cuadrantes (2 x 2), repitiendo cada vehículo `copias` veces.
-// Se monta solo cuando hay que imprimir y avisa con onFin al terminar o cancelar.
 export function ImpresionQrPortal({ vehiculos, copias = 1, onFin }) {
   const [estilos, setEstilos] = useState(null)
 
