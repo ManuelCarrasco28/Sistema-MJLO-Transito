@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-/** Reglas compartidas por altas y ediciones, sin normalizar fechas inválidas. */
 final class ValidacionRegistro
 {
     public static function fechas(array $datos, array $campos, array $orden = []): array

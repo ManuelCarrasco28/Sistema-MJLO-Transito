@@ -24,7 +24,7 @@ use CodeIgniter\HotReloader\HotReloader;
  */
 
 Events::on('pre_system', static function (): void {
-    // La BD (CURDATE, NOW, TIMESTAMP) trabaja en hora de Lima, igual que PHP (appTimezone)
+
     date_default_timezone_set('America/Lima');
     Events::on('post_controller_constructor', static function (): void {
         \Config\Database::connect()->query("SET time_zone = '-05:00'");
@@ -44,16 +44,10 @@ Events::on('pre_system', static function (): void {
         ob_start(static fn ($buffer) => $buffer);
     }
 
-    /*
-     * --------------------------------------------------------------------
-     * Debug Toolbar Listeners.
-     * --------------------------------------------------------------------
-     * If you delete, they will no longer be collected.
-     */
     if (CI_DEBUG && ! is_cli()) {
         Events::on('DBQuery', 'CodeIgniter\Debug\Toolbar\Collectors\Database::collect');
         service('toolbar')->respond();
-        // Hot Reload route - for framework use on the hot reloader.
+
         if (ENVIRONMENT === 'development') {
             service('routes')->get('__hot-reload', static function (): void {
                 (new HotReloader())->run();

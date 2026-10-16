@@ -8,7 +8,7 @@ use CodeIgniter\Format\XMLFormatter;
 
 class Format extends BaseConfig
 {
-    /**
+/**
      * --------------------------------------------------------------------------
      * Available Response Formats
      * --------------------------------------------------------------------------
@@ -25,11 +25,11 @@ class Format extends BaseConfig
      */
     public array $supportedResponseFormats = [
         'application/json',
-        'application/xml', // machine-readable XML
-        'text/xml', // human-readable XML
+        'application/xml',
+        'text/xml',
     ];
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Formatters
      * --------------------------------------------------------------------------
@@ -46,7 +46,7 @@ class Format extends BaseConfig
         'text/xml'         => XMLFormatter::class,
     ];
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Formatters Options
      * --------------------------------------------------------------------------
@@ -62,12 +62,5 @@ class Format extends BaseConfig
         'text/xml'         => 0,
     ];
 
-    /**
-     * --------------------------------------------------------------------------
-     * Maximum depth for JSON encoding.
-     * --------------------------------------------------------------------------
-     *
-     * This value determines how deep the JSON encoder will traverse nested structures.
-     */
     public int $jsonEncodeDepth = 512;
 }

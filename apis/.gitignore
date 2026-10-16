@@ -1,0 +1,5 @@
+environments/Local.bru
+.env
+.env.*
+!.env.example
+

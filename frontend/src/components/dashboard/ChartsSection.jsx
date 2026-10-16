@@ -50,7 +50,6 @@ const aniosDeVista = (vista, claves) => {
   return Number.isFinite(n) ? asc.slice(-n) : asc
 }
 
-// Fila de columnas con ancho mínimo: si no caben (muchos años) se desliza de lado y abre en lo más reciente
 function ColumnasDesplazables({ n, minCol = 56, flechas = true, children, className = '' }) {
   const ref = useRef(null)
   const [puedeIzq, setPuedeIzq] = useState(false)

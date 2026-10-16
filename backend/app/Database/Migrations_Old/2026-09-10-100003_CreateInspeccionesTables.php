@@ -8,7 +8,7 @@ class CreateInspeccionesTables extends Migration
 {
     public function up()
     {
-        // 1. Tabla: inspeccion_criterios
+
         $this->forge->addField([
             'id'          => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'codigo'      => ['type' => 'VARCHAR', 'constraint' => 20],
@@ -23,7 +23,6 @@ class CreateInspeccionesTables extends Migration
         $this->forge->addKey('id', true);
         $this->forge->createTable('inspeccion_criterios', true);
 
-        // 2. Tabla: inspecciones_tecnicas
         $this->forge->addField([
             'id'                 => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'numero_inspeccion'  => ['type' => 'VARCHAR', 'constraint' => 50],
@@ -43,7 +42,6 @@ class CreateInspeccionesTables extends Migration
         $this->forge->addForeignKey('id_tecnico', 'personal', 'id', 'CASCADE', 'CASCADE');
         $this->forge->createTable('inspecciones_tecnicas', true);
 
-        // 3. Tabla: inspeccion_detalles
         $this->forge->addField([
             'id'              => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'id_inspeccion'   => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],

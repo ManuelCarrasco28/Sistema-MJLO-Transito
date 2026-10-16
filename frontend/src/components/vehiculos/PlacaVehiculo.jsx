@@ -44,12 +44,12 @@ export function PlacaVehiculo({ placa, vehiculoId, className = '', size = 'md' }
   }
 
   return <>
-    <span className="group/placa inline-flex items-center gap-0.5">
+    <span className="group/placa relative inline-flex items-center">
     <button type="button" onClick={abrir} disabled={cargando} title="Ver datos del vehículo" aria-label={`Ver vehículo ${placa || 'sin placa'}`} aria-busy={cargando}
       className="rounded-lg cursor-pointer transition hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 disabled:cursor-wait">
       <PlacaBadge placa={placa} className={className} size={size} />
     </button>
-    <CopiarPlaca placa={placa} />
+    <span className="absolute left-full top-1/2 -translate-y-1/2 pl-0.5"><CopiarPlaca placa={placa} /></span>
     </span>
     {vehiculo && createPortal(<div className="relative z-[120]" onClick={event => event.stopPropagation()}>
       <VehiculoDetalleModal selectedVehiculo={vehiculo} onClose={() => setVehiculo(null)} isVehiculoFormal={isVehiculoFormal} buildVehiculoQrValue={buildVehiculoQrValue} getVehiculoDocumento={getVehiculoDocumento} />

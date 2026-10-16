@@ -8,7 +8,7 @@ class CreateVehiculosTables extends Migration
 {
     public function up()
     {
-        // 1. Tabla: tipos_vehiculo
+
         $this->forge->addField([
             'id'          => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'nombre'      => ['type' => 'VARCHAR', 'constraint' => 50],
@@ -20,7 +20,6 @@ class CreateVehiculosTables extends Migration
         $this->forge->addKey('id', true);
         $this->forge->createTable('tipos_vehiculo', true);
 
-        // 2. Tabla: vehiculos
         $this->forge->addField([
             'id'                   => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'id_tipo_vehiculo'     => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],
@@ -43,7 +42,6 @@ class CreateVehiculosTables extends Migration
         $this->forge->addForeignKey('id_asociacion', 'organizaciones', 'id', 'SET NULL', 'CASCADE');
         $this->forge->createTable('vehiculos', true);
 
-        // 3. Tabla: vehiculo_propietarios
         $this->forge->addField([
             'id'                 => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'id_vehiculo'        => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],
@@ -62,7 +60,6 @@ class CreateVehiculosTables extends Migration
         $this->forge->addForeignKey('id_organizacion', 'organizaciones', 'id', 'CASCADE', 'CASCADE');
         $this->forge->createTable('vehiculo_propietarios', true);
 
-        // 4. Tabla: documentos_vehiculo
         $this->forge->addField([
             'id'               => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
             'id_vehiculo'      => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],

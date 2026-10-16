@@ -26,9 +26,7 @@ const TIPO_DOC_OPTIONS = [
   { value: 'TARJETA_PROPIEDAD', label: 'Tarjeta de Propiedad' },
 ]
 
-// Tipos que ya no se emiten desde este módulo (el CertiCAV/inspección técnica
-// se registra aparte, en su propio módulo) pero que algún registro antiguo
-// todavía puede tener guardado: se muestran de solo lectura al editar.
+// Mostrar los tipos antiguos solo en edición y como lectura.
 const TIPO_DOC_LABEL_EXTERNO = {
   CITV: 'CITV (Inspección Técnica)',
   INSPECCION_TECNICA: 'Inspección Técnica',
@@ -43,9 +41,7 @@ const ESTADO_OPTIONS = [
   { value: 'VENCIDO', label: 'VENCIDO' },
 ]
 
-// La Tarjeta de Propiedad no vence (vigencia indefinida): "En trámite" y
-// "Vencido" no aplican, solo si sigue vigente o fue anulada (venta/cambio
-// de propietario, que genera una tarjeta nueva).
+// La tarjeta de propiedad tiene vigencia indefinida.
 const ESTADO_OPTIONS_SIN_VIGENCIA = [
   { value: 'VIGENTE', label: 'VIGENTE' },
   { value: 'ANULADO', label: 'ANULADO' },
@@ -98,7 +94,7 @@ function getDocTypeBadge(tipo) {
           CertiCAV (Inspección)
         </span>
       )
-    
+
     case 'INSPECCION_TECNICA':
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-0.5 text-[10.5px] font-bold text-cyan-700 border border-cyan-200/80 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800">
@@ -333,9 +329,7 @@ export function Documentos() {
       prerellenadoId.current = null
       setFormData((prev) => ({
         ...prev,
-        // Al salir de un tipo con documento existente (p. ej. SOAT) y volver a uno sin documento,
-        // no se borra a ciegas: si ese tipo es Tarjeta de Operatividad y el vehículo tiene asociación
-        // con resolución registrada, se vuelve a heredar en vez de dejar el campo vacío.
+        // Restaurar la resolución heredada al volver a operatividad.
         ...resolverCodigoYHerencia(prev.tipoDocumento, prev.asociacionResolucionAlcaldia),
         fechaExpedicion: fechaLocalActual(),
         fechaExpiracion: TIPOS_SIN_VIGENCIA.includes(prev.tipoDocumento)
@@ -381,27 +375,16 @@ export function Documentos() {
       propietarioDni: '',
       asociacion: '',
       asociacionResolucionAlcaldia: '',
-      // El código de un documento (resolución heredada, código de SOAT, partida registral...) es
-      // propio de un vehículo y un tipo de documento concretos: al borrar la placa, se pierde el
-      // vehículo del que venía, así que no tiene sentido conservarlo.
+      // Limpiar el código del documento al quitar el vehículo.
       codigo: '',
     }))
   }
 
-  // La Tarjeta de Operatividad se emite bajo la resolución de alcaldía de la asociación/empresa
-  // del vehículo (no una por vehículo): si el titular pertenece a una y esta tiene su resolución
-  // registrada, se completa sola y se bloquea para no escribir un número distinto por error; se
-  // sigue viendo siempre, y si el vehículo es independiente (o la asociación no la tiene cargada
-  // todavía) el campo queda editable como antes. Solo aplica al crear: un documento ya emitido
-  // conserva su número tal como se registró, aunque la resolución de la asociación cambie después.
+  // Heredar la resolución de la asociación solo al crear operatividad.
   const codigoHeredaResolucion = (tipoDocumento, asociacionResolucionAlcaldia) =>
     !isEditing && tipoDocumento === 'TARJETA_OPERATIVIDAD' && !!asociacionResolucionAlcaldia
 
-  // Decide el código que corresponde tras un cambio de tipo o de vehículo: lo hereda si aplica
-  // (Tarjeta de Operatividad con asociación); si no, se limpia. El código de un SOAT o de una
-  // Tarjeta de Propiedad es propio de ESE tipo y de ESE vehículo, así que nunca debe arrastrarse
-  // a otro tipo o a otro vehículo; si el nuevo tipo/vehículo ya tiene un documento registrado, el
-  // efecto que vigila "documento existente" lo vuelve a completar un instante después con su dato real.
+  // Limpiar o heredar el código al cambiar el tipo o vehículo.
   const resolverCodigoYHerencia = (tipoDocumento, asociacionResolucionAlcaldia) =>
     codigoHeredaResolucion(tipoDocumento, asociacionResolucionAlcaldia)
       ? { codigo: asociacionResolucionAlcaldia }

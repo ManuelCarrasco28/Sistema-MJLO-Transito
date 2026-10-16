@@ -5,10 +5,6 @@ namespace App\Database\Migrations;
 use App\Libraries\Identificador;
 use CodeIgniter\Database\Migration;
 
-/**
- * Agrega la columna `uuid` (CHAR(36), única) a las tablas principales y rellena los registros existentes con
- * UUID versión 7 (ramsey/uuid). Es repetible: no vuelve a crear columnas ni a cambiar uuid ya asignados.
- */
 class AgregarUuidATablasPrincipales extends Migration
 {
     public function up()

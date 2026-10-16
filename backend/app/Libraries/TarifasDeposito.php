@@ -2,12 +2,6 @@
 
 namespace App\Libraries;
 
-/**
- * Tarifas del depósito municipal, guardadas en configuracion_sistema:
- *  - tarifa_guardiania_dia: S/ por cada día de custodia.
- *  - tarifa_remolque: S/ fijos por el traslado en grúa.
- * Con una tarifa en 0 no hay validación para ese concepto (el cajero escribe el monto).
- */
 final class TarifasDeposito
 {
     public const CLAVES = [
@@ -15,7 +9,6 @@ final class TarifasDeposito
         'tarifa_remolque' => 'Tarifa fija del remolque (S/).',
     ];
 
-    /** Roles que pueden cambiar las tarifas y rebajar o exonerar un cobro. */
     public const ROLES_JEFATURA = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE'];
 
     public static function obtener($db): array
@@ -47,10 +40,6 @@ final class TarifasDeposito
         return in_array(Acceso::rol($usuario), self::ROLES_JEFATURA, true);
     }
 
-    /**
-     * Valida los montos que el cajero escribió contra la tarifa. Secretaría debe cobrar exactamente lo que marca la
-     * tarifa; la jefatura puede rebajar o exonerar (nunca cobrar de más). Devuelve true si hubo rebaja.
-     */
     public static function validar(array $tarifas, int $dias, float $montoGuardiania, float $montoRemolque, bool $jefatura): bool
     {
         $rebaja = false;

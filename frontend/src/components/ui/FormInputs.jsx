@@ -2,9 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { isoATexto, formatearDigitos, textoAIso } from '../../utils/fechaEscrita'
 
-// Fecha escrita como dd/mm/aaaa. El <input type="date"> nativo trata el año como un solo bloque
-// (al teclear reemplaza los 4 dígitos); aquí se edita dígito por dígito. El valor que sube al
-// formulario sigue siendo ISO (aaaa-mm-dd), o '' mientras la fecha está incompleta o no existe.
+// Editar dd/mm/aaaa y emitir ISO solo si la fecha es válida.
 function CampoFecha({ id, value, onChange, required, disabled, readOnly, onFocus, onBlur, inputClassName, name }) {
   const [texto, setTexto] = useState(() => isoATexto(value))
   const inputRef = useRef(null)
@@ -187,14 +185,12 @@ function parsearEntradaHora(crudo) {
   return null
 }
 
-// Columna desplazable tipo "rueda" (como el selector de hora de iOS): el elemento que queda en el centro es el elegido.
 const ALTO_ITEM_RUEDA = 36
 const ITEMS_VISIBLES_RUEDA = 5
 function RuedaHora({ items, indice, onElegir, etiqueta }) {
   const columna = useRef(null)
   const temporizador = useRef(null)
 
-  // Mantiene la rueda alineada con el valor elegido (también cuando cambia desde fuera: escribir, "Restablecer"…)
   useEffect(() => {
     const el = columna.current
     if (!el) return
@@ -493,9 +489,7 @@ export function FloatingInput({
   ...props
 }) {
   const [isFocused, setIsFocused] = useState(false)
-  // Los inputs de fecha/hora siempre muestran su propio esqueleto (dd/mm/aaaa o hh:mm am/pm),
-  // nunca se ven realmente "vacíos", así que la etiqueta debe quedar arriba
-  // desde el inicio para no superponerse con ese texto nativo del navegador.
+  // Elevar la etiqueta para no superponerla al formato de fecha y hora.
   const isFloating = ['date', 'time', 'datetime-local', 'month', 'week'].includes(type)
     || isFocused
     || Boolean(error)
@@ -586,9 +580,7 @@ export function FloatingTextarea({
 
   const isFloating = isFocused || Boolean(error) || (value !== undefined && value !== null && String(value).trim() !== '')
 
-  // Ajusta el alto al contenido (entre 42 y 160 px; si hay más texto aparece barra de desplazamiento). Se recalcula
-  // también cuando cambia el ancho del campo: medido con el ancho aún sin asentar (p. ej. al abrirse una ventana)
-  // daba alturas enormes.
+  // Recalcular la altura al cambiar el contenido o el ancho.
   const ajustarAlto = () => {
     const el = textareaRef.current
     if (!el) return
@@ -752,10 +744,7 @@ export function FloatingSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // El menú se renderiza vía portal (fuera del cuerpo del modal) con
-  // posición fija, para que no quede recortado/con scroll raro cuando el
-  // contenedor padre (ej. un modal) tiene su propio overflow. Se cierra si
-  // el usuario hace scroll, en vez de recalcular la posición en cada frame.
+  // Usar un portal fijo para evitar recortes; cerrar al desplazar el contenedor.
   useEffect(() => {
     if (!isOpen) return undefined
     // El scroll de la propia lista de opciones NO debe cerrarla (antes, al intentar bajar por las opciones el menú

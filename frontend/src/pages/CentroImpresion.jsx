@@ -23,9 +23,8 @@ const pestanaGuardada = () => {
   }
 }
 
-// Centro de impresión: un solo lugar para reunir en un carrito e imprimir en lote carnets, tarjetas y QR.
 export function CentroImpresion() {
-  // Desde Cursos se llega con ?pestana=CARNETS&cursoId=..&cursoEtiqueta=.. para imprimir los carnets de ese curso.
+  // Desde Cursos se llega con ?pestana=CARNETS&cursoId=..&cursoEtiqueta=.
   const [params, setParams] = useSearchParams()
   const [cursoInicial, setCursoInicial] = useState(() => (
     params.get('cursoId') ? { id: params.get('cursoId'), etiqueta: params.get('cursoEtiqueta') || `Curso ${params.get('cursoId')}` } : null
@@ -78,8 +77,7 @@ export function CentroImpresion() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
 
-  // El curso que llega desde Cursos se aplica una sola vez: al volver a la pestaña ya no se re-filtra ni se
-  // vuelve a llenar el carrito, y recargar la página tampoco lo repite (se limpia de la URL).
+  // Aplicar el curso de la URL una vez y limpiar sus parámetros.
   const usarCursoInicial = () => {
     setCursoInicial(null)
     setParams((prev) => {

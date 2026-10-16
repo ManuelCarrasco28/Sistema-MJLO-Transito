@@ -12,7 +12,6 @@ import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import './CursoDetalleVentana.css'
 import { retirarInscripcion } from '../utils/retirarInscripcion'
 
-// Foto redonda de la persona; sin foto (o si no carga) se muestra un avatar con la silueta de una persona.
 const CLASES_FOTO_PARTICIPANTE = 'size-11 shrink-0 rounded-full border border-slate-200 bg-white object-cover dark:border-[var(--border-strong)]'
 
 function AvatarParticipante({ fotoUrl }) {
@@ -183,10 +182,10 @@ export default function CursoDetalleVentana() {
       const response = await apiFetch('/personas', { method: 'POST', body: formData })
       const result = await response.json()
       if (!response.ok) throw new Error(result.messages?.error || 'Error al guardar')
-      
+
       showToast('Persona registrada correctamente')
       setPersonaModalOpen(false)
-      
+
       // Auto-inscribir
       const dni = formData.numeroDocumento
       if (dni) {
@@ -373,7 +372,7 @@ export default function CursoDetalleVentana() {
                       className="w-full h-[46px] pl-11 pr-4 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-800 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
                     />
                       </div>
-                      
+
                       <button
                         type="button"
                         onClick={() => {
@@ -481,7 +480,7 @@ export default function CursoDetalleVentana() {
                   return nameA.localeCompare(nameB);
                 }).map((p, i) => {
                   const estadoReal = estadoParticipante(p, curso.estado);
-                    
+
                   return (
                   <li key={p.uuid || p.idInscripcion || p.dni || p.numero || i} className="curso-detalle__participant flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white dark:bg-[var(--bg-subtle)] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-xs hover:shadow-md transition-shadow gap-3">
                     <div className="curso-detalle__person flex items-center gap-3">
@@ -506,7 +505,7 @@ export default function CursoDetalleVentana() {
                       </div>
                       </div>
                     </div>
-                    
+
                     <div className="curso-detalle__actions">
                       {/* Controles de Asistencia y Estado */}
                       {/* Asistencia y resultado solo desde que comienza el curso; antes es solo inscripción. */}
@@ -531,7 +530,7 @@ export default function CursoDetalleVentana() {
                                     }
                                     throw new Error(mensaje);
                                   }
-                                
+
                                   setCurso(actual => ({ ...actual, participantes: actualizarParticipante(actual.participantes, p, { asistio, estado: asistio ? 'APROBADO' : 'DESAPROBADO' }) }));
                                   showToast(asistio ? 'Marcado como asistente' : 'Desmarcado como asistente');
                                 } catch (err) {
@@ -542,7 +541,7 @@ export default function CursoDetalleVentana() {
                             />
                             Asistió
                           </label>
-                        
+
                         </div>
                       )}
                       {(() => {

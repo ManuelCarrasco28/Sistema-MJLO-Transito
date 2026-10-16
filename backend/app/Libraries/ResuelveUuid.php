@@ -28,7 +28,6 @@ trait ResuelveUuid
             $soloUuid = in_array($method, $this->soloUuidEnEstricto ?? [], true);
             $id = Identificador::resolverId(\Config\Database::connect(), $tabla, $params[0], $soloUuid);
 
-            // Los ids sintéticos de pagos pendientes ("pap_pend_12") y los DNI no son uuid: se dejan pasar tal cual.
             if ($id === null && !$this->esIdEspecial($params[0])) {
                 return $this->failNotFound('Registro no encontrado.');
             }

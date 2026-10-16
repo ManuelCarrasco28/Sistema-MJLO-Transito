@@ -18,9 +18,8 @@ class PermisosController extends ResourceController
     {
         $db = \Config\Database::connect();
         \App\Libraries\EstadosPorFecha::alDia($db);
-        // "Control Vehicular" es la categoría por defecto en la UI (todo lo que
-        // no es Carga/Descarga, Uso de Vías o Zonas Reservadas), no un valor de
-        // enum propio — replicamos exactamente esa misma regla aquí.
+// "Control Vehicular" es la categoría por defecto en la UI (todo lo que
+
         $row = $db->table('permisos_circulacion')
             ->select("
                 COUNT(*) as total,
@@ -51,8 +50,8 @@ class PermisosController extends ResourceController
     private function getBaseQuery()
     {
         $db = \Config\Database::connect();
-        // Placa, solicitante, expediente y recibo no son columnas propias: se
-        // derivan de las FK del permiso (o del trámite vinculado) y del pago real.
+
+// derivan de las FK del permiso (o del trámite vinculado) y del pago real.
         $nombreCiudadano = "TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, '')))";
 
         return $db->table('permisos_circulacion pc')
@@ -109,10 +108,6 @@ class PermisosController extends ResourceController
             ->join('pagos_transito pt', 'pt.id = pm.id', 'left');
     }
 
-    /**
-     * Traduce los datos del formulario (placa, documento del solicitante,
-     * expediente) a las columnas reales de permisos_circulacion.
-     */
     private function resolverRelaciones($db, array $payload, bool $esCreacion): array
     {
         $data = [];
@@ -125,7 +120,7 @@ class PermisosController extends ResourceController
                 if ($vehiculo) {
                     $data['id_vehiculo'] = (int)$vehiculo['id'];
                 } elseif (empty($payload['flotaPlacas'])) {
-                    // Vehículo fuera del padrón (p. ej. camión de carga): se conserva la placa.
+
                     $data['flota_placas'] = $placa;
                 }
             }
@@ -189,7 +184,7 @@ class PermisosController extends ResourceController
 
             $tipoPermiso = strtoupper(trim((string)$this->request->getGet('tipoPermiso')));
             if ($tipoPermiso === 'CONTROL_VEHICULAR') {
-                // Categoría por defecto: todo lo que no es Carga/Descarga, Uso de Vías ni Zonas Reservadas.
+// Categoría por defecto: todo lo que no es Carga/Descarga, Uso de Vías ni Zonas Reservadas.
                 $builder->groupStart()
                     ->whereNotIn('pc.tipo_permiso', ['CARGA_DESCARGA', 'USO_VIAS', 'ZONAS_RESERVADAS', 'ZONA_RESERVADA'])
                     ->orWhere('pc.tipo_permiso IS NULL', null, false)
@@ -211,6 +206,7 @@ class PermisosController extends ResourceController
             $columnasOrdenables = [
                 'tipoPermiso' => 'pc.tipo_permiso',
                 'numeroAutorizacion' => 'pc.numero_autorizacion',
+                'vehiculoPlaca' => 'vehiculoPlaca',
                 'solicitanteNombre' => 'solicitanteNombre',
                 'estado' => 'pc.estado',
             ];
@@ -287,13 +283,12 @@ class PermisosController extends ResourceController
             $tipoPermiso = !empty($payload['tipoPermiso']) ? trim($payload['tipoPermiso']) : 'CARGA_DESCARGA';
             $year = date('Y');
 
-            // Si se envió un ID en el payload y dicho permiso existe, actualizarlo en lugar de insertar
             $idParam = !empty($payload['id']) ? (int)$payload['id'] : null;
             if ($idParam && $db->table('permisos_circulacion')->where('id', $idParam)->countAllResults() > 0) {
                 return $this->update($idParam);
             }
 
-            // Validar número de autorización o generar correlativo único
+// Validar número de autorización o generar correlativo único
             $numeroAutorizacion = !empty($payload['numeroAutorizacion']) ? trim($payload['numeroAutorizacion']) : '';
             if (!empty($numeroAutorizacion)) {
                 $existeColision = $db->table('permisos_circulacion')
@@ -507,7 +502,7 @@ class PermisosController extends ResourceController
                     td.id_procedimiento_admin as procedimientoAdminId,
                     pa.codigo as procedimientoCodigo,
                     pa.nombre as procedimientoNombre,
-                    pa.costo as procedimientoCosto,
+                    " . \App\Libraries\TupaCosto::sql('pa') . " as procedimientoCosto,
                     COALESCE(o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as solicitanteNombre,
                     COALESCE(o.ruc, p.numero, '') as solicitanteDocumento,
                     o.razon_social as asociacionNombre,
@@ -545,7 +540,6 @@ class PermisosController extends ResourceController
         try {
             $results = [];
 
-            // 1. Buscar en Asociaciones / Empresas
             $builderAsoc = $db->table('asociaciones o')
                 ->select("
                     o.id as asociacionId,
@@ -574,7 +568,6 @@ class PermisosController extends ResourceController
                 ]);
             }
 
-            // 2. Buscar en Personas / Ciudadanos
             $builderPers = $db->table('personas p')
                 ->select("
                     p.id as personaId,
@@ -608,7 +601,6 @@ class PermisosController extends ResourceController
                 ]);
             }
 
-            // 3. Buscar en Trámites Documentarios (para auto-rellenar expediente, placa, recibo y solicitante)
             $builderTram = $db->table('tramites_documentarios td')
                 ->select("
                     td.id as tramiteId,
@@ -657,7 +649,6 @@ class PermisosController extends ResourceController
                 ]);
             }
 
-            // Deduplicar resultados por documento + nombre + expediente
             $unique = [];
             $seen = [];
             foreach ($results as $item) {
@@ -675,10 +666,6 @@ class PermisosController extends ResourceController
         }
     }
 
-    /**
-     * Completa un resultado de búsqueda de administrados con los campos por
-     * defecto que no aplican a cada origen (empresa, persona o trámite).
-     */
     private function formatearResultadoAdministrado(string $tipo, array $item): array
     {
         return array_merge([
@@ -712,10 +699,10 @@ class PermisosController extends ResourceController
     {
         $db = \Config\Database::connect();
         try {
-            $rows = $db->table('procedimientos_administrativos')
-                ->select('id, codigo, nombre, descripcion, costo, estado')
-                ->where('estado', 'ACTIVO')
-                ->orderBy('id', 'ASC')
+            $rows = $db->table('procedimientos_administrativos pa')
+                ->select('pa.id, pa.codigo, pa.nombre, pa.descripcion, pa.plazo_atencion AS plazoAtencion, pa.vigencia, pa.tipo_tramite AS tipoTramite, ' . \App\Libraries\TupaCosto::sql('pa') . ' AS costo, pa.estado', false)
+                ->where('pa.estado', 'ACTIVO')
+                ->orderBy('pa.id', 'ASC')
                 ->get()
                 ->getResultArray();
             return $this->respond(['data' => $rows]);

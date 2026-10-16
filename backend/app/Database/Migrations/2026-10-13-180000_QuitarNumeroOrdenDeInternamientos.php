@@ -4,10 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Cada internamiento tiene un solo número, el de su boleta (numero_boleta); la orden de libertad tiene el suyo
- * (ordenes_libertad.numero_orden). El segundo número del internamiento (INT-000001) era redundante. Idempotente.
- */
 class QuitarNumeroOrdenDeInternamientos extends Migration
 {
     private function existe(): bool

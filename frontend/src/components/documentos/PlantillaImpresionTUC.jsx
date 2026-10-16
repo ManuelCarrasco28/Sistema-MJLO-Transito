@@ -4,7 +4,6 @@ import { TarjetaOperatividadPrint, CarnetCursoVialPrint, CerticavFichaPrint, Soa
 import './TarjetasImpresion.css'
 import { BotonCerrarModal } from '../ui/ModalControls'
 
-// Datos que usan las plantillas de impresión (tarjeta, carnet, CertiCAV, SOAT) a partir de un documento del vehículo.
 export function datosImpresionDocumento(documento) {
   const propietarioParts = (documento.propietario || '').trim().split(/\s+/).filter(Boolean)
   const fallbackApellidos = propietarioParts.length > 2 ? propietarioParts.slice(-2).join(' ') : documento.propietario || ''
@@ -86,7 +85,7 @@ export function PlantillaImpresionTUC({ documento, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-enter">
       <div className="w-full max-w-4xl bg-white dark:bg-[#1C2438] rounded-3xl shadow-2xl border border-slate-200 dark:border-[var(--border)] overflow-hidden my-auto">
-        
+
         {/* Header estilo /personas */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center gap-2.5">

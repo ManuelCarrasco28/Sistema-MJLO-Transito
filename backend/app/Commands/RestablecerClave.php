@@ -6,11 +6,6 @@ use App\Libraries\Acceso;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 
-/**
- * php spark usuarios:clave <usuario> [clave]
- * Fija la contraseña de un usuario existente. Sin [clave] genera una aleatoria y la muestra una sola vez.
- * El volcado inicial de la base no trae contraseñas: así se habilita el primer acceso (p. ej. superadmin).
- */
 class RestablecerClave extends BaseCommand
 {
     protected $group = 'Mantenimiento';
@@ -29,7 +24,7 @@ class RestablecerClave extends BaseCommand
         $clave = $params[1] ?? null;
         $generada = $clave === null;
         if ($generada) {
-            // Letras y números sin caracteres ambiguos; cumple la política de Acceso::errorDePassword.
+
             $alfabeto = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
             $clave = '';
             for ($i = 0; $i < 12; $i++) {

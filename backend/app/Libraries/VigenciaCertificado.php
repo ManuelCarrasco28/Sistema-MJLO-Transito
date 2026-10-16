@@ -2,10 +2,6 @@
 
 namespace App\Libraries;
 
-/**
- * Vigencia de 6 meses del CERTICAV. Igual que DATE_ADD(fecha, INTERVAL 6 MONTH) de MariaDB: si el día no existe en
- * el mes de destino se usa el último día de ese mes (31/08 vence el 28/02, no el 03/03 como daría strtotime).
- */
 final class VigenciaCertificado
 {
     public const MESES = 6;

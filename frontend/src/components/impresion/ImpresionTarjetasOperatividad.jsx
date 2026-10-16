@@ -19,7 +19,6 @@ const FILTROS = [
   },
 ]
 
-// Los documentos traen la foto como ruta relativa del almacenamiento; el carnet necesita una URL con sesión.
 const urlDeFoto = (ruta) => {
   const texto = String(ruta || '').trim()
   if (!texto || /^(https?:|data:)/.test(texto)) return texto

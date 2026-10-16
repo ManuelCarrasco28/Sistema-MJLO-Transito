@@ -18,7 +18,6 @@ const TIPOS_CON_PLANTILLA = [
   { value: 'Motocarguera', label: 'Solo motocarguera' },
 ]
 
-// Cada vehículo lleva 3 QR (uno por imagen) y las hojas se llenan de a 4, sin dejar espacios entre vehículos.
 const COPIAS = [
   { value: '3', label: '3 QR por vehículo' },
   { value: '1', label: '1 QR por vehículo' },
@@ -34,12 +33,10 @@ const TAMANOS_LOTE = [
 ]
 
 const COLOR_PRIMARIO = 'oklch(62.3% 0.214 259.815)'
-// _v2: el código QR de los vehículos pasó a ser su uuid. Lo que quedó guardado con la clave anterior traía códigos
-// que ya no existen (QR-VEH-2026-920…) y habría impreso etiquetas que la app móvil no encuentra.
+// Invalidar los QR antiguos al migrar a UUID.
 const CLAVE_CARRITO = 'qr_carrito_vehiculos_v2'
 const CLAVES_ANTERIORES = ['qr_carrito_vehiculos']
 
-// Del vehículo solo se guarda lo que usa la plantilla y la lista: el carrito sobrevive a recargar la página.
 const compactar = (v) => ({
   id: v.id,
   placa: v.placa,
@@ -277,8 +274,6 @@ function CarritoQrModal({ carrito, onQuitar, onVaciar, onClose, onImprimir, onIm
   )
 }
 
-// Pestaña "Impresión de QR": elegir vehículos (por asociación, tipo o búsqueda), guardarlos en un carrito
-// e imprimir sus QR de una vez o por lotes.
 export function ImpresionQrVehiculos({ asociaciones }) {
   const [filas, setFilas] = useState([])
   const [total, setTotal] = useState(0)
@@ -393,7 +388,6 @@ export function ImpresionQrVehiculos({ asociaciones }) {
     return sig
   })
 
-  // Devuelve una promesa que se cumple cuando se cierra el diálogo de impresión (se imprimió o se canceló).
   const imprimirUnLote = (vehiculos, copias) => new Promise((resolve) => {
     setTrabajo({ vehiculos, copias, alTerminar: resolve })
   })

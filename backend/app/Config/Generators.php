@@ -6,7 +6,7 @@ use CodeIgniter\Config\BaseConfig;
 
 class Generators extends BaseConfig
 {
-    /**
+/**
      * --------------------------------------------------------------------------
      * Generator Commands' Views
      * --------------------------------------------------------------------------

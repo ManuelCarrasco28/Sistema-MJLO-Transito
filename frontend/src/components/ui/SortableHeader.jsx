@@ -1,9 +1,4 @@
-// Encabezado de columna con orden A-Z / Z-A. El orden se resuelve en el
-// servidor (no solo en la página visible), así que cada click dispara una
-// nueva carga con sortBy/sortDir en vez de reordenar el array en memoria.
-// Admite ordenar por varias columnas a la vez: sortBy="a,b" y sortDir="ASC,DESC".
-// Cada clic recorre ASC -> DESC -> sin orden, y las demás columnas elegidas se conservan.
-// La página solo guarda los dos textos que recibe en onSort, sin lógica extra.
+// Ordenar columnas en servidor: ASC, DESC y sin orden.
 export function SortableHeader({ column, label, sortBy, sortDir, onSort, className = '', align = 'left' }) {
   const columnas = String(sortBy || '').split(',').filter(Boolean)
   const direcciones = String(sortDir || '').split(',')

@@ -2,15 +2,9 @@
 
 namespace App\Libraries;
 
-/**
- * Resuelve de forma segura el ordenamiento (columna + dirección) pedido por
- * el cliente vía querystring (?sortBy=...&sortDir=...), validando la columna
- * contra una lista blanca (nunca se concatena el nombre recibido directo al
- * SQL) para no abrir una inyección SQL a través del parámetro de orden.
- */
 class QuerySort
 {
-    /**
+/**
      * @param object $request Request actual (para leer sortBy/sortDir de la querystring).
      * @param array $columnas Mapa clave-de-frontend => columna SQL real permitida, ej. ['nombre' => 'c.nombres'].
      * @param string $columnaDefecto Columna SQL a usar si no se pide ninguna (o la pedida no es válida).
@@ -25,7 +19,6 @@ class QuerySort
             explode(',', (string) $request->getGet('sortDir'))
         );
 
-        // Admite varias columnas a la vez ("a,b" con "ASC,DESC"); cada una se valida contra la lista blanca.
         $aplicadas = [];
         foreach ($claves as $i => $clave) {
             if ($clave === '' || !isset($columnas[$clave]) || in_array($columnas[$clave], $aplicadas, true)) {
@@ -36,7 +29,6 @@ class QuerySort
             $aplicadas[] = $columnas[$clave];
         }
 
-        // Desempate estable por la columna por defecto (normalmente el id): mismo orden en cada consulta y entre páginas.
         if ($aplicadas !== [] && !in_array($columnaDefecto, $aplicadas, true)) {
             $builder->orderBy($columnaDefecto, $direccionDefecto);
         }

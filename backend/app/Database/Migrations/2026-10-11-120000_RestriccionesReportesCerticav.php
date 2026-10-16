@@ -4,10 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Integridad de CERTICAV y reportes de intervención: N° de registro único y claves foráneas del conductor
- * y del operativo. Idempotente; si hay datos huérfanos o repetidos se detiene sin borrar nada.
- */
 class RestriccionesReportesCerticav extends Migration
 {
     private function existeIndice(string $tabla, string $indice): bool
@@ -54,6 +50,6 @@ class RestriccionesReportesCerticav extends Migration
 
     public function down()
     {
-        // Las restricciones protegen datos; no se retiran al revertir.
+
     }
 }

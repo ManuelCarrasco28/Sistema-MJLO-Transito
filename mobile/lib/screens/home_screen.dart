@@ -84,10 +84,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _cargarPanel() async {
-    // Un solo endpoint liviano en lugar de 3 peticiones pesadas.
-    // Cada llamada se maneja por separado para que una falla en una
-    // (p. ej. sin operativo asignado o wifi inestable) no bloquee
-    // la actualización del permiso móvil ni de los contadores del día.
+    // Actualizar permiso y contadores sin que una petición bloquee las demás.
     try {
       final dashData = await ApiService.getMobileDashboard();
       if (mounted) {

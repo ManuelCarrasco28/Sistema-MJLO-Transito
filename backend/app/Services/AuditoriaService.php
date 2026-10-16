@@ -4,7 +4,7 @@ namespace App\Services;
 
 class AuditoriaService
 {
-    /**
+/**
      * Registra un evento en la tabla de auditoría.
      *
      * @param string $modulo (e.g. 'USUARIOS', 'VEHICULOS', 'ASOCIACIONES', 'PAPELETAS', 'PAGOS', 'DOCUMENTOS', 'SEGURIDAD', 'CONFIGURACION')

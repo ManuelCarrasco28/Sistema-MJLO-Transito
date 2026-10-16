@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fechaLocalActual } from '../utils/calendarioCurso'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -113,6 +114,10 @@ export function Inspecciones() {
   const [filterVigencia, setFilterVigencia] = useState('TODOS')
   const filterHistorial = 'ACTUALES'
   const [inspeccionPendiente, setInspeccionPendiente] = useState(null)
+  const navigate = useNavigate()
+  // Situación del CERTICAV de la placa escrita: solo formales, y pagado antes de la revisión técnica
+  const [certicav, setCerticav] = useState(null)
+  const [solicitandoCerticav, setSolicitandoCerticav] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
   const [sortBy, setSortBy] = useState('')
@@ -292,7 +297,6 @@ export function Inspecciones() {
 
   const paginatedInspecciones = inspecciones
 
-  // Los conductores se buscan en el servidor mientras se escribe (antes solo se buscaba entre las primeras 100 personas)
   const sumarPersonas = (lista) => setPersonas((prev) => [...prev.filter((p) => !lista.some((n) => n.id === p.id)), ...lista])
   useEffect(() => {
     const termino = (formData.conductorNombre || '').trim()
@@ -568,6 +572,34 @@ export function Inspecciones() {
     return () => controller.abort()
   }, [isModalOpen, selectedInspeccion, formData.vehiculoPlaca])
 
+  useEffect(() => {
+    setCerticav(null)
+    if (!isModalOpen || selectedInspeccion || normalizarPlaca(formData.vehiculoPlaca || '').length !== 6) return undefined
+    const controller = new AbortController()
+    apiFetch(`/inspecciones/certicav-estado?placa=${encodeURIComponent(formData.vehiculoPlaca)}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => { if (!controller.signal.aborted) setCerticav(payload?.data || null) })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [isModalOpen, selectedInspeccion, formData.vehiculoPlaca])
+
+  const solicitarCerticav = async () => {
+    setSolicitandoCerticav(true)
+    try {
+      const res = await apiFetch('/inspecciones/certicav-solicitar', { method: 'POST', body: { placa: normalizarPlaca(formData.vehiculoPlaca) } })
+      if (!res.ok) throw new Error(await leerMensajeError(res, 'No se pudo solicitar el CERTICAV.'))
+      const payload = await res.json()
+      setCerticav(payload?.data || null)
+    } catch (err) {
+      showError('No se pudo solicitar el CERTICAV', err.message)
+    } finally {
+      setSolicitandoCerticav(false)
+    }
+  }
+
+  // Una inspección nueva solo se guarda con el CERTICAV pagado (formal y cobrado en Pagos)
+  const certicavImpideGuardar = !selectedInspeccion && Boolean(certicav) && certicav.estado !== 'PAGADO'
+
   const handleOpenDetail = (inspeccion) => {
     setSelectedInspeccion(inspeccion)
     setIsDetailModalOpen(true)
@@ -657,9 +689,7 @@ export function Inspecciones() {
       const newDetalles = prev.detalles.map((d) => (d.criterioId === criterioId ? { ...d, [field]: value } : d))
       const evalChecklist = calcularPrimeraEvaluacion(newDetalles)
 
-      // Editando una inspección ya DESAPROBADA: la Primera Evaluación queda
-      // fija (es historia); volver a llenar el checklist ahora define la
-      // Segunda Evaluación (subsanación), no la primera.
+      // La subsanación modifica la segunda evaluación, no la primera.
       if (selectedInspeccion && prev.primeraEvaluacion !== 'APROBADO') {
         return {
           ...prev,
@@ -1333,6 +1363,37 @@ export function Inspecciones() {
             </div>
 
             <form onSubmit={handleFormSubmit} autoComplete="off" className="flex flex-col">
+              {!selectedInspeccion && certicav && (() => {
+                const costo = Number(certicav.costo || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                const estilos = {
+                  PAGADO: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300',
+                  PENDIENTE_PAGO: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300',
+                  SIN_SOLICITUD: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300',
+                  NO_FORMAL: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300',
+                }
+                const boton = 'shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60'
+                return (
+                  <div className={`mx-5 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-xs ${estilos[certicav.estado] || estilos.NO_FORMAL}`}>
+                    <p className="min-w-0 flex-1 leading-snug">
+                      {certicav.estado === 'PAGADO' && <><strong>CERTICAV pagado</strong> · recibo {certicav.numeroRecibo} · ya se puede registrar la revisión técnica.</>}
+                      {certicav.estado === 'PENDIENTE_PAGO' && <><strong>CERTICAV pendiente de pago</strong> (S/ {costo}) · expediente {certicav.expediente}. Cóbralo en Pagos para poder registrar la revisión técnica.</>}
+                      {certicav.estado === 'SIN_SOLICITUD' && <><strong>Falta solicitar el CERTICAV</strong> (S/ {costo}). Se solicita, se cobra en Pagos y luego se registra la revisión técnica.</>}
+                      {certicav.estado === 'NO_FORMAL' && <><strong>Vehículo informal.</strong> El CERTICAV es solo para vehículos formales: vincúlalo a una asociación en Vehículos para poder inspeccionarlo.</>}
+                    </p>
+                    {certicav.estado === 'SIN_SOLICITUD' && (
+                      <button type="button" onClick={solicitarCerticav} disabled={solicitandoCerticav} className={`${boton} bg-amber-600`}>
+                        {solicitandoCerticav ? 'Solicitando…' : 'Solicitar CERTICAV'}
+                      </button>
+                    )}
+                    {certicav.estado === 'PENDIENTE_PAGO' && (
+                      <button type="button" onClick={() => navigate('/pagos')} className={`${boton} bg-amber-600`}>Ir a Pagos</button>
+                    )}
+                    {certicav.estado === 'NO_FORMAL' && (
+                      <button type="button" onClick={() => navigate('/vehiculos')} className={`${boton} bg-rose-600`}>Ir a Vehículos</button>
+                    )}
+                  </div>
+                )
+              })()}
               {inspeccionPendiente && (
                 <div className="mx-5 mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                   <p>Esta placa tiene una inspección observada pendiente: <strong>{inspeccionPendiente.numeroRegistro}</strong>. Si estás subsanando sus observaciones, continúa la segunda evaluación.</p>
@@ -1792,7 +1853,7 @@ export function Inspecciones() {
               {/* Modal Footer */}
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-2.5 dark:border-[var(--border)] dark:bg-slate-900/80">
                 <BotonCancelar onClick={() => setIsModalOpen(false)} />
-                <BotonGuardar>
+                <BotonGuardar disabled={certicavImpideGuardar}>
                   {selectedInspeccion ? 'Actualizar inspección' : 'Guardar inspección'}
                 </BotonGuardar>
               </div>

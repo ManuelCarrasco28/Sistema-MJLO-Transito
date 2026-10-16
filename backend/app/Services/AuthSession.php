@@ -38,11 +38,6 @@ class AuthSession
         return $user;
     }
 
-    /**
-     * Decodifica la cookie y además verifica que la sesión no haya sido
-     * revocada (logout / cambio de contraseña incrementan session_version
-     * en la tabla usuarios, invalidando cualquier cookie firmada anterior).
-     */
     public static function resolveActiveUser(?string $cookie): ?array
     {
         $user = self::decodeCookie($cookie);
@@ -98,14 +93,6 @@ class AuthSession
         return self::rateLimitDirectory($bucket) . hash('sha256', $key) . '.json';
     }
 
-    /**
-     * Limitador de intentos genérico basado en archivos, reutilizable para
-     * cualquier endpoint sensible (login, cambio de contraseña, consultas
-     * a servicios externos como RENIEC/SUNARP).
-     *
-     * Devuelve null si se puede continuar, o un array ['retryAfterMinutes' => n]
-     * si el llamante debe ser bloqueado.
-     */
     public static function checkRateLimit(string $bucket, string $key, int $maxAttempts = 8, int $windowSeconds = 300, int $blockSeconds = 900): ?array
     {
         $path = self::rateLimitPath($bucket, $key);

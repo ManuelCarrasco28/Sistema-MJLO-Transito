@@ -6,10 +6,6 @@ use App\Libraries\Identificador;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 
-/**
- * php spark uuid:rellenar
- * Asigna UUID a los registros que quedaron sin uno (por ejemplo, insertados a mano en la base de datos).
- */
 class RellenarUuid extends BaseCommand
 {
     protected $group = 'Mantenimiento';

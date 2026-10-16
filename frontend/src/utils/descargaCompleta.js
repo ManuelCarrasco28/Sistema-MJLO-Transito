@@ -3,10 +3,7 @@ import { apiFetch } from '../config/api'
 import { armarConsulta } from '../hooks/useListaServidor'
 import { loading, closeLoading } from './SwalUtil'
 
-// Descarga TODAS las filas que coinciden con los filtros, pidiéndolas por páginas al servidor.
-// Pedir el listado completo de una sola vez agota la memoria del servidor con decenas de miles
-// de registros (Personas, Inspecciones) y algunos listados lo recortan sin filtros (Papeletas).
-// Con páginas de 200 filas el resultado es siempre el conjunto completo y en el mismo orden de la tabla.
+// Exportar todas las filas por páginas de 200 para limitar la memoria.
 export async function fetchTodasLasFilas(endpoint, params = {}, opciones = {}) {
   const { porPagina = 200, concurrencia = 2, campoPorPagina = 'porPagina', mensaje = 'Preparando la descarga...', silencioso = false, signal, procesarPagina, maxFilas = Infinity } = opciones
   const controller = new AbortController()

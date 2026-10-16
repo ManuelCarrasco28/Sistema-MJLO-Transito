@@ -4,10 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Quita `codigo_qr_anterior`: el código QR de los vehículos ya es su UUID y el código viejo
- * (QR-VEH-2026-920…) no se conserva. Los QR impresos con el código viejo dejan de encontrarse.
- */
 class QuitarCodigoQrAnterior extends Migration
 {
     public function up()

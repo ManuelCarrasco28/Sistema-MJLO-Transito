@@ -5,8 +5,7 @@ import { FloatingInput, FloatingSelect } from '../ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
 import { OficinaRegistralSelect } from './OficinaRegistralSelect'
 
-// Posición del desplegable: debajo del campo si cabe; si no, arriba, y siempre con la altura que quede libre
-// (así no se sale de la pantalla cuando el campo está cerca del borde inferior)
+// Ajustar el desplegable al espacio disponible arriba o abajo.
 function posicionDesplegable(rect) {
   const margen = 12
   const ideal = 208
@@ -73,10 +72,7 @@ export function VehiculoFormModal({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [setShowPropietarioResults, setShowAsociacionResults])
 
-  // El desplegable de resultados se renderiza vía portal (fuera del cuerpo
-  // scrolleable del modal) para que no quede recortado por su overflow.
-  // Recalculamos la posición al abrir y la cerramos si el usuario hace
-  // scroll dentro del modal, para no arrastrar un desplegable desalineado.
+  // Renderizar resultados en un portal y cerrarlos al desplazar el modal.
   useEffect(() => {
     if (showPropietarioResults && propietarioRef.current) {
       const rect = propietarioRef.current.getBoundingClientRect()

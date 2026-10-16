@@ -14,7 +14,7 @@ use CodeIgniter\Config\BaseConfig;
 
 class Cache extends BaseConfig
 {
-    /**
+/**
      * --------------------------------------------------------------------------
      * Primary Handler
      * --------------------------------------------------------------------------
@@ -24,41 +24,13 @@ class Cache extends BaseConfig
      */
     public string $handler = 'dummy';
 
-    /**
-     * --------------------------------------------------------------------------
-     * Backup Handler
-     * --------------------------------------------------------------------------
-     *
-     * The name of the handler that will be used in case the first one is
-     * unreachable. Often, 'file' is used here since the filesystem is
-     * always available, though that's not always practical for the app.
-     */
     public string $backupHandler = 'dummy';
 
-    /**
-     * --------------------------------------------------------------------------
-     * Key Prefix
-     * --------------------------------------------------------------------------
-     *
-     * This string is added to all cache item names to help avoid collisions
-     * if you run multiple applications with the same cache engine.
-     */
     public string $prefix = '';
 
-    /**
-     * --------------------------------------------------------------------------
-     * Default TTL
-     * --------------------------------------------------------------------------
-     *
-     * The default number of seconds to save items when none is specified.
-     *
-     * WARNING: This is not used by framework handlers where 60 seconds is
-     * hard-coded, but may be useful to projects and modules. This will replace
-     * the hard-coded value in a future release.
-     */
     public int $ttl = 60;
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Reserved Characters
      * --------------------------------------------------------------------------
@@ -71,7 +43,7 @@ class Cache extends BaseConfig
      */
     public string $reservedCharacters = '{}()/\@:';
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * File settings
      * --------------------------------------------------------------------------
@@ -86,7 +58,7 @@ class Cache extends BaseConfig
         'mode'      => 0640,
     ];
 
-    /**
+/**
      * -------------------------------------------------------------------------
      * Memcached settings
      * -------------------------------------------------------------------------
@@ -105,7 +77,7 @@ class Cache extends BaseConfig
         'raw'    => false,
     ];
 
-    /**
+/**
      * -------------------------------------------------------------------------
      * Redis settings
      * -------------------------------------------------------------------------
@@ -128,12 +100,12 @@ class Cache extends BaseConfig
         'password'   => null,
         'port'       => 6379,
         'timeout'    => 0,
-        'async'      => false, // specific to Predis and ignored by the native Redis extension
+        'async'      => false,
         'persistent' => false,
         'database'   => 0,
     ];
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Available Cache Handlers
      * --------------------------------------------------------------------------
@@ -153,7 +125,7 @@ class Cache extends BaseConfig
         'wincache'  => WincacheHandler::class,
     ];
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Web Page Caching: Cache Include Query String
      * --------------------------------------------------------------------------
@@ -172,7 +144,7 @@ class Cache extends BaseConfig
      */
     public $cacheQueryString = false;
 
-    /**
+/**
      * --------------------------------------------------------------------------
      * Web Page Caching: Cache Status Codes
      * --------------------------------------------------------------------------

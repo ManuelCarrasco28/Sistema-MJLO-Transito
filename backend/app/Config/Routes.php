@@ -10,9 +10,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->get('status', 'StatusController::index');
     $routes->match(['get', 'head'], 'files/(:segment)/(:segment)', 'FilesController::ver/$1/$2');
 
-    // Eliminaciones y anulaciones: solo la jefatura (Super Admin, Gerente y Subgerente). Secretaría cobra y registra,
-    // pero no borra ni anula; el frontend oculta estas acciones y aquí se exige también en el servidor.
-    // Va antes del grupo general para que estas rutas DELETE se resuelvan primero.
+// Solo jefatura elimina; resolver estas rutas antes del grupo general.
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE'], static function ($routes): void {
         $recursosEliminables = [
             'vehiculos' => 'VehiculosController',
@@ -34,12 +32,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         }
     });
 
-    // Módulos que la interfaz ya restringe a personal de oficina (Documentos, Permisos, Cursos, Pagos) y las
-    // escrituras sobre el padrón (personas, vehículos, asociaciones, trabajadores). Aquí también se exige en
-    // el servidor: antes cualquier usuario con sesión (p. ej. un Trabajador) podía llamar estas rutas
-    // directamente aunque la pantalla no se las mostrara. Las lecturas del padrón que usan las pantallas y la
-    // app móvil (buscar personas, vehículos, asociaciones) siguen abiertas en el grupo general.
-    // Va antes del grupo general para que estas rutas se resuelvan primero.
+// Rutas de oficina con permisos de servidor; preceden al grupo general.
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA'], static function ($routes): void {
         $routes->post('vehiculos', 'VehiculosController::create');
         $routes->put('vehiculos/(:segment)', 'VehiculosController::update/$1');
@@ -69,7 +62,6 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('permisos', ['controller' => 'PermisosController']);
         $routes->get('procedimientos-admin', 'PermisosController::procedimientos');
 
-        // Cobrar una papeleta es del personal de oficina: los inspectores emiten papeletas pero no cobran.
         $routes->post('papeletas/(:segment)/pagar', 'PapeletasController::pagar/$1');
         $routes->get('pagos/origenes', 'PagosController::origenes');
         $routes->get('pagos/deudas', 'PagosController::deudasPorPersona');
@@ -89,7 +81,6 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('cursos', ['controller' => 'CursosController']);
     });
 
-    // Rutas accesibles por inspectores y personal móvil que deben resolverse antes de los recursos de oficina
     $routes->group('', ['filter' => 'sessionauth'], static function ($routes): void {
         $routes->get('operativos', 'OperativosController::index');
         $routes->get('operativos/activo/(:segment)', 'OperativosController::activo/$1');
@@ -97,7 +88,6 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('vehiculos/persona/dni', 'VehiculosController::getVehiculosByPersonaDni');
     });
 
-    // Resto del sistema: solo oficina (el inspector no ve dashboards, padrones ni gestión).
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA'], static function ($routes): void {
         $routes->get('dashboard', 'DashboardController::index');
         $routes->get('vehiculos/estadisticas', 'VehiculosController::estadisticas');
@@ -115,6 +105,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->resource('operativos', ['controller' => 'OperativosController', 'placeholder' => '(:segment)']);
         $routes->get('inspecciones/siguiente-correlativo', 'InspeccionesController::siguienteCorrelativo');
         $routes->get('inspecciones/estadisticas', 'InspeccionesController::estadisticas');
+        $routes->get('inspecciones/certicav-estado', 'InspeccionesController::certicavEstado');
+        $routes->post('inspecciones/certicav-solicitar', 'InspeccionesController::certicavSolicitar');
         $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
         $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
         $routes->get('internamientos/estadisticas', 'InternamientosController::estadisticas');
@@ -128,7 +120,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('ruc/(:segment)', 'RucController::consultar/$1');
     });
 
-    // Lista blanca de lo que necesita la app móvil (inspector). Todo lo demás es solo de oficina.
+// Lista blanca de lo que necesita la app móvil (inspector). Todo lo demás es solo de oficina.
     $routes->group('', ['filter' => 'sessionauth'], static function ($routes): void {
         $routes->get('mobile/config', 'MunicipalidadController::mobileConfig');
         $routes->get('municipalidad/config-mobile', 'MunicipalidadController::mobileConfig');
@@ -145,7 +137,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->put('perfil/preferencias', 'AuthController::guardarPreferencias');
 
         $routes->get('tipo-documentos', 'PersonasController::tiposDocumento');
-        // Para no-oficina el controlador solo admite búsqueda exacta por numeroDocumento y nunca show por id.
+
         $routes->resource('personas', ['controller' => 'PersonasController', 'only' => ['index', 'show']]);
         $routes->resource('papeletas', ['controller' => 'PapeletasController', 'only' => ['index', 'create']]);
         $routes->post('papeletas/(:segment)/firma', 'PapeletasController::firma/$1');
@@ -156,12 +148,10 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('reportes-intervencion/(:segment)/fotos', 'ReportesIntervencionController::fotos/$1');
     });
 
-    // Rutas de exportación y reportes sensibles: restringidas a personal de oficina autorizado
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA'], static function ($routes): void {
         $routes->post('export-pdf', 'ExportPdfController::generar');
     });
 
-    // Catálogo de infracciones y sus multas (porcentaje de UIT): lo administran los cargos de dirección.
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE'], static function ($routes): void {
         $routes->get('catalogo-infracciones', 'TiposInfraccionController::index');
         $routes->post('catalogo-infracciones', 'TiposInfraccionController::create');
@@ -170,13 +160,11 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->delete('catalogo-infracciones/(:num)', 'TiposInfraccionController::delete/$1');
     });
 
-    // El token de PIDE es un secreto: quitarlo es solo del SuperAdmin.
+// El token de PIDE es un secreto: quitarlo es solo del SuperAdmin.
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN'], static function ($routes): void {
         $routes->delete('municipalidad/anios/(:num)/token', 'MunicipalidadController::quitarTokenAnio/$1');
     });
 
-    // Rutas administrativas: solo roles con privilegios de gestión institucional.
-    // (gestión de cuentas/roles de usuarios, datos de la municipalidad, token PIDE y auditoría del sistema).
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE'], static function ($routes): void {
         $routes->get('auditoria', 'AuditoriaController::index');
         $routes->get('auditoria/estadisticas', 'AuditoriaController::estadisticas');

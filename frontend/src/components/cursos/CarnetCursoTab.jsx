@@ -33,7 +33,6 @@ function EstadoCarnet({ estado }) {
   return <StatusBadge status={base} label={TEXTO_ESTADO[estado] || estado} />
 }
 
-// Carnet de curso: vigencia de cada persona (un año desde su último curso aprobado), con vigentes, por vencer y vencidos.
 export function CarnetCursoTab() {
   const [filas, setFilas] = useState([])
   const [total, setTotal] = useState(0)
@@ -48,7 +47,6 @@ export function CarnetCursoTab() {
   useEffect(() => { setPagina(1) }, [buscar, estado])
 
   useEffect(() => {
-    // Sin AbortController: si llega una respuesta vieja simplemente se descarta (así no aparecen peticiones "canceladas")
     let vigente = true
     setCargando(true)
     const params = new URLSearchParams({ page: String(pagina), porPagina: String(porPagina) })

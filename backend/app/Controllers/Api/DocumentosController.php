@@ -14,7 +14,6 @@ class DocumentosController extends ResourceController
 
     protected $format = 'json';
 
-    // Columnas reales de documentos_vehiculo: cualquier otro dato del formulario se descarta.
     private const COLUMNAS = ['id_vehiculo', 'fecha_expedicion', 'fecha_expiracion', 'tipo_documento', 'codigo', 'estado'];
 
     private const ETIQUETAS_TIPO = [
@@ -28,11 +27,6 @@ class DocumentosController extends ResourceController
         return array_intersect_key($record, array_flip(self::COLUMNAS));
     }
 
-    /**
-     * Estado real de un documento hoy: el campo estado puede quedar desfasado
-     * (VIGENTE con fecha ya vencida), así que se contrasta con la fecha.
-     * La Tarjeta de Propiedad no vence: solo puede estar vigente o anulada.
-     */
     private function estadoEfectivo(array $doc): string
     {
         $estado = strtoupper((string) ($doc['estado'] ?? ''));
@@ -50,7 +44,6 @@ class DocumentosController extends ResourceController
         return ($vence && $vence < date('Y-m-d')) ? 'VENCIDO' : 'VIGENTE';
     }
 
-    /** Un documento marcado VIGENTE no puede traer una fecha de vencimiento que ya pasó. */
     private function vigenteConFechaPasada(array $doc): bool
     {
         if (($doc['tipo_documento'] ?? '') === 'TARJETA_PROPIEDAD') {
@@ -61,11 +54,6 @@ class DocumentosController extends ResourceController
         return strtoupper((string) ($doc['estado'] ?? '')) === 'VIGENTE' && $vence && $vence < date('Y-m-d');
     }
 
-    /**
-     * Devuelve el motivo por el que el documento sería un duplicado, o null si
-     * se puede guardar: (1) el mismo número ya existe para ese tipo; (2) el
-     * vehículo ya tiene un documento vigente del mismo tipo.
-     */
     private function mensajeDuplicado($db, int $vehiculoId, string $placa, array $doc, ?int $excluirId, bool $validarVigencia = true): ?string
     {
         $tipo = $doc['tipo_documento'];
@@ -109,7 +97,6 @@ class DocumentosController extends ResourceController
         return null;
     }
 
-    /** Estado de los tres documentos de un vehículo, para el cuadro del formulario. */
     public function resumenVehiculo($vehiculoId = null)
     {
         $db = \Config\Database::connect();
@@ -131,7 +118,7 @@ class DocumentosController extends ResourceController
         foreach (self::ETIQUETAS_TIPO as $tipo => $etiqueta) {
             $delTipo = array_values(array_filter($docs, static fn ($d) => $d['tipo_documento'] === $tipo));
             $elegido = null;
-            // Se muestra el vigente si lo hay; si no, el más reciente que no esté anulado; si no, el más reciente.
+
             foreach ([['VIGENTE'], ['VENCIDO'], ['ANULADO']] as $prioridad) {
                 foreach ($delTipo as $d) {
                     if (in_array($this->estadoEfectivo($d), $prioridad, true)) {
@@ -361,7 +348,6 @@ class DocumentosController extends ResourceController
 
         $vehiculoId = (int)$vehiculoRow['id'];
 
-        // Check owner if issuing TUC
         $propietarioRow = $db->table('vehiculo_propietarios vp')
             ->select("COALESCE(c.nombres, '') AS nombres, COALESCE(c.apellido_paterno, '') AS apePaterno, COALESCE(c.apellido_materno, '') AS apeMaterno, COALESCE(c.foto, '') AS foto, COALESCE(p.numero, '') AS dni, COALESCE(p.direccion, '') AS direccion, COALESCE(c.numero_licencia, '') AS licencia")
             ->join('personas p', 'p.id = vp.id_persona', 'inner')
@@ -380,7 +366,7 @@ class DocumentosController extends ResourceController
                 return $this->failValidationErrors('No se puede emitir la Tarjeta Única de Circulación (TUC): El vehículo con placa ' . $placa . ' figura como "Sin Propietario Asignado". Es requisito legal vincular previamente al propietario en el Padrón Vehicular.');
             }
 
-            // Requisito: CERTICAV aprobado, no anulado y dentro de sus 6 meses de vigencia
+// Requisito: CERTICAV aprobado, no anulado y dentro de sus 6 meses de vigencia
             $inspRow = $db->table('certicav')
                 ->where('id_vehiculo', $vehiculoId)
                 ->where('resultado', 'APROBADO')
@@ -395,7 +381,6 @@ class DocumentosController extends ResourceController
                 return $this->failValidationErrors('No se puede emitir la Tarjeta de Operatividad: el vehículo con placa ' . $placa . ' no tiene un CERTICAV aprobado y vigente. Registre primero su inspección técnica.');
             }
 
-            // Look for approved municipal inspection if not supplied
             if (empty($input['numeroInspeccion']) && empty($input['idInspeccion'])) {
 
                 if ($inspRow) {
@@ -410,7 +395,7 @@ class DocumentosController extends ResourceController
             'tipo_documento'     => $rawTipo,
             'codigo'             => trim($input['codigo']),
             'fecha_expedicion'   => !empty($input['fechaExpedicion']) ? $input['fechaExpedicion'] : date('Y-m-d'),
-            // La Tarjeta de Propiedad no tiene fecha de vencimiento (no vence).
+// La Tarjeta de Propiedad no tiene fecha de vencimiento (no vence).
             'fecha_expiracion'   => $rawTipo === 'TARJETA_PROPIEDAD'
                 ? null
                 : (!empty($input['fechaExpiracion']) ? $input['fechaExpiracion'] : date('Y-m-d', strtotime('+1 year'))),
@@ -439,7 +424,6 @@ class DocumentosController extends ResourceController
         }
         $insertId = (int)$db->insertID();
 
-        // Fetch asociación
         $asocName = 'Independiente';
         if (!empty($vehiculoRow['id_asociacion'])) {
             $asocRow = $db->table('asociaciones')->where('id', $vehiculoRow['id_asociacion'])->get()->getRowArray();
@@ -501,8 +485,7 @@ class DocumentosController extends ResourceController
 
         $record = [];
         $tipoDocumento = isset($input['tipoDocumento']) ? strtoupper(trim($input['tipoDocumento'])) : null;
-        // Solo se valida si cambia el tipo: un CITV/CertiCAV ya registrado
-        // (legado) debe poder seguir editándose (p. ej. marcarlo VENCIDO).
+
         if ($tipoDocumento !== null && $tipoDocumento !== $actual['tipo_documento']) {
             if ($tipoDocumento === 'CITV' || $tipoDocumento === 'INSPECCION_TECNICA' || $tipoDocumento === 'CERTICAV' || $tipoDocumento === 'REVISION_TECNICA') {
                 return $this->failValidationErrors('Las inspecciones técnicas (CertiCAV/CITV) se registran en el módulo de Inspecciones Técnicas, no aquí.');
@@ -518,7 +501,7 @@ class DocumentosController extends ResourceController
         if (array_key_exists('codigo', $input)) $record['codigo'] = trim((string)$input['codigo']);
         if (array_key_exists('fechaExpedicion', $input)) $record['fecha_expedicion'] = $input['fechaExpedicion'] ?: null;
         if (array_key_exists('fechaExpiracion', $input)) {
-            // La Tarjeta de Propiedad no tiene fecha de vencimiento.
+
             $record['fecha_expiracion'] = $tipoEfectivo === 'TARJETA_PROPIEDAD'
                 ? null
                 : ($input['fechaExpiracion'] ?: null);
@@ -575,8 +558,4 @@ class DocumentosController extends ResourceController
         return $this->respondDeleted(['status' => true, 'message' => 'Documento eliminado con éxito']);
     }
 }
-
-
-
-
 

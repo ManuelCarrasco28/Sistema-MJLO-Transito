@@ -2,7 +2,6 @@
 
 namespace App\Libraries;
 
-/** Una fila por comprobante o deuda, antes de filtrar y paginar. */
 final class PagosListado
 {
     public static function condicionReciboVisible(string $alias = 'pt'): string
@@ -12,7 +11,7 @@ final class PagosListado
 
     public static function builder($db)
     {
-        // Los SELECT son constantes; los FROM/JOIN/WHERE se construyen por separado.
+
         $sqlNormalizado = str_replace("\r\n", "\n", self::sql());
         $partes = explode("\nUNION ALL\n", $sqlNormalizado);
         $selects = array_map(static function ($sql) {

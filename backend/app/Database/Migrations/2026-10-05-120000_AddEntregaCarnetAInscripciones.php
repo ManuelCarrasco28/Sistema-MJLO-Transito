@@ -4,10 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Permite marcar cuándo (y quién) entregó el carnet físico de un curso de seguridad vial
- * a su conductor, para distinguir "ya se imprimió" de "ya lo recogió" en el padrón.
- */
 class AddEntregaCarnetAInscripciones extends Migration
 {
     public function up()

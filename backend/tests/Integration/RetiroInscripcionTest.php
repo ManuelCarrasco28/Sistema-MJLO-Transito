@@ -1,5 +1,5 @@
 <?php
-// Registros temporales: todas las operaciones se revierten al terminar.
+
 define('FCPATH', dirname(__DIR__, 2) . '/public/');
 define('ENVIRONMENT', 'development');
 require FCPATH . '../app/Config/Paths.php';

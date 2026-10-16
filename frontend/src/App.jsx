@@ -298,7 +298,6 @@ function ProtectedApp({ user, onLogout, onUserUpdate }) {
 function App() {
   const [user, setUser] = useState(null)
   const [checkingSession, setCheckingSession] = useState(true)
-  // Los botones de eliminar consultan el rol desde fuera de React; la sesión ya no se guarda en localStorage.
   definirRolActual(user?.rol)
   const inactivityTimerRef = useRef(null)
 
@@ -423,7 +422,7 @@ function App() {
               </Suspense>
             ) : <Navigate to="/login" replace />}
           />
-          
+
           <Route
             path="/cursos/:id/popup"
             element={user ? (

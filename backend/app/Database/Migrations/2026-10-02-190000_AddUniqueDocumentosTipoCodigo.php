@@ -4,12 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Un mismo número de documento (póliza SOAT, resolución de la tarjeta de
- * operatividad, partida de la tarjeta de propiedad) no puede registrarse dos
- * veces para el mismo tipo. La validación del formulario avisa con un mensaje
- * claro; este índice es la garantía final si dos usuarios guardan a la vez.
- */
 class AddUniqueDocumentosTipoCodigo extends Migration
 {
     private const INDICE = 'uq_docveh_tipo_codigo';

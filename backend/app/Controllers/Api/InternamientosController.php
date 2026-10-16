@@ -6,8 +6,8 @@ use CodeIgniter\RESTful\ResourceController;
 
 class InternamientosController extends ResourceController
 {
-    /** Depósito oficial donde quedan internados los vehículos (único). */
-    private const DEPOSITO_OFICIAL = 'Depósito Oficial José L. Ortiz';
+
+    private const DEPOSITO_OFICIAL = \App\Services\InternamientoAutomatico::DEPOSITO_OFICIAL;
 
     use \App\Libraries\ResuelveUuid;
 
@@ -17,7 +17,6 @@ class InternamientosController extends ResourceController
 
     protected $format = 'json';
 
-    /** Tarifas del depósito y si el usuario puede cambiarlas o rebajar un cobro (jefatura). */
     public function tarifas()
     {
         $db = \Config\Database::connect();
@@ -167,6 +166,8 @@ class InternamientosController extends ResourceController
 
             $columnasOrdenables = [
                 'numeroBoleta' => 'oi.numero_boleta',
+                'vehiculoPlaca' => 'vehiculoPlaca',
+                'conductorNombre' => 'conductorNombre',
                 'fechaIngreso' => 'oi.fecha_ingreso',
                 'estado' => 'oi.estado',
                 'totalDias' => 'oi.total_dias',
@@ -212,7 +213,6 @@ class InternamientosController extends ResourceController
                 }
             }
 
-            // Infracciones de la papeleta de cada internamiento (código, descripción, gravedad y monto).
             $infraccionesPorPapeleta = [];
             $codigosPorPapeleta = [];
             $descripcionesPorPapeleta = [];
@@ -267,11 +267,6 @@ class InternamientosController extends ResourceController
         }
     }
 
-    /**
-     * Registra un internamiento (orden de retención) a partir de una
-     * papeleta ya existente. Cada papeleta solo puede generar un
-     * internamiento (id_papeleta es único en ordenes_internamiento).
-     */
     public function create()
     {
         $db = \Config\Database::connect();
@@ -338,7 +333,7 @@ class InternamientosController extends ResourceController
                 $idRemisor = null;
             }
 
-            // Orden y boleta correlativas bajo candado (antes la orden era un número al azar y la boleta quedaba vacía)
+// Generar correlativos de orden y boleta bajo bloqueo.
             $candadoNumero = (int) ($db->query("SELECT GET_LOCK('mjlo_numero_internamiento', 10) AS ok")->getRowArray()['ok'] ?? 0) === 1;
             if (!$candadoNumero) {
                 return $this->failServerError('El sistema está generando otro internamiento. Intente nuevamente.');
@@ -353,13 +348,13 @@ class InternamientosController extends ResourceController
                 'id_remisor' => $idRemisor,
                 'id_interesado' => $idInteresado,
                 'fecha_ingreso' => date('Y-m-d H:i:s'),
-                // El depósito oficial es siempre el de José Leonardo Ortiz (no lo elige el usuario).
+
                 'deposito' => self::DEPOSITO_OFICIAL,
                 'motivo' => trim($input['motivo'] ?? ''),
-                // Estos datos no se digitan: salen de la papeleta, del vehículo y del inspector que la emitió.
+
                 'lugar_intervencion' => trim((string)($papeleta['lugar'] ?? '')),
                 'grado_remisor' => $this->cargoDelInspector($db, $papeleta),
-                // El N° de carné no se digita: sale del inspector que emitió la papeleta.
+
                 'carnet_remisor' => $this->carneDelInspector($db, $papeleta),
                 'autoridad_que_dispone' => $this->cargoDelInspector($db, $papeleta),
                 'estado_carroceria' => $this->carroceriaDelVehiculo($db, (int)$papeleta['id_vehiculo']),
@@ -367,7 +362,6 @@ class InternamientosController extends ResourceController
                 'estado' => 'RETENIDO',
             ];
 
-            // Inventario del vehículo (opcional): [{idCriterio, cantidad}]; se valida contra el catálogo.
             $inventario = [];
             foreach ((array)($input['inventario'] ?? []) as $fila) {
                 $idCriterio = (int)($fila['idCriterio'] ?? 0);
@@ -427,7 +421,7 @@ class InternamientosController extends ResourceController
         }
     }
 
-    /**
+/**
      * Cobro y liberación de un vehículo internado: registra el pago de la papeleta (si aún no está pagada), la
      * guardianía y el remolque, emite la ORDEN DE LIBERTAD y pasa el internamiento a LIBERADO. Todo en una sola
      * transacción: o se hace completo o no se hace nada.
@@ -462,7 +456,7 @@ class InternamientosController extends ResourceController
                 }
             }
 
-            // El candado evita que dos liberaciones simultáneas calculen el mismo número LIB-; se suelta al terminar
+// Serializar el correlativo de libertad hasta finalizar la operación.
             $candadoLibertad = (int) ($db->query("SELECT GET_LOCK('mjlo_numero_libertad', 10) AS ok")->getRowArray()['ok'] ?? 0) === 1;
             if (!$candadoLibertad) {
                 throw new \DomainException('El sistema está generando otra orden de libertad. Intente nuevamente.');
@@ -478,13 +472,11 @@ class InternamientosController extends ResourceController
                 throw new \DomainException('Este vehículo ya fue liberado.');
             }
 
-            // Guardianía y remolque contra la tarifa del depósito (los montos ya no los decide solo el cliente)
             $diasCustodia = max(1, (int)(new \DateTime(substr($orden['fecha_ingreso'], 0, 10)))->diff(new \DateTime(date('Y-m-d')))->days);
             $huboRebaja = \App\Libraries\TarifasDeposito::validar(
                 \App\Libraries\TarifasDeposito::obtener($db), $diasCustodia, $montoGuardiania, $montoRemolque, \App\Libraries\TarifasDeposito::esJefatura()
             );
 
-            // Persona que retira el vehículo: la indicada por DNI o, por defecto, el interesado del internamiento.
             $idAutorizada = (int)($orden['id_interesado'] ?? 0);
             if ($dniAutorizado !== '') {
                 $persona = $db->table('personas')->where('numero', $dniAutorizado)->get()->getRowArray();
@@ -497,7 +489,6 @@ class InternamientosController extends ResourceController
                 throw new \DomainException('Indique el DNI de la persona que retira el vehículo.');
             }
 
-            // Papeleta: si sigue pendiente se cobra aquí; si ya estaba pagada se conserva su recibo.
             $montoPapeleta = 0.0;
             $papeleta = $orden['id_papeleta'] ? $db->table('papeletas')->where('id', (int)$orden['id_papeleta'])->get()->getRowArray() : null;
             if ($papeleta) {
@@ -544,7 +535,6 @@ class InternamientosController extends ResourceController
                 'estado' => 'EMITIDA',
             ]);
 
-            // Días de custodia = días calendario desde el ingreso (mínimo 1), igual que el contador de la lista.
             $dias = max(1, (int)(new \DateTime(substr($orden['fecha_ingreso'], 0, 10)))->diff(new \DateTime(date('Y-m-d')))->days);
             $db->table('ordenes_internamiento')->where('id', (int)$orden['id'])->update([
                 'estado' => 'LIBERADO',
@@ -578,10 +568,6 @@ class InternamientosController extends ResourceController
         }
     }
 
-    /**
-     * Corrige los datos de un internamiento (la papeleta, el vehículo y los cobros no se cambian). Si se envía
-     * "inventario", reemplaza el inventario completo por el nuevo.
-     */
     public function update($id = null)
     {
         $db = \Config\Database::connect();
@@ -598,7 +584,7 @@ class InternamientosController extends ResourceController
                 $db->transRollback();
                 return $this->failNotFound('Internamiento no encontrado.');
             }
-            // Ya liberado: la orden de libertad está emitida, así que no se cambian interesado, motivo ni inventario
+// No modificar los datos de una orden ya liberada.
             if ($orden['estado'] !== 'RETENIDO') {
                 unset($input['motivo'], $input['interesadoDni'], $input['inventario']);
             }
@@ -680,10 +666,6 @@ class InternamientosController extends ResourceController
         }
     }
 
-    /**
-     * Elimina un internamiento junto con su inventario. Si ya fue liberado, también se elimina su orden de libertad
-     * (el pago de la papeleta registrado en Pagos no se toca).
-     */
     public function delete($id = null)
     {
         $db = \Config\Database::connect();
@@ -721,7 +703,6 @@ class InternamientosController extends ResourceController
         }
     }
 
-    /** Cargo vigente del inspector que emitió la papeleta (ej. INSPECTOR DE TRÁNSITO MUNICIPAL). */
     private function cargoDelInspector($db, array $papeleta): string
     {
         if (empty($papeleta['id_inspector'])) {
@@ -738,7 +719,6 @@ class InternamientosController extends ResourceController
         return trim((string)($fila['nombre'] ?? '')) ?: 'Inspector de Tránsito Municipal';
     }
 
-    /** Carrocería registrada del vehículo (tipo y, si lo hay, el tipo de carrocería). */
     private function carroceriaDelVehiculo($db, int $idVehiculo): string
     {
         $v = $db->table('vehiculos')->select('carroceria, tipo_carroceria')->where('id', $idVehiculo)->get()->getRowArray();
@@ -747,7 +727,6 @@ class InternamientosController extends ResourceController
         return implode(' - ', array_unique($partes));
     }
 
-    /** Documento (carné) del inspector que emitió la papeleta; vacío si la papeleta no tiene inspector. */
     private function carneDelInspector($db, array $papeleta): string
     {
         if (empty($papeleta['id_inspector'])) {

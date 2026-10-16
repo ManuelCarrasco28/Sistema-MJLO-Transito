@@ -10,7 +10,7 @@ class MassiveSeeder extends Seeder
     public function run()
     {
         $db = \Config\Database::connect();
-        
+
         $total = 2000000;
         $chunkSize = 5000;
 
@@ -35,7 +35,7 @@ class MassiveSeeder extends Seeder
 
         $nextDni = 30000000;
         $lotes = ceil($total / $chunkSize);
-        
+
         for ($i = 0; $i < $lotes; $i++) {
             $personas = [];
             $ciudadanos = [];

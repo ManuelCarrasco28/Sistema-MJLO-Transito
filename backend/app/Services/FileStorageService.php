@@ -11,19 +11,48 @@ class FileStorageService
         'image/webp' => 'webp',
     ];
 
-    private const TAMANO_MAXIMO_BYTES = 8 * 1024 * 1024; // 8 MB
+    private const TAMANO_MAXIMO_BYTES = 8 * 1024 * 1024;
     private const LADO_MAXIMO_PX = 10000;
-    // Una foto de 64 megapíxeles ocupa ~256 MB al decodificarse: se limita la superficie total (50 MP cubre los celulares actuales; la app debe reducir las fotos antes de enviarlas)
+
     private const PIXELES_MAXIMOS = 50000000;
 
+    private const HOST_PIDE = 'pide.munijlo.gob.pe';
 
+    public function guardarFotoPide(string $url, string $subcarpeta): ?string
+    {
+        $partes = parse_url(trim($url));
+        if (!$partes || ($partes['scheme'] ?? '') !== 'https' || strtolower($partes['host'] ?? '') !== self::HOST_PIDE
+            || !empty($partes['port']) || !empty($partes['user'])
+            || !preg_match('#^/api/v1/services/reniec/photo/[A-Za-z0-9-]+$#', $partes['path'] ?? '')) {
+            return null;
+        }
 
-    /**
-     * Decodifica una imagen en base64 (con o sin prefijo data:image/...) y la
-     * guarda en writable/uploads/{subcarpeta}/. Devuelve la ruta relativa
-     * (ej. "papeletas/6f1a....jpg") que se debe persistir en la base de datos,
-     * en vez del base64 completo.
-     */
+        $sslVerify = filter_var(env('app.pideSslVerify', true), FILTER_VALIDATE_BOOLEAN);
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => $sslVerify,
+            CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0,
+            CURLOPT_MAXFILESIZE => 2 * 1024 * 1024,
+            CURLOPT_HTTPHEADER => ['Accept: image/*'],
+        ]);
+        $cuerpo = curl_exec($curl);
+        $codigo = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $tipo = (string) curl_getinfo($curl, CURLINFO_CONTENT_TYPE);
+        curl_close($curl);
+
+        if ($cuerpo === false || $codigo !== 200 || $cuerpo === '' || strlen($cuerpo) > 2 * 1024 * 1024 || !str_starts_with(strtolower($tipo), 'image/')) {
+            log_message('warning', 'No se pudo descargar la foto de RENIEC (HTTP ' . $codigo . ').');
+            return null;
+        }
+
+        return $this->guardarImagenBase64('data:image/jpeg;base64,' . base64_encode($cuerpo), $subcarpeta);
+    }
+
     public function guardarImagenBase64(string $base64, string $subcarpeta): ?string
     {
         $base64 = trim($base64);
@@ -31,8 +60,6 @@ class FileStorageService
             return null;
         }
 
-        // Solo letras/números/guiones: evita path traversal (../) si en el
-        // futuro $subcarpeta llegara a depender de un valor externo.
         $subcarpeta = preg_replace('/[^a-zA-Z0-9_-]/', '', trim($subcarpeta, '/'));
         if ($subcarpeta === '') {
             return null;
@@ -49,8 +76,6 @@ class FileStorageService
             return null;
         }
 
-        // El tipo se decide por el contenido real (no por lo que declare el cliente) y la imagen se vuelve a
-        // codificar: así se descartan EXIF/GPS y cualquier carga extra escondida en el archivo.
         $info = @getimagesizefromstring($binario);
         if ($info === false || !isset(self::MIME_EXT[$info['mime'] ?? ''])) {
             return null;
@@ -96,7 +121,6 @@ class FileStorageService
         return $subcarpeta . '/' . $nombre;
     }
 
-    /** Archivos escritos en esta petición: si la transacción falla se borran para no dejar fotos sin registro. */
     private static array $escritosEnPeticion = [];
 
     public static function descartarEscritos(): void
@@ -107,17 +131,13 @@ class FileStorageService
         self::$escritosEnPeticion = [];
     }
 
-    /**
-     * Convierte una ruta relativa guardada en BD en una URL servible por la API.
-     * Si ya es una URL completa (ej. foto de RENIEC/PIDE), la deja intacta.
-     */
     public function urlPublica(?string $ruta): ?string
     {
         if (empty($ruta)) {
             return null;
         }
         if (str_starts_with($ruta, 'http://') || str_starts_with($ruta, 'https://') || str_starts_with($ruta, 'data:')) {
-            // Si por alguna razón la BD o la respuesta tiene http://backend/..., limpiarlo a relativo
+
             if (str_contains($ruta, '://backend/')) {
                 return preg_replace('#^https?://backend#', '', $ruta);
             }
@@ -128,8 +148,6 @@ class FileStorageService
         $forwarded = $request->getHeaderLine('X-Forwarded-Host');
         $host = !empty($forwarded) ? $forwarded : (string) $request->getServer('HTTP_HOST');
 
-        // Si la petición viene desde Docker interno ("backend") o no tiene host,
-        // devolver ruta relativa /api/files/... para que cualquier navegador resuelva contra su propio dominio
         if (empty($host) || $host === 'backend') {
             return '/api/files/' . ltrim($ruta, '/');
         }

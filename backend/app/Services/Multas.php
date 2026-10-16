@@ -25,7 +25,7 @@ class Multas
             ->getRowArray();
 
         if (!$row || (float)$row['uit'] <= 0) {
-            // Al cambiar de año todavía puede faltar la UIT nueva: se usa la última configurada para no frenar las papeletas
+// Usar la última UIT disponible si aún falta la del año actual.
             $ultima = $this->db->table('municipalidad_anio ma')
                 ->select('ma.uit, ma.anio')
                 ->join('municipalidad m', 'm.id = ma.id_municipalidad', 'inner')

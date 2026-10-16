@@ -180,9 +180,7 @@ export function Pagos() {
     setIsModalOpen(true)
   }
 
-  // Para papeletas/cursos pendientes que aún no tienen un recibo generado:
-  // abre el mismo formulario de "Registrar Pago" con el origen ya elegido,
-  // sin necesidad de volver a buscarlo por DNI.
+  // Abrir el cobro pendiente con el origen ya seleccionado.
   const handleGenerarRecibo = (pago) => {
     setPagoToConfirm(null)
     setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: String(pago.origenId), fechaPago: fechaLocalActual() })

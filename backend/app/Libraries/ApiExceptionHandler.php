@@ -10,12 +10,6 @@ use CodeIgniter\HTTP\ResponseInterface;
 use Config\Exceptions as ExceptionsConfig;
 use Throwable;
 
-/**
- * Ninguna ruta devuelve trazas, rutas de archivos ni mensajes internos,
- * sin importar CI_ENVIRONMENT. La excepción completa ya queda en el log del
- * servidor (Config\Exceptions::$log); el cliente solo recibe un mensaje genérico.
- * Solo la línea de comandos (spark) usa el manejador por defecto de CodeIgniter.
- */
 class ApiExceptionHandler implements ExceptionHandlerInterface
 {
     private const MENSAJES = [
@@ -40,7 +34,7 @@ class ApiExceptionHandler implements ExceptionHandlerInterface
         int $statusCode,
         int $exitCode,
     ): void {
-        // Este servidor es solo API: ninguna ruta devuelve trazas ni rutas internas (antes solo /api, y /noexiste las mostraba)
+// No exponer trazas ni rutas internas en ninguna respuesta.
         if (! $request instanceof IncomingRequest) {
             $this->porDefecto->handle($exception, $request, $response, $statusCode, $exitCode);
 
@@ -64,7 +58,7 @@ class ApiExceptionHandler implements ExceptionHandlerInterface
 
     private function esRutaApi(IncomingRequest $request): bool
     {
-        // Según cómo se sirva (index.php en la URL) la ruta puede venir con ese prefijo.
+
         $ruta = preg_replace('#^index\.php/#', '', trim($request->getUri()->getPath(), '/'));
 
         return $ruta === 'api' || str_starts_with($ruta, 'api/');

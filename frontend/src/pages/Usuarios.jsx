@@ -168,8 +168,6 @@ export function Usuarios({ user }) {
     return sortedUsuarios.slice(start, start + itemsPerPage)
   }, [sortedUsuarios, currentPage, itemsPerPage])
 
-  // La cuenta se le crea a una persona del PADRÓN (no solo a quien ya es trabajador): si aún no es trabajador,
-  // el servidor lo registra al crear el usuario. La búsqueda se hace en el servidor (el padrón es muy grande).
   const busquedaPadron = useDebounce(trabajadorSearch.trim(), 300)
   const personasConCuenta = useMemo(
     () => new Set(usuarios.map((u) => String(u.id_persona || u.id_trabajador || ''))),

@@ -10,11 +10,8 @@ use CodeIgniter\Validation\StrictRules\Rules;
 
 class Validation extends BaseConfig
 {
-    // --------------------------------------------------------------------
-    // Setup
-    // --------------------------------------------------------------------
 
-    /**
+/**
      * Stores the classes that contain the
      * rules that are available.
      *
@@ -27,7 +24,7 @@ class Validation extends BaseConfig
         CreditCardRules::class,
     ];
 
-    /**
+/**
      * Specifies the views that are used to display the
      * errors.
      *
@@ -38,7 +35,4 @@ class Validation extends BaseConfig
         'single' => 'CodeIgniter\Validation\Views\single',
     ];
 
-    // --------------------------------------------------------------------
-    // Rules
-    // --------------------------------------------------------------------
 }

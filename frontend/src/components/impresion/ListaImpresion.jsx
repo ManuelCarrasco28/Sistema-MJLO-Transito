@@ -312,8 +312,7 @@ export function ListaImpresion({
     return () => clearTimeout(timer)
   }, [buscar])
 
-  // baseParams llega como objeto nuevo en cada render: se compara por contenido para que "params" solo
-  // cambie cuando cambian los filtros (si no, la página se reiniciaba a la 1 en cada render y no se podía avanzar).
+  // Comparar filtros por contenido para no reiniciar la página en cada render.
   const baseParamsClave = JSON.stringify(baseParams)
   const params = useMemo(() => {
     const p = { ...JSON.parse(baseParamsClave) }
@@ -350,7 +349,7 @@ export function ListaImpresion({
     return () => { activo = false }
   }, [endpoint, params, paginaEfectiva, porPagina])
 
-  // Cambia datos de una fila ya cargada (p. ej. marcar un carnet como entregado) sin volver a pedir la lista.
+  // Cambia datos de una fila ya cargada (p.
   const actualizarFila = (id, cambios) => {
     cachePaginas.clear()
     setFilas((prev) => prev.map((f) => (String(idDe(f)) === String(id) ? { ...f, ...cambios } : f)))
@@ -418,8 +417,7 @@ export function ListaImpresion({
     return sig
   })
 
-  // Prepara los elementos (fotos, plantillas), monta la hoja y abre la impresión. Devuelve una promesa que
-  // se cumple cuando se cierra el diálogo de impresión (se imprimió o se canceló).
+  // Prepara los elementos (fotos, plantillas), monta la hoja y abre la impresión.
   const imprimirUnLote = (items) => new Promise((resolve) => {
     setPreparando(true)
     preparar(items)

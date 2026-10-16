@@ -13,10 +13,9 @@ class NotificacionesController extends BaseController
     {
         $db = \Config\Database::connect();
         $notificaciones = [];
-        // "Permiso móvil" activo: los inspectores emiten la papeleta directamente (no hay reportes de evidencia).
         $movilAplicaPapeleta = \App\Libraries\Acceso::movilPuedeAplicarPapeletas();
 
-        // 1. Permisos próximos a vencer (en los próximos 30 días)
+// 1. Permisos próximos a vencer (en los próximos 30 días)
         $permisos = $db->table('permisos_circulacion')
             ->select('id, numero_autorizacion, fecha_fin_vigencia, tipo_permiso')
             ->where('estado', 'VIGENTE')
@@ -46,7 +45,6 @@ class NotificacionesController extends BaseController
             ];
         }
 
-        // 2. Vehículos internados recientemente (últimos 3 días sin orden de libertad)
         $internamientos = $db->table('ordenes_internamiento')
             ->select('ordenes_internamiento.id, ordenes_internamiento.fecha_ingreso, vehiculos.placa')
             ->join('vehiculos', 'vehiculos.id = ordenes_internamiento.id_vehiculo')
@@ -69,7 +67,6 @@ class NotificacionesController extends BaseController
             ];
         }
 
-        // 3. Papeletas recientes pendientes de pago (últimas 24 horas); con el permiso móvil activo, indica el inspector
         $papeletas = $db->table('papeletas p')
             ->select("p.id, p.numero_papeleta, p.fecha_hora, TRIM(CONCAT(COALESCE(ci.nombres, ''), ' ', COALESCE(ci.apellido_paterno, ''))) AS inspector", false)
             ->join('ciudadanos ci', 'ci.id_persona = p.id_inspector', 'left')
@@ -94,7 +91,6 @@ class NotificacionesController extends BaseController
             ];
         }
 
-        // 4. Reportes de evidencia pendientes de revisar: solo si el móvil NO aplica papeletas directamente
         if (!$movilAplicaPapeleta && $db->tableExists('reportes_intervencion')) {
             $pendientes = (int) $db->table('reportes_intervencion')->where('estado', 'PENDIENTE')->countAllResults();
             if ($pendientes > 0) {

@@ -1,6 +1,4 @@
 // Mapa de prefetch por path: cada función dispara un import() dinámico silencioso.
-// El módulo ES ya cachea la promesa internamente — llamarlo varias veces no
-// genera peticiones duplicadas, simplemente devuelve la misma promesa resuelta.
 export const PREFETCH_MAP = {
   '/dashboard':               () => import('../pages/DashboardHome'),
   '/vehiculos':               () => import('../pages/Vehiculos'),

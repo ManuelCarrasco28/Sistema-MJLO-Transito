@@ -52,9 +52,7 @@ export function invalidateCache(keyPrefix = null) {
   }
 }
 
-// Detecta si un mensaje de error "se ve técnico" (traza de PHP, SQL crudo, rutas
-// de archivos del servidor) para no mostrárselo nunca al usuario final, aunque el
-// backend lo devuelva por error (por ejemplo con CI_ENVIRONMENT=development).
+// Ocultar trazas, SQL y rutas internas en los errores al usuario.
 const PATRON_TECNICO = /sqlstate|syntax error|stack trace|fatal error|exception|mysqli|pdoexception|codeigniter|vendor[/\\]|app[/\\]controllers|\.php on line|integrity constraint|#\d+ \{main\}/i
 
 export function sanitizarMensaje(mensaje, fallback = 'Ocurrió un error en el servidor. Intente nuevamente.') {
@@ -63,12 +61,10 @@ export function sanitizarMensaje(mensaje, fallback = 'Ocurrió un error en el se
   return texto
 }
 
-// Extrae el mensaje que devuelve CodeIgniter (failValidationErrors, failNotFound…)
-// para mostrarle al usuario el motivo real en vez de un error genérico, filtrando
-// cualquier traza técnica que se haya colado en la respuesta.
+// Extraer el mensaje de error sin exponer detalles técnicos.
 export async function leerMensajeError(response, fallback = 'Ocurrió un error en el servidor.') {
   try {
-    const data = typeof response?.json === 'function' ? await response.json() : response
+    const data = await response.json()
     const mensajes = data?.messages
     if (mensajes && typeof mensajes === 'object') {
       const detalles = Object.values(mensajes).flat().filter(value => typeof value === 'string' && value.trim())

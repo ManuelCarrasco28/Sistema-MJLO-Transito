@@ -51,8 +51,6 @@ class CorsFilter implements FilterInterface
         $response->setHeader('Access-Control-Allow-Credentials', 'true');
         $response->setHeader('Connection', 'close');
 
-        // Las respuestas JSON traen datos personales: que ni el navegador ni un proxy las guarden en caché.
-        // (Los archivos, p. ej. fotos, fijan su propia política de caché privada y no se tocan.)
         if (!$response->hasHeader('Cache-Control') && str_contains(strtolower($response->getHeaderLine('Content-Type')), 'json')) {
             $response->setHeader('Cache-Control', 'no-store');
         }

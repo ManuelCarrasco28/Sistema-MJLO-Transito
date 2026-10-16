@@ -265,9 +265,7 @@ export const showConfirm = (title, text, confirmText = 'Sí, continuar', cancelT
     });
 };
 
-// Avisos que no son un fallo del sistema sino algo que el usuario debe corregir o que no existe (validaciones,
-// datos faltantes, búsquedas sin resultado): se muestran con el triángulo de advertencia. Un error real
-// ("Error…", "No se pudo…", "Consulta fallida") lleva la X roja, para poder distinguirlos de un vistazo.
+// Distinguir advertencias de validación de los errores del sistema.
 const ES_ADVERTENCIA = /^(atenci[oó]n|validaci[oó]n|revisa|falta|sin |motivo requerido|consulta de (documento|foto)|no se puede|.*(inv[aá]lid|no disponible|requerid|pendiente))/i
 const ES_FALLO_REAL = /^(error|no se pudo|consulta fallida|sesi[oó]n)/i
 
@@ -304,7 +302,7 @@ const ICONO_ADVERTENCIA = `<svg viewBox="0 0 100 90" width="92" height="83" aria
   <circle cx="50" cy="70" r="4.2" fill="#000"/>
 </svg>`
 
-// Advertencia: algo no salió como se esperaba pero no es un error del sistema (ej. una búsqueda sin resultados).
+// Advertencia: algo no salió como se esperaba pero no es un error del sistema (ej.
 export const showWarning = (title, text) => {
     const tema = temaDialogo();
     return Swal.fire({

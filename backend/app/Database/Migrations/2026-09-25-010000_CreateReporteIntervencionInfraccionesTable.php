@@ -4,12 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * `ReportesIntervencionController` ya usaba la tabla
- * `reporte_intervencion_infracciones` para listar y convertir reportes de
- * evidencia a papeletas, pero nunca se creó en el esquema: cualquier reporte
- * con infracciones asociadas hacía fallar `index()` con un error 500.
- */
 class CreateReporteIntervencionInfraccionesTable extends Migration
 {
     public function up()

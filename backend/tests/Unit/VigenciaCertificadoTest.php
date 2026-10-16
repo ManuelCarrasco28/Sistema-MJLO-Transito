@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 
 final class VigenciaCertificadoTest extends TestCase
 {
-    /** @dataProvider fechas */
+/** @dataProvider fechas */
     public function testVenceALosSeisMesesSinDesbordarElMes(string $fecha, string $esperado): void
     {
         $this->assertSame($esperado, VigenciaCertificado::vencimiento($fecha));

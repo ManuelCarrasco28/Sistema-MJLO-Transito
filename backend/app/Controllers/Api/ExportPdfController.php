@@ -13,17 +13,10 @@ class ExportPdfController extends ResourceController
     private const MAXIMO_FILAS = 10000;
     private const FILAS_POR_BLOQUE = 40;
 
-    /**
-     * Genera un PDF real (no una captura de pantalla) a partir de la misma
-     * estructura {title, subtitle, summaryItems, columns, data} que ya arma
-     * el frontend para Excel, y lo devuelve como archivo binario descargable.
-     * Cada exportación queda registrada en la auditoría del sistema.
-     */
     public function generar()
     {
         $input = $this->request->getJSON(true) ?: [];
 
-        // El nombre se corta a 100 caracteres: antes un nombre enorme llenaba la auditoría y el registro del servidor
         $filename = mb_substr(trim((string) ($input['filename'] ?? 'Reporte')), 0, 100);
         $title = (string) ($input['title'] ?? 'MUNICIPALIDAD DISTRITAL JOSÉ LEONARDO ORTIZ');
         $subtitle = (string) ($input['subtitle'] ?? 'Subgerencia de Tránsito y Transporte');
@@ -36,11 +29,9 @@ class ExportPdfController extends ResourceController
             return $this->failValidationErrors('No hay registros para exportar a PDF.');
         }
 
-        // Los PDF grandes necesitan más memoria y tiempo que una petición normal.
         @ini_set('memory_limit', '1024M');
         @set_time_limit(120);
 
-        // Nunca se recorta en silencio: si el reporte excede lo que el render soporta, se avisa.
         if (count($data) > self::MAXIMO_FILAS) {
             return $this->failValidationErrors(
                 'El PDF admite hasta ' . number_format(self::MAXIMO_FILAS, 0, ',', '.')
@@ -89,11 +80,6 @@ class ExportPdfController extends ResourceController
         return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
     }
 
-    /**
-     * Devuelve el logo institucional como data URI base64, para incrustarlo
-     * directamente en el PDF sin depender de red (isRemoteEnabled queda en
-     * false por seguridad).
-     */
     private function logoBase64(): ?string
     {
         static $cache = null;
@@ -129,8 +115,6 @@ class ExportPdfController extends ResourceController
             $headersHtml .= "<th style=\"text-align:{$align};{$width}\">{$this->e($col['header'] ?? '')}</th>";
         }
 
-        // dompdf consume memoria de forma desproporcionada con una sola tabla enorme (3.000 filas
-        // superan los 2 GB). Partir el reporte en tablas de pocas filas mantiene el consumo estable.
         $bloquesHtml = '';
         $filasBloque = '';
         $enBloque = 0;

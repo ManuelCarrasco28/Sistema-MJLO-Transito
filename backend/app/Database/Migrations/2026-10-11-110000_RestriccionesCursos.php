@@ -4,10 +4,6 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-/**
- * Reglas de los cursos que antes solo cuidaba el código: fechas coherentes, cupos válidos y código único.
- * Idempotente. Si hay datos que no cumplen, se detiene sin borrar nada.
- */
 class RestriccionesCursos extends Migration
 {
     private function existeRestriccion(string $nombre): bool
@@ -48,6 +44,6 @@ class RestriccionesCursos extends Migration
 
     public function down()
     {
-        // Las restricciones protegen datos; no se retiran al revertir.
+
     }
 }

@@ -46,7 +46,7 @@ class PapeletasController extends ResourceController
     {
         $db = \Config\Database::connect();
         $consulta = $db->table('papeletas');
-        // Un inspector solo ve los totales de sus propias papeletas (igual que su listado)
+
         $sesion = \App\Libraries\Acceso::usuario();
         if (!\App\Libraries\Acceso::esOficina($sesion)) {
             $consulta->where('id_inspector', (int) ($sesion['id_persona'] ?? -1));
@@ -71,8 +71,7 @@ class PapeletasController extends ResourceController
     public function index()
     {
         $db = \Config\Database::connect();
-        
-        
+
         try {
             $builder = $db->table('papeletas p')
                 ->select("
@@ -139,8 +138,7 @@ class PapeletasController extends ResourceController
                 ->join('trabajadores ins', 'ins.id_persona = p.id_inspector', 'left')
                 ->join('personas ins_per', 'ins_per.id = ins.id_persona', 'left')
                 ->join('ciudadanos c_ins', 'c_ins.id_persona = ins.id_persona', 'left')
-                // Propietario a la fecha de la infracción (según fecha_inicio/fecha_fin);
-                // si no hay registro para esa fecha, el propietario activo actual.
+
                 ->join(
                     'vehiculo_propietarios vp',
                     'vp.id = (SELECT vp2.id FROM vehiculo_propietarios vp2 WHERE vp2.id_vehiculo = v.id'
@@ -160,7 +158,7 @@ class PapeletasController extends ResourceController
                 ->join('ordenes_internamiento ret', 'ret.id_papeleta = p.id', 'left');
 
             $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
-            // El inspector solo ve las papeletas que él emitió; el filtro del cliente no puede ampliarlo.
+
             $sesion = \App\Libraries\Acceso::usuario();
             if (!\App\Libraries\Acceso::esOficina($sesion)) {
                 $inspectorId = (int) ($sesion['id_persona'] ?? -1);
@@ -179,8 +177,7 @@ class PapeletasController extends ResourceController
             if ($inspectorId > 0) {
                 $builder->where('p.id_inspector', $inspectorId);
             }
-            // sinInternamiento=1: solo papeletas con vehículo identificado que aún no generaron un internamiento
-            // (lo usa el buscador del formulario "Nuevo internamiento", que busca en el servidor).
+
             if ($this->request->getGet('sinInternamiento')) {
                 $builder->where('p.id_vehiculo IS NOT NULL', null, false)
                     ->where('NOT EXISTS (SELECT 1 FROM ordenes_internamiento oi_x WHERE oi_x.id_papeleta = p.id)', null, false);
@@ -189,16 +186,10 @@ class PapeletasController extends ResourceController
                 $builder->groupStart()
                         ->where('per.numero', $dni)
                         ->orWhere('prop_per.numero', $dni)
-                        ->orWhere('p.conductor_informal_dni', $dni)
-                        ->orWhere('p.dueño_informal_dni', $dni)
                         ->groupEnd();
             }
             if (!empty($placa)) {
-                $builder->groupStart()
-                        ->where('v.placa', $placa)
-                        ->orWhere('p.placa', $placa)
-                        ->orWhere("REPLACE(REPLACE(p.placa, '-', ''), ' ', '') =", $placa)
-                        ->groupEnd();
+                $builder->where('v.placa', $placa);
             }
             if ($estado !== '' && $estado !== 'TODOS') {
                 $builder->where('p.estado', $estado);
@@ -231,10 +222,7 @@ class PapeletasController extends ResourceController
                 $builder->groupStart()
                     ->like('p.numero_papeleta', $buscar)
                     ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
-                    ->orLike('p.placa', \App\Libraries\Placa::paraBusqueda($buscar))
                     ->orLike('per.numero', $buscar)
-                    ->orLike('p.conductor_informal_dni', $buscar)
-                    ->orLike('p.dueño_informal_dni', $buscar)
                     ->orLike('c_per.nombres', $buscar)
                     ->orLike('c_per.apellido_paterno', $buscar)
                     ->orLike('c_per.apellido_materno', $buscar)
@@ -280,7 +268,6 @@ class PapeletasController extends ResourceController
             $fileStorage = new \App\Services\FileStorageService();
             $data = [];
 
-            // Optimización por lotes para evitar N+1 al cargar detalles de infracción
             $papeletaIds = array_column($rows, 'id');
             $detallesAgrupados = [];
             if (!empty($papeletaIds)) {
@@ -306,20 +293,20 @@ class PapeletasController extends ResourceController
                 $row['id'] = (int)$row['id'];
                 $row['montoTotal'] = (float)$row['montoTotal'];
                 $row['firmaConductorImg'] = $fileStorage->urlPublica($row['firmaConductorImg']);
-                
+
                 $isFormal = !empty($row['vehiculoAsociacionId']);
                 $row['tipoInfractor'] = $isFormal ? 'FORMAL' : 'INFORMAL';
-                
+
                 $isRetenido = (!empty($row['retencionId']) && $row['retencionEstado'] !== 'LIBERADO');
                 $row['vehiculoRetenido'] = $isRetenido ? 'SI' : 'NO';
-                
+
                 $descPartes = array_filter([$row['vehiculoMarca'] ?? '', $row['vehiculoModelo'] ?? '']);
                 $caract = trim(implode(' ', $descPartes));
                 if (!empty($row['vehiculoColor'])) {
                     $caract .= ($caract ? ' · ' : '') . $row['vehiculoColor'];
                 }
                 $row['vehiculoCaracteristicas'] = $caract ?: 'Características no especificadas';
-                
+
                 $row['detalles'] = $detallesAgrupados[$row['id']] ?? [];
 
                 $row['tipoInfraccionCodigo'] = $row['detalles'][0]['codigo'] ?? 'SIN DETALLE';
@@ -350,11 +337,9 @@ class PapeletasController extends ResourceController
 
     public function create()
     {
-        // Interruptor "Permiso móvil": con "solo reportes/evidencias" la app móvil no emite papeletas. Antes solo la app
-        // lo respetaba (ocultaba el botón); ahora el servidor también lo exige. La oficina y la web no se ven afectadas.
+// Exigir también en el servidor el permiso de emisión móvil.
         $usuarioSesion = \App\Libraries\Acceso::usuario();
-        // El inspector (rol Trabajador) solo opera desde la app móvil, así que el interruptor se aplica por rol y no
-        // por cabeceras del cliente (que se pueden falsificar).
+
         if (!\App\Libraries\Acceso::esOficina($usuarioSesion)
             && !\App\Libraries\Acceso::movilPuedeAplicarPapeletas()) {
             return $this->failForbidden('La aplicación móvil está en modo "solo reportes/evidencias": no puede emitir papeletas.');
@@ -413,11 +398,11 @@ class PapeletasController extends ResourceController
             return $this->failValidationErrors('La placa del vehículo no es válida.');
         }
         $inputInspectorId = (int)($input['inspectorId'] ?? 0);
-        // El inspector siempre firma con su propia identidad (no se puede emitir a nombre de otro).
+
         if (!\App\Libraries\Acceso::esOficina($usuarioSesion)) {
             $inputInspectorId = (int) ($usuarioSesion['id_persona'] ?? 0);
         }
-        
+
         $claseVehiculo = strtoupper(trim($input['claseVehiculo'] ?? ''));
         $marcaVehiculo = strtoupper(trim($input['marcaVehiculo'] ?? ''));
         $colorVehiculo = strtoupper(trim($input['colorVehiculo'] ?? ''));
@@ -460,8 +445,6 @@ class PapeletasController extends ResourceController
                 $db, $placa, $marcaVehiculo, $colorVehiculo, $claseVehiculo, $motorVehiculo, $input
             );
 
-            // Reintento (doble toque o red caída tras guardar): si el mismo inspector acaba de registrar la misma
-            // papeleta (vehículo, lugar e importe) en los últimos 2 minutos, se devuelve esa y no se crea otra.
             $reciente = $db->query(
                 "SELECT id, uuid, numero_papeleta, fecha_hora FROM papeletas WHERE id_inspector = ? AND id_vehiculo <=> ? AND lugar = ? AND monto_total = ?
                  AND estado <> 'ANULADA' AND fecha_hora >= DATE_SUB(?, INTERVAL 120 SECOND) ORDER BY id DESC LIMIT 1 FOR UPDATE",
@@ -480,7 +463,6 @@ class PapeletasController extends ResourceController
             $fuga = $input['fuga'] ?? false;
             ['personaId' => $personaId, 'conductorNombresInformal' => $conductorNombresInformal, 'conductorDniInformal' => $conductorDniInformal] = $this->resolverInfractor($db, $fuga, $duenoId, $conductorDni, $conductorNombres, $conductorApellidos, $infractor, $duenoNombresInformal, $duenoDniInformal);
 
-            // Generar un número temporal para la inserción
             $tempNumero = 'TEMP-' . uniqid('', true);
             $inspectorNombre = trim($inspector['nombres'] . ' ' . $inspector['apellido_paterno'] . ' ' . ($inspector['apellido_materno'] ?? ''));
 
@@ -508,7 +490,6 @@ class PapeletasController extends ResourceController
             $db->table('papeletas')->insert($papeletaData);
             $papeletaId = (int)$db->insertID();
 
-            // Actualizar el número de papeleta basado en el ID para asegurar unicidad absoluta
             $numeroPapeletaDefinitivo = str_pad((string)$papeletaId, 7, '0', STR_PAD_LEFT);
             $db->table('papeletas')->where('id', $papeletaId)->update(['numero_papeleta' => $numeroPapeletaDefinitivo]);
 
@@ -519,9 +500,12 @@ class PapeletasController extends ResourceController
 
             (new \App\Services\PagosTransito($db))->generar('PAPELETA', (int)$papeletaId);
 
+            $internamientoAuto = new \App\Services\InternamientoAutomatico($db);
+            $internamiento = $internamientoAuto->generar((int)$papeletaId);
+
             $fotos = $input['fotos'] ?? [];
             if (!empty($fotos) && is_array($fotos)) {
-                // Máximo 5 fotos por papeleta y límite de tamaño (~7MB base64 ~= 5MB binario)
+
                 $fotos = array_slice($fotos, 0, 5);
                 $fileStorage = new \App\Services\FileStorageService();
                 foreach ($fotos as $foto) {
@@ -554,6 +538,7 @@ class PapeletasController extends ResourceController
                 'observacionesConductor' => $obsConductor,
                 'montoTotal' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
+                'internamiento' => $internamiento,
             ];
 
             return $this->respondCreated(['status' => 201, 'data' => $response]);
@@ -651,8 +636,6 @@ class PapeletasController extends ResourceController
                 return $this->failValidationErrors('No se puede registrar la firma en una papeleta ' . ($papeleta['estado'] === 'ANULADA' ? 'anulada' : 'pagada') . '.');
             }
 
-            // La firma del conductor la registra el inspector que emitió la papeleta (o el personal de oficina):
-            // antes cualquier usuario con sesión podía firmar o cambiar la firma de cualquier papeleta.
             $usuarioSesion = \App\Libraries\Acceso::usuario();
             if (!\App\Libraries\Acceso::esOficina($usuarioSesion) && (int) ($papeleta['id_inspector'] ?? 0) !== (int) ($usuarioSesion['id_persona'] ?? -1)) {
                 return $this->failForbidden('Solo el inspector que emitió la papeleta puede registrar la firma.');
@@ -716,7 +699,7 @@ class PapeletasController extends ResourceController
                 ->where('ri.id_papeleta', $id)
                 ->get()
                 ->getResultArray();
-                
+
             $fotosPapeleta = $db->table('papeleta_fotos')
                 ->select('id, foto')
                 ->where('id_papeleta', $id)
@@ -742,10 +725,6 @@ class PapeletasController extends ResourceController
         return (new \App\Services\Multas($db))->uit((int)date('Y'));
     }
 
-    /**
-     * Calcula el monto de cada infracción seleccionada y arma las filas listas
-     * para papeleta_detalles.
-     */
     private function calcularInfracciones($db, array $infraccionesIds, string $fechaHora): array
     {
         $multas = new \App\Services\Multas($db);
@@ -771,10 +750,6 @@ class PapeletasController extends ResourceController
         return ['montoTotal' => $montoTotal, 'detalles' => $detalles];
     }
 
-    /**
-     * Busca el vehículo por placa; si no existe lo registra con los datos
-     * capturados en campo y, de venir datos del dueño, lo vincula como propietario.
-     */
     private function resolverVehiculo($db, string $placa, string $marca, string $color, string $clase, string $motor, array $input): array
     {
         $vehiculoId = null;
@@ -786,7 +761,7 @@ class PapeletasController extends ResourceController
             $vehiculo = $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray();
             if ($vehiculo) {
                 $vehiculoId = (int)$vehiculo['id'];
-                // Check if it already has a PROPIETARIO
+
                 $propietarioActual = $db->table('vehiculo_propietarios')
                     ->where('id_vehiculo', $vehiculoId)
                     ->where('estado', 'ACTIVO')
@@ -804,7 +779,7 @@ class PapeletasController extends ResourceController
         $duenoDni = trim($input['duenoDni'] ?? '');
         $duenoNombres = trim($input['duenoNombres'] ?? '');
         $duenoApellidos = trim($input['duenoApellidos'] ?? '');
-        
+
         if ($duenoDni !== '' || $duenoNombres !== '' || $duenoApellidos !== '') {
             $duenoNombresInformal = trim("$duenoNombres $duenoApellidos");
             if ($duenoDni !== '' && $duenoDni !== 'S/D' && !str_starts_with($duenoDni, 'S/D')) {
@@ -815,14 +790,10 @@ class PapeletasController extends ResourceController
         return ['vehiculoId' => $vehiculoId, 'placa' => $placa, 'duenoId' => $duenoId, 'duenoNombresInformal' => $duenoNombresInformal, 'duenoDniInformal' => $duenoDniInformal];
     }
 
-    /**
-     * Resuelve la persona infractora: si hubo fuga, el dueño registrado del
-     * vehículo; si no, busca/crea al conductor por DNI.
-     */
     private function resolverInfractor($db, $fuga, ?int $duenoId, string $conductorDni, string $conductorNombres, string $conductorApellidos, string $infractor, ?string $duenoNombresInformal, ?string $duenoDniInformal): array
     {
         if ($fuga) {
-            // Si hubo fuga, el infractor pasa a ser el dueño (si se registró)
+
             return ['personaId' => $duenoId, 'conductorNombresInformal' => $duenoNombresInformal, 'conductorDniInformal' => $duenoDniInformal];
         }
 

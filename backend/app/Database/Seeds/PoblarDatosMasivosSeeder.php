@@ -24,7 +24,7 @@ use Faker\Factory as FakerFactory;
  */
 class PoblarDatosMasivosSeeder extends Seeder
 {
-    // ------ Metas de cantidad (ajustables) ------
+
     private const META_PERSONAS = 600;
     private const META_ASOCIACIONES = 20;
     private const META_VEHICULOS = 350;
@@ -44,8 +44,6 @@ class PoblarDatosMasivosSeeder extends Seeder
     private array $rucUsados = [];
     private array $placasUsadas = [];
 
-    // IDs de personas que ya son trabajadores municipales (inspectores,
-    // técnicos, autoridades) — se reutilizan tal cual, nunca se duplican.
     private array $inspectorPersonaIds = [1, 2, 4, 5, 48, 50];
     private array $inspectorUsuarioIds = [9, 6, 4, 5, 8, 7];
 
@@ -103,10 +101,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         echo "=== Listo ===\n";
     }
 
-    // ---------------------------------------------------------------
-    // Utilidades
-    // ---------------------------------------------------------------
-
     private function cargarCatalogos(): void
     {
         $this->ubigeoIds = array_column(
@@ -130,7 +124,7 @@ class PoblarDatosMasivosSeeder extends Seeder
 
     private function insertarPorLotes(string $tabla, array $filas): void
     {
-        // Las tablas principales llevan uuid (obligatorio). En vehículos el código QR es el mismo uuid.
+
         if (in_array($tabla, \App\Libraries\Identificador::TABLAS, true)) {
             foreach ($filas as &$fila) {
                 $fila['uuid'] = $fila['uuid'] ?? \App\Libraries\Identificador::nuevo();
@@ -146,7 +140,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         }
     }
 
-    /** IDs recién insertados en $tabla leyendo directamente desde la base de datos para no depender de auto_increments sin huecos. */
     private function idsRecienInsertados(string $tabla, int $maxAntes, int $cantidad): array
     {
         if ($cantidad <= 0) return [];
@@ -206,10 +199,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         return (string) array_key_first($opcionesConPeso);
     }
 
-    // ---------------------------------------------------------------
-    // Personas
-    // ---------------------------------------------------------------
-
     private function seedPersonas(): array
     {
         $faltan = $this->faltantes('personas', self::META_PERSONAS);
@@ -231,7 +220,7 @@ class PoblarDatosMasivosSeeder extends Seeder
             $nombres = $sexo === 'M' ? $this->faker->firstNameMale() : $this->faker->firstNameFemale();
             $apPat = $this->faker->lastName();
             $apMat = $this->faker->lastName();
-            $tieneLicencia = random_int(1, 100) <= 55; // ~55% son conductores
+            $tieneLicencia = random_int(1, 100) <= 55;
 
             $filasPersonas[] = [
                 'id_tipo_documento' => random_int(1, 100) <= 95 ? 1 : 2,
@@ -275,10 +264,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         $todas = array_column($this->db->table('personas')->select('id')->get()->getResultArray(), 'id');
         return $todas;
     }
-
-    // ---------------------------------------------------------------
-    // Asociaciones
-    // ---------------------------------------------------------------
 
     private function seedAsociaciones(array $personaIds): array
     {
@@ -324,10 +309,6 @@ class PoblarDatosMasivosSeeder extends Seeder
 
         return array_column($this->db->table('asociaciones')->select('id')->get()->getResultArray(), 'id');
     }
-
-    // ---------------------------------------------------------------
-    // Vehículos + propietarios
-    // ---------------------------------------------------------------
 
     private function seedVehiculos(array $personaIds, array $asociacionIds): array
     {
@@ -395,10 +376,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         $todos = array_column($this->db->table('vehiculos')->select('id')->get()->getResultArray(), 'id');
         return [$todos, $propietarioDePorVehiculo];
     }
-
-    // ---------------------------------------------------------------
-    // Cursos de seguridad vial + inscripciones + certificados
-    // ---------------------------------------------------------------
 
     private function seedCursos(): array
     {
@@ -521,7 +498,6 @@ class PoblarDatosMasivosSeeder extends Seeder
             }
         }
 
-        // Certificados solo para quienes asistieron y aprobaron (~72% del total)
         $filasCertificados = [];
         $numeroBase = 1;
         foreach ($idsNuevos as $idx => $idInscripcion) {
@@ -544,10 +520,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         echo '  ' . count($idsNuevos) . ' inscripciones y ' . count($filasCertificados) . " certificados creados.\n";
         return $inscripcionesPagadas;
     }
-
-    // ---------------------------------------------------------------
-    // Documentos del vehículo
-    // ---------------------------------------------------------------
 
     private function seedDocumentosVehiculo(array $vehiculoIds): void
     {
@@ -577,10 +549,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         $this->insertarPorLotes('documentos_vehiculo', $filas);
         echo '  ' . count($filas) . " documentos de vehículo creados.\n";
     }
-
-    // ---------------------------------------------------------------
-    // CERTICAV (inspecciones técnicas)
-    // ---------------------------------------------------------------
 
     private function seedCerticav(array $vehiculoIds, array $personaIds): void
     {
@@ -613,7 +581,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         $this->insertarPorLotes('certicav', $filas);
         $idsNuevos = $this->idsRecienInsertados('certicav', $maxAntes, count($filas));
 
-        // Detalle de criterios evaluados por cada inspección (~12 criterios c/u)
         if (!empty($this->criteriosInspeccionIds)) {
             $filasDetalle = [];
             foreach ($idsNuevos as $idCerticav) {
@@ -632,10 +599,6 @@ class PoblarDatosMasivosSeeder extends Seeder
 
         echo '  ' . count($idsNuevos) . " inspecciones CERTICAV creadas.\n";
     }
-
-    // ---------------------------------------------------------------
-    // Operativos
-    // ---------------------------------------------------------------
 
     private function seedOperativos(): array
     {
@@ -681,10 +644,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         echo '  ' . count($idsNuevos) . " operativos creados.\n";
         return array_column($this->db->table('operativos')->select('id')->get()->getResultArray(), 'id');
     }
-
-    // ---------------------------------------------------------------
-    // Papeletas + detalles
-    // ---------------------------------------------------------------
 
     private function seedPapeletasYDetalles(array $vehiculoIds, array $personaIds, array $operativoIds, array $propietarioDePorVehiculo): array
     {
@@ -741,7 +700,7 @@ class PoblarDatosMasivosSeeder extends Seeder
         $filasDetalles = [];
         $actualizacionesMonto = [];
         foreach ($idsNuevos as $idx => $idPapeleta) {
-            if (!isset($filas[$idx])) continue; // salvaguarda: nunca desbordar $filas
+            if (!isset($filas[$idx])) continue;
             $papeletaVehiculoMap[$idPapeleta] = $vehiculoPorFila[$idx];
             if ($filas[$idx]['estado'] === 'PAGADA') {
                 $papeletasPagadas[] = $idPapeleta;
@@ -775,10 +734,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         echo '  ' . count($idsNuevos) . " papeletas creadas.\n";
         return [$papeletasPagadas, $papeletaVehiculoMap];
     }
-
-    // ---------------------------------------------------------------
-    // Reportes de intervención
-    // ---------------------------------------------------------------
 
     private function seedReportesIntervencion(array $vehiculoIds, array $personaIds, array $operativoIds): void
     {
@@ -824,10 +779,6 @@ class PoblarDatosMasivosSeeder extends Seeder
 
         echo '  ' . count($idsNuevos) . " reportes de intervención creados.\n";
     }
-
-    // ---------------------------------------------------------------
-    // Internamientos + órdenes de libertad
-    // ---------------------------------------------------------------
 
     private function seedInternamientos(array $vehiculoIds, array $personaIds, array $papeletaVehiculoMap): void
     {
@@ -904,9 +855,7 @@ class PoblarDatosMasivosSeeder extends Seeder
         echo '  ' . count($idsNuevos) . ' internamientos y ' . count($filasLibertad) . " órdenes de libertad creados.\n";
     }
 
-    // ---------------------------------------------------------------
-    // Trámites documentarios + permisos de circulación
-    // ---------------------------------------------------------------
+// Trámites documentarios + permisos de circulación.
 
     private function seedTramitesYPermisos(array $personaIds, array $asociacionIds, array $vehiculoIds): array
     {
@@ -978,10 +927,6 @@ class PoblarDatosMasivosSeeder extends Seeder
         echo '  ' . count($idsNuevos) . ' trámites y ' . count($filasPermisos) . " permisos de circulación creados.\n";
         return $tramitesPagados;
     }
-
-    // ---------------------------------------------------------------
-    // Pagos
-    // ---------------------------------------------------------------
 
     private function seedPagos(array $papeletasPagadas, array $tramitesPagados, array $inscripcionesPagadas): void
     {

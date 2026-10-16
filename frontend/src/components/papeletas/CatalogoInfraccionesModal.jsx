@@ -58,7 +58,7 @@ export function CatalogoInfraccionesModal({ onClose, onChanged, editarCodigo = n
   useEffect(() => { cargar(editarCodigo) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const multaEstimada = Number(form?.porcentajeUit || 0) > 0 ? (uit * Number(form.porcentajeUit)) / 100 : 0
-  // La UIT se toma de Configuración UIT (Superadmin) del año vigente. Se puede fijar la multa por % o por monto en soles.
+  // La UIT se toma de Configuración UIT (Superadmin) del año vigente.
   const cambiarMulta = (valor) => {
     const soles = Number(valor)
     setForm((prev) => ({ ...prev, porcentajeUit: valor === '' || !(uit > 0) ? '' : String(Math.round((soles / uit) * 10000) / 100) }))

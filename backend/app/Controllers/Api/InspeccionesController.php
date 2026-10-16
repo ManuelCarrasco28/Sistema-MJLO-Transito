@@ -59,10 +59,44 @@ class InspeccionesController extends ResourceController
         }
     }
 
-    /**
-     * Vista previa de los correlativos que se asignarán al registrar. Se muestra
-     * bloqueada en el formulario; el valor definitivo se reasigna al guardar.
-     */
+    public function certicavEstado()
+    {
+        $db = \Config\Database::connect();
+        $placa = \App\Libraries\Placa::normalizar((string) $this->request->getGet('placa'));
+        $vehiculo = $placa !== '' ? $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray() : null;
+        if (!$vehiculo) {
+            return $this->respond(['data' => null]);
+        }
+        try {
+            $servicio = new \App\Services\CerticavPago($db);
+            $estado = $servicio->estado($vehiculo);
+            return $this->respond(['data' => $estado + ['mensaje' => $servicio->bloqueo($estado)]]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        }
+    }
+
+    public function certicavSolicitar()
+    {
+        $db = \Config\Database::connect();
+        $input = $this->request->getJSON(true) ?: [];
+        $placa = \App\Libraries\Placa::normalizar((string) ($input['placa'] ?? $input['vehiculoPlaca'] ?? ''));
+        $vehiculo = $placa !== '' ? $db->table('vehiculos')->where('placa', $placa)->limit(1)->get()->getRowArray() : null;
+        if (!$vehiculo) {
+            return $this->failNotFound('La placa no está registrada en el padrón vehicular.');
+        }
+        try {
+            $servicio = new \App\Services\CerticavPago($db);
+            $estado = $servicio->solicitar($vehiculo);
+            return $this->respondCreated(['data' => $estado + ['mensaje' => $servicio->bloqueo($estado)]]);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            log_message('error', 'No se pudo solicitar el CERTICAV: ' . $e->getMessage());
+            return $this->failServerError('No se pudo solicitar el CERTICAV. Intente nuevamente.');
+        }
+    }
+
     public function siguienteCorrelativo()
     {
         $db = \Config\Database::connect();
@@ -114,7 +148,7 @@ class InspeccionesController extends ResourceController
     public function index()
     {
         $db = \Config\Database::connect();
-        
+
         try {
             $builder = $this->consultaInspeccion($db)
                 ->where('i.estado !=', 'ANULADA');
@@ -145,7 +179,6 @@ class InspeccionesController extends ResourceController
                 $builder->where('i.resultado', $resultado);
             }
 
-            // Vigencia del certificado: 6 meses desde la inspección (o desde la segunda evaluación si se aprobó en ella)
             $vigencia = strtoupper(trim((string)$this->request->getGet('vigencia')));
             $baseVigencia = "CASE WHEN i.resultado = 'APROBADO' AND i.segunda_evaluacion = 'APROBADO' AND i.fecha_segunda_evaluacion IS NOT NULL THEN i.fecha_segunda_evaluacion ELSE i.fecha END";
             if ($vigencia === 'VIGENTE') {
@@ -279,17 +312,22 @@ class InspeccionesController extends ResourceController
             }
             $vehiculoId = (int)$vehiculo['id'];
 
-            // Un solo registro a la vez: los correlativos se calculan con MAX()+1 y se validan antes de insertar
+            $certicavPago = new \App\Services\CerticavPago($db);
+            $mensajeBloqueo = $certicavPago->bloqueo($certicavPago->estado($vehiculo));
+            if ($mensajeBloqueo !== null) {
+                throw new \DomainException($mensajeBloqueo);
+            }
+            $pagoCerticav = $certicavPago->pagoDisponible($vehiculoId);
+
             $candado = (int)($db->query("SELECT GET_LOCK('mjlo_certicav', 10) AS l")->getRowArray()['l'] ?? 0) === 1;
             if (!$candado) {
                 throw new \DomainException('El sistema está registrando otra inspección. Intente de nuevo en unos segundos.');
             }
-            // Si el conductor no existe se crea: se serializa con el resto de altas de personas (mismo candado que Personas)
+// Crear el conductor bajo el mismo bloqueo del padrón.
             \App\Services\CandadoPersona::adquirir($db);
             $candadoPersona = true;
             $db->transException(true)->transBegin();
 
-            // Actualizar datos técnicos del vehículo si se ingresaron en la inspección
             $vehUpdate = [];
             if (!empty($input['vehiculoMarca'])) $vehUpdate['marca'] = trim($input['vehiculoMarca']);
             if (!empty($input['vehiculoModelo'])) $vehUpdate['modelo'] = trim($input['vehiculoModelo']);
@@ -332,6 +370,7 @@ class InspeccionesController extends ResourceController
                 'segunda_evaluacion'    => $segundaEvaluacion,
                 'id_conductor'          => $conductorId,
                 'id_vehiculo'           => $vehiculoId,
+                'id_pago'               => (int) $pagoCerticav['id'],
                 'id_tecnico'            => $tecnicoId,
                 'nombre_tecnico'        => $inspectorNombre,
                 'fecha'                 => $fecha,
@@ -343,7 +382,7 @@ class InspeccionesController extends ResourceController
             $db->table('certicav')->insert($inspData);
             $inspeccionId = (int)$db->insertID();
 
-            // Vigencia oficial de 6 meses
+// Vigencia oficial de 6 meses
             if ($resultado === 'APROBADO') {
                 $estadoVigencia = ($hoy <= $fechaVencimiento) ? 'VIGENTE' : 'VENCIDO';
                 $diasRestantes = max(0, (int)((strtotime($fechaVencimiento) - strtotime($hoy)) / 86400));
@@ -483,7 +522,7 @@ class InspeccionesController extends ResourceController
             if (array_key_exists('segundaEvaluacion', $input)) {
                 $segunda = trim((string)$input['segundaEvaluacion']) ?: null;
                 $data['segunda_evaluacion'] = $segunda;
-                // La vigencia se cuenta desde el día en que se registra la segunda evaluación.
+// La vigencia se cuenta desde el día en que se registra la segunda evaluación.
                 if ($segunda === null) {
                     $data['fecha_segunda_evaluacion'] = null;
                 } elseif ($segunda !== ($actual['segunda_evaluacion'] ?? null)) {
@@ -509,7 +548,6 @@ class InspeccionesController extends ResourceController
                 $db->table('certicav')->where('id', $id)->update($data);
             }
 
-            // Actualizar datos técnicos del vehículo si se modificaron
             $existingCert = $db->table('certicav')->where('id', $id)->get()->getRowArray();
             if ($existingCert && !empty($existingCert['id_vehiculo'])) {
                 $vehId = (int)$existingCert['id_vehiculo'];
@@ -557,7 +595,7 @@ class InspeccionesController extends ResourceController
     public function delete($id = null)
     {
         $db = \Config\Database::connect();
-        
+
         if (!$id) {
             return $this->failNotFound('ID de inspección no especificado.');
         }
@@ -574,7 +612,7 @@ class InspeccionesController extends ResourceController
         }
     }
 
-    /**
+/**
      * Busca a la persona conductora por DNI; si no existe la crea con los datos
      * capturados en el formulario de CERTICAV (nombre, licencia). Devuelve el id
      * de personas.id o null si no se proporcionó DNI.
@@ -603,8 +641,6 @@ class InspeccionesController extends ResourceController
             throw new \DomainException('El número de licencia no puede superar los 20 caracteres.');
         }
 
-        // Convención peruana: los dos últimos términos son los apellidos y el
-        // resto los nombres ("Juan Carlos Coronado Rojas").
         $partes = array_values(array_filter(preg_split('/\s+/', trim($nombre)) ?: [], 'strlen'));
         $total = count($partes);
         if ($total >= 3) {
@@ -639,10 +675,6 @@ class InspeccionesController extends ResourceController
         return $conductorId;
     }
 
-    /**
-     * Consulta base de CERTICAV con los datos de vehículo, conductor, propietario
-     * y técnico. Compartida por index() y show() para evitar duplicar el SELECT/JOIN.
-     */
     private function esActualSql(): string
     {
         return "NOT EXISTS (SELECT 1 FROM certicav mas WHERE mas.id_vehiculo = i.id_vehiculo AND mas.estado != 'ANULADA' AND (mas.fecha > i.fecha OR (mas.fecha = i.fecha AND mas.id > i.id)))";
@@ -690,10 +722,6 @@ class InspeccionesController extends ResourceController
             ->join('ciudadanos cc', 'cc.id_persona = pc.id', 'left');
     }
 
-    /**
-     * Resultados del checklist con los datos del criterio con que se evaluó
-     * (puede ser un criterio ya desactivado en inspecciones antiguas).
-     */
     private function consultaDetalles($db)
     {
         return $db->table('certicav_detalles d')
@@ -702,10 +730,6 @@ class InspeccionesController extends ResourceController
             ->orderBy('ic.orden', 'ASC');
     }
 
-    /**
-     * Vigencia oficial de 6 meses. Si la inspección se aprobó en la segunda
-     * evaluación, se cuenta desde esa fecha y no desde la primera.
-     */
     private function aplicarVigencia(array $row): array
     {
         $row['id'] = (int)$row['id'];

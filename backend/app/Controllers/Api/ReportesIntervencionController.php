@@ -22,11 +22,9 @@ class ReportesIntervencionController extends ResourceController
             return $this->respond(['data' => []]);
         }
 
-
         $query = $db->table('reportes_intervencion r')
             ->select("r.uuid AS uuid, 
                 r.*,
-                r.observaciones_conductor AS observacionesConductor,
                 COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa_visual,
                 COALESCE(NULLIF(v.marca, ''), '') AS vehiculo_marca,
                 COALESCE(v.modelo, '') AS vehiculo_modelo,
@@ -66,19 +64,13 @@ class ReportesIntervencionController extends ResourceController
             $query->groupStart()
                   ->where('cond_per.numero', $dni)
                   ->orWhere('prop_per.numero', $dni)
-                  ->orWhere('r.conductor_informal_dni', $dni)
-                  ->orWhere('r.dueno_informal_dni', $dni)
                   ->groupEnd();
         }
         if (!empty($placa)) {
-            $query->groupStart()
-                  ->where('v.placa', $placa)
-                  ->orWhere('r.placa', $placa)
-                  ->orWhere("REPLACE(REPLACE(r.placa, '-', ''), ' ', '') =", $placa)
-                  ->groupEnd();
+            $query->where('v.placa', $placa);
         }
 
-        // Modo paginado (pantalla de Papeletas): filtros y página en el servidor, para no traer todo el historial
+// Modo paginado (pantalla de Papeletas): filtros y página en el servidor, para no traer todo el historial
         $pagina = (int) $this->request->getGet('page');
         $porPagina = max(1, min(100, (int) ($this->request->getGet('porPagina') ?: 8)));
         $total = null;
@@ -102,9 +94,9 @@ class ReportesIntervencionController extends ResourceController
                     ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c_cond.nombres', 'c_cond.apellido_paterno', 'c_cond.apellido_materno'), null, false)
                     ->groupEnd();
             }
-            // Conteo: se reutiliza todo lo que sigue al SELECT (joins y filtros), contando reportes distintos
+// Conteo: se reutiliza todo lo que sigue al SELECT (joins y filtros), contando reportes distintos
             $sqlCompleto = (clone $query)->getCompiledSelect();
-            // Se cuenta con el FROM de la consulta compilada (cualquier tipo de salto de línea)
+
             if (!preg_match('/\sFROM\s+`?reportes_intervencion`?/i', $sqlCompleto, $m, PREG_OFFSET_CAPTURE)) {
                 throw new \RuntimeException('No se pudo armar el conteo de reportes.');
             }
@@ -116,9 +108,17 @@ class ReportesIntervencionController extends ResourceController
         }
 
         $query->groupBy('r.id');
-        $rows = $query->orderBy('r.id', 'DESC')->get()->getResultArray();
 
-        // Infracciones de todos los reportes de la página en dos consultas (antes eran 1 o 2 por cada reporte)
+        $rows = \App\Libraries\QuerySort::aplicar($query, $this->request, [
+            'numero' => 'r.id',
+            'placa' => 'placa_visual',
+            'lugar' => 'r.lugar',
+            'inspector' => 'inspector_nombre',
+            'fecha' => 'r.fecha_hora',
+            'estado' => 'r.estado',
+        ], 'r.id')->get()->getResultArray();
+
+// Infracciones de todos los reportes de la página en dos consultas (antes eran 1 o 2 por cada reporte)
         $porReporte = [];
         $porPapeleta = [];
         if ($rows) {
@@ -156,7 +156,7 @@ class ReportesIntervencionController extends ResourceController
             $row['fotos'] = []; // No cargamos fotos en el historial para evitar colapsar la memoria RAM del servidor
 
             $infrs = $porReporte[$row['id']] ?? [];
-            // Un reporte ya convertido muestra las infracciones que la oficina aplicó en su papeleta.
+
             if (empty($infrs) && !empty($row['id_papeleta'])) {
                 $infrs = $porPapeleta[$row['id_papeleta']] ?? [];
             }
@@ -165,7 +165,6 @@ class ReportesIntervencionController extends ResourceController
             $row['infraccionesIds'] = array_map('intval', array_column($infrs, 'id'));
         }
 
-        // Total real de pendientes: la lista trae solo los últimos 100 reportes, el contador no debe depender de eso
         $pendientes = (int) $db->table('reportes_intervencion')->where('estado', 'PENDIENTE')->countAllResults();
 
         $meta = ['pendientes' => $pendientes];
@@ -213,7 +212,6 @@ class ReportesIntervencionController extends ResourceController
         $placa = \App\Libraries\Placa::normalizar((string)($input['placa'] ?? $input['vehiculoPlaca'] ?? ''));
         $lugar = trim((string)($input['lugar'] ?? ''));
         $observaciones = trim((string)($input['observaciones'] ?? $input['observacionesAutoridad'] ?? ''));
-        $observacionesConductor = trim((string)($input['observacionesConductor'] ?? $input['observaciones_conductor'] ?? ''));
         $coordenadas = trim((string)($input['coordenadas'] ?? ''));
         $idOperativo = !empty($input['id_operativo']) ? (int)$input['id_operativo'] : null;
         $fotos = $input['fotos'] ?? [];
@@ -227,9 +225,6 @@ class ReportesIntervencionController extends ResourceController
         if ($observaciones === '') {
             return $this->failValidationErrors('Ingrese una observación del reporte.');
         }
-        // if ($placa === '' && empty($fotos)) {
-        //     return $this->failValidationErrors('Si no hay placa, registre al menos una foto como evidencia.');
-        // }
 
         $inspector = $db->table('trabajadores')
             ->where('id_persona', $inspectorId)
@@ -251,7 +246,7 @@ class ReportesIntervencionController extends ResourceController
         if ($fechaHora === '') {
             $fechaHora = $ahoraLima->format('Y-m-d H:i:s');
         } else {
-            // La hora la manda el cliente: debe ser una fecha válida, no futura y de los últimos 7 días
+
             try {
                 $momento = new \DateTime($fechaHora, new \DateTimeZone('America/Lima'));
             } catch (\Throwable $e) {
@@ -269,16 +264,12 @@ class ReportesIntervencionController extends ResourceController
             return $this->failValidationErrors('El lugar de la intervención no puede superar los 250 caracteres.');
         }
         if (mb_strlen($observaciones) > 500) {
-            return $this->failValidationErrors('La observación de la autoridad no puede superar los 500 caracteres.');
+            return $this->failValidationErrors('La observación no puede superar los 500 caracteres.');
         }
-        if (mb_strlen($observacionesConductor) > 500) {
-            return $this->failValidationErrors('La observación del conductor no puede superar los 500 caracteres.');
-        }
-
 
         $db->transException(true)->transBegin();
         try {
-            // No registrar el vehículo ni los dueños en las tablas maestras desde la app móvil
+
             $duenoNombresInformal = null;
             $conductorNombresInformal = null;
             $duenoDniInformal = null;
@@ -299,7 +290,6 @@ class ReportesIntervencionController extends ResourceController
                 }
             }
 
-            // Conductor
             $conductorDni = trim((string)($input['dni_conductor'] ?? ''));
             $conductorId = null;
             if ($conductorDni !== '') {
@@ -329,13 +319,12 @@ class ReportesIntervencionController extends ResourceController
                 'lugar' => $lugar,
                 'coordenadas' => $coordenadas !== '' ? $coordenadas : null,
                 'observaciones' => $observaciones,
-                'observaciones_conductor' => $observacionesConductor !== '' ? $observacionesConductor : null,
                 'estado' => 'PENDIENTE',
             ]);
             $id = (int)$db->insertID();
 
             if (is_array($fotos)) {
-                // Máximo 5 fotos por reporte y límite de tamaño (~7MB base64 ~= 5MB binario)
+
                 $fotos = array_slice($fotos, 0, 5);
                 $fileStorage = new \App\Services\FileStorageService();
                 foreach ($fotos as $foto) {
@@ -351,7 +340,7 @@ class ReportesIntervencionController extends ResourceController
                     }
                 }
             }
-            
+
             $infraccionesIds = $input['infraccionesIds'] ?? [];
             if (is_array($infraccionesIds)) {
                 $infraccionesIds = array_values(array_unique(array_filter(array_map('intval', $infraccionesIds), static fn ($v) => $v > 0)));
@@ -421,8 +410,7 @@ class ReportesIntervencionController extends ResourceController
             $personaId = null;
             $conductorInformalDni = null;
             $conductorInformalNombres = null;
-            
-            // El conductor lo informa el inspector en el reporte: la oficina no lo cambia al convertirlo en papeleta.
+
             $conductorDni = '';
             if (!empty($reporte['id_conductor'])) {
                 $conductorReporte = $db->table('personas')->select('numero')->where('id', (int)$reporte['id_conductor'])->get()->getRowArray();
@@ -469,23 +457,20 @@ class ReportesIntervencionController extends ResourceController
 
             $tempNumero = 'TEMP-' . uniqid('', true);
 
-            $nombreAutoridad = trim((string)($input['infractor'] ?? ''));
-            if ($nombreAutoridad === '') {
-                if ($personaId) {
-                    $ciudadano = $db->table('ciudadanos')->where('id_persona', $personaId)->get()->getRowArray();
-                    $nombreAutoridad = $ciudadano
-                        ? trim($ciudadano['nombres'] . ' ' . $ciudadano['apellido_paterno'] . ' ' . ($ciudadano['apellido_materno'] ?? ''))
-                        : 'INFRACTOR';
-                } elseif (!empty($conductorInformalNombres)) {
-                    $nombreAutoridad = $conductorInformalNombres;
-                } else {
-                    $nombreAutoridad = 'CONDUCTOR NO IDENTIFICADO';
-                }
+            $nombreAutoridad = $personaId
+                ? trim((string)($input['infractor'] ?? ''))
+                : 'CONDUCTOR NO PRESENTE';
+            if ($personaId && $nombreAutoridad === '') {
+                $ciudadano = $db->table('ciudadanos')->where('id_persona', $personaId)->get()->getRowArray();
+                $nombreAutoridad = $ciudadano
+                    ? trim($ciudadano['nombres'] . ' ' . $ciudadano['apellido_paterno'] . ' ' . ($ciudadano['apellido_materno'] ?? ''))
+                    : 'INFRACTOR';
             }
 
-            $observacion = trim((string)($input['observacionesAutoridad'] ?? $reporte['observaciones'] ?? ''));
-            $tieneConductor = (bool)($personaId || !empty($conductorInformalNombres) || !empty($conductorInformalDni));
-            $obsConductor = trim((string)($input['observacionesConductor'] ?? $input['observaciones_conductor'] ?? $reporte['observaciones_conductor'] ?? ''));
+            $observacion = trim((string)($input['observacionesAutoridad'] ?? $reporte['observaciones']));
+            if (!$personaId) {
+                $observacion = trim($observacion . ' Responsable administrativo: propietario del vehículo.');
+            }
 
             $db->table('papeletas')->insert([
                 'uuid' => \App\Libraries\Identificador::nuevo(),
@@ -498,9 +483,9 @@ class ReportesIntervencionController extends ResourceController
                 'lugar' => $reporte['lugar'],
                 'nombre_autoridad' => $nombreAutoridad,
                 'observacion_autoridad' => $observacion,
-                'observaciones_conductor' => $obsConductor,
-                'firma_conductor_estado' => $tieneConductor ? 'PENDIENTE' : 'NO_PRESENTE',
-                'firma_conductor_observacion' => $tieneConductor ? null : 'Papeleta generada desde reporte de evidencia.',
+                'observaciones_conductor' => $personaId ? trim((string)($input['observacionesConductor'] ?? '')) : 'Conductor no presente durante la intervención.',
+                'firma_conductor_estado' => $personaId ? 'PENDIENTE' : 'NO_PRESENTE',
+                'firma_conductor_observacion' => $personaId ? null : 'Papeleta generada desde reporte de evidencia.',
                 'monto_total' => $montoTotal,
                 'estado' => 'PENDIENTE_PAGO',
                 'dueño_informal_nombres' => $reporte['dueno_informal_nombres'] ?? null,
@@ -521,6 +506,9 @@ class ReportesIntervencionController extends ResourceController
 
             (new \App\Services\PagosTransito($db))->generar('PAPELETA', $papeletaId);
 
+            $internamientoAuto = new \App\Services\InternamientoAutomatico($db);
+            $internamiento = $internamientoAuto->generar($papeletaId);
+
             $db->table('reportes_intervencion')->where('id', $id)->update([
                 'id_vehiculo' => $vehiculoId,
                 'id_papeleta' => $papeletaId,
@@ -528,7 +516,7 @@ class ReportesIntervencionController extends ResourceController
             ]);
 
             $db->transCommit();
-            return $this->respond(['message' => 'Reporte convertido a papeleta.', 'data' => ['id' => $papeletaId, 'numeroPapeleta' => $numeroPapeletaDefinitivo]]);
+            return $this->respond(['message' => 'Reporte convertido a papeleta.', 'data' => ['id' => $papeletaId, 'numeroPapeleta' => $numeroPapeletaDefinitivo, 'internamiento' => $internamiento]]);
         } catch (\DomainException $e) {
             $db->transRollback();
             return $this->failValidationErrors($e->getMessage());
@@ -556,7 +544,6 @@ class ReportesIntervencionController extends ResourceController
             return $this->failValidationErrors('Solo se pueden rechazar reportes pendientes.');
         }
 
-        // Atómico: si otro usuario lo convirtió mientras tanto, no se pisa (el UPDATE exige que siga PENDIENTE)
         $db->table('reportes_intervencion')->where('id', (int)$id)->where('estado', 'PENDIENTE')->update([
             'estado' => 'RECHAZADO',
             'motivo_rechazo' => $motivo,

@@ -5,7 +5,6 @@ import { SmartPersonaFormModal } from './SmartPersonaFormModal'
 import { apiFetch } from '../../config/api'
 import { showError } from '../../utils/SwalUtil'
 
-// Nombre + DNI de una persona que, al hacer clic, abre su ficha (con opción de editarla) sin salir de la lista.
 export function PersonaEnlace({ personaId, nombre, dni, sinDniTexto = 'Sin DNI', children = null, className = '' }) {
   const [persona, setPersona] = useState(null)
   const [editando, setEditando] = useState(false)
