@@ -295,40 +295,6 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
     );
   }
 
-  Widget _buildLargeImage(String photoStr) {
-    if (photoStr.isEmpty) {
-      return const Icon(Icons.person, size: 80, color: Colors.white70);
-    }
-
-    if (photoStr.startsWith('data:image') || (!photoStr.startsWith('http') && photoStr.length > 100)) {
-      try {
-        final base64Part = photoStr.contains(',') ? photoStr.split(',').last : photoStr;
-        final bytes = base64Decode(base64Part);
-        return Image.memory(
-          bytes,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 60, color: Colors.white70),
-        );
-      } catch (_) {
-        return const Icon(Icons.broken_image, size: 60, color: Colors.white70);
-      }
-    }
-
-    final photoFullUrl = ApiService.urlArchivo(photoStr);
-    return Image.network(
-      photoFullUrl,
-      fit: BoxFit.contain,
-      headers: ApiService.headersImagen,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        );
-      },
-      errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 60, color: Colors.white70),
-    );
-  }
-
   void _mostrarFotoEnGrande(BuildContext context, String photoStr, String nombre) {
     if (photoStr.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -340,127 +306,16 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
     final docNum = _persona?['numeroDocumento']?.toString() ?? widget.dni;
     final tipoDoc = _persona?['tipoDocumento']?.toString() ?? 'DOCUMENTO';
 
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 15,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: const BoxDecoration(
-                    color: AppTheme.primaryBlue,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.badge_outlined, color: Colors.white, size: 20),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Fotografía de Identidad',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white, size: 22),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                  child: Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        constraints: const BoxConstraints(
-                          maxHeight: 320,
-                          maxWidth: 240,
-                        ),
-                        child: InteractiveViewer(
-                          panEnabled: true,
-                          minScale: 0.8,
-                          maxScale: 4.0,
-                          child: _buildLargeImage(photoStr),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    children: [
-                      Text(
-                        nombre,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$tipoDoc: $docNum',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: const Text('Cerrar', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _FotoPantallaCompletaScreen(
+          photoStr: photoStr,
+          nombre: nombre,
+          tipoDoc: tipoDoc,
+          docNum: docNum,
+        ),
+      ),
     );
   }
 
@@ -653,3 +508,171 @@ class _PersonDetailsScreenState extends State<PersonDetailsScreen> {
     );
   }
 }
+
+class _FotoPantallaCompletaScreen extends StatefulWidget {
+  final String photoStr;
+  final String nombre;
+  final String tipoDoc;
+  final String docNum;
+
+  const _FotoPantallaCompletaScreen({
+    required this.photoStr,
+    required this.nombre,
+    required this.tipoDoc,
+    required this.docNum,
+  });
+
+  @override
+  State<_FotoPantallaCompletaScreen> createState() => _FotoPantallaCompletaScreenState();
+}
+
+class _FotoPantallaCompletaScreenState extends State<_FotoPantallaCompletaScreen> {
+  final TransformationController _transformationController = TransformationController();
+  TapDownDetails? _doubleTapDetails;
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _handleDoubleTap() {
+    if (_transformationController.value != Matrix4.identity()) {
+      _transformationController.value = Matrix4.identity();
+    } else {
+      final position = _doubleTapDetails?.localPosition ?? Offset.zero;
+      _transformationController.value = Matrix4.identity()
+        ..translate(-position.dx * 1.5, -position.dy * 1.5)
+        ..scale(2.5);
+    }
+  }
+
+  Widget _buildImageWidget(BuildContext context, double width, double height) {
+    if (widget.photoStr.isEmpty) {
+      return const Center(
+        child: Icon(Icons.person, size: 100, color: Colors.white60),
+      );
+    }
+
+    Widget img;
+    if (widget.photoStr.startsWith('data:image') || (!widget.photoStr.startsWith('http') && widget.photoStr.length > 100)) {
+      try {
+        final base64Part = widget.photoStr.contains(',') ? widget.photoStr.split(',').last : widget.photoStr;
+        final bytes = base64Decode(base64Part);
+        img = Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          width: width,
+          height: height,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (context, error, stackTrace) => const Center(
+            child: Icon(Icons.broken_image, size: 80, color: Colors.white60),
+          ),
+        );
+      } catch (_) {
+        return const Center(
+          child: Icon(Icons.broken_image, size: 80, color: Colors.white60),
+        );
+      }
+    } else {
+      final photoFullUrl = ApiService.urlArchivo(widget.photoStr);
+      img = Image.network(
+        photoFullUrl,
+        fit: BoxFit.contain,
+        width: width,
+        height: height,
+        filterQuality: FilterQuality.high,
+        headers: ApiService.headersImagen,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => const Center(
+          child: Icon(Icons.broken_image, size: 80, color: Colors.white60),
+        ),
+      );
+    }
+
+    return img;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final width = mediaQuery.size.width;
+    final height = mediaQuery.size.height - kToolbarHeight - mediaQuery.padding.top - mediaQuery.padding.bottom;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.nombre,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              '${widget.tipoDoc}: ${widget.docNum}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white, size: 24),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: GestureDetector(
+          onDoubleTapDown: (details) => _doubleTapDetails = details,
+          onDoubleTap: _handleDoubleTap,
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: InteractiveViewer(
+              transformationController: _transformationController,
+              clipBehavior: Clip.none,
+              panEnabled: true,
+              minScale: 1.0,
+              maxScale: 6.0,
+              child: SizedBox(
+                width: width,
+                height: height,
+                child: Center(
+                  child: _buildImageWidget(context, width, height),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

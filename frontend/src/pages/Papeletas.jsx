@@ -565,7 +565,8 @@ export function Papeletas({ user }) {
       vehiculoId: String(reporte.id_vehiculo || matchVehiculo?.id || ''),
       conductorDni: reporte.conductorDni && reporte.conductorDni !== 'S/D' ? reporte.conductorDni : '',
       // Observaciones de la oficina: empiezan vacías (la del inspector ya se ve en la tarjeta del reporte)
-      observacionesAutoridad: ''
+      observacionesAutoridad: '',
+      observacionesConductor: reporte.observaciones_conductor || reporte.observacionesConductor || ''
     })
     try {
       const res = await apiFetch(`/reportes-intervencion/${reporte.id}/fotos`)
@@ -600,7 +601,8 @@ export function Papeletas({ user }) {
           infraccionesIds: validInfracciones,
           vehiculoId: Number(convertForm.vehiculoId),
           conductorDni: convertForm.conductorDni,
-          observacionesAutoridad: convertForm.observacionesAutoridad
+          observacionesAutoridad: convertForm.observacionesAutoridad,
+          observacionesConductor: convertForm.observacionesConductor || ''
         }
       })
       const data = await res.json().catch(() => ({}))
