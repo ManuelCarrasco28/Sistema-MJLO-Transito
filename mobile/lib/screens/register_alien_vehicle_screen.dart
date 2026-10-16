@@ -815,6 +815,7 @@ class _RegisterAlienVehicleScreenState
       inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
+        counterText: '',
         prefixIcon: Icon(icon, color: Colors.grey.shade600),
         suffixIcon: hasSearch
             ? Padding(

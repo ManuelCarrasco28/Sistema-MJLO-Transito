@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 
 /// Envuelve las llamadas autenticadas: si el servidor responde 401 la sesión venció (o la cerraron),
 /// se limpian las credenciales y se avisa a la app para volver al login en vez de mostrar errores sueltos.
@@ -43,16 +43,14 @@ class ApiService {
   static const _sessionCookieKey = 'session_cookie';
   static const _savedUsernameKey = 'saved_username';
   static const _savedPasswordKey = 'saved_password';
-  static const _keyHistorialUsuarios = 'historial_usuarios_login';
   static const _keyRecordarUsuario = 'recordar_usuario_activo';
   static const _keyUsuarioRecordado = 'usuario_recordado_login';
   static const _keyPasswordRecordado = 'password_recordado_login';
 
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
-  // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
   static const String _defaultUrl =
-      'http://192.168.137.1:8080/api'; // Conectado al punto de acceso del compañero
+      'http://10.24.31.109:8080/api'; // Conexión local a mi Docker en esta red
   // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
   static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
   static const String _configuredUrl = String.fromEnvironment(
@@ -66,11 +64,10 @@ class ApiService {
   static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api/?$'), '');
   static const Duration _requestTimeout = Duration(seconds: 20);
 
-  // --- GESTIÓN DE USUARIOS Y RECORDAR SESIÓN ---
+  // --- GESTIÓN DE RECORDAR SESIÓN ---
   /// Registra el inicio de sesión exitoso.
-  /// - Guarda el usuario en el historial de cuentas válidas.
   /// - Si recordar == true, almacena usuario y contraseña para autocompletar en el próximo inicio.
-  /// - Si recordar == false, borra los datos guardados de autocompletado pero conserva el historial de cuentas.
+  /// - Si recordar == false, borra los datos guardados de autocompletado.
   static Future<void> registrarLoginExitoso(
     String username,
     String password,
@@ -81,16 +78,10 @@ class ApiService {
 
     final prefs = await SharedPreferences.getInstance();
 
-    // 1. Historial de usuarios que han iniciado sesión correctamente
-    List<String> historial = prefs.getStringList(_keyHistorialUsuarios) ?? [];
-    historial.removeWhere((u) => u.trim().toLowerCase() == clean.toLowerCase());
-    historial.insert(0, clean);
-    if (historial.length > 10) {
-      historial = historial.sublist(0, 10);
-    }
-    await prefs.setStringList(_keyHistorialUsuarios, historial);
+    // Limpia residuo anterior del historial si existiera
+    await prefs.remove('historial_usuarios_login');
 
-    // 2. Opción "Recordar mi usuario y contraseña"
+    // Opción "Recordar mi usuario y contraseña"
     await prefs.setBool(_keyRecordarUsuario, recordar);
     if (recordar) {
       await prefs.setString(_keyUsuarioRecordado, clean);
@@ -109,7 +100,7 @@ class ApiService {
     }
   }
 
-  /// Obtiene la configuración de login (si recordar está activo, el usuario guardado, contraseña y el historial)
+  /// Obtiene la configuración de login (si recordar está activo, el usuario guardado y contraseña)
   static Future<Map<String, dynamic>> obtenerConfiguracionLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final bool recordar = prefs.getBool(_keyRecordarUsuario) ?? false;
@@ -129,9 +120,6 @@ class ApiService {
       }
     }
 
-    final List<String> historial =
-        prefs.getStringList(_keyHistorialUsuarios) ?? [];
-
     return {
       'recordar': recordar,
       'usuario': (recordar && usuario != null && usuario.isNotEmpty)
@@ -140,29 +128,7 @@ class ApiService {
       'password': (recordar && password != null && password.isNotEmpty)
           ? password
           : null,
-      'historial': historial,
     };
-  }
-
-  /// Elimina un usuario del historial y del recordatorio si coincide
-  static Future<void> eliminarUsuarioDeHistorial(String username) async {
-    final clean = username.trim();
-    final prefs = await SharedPreferences.getInstance();
-    List<String> historial = prefs.getStringList(_keyHistorialUsuarios) ?? [];
-    historial.removeWhere((u) => u.trim().toLowerCase() == clean.toLowerCase());
-    await prefs.setStringList(_keyHistorialUsuarios, historial);
-
-    final usuarioRecordado = prefs.getString(_keyUsuarioRecordado);
-    if (usuarioRecordado != null &&
-        usuarioRecordado.trim().toLowerCase() == clean.toLowerCase()) {
-      await prefs.remove(_keyUsuarioRecordado);
-      await prefs.remove(_keyPasswordRecordado);
-      await prefs.setBool(_keyRecordarUsuario, false);
-      try {
-        await _secureStorage.delete(key: _savedUsernameKey);
-        await _secureStorage.delete(key: _savedPasswordKey);
-      } catch (_) {}
-    }
   }
 
   // Métodos de compatibilidad
@@ -432,6 +398,25 @@ class ApiService {
     return null;
   }
 
+  static Future<List<dynamic>> getOperativos() async {
+    try {
+      final response = await _http
+          .get(
+            Uri.parse('$baseUrl/operativos'),
+            headers: await _getHeaders(isJson: false),
+          )
+          .timeout(_requestTimeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['data'] ?? [];
+      }
+    } catch (e) {
+      debugPrint('Error al obtener operativos: $e');
+    }
+    return [];
+  }
+
   static Future<bool> permiteAplicarPapeletaMovil() async {
     final uri = Uri.parse('$baseUrl/mobile/config').replace(
       queryParameters: {'_': DateTime.now().millisecondsSinceEpoch.toString()},
@@ -600,6 +585,24 @@ class ApiService {
         return list.first;
       }
     }
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> getReniecByDni(String dni) async {
+    try {
+      final response = await _http
+          .get(
+            Uri.parse('$baseUrl/pide/reniec/$dni'),
+            headers: await _getHeaders(isJson: false),
+          )
+          .timeout(_requestTimeout);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map<String, dynamic>) {
+          return data['data'] ?? data;
+        }
+      }
+    } catch (_) {}
     return null;
   }
 

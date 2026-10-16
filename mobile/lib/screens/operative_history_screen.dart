@@ -13,35 +13,152 @@ class OperativeHistoryScreen extends StatelessWidget {
     required this.actividades,
   });
 
+  String _formatTime(String? timeStr) {
+    if (timeStr == null || timeStr.isEmpty) return '--:--';
+    final parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      int? hour = int.tryParse(parts[0]);
+      int? minute = int.tryParse(parts[1]);
+      if (hour != null && minute != null) {
+        final period = hour >= 12 ? 'pm' : 'am';
+        int hour12 = hour % 12;
+        if (hour12 == 0) hour12 = 12;
+        final hourStr = hour12.toString().padLeft(2, '0');
+        final minStr = minute.toString().padLeft(2, '0');
+        return '$hourStr:$minStr $period';
+      }
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+    return timeStr;
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return '';
+    try {
+      final parts = dateStr.split('-');
+      if (parts.length == 3) {
+        return '${parts[2]}/${parts[1]}/${parts[0]}';
+      }
+    } catch (_) {}
+    return dateStr;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Filtrar actividades por este operativo
-    final acts = actividades.where((a) => a['operativoId'] == operativo['id']).toList();
+    final String opIdStr = operativo['id']?.toString() ?? '';
+    final acts = actividades.where((a) => a['operativoId']?.toString() == opIdStr).toList();
+
+    final String nombre = operativo['nombre']?.toString() ?? 'Operativo';
+    final String lugar = operativo['lugar']?.toString() ?? '';
+    final String fecha = _formatDate(operativo['fecha']?.toString());
+    final String horaInicio = _formatTime(operativo['hora_inicio']?.toString());
+    final String horaFin = _formatTime(operativo['hora_fin']?.toString());
+    final String estado = operativo['estado']?.toString().toUpperCase() ?? '';
+    final bool fueCancelado = estado == 'CANCELADO' || (operativo['hora_cancelacion'] != null && operativo['hora_cancelacion'].toString().isNotEmpty);
+    final String horaCorte = _formatTime(operativo['hora_cancelacion']?.toString());
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundLight,
       appBar: AppBar(
-        title: Text(operativo['nombre'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text(nombre, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         backgroundColor: AppTheme.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: acts.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.list_alt, size: 64, color: Colors.grey.shade400),
-                  const SizedBox(height: 16),
-                  Text('No hay actividades en este operativo', style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: fueCancelado ? Colors.orange.shade200 : Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (lugar.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.location_on_outlined, size: 16, color: Colors.grey.shade700),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Lugar: $lugar',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+                          ),
+                        ),
+                        if (fecha.isNotEmpty)
+                          Text(fecha, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                      ],
+                    ),
+                  ),
+                Row(
+                  children: [
+                    Icon(Icons.access_time, size: 16, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Horario programado: $horaInicio a $horaFin',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                    ),
+                  ],
+                ),
+                if (fueCancelado) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.stop_circle_outlined, size: 16, color: Colors.orange.shade900),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            horaCorte != '--:--'
+                                ? 'Terminado antes de tiempo a las $horaCorte (Reportes e infracciones registrados se conservan)'
+                                : 'Terminado antes de tiempo (Actividades válidas y registradas)',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.orange.shade900),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
-              itemCount: acts.length,
-              itemBuilder: (context, index) {
-                final data = acts[index];
-                final esReporte = data['es_reporte'] == true;
+              ],
+            ),
+          ),
+          Expanded(
+            child: acts.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.list_alt, size: 64, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        Text('No hay actividades en este operativo', style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.only(left: 12, right: 12, bottom: 80),
+                    itemCount: acts.length,
+                    itemBuilder: (context, index) {
+                      final data = acts[index];
+                      final esReporte = data['es_reporte'] == true;
                 
                 final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
                 final identificador = esReporte ? (data['placa_visual'] ?? 'Sin placa') : (data['vehiculoPlaca'] ?? 'Sin placa');
@@ -94,6 +211,9 @@ class OperativeHistoryScreen extends StatelessWidget {
                 );
               },
             ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -117,9 +237,113 @@ class OperativeHistoryScreen extends StatelessWidget {
             ? '\nN° Doc: ${data['conductorDni']}'
             : '';
 
+        final rawFechaHora = data['fecha_hora'] ?? data['fechaHora'] ?? data['fecha'] ?? data['fechaRegistro'];
+        String fechaTexto = '';
+        String horaTexto = '';
+
+        if (rawFechaHora != null && rawFechaHora.toString().trim().isNotEmpty) {
+          final str = rawFechaHora.toString().trim();
+          final dt = DateTime.tryParse(str);
+          if (dt != null) {
+            final dia = dt.day.toString().padLeft(2, '0');
+            final mes = dt.month.toString().padLeft(2, '0');
+            final anio = dt.year.toString();
+            fechaTexto = '$dia/$mes/$anio';
+
+            final period = dt.hour >= 12 ? 'pm' : 'am';
+            int hour12 = dt.hour % 12;
+            if (hour12 == 0) hour12 = 12;
+            final hora = hour12.toString().padLeft(2, '0');
+            final min = dt.minute.toString().padLeft(2, '0');
+            horaTexto = '$hora:$min $period';
+          } else {
+            final parts = str.split(' ');
+            if (parts.isNotEmpty) {
+              final dParts = parts[0].split('-');
+              if (dParts.length == 3) {
+                fechaTexto = '${dParts[2]}/${dParts[1]}/${dParts[0]}';
+              } else {
+                fechaTexto = parts[0];
+              }
+            }
+            if (parts.length > 1) {
+              final tParts = parts[1].split(':');
+              if (tParts.length >= 2) {
+                int? h = int.tryParse(tParts[0]);
+                int? m = int.tryParse(tParts[1]);
+                if (h != null && m != null) {
+                  final period = h >= 12 ? 'pm' : 'am';
+                  int h12 = h % 12;
+                  if (h12 == 0) h12 = 12;
+                  horaTexto = '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period';
+                }
+              }
+            }
+          }
+        }
+
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Detalles de la Actividad', style: TextStyle(color: esSinIdentificar ? Colors.orange.shade800 : (isFormal ? Colors.blue.shade800 : Colors.red.shade800), fontWeight: FontWeight.bold)),
+          title: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  'Detalles de la Actividad',
+                  style: TextStyle(
+                    color: esSinIdentificar
+                        ? Colors.orange.shade800
+                        : (isFormal ? Colors.blue.shade800 : Colors.red.shade800),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                  ),
+                ),
+              ),
+              if (fechaTexto.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.calendar_today, size: 11, color: Colors.grey.shade700),
+                            const SizedBox(width: 4),
+                            Text(
+                              fechaTexto,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
+                            ),
+                          ],
+                        ),
+                        if (horaTexto.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time, size: 11, color: Colors.grey.shade700),
+                              const SizedBox(width: 4),
+                              Text(
+                                horaTexto,
+                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

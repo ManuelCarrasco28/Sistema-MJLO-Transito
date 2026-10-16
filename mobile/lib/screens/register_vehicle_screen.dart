@@ -526,6 +526,7 @@ class _RegisterVehicleScreenState extends State<RegisterVehicleScreen> {
       maxLength: maxLength,
       decoration: InputDecoration(
         labelText: label,
+        counterText: '',
         prefixIcon: Icon(icon, color: Colors.grey.shade600),
         suffixIcon: hasSearch
             ? Padding(

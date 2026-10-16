@@ -91,7 +91,10 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
 
     // Rutas accesibles por inspectores y personal móvil que deben resolverse antes de los recursos de oficina
     $routes->group('', ['filter' => 'sessionauth'], static function ($routes): void {
+        $routes->get('operativos', 'OperativosController::index');
         $routes->get('operativos/activo/(:segment)', 'OperativosController::activo/$1');
+        $routes->get('operativos/(:segment)', 'OperativosController::show/$1');
+        $routes->get('vehiculos/persona/dni', 'VehiculosController::getVehiculosByPersonaDni');
     });
 
     // Resto del sistema: solo oficina (el inspector no ve dashboards, padrones ni gestión).
@@ -141,7 +144,6 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->post('perfil/password', 'AuthController::cambiarPassword');
         $routes->put('perfil/preferencias', 'AuthController::guardarPreferencias');
 
-        $routes->get('vehiculos/persona/dni', 'VehiculosController::getVehiculosByPersonaDni');
         $routes->get('tipo-documentos', 'PersonasController::tiposDocumento');
         // Para no-oficina el controlador solo admite búsqueda exacta por numeroDocumento y nunca show por id.
         $routes->resource('personas', ['controller' => 'PersonasController', 'only' => ['index', 'show']]);

@@ -253,6 +253,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 decoration: InputDecoration(
                   labelText: label,
                   hintText: hint,
+                  counterText: '',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

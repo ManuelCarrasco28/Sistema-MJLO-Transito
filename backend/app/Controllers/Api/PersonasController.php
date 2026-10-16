@@ -372,13 +372,14 @@ class PersonasController extends ResourceController
             }
         } elseif (!empty($rows) && $numero && strlen(trim($numero)) === 8 && ctype_digit(trim($numero))) {
             // Si la persona ya está en BD pero su foto está vacía (o es una URL expirada de PIDE),
-            // se consulta la API de RENIEC en vivo solo para responderla al cliente, sin descargar nada.
+            // se consulta la API de RENIEC en vivo para responderla al cliente.
             $fotoActual = trim((string)($rows[0]['fotoUrl'] ?? ''));
             if ($fotoActual === '' || str_starts_with($fotoActual, 'https://pide.munijlo.gob.pe')) {
                 $pideData = \App\Services\PideService::reniec(trim($numero));
-                if (!empty($pideData['foto_url'])) {
-                    $rows[0]['fotoUrl'] = $pideData['foto_url'];
-                    $rows[0]['fotoImg'] = $pideData['foto_url'];
+                $fotoPide = trim((string)($pideData['foto_url'] ?? $pideData['foto'] ?? ''));
+                if ($fotoPide !== '') {
+                    $rows[0]['fotoUrl'] = $fotoPide;
+                    $rows[0]['fotoImg'] = $fotoPide;
                 }
             }
         }

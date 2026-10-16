@@ -18,9 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _recordarUsuario = false;
-  List<String> _historialUsuarios = [];
-  String? _usuarioGuardado;
-  String? _passwordGuardado;
 
   @override
   void initState() {
@@ -34,184 +31,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() {
           _recordarUsuario = config['recordar'] as bool;
-          _usuarioGuardado = config['usuario'] as String?;
-          _passwordGuardado = config['password'] as String?;
-          if (_recordarUsuario && _usuarioGuardado != null && _usuarioGuardado!.isNotEmpty) {
-            _usuarioController.text = _usuarioGuardado!;
-            if (_passwordGuardado != null && _passwordGuardado!.isNotEmpty) {
-              _passwordController.text = _passwordGuardado!;
+          final usuario = config['usuario'] as String?;
+          final password = config['password'] as String?;
+          if (_recordarUsuario && usuario != null && usuario.isNotEmpty) {
+            _usuarioController.text = usuario;
+            if (password != null && password.isNotEmpty) {
+              _passwordController.text = password;
             }
           }
-          _historialUsuarios = List<String>.from(config['historial'] ?? []);
         });
       }
     } catch (_) {}
-  }
-
-  void _seleccionarUsuario(String user) {
-    setState(() {
-      _usuarioController.text = user;
-      if (_recordarUsuario &&
-          _usuarioGuardado != null &&
-          user.trim().toLowerCase() == _usuarioGuardado!.trim().toLowerCase() &&
-          _passwordGuardado != null &&
-          _passwordGuardado!.isNotEmpty) {
-        _passwordController.text = _passwordGuardado!;
-      }
-    });
-    if (_passwordController.text.isEmpty) {
-      _passwordFocusNode.requestFocus();
-    }
-  }
-
-  Future<void> _eliminarDeHistorial(String user) async {
-    await ApiService.eliminarUsuarioDeHistorial(user);
-    if (mounted) {
-      setState(() {
-        _historialUsuarios.remove(user);
-        if (_usuarioController.text.trim().toLowerCase() == user.toLowerCase() && !_recordarUsuario) {
-          _usuarioController.clear();
-        }
-      });
-    }
-  }
-
-  void _mostrarModalHistorial() {
-    if (_historialUsuarios.isEmpty) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryBlue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.history_rounded,
-                            color: AppTheme.primaryBlue,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Cuentas Recientes',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primaryBlue,
-                                ),
-                              ),
-                              Text(
-                                'Usuarios validados previamente en este dispositivo',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.4,
-                      ),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: _historialUsuarios.length,
-                        separatorBuilder: (ctx, idx) => Divider(
-                          color: Colors.grey.shade200,
-                          height: 1,
-                        ),
-                        itemBuilder: (context, index) {
-                          final user = _historialUsuarios[index];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            leading: CircleAvatar(
-                              backgroundColor: AppTheme.accentYellow.withOpacity(0.3),
-                              foregroundColor: AppTheme.primaryBlue,
-                              child: const Icon(Icons.person_rounded, size: 20),
-                            ),
-                            title: Text(
-                              user,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                            subtitle: const Text(
-                              'Inspector Municipal',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                size: 18,
-                                color: Colors.grey,
-                              ),
-                              tooltip: 'Eliminar del historial',
-                              onPressed: () async {
-                                await _eliminarDeHistorial(user);
-                                setModalState(() {});
-                                if (_historialUsuarios.isEmpty && context.mounted) {
-                                  Navigator.pop(context);
-                                }
-                              },
-                            ),
-                            onTap: () {
-                              Navigator.pop(context);
-                              _seleccionarUsuario(user);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   Future<void> _signIn() async {
@@ -358,119 +188,26 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 24),
 
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Usuario',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                if (_historialUsuarios.isNotEmpty)
-                                  InkWell(
-                                    onTap: _mostrarModalHistorial,
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.history_rounded,
-                                            size: 14,
-                                            color: AppTheme.primaryBlue,
-                                          ),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            'Ver historial',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppTheme.primaryBlue,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                            Text(
+                              'Usuario',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey.shade600,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             TextField(
                               controller: _usuarioController,
                               textInputAction: TextInputAction.next,
                               onSubmitted: (_) => _passwordFocusNode.requestFocus(),
-                              decoration: InputDecoration(
-                                prefixIcon: const Icon(
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(
                                   Icons.badge_outlined,
                                   color: Colors.grey,
                                 ),
-                                suffixIcon: _historialUsuarios.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(
-                                          Icons.history_rounded,
-                                          color: AppTheme.primaryBlue,
-                                        ),
-                                        tooltip: 'Cuentas recientes',
-                                        onPressed: _mostrarModalHistorial,
-                                      )
-                                    : null,
                               ),
                             ),
-                            if (_historialUsuarios.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                physics: const BouncingScrollPhysics(),
-                                child: Row(
-                                  children: [
-                                    const Text(
-                                      'Recientes: ',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    ..._historialUsuarios.take(4).map((u) {
-                                      final isSelected = _usuarioController.text.trim().toLowerCase() == u.toLowerCase();
-                                      return Padding(
-                                        padding: const EdgeInsets.only(right: 6.0),
-                                        child: ActionChip(
-                                          visualDensity: VisualDensity.compact,
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                          avatar: Icon(
-                                            Icons.person_outline_rounded,
-                                            size: 14,
-                                            color: isSelected ? Colors.white : AppTheme.primaryBlue,
-                                          ),
-                                          label: Text(
-                                            u,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: isSelected ? Colors.white : AppTheme.primaryBlue,
-                                            ),
-                                          ),
-                                          backgroundColor: isSelected
-                                              ? AppTheme.primaryBlue
-                                              : AppTheme.primaryBlue.withOpacity(0.08),
-                                          side: BorderSide(
-                                            color: isSelected
-                                                ? AppTheme.primaryBlue
-                                                : AppTheme.primaryBlue.withOpacity(0.2),
-                                          ),
-                                          onPressed: () => _seleccionarUsuario(u),
-                                        ),
-                                      );
-                                    }),
-                                  ],
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 16),
 
                             Text(

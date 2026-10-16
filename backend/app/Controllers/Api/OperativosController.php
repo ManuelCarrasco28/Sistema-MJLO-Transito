@@ -332,7 +332,7 @@ class OperativosController extends ResourceController
             if (trim((string) $this->request->getGet('sortBy')) !== '') {
                 \App\Libraries\QuerySort::aplicar($builder, $this->request, $columnasOrdenables, 'o.fecha');
             } else {
-                $builder->orderBy('o.fecha', 'DESC')->orderBy('o.hora_inicio', 'DESC');
+                $builder->orderBy('o.fecha', 'DESC')->orderBy('o.hora_inicio', 'DESC')->orderBy('o.id', 'DESC');
             }
 
             $rows = $builder
@@ -353,6 +353,7 @@ class OperativosController extends ResourceController
 
         $rows = $builder->orderBy('o.fecha', 'DESC')
             ->orderBy('o.hora_inicio', 'DESC')
+            ->orderBy('o.id', 'DESC')
             ->get()
             ->getResultArray();
 

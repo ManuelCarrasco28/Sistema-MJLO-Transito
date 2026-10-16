@@ -50,8 +50,14 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
 
   Future<void> _loadHistory() async {
     try {
-      final papeletas = await ApiService.getPapeletas(dni: widget.filterDni, placa: widget.filterPlaca);
-      final reportes = await ApiService.getReportes(dni: widget.filterDni, placa: widget.filterPlaca);
+      final papeletasFuture = ApiService.getPapeletas(dni: widget.filterDni, placa: widget.filterPlaca);
+      final reportesFuture = ApiService.getReportes(dni: widget.filterDni, placa: widget.filterPlaca);
+      final operativosFuture = ApiService.getOperativos();
+
+      final results = await Future.wait([papeletasFuture, reportesFuture, operativosFuture]);
+      final papeletas = results[0];
+      final reportes = results[1];
+      final operativosApi = results[2];
 
       List<dynamic> todas = [];
       Map<String, Map<String, dynamic>> opsMap = {};
@@ -68,8 +74,6 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
       }
       
       for (var r in reportes) {
-        // Si el reporte ya fue convertido a papeleta, no lo mostramos para evitar duplicados
-        // ya que la papeleta correspondiente ya viene en la lista de papeletas.
         final estadoReporte = r['estado']?.toString().toUpperCase() ?? '';
         if (estadoReporte.contains('CONVERTIDO') || r['id_papeleta'] != null) {
           continue;
@@ -85,18 +89,57 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
         }
       }
       
-      // Ordenar por fecha_hora descendente
+      // Ordenar actividades por fecha_hora descendente
       todas.sort((a, b) {
         final dateA = DateTime.tryParse(a['fecha_hora']?.toString() ?? a['fechaHora']?.toString() ?? '') ?? DateTime(2000);
         final dateB = DateTime.tryParse(b['fecha_hora']?.toString() ?? b['fechaHora']?.toString() ?? '') ?? DateTime(2000);
         return dateB.compareTo(dateA);
       });
 
-      // Filtros ahora se aplican en el backend
+      // Construir lista de operativos con todos sus datos detallados
+      List<Map<String, dynamic>> listaOperativosFinal = [];
+      if (operativosApi.isNotEmpty) {
+        final mapOperativosApi = {
+          for (var o in operativosApi) (o['id']?.toString() ?? ''): Map<String, dynamic>.from(o)
+        };
+
+        if (widget.filterDni != null || widget.filterPlaca != null) {
+          for (var opId in opsMap.keys) {
+            if (mapOperativosApi.containsKey(opId)) {
+              listaOperativosFinal.add(mapOperativosApi[opId]!);
+            } else {
+              listaOperativosFinal.add(opsMap[opId]!);
+            }
+          }
+        } else {
+          for (var o in operativosApi) {
+            listaOperativosFinal.add(Map<String, dynamic>.from(o));
+          }
+        }
+      } else {
+        listaOperativosFinal = opsMap.values.toList();
+      }
+
+      // Ordenar los operativos: más recientes primero (fecha DESC, hora_inicio DESC, id DESC)
+      listaOperativosFinal.sort((a, b) {
+        final fA = (a['fecha'] ?? '').toString();
+        final fB = (b['fecha'] ?? '').toString();
+        final compFecha = fB.compareTo(fA);
+        if (compFecha != 0) return compFecha;
+
+        final hA = (a['hora_inicio'] ?? '').toString();
+        final hB = (b['hora_inicio'] ?? '').toString();
+        final compHora = hB.compareTo(hA);
+        if (compHora != 0) return compHora;
+
+        final idA = int.tryParse(a['id']?.toString() ?? '0') ?? 0;
+        final idB = int.tryParse(b['id']?.toString() ?? '0') ?? 0;
+        return idB.compareTo(idA);
+      });
 
       setState(() {
         _todasActividades = todas;
-        _listaOperativos = opsMap.values.toList();
+        _listaOperativos = listaOperativosFinal;
         _isLoading = false;
       });
     } catch (e, stacktrace) {
@@ -200,11 +243,43 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
     }).toList();
   }
 
+  String _formatTime(String? timeStr) {
+    if (timeStr == null || timeStr.isEmpty) return '--:--';
+    final parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      int? hour = int.tryParse(parts[0]);
+      int? minute = int.tryParse(parts[1]);
+      if (hour != null && minute != null) {
+        final period = hour >= 12 ? 'pm' : 'am';
+        int hour12 = hour % 12;
+        if (hour12 == 0) hour12 = 12;
+        final hourStr = hour12.toString().padLeft(2, '0');
+        final minStr = minute.toString().padLeft(2, '0');
+        return '$hourStr:$minStr $period';
+      }
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+    return timeStr;
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return '';
+    try {
+      final parts = dateStr.split('-');
+      if (parts.length == 3) {
+        return '${parts[2]}/${parts[1]}/${parts[0]}';
+      }
+    } catch (_) {}
+    return dateStr;
+  }
+
   List<Map<String, dynamic>> _getFilteredOperativos() {
     if (_searchQuery.isEmpty) return _listaOperativos;
     String query = _searchQuery.toLowerCase();
     return _listaOperativos.where((op) {
-      return (op['nombre']?.toString() ?? '').toLowerCase().contains(query);
+      final nombre = (op['nombre']?.toString() ?? '').toLowerCase();
+      final lugar = (op['lugar']?.toString() ?? '').toLowerCase();
+      return nombre.contains(query) || lugar.contains(query);
     }).toList();
   }
 
@@ -383,18 +458,52 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
       itemCount: list.length,
       itemBuilder: (context, index) {
         final op = list[index];
+        final String opIdStr = op['id']?.toString() ?? '';
+        final int totalActs = _todasActividades.where((a) => a['operativoId']?.toString() == opIdStr).length;
+        final String nombre = op['nombre']?.toString() ?? 'Operativo';
+        final String lugar = op['lugar']?.toString() ?? '';
+        final String fecha = _formatDate(op['fecha']?.toString());
+        final String horaInicio = _formatTime(op['hora_inicio']?.toString());
+        final String horaFin = _formatTime(op['hora_fin']?.toString());
+        final String estado = op['estado']?.toString().toUpperCase() ?? 'FINALIZADO';
+        final bool fueCancelado = estado == 'CANCELADO' || (op['hora_cancelacion'] != null && op['hora_cancelacion'].toString().isNotEmpty);
+        final String horaCorte = _formatTime(op['hora_cancelacion']?.toString());
+
+        Color stateColor;
+        String stateText;
+        IconData stateIcon;
+
+        if (fueCancelado) {
+          stateColor = Colors.orange.shade800;
+          stateText = 'Terminado antes de tiempo';
+          stateIcon = Icons.timer_off_outlined;
+        } else if (estado == 'EN_CURSO') {
+          stateColor = Colors.green.shade700;
+          stateText = 'En curso';
+          stateIcon = Icons.play_circle_outline;
+        } else if (estado == 'PROGRAMADO') {
+          stateColor = Colors.blue.shade700;
+          stateText = 'Programado';
+          stateIcon = Icons.calendar_today_outlined;
+        } else {
+          stateColor = Colors.grey.shade700;
+          stateText = 'Finalizado';
+          stateIcon = Icons.check_circle_outline;
+        }
+
         return Card(
           elevation: 2,
           margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            leading: const CircleAvatar(backgroundColor: AppTheme.primaryBlue, child: Icon(Icons.local_police, color: Colors.white)),
-            title: Text(op['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: fueCancelado ? Colors.orange.shade200 : Colors.grey.shade200),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
             onTap: () {
               Navigator.push(
                 context,
@@ -406,6 +515,166 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                 ),
               );
             },
+            child: Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: fueCancelado ? Colors.orange.shade50 : AppTheme.primaryBlue.withOpacity(0.1),
+                        child: Icon(Icons.local_police, color: fueCancelado ? Colors.orange.shade800 : AppTheme.primaryBlue, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              nombre,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
+                            ),
+                            if (fecha.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  fecha,
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: stateColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: stateColor.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(stateIcon, size: 12, color: stateColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              stateText,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: stateColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                  const SizedBox(height: 10),
+                  if (lugar.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Icon(Icons.location_on_outlined, size: 16, color: Colors.grey.shade700),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Lugar: $lugar',
+                              style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, size: 16, color: Colors.grey.shade700),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Horario programado: $horaInicio a $horaFin',
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                      ),
+                    ],
+                  ),
+                  if (fueCancelado) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.stop_circle_outlined, size: 16, color: Colors.orange.shade900),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              horaCorte != '--:--'
+                                  ? 'Cortado a las $horaCorte (Reportes e infracciones registrados se conservan)'
+                                  : 'Terminado antes del horario (Actividades registradas se conservan)',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.orange.shade900),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: Colors.grey.shade100)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.receipt_long_outlined, size: 14, color: Colors.grey.shade600),
+                            const SizedBox(width: 5),
+                            Text(
+                              totalActs > 0
+                                  ? '$totalActs ${totalActs == 1 ? "intervención" : "intervenciones"}'
+                                  : 'Sin intervenciones',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: totalActs > 0 ? Colors.grey.shade800 : Colors.grey.shade500,
+                                fontWeight: totalActs > 0 ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Ver papeletas',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryBlue,
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            const Icon(
+                              Icons.arrow_forward_ios,
+                              size: 11,
+                              color: AppTheme.primaryBlue,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -513,9 +782,113 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
             ? '\nN° Doc: ${data['conductorDni']}'
             : '';
 
+        final rawFechaHora = data['fecha_hora'] ?? data['fechaHora'] ?? data['fecha'] ?? data['fechaRegistro'];
+        String fechaTexto = '';
+        String horaTexto = '';
+
+        if (rawFechaHora != null && rawFechaHora.toString().trim().isNotEmpty) {
+          final str = rawFechaHora.toString().trim();
+          final dt = DateTime.tryParse(str);
+          if (dt != null) {
+            final dia = dt.day.toString().padLeft(2, '0');
+            final mes = dt.month.toString().padLeft(2, '0');
+            final anio = dt.year.toString();
+            fechaTexto = '$dia/$mes/$anio';
+
+            final period = dt.hour >= 12 ? 'pm' : 'am';
+            int hour12 = dt.hour % 12;
+            if (hour12 == 0) hour12 = 12;
+            final hora = hour12.toString().padLeft(2, '0');
+            final min = dt.minute.toString().padLeft(2, '0');
+            horaTexto = '$hora:$min $period';
+          } else {
+            final parts = str.split(' ');
+            if (parts.isNotEmpty) {
+              final dParts = parts[0].split('-');
+              if (dParts.length == 3) {
+                fechaTexto = '${dParts[2]}/${dParts[1]}/${dParts[0]}';
+              } else {
+                fechaTexto = parts[0];
+              }
+            }
+            if (parts.length > 1) {
+              final tParts = parts[1].split(':');
+              if (tParts.length >= 2) {
+                int? h = int.tryParse(tParts[0]);
+                int? m = int.tryParse(tParts[1]);
+                if (h != null && m != null) {
+                  final period = h >= 12 ? 'pm' : 'am';
+                  int h12 = h % 12;
+                  if (h12 == 0) h12 = 12;
+                  horaTexto = '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period';
+                }
+              }
+            }
+          }
+        }
+
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Detalles de la Actividad', style: TextStyle(color: esSinIdentificar ? Colors.orange.shade800 : (isFormal ? Colors.blue.shade800 : Colors.red.shade800), fontWeight: FontWeight.bold)),
+          title: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  'Detalles de la Actividad',
+                  style: TextStyle(
+                    color: esSinIdentificar
+                        ? Colors.orange.shade800
+                        : (isFormal ? Colors.blue.shade800 : Colors.red.shade800),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                  ),
+                ),
+              ),
+              if (fechaTexto.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.calendar_today, size: 11, color: Colors.grey.shade700),
+                            const SizedBox(width: 4),
+                            Text(
+                              fechaTexto,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
+                            ),
+                          ],
+                        ),
+                        if (horaTexto.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time, size: 11, color: Colors.grey.shade700),
+                              const SizedBox(width: 4),
+                              Text(
+                                horaTexto,
+                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

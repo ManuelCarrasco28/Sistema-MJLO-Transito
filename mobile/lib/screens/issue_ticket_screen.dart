@@ -122,7 +122,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   Future<void> _loadTiposInfraccion() async {
     try {
       final permite = await ApiService.permiteAplicarPapeletaMovil();
-      final response = permite ? await ApiService.getTiposInfraccion() : <dynamic>[];
+      final response = await ApiService.getTiposInfraccion();
       setState(() {
         _permitePapeletaMovil = permite;
         _tiposInfraccion = response;
@@ -485,7 +485,29 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                     ),
 
                   const SizedBox(height: 24),
-                  if (permitePapeleta) ...[
+                  if (!permitePapeleta)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.amber.shade800),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Las infracciones se guardarán como evidencia y serán verificadas por la administración.',
+                              style: TextStyle(color: Colors.amber.shade900, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   _buildSectionTitle('Infracciones a Aplicar'),
                   Container(
                     decoration: BoxDecoration(
@@ -562,14 +584,15 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'TOTAL DE PAPELETA: S/ $_montoTotal',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                  if (permitePapeleta) ...[
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'TOTAL DE PAPELETA: S/ $_montoTotal',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
                     ),
-                  ),
                   ],
 
                   const SizedBox(height: 24),
@@ -866,6 +889,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       maxLength: maxLength,
       decoration: InputDecoration(
         labelText: label,
+        counterText: '',
         prefixIcon: Icon(icon, color: Colors.grey.shade600),
         suffixIcon: hasSearch
             ? Padding(
