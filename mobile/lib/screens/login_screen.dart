@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 import 'home_screen.dart';
+import 'technical_home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -64,10 +65,14 @@ class _LoginScreenState extends State<LoginScreen> {
       // SOLO guardamos en historial y actualizamos recordar si la autenticación fue exitosa
       await ApiService.registrarLoginExitoso(usuario, password, _recordarUsuario);
 
+      final esTecnico = await ApiService.esInspectorTecnico();
+
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(
+            builder: (_) => esTecnico ? const TechnicalHomeScreen() : const HomeScreen(),
+          ),
         );
       }
     } catch (error) {

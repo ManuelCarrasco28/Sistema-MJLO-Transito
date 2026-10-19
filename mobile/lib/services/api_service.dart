@@ -18,6 +18,12 @@ class _ClienteAutenticado {
   Future<http.Response> post(Uri url, {Map<String, String>? headers, Object? body}) async =>
       _revisar(await http.post(url, headers: headers, body: body));
 
+  Future<http.Response> put(Uri url, {Map<String, String>? headers, Object? body}) async =>
+      _revisar(await http.put(url, headers: headers, body: body));
+
+  Future<http.Response> delete(Uri url, {Map<String, String>? headers, Object? body}) async =>
+      _revisar(await http.delete(url, headers: headers, body: body));
+
   Future<http.Response> _revisar(http.Response r) async {
     if (r.statusCode == 401) {
       await ApiService.logout();
@@ -45,7 +51,7 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://10.24.31.109:8080/api'; // Conexión local a Docker / IP de red local
+  static const String _defaultUrl = 'http://10.225.254.109:8080/api'; // Conexión local a Docker / IP de red local
   // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
   static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
   static const String _configuredUrl = String.fromEnvironment(
@@ -231,9 +237,20 @@ class ApiService {
             : int.parse(idPersona.toString());
 
         await prefs.setInt('id_persona', parsedId);
-        await prefs.setString('nombres', data['data']['nombres']);
-        await prefs.setString('apellidos', data['data']['apellidos']);
+        await prefs.setString('nombres', data['data']['nombres'] ?? '');
+        await prefs.setString('apellidos', data['data']['apellidos'] ?? '');
         await prefs.setString('usuario', username);
+        await prefs.setString('dni', data['data']['dni']?.toString() ?? '');
+        await prefs.setString('cargo', data['data']['cargo']?.toString() ?? '');
+        await prefs.setString('unidad_organica', data['data']['unidad_organica']?.toString() ?? '');
+        await prefs.setString('uo_siglas', data['data']['uo_siglas']?.toString() ?? '');
+        await prefs.setString('email', data['data']['email']?.toString() ?? '');
+        await prefs.setString('celular', data['data']['celular']?.toString() ?? '');
+        await prefs.setString('direccion', data['data']['direccion']?.toString() ?? '');
+        await prefs.setString('tipo_contrato', data['data']['tipo_contrato']?.toString() ?? '');
+        await prefs.setString('tipo_inspector', data['data']['tipo_inspector']?.toString() ?? '');
+        await prefs.setString('rol', data['data']['rol']?.toString() ?? '');
+        await prefs.setString('foto_img', data['data']['foto_img']?.toString() ?? '');
         return data;
       }
     }
@@ -257,15 +274,96 @@ class ApiService {
 
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    // Limpiar la sesión sin borrar el historial ni las preferencias.
+    // Limpiar la sesión completa
     await prefs.remove('id_persona');
     await prefs.remove('nombres');
     await prefs.remove('apellidos');
     await prefs.remove('usuario');
+    await prefs.remove('dni');
+    await prefs.remove('cargo');
+    await prefs.remove('unidad_organica');
+    await prefs.remove('uo_siglas');
+    await prefs.remove('email');
+    await prefs.remove('celular');
+    await prefs.remove('direccion');
+    await prefs.remove('tipo_contrato');
+    await prefs.remove('tipo_inspector');
+    await prefs.remove('rol');
+    await prefs.remove('foto_img');
     _cookieEnMemoria = null;
     try {
       await _secureStorage.delete(key: _sessionCookieKey);
     } catch (_) {}
+  }
+
+  /// Obtiene los datos completos del perfil del inspector activo
+  static Future<Map<String, dynamic>> getPerfilInspector() async {
+    final prefs = await SharedPreferences.getInstance();
+    final localData = <String, dynamic>{
+      'id_persona': prefs.getInt('id_persona'),
+      'nombres': prefs.getString('nombres') ?? '',
+      'apellidos': prefs.getString('apellidos') ?? '',
+      'usuario': prefs.getString('usuario') ?? '',
+      'dni': prefs.getString('dni') ?? '',
+      'cargo': prefs.getString('cargo') ?? '',
+      'unidad_organica': prefs.getString('unidad_organica') ?? '',
+      'uo_siglas': prefs.getString('uo_siglas') ?? '',
+      'email': prefs.getString('email') ?? '',
+      'celular': prefs.getString('celular') ?? '',
+      'direccion': prefs.getString('direccion') ?? '',
+      'tipo_contrato': prefs.getString('tipo_contrato') ?? '',
+      'tipo_inspector': prefs.getString('tipo_inspector') ?? '',
+      'rol': prefs.getString('rol') ?? '',
+      'foto_img': prefs.getString('foto_img') ?? '',
+    };
+
+    try {
+      final response = await _send(
+        () async => http.get(
+          Uri.parse('$baseUrl/me'),
+          headers: await _getHeaders(),
+        ),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        if (json['status'] == true && json['data'] != null) {
+          final d = json['data'] as Map<String, dynamic>;
+          for (final entry in d.entries) {
+            if (entry.value != null) {
+              if (entry.value is int) {
+                await prefs.setInt(entry.key, entry.value as int);
+              } else if (entry.value is String) {
+                await prefs.setString(entry.key, entry.value as String);
+              }
+            }
+          }
+          return {
+            ...localData,
+            ...d,
+          };
+        }
+      }
+    } catch (_) {}
+
+    return localData;
+  }
+
+  static Future<String?> getCargo() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('cargo');
+  }
+
+  static Future<String?> getTipoInspector() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('tipo_inspector');
+  }
+
+  static Future<bool> esInspectorTecnico() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cargo = (prefs.getString('cargo') ?? '').toUpperCase();
+    final tipo = (prefs.getString('tipo_inspector') ?? '').toUpperCase();
+    return cargo.contains('TÉCNICO') || cargo.contains('TECNICO') || tipo == 'TECNICO';
   }
 
   static Future<List<dynamic>> getPapeletas({
@@ -618,5 +716,115 @@ class ApiService {
         'No se pudo conectar con el servidor. Verifica la conexión y que el backend esté levantado.',
       );
     }
+  }
+
+  // ==================== MÓDULO INSPECCIÓN TÉCNICA VEHICULAR (CERTICAV) ====================
+
+  /// Obtiene la lista de vehículos FORMALES para inspección técnica
+  static Future<List<Map<String, dynamic>>> getVehiculosFormales({
+    String? buscar,
+    int page = 1,
+    int porPagina = 30,
+  }) async {
+    final Map<String, String> queryParams = {
+      'page': page.toString(),
+      'porPagina': porPagina.toString(),
+    };
+    if (buscar != null && buscar.trim().isNotEmpty) {
+      queryParams['buscar'] = buscar.trim();
+    }
+
+    final uri = Uri.parse('$baseUrl/mobile/vehiculos-formales').replace(
+      queryParameters: queryParams,
+    );
+    final response = await _send(() async => _http.get(uri, headers: await _getHeaders()));
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      if (json['data'] is List) {
+        return List<Map<String, dynamic>>.from(json['data']);
+      }
+    }
+    return [];
+  }
+
+  /// Obtiene los criterios oficiales de inspección CERTICAV
+  static Future<List<Map<String, dynamic>>> getInspeccionCriterios() async {
+    final uri = Uri.parse('$baseUrl/mobile/inspeccion-criterios');
+    final response = await _send(() async => _http.get(uri, headers: await _getHeaders()));
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      if (json['data'] is List) {
+        return List<Map<String, dynamic>>.from(json['data']);
+      }
+    }
+    return [];
+  }
+
+  /// Registra la inspección técnica en estado PENDIENTE_REVISION
+  static Future<Map<String, dynamic>> enviarInspeccionTecnica(
+    Map<String, dynamic> data,
+  ) async {
+    final uri = Uri.parse('$baseUrl/mobile/inspecciones');
+    final response = await _send(
+      () async => _http.post(
+        uri,
+        headers: await _getHeaders(isJson: true),
+        body: jsonEncode(data),
+      ),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final json = jsonDecode(response.body);
+      return json;
+    }
+
+    throw Exception(_extractError(response.body, 'No se pudo enviar la inspección técnica.'));
+  }
+
+  /// Modifica una inspección técnica existente dentro de la ventana de tolerancia de 5 minutos
+  static Future<Map<String, dynamic>> modificarInspeccionTecnica(
+    int inspeccionId,
+    Map<String, dynamic> data,
+  ) async {
+    final uri = Uri.parse('$baseUrl/mobile/inspecciones/$inspeccionId');
+    final response = await _send(
+      () async => _http.put(
+        uri,
+        headers: await _getHeaders(isJson: true),
+        body: jsonEncode(data),
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      return json;
+    }
+
+    throw Exception(_extractError(response.body, 'No se pudo modificar la inspección técnica.'));
+  }
+
+  /// Obtiene el historial de inspecciones del inspector técnico
+  static Future<List<Map<String, dynamic>>> getHistorialInspeccionesTecnicas({
+    String? buscar,
+  }) async {
+    final Map<String, String> queryParams = {};
+    if (buscar != null && buscar.trim().isNotEmpty) {
+      queryParams['buscar'] = buscar.trim();
+    }
+
+    final uri = Uri.parse('$baseUrl/mobile/inspecciones').replace(
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
+    );
+    final response = await _send(() async => _http.get(uri, headers: await _getHeaders()));
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      if (json['data'] is List) {
+        return List<Map<String, dynamic>>.from(json['data']);
+      }
+    }
+    return [];
   }
 }

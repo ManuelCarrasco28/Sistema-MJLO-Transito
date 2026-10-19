@@ -12,6 +12,7 @@ import 'history_screen.dart';
 import 'vehicle_details_screen.dart';
 import 'person_details_screen.dart';
 import 'settings_screen.dart';
+import 'inspector_profile_screen.dart';
 import '../utils/oficinas_registrales.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -670,7 +671,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
           IconButton(
+            icon: const Icon(Icons.badge_outlined, color: Colors.white),
+            tooltip: 'Ver perfil del inspector',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const InspectorProfileScreen()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.settings, color: Colors.white),
+            tooltip: 'Configuración',
             onPressed: () {
               Navigator.push(
                 context,

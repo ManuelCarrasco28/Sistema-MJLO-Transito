@@ -910,4 +910,76 @@ class VehiculosController extends ResourceController
 
         return $this->respondDeleted(['status' => true, 'message' => 'Vehículo eliminado con éxito']);
     }
+
+    public function formalesMobile()
+    {
+        $db = \Config\Database::connect();
+        $builder = $db->table('vehiculos v')
+            ->select("
+                v.id,
+                v.uuid,
+                v.placa,
+                COALESCE(tv.nombre, 'Mototaxi') AS tipo,
+                COALESCE(v.marca, '') AS marca,
+                COALESCE(v.modelo, '') AS modelo,
+                COALESCE(v.color, '') AS color,
+                COALESCE(v.anio_fabricacion, '') AS anio,
+                COALESCE(v.serie_motor, '') AS serieMotor,
+                v.id_asociacion AS asociacionId,
+                COALESCE(o.razon_social, '') AS asociacion,
+                COALESCE(o.ruc, '') AS asociacionRuc,
+                COALESCE(p.numero, '') AS propietarioDni,
+                TRIM(CONCAT(COALESCE(c.nombres, ''), ' ', COALESCE(c.apellido_paterno, ''), ' ', COALESCE(c.apellido_materno, ''))) AS propietario,
+                v.estado AS estado,
+                'FORMAL' AS formalidad
+            ", false)
+            ->join('tipos_vehiculo tv', 'tv.id = v.id_tipo_vehiculo', 'left')
+            ->join('asociaciones o', 'o.id = v.id_asociacion', 'inner')
+            ->join('vehiculo_propietarios vp', "vp.id_vehiculo = v.id AND vp.fecha_fin IS NULL AND vp.estado = 'ACTIVO'", 'left')
+            ->join('personas p', 'p.id = vp.id_persona', 'left')
+            ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
+            ->where('v.estado', 'ACTIVO')
+            ->where('v.id_asociacion IS NOT NULL', null, false);
+
+        $buscar = trim((string) $this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $builder->groupStart()
+                ->like('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
+                ->orLike('v.marca', $buscar)
+                ->orLike('v.modelo', $buscar)
+                ->orLike('o.razon_social', $buscar)
+                ->orLike('p.numero', $buscar)
+                ->orLike('c.nombres', $buscar)
+                ->orLike('c.apellido_paterno', $buscar)
+                ->orWhere(\App\Libraries\Busqueda::nombreCompleto($buscar, 'c.nombres', 'c.apellido_paterno', 'c.apellido_materno'), null, false)
+                ->groupEnd();
+        }
+
+        $page = max(1, (int) $this->request->getGet('page'));
+        $porPagina = max(1, min(100, (int) ($this->request->getGet('porPagina') ?: 30)));
+
+        $total = (clone $builder)->countAllResults(false);
+        $rows = $builder->orderBy('v.placa', 'ASC')
+            ->limit($porPagina, ($page - 1) * $porPagina)
+            ->get()
+            ->getResultArray();
+
+        $rows = array_map(static function (array $r) {
+            $r['id'] = (int) $r['id'];
+            $r['asociacionId'] = (int) $r['asociacionId'];
+            $r['propietario'] = !empty(trim($r['propietario'])) ? trim($r['propietario']) : 'Sin Propietario Asignado';
+            return $r;
+        }, $rows);
+
+        return $this->respond([
+            'status' => true,
+            'data' => $rows,
+            'meta' => [
+                'total' => $total,
+                'page' => $page,
+                'porPagina' => $porPagina,
+                'totalPaginas' => (int) ceil($total / $porPagina),
+            ],
+        ]);
+    }
 }

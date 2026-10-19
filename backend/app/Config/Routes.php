@@ -123,6 +123,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('inspecciones/certicav-estado', 'InspeccionesController::certicavEstado');
         $routes->get('inspecciones/certicav-solicitudes', 'InspeccionesController::certicavSolicitudes');
         $routes->post('inspecciones/certicav-solicitar', 'InspeccionesController::certicavSolicitar');
+        $routes->post('inspecciones/(:segment)/aprobar', 'InspeccionesController::aprobar/$1');
         $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
         $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');
         $routes->get('internamientos/estadisticas', 'InternamientosController::estadisticas');
@@ -142,6 +143,11 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('municipalidad/config-mobile', 'MunicipalidadController::mobileConfig');
         $routes->get('mobile/dashboard', 'MunicipalidadController::mobileDashboard');
         $routes->get('mobile/vehiculos/buscar', 'VehiculosController::buscarMobile');
+        $routes->get('mobile/vehiculos-formales', 'VehiculosController::formalesMobile');
+        $routes->get('mobile/inspeccion-criterios', 'InspeccionesController::criterios');
+        $routes->get('mobile/inspecciones', 'InspeccionesController::historialMovil');
+        $routes->post('mobile/inspecciones', 'InspeccionesController::registrarDesdeMovil');
+        $routes->put('mobile/inspecciones/(:segment)', 'InspeccionesController::modificarDesdeMovil/$1');
         $routes->get('papeletas/(:segment)/fotos', 'PapeletasController::fotos/$1');
 
         $routes->get('pide/reniec/(:segment)', 'PideController::reniec/$1');

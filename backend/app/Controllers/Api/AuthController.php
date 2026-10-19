@@ -30,12 +30,14 @@ class AuthController extends ResourceController
     {
         $usuarioModel = new UsuarioModel();
         $userRecord = $usuarioModel->asArray()
-            ->select('usuarios.*, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, COALESCE(ciudadanos.foto, "") as foto_img, roles.nombre as rol, cargos.nombre as cargo')
+            ->select('usuarios.*, personas.numero as dni, personas.email, personas.celular, personas.direccion, ciudadanos.nombres, TRIM(CONCAT(ciudadanos.apellido_paterno, " ", IFNULL(ciudadanos.apellido_materno, ""))) as apellidos, COALESCE(ciudadanos.foto, "") as foto_img, roles.nombre as rol, cargos.nombre as cargo, unidades_organicas.nombre as unidad_organica, unidades_organicas.siglas as uo_siglas, trabajadores.tipo as tipo_contrato')
+            ->join('personas', 'personas.id = usuarios.id_persona', 'inner')
             ->join('ciudadanos', 'ciudadanos.id_persona = usuarios.id_persona', 'inner')
             ->join('roles', 'roles.id = usuarios.id_rol', 'inner')
             ->join('trabajadores', 'trabajadores.id_persona = usuarios.id_persona', 'left')
             ->join('desplazamiento_oficina', 'desplazamiento_oficina.id_trabajador = usuarios.id_persona AND (desplazamiento_oficina.fecha_termino IS NULL OR desplazamiento_oficina.fecha_termino > CURDATE())', 'left')
             ->join('cargos', 'cargos.id = desplazamiento_oficina.id_cargo', 'left')
+            ->join('unidades_organicas', 'unidades_organicas.id = desplazamiento_oficina.id_unidad_organica', 'left')
             ->where('usuarios.id', $userId)
             ->first();
 
@@ -44,18 +46,26 @@ class AuthController extends ResourceController
         }
 
         return [
-            'id'           => $userRecord['id'],
-            'nombres'      => $userRecord['nombres'],
-            'apellidos'    => $userRecord['apellidos'],
-            'usuario'      => $userRecord['usuario'],
-            'rol'          => $userRecord['rol'],
-            'id_rol'       => (int) $userRecord['id_rol'],
-            'cargo'        => $userRecord['cargo'],
-            'id_persona'   => (int) $userRecord['id_persona'],
+            'id'              => $userRecord['id'],
+            'dni'             => $userRecord['dni'] ?? '',
+            'nombres'         => $userRecord['nombres'],
+            'apellidos'       => $userRecord['apellidos'],
+            'usuario'         => $userRecord['usuario'],
+            'rol'             => $userRecord['rol'],
+            'id_rol'          => (int) $userRecord['id_rol'],
+            'cargo'           => $userRecord['cargo'] ?? 'Inspector Técnico',
+            'unidad_organica' => $userRecord['unidad_organica'] ?? 'Subgerencia de Tránsito, Transporte y Seguridad Vial',
+            'uo_siglas'       => $userRecord['uo_siglas'] ?? 'STTS',
+            'email'           => $userRecord['email'] ?? '',
+            'celular'         => $userRecord['celular'] ?? '',
+            'direccion'       => $userRecord['direccion'] ?? '',
+            'tipo_contrato'   => $userRecord['tipo_contrato'] ?? '',
+            'id_persona'      => (int) $userRecord['id_persona'],
+            'tipo_inspector'  => (strcasecmp((string) $userRecord['rol'], 'Inspector Técnico') === 0 || str_contains(strtoupper((string) ($userRecord['cargo'] ?? '')), 'TÉCNICO')) ? 'TECNICO' : ((strcasecmp((string) $userRecord['rol'], 'Inspector de Tránsito') === 0 || strcasecmp((string) $userRecord['rol'], 'Trabajador') === 0) ? 'TRANSITO' : null),
 
-            'foto_img'     => (new \App\Services\FileStorageService())->urlPublica($userRecord['foto_img'] ?? null) ?? '',
-            'sv'           => (int) $userRecord['session_version'],
-            'preferencias' => json_decode((string) ($userRecord['preferencias'] ?? ''), true) ?: new \stdClass(),
+            'foto_img'        => (new \App\Services\FileStorageService())->urlPublica($userRecord['foto_img'] ?? null) ?? '',
+            'sv'              => (int) $userRecord['session_version'],
+            'preferencias'    => json_decode((string) ($userRecord['preferencias'] ?? ''), true) ?: new \stdClass(),
         ];
     }
 

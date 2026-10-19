@@ -124,6 +124,7 @@ export function Inspecciones() {
 
   const [filterResultado, setFilterResultado] = useState('TODOS')
   const [filterVigencia, setFilterVigencia] = useState('TODOS')
+  const [filterEstado, setFilterEstado] = useState('TODOS')
   const filterHistorial = 'ACTUALES'
   const [inspeccionPendiente, setInspeccionPendiente] = useState(null)
   const navigate = useNavigate()
@@ -213,6 +214,7 @@ export function Inspecciones() {
       if (debouncedSearch) params.set('buscar', debouncedSearch)
       if (filterResultado !== 'TODOS') params.set('resultado', filterResultado)
       if (filterVigencia !== 'TODOS') params.set('vigencia', filterVigencia)
+      if (filterEstado !== 'TODOS') params.set('estado', filterEstado)
       params.set('historial', filterHistorial)
       if (sortBy) { params.set('sortBy', sortBy); params.set('sortDir', sortDir) }
 
@@ -237,11 +239,11 @@ export function Inspecciones() {
     setLoadError('')
     loadData()
     return () => cargaInspecciones.current?.abort()
-  }, [currentPage, itemsPerPage, debouncedSearch, filterResultado, filterVigencia, filterHistorial, sortBy, sortDir])
+  }, [currentPage, itemsPerPage, debouncedSearch, filterResultado, filterVigencia, filterEstado, filterHistorial, sortBy, sortDir])
 
   useRecargaSilenciosa('/inspecciones', [() => loadData(), () => loadStats(), () => cargarSolicitudes()])
 
-  const [stats, setStats] = useState({ totales: 0, aprobados: 0, observados: 0, desaprobados: 0 })
+  const [stats, setStats] = useState({ totales: 0, aprobados: 0, observados: 0, desaprobados: 0, pendientes_revision: 0 })
 
   const loadStats = () => {
     apiFetch('/inspecciones/estadisticas')
@@ -318,13 +320,14 @@ export function Inspecciones() {
   const aprobados = stats.aprobados ?? 0
   const observados = stats.observados ?? 0
   const desaprobados = stats.desaprobados ?? 0
+  const pendientesRevision = stats.pendientes_revision ?? 0
   const porcentajeAprobados = totales > 0 ? Math.round((aprobados / totales) * 100) : 0
 
   const filteredInspecciones = inspecciones
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterResultado, filterVigencia])
+  }, [searchTerm, filterResultado, filterVigencia, filterEstado])
 
   const paginatedInspecciones = inspecciones
 
@@ -759,6 +762,24 @@ export function Inspecciones() {
     buscarVehiculoPorPlaca()
   }, [isModalOpen, selectedInspeccion, placaBloqueada, formData.vehiculoPlaca])
 
+  const handleAprobarInspeccion = async (inspeccion) => {
+    try {
+      const res = await apiFetch(`/inspecciones/${inspeccion.id}/aprobar`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        showToast(await leerMensajeError(res, 'No se pudo aprobar la inspección.'), 'error')
+        return
+      }
+      showToast(`Inspección ${inspeccion.numeroRegistro || ''} aprobada y oficializada con éxito`, 'crear')
+      setIsDetailModalOpen(false)
+      loadData()
+      loadStats()
+    } catch {
+      showToast('Error de conexión al aprobar la inspección.', 'error')
+    }
+  }
+
   const handleOpenDetail = (inspeccion) => {
     setSelectedInspeccion(inspeccion)
     setIsDetailModalOpen(true)
@@ -1166,6 +1187,34 @@ export function Inspecciones() {
             </p>
           </div>
         </div>
+
+        {/* 6. Pendientes de revisión (Móvil) */}
+        <div
+          onClick={() => {
+            setFilterEstado((prev) => (prev === 'PENDIENTE_REVISION' ? 'TODOS' : 'PENDIENTE_REVISION'))
+            setCurrentPage(1)
+          }}
+          className={`relative overflow-hidden rounded-xl border-[1.5px] ${filterEstado === 'PENDIENTE_REVISION' ? 'border-amber-500 ring-2 ring-amber-400 bg-amber-50/70 dark:bg-amber-950/40' : 'border-amber-400 bg-white dark:border-[var(--border)] dark:bg-[#1C2438]'} px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs cursor-pointer`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              Pendientes revisión
+            </span>
+            <span className="grid size-6 place-items-center rounded-md text-amber-600 dark:text-amber-400 font-bold text-xs">
+              <Icon name="clock" className="size-3.5" />
+            </span>
+          </div>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+              {formatNumeroTarjeta(pendientesRevision)}
+            </p>
+            {Number(pendientesRevision) > 0 && (
+              <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+                Móvil
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="mb-3 flex border-b border-slate-200 dark:border-[var(--border)] print:hidden">
@@ -1361,12 +1410,13 @@ export function Inspecciones() {
               options={FILTER_VIGENCIA_OPTIONS}
             />
 
-            {(filterResultado !== 'TODOS' || filterVigencia !== 'TODOS' || searchTerm !== '') && (
+            {(filterResultado !== 'TODOS' || filterVigencia !== 'TODOS' || filterEstado !== 'TODOS' || searchTerm !== '') && (
               <button
                 type="button"
                 onClick={() => {
                   setFilterResultado('TODOS')
                   setFilterVigencia('TODOS')
+                  setFilterEstado('TODOS')
                   setSearchTerm('')
                   setCurrentPage(1)
                 }}
@@ -1492,10 +1542,21 @@ export function Inspecciones() {
                       </td>
 
                       <td className="px-4 py-3 ">
-                        {getResultadoBadge(i.resultado)}
+                        {i.estado === 'PENDIENTE_REVISION' ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                            <span className="size-1.5 rounded-full bg-amber-600 animate-ping" />
+                            PENDIENTE REVISIÓN
+                          </span>
+                        ) : (
+                          getResultadoBadge(i.resultado)
+                        )}
                       </td>
                       <td className="px-4 py-3">
-                        {i.estadoVigencia === 'OBSERVADO' ? (
+                        {i.estado === 'PENDIENTE_REVISION' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                            Por aprobar
+                          </span>
+                        ) : i.estadoVigencia === 'OBSERVADO' ? (
                           <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Pendiente de subsanar</span>
                         ) : i.estadoVigencia === 'DESAPROBADO' ? (
                           <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300">No habilitado</span>
@@ -1510,6 +1571,16 @@ export function Inspecciones() {
                         className="sticky right-0 z-10 px-4 py-3 text-center bg-white group-hover:bg-[#e6eef8] dark:bg-[#1C2438] dark:group-hover:bg-[#222d45] transition-colors shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"
                       >
                         <div className="flex items-center justify-center gap-1.5">
+                          {i.estado === 'PENDIENTE_REVISION' && (
+                            <button
+                              type="button"
+                              onClick={() => handleAprobarInspeccion(i)}
+                              title="Aprobar inspección técnica móvil"
+                              className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-600 hover:text-white dark:bg-emerald-950/50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-600 dark:hover:text-white"
+                            >
+                              <Icon name="check" className="size-4" />
+                            </button>
+                          )}
                           {/* OJO: Celeste (Ver Ficha) */}
                           <button
                             type="button"
@@ -2277,6 +2348,31 @@ export function Inspecciones() {
 
             {/* Modal Body */}
             <div className="p-5 pb-6 space-y-3.5 max-h-[80vh] overflow-y-auto">
+              {selectedInspeccion.estado === 'PENDIENTE_REVISION' && (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 p-3.5 dark:border-amber-700/60 dark:bg-amber-950/40">
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+                      <Icon name="alert" className="size-4" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                        Inspección técnica enviada desde la app móvil (Pendiente de revisión)
+                      </p>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                        Registrada por el inspector <strong className="font-semibold">{selectedInspeccion.inspector || selectedInspeccion.nombreTecnico || 'técnico'}</strong>. Revise el dictamen y apruebe para oficializarla como ACTIVO.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAprobarInspeccion(selectedInspeccion)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 cursor-pointer whitespace-nowrap"
+                  >
+                    <span>✓ Aprobar y Oficializar CERTICAV</span>
+                  </button>
+                </div>
+              )}
+
               {/* Profile Hero Card */}
               <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] shadow-xs">
                 <div className="flex items-center gap-3.5">

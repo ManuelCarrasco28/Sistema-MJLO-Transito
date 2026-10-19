@@ -20,9 +20,10 @@ class InspeccionesController extends ResourceController
         $row = $db->table('certicav')
             ->select("
                 COUNT(*) as total,
-                SUM(CASE WHEN resultado = 'APROBADO' THEN 1 ELSE 0 END) as aprobados,
-                SUM(CASE WHEN resultado = 'OBSERVADO' THEN 1 ELSE 0 END) as observados,
-                SUM(CASE WHEN resultado = 'DESAPROBADO' THEN 1 ELSE 0 END) as desaprobados
+                SUM(CASE WHEN resultado = 'APROBADO' AND estado != 'PENDIENTE_REVISION' THEN 1 ELSE 0 END) as aprobados,
+                SUM(CASE WHEN resultado = 'OBSERVADO' AND estado != 'PENDIENTE_REVISION' THEN 1 ELSE 0 END) as observados,
+                SUM(CASE WHEN resultado = 'DESAPROBADO' AND estado != 'PENDIENTE_REVISION' THEN 1 ELSE 0 END) as desaprobados,
+                SUM(CASE WHEN estado = 'PENDIENTE_REVISION' THEN 1 ELSE 0 END) as pendientes_revision
             ", false)
             ->get()->getRowArray();
 
@@ -31,6 +32,7 @@ class InspeccionesController extends ResourceController
             'aprobados' => (int) ($row['aprobados'] ?? 0),
             'observados' => (int) ($row['observados'] ?? 0),
             'desaprobados' => (int) ($row['desaprobados'] ?? 0),
+            'pendientes_revision' => (int) ($row['pendientes_revision'] ?? 0),
         ]]);
     }
 
@@ -217,6 +219,13 @@ class InspeccionesController extends ResourceController
             $resultado = strtoupper(trim((string)$this->request->getGet('resultado')));
             if (in_array($resultado, ['APROBADO', 'OBSERVADO', 'DESAPROBADO'], true)) {
                 $builder->where('i.resultado', $resultado);
+            }
+
+            $estadoFiltro = strtoupper(trim((string)$this->request->getGet('estado')));
+            if ($estadoFiltro === 'PENDIENTE_REVISION') {
+                $builder->where('i.estado', 'PENDIENTE_REVISION');
+            } elseif ($estadoFiltro === 'ACTIVO') {
+                $builder->where('i.estado', 'ACTIVO');
             }
 
             $vigencia = strtoupper(trim((string)$this->request->getGet('vigencia')));
@@ -750,7 +759,11 @@ class InspeccionesController extends ResourceController
                 i.fecha_segunda_evaluacion as fechaSegundaEvaluacion,
                 i.resultado,
                 i.observaciones,
-                i.estado
+                i.estado,
+                i.fecha_modificacion as fechaModificacion,
+                TIMESTAMPDIFF(SECOND, i.fecha_modificacion, NOW()) as segundosDesdeCreacion,
+                GREATEST(0, 300 - TIMESTAMPDIFF(SECOND, i.fecha_modificacion, NOW())) as segundosRestantesTolerancia,
+                CASE WHEN i.estado = 'PENDIENTE_REVISION' AND TIMESTAMPDIFF(SECOND, i.fecha_modificacion, NOW()) <= 300 THEN 1 ELSE 0 END as puedeEditar
             ")
             ->join('vehiculos v', 'v.id = i.id_vehiculo', 'left')
             ->join('asociaciones a', 'a.id = v.id_asociacion', 'left')
@@ -785,6 +798,8 @@ class InspeccionesController extends ResourceController
 
         if (($row['estado'] ?? '') === 'ANULADA') {
             $row['estadoVigencia'] = 'ANULADA';
+        } elseif (($row['estado'] ?? '') === 'PENDIENTE_REVISION') {
+            $row['estadoVigencia'] = 'PENDIENTE_REVISION';
         } elseif ($row['resultado'] === 'APROBADO') {
             $row['estadoVigencia'] = $hoy <= $fechaVencimiento ? 'VIGENTE' : 'VENCIDO';
             $row['diasRestantes'] = max(0, (int)((strtotime($fechaVencimiento) - strtotime($hoy)) / 86400));
@@ -865,5 +880,398 @@ class InspeccionesController extends ResourceController
         }
         if (count($seen) !== count($existentes)) throw new \DomainException('Debes evaluar todos los ítems del checklist.');
         return $detalles;
+    }
+
+    public function registrarDesdeMovil()
+    {
+        $db = \Config\Database::connect();
+        $input = $this->request->getJSON(true) ?: $this->request->getPost();
+
+        $vehiculoId = (int)($input['vehiculoId'] ?? 0);
+        if ($vehiculoId <= 0 && !empty($input['vehiculoPlaca'])) {
+            $vRow = $db->table('vehiculos')->where('placa', \App\Libraries\Placa::paraBusqueda($input['vehiculoPlaca']))->get()->getRowArray();
+            if ($vRow) {
+                $vehiculoId = (int)$vRow['id'];
+            }
+        }
+        if ($vehiculoId <= 0) {
+            return $this->failValidationErrors('Debe seleccionar un vehículo válido.');
+        }
+
+        // VALIDACIÓN ESTRICTA: Solo vehículos FORMALES (con id_asociacion)
+        $vehiculo = $db->table('vehiculos')
+            ->select('id, placa, id_asociacion, estado')
+            ->where('id', $vehiculoId)
+            ->where('estado', 'ACTIVO')
+            ->get()
+            ->getRowArray();
+
+        if (!$vehiculo) {
+            return $this->failNotFound('El vehículo seleccionado no existe o se encuentra inactivo.');
+        }
+
+        if (empty($vehiculo['id_asociacion'])) {
+            return $this->failValidationErrors('Solo se permite realizar inspecciones técnicas a vehículos FORMALES debidamente autorizados con asociación.');
+        }
+
+        $placa = $vehiculo['placa'];
+
+        $detalles = $input['detalles'] ?? [];
+        try {
+            $detalles = $this->validarDetalles($db, $detalles);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        }
+
+        $cookieUser = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
+        $tecnicoPersonaId = (int)($cookieUser['id_persona'] ?? 0);
+        $tecnicoNombre = trim(($cookieUser['nombres'] ?? '') . ' ' . ($cookieUser['apellidos'] ?? ''));
+
+        if ($tecnicoPersonaId > 0 && empty($tecnicoNombre)) {
+            $tecnicoDb = $db->table('ciudadanos')->where('id_persona', $tecnicoPersonaId)->get()->getRowArray();
+            if ($tecnicoDb) {
+                $tecnicoNombre = trim($tecnicoDb['nombres'] . ' ' . $tecnicoDb['apellido_paterno'] . ' ' . ($tecnicoDb['apellido_materno'] ?? ''));
+            }
+        }
+        if (empty($tecnicoNombre)) {
+            $tecnicoNombre = trim((string)($input['inspector'] ?? 'Inspector Técnico'));
+        }
+
+        $fecha = !empty($input['fecha']) ? trim($input['fecha']) : date('Y-m-d');
+        $numeroInspeccion = trim((string)($input['numeroRegistro'] ?? ($input['numeroInspeccion'] ?? '')));
+        $numeroSerieCerticav = trim((string)($input['numeroSerieCerticav'] ?? ''));
+
+        if ($numeroInspeccion === '') {
+            $numeroInspeccion = $this->siguienteNumeroRegistro($db, substr($fecha, 0, 4));
+        }
+        if ($numeroSerieCerticav === '') {
+            $numeroSerieCerticav = $this->siguienteSerieCerticav($db);
+        }
+
+        try {
+            $this->validarCorrelativos($db, $numeroInspeccion, $numeroSerieCerticav);
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        }
+
+        $primeraEvaluacion = trim($input['primeraEvaluacion'] ?? 'APROBADO');
+        if (!in_array($primeraEvaluacion, ['APROBADO', 'DESAPROBADO', 'OBSERVADO'], true)) {
+            $primeraEvaluacion = 'APROBADO';
+        }
+        $resultado = trim($input['resultado'] ?? $primeraEvaluacion);
+        if (!in_array($resultado, ['APROBADO', 'DESAPROBADO', 'OBSERVADO'], true)) {
+            $resultado = 'APROBADO';
+        }
+
+        $conductorNombre = trim($input['conductorNombre'] ?? ($input['conductor'] ?? ''));
+        $conductorDni = trim($input['conductorDni'] ?? '');
+        $conductorLicencia = trim($input['conductorLicencia'] ?? '');
+        $conductorId = null;
+        if (!empty($conductorNombre) || !empty($conductorDni)) {
+            $conductorId = $this->resolverConductor($db, $conductorNombre, $conductorDni, $conductorLicencia);
+        }
+
+        $observaciones = !empty($input['observaciones']) ? trim($input['observaciones']) : null;
+
+        // Si ya hay un pago CERTICAV libre para este vehículo, lo vinculamos
+        $idPago = null;
+        try {
+            $certicavPago = new \App\Services\CerticavPago($db);
+            $pagoDisp = $certicavPago->pagoDisponible($vehiculoId);
+            if ($pagoDisp) {
+                $idPago = (int)$pagoDisp['id'];
+            }
+        } catch (\Throwable $e) {
+            // No bloquea el guardado en estado pendiente de revisión
+        }
+
+        $candado = (int)($db->query("SELECT GET_LOCK('mjlo_certicav', 10) AS l")->getRowArray()['l'] ?? 0) === 1;
+        if (!$candado) {
+            return $this->failServerError('El sistema está procesando otra inspección. Intente nuevamente en unos segundos.');
+        }
+
+        try {
+            $db->transException(true)->transBegin();
+
+            $inspData = [
+                'uuid'                  => \App\Libraries\Identificador::nuevo(),
+                'numero_registro'       => $numeroInspeccion,
+                'numero_serie_certicav' => $numeroSerieCerticav,
+                'primera_evaluacion'    => $primeraEvaluacion,
+                'segunda_evaluacion'    => null,
+                'id_conductor'          => $conductorId,
+                'id_vehiculo'           => $vehiculoId,
+                'id_pago'               => $idPago,
+                'id_tecnico'            => $tecnicoPersonaId > 0 ? $tecnicoPersonaId : null,
+                'nombre_tecnico'        => $tecnicoNombre,
+                'fecha'                 => $fecha,
+                'resultado'             => $resultado,
+                'observaciones'         => $observaciones,
+                'estado'                => 'PENDIENTE_REVISION',
+            ];
+
+            $db->table('certicav')->insert($inspData);
+            $inspeccionId = (int)$db->insertID();
+
+            $filasDetalles = [];
+            foreach ($detalles as $det) {
+                $filasDetalles[] = [
+                    'id_certicav'     => $inspeccionId,
+                    'id_criterio'     => (int)$det['criterioId'],
+                    'estado_revision' => trim($det['estado'] ?? 'BIEN'),
+                    'observacion'     => trim($det['obs'] ?? ''),
+                ];
+            }
+            if (!empty($filasDetalles)) {
+                $db->table('certicav_detalles')->insertBatch($filasDetalles);
+            }
+
+            $db->transComplete();
+
+            if ($db->transStatus() === false) {
+                return $this->failServerError('Error guardando los datos de la inspección técnica.');
+            }
+
+            \App\Services\AuditoriaService::registrar(
+                'INSPECCION_TECNICA',
+                'REGISTRO_MOVIL',
+                "El inspector técnico {$tecnicoNombre} registró la inspección de campo para el vehículo {$placa} (Registro: {$numeroInspeccion}). Enviada a revisión del Administrador.",
+                ['id' => $inspeccionId, 'placa' => $placa, 'registro' => $numeroInspeccion, 'resultado' => $resultado]
+            );
+
+            return $this->respondCreated([
+                'status'  => true,
+                'message' => 'Inspección técnica enviada con éxito en estado pendiente de revisión para la aprobación del Administrador.',
+                'data'    => [
+                    'id'                  => $inspeccionId,
+                    'numeroRegistro'      => $numeroInspeccion,
+                    'numeroSerieCerticav' => $numeroSerieCerticav,
+                    'vehiculoPlaca'       => $placa,
+                    'fecha'               => $fecha,
+                    'resultado'           => $resultado,
+                    'primeraEvaluacion'   => $primeraEvaluacion,
+                    'estado'              => 'PENDIENTE_REVISION',
+                    'inspector'           => $tecnicoNombre,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'Error al registrar inspección desde móvil: ' . $e->getMessage());
+            return $this->failServerError('Ocurrió un error al guardar la inspección técnica.');
+        } finally {
+            if ($candado) {
+                $db->query("SELECT RELEASE_LOCK('mjlo_certicav')");
+            }
+        }
+    }
+
+    public function modificarDesdeMovil($id = null)
+    {
+        $db = \Config\Database::connect();
+        $cookieUser = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
+        if (!$cookieUser) {
+            return $this->failUnauthorized('Sesión no válida o expirada.');
+        }
+        $tecnicoPersonaId = (int)($cookieUser['id_persona'] ?? 0);
+        $tecnicoNombre = trim(($cookieUser['nombres'] ?? '') . ' ' . ($cookieUser['apellidos'] ?? ''));
+
+        $id = (int)$id;
+        if ($id <= 0) {
+            return $this->failNotFound('ID de inspección no válido.');
+        }
+
+        $row = $db->table('certicav')->where('id', $id)->get()->getRowArray();
+        if (!$row) {
+            return $this->failNotFound('Inspección no encontrada.');
+        }
+
+        if ($row['estado'] !== 'PENDIENTE_REVISION') {
+            return $this->failValidationErrors('La inspección ya no puede modificarse porque ha sido aprobada u oficializada.');
+        }
+
+        if ($tecnicoPersonaId > 0 && !empty($row['id_tecnico']) && (int)$row['id_tecnico'] !== $tecnicoPersonaId) {
+            return $this->failForbidden('No tiene permisos para modificar una inspección realizada por otro inspector.');
+        }
+
+        // Tolerancia estricta de 5 minutos (300 segundos) desde la creación
+        $segundosTranscurridos = (int)($db->query("SELECT TIMESTAMPDIFF(SECOND, ?, NOW()) AS seg", [$row['fecha_modificacion']])->getRowArray()['seg'] ?? 999);
+        if ($segundosTranscurridos > 300) {
+            return $this->failValidationErrors('Ha superado el tiempo de tolerancia de 5 minutos para modificar esta inspección técnica.');
+        }
+
+        $input = $this->request->getJSON(true) ?: $this->request->getPost();
+        if (empty($input)) {
+            return $this->failValidationErrors('Datos no proporcionados.');
+        }
+
+        $primeraEvaluacion = trim($input['primeraEvaluacion'] ?? ($row['primera_evaluacion'] ?? 'APROBADO'));
+        if (!in_array($primeraEvaluacion, ['APROBADO', 'DESAPROBADO', 'OBSERVADO'], true)) {
+            $primeraEvaluacion = 'APROBADO';
+        }
+        $resultado = trim($input['resultado'] ?? $primeraEvaluacion);
+        if (!in_array($resultado, ['APROBADO', 'DESAPROBADO', 'OBSERVADO'], true)) {
+            $resultado = 'APROBADO';
+        }
+
+        $observaciones = isset($input['observaciones']) ? trim($input['observaciones']) : $row['observaciones'];
+        $detalles = $input['detalles'] ?? [];
+
+        try {
+            $db->transException(true)->transBegin();
+
+            $updateData = [
+                'primera_evaluacion' => $primeraEvaluacion,
+                'resultado'          => $resultado,
+                'observaciones'      => $observaciones,
+                // Preservar la fecha_modificacion original para que la tolerancia sea estrictamente desde el inicio
+                'fecha_modificacion' => $row['fecha_modificacion'],
+            ];
+
+            $db->table('certicav')->where('id', $id)->update($updateData);
+
+            if (!empty($detalles) && is_array($detalles)) {
+                $db->table('certicav_detalles')->where('id_certicav', $id)->delete();
+                $filasDetalles = [];
+                foreach ($detalles as $det) {
+                    $filasDetalles[] = [
+                        'id_certicav'     => $id,
+                        'id_criterio'     => (int)$det['criterioId'],
+                        'estado_revision' => trim($det['estado'] ?? 'BIEN'),
+                        'observacion'     => trim($det['obs'] ?? ''),
+                    ];
+                }
+                $db->table('certicav_detalles')->insertBatch($filasDetalles);
+            }
+
+            $db->transComplete();
+
+            if ($db->transStatus() === false) {
+                return $this->failServerError('Error guardando las modificaciones de la inspección.');
+            }
+
+            \App\Services\AuditoriaService::registrar(
+                'INSPECCION_TECNICA',
+                'MODIFICACION_TOLERANCIA_MOVIL',
+                "El inspector técnico {$tecnicoNombre} modificó dentro de los 5 minutos de tolerancia la inspección ID {$id} (Registro: {$row['numero_registro']}).",
+                ['id' => $id, 'registro' => $row['numero_registro'], 'resultado' => $resultado]
+            );
+
+            return $this->respond([
+                'status'  => true,
+                'message' => 'Inspección técnica modificada exitosamente dentro del período de tolerancia.',
+                'data'    => array_merge($row, $updateData),
+            ]);
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'Error modificando inspección desde móvil: ' . $e->getMessage());
+            return $this->failServerError('Ocurrió un error al modificar la inspección técnica.');
+        }
+    }
+
+    public function historialMovil()
+    {
+        $db = \Config\Database::connect();
+        $cookieUser = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
+        $tecnicoPersonaId = (int)($cookieUser['id_persona'] ?? 0);
+
+        $builder = $this->consultaInspeccion($db)
+            ->where('i.estado !=', 'ANULADA');
+
+        if ($tecnicoPersonaId > 0) {
+            $builder->where('i.id_tecnico', $tecnicoPersonaId);
+        }
+
+        $buscar = trim((string)$this->request->getGet('buscar'));
+        if ($buscar !== '') {
+            $builder->groupStart()
+                ->like('i.numero_registro', $buscar)
+                ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($buscar))
+                ->orLike('a.razon_social', $buscar)
+                ->groupEnd();
+        }
+
+        $rows = $builder->groupBy('i.id')
+            ->orderBy('i.id', 'DESC')
+            ->limit(50)
+            ->get()
+            ->getResultArray();
+
+        $detallesPorInspeccion = [];
+        $ids = array_map(static fn (array $r) => (int)$r['id'], $rows);
+        if ($ids) {
+            $todos = $this->consultaDetalles($db)
+                ->select('d.id_certicav')
+                ->whereIn('d.id_certicav', $ids)
+                ->get()
+                ->getResultArray();
+            foreach ($todos as $d) {
+                $idCerticav = (int)$d['id_certicav'];
+                unset($d['id_certicav']);
+                $d['criterioId'] = (int)$d['criterioId'];
+                $detallesPorInspeccion[$idCerticav][] = $d;
+            }
+        }
+
+        $data = [];
+        foreach ($rows as $row) {
+            $row = $this->aplicarVigencia($row);
+            $row['detalles'] = $detallesPorInspeccion[$row['id']] ?? [];
+            $data[] = $row;
+        }
+
+        return $this->respond(['status' => true, 'data' => $data]);
+    }
+
+    public function aprobar($id = null)
+    {
+        $db = \Config\Database::connect();
+        $id = (int)$id;
+        if ($id <= 0) {
+            return $this->failNotFound('ID de inspección no válido.');
+        }
+
+        $row = $db->table('certicav')->where('id', $id)->get()->getRowArray();
+        if (!$row) {
+            return $this->failNotFound('Inspección no encontrada.');
+        }
+
+        if ($row['estado'] === 'ACTIVO') {
+            return $this->respond(['status' => true, 'message' => 'La inspección ya se encuentra aprobada y activa.']);
+        }
+
+        $vehiculoId = (int)$row['id_vehiculo'];
+        $idPago = $row['id_pago'];
+
+        if (empty($idPago)) {
+            try {
+                $certicavPago = new \App\Services\CerticavPago($db);
+                $pagoDisp = $certicavPago->pagoDisponible($vehiculoId);
+                if ($pagoDisp) {
+                    $idPago = (int)$pagoDisp['id'];
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        $updateData = [
+            'estado' => 'ACTIVO',
+        ];
+        if (!empty($idPago)) {
+            $updateData['id_pago'] = $idPago;
+        }
+
+        $db->table('certicav')->where('id', $id)->update($updateData);
+
+        \App\Services\AuditoriaService::registrar(
+            'INSPECCION_TECNICA',
+            'APROBACION_ADMIN',
+            "El administrador aprobó la inspección técnica ID {$id} (Registro: {$row['numero_registro']}), pasando de PENDIENTE_REVISION a ACTIVO.",
+            ['id' => $id, 'numero_registro' => $row['numero_registro'], 'estado' => 'ACTIVO']
+        );
+
+        return $this->respond([
+            'status'  => true,
+            'message' => 'Inspección técnica aprobada y oficializada con éxito.',
+            'data'    => array_merge($row, $updateData),
+        ]);
     }
 }
