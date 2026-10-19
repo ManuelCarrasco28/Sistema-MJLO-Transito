@@ -206,7 +206,7 @@ export function PersonaRapidaModal({
                 <p className="font-extrabold uppercase tracking-wide text-[10.5px] text-blue-700 dark:text-blue-300">
                   Titular detectado en el registro:
                 </p>
-                <p className="font-bold text-slate-900 dark:text-white text-xs mt-0.5 truncate">
+                <p className="font-bold text-slate-900 dark:text-white text-xs mt-0.5 min-w-0 break-words">
                   {initialNombre}
                 </p>
                 <p className="text-[10px] text-blue-800/80 dark:text-blue-300/80 mt-1">

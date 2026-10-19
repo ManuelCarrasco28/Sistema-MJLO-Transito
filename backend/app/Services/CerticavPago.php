@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Libraries\TupaCosto;
+use App\Libraries\VigenciaCertificado;
 use CodeIgniter\Database\BaseConnection;
 use DomainException;
 
@@ -14,6 +15,7 @@ class CerticavPago
     public const SIN_SOLICITUD = 'SIN_SOLICITUD';
     public const PENDIENTE_PAGO = 'PENDIENTE_PAGO';
     public const PAGADO = 'PAGADO';
+    public const VIGENTE = 'VIGENTE';
 
     public function __construct(private BaseConnection $db)
     {
@@ -37,6 +39,33 @@ class CerticavPago
         }
 
         return $costo;
+    }
+
+    /**
+     * Fecha de vencimiento del CERTICAV aprobado que aún está vigente, o null si no tiene ninguno.
+     */
+    public function vigenteHasta(int $idVehiculo): ?string
+    {
+        $filas = $this->db->table('certicav')
+            ->select('fecha, segunda_evaluacion, fecha_segunda_evaluacion')
+            ->where('id_vehiculo', $idVehiculo)
+            ->where('resultado', 'APROBADO')
+            ->where('estado <>', 'ANULADA')
+            ->get()->getResultArray();
+        $hoy = date('Y-m-d');
+        $mejor = null;
+        foreach ($filas as $f) {
+            $base = ($f['segunda_evaluacion'] ?? '') === 'APROBADO' && !empty($f['fecha_segunda_evaluacion']) ? $f['fecha_segunda_evaluacion'] : $f['fecha'];
+            if (empty($base)) {
+                continue;
+            }
+            $vence = VigenciaCertificado::vencimiento((string) $base);
+            if ($vence >= $hoy && ($mejor === null || $vence > $mejor)) {
+                $mejor = $vence;
+            }
+        }
+
+        return $mejor;
     }
 
     public function esFormal(array $vehiculo): bool
@@ -81,6 +110,9 @@ class CerticavPago
             return $base;
         }
         $idVehiculo = (int) $vehiculo['id'];
+        if ($vence = $this->vigenteHasta($idVehiculo)) {
+            return array_merge($base, ['estado' => self::VIGENTE, 'vigenteHasta' => $vence]);
+        }
         if ($pagado = $this->pagoDisponible($idVehiculo)) {
             return array_merge($base, ['estado' => self::PAGADO, 'pagoId' => (int) $pagado['id'], 'numeroRecibo' => (string) $pagado['numero_recibo'], 'expediente' => (string) $pagado['numero_expediente']]);
         }
@@ -94,7 +126,8 @@ class CerticavPago
     public function bloqueo(array $estado): ?string
     {
         return match ($estado['estado']) {
-            self::NO_FORMAL => 'El CERTICAV es solo para vehículos formales. Vincule el vehículo a una asociación (Vehículos > Editar) para poder hacer su inspección técnica.',
+            self::NO_FORMAL => 'El CERTICAV es solo para vehículos formales. Vincule el vehículo a una asociación para poder hacer su inspección técnica.',
+            self::VIGENTE => 'El vehículo ya tiene un CERTICAV vigente hasta el ' . date('d/m/Y', strtotime($estado['vigenteHasta'] ?? 'now')) . '. Podrá solicitar uno nuevo cuando venza.',
             self::SIN_SOLICITUD => 'El vehículo no tiene un CERTICAV pagado. Solicítelo y cóbrelo en Pagos antes de registrar la revisión técnica.',
             self::PENDIENTE_PAGO => 'El CERTICAV de este vehículo está pendiente de pago (S/ ' . number_format($estado['costo'], 2) . '). Cóbrelo en Pagos para poder registrar la revisión técnica.',
             default => null,
@@ -107,6 +140,9 @@ class CerticavPago
             throw new DomainException($this->bloqueo(['estado' => self::NO_FORMAL, 'costo' => 0]));
         }
         $actual = $this->estado($vehiculo);
+        if ($actual['estado'] === self::VIGENTE) {
+            throw new DomainException($this->bloqueo($actual));
+        }
         if ($actual['estado'] !== self::SIN_SOLICITUD) {
             return $actual;
         }

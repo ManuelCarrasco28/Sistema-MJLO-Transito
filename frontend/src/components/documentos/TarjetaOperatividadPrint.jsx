@@ -566,14 +566,14 @@ export function CerticavFichaPrint({ data }) {
   const renderCheckCell = (val, targetVal) => {
     const isChecked = val === targetVal
     return (
-      <span style={{ fontWeight: 900, fontSize: '10pt', color: '#000000', display: 'inline-block', lineHeight: 1 }}>
+      <span style={{ fontWeight: 900, fontSize: '11.5pt', color: '#000000', display: 'inline-block', lineHeight: 1 }}>
         {isChecked ? '✓' : ''}
       </span>
     )
   }
 
   const renderTableSection = (items) => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.6pt', border: '1.5px solid #000' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.4pt', border: '1.5px solid #000' }}>
       <thead>
         <tr style={{ background: '#004b93', color: '#ffffff', textAlign: 'left', lineHeight: 1.2 }}>
           <th style={{ padding: '2px 4px', borderRight: '1px solid #000', textTransform: 'uppercase', fontWeight: 900, fontSize: '8pt' }}>
@@ -612,7 +612,7 @@ export function CerticavFichaPrint({ data }) {
           const val = getCriterioVal(item.codigo || item.id)
 
           return (
-            <tr key={'row-' + item.id} style={{ height: '17px', lineHeight: 1 }}>
+            <tr key={'row-' + item.id} style={{ height: '21px', lineHeight: 1 }}>
               <td style={{ borderBottom: '1px solid #000', borderRight: '1px solid #000', padding: '1px 3px', paddingLeft: item.isChild ? '10px' : '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#000' }}>
                 {item.label}
               </td>
@@ -642,7 +642,7 @@ export function CerticavFichaPrint({ data }) {
 
           <div style={{ textAlign: 'center' }}>
             {/* El logo ya incluye "Municipalidad José Leonardo Ortiz". */}
-            <img src="/escudo-jlo.png" alt="Municipalidad Distrital de José Leonardo Ortiz" style={{ height: '72px', width: 'auto', maxWidth: '100%', display: 'block', margin: '0 auto 4px' }} />
+            <img src="/escudo-jlo.png" alt="Municipalidad Distrital de José Leonardo Ortiz" style={{ height: '88px', width: 'auto', maxWidth: '100%', display: 'block', margin: '0 auto 6px' }} />
             <p style={{ fontSize: '6.5pt', fontWeight: 800, margin: '1px 0 0', color: '#004b93', textTransform: 'uppercase' }}>
               ORDENANZA MUNICIPAL Nº 012-2012-MDJLO
             </p>
@@ -654,19 +654,17 @@ export function CerticavFichaPrint({ data }) {
             </div>
           </div>
 
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ border: '2px solid #22c55e', borderRadius: '30px', padding: '4px 8px', background: '#ffffff', display: 'inline-block' }}>
-              <span style={{ fontSize: '15pt', fontWeight: 900, color: '#dc2626', fontFamily: 'monospace', letterSpacing: '1px', lineHeight: 1 }}>
-                {serieSello}
-              </span>
-            </div>
+          {/* Numeración como en la ficha física: «Nº» y serie en rojo, tipografía con serifas, sin recuadro */}
+          <div style={{ textAlign: 'center', whiteSpace: 'nowrap', color: '#c0392b', fontFamily: '"Times New Roman", Times, serif', lineHeight: 1 }}>
+            <span style={{ fontSize: '15pt', fontWeight: 400, marginRight: '6px' }}>Nº</span>
+            <span style={{ fontSize: '17pt', fontWeight: 500, letterSpacing: '1.5px' }}>{serieSello}</span>
           </div>
         </div>
 
         {/* CUADRÍCULA DE DATOS DEL VEHÍCULO Y OPERADOR */}
         <div style={{ border: '1.5px solid #000', marginBottom: '6px', fontSize: '7.8pt' }}>
           {/* Fila 1: Registro, Marca y Serie */}
-          <div style={{ display: 'grid', gridTemplateColumns: '40% 30% 30%', borderBottom: '1.5px solid #000' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '31% 31% 38%', borderBottom: '1.5px solid #000' }}>
             <div style={{ padding: '2px 5px', borderRight: '1.5px solid #000' }}>
               <strong style={{ fontSize: '6pt', textTransform: 'uppercase', color: '#1e293b' }}>N° DE REGISTRO:</strong>{' '}
               <span style={{ fontSize: '7.8pt', fontWeight: 900, fontFamily: 'monospace' }}>
@@ -728,8 +726,8 @@ export function CerticavFichaPrint({ data }) {
               </div>
             </div>
 
-            {/* Lado Derecho */}
-            <div>
+            {/* Lado Derecho: la última fila (modelo / motor) se estira hasta el borde inferior */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
               {/* Fecha en 3 casillas */}
               <div style={{ display: 'grid', gridTemplateColumns: '40% 60%', borderBottom: '1px solid #000', alignItems: 'center' }}>
                 <div style={{ padding: '2px 4px', borderRight: '1px solid #000' }}>
@@ -759,7 +757,7 @@ export function CerticavFichaPrint({ data }) {
               </div>
 
               {/* Modelo y Motor */}
-              <div style={{ display: 'grid', gridTemplateColumns: '50% 50%' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '50% 50%', flex: '1 1 auto' }}>
                 <div style={{ padding: '2px 4px', borderRight: '1px solid #000' }}>
                   <strong style={{ fontSize: '5.8pt', display: 'block', textTransform: 'uppercase' }}>MODELO:</strong>
                   <span style={{ fontSize: '6.8pt', fontWeight: 800, textTransform: 'uppercase' }}>
@@ -780,13 +778,13 @@ export function CerticavFichaPrint({ data }) {
         </div>
 
         {/* CHECKLIST DE INSPECCIÓN EN 2 COLUMNAS SIMÉTRICAS */}
-        <div style={{ display: 'grid', gridTemplateColumns: '49.5% 49.5%', justifyContent: 'space-between', marginBottom: '5px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '49.5% 49.5%', justifyContent: 'space-between', marginBottom: '7px' }}>
           <div>{renderTableSection(columnaIzquierda)}</div>
           <div>{renderTableSection(columnaDerecha)}</div>
         </div>
 
         {/* BLOQUE DE EVALUACIÓN Y LEYENDA */}
-        <div style={{ display: 'grid', gridTemplateColumns: '32% 32% 36%', border: '1.5px solid #000', marginBottom: '5px', fontSize: '6.5pt', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '29% 29% 42%', border: '1.5px solid #000', marginBottom: '7px', fontSize: '7.5pt', alignItems: 'center' }}>
 
           {/* Primera Evaluación */}
           <div style={{ borderRight: '1.5px solid #000', padding: '3px 5px' }}>
@@ -819,16 +817,16 @@ export function CerticavFichaPrint({ data }) {
           </div>
 
           {/* Leyenda */}
-          <div style={{ padding: '3px 6px', textAlign: 'center', fontWeight: 900, fontSize: '6.5pt', letterSpacing: '0.2px' }}>
-            B = BIEN · M.E. = MAL ESTADO · N.T. = NO TIENE
+          <div style={{ padding: '3px 6px', textAlign: 'center', fontWeight: 900, fontSize: '6.6pt', letterSpacing: 0, whiteSpace: 'nowrap' }}>
+            B= BIEN · M.E.= MAL ESTADO · N.T.= NO TIENE
           </div>
         </div>
 
         {/* RESPONSABLES Y FIRMAS */}
-        <div style={{ display: 'grid', gridTemplateColumns: '49.5% 49.5%', justifyContent: 'space-between', border: '1.5px solid #000', marginBottom: '5px', fontSize: '6.8pt' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '49.5% 49.5%', justifyContent: 'space-between', border: '1.5px solid #000', marginBottom: '7px', fontSize: '7.6pt', flex: '1 1 auto' }}>
 
           {/* Técnico Responsable */}
-          <div style={{ borderRight: '1.5px solid #000', padding: '3px 5px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '52px' }}>
+          <div style={{ borderRight: '1.5px solid #000', padding: '3px 5px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '56px' }}>
             <div style={{ background: '#004b93', color: '#fff', padding: '1px 4px', fontWeight: 900, fontSize: '6.2pt', textTransform: 'uppercase' }}>
               TECNICO RESPONSABLE:
             </div>
@@ -838,14 +836,13 @@ export function CerticavFichaPrint({ data }) {
                 {data.inspector || '—'}
               </strong>
             </div>
-            <div style={{ marginTop: '16px', borderTop: '1px dotted #64748b', paddingTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontSize: '6.2pt', color: '#334155' }}>Firma y Sello:</span>
-              <span style={{ fontSize: '5.5pt', color: '#64748b' }}>Subgerencia de Tránsito y Transporte - MDJLO</span>
+            <div style={{ marginTop: '18px', borderTop: '1px dotted #64748b', paddingTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontSize: '6.2pt', color: '#334155' }}>Firma:</span>
             </div>
           </div>
 
           {/* Propietario / Conductor */}
-          <div style={{ padding: '3px 5px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '52px' }}>
+          <div style={{ padding: '3px 5px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '56px' }}>
             <div style={{ background: '#004b93', color: '#fff', padding: '1px 4px', fontWeight: 900, fontSize: '6.2pt', textTransform: 'uppercase' }}>
               PROPIETARIO Y/O CONDUCTOR DEL VEHICULO:
             </div>
@@ -863,7 +860,7 @@ export function CerticavFichaPrint({ data }) {
                 </strong>
               </div>
             </div>
-            <div style={{ marginTop: '16px', borderTop: '1px dotted #64748b', paddingTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <div style={{ marginTop: '18px', borderTop: '1px dotted #64748b', paddingTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ fontSize: '6.2pt', color: '#334155' }}>Firma:</span>
               <span style={{ fontSize: '5.5pt', color: '#64748b' }}>Conductor / Titular Evaluado</span>
             </div>
@@ -872,13 +869,13 @@ export function CerticavFichaPrint({ data }) {
         </div>
 
         {/* PIE LEGAL CON QR DE SEGURIDAD DIGITAL */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 45px', gap: '6px', alignItems: 'center', borderTop: '1px solid #000', paddingTop: '2px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 74px', gap: '10px', alignItems: 'center', borderTop: '1px solid #000', paddingTop: '2px' }}>
           <p style={{ fontSize: '5.5pt', color: '#000', margin: 0, lineHeight: 1.25, textAlign: 'justify' }}>
             <strong>Nota:</strong> Se otorgará un plazo de cinco (5) días para subsanar las observaciones para una 2da. evaluación, de corresponder. Declaro bajo juramento que los datos consignados en la presente Declaración Jurada son verdaderos, en caso contrario me someto a las acciones y sanciones contempladas en la Ley del Procedimiento Administrativo General Nº 27444.
           </p>
           <div style={{ textAlign: 'center' }}>
-            <QRCodeSVG value={qrRaw} size={40} level="M" includeMargin={false} />
-            <span style={{ fontSize: '4pt', fontWeight: 800, color: '#004b93', display: 'block', lineHeight: 1, marginTop: '1px' }}>
+            <QRCodeSVG value={qrRaw} size={72} level="M" includeMargin={false} />
+            <span style={{ fontSize: '5pt', fontWeight: 800, color: '#004b93', display: 'block', lineHeight: 1, marginTop: '2px' }}>
               VAL. DIGITAL
             </span>
           </div>
@@ -1753,10 +1750,9 @@ export function AutorizacionDocumentoPrint({ data }) {
   return (
     <PrintWrapper>
       <div className="hoja-documento-a4 hoja-editor">
-        <div className="hoja-editor__encabezado">
-          <img src="/escudo-jlo.png" alt="Escudo de la Municipalidad" className="hoja-editor__escudo" />
+        <div className="hoja-editor__encabezado" style={{ flexDirection: 'column', gap: '6px', textAlign: 'center' }}>
+          <img src="/escudo-jlo.png" alt="Municipalidad de José Leonardo Ortiz" className="hoja-editor__escudo" style={{ width: '55mm', maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />
           <div className="hoja-editor__titulos">
-            <div className="hoja-editor__municipalidad">MUNICIPALIDAD DISTRITAL DE JOSE LEONARDO ORTIZ</div>
             <div className="hoja-editor__subgerencia">SUB GERENCIA DE TRANSITO, TRANSPORTE Y SEGURIDAD VIAL</div>
             <div className="hoja-editor__lema">“Año de la Esperanza y el Fortalecimiento de la Democracia”</div>
           </div>

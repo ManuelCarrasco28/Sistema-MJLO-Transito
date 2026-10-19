@@ -9,6 +9,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { apiFetch, getCachedData, setCachedData, invalidateCache, leerMensajeError } from '../config/api'
 import { CerticavFichaPrint } from '../components/documentos/TarjetaOperatividadPrint'
+import { CobrarPagoModal } from '../components/pagos/CobrarPagoModal'
 import { exportToExcel } from '../utils/exportToExcel'
 import { showError } from '../utils/SwalUtil'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
@@ -17,8 +18,17 @@ import { ActionToast, TOAST_DURACION_MS } from '../components/ui/ActionToast'
 import { formatFecha, formatNumeroTarjeta, normalizarPlaca } from '../utils/formatters'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
+import { StandaloneVehiculoFormModal } from '../components/vehiculos/StandaloneVehiculoFormModal'
 import { puedeEliminarRegistros } from '../config/roles'
 import './Inspecciones.css'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
+
+const FILTER_SOLICITUD_OPTIONS = [
+  { value: 'TODOS', label: 'Todos los estados' },
+  { value: 'PENDIENTE', label: 'Pendientes de pago' },
+  { value: 'PAGADO', label: 'Pagadas' },
+]
 
 const FILTER_RESULTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los resultados' },
@@ -90,6 +100,8 @@ export function Inspecciones() {
   const [vehiculos, setVehiculos] = useState(cachedVeh || [])
   const [asociaciones, setAsociaciones] = useState([])
   const [tecnicos, setTecnicos] = useState([])
+  const [tecnicoAbierto, setTecnicoAbierto] = useState(false)
+  const nombreTecnico = (t) => `${t.nombres} ${t.apellidos}`.replace(/\s+/g, ' ').trim().toUpperCase()
   const [personas, setPersonas] = useState([])
   const [conductorEsRegistrado, setConductorEsRegistrado] = useState(false)
   const [conductorMismoPropietario, setConductorMismoPropietario] = useState(false)
@@ -118,6 +130,23 @@ export function Inspecciones() {
   // Situación del CERTICAV de la placa escrita: solo formales, y pagado antes de la revisión técnica
   const [certicav, setCerticav] = useState(null)
   const [solicitandoCerticav, setSolicitandoCerticav] = useState(false)
+  // Paso previo a la revisión: solicitud del CERTICAV (placa), cobro en Pagos y recién entonces el checklist
+  const [solicitudes, setSolicitudes] = useState([])
+  const [cobrandoExpediente, setCobrandoExpediente] = useState(null)
+  const [solicitudesPage, setSolicitudesPage] = useState(1)
+  const [vista, setVista] = useState('INSPECCIONES')
+  const [solSortBy, setSolSortBy] = useState('')
+  const [solBusqueda, setSolBusqueda] = useState('')
+  const [solEstado, setSolEstado] = useState('TODOS')
+  const [solSortDir, setSolSortDir] = useState('ASC')
+  const [solicitudModal, setSolicitudModal] = useState(false)
+  const [solicitudPlaca, setSolicitudPlaca] = useState('')
+  const [solicitudError, setSolicitudError] = useState('')
+  const [solicitudVehiculo, setSolicitudVehiculo] = useState(null)
+  // Formulario de vehículo dentro de la solicitud: { vehiculo } para editar o {} para registrar
+  const [vehiculoForm, setVehiculoForm] = useState(null)
+  const [solicitudRefresco, setSolicitudRefresco] = useState(0)
+  const [placaBloqueada, setPlacaBloqueada] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
   const [sortBy, setSortBy] = useState('')
@@ -209,6 +238,8 @@ export function Inspecciones() {
     loadData()
     return () => cargaInspecciones.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterResultado, filterVigencia, filterHistorial, sortBy, sortDir])
+
+  useRecargaSilenciosa('/inspecciones', [() => loadData(), () => loadStats(), () => cargarSolicitudes()])
 
   const [stats, setStats] = useState({ totales: 0, aprobados: 0, observados: 0, desaprobados: 0 })
 
@@ -434,7 +465,14 @@ export function Inspecciones() {
       }))
       setConductorEsRegistrado(true)
     } else {
-      setFormData((prev) => ({ ...prev, conductorDni: dni }))
+      // Si el DNI cambia (o se borra) tras haber autocompletado a una persona, sus datos ya no corresponden:
+      // se limpia la licencia (y el nombre, si venía de esa persona). Con el DNI vacío la licencia se limpia siempre.
+      setFormData((prev) => ({
+        ...prev,
+        conductorDni: dni,
+        ...(conductorEsRegistrado ? { conductorNombre: '', conductorLicencia: '' } : {}),
+        ...(!dni ? { conductorLicencia: '' } : {}),
+      }))
       setConductorEsRegistrado(false)
     }
   }
@@ -451,7 +489,20 @@ export function Inspecciones() {
           const lista = payload.data || []
           sumarPersonas(lista)
           const encontrado = lista.find((p) => (p.numeroDocumento || '').trim() === dni)
-          if (encontrado) aplicarPersonaConductor(encontrado, dni)
+          if (encontrado) {
+            aplicarPersonaConductor(encontrado, dni)
+            return null
+          }
+          // No está en el sistema: con un DNI de 8 dígitos se completa el nombre desde RENIEC
+          if (!/^\d{8}$/.test(dni)) return null
+          return apiFetch(`/pide/reniec/${dni}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((reniec) => {
+              const d = reniec?.data
+              const nombre = d ? `${d.nombres || ''} ${d.apellidoPaterno || ''} ${d.apellidoMaterno || ''}`.replace(/\s+/g, ' ').trim().toUpperCase() : ''
+              // Solo si el DNI sigue siendo el mismo y no se escribió otro nombre mientras tanto
+              if (nombre) setFormData((prev) => (prev.conductorDni === dni ? { ...prev, conductorNombre: nombre } : prev))
+            })
         })
         .catch(() => {})
     }
@@ -583,6 +634,15 @@ export function Inspecciones() {
     return () => controller.abort()
   }, [isModalOpen, selectedInspeccion, formData.vehiculoPlaca])
 
+  const recargarEstadoCerticav = () => {
+    const placa = normalizarPlaca(formData.vehiculoPlaca || '')
+    if (!isModalOpen || selectedInspeccion || placa.length !== 6) return
+    apiFetch(`/inspecciones/certicav-estado?placa=${encodeURIComponent(placa)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => { if (payload?.data) setCerticav(payload.data) })
+      .catch(() => {})
+  }
+
   const solicitarCerticav = async () => {
     setSolicitandoCerticav(true)
     try {
@@ -599,6 +659,105 @@ export function Inspecciones() {
 
   // Una inspección nueva solo se guarda con el CERTICAV pagado (formal y cobrado en Pagos)
   const certicavImpideGuardar = !selectedInspeccion && Boolean(certicav) && certicav.estado !== 'PAGADO'
+
+  const cargarSolicitudes = () => {
+    apiFetch('/inspecciones/certicav-solicitudes')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => { if (payload?.data) setSolicitudes(payload.data) })
+      .catch(() => {})
+  }
+
+  useEffect(() => { cargarSolicitudes() }, [])
+
+  // Solo se aceptan vehículos ya registrados en Vehículos: al completar la placa se traen sus datos
+  useEffect(() => {
+    setSolicitudVehiculo(null)
+    const placa = normalizarPlaca(solicitudPlaca)
+    if (!solicitudModal || placa.length !== 6) return undefined
+    const controller = new AbortController()
+    apiFetch(`/vehiculos?buscar=${encodeURIComponent(placa)}&porPagina=20&ligero=1`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (controller.signal.aborted) return
+        const v = (payload?.data || []).find((x) => normalizarPlaca(x.placa || '') === placa)
+        if (!v) {
+          setSolicitudVehiculo({ noEncontrado: true })
+          return null
+        }
+        setSolicitudVehiculo({ ...v, origen: 'sistema' })
+        // Solo formales y sin CERTICAV vigente ni solicitud abierta pueden solicitar
+        return apiFetch(`/inspecciones/certicav-estado?placa=${encodeURIComponent(placa)}`, { signal: controller.signal })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((estado) => {
+            if (!controller.signal.aborted && estado?.data) setSolicitudVehiculo({ ...v, origen: 'sistema', certicav: estado.data })
+          })
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [solicitudModal, solicitudPlaca, solicitudRefresco])
+
+  const editarVehiculoSolicitud = async () => {
+    try {
+      const res = await apiFetch(`/vehiculos/${solicitudVehiculo.uuid || solicitudVehiculo.id}`)
+      const payload = res.ok ? await res.json() : null
+      if (!payload?.data) throw new Error('No se pudo cargar el vehículo.')
+      setVehiculoForm({ vehiculo: payload.data })
+    } catch (err) {
+      showError('No se pudo abrir el vehículo', err.message)
+    }
+  }
+
+  const abrirSolicitud = () => {
+    setSolicitudPlaca('')
+    setSolicitudVehiculo(null)
+    setSolicitudError('')
+    setSolicitudModal(true)
+  }
+
+  const enviarSolicitud = async (event) => {
+    event.preventDefault()
+    const placa = normalizarPlaca(solicitudPlaca)
+    if (placa.length !== 6) {
+      setSolicitudError('Ingrese una placa de 6 caracteres.')
+      return
+    }
+    setSolicitandoCerticav(true)
+    setSolicitudError('')
+    try {
+      const res = await apiFetch('/inspecciones/certicav-solicitar', { method: 'POST', body: { placa } })
+      if (!res.ok) {
+        setSolicitudError(await leerMensajeError(res, 'No se pudo solicitar el CERTICAV.'))
+        return
+      }
+      const payload = await res.json()
+      cargarSolicitudes()
+      setSolicitudesPage(1)
+      setVista('SOLICITUDES')
+      setSolicitudModal(false)
+      showToast(
+        payload?.data?.estado === 'PAGADO'
+          ? `El CERTICAV de ${placa} ya está pagado: use "Realizar inspección".`
+          : `CERTICAV de ${placa} solicitado. Cóbrelo en Pagos para habilitar la inspección.`,
+        'crear'
+      )
+    } catch {
+      setSolicitudError('No se pudo conectar con el servidor. Intente nuevamente.')
+    } finally {
+      setSolicitandoCerticav(false)
+    }
+  }
+
+  const realizarInspeccion = (solicitud) => {
+    handleOpenCreateModal()
+    handlePlacaChange(normalizarPlaca(solicitud.placa))
+    setPlacaBloqueada(normalizarPlaca(solicitud.placa))
+  }
+
+  // Si el vehículo no estaba en la lista cargada, se completan sus datos desde el padrón
+  useEffect(() => {
+    if (!isModalOpen || selectedInspeccion || !placaBloqueada || formData.vehiculoPlaca !== placaBloqueada || formData.vehiculoMarca) return
+    buscarVehiculoPorPlaca()
+  }, [isModalOpen, selectedInspeccion, placaBloqueada, formData.vehiculoPlaca])
 
   const handleOpenDetail = (inspeccion) => {
     setSelectedInspeccion(inspeccion)
@@ -720,7 +879,7 @@ export function Inspecciones() {
 
     const payload = { ...formData }
     if (!formData.inspector.trim()) {
-      showToast('Escriba el nombre del inspector técnico responsable.', 'error')
+      showToast('Escriba o seleccione el inspector técnico responsable.', 'error')
       return
     }
     // Al editar sin tocar el checklist no se reenvía: así no se reemplaza el
@@ -752,6 +911,8 @@ export function Inspecciones() {
       setInspecciones(next)
       setCachedData('/inspecciones', next)
       loadStats()
+      cargarSolicitudes()
+      setVista('INSPECCIONES')
       if (!esEdicion) setCurrentPage(1)
       showToast(
         `Inspección ${guardada?.numeroRegistro || ''} ${esEdicion ? 'actualizada' : 'registrada'} correctamente`,
@@ -1007,13 +1168,158 @@ export function Inspecciones() {
         </div>
       </div>
 
+      <div className="mb-3 flex border-b border-slate-200 dark:border-[var(--border)] print:hidden">
+        <button
+          type="button"
+          onClick={() => setVista('INSPECCIONES')}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${vista === 'INSPECCIONES' ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}
+        >
+          <Icon name="inspection" className="size-4" />
+          <span>Inspecciones registradas</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setVista('SOLICITUDES')}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${vista === 'SOLICITUDES' ? 'border-amber-500 text-amber-500 dark:border-amber-400 dark:text-amber-400' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}
+        >
+          <Icon name="document" className="size-4" />
+          <span>CERTICAV por inspeccionar</span>
+          {solicitudes.length > 0 && (
+            <span className="min-w-6 rounded-full bg-amber-400 px-2 py-0.5 text-center text-[11px] font-black text-amber-950 shadow-sm shadow-amber-500/40" title={`${solicitudes.filter((x) => !x.pagado).length} pendiente(s) de pago`}>
+              {solicitudes.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Solicitudes de CERTICAV: primero se solicita, luego se paga y recién entonces se inspecciona */}
+      {vista === 'SOLICITUDES' && (() => {
+        const porPagina = 5
+        const termino = solBusqueda.trim().toLowerCase()
+        const filtradas = solicitudes.filter((x) => (
+          (solEstado === 'TODOS' || (solEstado === 'PAGADO') === Boolean(x.pagado))
+          && (!termino || [x.placa, x.expediente, x.propietario, x.vehiculo].some((v) => String(v || '').toLowerCase().includes(termino)))
+        ))
+        const totalPaginas = Math.max(1, Math.ceil(filtradas.length / porPagina))
+        const pagina = Math.min(solicitudesPage, totalPaginas)
+        // Sin orden elegido: primero las pendientes de pago y luego las más recientes
+        const columna = solSortBy.split(',')[0]
+        const dir = (solSortDir.split(',')[0] === 'DESC' ? -1 : 1)
+        const valor = (x) => ({ placa: x.placa, expediente: x.expediente, fecha: x.fecha, monto: Number(x.monto), estado: x.pagado ? 1 : 0 })[columna]
+        const ordenadas = [...filtradas].sort((a, b) => {
+          if (columna) {
+            const va = valor(a)
+            const vb = valor(b)
+            const cmp = typeof va === 'number' ? va - vb : String(va ?? '').localeCompare(String(vb ?? ''), 'es', { numeric: true })
+            return cmp * dir || b.id - a.id
+          }
+          return Number(a.pagado) - Number(b.pagado) || String(b.fecha).localeCompare(String(a.fecha)) || b.id - a.id
+        })
+        const visibles = ordenadas.slice((pagina - 1) * porPagina, pagina * porPagina)
+        const ordenar = (col, d) => { setSolSortBy(col); setSolSortDir(d); setSolicitudesPage(1) }
+        const hayFiltros = solEstado !== 'TODOS' || solBusqueda !== ''
+        return (
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
+            <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1">
+                <Icon name="search" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por placa, expediente o propietario"
+                  value={solBusqueda}
+                  onChange={(e) => { setSolBusqueda(e.target.value); setSolicitudesPage(1) }}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-2 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white dark:focus:border-indigo-400"
+                />
+                {solBusqueda && (
+                  <button type="button" onClick={() => { setSolBusqueda(''); setSolicitudesPage(1) }} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <RoundedSelect value={solEstado} onChange={(val) => { setSolEstado(val); setSolicitudesPage(1) }} options={FILTER_SOLICITUD_OPTIONS} />
+                {hayFiltros && (
+                  <button
+                    type="button"
+                    onClick={() => { setSolEstado('TODOS'); setSolBusqueda(''); setSolicitudesPage(1) }}
+                    title="Limpiar filtros"
+                    className="grid size-[34px] place-items-center rounded-xl border border-rose-200/80 bg-rose-50/70 text-rose-600 shadow-2xs transition-all hover:bg-rose-100 hover:text-rose-700 active:scale-95 cursor-pointer dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-900/60"
+                  >
+                    <Icon name="filterX" className="size-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={abrirSolicitud}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
+                  style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
+                >
+                  <span className="text-base leading-none font-black">+</span>
+                  <span>Solicitar CERTICAV</span>
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] table-fixed text-left text-xs">
+                <colgroup>
+                  <col className="w-[16%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[19%]" />
+                </colgroup>
+                <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3"><SortableHeader column="placa" label="Placa" sortBy={solSortBy} sortDir={solSortDir} onSort={ordenar} /></th>
+                    <th className="px-4 py-3"><SortableHeader column="expediente" label="Expediente" sortBy={solSortBy} sortDir={solSortDir} onSort={ordenar} /></th>
+                    <th className="px-4 py-3"><SortableHeader column="fecha" label="Fecha" sortBy={solSortBy} sortDir={solSortDir} onSort={ordenar} /></th>
+                    <th className="px-4 py-3"><SortableHeader column="monto" label="Monto" align="right" sortBy={solSortBy} sortDir={solSortDir} onSort={ordenar} /></th>
+                    <th className="px-4 py-3"><SortableHeader column="estado" label="Estado" sortBy={solSortBy} sortDir={solSortDir} onSort={ordenar} /></th>
+                    <th className="px-4 py-3 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
+                  {visibles.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="p-12 text-center">
+                        <Icon name="inspection" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
+                        <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron solicitudes</p>
+                      </td>
+                    </tr>
+                  ) : visibles.map((x) => (
+                    <tr key={x.id} className="group transition-colors hover:bg-[var(--brand-soft)] dark:hover:bg-[var(--bg-subtle)]">
+                      <td className="px-4 py-3"><PlacaVehiculo placa={x.placa} /></td>
+                      <td className="px-4 py-3 font-mono">{x.expediente}</td>
+                      <td className="px-4 py-3">{formatFecha(x.fecha)}</td>
+                      <td className="px-4 py-3 text-right font-mono">S/ {Number(x.monto).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${x.pagado ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'}`}>
+                          {x.pagado ? `Pagado · ${x.numeroRecibo || ''}` : 'Pendiente de pago'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {x.pagado ? (
+                          <button type="button" onClick={() => realizarInspeccion(x)} className="cursor-pointer rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:opacity-90">Realizar inspección</button>
+                        ) : (
+                          <button type="button" onClick={() => setCobrandoExpediente(x.expediente)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300/90 bg-amber-50 px-2.5 text-xs font-bold text-amber-700 shadow-2xs transition-all hover:bg-amber-500 hover:border-amber-500 hover:text-white dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-600 dark:hover:text-white active:scale-95 whitespace-nowrap cursor-pointer shrink-0 cursor-pointer"><Icon name="payment" className="size-3.5" /><span>Cobrar</span></button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination currentPage={pagina} totalItems={filtradas.length} itemsPerPage={porPagina} onPageChange={setSolicitudesPage} />
+          </div>
+        )
+      })()}
+
       {/* Contenedor de la Tabla */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
+      <div className={`rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden ${vista === 'INSPECCIONES' ? '' : 'hidden'}`}>
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon
-              name={isLoading ? "refresh" : "search"}
-              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-indigo-500' : 'text-slate-400'}`}
+              name="search"
+              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors text-slate-400`}
             />
             <input
               type="text"
@@ -1084,12 +1390,12 @@ export function Inspecciones() {
 
             <button
               type="button"
-              onClick={handleOpenCreateModal}
+              onClick={abrirSolicitud}
               className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
               style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
             >
               <span className="text-base leading-none font-black">+</span>
-              <span>Registrar inspección</span>
+              <span>Solicitar CERTICAV</span>
             </button>
           </div>
         </div>
@@ -1104,7 +1410,7 @@ export function Inspecciones() {
               <col className="w-[16%]" />
               <col className="w-[11%]" />
               <col className="w-[12%]" />
-              <col className="w-[12%]" />
+              <col className="w-[184px] min-w-[184px]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <tr>
@@ -1114,41 +1420,14 @@ export function Inspecciones() {
                 <th className="px-4 py-3 "><SortableHeader column="fecha" label="Fechas" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3 "><SortableHeader column="resultado" label="Resultado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3">Vigencia</th>
-                <th className="sticky right-0 z-20 px-4 py-3 text-right bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
+                <th className="sticky right-0 z-20 px-4 py-3 text-center bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                   Acciones
                 </th>
               </tr>
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && inspecciones.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && inspecciones.length === 0 ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-4 py-3">
-                      <div className="h-4 w-28 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-5 w-20 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-4 w-36 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-4 w-24 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-5 w-20 rounded-full" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-5 w-20 rounded-full" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td
-                      className="sticky right-0 z-10 px-4 py-3 text-right"
-                      style={{ backgroundColor: 'var(--bg-surface)' }}
-                    >
-                      <div className="h-7 w-20 ml-auto rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                  </tr>
-                ))
+                <FilaCargando colSpan={7} />
               ) : filteredInspecciones.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-12 text-center">
@@ -1186,12 +1465,12 @@ export function Inspecciones() {
                       <td className="px-4 py-3 max-w-[210px]">
                         <div>
                           <p
-                            className="font-bold text-xs text-slate-900 dark:text-white truncate"
+                            className="font-bold text-xs text-slate-900 dark:text-white min-w-0 break-words"
                             title={vehiculo?.propietario || i.propietario}
                           >
                             {vehiculo?.propietario || i.propietario || 'Propietario no asignado'}
                           </p>
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0 break-words">
                             {(vehiculo?.propietarioDni || i.propietarioDni) && (
                               <span className="font-mono font-semibold">
                                 DNI: {vehiculo?.propietarioDni || i.propietarioDni}
@@ -1228,10 +1507,9 @@ export function Inspecciones() {
                       </td>
 
                       <td
-                        className="sticky right-0 z-10 px-4 py-3 text-right group-hover:bg-[var(--brand-soft)] dark:group-hover:bg-slate-800/40 transition-colors shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"
-                        style={{ backgroundColor: 'var(--bg-surface)' }}
+                        className="sticky right-0 z-10 px-4 py-3 text-center bg-white group-hover:bg-[#e6eef8] dark:bg-[#1C2438] dark:group-hover:bg-[#222d45] transition-colors shadow-[-4px_0_8px_rgba(0,0,0,0.03)]"
                       >
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-center gap-1.5">
                           {/* OJO: Celeste (Ver Ficha) */}
                           <button
                             type="button"
@@ -1345,6 +1623,98 @@ export function Inspecciones() {
         />
       </div>
 
+      {/* Modal Solicitar CERTICAV (solo placa; el cobro se hace en Pagos) */}
+      {solicitudModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-xs animate-enter sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = '1' }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === '1') setSolicitudModal(false); e.currentTarget.dataset.downOnOverlay = '' }}>
+          <div className="w-full max-w-5xl rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-3.5 dark:border-[var(--border)]">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Solicitar CERTICAV</h3>
+              <BotonCerrarModal onClick={() => setSolicitudModal(false)} title="Cerrar" />
+            </div>
+            <form onSubmit={enviarSolicitud} autoComplete="off" className="space-y-4 p-5 sm:p-6">
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50">
+                <h4 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                  <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
+                  Documento y registro
+                </h4>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  <FloatingInput
+                    id="solicitud_placa"
+                    label="N° de Placa del Vehículo"
+                    required
+                    autoFocus
+                    value={solicitudPlaca}
+                    inputClassName="font-mono font-black tracking-widest uppercase"
+                    onChange={(e) => { setSolicitudPlaca(normalizarPlaca(e.target.value)); setSolicitudError('') }}
+                  />
+                  <FloatingInput id="solicitud_fecha" label="Fecha de solicitud" type="date" disabled value={fechaLocalActual()} onChange={() => {}} />
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50">
+                <h4 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                  <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
+                  Vehículo y transportador
+                </h4>
+                {solicitudVehiculo?.certicav && solicitudVehiculo.certicav.estado !== 'SIN_SOLICITUD' && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+                    <p className="min-w-0 flex-1">
+                      {solicitudVehiculo.certicav.estado === 'PAGADO' || solicitudVehiculo.certicav.estado === 'PENDIENTE_PAGO'
+                        ? 'Este vehículo ya tiene una solicitud de CERTICAV en curso. Revísela en la lista "CERTICAV por inspeccionar".'
+                        : solicitudVehiculo.certicav.mensaje}
+                    </p>
+                    {solicitudVehiculo.certicav.estado === 'NO_FORMAL' && (
+                      <button type="button" onClick={editarVehiculoSolicitud} className="shrink-0 cursor-pointer rounded-lg bg-amber-600 px-3 py-1.5 font-bold text-white transition hover:opacity-90">Editar vehículo</button>
+                    )}
+                  </div>
+                )}
+                {solicitudVehiculo?.noEncontrado && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+                    <p className="min-w-0 flex-1">La placa no está registrada en Vehículos. Regístrela y vincúlela a una asociación para solicitar el CERTICAV.</p>
+                    <button type="button" onClick={() => setVehiculoForm({})} className="shrink-0 cursor-pointer rounded-lg bg-rose-600 px-3 py-1.5 font-bold text-white transition hover:opacity-90">Registrar vehículo</button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+                  <FloatingInput id="solicitud_marca" label="Marca de Vehículo" readOnly tabIndex={-1} value={solicitudVehiculo?.marca || ''} onChange={() => {}} />
+                  <FloatingInput id="solicitud_modelo" label="Modelo" readOnly tabIndex={-1} value={solicitudVehiculo?.modelo || ''} onChange={() => {}} />
+                  <FloatingInput id="solicitud_anio" label="Año Fabricación" readOnly tabIndex={-1} value={solicitudVehiculo?.anio || ''} onChange={() => {}} />
+                  <FloatingInput id="solicitud_color" label="Color" readOnly tabIndex={-1} value={solicitudVehiculo?.color || ''} onChange={() => {}} />
+                  <FloatingInput id="solicitud_motor" label="N° Motor" readOnly tabIndex={-1} value={solicitudVehiculo?.serieMotor || ''} onChange={() => {}} />
+                </div>
+                <FloatingInput id="solicitud_asoc" label="Razón Social del Transportador (Empresa / Asociación)" readOnly tabIndex={-1} value={solicitudVehiculo?.asociacion || ''} onChange={() => {}} />
+              </div>
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50">
+                <h4 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                  <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
+                  Propietario
+                </h4>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-12">
+                  <div className="sm:col-span-4">
+                    <FloatingInput id="solicitud_dni" label="DNI del Propietario" readOnly tabIndex={-1} value={solicitudVehiculo?.propietarioDni || ''} onChange={() => {}} />
+                  </div>
+                  <div className="sm:col-span-8">
+                    <FloatingInput id="solicitud_propietario" label="Propietario del Vehículo" readOnly tabIndex={-1} value={solicitudVehiculo?.propietario || ''} onChange={() => {}} />
+                  </div>
+                </div>
+              </div>
+              {solicitudError && <p className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">{solicitudError}</p>}
+              <div className="flex justify-end gap-2 pt-1">
+                <BotonCancelar onClick={() => setSolicitudModal(false)} />
+                <button type="submit" disabled={solicitandoCerticav || solicitudVehiculo?.certicav?.estado !== 'SIN_SOLICITUD'} title={solicitudVehiculo?.certicav?.estado === 'SIN_SOLICITUD' ? '' : 'Solo vehículos formales sin CERTICAV vigente ni solicitud en curso'} className="cursor-pointer rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{solicitandoCerticav ? 'Solicitando…' : 'Solicitar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {vehiculoForm && (
+        <StandaloneVehiculoFormModal
+          vehiculo={vehiculoForm.vehiculo || null}
+          placaInicial={solicitudPlaca}
+          onClose={() => setVehiculoForm(null)}
+          onSuccess={() => setSolicitudRefresco((n) => n + 1)}
+        />
+      )}
+
       {/* Modal Registrar / Editar Inspección Técnica */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
@@ -1363,7 +1733,7 @@ export function Inspecciones() {
             </div>
 
             <form onSubmit={handleFormSubmit} autoComplete="off" className="flex flex-col">
-              {!selectedInspeccion && certicav && (() => {
+              {!selectedInspeccion && certicav && certicav.estado !== 'PAGADO' && (() => {
                 const costo = Number(certicav.costo || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 const estilos = {
                   PAGADO: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300',
@@ -1386,7 +1756,7 @@ export function Inspecciones() {
                       </button>
                     )}
                     {certicav.estado === 'PENDIENTE_PAGO' && (
-                      <button type="button" onClick={() => navigate('/pagos')} className={`${boton} bg-amber-600`}>Ir a Pagos</button>
+                      <button type="button" onClick={() => setCobrandoExpediente(certicav.expediente || '')} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300/90 bg-amber-50 px-2.5 text-xs font-bold text-amber-700 shadow-2xs transition-all hover:bg-amber-500 hover:border-amber-500 hover:text-white dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-600 dark:hover:text-white active:scale-95 whitespace-nowrap cursor-pointer shrink-0 cursor-pointer"><Icon name="payment" className="size-3.5" /><span>Cobrar</span></button>
                     )}
                     {certicav.estado === 'NO_FORMAL' && (
                       <button type="button" onClick={() => navigate('/vehiculos')} className={`${boton} bg-rose-600`}>Ir a Vehículos</button>
@@ -1403,19 +1773,20 @@ export function Inspecciones() {
               )}
               <div className="p-4 sm:p-5 space-y-4 max-h-[75vh] overflow-y-auto">
                 {/* 1. Sección: Identificación del Documento y Talonario */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 space-y-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                     Documento y registro
                   </h4>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
                     {/* Consulta puntual por placa, sin cargar un desplegable. */}
                     <div className="sm:col-span-4">
                       <FloatingInput
                         id="insp_placa"
                         label="N° de Placa del Vehículo"
                         required
+                        readOnly={Boolean(placaBloqueada) && !selectedInspeccion}
                         value={formData.vehiculoPlaca}
                         inputClassName="font-mono font-black tracking-widest uppercase text-slate-900 dark:text-white"
                         autoComplete="off"
@@ -1463,13 +1834,13 @@ export function Inspecciones() {
                 </div>
 
                 {/* 2. Sección: Características Técnicas del Vehículo Menor */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 space-y-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
                     <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                     Vehículo y transportador
                   </h4>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
                     <div className="sm:col-span-3">
                       <FloatingInput
                         id="insp_marca"
@@ -1481,7 +1852,7 @@ export function Inspecciones() {
                       />
                     </div>
 
-                    <div className="sm:col-span-3">
+                    <div className="sm:col-span-2">
                       <FloatingInput
                         id="insp_modelo"
                         label="Modelo"
@@ -1515,7 +1886,7 @@ export function Inspecciones() {
                       />
                     </div>
 
-                    <div className="sm:col-span-2">
+                    <div className="sm:col-span-3">
                       <FloatingInput
                         id="insp_motor"
                         label="N° Motor"
@@ -1541,7 +1912,7 @@ export function Inspecciones() {
                 </div>
 
                 {/* 3. Sección: Propietario, Conductor y Técnico Responsable */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 space-y-3.5 dark:border-[var(--border)] dark:bg-slate-900/50 shadow-xs">
                   <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 dark:border-[var(--border)]">
                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
                       <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
@@ -1558,20 +1929,8 @@ export function Inspecciones() {
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                    {/* Propietario */}
-                    <div className="sm:col-span-4">
-                      <FloatingInput
-                        id="insp_prop_nombre"
-                        label="Propietario del Vehículo"
-                        disabled
-                        value={formData.propietario}
-                        inputClassName="font-bold uppercase text-slate-800 dark:text-white"
-                        onChange={(e) => setFormData({ ...formData, propietario: e.target.value.toUpperCase() })}
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+                    <div className="sm:col-span-3">
                       <FloatingInput
                         id="insp_prop_dni"
                         label="DNI del Propietario"
@@ -1583,8 +1942,32 @@ export function Inspecciones() {
                       />
                     </div>
 
+                    {/* Propietario */}
+                    <div className="sm:col-span-9">
+                      <FloatingInput
+                        id="insp_prop_nombre"
+                        label="Propietario del Vehículo"
+                        disabled
+                        value={formData.propietario}
+                        inputClassName="font-bold uppercase text-slate-800 dark:text-white"
+                        onChange={(e) => setFormData({ ...formData, propietario: e.target.value.toUpperCase() })}
+                      />
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <FloatingInput
+                        id="insp_cond_dni"
+                        label="DNI Conductor"
+                        maxLength={8}
+                        disabled={conductorMismoPropietario}
+                        value={formData.conductorDni}
+                        inputClassName={`font-mono font-bold ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-[#1C2438]' : ''}`}
+                        onChange={(e) => handleConductorDniChange(e.target.value)}
+                      />
+                    </div>
+
                     {/* Conductor con autocompletado contra el padrón de personas */}
-                    <div className="sm:col-span-4 relative" ref={conductorDropdownRef}>
+                    <div className="sm:col-span-6 relative" ref={conductorDropdownRef}>
                       <FloatingInput
                         id="insp_cond_nombre"
                         label="Conductor"
@@ -1609,7 +1992,7 @@ export function Inspecciones() {
                               onClick={() => handleSeleccionarConductor(p)}
                               className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition cursor-pointer text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/60"
                             >
-                              <span className="font-bold truncate max-w-[170px]">
+                              <span className="font-bold min-w-0 break-words max-w-[170px]">
                                 {`${p.nombres || ''} ${p.apellidoPaterno || ''} ${p.apellidoMaterno || ''}`.trim()}
                               </span>
                               <span className="font-mono text-[11px] text-slate-400">{p.numeroDocumento}</span>
@@ -1619,20 +2002,8 @@ export function Inspecciones() {
                       )}
                     </div>
 
-                    <div className="sm:col-span-2">
-                      <FloatingInput
-                        id="insp_cond_dni"
-                        label="DNI Conductor"
-                        maxLength={8}
-                        disabled={conductorMismoPropietario}
-                        value={formData.conductorDni}
-                        inputClassName={`font-mono font-bold ${conductorMismoPropietario ? 'opacity-60 cursor-not-allowed bg-slate-50 dark:bg-[#1C2438]' : ''}`}
-                        onChange={(e) => handleConductorDniChange(e.target.value)}
-                      />
-                    </div>
-
-                    {/* Licencia y Técnico */}
-                    <div className="sm:col-span-4">
+                    {/* Licencia */}
+                    <div className="sm:col-span-3">
                       <FloatingInput
                         id="insp_cond_licencia"
                         label="N° Licencia de Conductor"
@@ -1644,25 +2015,45 @@ export function Inspecciones() {
                       />
                     </div>
 
-                    <div className="sm:col-span-8">
+                    <div className="sm:col-span-12 relative">
                       <FloatingInput
                         id="insp_tecnico"
-                        label="Nombre del inspector técnico responsable"
+                        label="Inspector técnico responsable"
                         required
                         maxLength={200}
                         autoComplete="off"
                         value={formData.inspector}
+                        onFocus={() => setTecnicoAbierto(true)}
+                        onBlur={() => setTimeout(() => setTecnicoAbierto(false), 150)}
                         onChange={(e) => {
-                          const nombre = e.target.value
-                          const normalizar = (texto) => texto.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
-                          const tecnico = tecnicos.find((t) => normalizar(`${t.nombres} ${t.apellidos}`) === normalizar(nombre))
-                          setFormData({
-                            ...formData,
-                            tecnicoId: tecnico?.id || '',
-                            inspector: nombre,
-                          })
+                          const nombre = e.target.value.toUpperCase()
+                          const tecnico = tecnicos.find((t) => nombreTecnico(t) === nombre.trim().replace(/\s+/g, ' '))
+                          setFormData({ ...formData, tecnicoId: tecnico?.id || '', inspector: nombre })
+                          setTecnicoAbierto(true)
                         }}
                       />
+                      {tecnicoAbierto && (() => {
+                        const termino = (formData.inspector || '').trim().toUpperCase()
+                        const lista = tecnicos.filter((t) => !termino || nombreTecnico(t).includes(termino))
+                        if (!lista.length) return null
+                        return (
+                          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
+                            {lista.map((t) => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onMouseDown={() => {
+                                  setFormData({ ...formData, tecnicoId: t.id, inspector: nombreTecnico(t) })
+                                  setTecnicoAbierto(false)
+                                }}
+                                className={`flex w-full cursor-pointer items-center rounded-lg px-3 py-2 text-left text-[13px] font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-700/60 ${String(formData.tecnicoId) === String(t.id) ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' : 'text-slate-700 dark:text-slate-200'}`}
+                              >
+                                {nombreTecnico(t)}
+                              </button>
+                            ))}
+                          </div>
+                        )
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -1961,7 +2352,7 @@ export function Inspecciones() {
                     </div>
                     <div className="flex justify-between items-center py-0.5">
                       <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-2">Razón Social del Transportador</span>
-                      <span className="font-bold text-indigo-600 dark:text-indigo-400 text-right truncate max-w-[210px]" title={selectedInspeccion.transportador}>
+                      <span className="font-bold text-indigo-600 dark:text-indigo-400 text-right min-w-0 break-words max-w-[210px]" title={selectedInspeccion.transportador}>
                         {selectedInspeccion.transportador || 'Independiente'}
                       </span>
                     </div>
@@ -2163,6 +2554,14 @@ export function Inspecciones() {
             </div>
           </div>
         </div>
+      )}
+
+      {cobrandoExpediente && (
+        <CobrarPagoModal
+          expediente={cobrandoExpediente}
+          onClose={() => setCobrandoExpediente(null)}
+          onPagado={() => { cargarSolicitudes(); recargarEstadoCerticav() }}
+        />
       )}
 
       {/* IMPRESIÓN DIRECTA DE LA FICHA CERTICAV: no hay panel; se abre el diálogo de impresión (ahí se guarda como PDF) */}

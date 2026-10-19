@@ -1001,3 +1001,14 @@
 @media print {
   .hoja-editor { padding: 14mm 16mm !important; }
 }
+
+/* Ficha CERTICAV: columna vertical que ocupa toda la hoja; el bloque de firmas absorbe el espacio sobrante */
+.ficha-certicav-a4 {
+  display: flex;
+  flex-direction: column;
+}
+@media print {
+  .ficha-certicav-a4 {
+    min-height: 268mm !important;
+  }
+}

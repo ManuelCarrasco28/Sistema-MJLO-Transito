@@ -364,7 +364,7 @@ export function VehiculoFormModal({
                       <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-amber-500 text-white">
                         <Icon name="alert" className="size-3.5" />
                       </span>
-                      <p className="text-xs text-amber-900 dark:text-amber-200 truncate">
+                      <p className="text-xs text-amber-900 dark:text-amber-200 min-w-0 break-words">
                         {formData.placa?.includes('SIN-PLACA') ? 'Supuesto dueño' : 'Titular'} detectado: <strong>{titularDetectado.nombre}</strong> (No registrado en Personas)
                       </p>
                     </div>
@@ -388,7 +388,7 @@ export function VehiculoFormModal({
                     label={formData.placa?.includes('SIN-PLACA') ? 'Supuesto Dueño' : 'Propietario Legal'}
                     required
                     error={errores.propietario && !formData.propietarioDni ? errores.propietario : ''}
-                    value={propietarioSearch}
+                    value={formData.propietarioDni ? (formData.propietario || '') : propietarioSearch}
                     onFocus={() => {
                       onLimpiarError('propietario')
                       setShowPropietarioResults(true)
@@ -428,7 +428,7 @@ export function VehiculoFormModal({
                               className="flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-[var(--bg-subtle)] cursor-pointer transition-colors"
                             >
                               <span className="font-mono text-xs font-black text-blue-700 dark:text-blue-300">{documento}</span>
-                              <span className="truncate text-xs font-bold text-slate-800 dark:text-white">{nombre || 'Sin nombre'}</span>
+                              <span className="min-w-0 break-words text-xs font-bold text-slate-800 dark:text-white">{nombre || 'Sin nombre'}</span>
                             </button>
                           )
                         })
@@ -445,8 +445,8 @@ export function VehiculoFormModal({
                     document.body
                   )}
                   {formData.propietarioDni && (
-                    <p className="px-2 pt-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 truncate">
-                      Seleccionado: {formData.propietarioDni} — {formData.propietario}
+                    <p className="px-2 pt-0.5 font-mono text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      DNI {formData.propietarioDni}
                     </p>
                   )}
                 </div>
@@ -455,7 +455,8 @@ export function VehiculoFormModal({
                   <FloatingInput
                     id="veh_org"
                     label="Empresa o Asociación"
-                    value={asociacionSearch}
+                    inputClassName={formData.asociacion ? 'pr-10' : ''}
+                    value={asociacionSearch.split(' — ')[0]}
                     onFocus={() => {
                       setShowAsociacionResults(true)
                       setShowPropietarioResults(false)
@@ -489,7 +490,7 @@ export function VehiculoFormModal({
                             }}
                             className="flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left hover:bg-blue-50 dark:hover:bg-[var(--bg-subtle)] cursor-pointer"
                           >
-                            <span className="truncate text-xs font-bold text-slate-800 dark:text-white">{org.razonSocial}</span>
+                            <span className="min-w-0 break-words text-xs font-bold text-slate-800 dark:text-white">{org.razonSocial}</span>
                             <span className="font-mono text-[10px] font-black text-blue-700 dark:text-blue-300">RUC: {org.ruc || 'S/D'}</span>
                           </button>
                         ))
@@ -506,14 +507,20 @@ export function VehiculoFormModal({
                     document.body
                   )}
                   {formData.asociacion && (
-                    <div className="flex items-center justify-between gap-2 px-2 pt-0.5 text-[11px]">
-                      <span className="font-semibold text-emerald-700 dark:text-emerald-300 truncate">
-                        {formData.asociacion}
-                      </span>
-                      <button type="button" onClick={clearAsociacion} className="font-bold text-rose-500 hover:text-rose-700 cursor-pointer shrink-0">
-                        Quitar
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={clearAsociacion}
+                      title="Quitar la asociación"
+                      aria-label="Quitar la asociación"
+                      className="absolute right-3 top-3 grid size-7 cursor-pointer place-items-center rounded-lg text-base font-bold leading-none text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                    >
+                      ×
+                    </button>
+                  )}
+                  {asociacionSearch.includes(' — ') && formData.asociacion && (
+                    <p className="px-2 pt-0.5 font-mono text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      RUC {asociacionSearch.split(' — ').slice(1).join(' — ')}
+                    </p>
                   )}
                 </div>
               </div>

@@ -70,7 +70,7 @@ export function EstadoDocumentosVehiculo({
 
             const contenido = (
               <>
-                <span className="w-full truncate font-bold leading-tight text-slate-800 dark:text-white" title={doc.etiqueta}>
+                <span className="w-full min-w-0 break-words font-bold leading-tight text-slate-800 dark:text-white" title={doc.etiqueta}>
                   {doc.etiqueta}
                 </span>
                 <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[9.5px] font-bold uppercase ${estilo.clases}`}>

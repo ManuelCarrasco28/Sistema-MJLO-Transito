@@ -76,6 +76,46 @@ class InspeccionesController extends ResourceController
         }
     }
 
+    public function certicavSolicitudes()
+    {
+        $db = \Config\Database::connect();
+        try {
+            $idProc = (int) (new \App\Services\CerticavPago($db))->procedimiento()['id'];
+            $filas = $db->query(
+                "SELECT t.id, t.numero_expediente, t.fecha_solicitud, v.placa, v.marca, v.modelo,
+                        p.total, p.estado AS estado_pago, p.numero_recibo,
+                        (SELECT TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', IFNULL(c.apellido_materno, ''))) FROM vehiculo_propietarios vp
+                         JOIN ciudadanos c ON c.id_persona = vp.id_persona WHERE vp.id_vehiculo = v.id AND vp.estado = 'ACTIVO' ORDER BY vp.id DESC LIMIT 1) AS propietario
+                 FROM tramites_documentarios t
+                 JOIN vehiculos v ON v.id = t.id_vehiculo
+                 JOIN pagos_transito p ON p.id_tramite = t.id AND p.estado IN ('PENDIENTE', 'PAGADO')
+                 WHERE t.id_procedimiento_admin = ?
+                   AND NOT EXISTS (SELECT 1 FROM certicav c WHERE c.id_pago = p.id)
+                   AND NOT EXISTS (SELECT 1 FROM certicav c3 WHERE c3.id_vehiculo = v.id AND c3.estado <> 'ANULADA' AND c3.fecha >= t.fecha_solicitud)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM certicav v2 WHERE v2.id_vehiculo = v.id AND v2.resultado = 'APROBADO' AND v2.estado <> 'ANULADA'
+                         AND DATE_ADD(CASE WHEN v2.segunda_evaluacion = 'APROBADO' AND v2.fecha_segunda_evaluacion IS NOT NULL THEN v2.fecha_segunda_evaluacion ELSE v2.fecha END, INTERVAL 6 MONTH) >= CURDATE()
+                   )
+                 ORDER BY t.id DESC",
+                [$idProc]
+            )->getResultArray();
+        } catch (\DomainException $e) {
+            return $this->failValidationErrors($e->getMessage());
+        }
+
+        return $this->respond(['data' => array_map(static fn ($f) => [
+            'id' => (int) $f['id'],
+            'placa' => $f['placa'],
+            'vehiculo' => trim(($f['marca'] ?? '') . ' ' . ($f['modelo'] ?? '')),
+            'propietario' => $f['propietario'] ?? null,
+            'expediente' => $f['numero_expediente'],
+            'fecha' => $f['fecha_solicitud'],
+            'monto' => (float) $f['total'],
+            'pagado' => $f['estado_pago'] === 'PAGADO',
+            'numeroRecibo' => $f['numero_recibo'],
+        ], $filas)]);
+    }
+
     public function certicavSolicitar()
     {
         $db = \Config\Database::connect();
@@ -777,7 +817,7 @@ class InspeccionesController extends ResourceController
             'SELECT MAX(CAST(SUBSTRING(numero_registro, ?) AS UNSIGNED)) AS n FROM certicav WHERE numero_registro LIKE ?',
             [strlen($prefijo) + 1, $prefijo . '%']
         )->getRowArray();
-        return $prefijo . str_pad((string)(((int)($row['n'] ?? 0)) + 1), 3, '0', STR_PAD_LEFT);
+        return $prefijo . str_pad((string)(((int)($row['n'] ?? 0)) + 1), 5, '0', STR_PAD_LEFT);
     }
 
     private function siguienteSerieCerticav($db): string
@@ -797,7 +837,7 @@ class InspeccionesController extends ResourceController
                 ->select('c.nombres, c.apellido_paterno, c.apellido_materno')
                 ->join('ciudadanos c', 'c.id_persona = t.id_persona', 'inner')
                 ->where('t.id_persona', $id)->where('t.estado', 'ACTIVO')
-                ->where('t.tipo_inspector', 'TECNICO')
+                ->where(\App\Libraries\TipoInspector::sqlTieneRol('t', 'TECNICO'), null, false)
                 ->get()->getRowArray();
             if (!$tecnico) throw new \DomainException('El responsable debe estar registrado como inspector de inspección técnica activo.');
             $nombre = trim($tecnico['nombres'] . ' ' . $tecnico['apellido_paterno'] . ' ' . ($tecnico['apellido_materno'] ?? ''));

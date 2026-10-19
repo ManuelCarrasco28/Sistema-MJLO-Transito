@@ -5,9 +5,19 @@ import { VehiculoFormModal } from './VehiculoFormModal'
 import { useOficinaRegistral } from '../../hooks/useOficinaRegistral'
 import { usePersonaRapida } from '../../hooks/usePersonaRapida'
 import { obtenerAnioFormularioVehiculo } from '../../utils/anioSunarp'
+import { isVehiculoFormal } from '../../utils/vehiculos'
 
-export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial = '' }) {
-  const [formData, setFormData] = useState({
+// Con `vehiculo` el mismo formulario edita ese vehículo; sin él registra uno nuevo.
+export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial = '', vehiculo = null }) {
+  const editando = Boolean(vehiculo?.id)
+  const formal = editando && isVehiculoFormal(vehiculo)
+  const [formData, setFormData] = useState(editando ? {
+    ...vehiculo,
+    asociacion: formal ? (vehiculo.asociacion || '') : '',
+    propietarioDni: vehiculo.propietarioDni || '',
+    propietario: vehiculo.propietario || '',
+    estado: vehiculo.estado === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO',
+  } : {
     placa: placaInicial, tipo: 'Mototaxi', marca: '', modelo: '', color: '', anio: '',
     categoria: '', carroceria: '', sedeRegistro: 'CHICLAYO', tipoCarroceria: '', numeroSerie: '', serieMotor: '', partidaRegistral: '',
     asociacion: '', propietario: '', propietarioDni: '', estado: 'ACTIVO', soatEstado: 'VIGENTE',
@@ -15,10 +25,10 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
   })
   
   const [erroresForm, setErroresForm] = useState({})
-  const [propietarioSearch, setPropietarioSearch] = useState('')
+  const [propietarioSearch, setPropietarioSearch] = useState(editando && vehiculo.propietarioDni ? `${vehiculo.propietarioDni} — ${vehiculo.propietario || ''}` : '')
   const [showPropietarioResults, setShowPropietarioResults] = useState(false)
   const [propietarioResults, setPropietarioResults] = useState([])
-  const [asociacionSearch, setAsociacionSearch] = useState('')
+  const [asociacionSearch, setAsociacionSearch] = useState(formal ? (vehiculo.asociacion || '') : '')
   const [showAsociacionResults, setShowAsociacionResults] = useState(false)
   const [asociacionesList, setAsociacionesList] = useState([])
   const oficinaReg = useOficinaRegistral()
@@ -171,6 +181,14 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
     }
 
     try {
+      if (editando) {
+        const res = await apiFetch(`/vehiculos/${vehiculo.id}`, { method: 'PUT', body: formData })
+        if (!res.ok) throw new Error(await leerMensajeError(res, 'No se pudo actualizar el vehículo.'))
+        showToast('Vehículo actualizado correctamente', 'success')
+        if (onSuccess) onSuccess()
+        onClose()
+        return
+      }
       const payload = {
         placa: placaClean,
         tipo: formData.tipo,
@@ -214,7 +232,7 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
   return (
     <>
     <VehiculoFormModal
-      isEditing={false}
+      isEditing={editando}
       errores={erroresForm}
       onLimpiarError={(campo) => setErroresForm((prev) => ({ ...prev, [campo]: '' }))}
       formData={formData}
