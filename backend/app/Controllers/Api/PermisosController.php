@@ -69,7 +69,7 @@ class PermisosController extends ResourceController
                 pc.tipo_permiso as tipoPermiso,
                 pc.asunto,
                 pc.referencia_sisgedo as referenciaSisgedo,
-                COALESCE(td.numero_expediente, pc.referencia_sisgedo, '') as expediente,
+                COALESCE(NULLIF(pc.referencia_sisgedo, ''), td.numero_expediente, '') as expediente,
                 pc.registro_numero as registroNumero,
                 pc.contenido,
                 pc.zona_circulacion as zonaCirculacion,
@@ -88,7 +88,7 @@ class PermisosController extends ResourceController
                 pc.fecha_inicio_vigencia as fechaInicioVigencia,
                 pc.fecha_fin_vigencia as fechaFinVigencia,
                 pc.estado,
-                COALESCE(td.numero_expediente, pc.referencia_sisgedo, '') as expedienteNumero,
+                COALESCE(NULLIF(pc.referencia_sisgedo, ''), td.numero_expediente, '') as expedienteNumero,
                 td.fecha_solicitud as fechaSolicitud,
                 pa.nombre as procedimientoNombre,
                 pa.codigo as procedimientoCodigo,
@@ -104,8 +104,8 @@ class PermisosController extends ResourceController
             ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
             ->join('ciudadanos rc', 'rc.id_persona = o.id_representante_legal', 'left')
             ->join('vehiculos v', 'v.id = COALESCE(pc.id_vehiculo, td.id_vehiculo)', 'left', false)
-            ->join('(SELECT id_tramite, MAX(id) AS id FROM pagos_transito WHERE id_tramite IS NOT NULL GROUP BY id_tramite) pm', 'pm.id_tramite = pc.id_tramite', 'left', false)
-            ->join('pagos_transito pt', 'pt.id = pm.id', 'left');
+            ->join("(SELECT p1.id_tramite, p1.id FROM pagos_transito p1 JOIN (SELECT id_tramite, MAX(id) AS id FROM pagos_transito WHERE id_tramite IS NOT NULL AND estado = 'PAGADO' GROUP BY id_tramite) ult ON ult.id = p1.id) pm", 'pm.id_tramite = pc.id_tramite', 'left', false)
+            ->join("pagos_transito pt", "pt.id = pm.id AND pt.estado = 'PAGADO'", 'left', false);
     }
 
     private function resolverRelaciones($db, array $payload, bool $esCreacion): array
@@ -270,7 +270,7 @@ class PermisosController extends ResourceController
 
         $rules = [
             'tipoPermiso' => [
-                'rules' => 'permit_empty|in_list[CARGA_DESCARGA,USO_VIAS,OPERACION,RENOVACION_OPERACION,CONTROL_VEHICULAR,ZONAS_RESERVADAS,ZONA_RESERVADA]',
+                'rules' => 'permit_empty|in_list[CARGA_DESCARGA,USO_VIAS,ZONAS_RESERVADAS,ZONA_RESERVADA]',
                 'errors' => ['in_list' => 'Tipo de permiso no válido.']
             ]
         ];
@@ -322,6 +322,10 @@ class PermisosController extends ResourceController
             }
 
             $idTramite = !empty($payload['tramiteId']) ? (int)$payload['tramiteId'] : (!empty($payload['id_tramite']) ? (int)$payload['id_tramite'] : null);
+            $relaciones = $this->resolverRelaciones($db, $payload, true);
+            if ($idTramite && !$this->validarTramiteVinculado($db, $idTramite, $tipoPermiso, $relaciones)) {
+                return $this->failValidationErrors(['tramiteId' => 'El trámite no existe, no corresponde al tipo de permiso o pertenece a otro solicitante.']);
+            }
 
             $data = array_merge([
                 'id_tramite'             => $idTramite,
@@ -336,20 +340,20 @@ class PermisosController extends ResourceController
                 },
                 'registro_numero'        => !empty($payload['registroNumero']) ? trim($payload['registroNumero']) : null,
                 'contenido'              => !empty($payload['contenido']) ? trim($payload['contenido']) : 'Autorización oficial emitida por la Subgerencia de Tránsito y Transporte.',
-                'zona_circulacion'       => !empty($payload['zonaCirculacion']) ? trim($payload['zonaCirculacion']) : 'Anillo Vial - Distrito de José Leonardo Ortiz',
+                'zona_circulacion'       => !empty($payload['zonaCirculacion']) ? trim($payload['zonaCirculacion']) : null,
                 'ubicacion'              => !empty($payload['ubicacion']) ? trim($payload['ubicacion']) : null,
                 'recorrido_ingreso'      => !empty($payload['recorridoIngreso']) ? trim($payload['recorridoIngreso']) : null,
                 'flota_placas'           => !empty($payload['flotaPlacas']) ? trim($payload['flotaPlacas']) : null,
                 'tonelaje'               => !empty($payload['tonelaje']) ? trim($payload['tonelaje']) : null,
                 'numero_seguridad'       => !empty($payload['numeroSeguridad']) ? trim($payload['numeroSeguridad']) : str_pad((string)mt_rand(10000, 99999), 5, '0', STR_PAD_LEFT),
                 'observaciones'          => !empty($payload['observaciones']) ? trim($payload['observaciones']) : null,
-                'horario_inicio'         => !empty($payload['horarioInicio']) ? trim($payload['horarioInicio']) : '16:00:00',
-                'horario_fin'            => !empty($payload['horarioFin']) ? trim($payload['horarioFin']) : '05:00:00',
+                'horario_inicio'         => !empty($payload['horarioInicio']) ? trim($payload['horarioInicio']) : null,
+                'horario_fin'            => !empty($payload['horarioFin']) ? trim($payload['horarioFin']) : null,
                 'fecha_emision'          => !empty($payload['fechaEmision']) ? trim($payload['fechaEmision']) : date('Y-m-d'),
                 'fecha_inicio_vigencia'  => !empty($payload['fechaInicioVigencia']) ? trim($payload['fechaInicioVigencia']) : date('Y-m-d'),
-                'fecha_fin_vigencia'     => !empty($payload['fechaFinVigencia']) ? trim($payload['fechaFinVigencia']) : date('Y-m-d', strtotime('+1 year')),
+                'fecha_fin_vigencia'     => !empty($payload['fechaFinVigencia']) ? trim($payload['fechaFinVigencia']) : null,
                 'estado'                 => !empty($payload['estado']) ? strtoupper(trim($payload['estado'])) : 'VIGENTE',
-            ], $this->resolverRelaciones($db, $payload, true));
+            ], $relaciones);
 
             $errores = \App\Services\ValidacionRegistro::permiso($data);
             if ($errores) return $this->failValidationErrors($errores);
@@ -428,6 +432,16 @@ class PermisosController extends ResourceController
             $data = array_merge($data, $this->resolverRelaciones($db, $payload, false));
 
             $actual = $db->table('permisos_circulacion')->where('id', $id)->get()->getRowArray();
+            $tramiteFinal = array_key_exists('id_tramite', $data) ? $data['id_tramite'] : ($actual['id_tramite'] ?? null);
+            $tipoFinal = $data['tipo_permiso'] ?? $actual['tipo_permiso'] ?? '';
+            $relacionesFinales = array_merge([
+                'id_persona' => $actual['id_persona'] ?? null,
+                'id_asociacion' => $actual['id_asociacion'] ?? null,
+                'id_vehiculo' => $actual['id_vehiculo'] ?? null,
+            ], $data);
+            if ($tramiteFinal && !$this->validarTramiteVinculado($db, (int)$tramiteFinal, (string)$tipoFinal, $relacionesFinales)) {
+                return $this->failValidationErrors(['tramiteId' => 'El trámite no existe, no corresponde al tipo de permiso o pertenece a otro solicitante.']);
+            }
             $errores = \App\Services\ValidacionRegistro::permiso(array_merge($actual, $data));
             foreach (['numero_autorizacion', 'fecha_emision', 'fecha_inicio_vigencia', 'contenido'] as $campo) {
                 if (array_key_exists($campo, $data) && ($data[$campo] === null || $data[$campo] === '')) $errores[$campo] = 'Campo obligatorio.';
@@ -503,6 +517,7 @@ class PermisosController extends ResourceController
                     pa.codigo as procedimientoCodigo,
                     pa.nombre as procedimientoNombre,
                     " . \App\Libraries\TupaCosto::sql('pa') . " as procedimientoCosto,
+                    pa.vigencia as procedimientoVigencia,
                     COALESCE(o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as solicitanteNombre,
                     COALESCE(o.ruc, p.numero, '') as solicitanteDocumento,
                     o.razon_social as asociacionNombre,
@@ -513,19 +528,30 @@ class PermisosController extends ResourceController
                     COALESCE(v.placa, '') as vehiculoPlaca,
                     COALESCE(pt.numero_recibo, '') as reciboIngresoNumero,
                     pt.total as reciboIngresoMonto,
-                    pt.fecha_pago as reciboIngresoFecha
+                    pt.fecha_pago as reciboIngresoFecha,
+                    pt.estado as pagoEstado
                 ", false)
                 ->join('procedimientos_administrativos pa', 'pa.id = td.id_procedimiento_admin', 'left')
                 ->join('asociaciones o', 'o.id = td.id_asociacion', 'left')
                 ->join('personas p', 'p.id = td.id_persona', 'left')
                 ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
                 ->join('vehiculos v', 'v.id = td.id_vehiculo', 'left')
-                ->join('pagos_transito pt', 'pt.id_tramite = td.id', 'left')
+                ->join("(SELECT p1.* FROM pagos_transito p1 JOIN (SELECT id_tramite, MAX(id) AS id FROM pagos_transito WHERE id_tramite IS NOT NULL AND estado = 'PAGADO' GROUP BY id_tramite) ult ON ult.id = p1.id) pt", 'pt.id_tramite = td.id', 'left', false)
                 ->orderBy('td.id', 'DESC')
                 ->get()
                 ->getResultArray();
 
-            return $this->respond(['data' => $rows]);
+            $compatibles = [];
+            foreach ($rows as $row) {
+                if (!$this->tieneTitularIdentificable($row)) continue;
+                $tipo = $this->inferirTipoPermiso((string)($row['procedimientoNombre'] ?? ''));
+                if ($tipo === null) continue;
+                $row['tipoPermiso'] = $tipo;
+                unset($row['procedimientoVigencia']);
+                if (empty($row['pagoEstado'])) $row['pagoEstado'] = 'SIN_PAGO_VINCULADO';
+                $compatibles[] = $row;
+            }
+            return $this->respond(['data' => $compatibles]);
         } catch (\Throwable $e) {
             log_message('error', 'Error consultando trámites: ' . $e->getMessage());
             return $this->failServerError('Error consultando trámites. Intente nuevamente.');
@@ -536,6 +562,7 @@ class PermisosController extends ResourceController
     {
         $db = \Config\Database::connect();
         $q = trim((string)($this->request->getGet('q') ?? ''));
+        if ($q === '') return $this->respond(['data' => []]);
 
         try {
             $results = [];
@@ -601,54 +628,6 @@ class PermisosController extends ResourceController
                 ]);
             }
 
-            $builderTram = $db->table('tramites_documentarios td')
-                ->select("
-                    td.id as tramiteId,
-                    td.numero_expediente as expediente,
-                    COALESCE(v.placa, '') as placa,
-                    COALESCE(o.razon_social, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), '') as nombre,
-                    COALESCE(o.ruc, p.numero, '') as documento,
-                    CASE WHEN o.id IS NOT NULL THEN 'RUC' ELSE 'DNI' END as tipoDocumento,
-                    CASE WHEN o.id IS NOT NULL AND td.id_persona IS NOT NULL THEN TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) ELSE '' END as representanteLegal,
-                    COALESCE(pt.numero_recibo, '') as reciboNumero,
-                    pt.total as reciboMonto,
-                    pt.fecha_pago as reciboFecha
-                ")
-                ->join('asociaciones o', 'o.id = td.id_asociacion', 'left')
-                ->join('personas p', 'p.id = td.id_persona', 'left')
-                ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
-                ->join('vehiculos v', 'v.id = td.id_vehiculo', 'left')
-                ->join('pagos_transito pt', 'pt.id_tramite = td.id', 'left');
-
-            if ($q !== '') {
-                $builderTram->groupStart()
-                    ->like('td.numero_expediente', $q)
-                    ->orLike('v.placa', \App\Libraries\Placa::paraBusqueda($q))
-                    ->orLike('o.razon_social', $q)
-                    ->orLike('o.ruc', $q)
-                    ->orLike('p.numero', $q)
-                    ->orLike('c.nombres', $q)
-                    ->orLike('c.apellido_paterno', $q)
-                    ->orLike('pt.numero_recibo', $q)
-                    ->groupEnd();
-            }
-            $trams = $builderTram->limit(10)->get()->getResultArray();
-            foreach ($trams as $t) {
-                if (empty($t['nombre']) && empty($t['documento']) && empty($t['expediente'])) continue;
-                $results[] = $this->formatearResultadoAdministrado('TRAMITE', [
-                    'nombre'             => $t['nombre'],
-                    'documento'          => $t['documento'],
-                    'tipoDocumento'      => $t['tipoDocumento'],
-                    'representanteLegal' => $t['representanteLegal'] ?? '',
-                    'placa'              => $t['placa'],
-                    'expediente'         => $t['expediente'],
-                    'reciboNumero'       => $t['reciboNumero'],
-                    'reciboMonto'        => $t['reciboMonto'] ? (float)$t['reciboMonto'] : null,
-                    'reciboFecha'        => $t['reciboFecha'],
-                    'tramiteId'          => (int)$t['tramiteId'],
-                ]);
-            }
-
             $unique = [];
             $seen = [];
             foreach ($results as $item) {
@@ -664,6 +643,54 @@ class PermisosController extends ResourceController
             log_message('error', 'Error buscando administrados: ' . $e->getMessage());
             return $this->failServerError('Error buscando administrados. Intente nuevamente.');
         }
+    }
+
+    private function inferirTipoPermiso(string $texto): ?string
+    {
+        $texto = mb_strtolower($texto, 'UTF-8');
+        $texto = strtr($texto, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u']);
+        $coincidencias = [];
+        if (preg_match('/\bcarga\b/u', $texto) && preg_match('/\bdescarga\b/u', $texto)) $coincidencias[] = 'CARGA_DESCARGA';
+        if (preg_match('/\b(?:uso\s+(?:provisional\s+)?de\s+v[ií]as?|provisional\s+de\s+uso\s+de?\s+v[ií]as?)\b/u', $texto)) $coincidencias[] = 'USO_VIAS';
+        if (preg_match('/\bzonas?\s+reservadas?\b/u', $texto)) $coincidencias[] = 'ZONAS_RESERVADAS';
+        return count($coincidencias) === 1 ? $coincidencias[0] : null;
+    }
+
+    private function validarTramiteVinculado($db, int $idTramite, string $tipoPermiso, array $relaciones): bool
+    {
+        if (empty($relaciones['id_persona']) && empty($relaciones['id_asociacion'])) return false;
+        $tramite = $db->table('tramites_documentarios')
+            ->select('id_persona, id_asociacion, id_vehiculo, id_procedimiento_admin')
+            ->where('id', $idTramite)->get()->getRowArray();
+        if (!$tramite || !$tramite['id_procedimiento_admin']) return false;
+        if (!empty($tramite['id_asociacion'])) {
+            $titular = $db->table('asociaciones')->select('ruc')->where('id', $tramite['id_asociacion'])->get()->getRowArray();
+            if (!$titular || trim((string)($titular['ruc'] ?? '')) === '') return false;
+        } elseif (!empty($tramite['id_persona'])) {
+            $titular = $db->table('personas')->select('numero')->where('id', $tramite['id_persona'])->get()->getRowArray();
+            if (!$titular || trim((string)($titular['numero'] ?? '')) === '') return false;
+        } else {
+            return false;
+        }
+        $procedimiento = $db->table('procedimientos_administrativos')
+            ->select('nombre')->where('id', $tramite['id_procedimiento_admin'])->get()->getRowArray();
+        if (!$procedimiento) return false;
+        $inferido = $this->inferirTipoPermiso((string)$procedimiento['nombre']);
+        $tipoCanonico = $tipoPermiso === 'ZONA_RESERVADA' ? 'ZONAS_RESERVADAS' : $tipoPermiso;
+        if ($inferido === null || $inferido !== $tipoCanonico) return false;
+        if (!empty($tramite['id_asociacion'])) {
+            if ((int)$tramite['id_asociacion'] !== (int)($relaciones['id_asociacion'] ?? 0)) return false;
+        } elseif ((int)($tramite['id_persona'] ?? 0) !== (int)($relaciones['id_persona'] ?? 0)) {
+            return false;
+        }
+        if (!empty($tramite['id_vehiculo']) && (int)$tramite['id_vehiculo'] !== (int)($relaciones['id_vehiculo'] ?? 0)) return false;
+        return true;
+    }
+
+    private function tieneTitularIdentificable(array $tramite): bool
+    {
+        $tieneTitular = !empty($tramite['personaId']) || !empty($tramite['asociacionId']);
+        return $tieneTitular && trim((string)($tramite['solicitanteDocumento'] ?? '')) !== '';
     }
 
     private function formatearResultadoAdministrado(string $tipo, array $item): array

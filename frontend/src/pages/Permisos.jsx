@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { Icon } from '../components/ui/Icon'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
@@ -15,12 +16,12 @@ import { formatNumeroTarjeta, formatRangoHoras12, formatTextoHorario12 } from '.
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { FloatingInput, FloatingSelect, RoundedSelect } from '../components/ui/FormInputs'
-import { BotonCancelar, BotonCerrarModal } from '../components/ui/ModalControls'
 import { puedeEliminarRegistros } from '../config/roles'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
-  { value: 'CONTROL_VEHICULAR', label: 'Control Vehicular' },
   { value: 'CARGA_DESCARGA', label: 'Carga y Descarga' },
   { value: 'USO_VIAS', label: 'Uso de Vías' },
   { value: 'ZONAS_RESERVADAS', label: 'Zonas Reservadas' },
@@ -32,12 +33,21 @@ const FILTER_ESTADO_OPTIONS = [
   { value: 'VENCIDO', label: 'Vencidos' },
 ]
 
+const formatFecha = (valor) => {
+  if (!valor) return '—'
+  const texto = String(valor).trim()
+  const fechaIso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (fechaIso) return `${fechaIso[3]}/${fechaIso[2]}/${fechaIso[1]}`
+  const fecha = new Date(texto)
+  return Number.isNaN(fecha.getTime())
+    ? texto
+    : new Intl.DateTimeFormat('es-PE', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }).format(fecha)
+}
+
 export function Permisos() {
   const cachedProcs = getCachedData('/procedimientos-admin')
 
   const [procedimientos, setProcedimientos] = useState(cachedProcs || [])
-  const [tramitesDisponibles, setTramitesDisponibles] = useState([])
-  const [activeTab, setActiveTab] = useState('permisos')
   const [searchTerm, setSearchTerm] = useState(() => new URLSearchParams(window.location.search).get('search') || '')
 
   const location = useLocation()
@@ -56,13 +66,6 @@ export function Permisos() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isExportingExcel, setIsExportingExcel] = useState(false)
-  const previewScrollRef = useRef(null)
-
-  useEffect(() => {
-    if (isDetailModalOpen && previewScrollRef.current) {
-      previewScrollRef.current.scrollTop = 0
-    }
-  }, [isDetailModalOpen, selectedPermiso])
   const handleDeletePermiso = async (id) => {
     const result = await showConfirm(
       '¿Eliminar autorización?',
@@ -115,16 +118,6 @@ export function Permisos() {
     },
   })
 
-  useEffect(() => {
-    if (!isCreateModalOpen) return undefined
-    let vigente = true
-    apiFetch('/permisos/tramites-disponibles')
-      .then((r) => (r.ok ? r.json() : { data: [] }))
-      .catch(() => ({ data: [] }))
-      .then((res) => { if (vigente) setTramitesDisponibles(Array.isArray(res?.data) ? res.data : []) })
-    return () => { vigente = false }
-  }, [isCreateModalOpen])
-
   // Los listeners de ventana (message/storage) se registran una sola vez: la ref
   // les entrega siempre la versión de loadData con los filtros actuales.
   const loadDataRef = useRef(loadData)
@@ -142,6 +135,8 @@ export function Permisos() {
   useEffect(() => {
     loadStats()
   }, [])
+
+  useRecargaSilenciosa('/permisos', [() => loadStats()])
 
   useEffect(() => {
     apiFetch('/procedimientos-admin')
@@ -204,7 +199,6 @@ export function Permisos() {
   }, [])
 
   const totalPermisos = stats.totalPermisos ?? 0
-  const totalControl = stats.totalControl ?? 0
   const totalCarga = stats.totalCarga ?? 0
   const totalVias = stats.totalVias ?? 0
   const totalZonas = stats.totalZonas ?? 0
@@ -213,7 +207,7 @@ export function Permisos() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [debouncedSearch, filterEstado, filterTipo, activeTab])
+  }, [debouncedSearch, filterEstado, filterTipo])
 
   const fetchTodoElFiltro = async () => {
     const params = new URLSearchParams()
@@ -279,11 +273,6 @@ export function Permisos() {
   }
 
 
-  const handleOpenDetail = (p) => {
-    setSelectedPermiso(p)
-    setIsDetailModalOpen(true)
-  }
-
   const handleOpenCreate = () => {
     limpiarBorradorPermiso()
     setEditingPermiso(null)
@@ -296,8 +285,23 @@ export function Permisos() {
     setIsCreateModalOpen(true)
   }
 
-  const handlePrint = () => {
-    window.print()
+  const handlePrint = async (permiso = selectedPermiso) => {
+    try {
+      flushSync(() => {
+        setSelectedPermiso(permiso)
+        setIsDetailModalOpen(true)
+      })
+      const documento = document.querySelector('#seccion-impresion .impresion-documento-hoja')
+      if (!documento) throw new Error('No se pudo preparar la autorización.')
+      await document.fonts.ready
+      await Promise.all(Array.from(documento.querySelectorAll('img')).map((imagen) =>
+        imagen.decode ? imagen.decode().catch(() => {}) : Promise.resolve()
+      ))
+      window.print()
+      setIsDetailModalOpen(false)
+    } catch (error) {
+      showError('Impresión no disponible', error.message)
+    }
   }
 
   return (
@@ -318,7 +322,7 @@ export function Permisos() {
         </div>
       </div>
 
-      {/* Tarjetas KPI con Bordes de Colores: 6 tarjetas separadas compactas */}
+      {/* Resumen de autorizaciones */}
       <div className="kpi-grid">
         {/* 1. Total Registros */}
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-blue-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
@@ -331,21 +335,6 @@ export function Permisos() {
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
               {formatNumeroTarjeta(totalPermisos)}
-            </p>
-          </div>
-        </div>
-
-        {/* 2. Control Vehicular */}
-        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-indigo-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Control Vehicular</span>
-            <span className="grid size-6 place-items-center rounded-md text-indigo-600 dark:text-indigo-400">
-              <Icon name="truck" className="size-3.5" />
-            </span>
-          </div>
-          <div className="mt-1">
-            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">
-              {formatNumeroTarjeta(totalControl)}
             </p>
           </div>
         </div>
@@ -411,34 +400,8 @@ export function Permisos() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-[var(--border)]">
-        <button
-          type="button"
-          onClick={() => setActiveTab('permisos')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${activeTab === 'permisos'
-              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-            }`}
-        >
-          <Icon name="permit" className="size-4" />
-          <span>Padrón de Autorizaciones</span>
-        </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('tupa')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${activeTab === 'tupa'
-              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-            }`}
-        >
-          <Icon name="document" className="size-4" />
-          <span>Catálogo Normativo TUPA</span>
-        </button>
-      </div>
-
-      {activeTab === 'permisos' && (
+      <>
         <div className="space-y-4">
           {/* Contenedor de la Tabla - Exacto a Personas.jsx */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] overflow-hidden">
@@ -516,30 +479,37 @@ export function Permisos() {
             </div>
 
             {/* Tabla de Autorizaciones */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] table-fixed text-left text-xs">
+            <div className="min-w-0 max-w-full overflow-x-auto">
+              <table className="w-full min-w-[1120px] table-fixed text-left text-xs">
+                <colgroup>
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '12%' }} />
+                </colgroup>
                 <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <tr>
-                    <th className="px-3 py-3 w-[200px]"><SortableHeader column="numeroAutorizacion" label="N° Autorización" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                    <th className="px-3 py-3 w-[140px]"><SortableHeader column="tipoPermiso" label="Tipo" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                    <th className="px-3 py-3 w-[22%]"><SortableHeader column="solicitanteNombre" label="Solicitante" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                    <th className="px-3 py-3 w-[110px]"><SortableHeader column="vehiculoPlaca" label="Placa" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                    <th className="px-3 py-3 w-[16%]">Zona</th>
-                    <th className="px-3 py-3 w-[165px]">Horario</th>
-                    <th className="px-3 py-3 w-[105px]">Vigencia</th>
-                    <th className="px-3 py-3 text-center w-[120px]"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
-                    <th className="sticky right-0 z-20 px-3 py-3 text-center bg-slate-50/75 dark:bg-[var(--bg-subtle)] w-[140px]">
+                    <th className="px-3 py-3"><SortableHeader column="numeroAutorizacion" label="N° Autorización" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-3 py-3"><SortableHeader column="tipoPermiso" label="Tipo" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-3 py-3"><SortableHeader column="solicitanteNombre" label="Solicitante" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-3 py-3"><SortableHeader column="vehiculoPlaca" label="Placa" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
+                    <th className="px-3 py-3">Zona</th>
+                    <th className="px-3 py-3">Horario</th>
+                    <th className="px-3 py-3">Vigencia</th>
+                    <th className="px-3 py-3 text-center"><SortableHeader column="estado" label="Estado" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
+                    <th className="sticky right-0 z-20 px-3 py-3 text-center bg-slate-50/75 dark:bg-[var(--bg-subtle)]">
                       Acciones
                     </th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && permisos.length > 0 ? 'opacity-50' : ''}`}>
                   {isLoading && permisos.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
-                        Cargando autorizaciones municipales...
-                      </td>
-                    </tr>
+                    <FilaCargando colSpan={9} />
                   ) : permisos.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="p-12 text-center">
@@ -558,10 +528,10 @@ export function Permisos() {
                         <tr key={p.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
                           {/* N° de autorización y expediente (una sola línea cada uno) */}
                           <td className="px-3 py-3 align-middle">
-                            <div className="truncate text-xs font-bold text-slate-700 dark:text-slate-200 font-mono" title={p.numeroAutorizacion}>
+                            <div className="min-w-0 break-words text-xs font-bold text-slate-700 dark:text-slate-200 font-mono" title={p.numeroAutorizacion}>
                               {p.numeroAutorizacion}
                             </div>
-                            <div className="truncate text-[10px] text-slate-400 font-mono" title={`Exp. ${p.expediente || p.expedienteNumero || 'S/N'}`}>
+                            <div className="min-w-0 break-words text-[10px] text-slate-400 font-mono" title={`Exp. ${p.expediente || p.expedienteNumero || 'S/N'}`}>
                               Exp. {p.expediente || p.expedienteNumero || 'S/N'}
                             </div>
                           </td>
@@ -569,26 +539,26 @@ export function Permisos() {
                           {/* Tipo */}
                           <td className="px-3 py-3 align-middle">
                             <span
-                              className={`inline-block whitespace-nowrap rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${isCarga
+                              className={`inline-block max-w-full rounded-md px-2 py-1 text-[10px] leading-tight font-extrabold uppercase tracking-wide ${isCarga
                                   ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
                                   : isVias
                                     ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                                     : isZonas
                                       ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                                      : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
+                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                                 }`}
                             >
-                              {isCarga ? 'Carga y Descarga' : isVias ? 'Uso de Vías' : isZonas ? 'Zonas Reservadas' : 'Control Vehicular'}
+                              {isCarga ? 'Carga y Descarga' : isVias ? 'Uso de Vías' : isZonas ? 'Zonas Reservadas' : 'Sin clasificar'}
                             </span>
                           </td>
 
                           {/* Vehículo / Flota */}
                           <td className="px-3 py-3 align-middle">
                             <div className="min-w-0">
-                              <p className="text-xs font-bold text-slate-900 dark:text-white">
+                              <p className="break-words text-xs font-bold text-slate-900 dark:text-white">
                                 {solicitanteText}
                               </p>
-                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              <p className="break-all text-[10px] text-slate-400 font-mono mt-0.5">
                                 {p.solicitanteDocumento || p.solicitanteDoc ? `DOC: ${p.solicitanteDocumento || p.solicitanteDoc}` : 'Sin documento'}
                               </p>
                             </div>
@@ -611,13 +581,13 @@ export function Permisos() {
 
                           {/* Zona */}
                           <td className="px-3 py-3 text-xs align-middle">
-                            <div className="font-semibold text-slate-800 dark:text-slate-200">
+                              <div className="break-words font-semibold text-slate-800 dark:text-slate-200">
                               {p.zonaCirculacion || p.zonaPermitida || '—'}
                             </div>
                           </td>
 
                           {/* Horario */}
-                          <td className="px-3 py-3 text-xs align-middle whitespace-nowrap">
+                          <td className="px-3 py-3 text-xs align-middle whitespace-normal">
                             <div className="font-semibold text-indigo-600 dark:text-indigo-400">
                               {p.horarioInicio && p.horarioFin ? formatRangoHoras12(p.horarioInicio, p.horarioFin) : (p.horarioPermitido ? formatTextoHorario12(p.horarioPermitido) : '—')}
                             </div>
@@ -626,10 +596,10 @@ export function Permisos() {
                           {/* Vigencia */}
                           <td className="px-3 py-3 text-xs align-middle">
                             <div className="font-bold text-slate-800 dark:text-slate-200">
-                              {p.fechaInicioVigencia || p.fechaInicio || '—'}
+                              {formatFecha(p.fechaInicioVigencia || p.fechaInicio)}
                             </div>
                             <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                              Al: {p.fechaFinVigencia || p.fechaFin || '—'}
+                              Al: {formatFecha(p.fechaFinVigencia || p.fechaFin)}
                             </div>
                           </td>
 
@@ -643,10 +613,7 @@ export function Permisos() {
                             <div className="flex items-center justify-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setSelectedPermiso(p)
-                                  setIsDetailModalOpen(true)
-                                }}
+                                onClick={() => handlePrint(p)}
                                 title="Imprimir Formato Oficial"
                                 className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
                                 style={{
@@ -696,7 +663,7 @@ export function Permisos() {
                                 <Icon name="pencil" className="size-4" />
                               </button>
 
-                              <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
+                              {puedeEliminarRegistros() && <button
                                 type="button"
                                 onClick={() => handleDeletePermiso(p.id)}
                                 title="Eliminar Autorización"
@@ -720,7 +687,7 @@ export function Permisos() {
                                 }}
                               >
                                 <Icon name="trash" className="size-4" />
-                              </button>
+                              </button>}
                             </div>
                           </td>
                         </tr>
@@ -731,6 +698,7 @@ export function Permisos() {
               </table>
             </div>
 
+            <div className="border-t border-slate-100 pt-2 dark:border-[var(--border)]">
             <Pagination
               currentPage={currentPage}
               totalItems={totalFiltrado}
@@ -742,45 +710,10 @@ export function Permisos() {
               }}
               disabled={isLoading}
             />
+            </div>
           </div>
         </div>
-      )}
-
-      {/* Catálogo TUPA */}
-      {activeTab === 'tupa' && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {procedimientos.map((proc) => (
-            <div
-              key={proc.id}
-              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-horizon dark:shadow-none dark:border-[var(--border)] dark:bg-[#1C2438]"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="rounded-lg bg-violet-50 px-2.5 py-1 font-mono text-xs font-black text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
-                    {proc.codigo}
-                  </span>
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    {proc.estado}
-                  </span>
-                </div>
-                <h3 className="mt-3 text-sm font-black text-slate-900 dark:text-white leading-snug">
-                  {proc.nombre}
-                </h3>
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-3">
-                  {proc.descripcion || 'Procedimiento administrativo oficial de tránsito y vialidad distrital.'}
-                </p>
-              </div>
-
-              <div className="mt-4 border-t border-slate-100 pt-3 dark:border-[var(--border)] flex items-center justify-between">
-                <span className="text-[11px] font-medium text-slate-400">Derecho de trámite</span>
-                <span className="text-sm font-black text-slate-900 dark:text-white">
-                  S/ {Number(proc.costo || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      </>
 
       {/* MODAL CREAR / EDITAR - EXACTO A PERSONAS.JSX */}
       {/* MODAL DE TRÁMITE / EMISIÓN Y EDICIÓN CON EDITOR DE TEXTO */}
@@ -797,71 +730,49 @@ export function Permisos() {
           loadStats()
         }}
         procedimientos={procedimientos}
-        tramitesDisponibles={tramitesDisponibles}
       />
 
-      {/* MODAL DE PREVISUALIZACIÓN E IMPRESIÓN OFICIAL HOJA A4 */}
       {isDetailModalOpen && selectedPermiso && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xs animate-enter overflow-y-auto">
-          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438] my-auto">
-
-            {/* Header del visualizador estilo /personas */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438]">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                  <Icon name="print" className="size-4" />
-                </span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Formato Oficial A4
-                    </h3>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
-                      {selectedPermiso.tipoPermiso === 'CARGA_DESCARGA'
-                        ? 'Carga y Descarga'
-                        : selectedPermiso.tipoPermiso === 'USO_VIAS'
-                          ? 'Uso Provisional de Vías'
-                          : selectedPermiso.tipoPermiso === 'ZONAS_RESERVADAS' || selectedPermiso.tipoPermiso === 'ZONA_RESERVADA'
-                            ? 'Zonas Reservadas'
-                            : 'Control Vehicular'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {selectedPermiso.numeroAutorizacion || selectedPermiso.numeroResolucion} • Subgerencia de Tránsito y Transporte
-                  </p>
-                </div>
-              </div>
-              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar previsualización" />
-            </div>
-
-            {/* Vista Previa del Documento Oficial */}
-            <div ref={previewScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-start gap-4 bg-slate-100 dark:bg-[var(--bg-subtle)]">
-              <div className="text-center max-w-lg">
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Documento Oficial de Autorización Municipal — Hoja Formato A4
-                </p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Al pulsar "Imprimir Documento Oficial A4", el sistema aísla exclusivamente el contenedor oficial <code className="font-mono text-violet-600 dark:text-violet-400">#seccion-impresion</code> emitiendo 1 página limpia idéntica al documento físico.
-                </p>
-              </div>
-
-              <ResolucionPermisoPrint data={selectedPermiso} />
-            </div>
-
-            {/* Footer de Acciones */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-[var(--border)] bg-white dark:bg-[#1C2438]">
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-xs font-black text-white shadow-md hover:from-violet-500 hover:to-indigo-500 transition cursor-pointer active:scale-95"
-              >
-                <Icon name="print" className="size-4" />
-                <span>Imprimir Documento Oficial A4</span>
-              </button>
-
-              <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
-            </div>
-          </div>
+        <div className="hidden" aria-hidden="true">
+          <style media="print">{`
+            @page { size: A4 portrait; margin: 0; background: #fff; }
+            #seccion-impresion .impresion-documento-hoja {
+              padding: 8mm 15mm !important;
+              box-sizing: border-box !important;
+              justify-content: flex-start !important;
+            }
+            #seccion-impresion .hoja-editor__encabezado {
+              margin-top: 0 !important;
+              margin-bottom: 8px !important;
+              padding-bottom: 6px !important;
+              gap: 4px !important;
+            }
+            #seccion-impresion .impresion-documento-hoja > .hoja-editor {
+              padding: 0 !important;
+            }
+            #seccion-impresion .hoja-editor__contenido p {
+              margin-bottom: 6pt;
+              orphans: 2;
+              widows: 2;
+            }
+            #seccion-impresion .hoja-editor__contenido table {
+              margin-top: 6pt;
+              margin-bottom: 8pt;
+              break-inside: avoid;
+            }
+            #seccion-impresion .hoja-editor__contenido ul,
+            #seccion-impresion .hoja-editor__contenido ol {
+              margin-top: 4pt;
+              margin-bottom: 8pt;
+            }
+            #seccion-impresion .hoja-editor__contenido > p:last-child {
+              margin-top: 12pt;
+              margin-bottom: 0;
+              break-before: avoid;
+              break-inside: avoid;
+            }
+          `}</style>
+          <ResolucionPermisoPrint data={selectedPermiso} />
         </div>
       )}
     </div>

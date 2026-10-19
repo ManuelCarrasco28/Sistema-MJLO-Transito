@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fechaLocalActual, fechaLocalMasDias } from '../../utils/calendarioCurso'
-import { normalizarPlaca } from '../../utils/formatters'
+import { fechaLocalActual } from '../../utils/calendarioCurso'
+import { normalizarPlaca, formatFecha } from '../../utils/formatters'
 import { Icon } from '../ui/Icon'
 import { FloatingInput } from '../ui/FormInputs'
 import { sanitizarMensaje, apiFetch } from '../../config/api'
-import { showError, showToast } from '../../utils/SwalUtil'
+import { showError, showToast, showConfirm } from '../../utils/SwalUtil'
 import { BuscadorAdministrados } from './BuscadorAdministrados'
 import { generarPlantillaCuerpo } from '../../utils/permisosPlantilla'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
+
+const formatearMontoVinculado = (valor) => (
+  valor === null || valor === undefined || valor === '' ? '' : String(valor)
+)
 
 export function TramiteFormularioModal({
   isOpen,
   onClose,
   initialData = null,
-  onSave,
-  tramitesDisponibles = []
+  onSave
 }) {
   const navigate = useNavigate()
   const initialFormState = {
@@ -32,15 +35,15 @@ export function TramiteFormularioModal({
     asunto: 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
     zonaCirculacion: '',
     ubicacion: '',
-    // Carga y descarga (tipo inicial) es nocturno; al cambiar de tipo se ajusta
+    // Horario inicial razonable para una nueva solicitud de carga y descarga.
     horarioInicio: '16:00',
     horarioFin: '05:00',
     fechaEmision: fechaLocalActual(),
     fechaInicioVigencia: fechaLocalActual(),
-    fechaFinVigencia: fechaLocalMasDias(365),
+    fechaFinVigencia: '',
     reciboIngresoNumero: '',
     reciboIngresoMonto: '',
-    reciboIngresoFecha: fechaLocalActual(),
+    reciboIngresoFecha: '',
     tonelaje: '',
     numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000)),
     recorridoIngreso: '',
@@ -59,7 +62,7 @@ export function TramiteFormularioModal({
     if (initialData && (initialData.id || initialData.solicitanteNombre || initialData.solicitanteDocumento)) {
       setFormData({
         id: initialData.id || null,
-        tipoPermiso: initialData.tipoPermiso || 'CARGA_DESCARGA',
+        tipoPermiso: initialData.tipoPermiso === 'ZONA_RESERVADA' ? 'ZONAS_RESERVADAS' : (initialData.tipoPermiso || 'CARGA_DESCARGA'),
         numeroAutorizacion: initialData.numeroAutorizacion || '',
         vehiculoPlaca: initialData.vehiculoPlaca || '',
         solicitanteNombre: initialData.solicitanteNombre || initialData.solicitante || '',
@@ -82,7 +85,7 @@ export function TramiteFormularioModal({
         fechaInicioVigencia: initialData.fechaInicioVigencia || fechaLocalActual(),
         fechaFinVigencia: initialData.fechaFinVigencia || '',
         reciboIngresoNumero: initialData.reciboIngresoNumero || '',
-        reciboIngresoMonto: initialData.reciboIngresoMonto ? String(initialData.reciboIngresoMonto) : '',
+        reciboIngresoMonto: formatearMontoVinculado(initialData.reciboIngresoMonto),
         reciboIngresoFecha: initialData.reciboIngresoFecha || '',
         tonelaje: initialData.tonelaje || '',
         numeroSeguridad: initialData.numeroSeguridad || String(Math.floor(10000 + Math.random() * 90000)),
@@ -141,41 +144,33 @@ export function TramiteFormularioModal({
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleTipoChange = (newTipo) => {
-    let asunto = 'AUTORIZACIÓN MUNICIPAL OFICIAL'
-    let monto = '450'
-
-    if (newTipo === 'CARGA_DESCARGA') {
-      asunto = 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA'
-      monto = '1030'
-    } else if (newTipo === 'USO_VIAS') {
-      asunto = 'AUTORIZACION PROVISIONAL DE USO DE VIAS'
-      monto = '850'
-    } else if (newTipo === 'ZONAS_RESERVADAS' || newTipo === 'ZONA_RESERVADA') {
-      asunto = 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
-      monto = '920'
-    } else {
-      // CONTROL_VEHICULAR / OPERACION
-      asunto = 'AUTORIZACIÓN MUNICIPAL DE CONTROL VEHICULAR Y CIRCULACIÓN'
-      monto = '450'
+  const handleTipoChange = async (newTipo) => {
+    const tipo = newTipo === 'ZONA_RESERVADA' ? 'ZONAS_RESERVADAS' : newTipo
+    if (!['CARGA_DESCARGA', 'USO_VIAS', 'ZONAS_RESERVADAS'].includes(tipo) || tipo === formData.tipoPermiso) return
+    const vinculoIncompatible = Boolean(formData.tramiteId && tipo !== formData.tipoPermiso)
+    const asuntoPorTipo = {
+      CARGA_DESCARGA: 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
+      USO_VIAS: 'AUTORIZACION PROVISIONAL DE USO DE VIAS',
+      ZONAS_RESERVADAS: 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
     }
-
-    // El horario lo determina el tipo: carga y descarga es nocturno; los demás rigen todo el día
-    const horario = newTipo === 'CARGA_DESCARGA'
-      ? { horarioInicio: '16:00', horarioFin: '05:00' }
-      : { horarioInicio: '00:00', horarioFin: '23:59' }
+    const horario = !formData.id
+      ? (tipo === 'CARGA_DESCARGA'
+          ? { horarioInicio: '16:00', horarioFin: '05:00' }
+          : { horarioInicio: '00:00', horarioFin: '23:59' })
+      : {}
     const updated = {
       ...formData,
-      ...(formData.id ? {} : horario),
-      tipoPermiso: newTipo,
-      asunto,
-      reciboIngresoMonto: formData.reciboIngresoMonto || monto
+      ...horario,
+      tipoPermiso: tipo,
+      ...(vinculoIncompatible ? { tramiteId: null, reciboIngresoNumero: '', reciboIngresoMonto: '', reciboIngresoFecha: '' } : {}),
+      asunto: asuntoPorTipo[tipo]
     }
     updated.contenido = generarPlantillaCuerpo(updated)
     setFormData(updated)
   }
 
   const handleSelectAdministrado = (item) => {
+    if (formData.tramiteId) return
     const updated = {
       ...formData,
       solicitanteNombre: item.nombre || formData.solicitanteNombre,
@@ -184,13 +179,26 @@ export function TramiteFormularioModal({
       vehiculoPlaca: item.placa || formData.vehiculoPlaca,
       expediente: item.expediente || formData.expediente,
       referenciaSisgedo: item.expediente || formData.referenciaSisgedo,
-      reciboIngresoNumero: item.reciboNumero || formData.reciboIngresoNumero,
-      reciboIngresoMonto: item.reciboMonto ? String(item.reciboMonto) : formData.reciboIngresoMonto,
-      reciboIngresoFecha: item.reciboFecha || formData.reciboIngresoFecha,
-      tramiteId: item.tramiteId || formData.tramiteId
+      reciboIngresoNumero: item.reciboNumero || item.reciboIngresoNumero || '',
+      reciboIngresoMonto: formatearMontoVinculado(item.reciboMonto ?? item.reciboIngresoMonto),
+      reciboIngresoFecha: item.reciboFecha || item.reciboIngresoFecha || '',
+      tramiteId: item.tramiteId || null
     }
     updated.contenido = generarPlantillaCuerpo(updated)
     setFormData(updated)
+  }
+
+
+  const quitarVinculo = async () => {
+    if (formData.contenido?.trim()) {
+      const confirmation = await showConfirm('Quitar vínculo', 'Se quitará el expediente y el pago. Se conservarán los datos del solicitante; el contenido actual se reemplazará para retirar las referencias al pago.', 'Quitar y regenerar', 'Cancelar')
+      if (!confirmation.isConfirmed) return
+    }
+    setFormData((prev) => {
+      const updated = { ...prev, tramiteId: null, reciboIngresoNumero: '', reciboIngresoMonto: '', reciboIngresoFecha: '' }
+      updated.contenido = generarPlantillaCuerpo(updated)
+      return updated
+    })
   }
 
   // Continuar a redacción abriendo una segunda ventana para mayor comodidad
@@ -295,15 +303,15 @@ export function TramiteFormularioModal({
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white min-w-0 break-words">
                   {formData.id ? 'Editar Autorización Municipal' : 'Nueva Autorización Municipal'}
                 </h3>
                 <span className="shrink-0 rounded-full font-mono text-[10px] font-bold px-2 py-0.5 border border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300">
                   {formData.numeroAutorizacion || 'Borrador'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                Subgerencia de Tránsito, Transporte y Seguridad Vial • Trámite Oficial
+              <p className="text-xs text-slate-500 dark:text-slate-400 min-w-0 break-words">
+                  Tránsito y Transporte • Trámite Oficial
               </p>
             </div>
           </div>
@@ -315,75 +323,16 @@ export function TramiteFormularioModal({
 
         {/* FORMULARIO DE DATOS DEL TRÁMITE */}
         <form onSubmit={handleContinuarRedaccionSegundaVentana} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
-          {/* Opcional: Vincular con Trámite / Expediente Previo */}
-          {!formData.id && tramitesDisponibles.length > 0 && (
-            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-[var(--border)] dark:bg-indigo-950/30">
-              <label className="mb-1 block font-extrabold uppercase tracking-wider text-indigo-900 dark:text-indigo-200 text-xs">
-                Vincular con Trámite / Mesa de Partes Existente (Opcional)
-              </label>
-              <select
-                className="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
-                onChange={(e) => {
-                  const tId = Number(e.target.value)
-                  if (!tId) return
-                  const t = tramitesDisponibles.find((item) => item.id === tId)
-                  if (t) {
-                    const updated = {
-                      ...formData,
-                      tramiteId: t.id,
-                      solicitanteNombre: t.persona?.razonSocial || `${t.persona?.nombres || ''} ${t.persona?.apellidos || ''}`.trim() || formData.solicitanteNombre,
-                      solicitanteDocumento: t.persona?.numeroDocumento || formData.solicitanteDocumento,
-                      representanteLegal: t.persona?.representanteLegal || formData.representanteLegal,
-                      expediente: t.numeroExpediente || formData.expediente,
-                      referenciaSisgedo: t.numeroExpediente || formData.referenciaSisgedo,
-                      reciboIngresoNumero: t.reciboNumero || formData.reciboIngresoNumero,
-                      reciboIngresoMonto: t.reciboMonto ? String(t.reciboMonto) : formData.reciboIngresoMonto,
-                      reciboIngresoFecha: t.reciboFecha || formData.reciboIngresoFecha
-                    }
-                    setFormData(updated)
-                  }
-                }}
-              >
-                <option value="">-- Seleccionar trámite de mesa de partes --</option>
-                {tramitesDisponibles.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.numeroExpediente} • {t.persona?.razonSocial || `${t.persona?.nombres || ''} ${t.persona?.apellidos || ''}`.trim()} ({t.tipoProcedimiento?.nombre || 'TUPA'})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {/* 1. BUSCADOR INTELIGENTE EN BASE DE DATOS */}
-          <div className="rounded-2xl border border-indigo-200 bg-white p-3 dark:border-[var(--border)] dark:bg-[#1C2438] shadow-2xs">
-            <BuscadorAdministrados onSelect={handleSelectAdministrado} />
-          </div>
+          {!vinculado && <div className="rounded-2xl border border-indigo-200 bg-white p-3 dark:border-[var(--border)] dark:bg-[#1C2438] shadow-2xs"><BuscadorAdministrados onSelect={handleSelectAdministrado} /></div>}
 
           {/* 2. CLASIFICACIÓN / SELECTOR DE TIPO */}
           <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs dark:border-[var(--border)] dark:bg-[#1C2438] space-y-2">
             <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              Clasificación / Tipo de Permiso *
+              Clasificación / Tipo de Permiso
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              <button
-                type="button"
-                onClick={() => handleTipoChange('CONTROL_VEHICULAR')}
-                className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
-                  formData.tipoPermiso === 'CONTROL_VEHICULAR' || formData.tipoPermiso === 'OPERACION'
-                    ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-200 shadow-xs ring-1 ring-indigo-500/20'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-black text-xs">Control Vehicular</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
-                    S/ 450
-                  </span>
-                </div>
-                <p className="text-[10px] opacity-80 leading-snug">
-                  Permiso municipal para verificación técnica y circulación autorizada de unidades.
-                </p>
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
 
               <button
                 type="button"
@@ -394,15 +343,7 @@ export function TramiteFormularioModal({
                     : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-black text-xs">Carga y Descarga</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200">
-                    S/ 1030
-                  </span>
-                </div>
-                <p className="text-[10px] opacity-80 leading-snug">
-                  Horario nocturno / madrugada (16:00 a 05:00 hrs) para abastecimiento comercial.
-                </p>
+                <span className="font-black text-xs">Carga y Descarga</span>
               </button>
 
               <button
@@ -414,15 +355,7 @@ export function TramiteFormularioModal({
                     : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-black text-xs">Uso de Vías</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
-                    S/ 850
-                  </span>
-                </div>
-                <p className="text-[10px] opacity-80 leading-snug">
-                  Ocupación provisional de calzada/acera para mudanzas, eventos u obras civiles.
-                </p>
+                <span className="font-black text-xs">Uso de Vías</span>
               </button>
 
               <button
@@ -434,15 +367,7 @@ export function TramiteFormularioModal({
                     : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-black text-xs">Zonas Reservadas</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
-                    S/ 920
-                  </span>
-                </div>
-                <p className="text-[10px] opacity-80 leading-snug">
-                  Reserva exclusiva de estacionamiento en frontis para entidades y establecimientos.
-                </p>
+                <span className="font-black text-xs">Zonas Reservadas</span>
               </button>
             </div>
           </div>
@@ -455,8 +380,8 @@ export function TramiteFormularioModal({
             </legend>
             {vinculado && (
               <p className="flex items-center justify-between gap-2 rounded-xl bg-indigo-50 px-3 py-1.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                <span>Solicitante, expediente y recibo salen del documento vinculado y no se editan.</span>
-                <button type="button" onClick={() => setFormData({ ...formData, tramiteId: undefined })} className="shrink-0 cursor-pointer font-bold underline">Quitar vínculo</button>
+                <span>Expediente {formData.expediente || 'sin número'} vinculado. Solicitante: {formData.solicitanteNombre}.</span>
+                <button type="button" onClick={quitarVinculo} className="shrink-0 cursor-pointer font-bold underline">Quitar vínculo</button>
               </p>
             )}
 
@@ -515,10 +440,9 @@ export function TramiteFormularioModal({
               <div>
                 <FloatingInput
                   id="perm_expediente"
-                  label="Expediente UTD / SISGEDO"
+                  label="N.º de expediente UTD / SISGEDO"
                   value={formData.expediente}
-                  onChange={(e) => setFormData({ ...formData, expediente: e.target.value })}
-                  readOnly={vinculado}
+                  onChange={(e) => setFormData({ ...formData, expediente: e.target.value, referenciaSisgedo: e.target.value })}
                   inputClassName={`font-mono ${claseDeterminado}`}
                 />
               </div>
@@ -563,30 +487,8 @@ export function TramiteFormularioModal({
                 />
               </div>
 
-              {/* Recibo TUPA */}
-              <div>
-                <FloatingInput
-                  id="perm_recibo_numero"
-                  label="N° Recibo de Pago"
-                  value={formData.reciboIngresoNumero}
-                  onChange={(e) => setFormData({ ...formData, reciboIngresoNumero: e.target.value })}
-                  readOnly={vinculado && Boolean(formData.reciboIngresoNumero)}
-                  inputClassName={`font-mono font-bold ${claseDeterminado}`}
-                />
-              </div>
-
-              {/* Monto TUPA */}
-              <div>
-                <FloatingInput
-                  id="perm_recibo_monto"
-                  label="Monto Pagado (S/)"
-                  type="number"
-                  step="0.01"
-                  value={formData.reciboIngresoMonto}
-                  onChange={(e) => setFormData({ ...formData, reciboIngresoMonto: e.target.value })}
-                  readOnly={vinculado && Boolean(formData.reciboIngresoMonto)}
-                  inputClassName={`font-mono font-bold ${claseDeterminado}`}
-                />
+              <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-[var(--border)] dark:bg-slate-900/40">
+                <span className="font-bold">Pago vinculado: </span>{formData.reciboIngresoNumero ? `Recibo ${formData.reciboIngresoNumero}${formData.reciboIngresoMonto !== '' ? ` · S/ ${Number(formData.reciboIngresoMonto).toLocaleString('es-PE', { maximumFractionDigits: 2 })}` : ''}${formData.reciboIngresoFecha ? ` · ${formatFecha(formData.reciboIngresoFecha)}` : ''}` : 'Sin pago vinculado'}
               </div>
 
               {/* Vigencia Hasta */}

@@ -28,7 +28,7 @@ final class ValidacionRegistro
             if (array_key_exists($campo, $datos) && empty($datos[$campo])) $errores[$campo] = 'Fecha obligatoria.';
         }
         if (!in_array($datos['estado'] ?? 'VIGENTE', ['VIGENTE', 'VENCIDO', 'ANULADO'], true)) $errores['estado'] = 'Estado no válido.';
-        if (!in_array($datos['tipo_permiso'] ?? 'OPERACION', ['CARGA_DESCARGA', 'USO_VIAS', 'OPERACION', 'RENOVACION_OPERACION', 'CONTROL_VEHICULAR', 'ZONAS_RESERVADAS', 'ZONA_RESERVADA'], true)) $errores['tipoPermiso'] = 'Tipo de permiso no válido.';
+        if (!in_array($datos['tipo_permiso'] ?? 'CARGA_DESCARGA', ['CARGA_DESCARGA', 'USO_VIAS', 'ZONAS_RESERVADAS', 'ZONA_RESERVADA'], true)) $errores['tipoPermiso'] = 'Seleccione Carga y Descarga, Uso de Vías o Zonas Reservadas.';
         foreach (['horario_inicio', 'horario_fin'] as $campo) {
             if (!empty($datos[$campo]) && !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/', (string)$datos[$campo])) $errores[$campo] = 'Hora no válida.';
         }

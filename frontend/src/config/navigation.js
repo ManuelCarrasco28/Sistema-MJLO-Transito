@@ -17,6 +17,7 @@ export const PREFETCH_MAP = {
   '/internamientos':          () => import('../pages/Retenciones'),
   '/retenciones':             () => import('../pages/Retenciones'),
   '/permisos':                () => import('../pages/Permisos'),
+  '/procedimientos-tarifas':   () => import('../pages/ProcedimientosTarifas'),
   '/operativos':              () => import('../pages/Operativos'),
   '/superadmin':              () => import('../pages/SuperAdminDashboard'),
   '/superadmin/usuarios':     () => import('../pages/Usuarios'),
@@ -68,6 +69,7 @@ export const navigationGroups = [
     officeOnly: true,
     items: [
       { id: 'permisos',    label: 'Permisos y Autorizaciones', icon: 'routePermit',  path: '/permisos' },
+      { id: 'procedimientos-tarifas', label: 'Procedimientos y tarifas', icon: 'document', path: '/procedimientos-tarifas' },
       { id: 'cursos',      label: 'Cursos de Seguridad Vial',   icon: 'course',       path: '/cursos' },
       { id: 'documentos',  label: 'Documentos del Vehículo',   icon: 'folderShield', path: '/documentos' },
       { id: 'impresion',   label: 'Centro de impresión',       icon: 'print',        path: '/impresion' },

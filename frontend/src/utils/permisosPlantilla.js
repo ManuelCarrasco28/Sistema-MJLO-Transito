@@ -22,7 +22,7 @@ export function generarPlantillaControlVehicular(data = {}) {
   const zona = data.zonaCirculacion || 'Anillo Vial y Cuadrantes Autorizados - Distrito de José Leonardo Ortiz'
   const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : '06:00:00 - 22:00:00'
   const recibo = data.reciboIngresoNumero || 'S/N'
-  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 450'
+  const monto = (data.reciboIngresoMonto !== null && data.reciboIngresoMonto !== undefined && data.reciboIngresoMonto !== '' && Number.isFinite(Number(data.reciboIngresoMonto))) ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'Sin pago vinculado'
 
   return `
 <p><strong>SUBGERENCIA DE TRÁNSITO, TRANSPORTE Y SEGURIDAD VIAL</strong></p>
@@ -70,11 +70,11 @@ export function generarPlantillaCargaDescarga(data = {}) {
   const reg = data.registroNumero || 'S/N'
   const asunto = data.asunto || 'AUTORIZACIÓN DE CARGA Y DESCARGA EN VÍA PÚBLICA'
   const placa = data.vehiculoPlaca || data.flotaPlacas || '—'
-  const zona = data.zonaCirculacion || 'Anillo Vial y Cuadrante Comercial - José Leonardo Ortiz'
-  const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : '16:00:00 - 05:00:00'
-  const tonelaje = data.tonelaje || 'Hasta 15 Tn'
+  const zona = data.zonaCirculacion || 'Por definir'
+  const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : 'Por definir'
+  const tonelaje = data.tonelaje || 'Por definir'
   const recibo = data.reciboIngresoNumero || 'S/N'
-  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 1030'
+  const monto = (data.reciboIngresoMonto !== null && data.reciboIngresoMonto !== undefined && data.reciboIngresoMonto !== '' && Number.isFinite(Number(data.reciboIngresoMonto))) ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'Sin pago vinculado'
 
   return `
 <p><strong>SUBGERENCIA DE TRÁNSITO, TRANSPORTE Y SEGURIDAD VIAL</strong></p>
@@ -124,9 +124,9 @@ export function generarPlantillaUsoVias(data = {}) {
   const reg = data.registroNumero || 'S/N'
   const asunto = data.asunto || 'AUTORIZACIÓN PROVISIONAL DE USO DE VÍAS PÚBLICAS'
   const ubicacion = data.ubicacion || data.zonaCirculacion || 'Vía pública solicitada - José Leonardo Ortiz'
-  const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : '08:00:00 - 18:00:00'
+  const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : 'Por definir'
   const recibo = data.reciboIngresoNumero || 'S/N'
-  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 850'
+  const monto = (data.reciboIngresoMonto !== null && data.reciboIngresoMonto !== undefined && data.reciboIngresoMonto !== '' && Number.isFinite(Number(data.reciboIngresoMonto))) ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'Sin pago vinculado'
 
   return `
 <p><strong>SUBGERENCIA DE TRÁNSITO, TRANSPORTE Y SEGURIDAD VIAL</strong></p>
@@ -173,10 +173,10 @@ export function generarPlantillaZonasReservadas(data = {}) {
   const exp = data.expediente || data.referenciaSisgedo || 'S/N'
   const reg = data.registroNumero || 'S/N'
   const asunto = data.asunto || 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
-  const ubicacion = data.ubicacion || data.zonaCirculacion || 'Frontis del establecimiento solicitante - José Leonardo Ortiz'
-  const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : '07:00:00 - 20:00:00'
+  const ubicacion = data.ubicacion || data.zonaCirculacion || 'Por definir'
+  const horario = data.horarioInicio && data.horarioFin ? `${data.horarioInicio} - ${data.horarioFin}` : 'Por definir'
   const recibo = data.reciboIngresoNumero || 'S/N'
-  const monto = data.reciboIngresoMonto ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'S/ 920'
+  const monto = (data.reciboIngresoMonto !== null && data.reciboIngresoMonto !== undefined && data.reciboIngresoMonto !== '' && Number.isFinite(Number(data.reciboIngresoMonto))) ? `S/ ${Number(data.reciboIngresoMonto).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : 'Sin pago vinculado'
 
   return `
 <p><strong>SUBGERENCIA DE TRÁNSITO, TRANSPORTE Y SEGURIDAD VIAL</strong></p>

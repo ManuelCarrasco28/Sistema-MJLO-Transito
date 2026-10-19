@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fechaLocalActual, fechaLocalMasDias } from '../utils/calendarioCurso'
+import { fechaLocalActual } from '../utils/calendarioCurso'
 import { Editor } from '@tinymce/tinymce-react'
 import { Icon } from '../components/ui/Icon'
+import { Cargando } from '../components/ui/Cargando'
 import { FloatingInput } from '../components/ui/FormInputs'
 import { sanitizarMensaje, leerMensajeError, apiFetch } from '../config/api'
 import { leerBorradorPermiso, guardarBorradorPermiso, limpiarBorradorPermiso, avisarPermisoActualizado } from '../utils/borradorPermiso'
-import { showError } from '../utils/SwalUtil'
-import { normalizarPlaca } from '../utils/formatters'
+import { showError, showConfirm } from '../utils/SwalUtil'
+import { normalizarPlaca, formatFecha } from '../utils/formatters'
 import { BuscadorAdministrados } from '../components/permisos/BuscadorAdministrados'
 import { generarPlantillaCuerpo } from '../utils/permisosPlantilla'
 import { normalizarFormatoEnLinea } from '../utils/formatoEditor'
 import { BotonCancelar, BotonGuardar } from '../components/ui/ModalControls'
+
+const formatearMontoVinculado = (valor) => (
+  valor === null || valor === undefined || valor === '' ? '' : String(valor)
+)
 
 // TinyMCE local bajo licencia GPL; sin servicios externos.
 const TINYMCE_SCRIPT = '/tinymce/tinymce.min.js'
@@ -37,14 +42,14 @@ export function PermisoFormularioVentana() {
     asunto: 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
     zonaCirculacion: '',
     ubicacion: '',
-    horarioInicio: '',
-    horarioFin: '',
+    horarioInicio: '16:00',
+    horarioFin: '05:00',
     fechaEmision: fechaLocalActual(),
     fechaInicioVigencia: fechaLocalActual(),
-    fechaFinVigencia: fechaLocalMasDias(365),
+    fechaFinVigencia: '',
     reciboIngresoNumero: '',
     reciboIngresoMonto: '',
-    reciboIngresoFecha: fechaLocalActual(),
+    reciboIngresoFecha: '',
     tonelaje: '',
     numeroSeguridad: String(Math.floor(10000 + Math.random() * 90000)),
     recorridoIngreso: '',
@@ -72,6 +77,7 @@ export function PermisoFormularioVentana() {
         const cleaned = {
           ...draftData,
           id: null,
+          tipoPermiso: draftData.tipoPermiso === 'ZONA_RESERVADA' ? 'ZONAS_RESERVADAS' : draftData.tipoPermiso,
           numeroAutorizacion: draftData.id ? '' : (draftData.numeroAutorizacion || '')
         }
         setFormData(cleaned)
@@ -97,9 +103,15 @@ export function PermisoFormularioVentana() {
           const json = await res.json()
           const p = json.data
           if (!cancelled && p) {
-            const merged = {
+          const tipoPermiso = p.tipoPermiso === 'ZONA_RESERVADA' ? 'ZONAS_RESERVADAS' : (p.tipoPermiso || 'CARGA_DESCARGA')
+          const asuntoPorTipo = {
+            CARGA_DESCARGA: 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
+            USO_VIAS: 'AUTORIZACION PROVISIONAL DE USO DE VIAS',
+            ZONAS_RESERVADAS: 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
+          }
+          const merged = {
               id: Number(p.id || permitId),
-              tipoPermiso: p.tipoPermiso || 'CARGA_DESCARGA',
+            tipoPermiso,
               numeroAutorizacion: p.numeroAutorizacion || '',
               vehiculoPlaca: p.vehiculoPlaca || '',
               solicitanteNombre: p.solicitanteNombre || p.solicitante || '',
@@ -108,18 +120,18 @@ export function PermisoFormularioVentana() {
               expediente: p.expediente || p.expedienteNumero || '',
               registroNumero: p.registroNumero || '',
               referenciaSisgedo: p.referenciaSisgedo || '',
-              asunto: p.asunto || 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
-              zonaCirculacion: p.zonaCirculacion || 'Anillo Vial - José Leonardo Ortiz',
+              asunto: p.asunto || asuntoPorTipo[tipoPermiso] || '',
+              zonaCirculacion: p.zonaCirculacion || '',
               ubicacion: p.ubicacion || '',
-              horarioInicio: p.horarioInicio || '16:00:00',
-              horarioFin: p.horarioFin || '05:00:00',
+              horarioInicio: p.horarioInicio || '',
+              horarioFin: p.horarioFin || '',
               fechaEmision: p.fechaEmision || fechaLocalActual(),
               fechaInicioVigencia: p.fechaInicioVigencia || fechaLocalActual(),
               fechaFinVigencia: p.fechaFinVigencia || '',
               reciboIngresoNumero: p.reciboIngresoNumero || '',
-              reciboIngresoMonto: p.reciboIngresoMonto ? String(p.reciboIngresoMonto) : '1030',
+              reciboIngresoMonto: formatearMontoVinculado(p.reciboIngresoMonto),
               reciboIngresoFecha: p.reciboIngresoFecha || '',
-              tonelaje: p.tonelaje || '03 A 07-TM',
+              tonelaje: p.tonelaje || '',
               numeroSeguridad: p.numeroSeguridad || String(Math.floor(10000 + Math.random() * 90000)),
               recorridoIngreso: p.recorridoIngreso || '',
               flotaPlacas: p.flotaPlacas || '',
@@ -132,6 +144,7 @@ export function PermisoFormularioVentana() {
               Object.assign(merged, draftData)
               merged.id = Number(p.id || permitId)
             }
+            if (merged.tipoPermiso === 'ZONA_RESERVADA') merged.tipoPermiso = 'ZONAS_RESERVADAS'
 
             setFormData(merged)
           }
@@ -173,30 +186,23 @@ export function PermisoFormularioVentana() {
   }
 
   // Cambio de clasificación / tipo
-  const handleTipoChange = (newTipo) => {
-    let asunto = 'AUTORIZACIÓN MUNICIPAL OFICIAL'
-    let monto = '450'
-
-    if (newTipo === 'CARGA_DESCARGA') {
-      asunto = 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA'
-      monto = '1030'
-    } else if (newTipo === 'USO_VIAS') {
-      asunto = 'AUTORIZACION PROVISIONAL DE USO DE VIAS'
-      monto = '850'
-    } else if (newTipo === 'ZONAS_RESERVADAS' || newTipo === 'ZONA_RESERVADA') {
-      asunto = 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
-      monto = '920'
-    } else {
-      // CONTROL_VEHICULAR / OPERACION
-      asunto = 'AUTORIZACIÓN MUNICIPAL DE CONTROL VEHICULAR Y CIRCULACIÓN'
-      monto = '450'
+  const handleTipoChange = async (newTipo) => {
+    const tipo = newTipo === 'ZONA_RESERVADA' ? 'ZONAS_RESERVADAS' : newTipo
+    if (!['CARGA_DESCARGA', 'USO_VIAS', 'ZONAS_RESERVADAS'].includes(tipo) || tipo === formData.tipoPermiso) return
+    const vinculoIncompatible = Boolean(formData.tramiteId && tipo !== formData.tipoPermiso)
+    const asuntoPorTipo = {
+      CARGA_DESCARGA: 'SE EMITE AUTORIZACION DE CARGA Y DESCARGA',
+      USO_VIAS: 'AUTORIZACION PROVISIONAL DE USO DE VIAS',
+      ZONAS_RESERVADAS: 'AUTORIZACIÓN DE ZONA RESERVADA DE ESTACIONAMIENTO EN VÍA PÚBLICA'
     }
-
     const updated = {
       ...formData,
-      tipoPermiso: newTipo,
-      asunto,
-      reciboIngresoMonto: formData.reciboIngresoMonto || monto
+      ...(formData.id ? {} : (tipo === 'CARGA_DESCARGA'
+        ? { horarioInicio: '16:00', horarioFin: '05:00' }
+        : { horarioInicio: '00:00', horarioFin: '23:59' })),
+      tipoPermiso: tipo,
+      ...(vinculoIncompatible ? { tramiteId: null, reciboIngresoNumero: '', reciboIngresoMonto: '', reciboIngresoFecha: '' } : {}),
+      asunto: asuntoPorTipo[tipo]
     }
     updated.contenido = generarPlantillaCuerpo(updated)
     setFormData(updated)
@@ -204,22 +210,48 @@ export function PermisoFormularioVentana() {
 
   // Cuando se selecciona un administrado desde el buscador
   const handleSelectAdministrado = (item) => {
+    if (formData.tramiteId) return
     const updated = {
       ...formData,
-      solicitanteNombre: item.nombre || formData.solicitanteNombre,
-      solicitanteDocumento: item.documento || formData.solicitanteDocumento,
+      solicitanteNombre: item.nombre || item.solicitanteNombre || formData.solicitanteNombre,
+      solicitanteDocumento: item.documento || item.solicitanteDocumento || formData.solicitanteDocumento,
       representanteLegal: item.representanteLegal || formData.representanteLegal,
-      vehiculoPlaca: item.placa || formData.vehiculoPlaca,
+      vehiculoPlaca: item.placa || item.vehiculoPlaca || formData.vehiculoPlaca,
       expediente: item.expediente || formData.expediente,
       referenciaSisgedo: item.expediente || formData.referenciaSisgedo,
-      reciboIngresoNumero: item.reciboNumero || formData.reciboIngresoNumero,
-      reciboIngresoMonto: item.reciboMonto ? String(item.reciboMonto) : formData.reciboIngresoMonto,
-      reciboIngresoFecha: item.reciboFecha || formData.reciboIngresoFecha,
-      tramiteId: item.tramiteId || formData.tramiteId
+      reciboIngresoNumero: item.reciboNumero || item.reciboIngresoNumero || '',
+      reciboIngresoMonto: formatearMontoVinculado(item.reciboMonto ?? item.reciboIngresoMonto),
+      reciboIngresoFecha: item.reciboFecha || item.reciboIngresoFecha || '',
+      tramiteId: item.tramiteId || null
     }
     // Regenerar el cuerpo HTML en TinyMCE con los datos actualizados
     updated.contenido = generarPlantillaCuerpo(updated)
     setFormData(updated)
+  }
+
+  const handleSelectTramite = async (t) => {
+    if (formData.contenido?.trim()) {
+      const confirmation = await showConfirm('Vincular expediente', 'El contenido actual puede reemplazarse por una plantilla con los datos del expediente.', 'Reemplazar contenido', 'Vincular y conservar')
+      if (!confirmation.isConfirmed && confirmation.dismiss !== 'cancel') return
+      const updated = { ...formData, tramiteId: t.id, solicitanteNombre: t.solicitanteNombre || t.persona?.razonSocial || `${t.persona?.nombres || ''} ${t.persona?.apellidos || ''}`.trim() || '', solicitanteDocumento: t.solicitanteDocumento || t.persona?.numeroDocumento || '', vehiculoPlaca: t.vehiculoPlaca || '', representanteLegal: t.representanteLegalNombre || t.representanteLegal || t.persona?.representanteLegal || '', expediente: t.numeroExpediente || '', referenciaSisgedo: t.numeroExpediente || '', reciboIngresoNumero: t.reciboIngresoNumero || t.reciboNumero || '', reciboIngresoMonto: formatearMontoVinculado(t.reciboIngresoMonto ?? t.reciboMonto), reciboIngresoFecha: t.reciboIngresoFecha || t.reciboFecha || '' }
+      if (confirmation.isConfirmed) updated.contenido = generarPlantillaCuerpo(updated)
+      setFormData(updated)
+      return
+    }
+    const updated = { ...formData, tramiteId: t.id, solicitanteNombre: t.solicitanteNombre || t.persona?.razonSocial || `${t.persona?.nombres || ''} ${t.persona?.apellidos || ''}`.trim() || '', solicitanteDocumento: t.solicitanteDocumento || t.persona?.numeroDocumento || '', vehiculoPlaca: t.vehiculoPlaca || '', representanteLegal: t.representanteLegalNombre || t.representanteLegal || t.persona?.representanteLegal || '', expediente: t.numeroExpediente || '', referenciaSisgedo: t.numeroExpediente || '', reciboIngresoNumero: t.reciboIngresoNumero || t.reciboNumero || '', reciboIngresoMonto: formatearMontoVinculado(t.reciboIngresoMonto ?? t.reciboMonto), reciboIngresoFecha: t.reciboIngresoFecha || t.reciboFecha || '' }
+    updated.contenido = generarPlantillaCuerpo(updated)
+    setFormData(updated)
+  }
+  const quitarVinculo = async () => {
+    if (formData.contenido?.trim()) {
+      const confirmation = await showConfirm('Quitar vínculo', 'Se quitará el expediente y el pago. Se conservarán los datos del solicitante; el contenido actual se reemplazará para retirar las referencias al pago.', 'Quitar y regenerar', 'Cancelar')
+      if (!confirmation.isConfirmed) return
+    }
+    setFormData((prev) => {
+      const updated = { ...prev, tramiteId: null, reciboIngresoNumero: '', reciboIngresoMonto: '', reciboIngresoFecha: '' }
+      updated.contenido = generarPlantillaCuerpo(updated)
+      return updated
+    })
   }
 
   // Regenerar plantilla
@@ -313,10 +345,7 @@ export function PermisoFormularioVentana() {
   if (isLoading) {
     return (
       <div className="grid min-h-screen place-items-center bg-slate-50 dark:bg-[#080d1a] p-4">
-        <div className="text-center space-y-3">
-          <div className="size-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-bold text-slate-500">Cargando datos de la autorización...</p>
-        </div>
+        <Cargando className="py-0" />
       </div>
     )
   }
@@ -324,29 +353,101 @@ export function PermisoFormularioVentana() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-[#070d1e] dark:text-slate-100 flex flex-col">
       {/* Barra Superior de la Ventana */}
-      <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#1C2438]/95 backdrop-blur-md border-b border-slate-200 dark:border-[var(--border)] px-4 sm:px-6 py-3.5 shadow-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md">
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#1C2438]/95 backdrop-blur-md border-b border-slate-200 dark:border-[var(--border)] px-4 sm:px-6 py-2.5 shadow-sm flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
             <Icon name="fileText" className="size-5" />
           </span>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                {formData.id ? 'Editar Autorización Municipal' : 'Nueva Autorización y Trámite Municipal'}
+              <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900 dark:text-white min-w-0 break-words">
+                {formData.id ? 'Editar autorización' : 'Nueva autorización'}
               </h1>
-              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              <span className="shrink-0 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                 {formData.numeroAutorizacion || 'Borrador'}
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Subgerencia de Tránsito, Transporte y Seguridad Vial — Sistema Oficial
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 min-w-0 break-words">
+              Tránsito y Transporte • Sistema municipal
             </p>
           </div>
+
+          {activeScreen === 'CUERPO' && (
+            <div className="hidden lg:flex items-center gap-3 pl-3.5 border-l border-slate-200 dark:border-slate-700 min-w-0">
+              <div className="min-w-0">
+                <p className="min-w-0 break-words font-bold text-xs text-slate-800 dark:text-slate-200" title={formData.solicitanteNombre}>
+                  {formData.solicitanteNombre || 'Sin solicitante'}
+                </p>
+                <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  {formData.solicitanteDocumento && <span className="font-mono">{formData.solicitanteDocumento}</span>}
+                  {formData.vehiculoPlaca && (
+                    <span className="font-mono font-semibold text-indigo-600 dark:text-indigo-400">
+                      Placa: {formData.vehiculoPlaca}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+
+        {activeScreen === 'CUERPO' && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleRecargarPlantilla}
+              disabled={isSubmitting}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-[var(--border)] dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 transition cursor-pointer"
+              title="Restablecer plantilla con los datos del trámite"
+            >
+              <Icon name="refresh" className="size-4 text-indigo-500" />
+              <span className="hidden sm:inline">Restablecer plantilla</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleVolverADatosModal}
+              disabled={isSubmitting}
+              className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 text-xs font-semibold text-rose-600 transition hover:border-rose-500/40 hover:bg-rose-500/20 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-400 dark:hover:bg-rose-500/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:opacity-50"
+              title="Volver a datos del trámite"
+            >
+              <Icon name="logout" className="size-4 text-rose-500 dark:text-rose-400" />
+              <span>Volver a datos</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCerrar}
+              disabled={isSubmitting}
+              className="h-9 shrink-0 rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-50 transition cursor-pointer"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait transition shadow-sm cursor-pointer"
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="animate-spin text-sm">⟳</span>
+                  <span>Guardando…</span>
+                </>
+              ) : (
+                <>
+                  <Icon name="check" className="size-4" />
+                  <span>Guardar autorización</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Contenido Principal con Formulario */}
-      <main className={`flex-1 mx-auto w-full p-4 sm:p-6 space-y-4 ${activeScreen === 'CUERPO' ? 'max-w-[1600px]' : 'max-w-6xl'}`}>
+      <main className={`flex-1 mx-auto w-full ${activeScreen === 'CUERPO' ? 'max-w-[960px] p-2 sm:p-4' : 'max-w-6xl p-3 sm:p-5'} space-y-4`}>
         {/* Banner de Éxito si guardó */}
         {successMsg && (
           <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 flex items-center justify-between text-xs font-bold animate-enter">
@@ -361,35 +462,16 @@ export function PermisoFormularioVentana() {
         {activeScreen === 'DATOS' && (
           <div className="space-y-5 animate-enter">
             {/* 1. BUSCADOR INTELIGENTE EN BASE DE DATOS (Auto-rellenado) */}
-            <div className="rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">
+            {!formData.tramiteId && <div className="space-y-3 rounded-3xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">
               <BuscadorAdministrados onSelect={handleSelectAdministrado} />
-            </div>
+            </div>}
 
             {/* 2. CLASIFICACIÓN / SELECTOR DE TIPO */}
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] space-y-3">
               <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                Clasificación / Tipo de Permiso *
+                Clasificación / Tipo de Permiso
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleTipoChange('CONTROL_VEHICULAR')}
-                  className={`p-3.5 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
-                    formData.tipoPermiso === 'CONTROL_VEHICULAR' || formData.tipoPermiso === 'OPERACION'
-                      ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-200 shadow-sm ring-1 ring-indigo-500/20'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[var(--border)] dark:bg-[#1C2438] dark:text-slate-400 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-black text-xs">Control Vehicular</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
-                      S/ 450
-                    </span>
-                  </div>
-                  <p className="text-[11px] opacity-80">
-                    Permiso municipal para verificación técnica y circulación autorizada de unidades.
-                  </p>
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
                 <button
                   type="button"
@@ -402,13 +484,7 @@ export function PermisoFormularioVentana() {
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-black text-xs">Carga y Descarga</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200">
-                      S/ 1030
-                    </span>
                   </div>
-                  <p className="text-[11px] opacity-80">
-                    Horario nocturno / madrugada (16:00 a 05:00 hrs) para camiones y abastecimiento comercial.
-                  </p>
                 </button>
 
                 <button
@@ -422,13 +498,7 @@ export function PermisoFormularioVentana() {
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-black text-xs">Uso de Vías</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
-                      S/ 850
-                    </span>
                   </div>
-                  <p className="text-[11px] opacity-80">
-                    Ocupación provisional de calzada/acera para eventos, mudanzas u obras civiles.
-                  </p>
                 </button>
 
                 <button
@@ -442,13 +512,7 @@ export function PermisoFormularioVentana() {
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-black text-xs">Zonas Reservadas</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
-                      S/ 920
-                    </span>
                   </div>
-                  <p className="text-[11px] opacity-80">
-                    Reserva exclusiva de estacionamiento en frontis para entidades y establecimientos.
-                  </p>
                 </button>
               </div>
             </div>
@@ -459,6 +523,7 @@ export function PermisoFormularioVentana() {
                 <span className="size-2 rounded-full bg-slate-900 dark:bg-white" />
                 Datos del Solicitante, Vehículo y Expediente
               </legend>
+              {formData.tramiteId && <p className="flex items-center justify-between gap-2 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"><span>Expediente {formData.expediente || 'sin número'} vinculado. Solicitante: {formData.solicitanteNombre}.</span><button type="button" onClick={quitarVinculo} className="shrink-0 underline">Quitar vínculo</button></p>}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {/* Administrado / Razón Social */}
@@ -469,6 +534,7 @@ export function PermisoFormularioVentana() {
                     required
                     value={formData.solicitanteNombre}
                     onChange={(e) => setFormData({ ...formData, solicitanteNombre: e.target.value })}
+                    readOnly={Boolean(formData.tramiteId)}
                     inputClassName="font-bold"
                   />
                 </div>
@@ -482,6 +548,7 @@ export function PermisoFormularioVentana() {
                     maxLength={15}
                     value={formData.solicitanteDocumento}
                     onChange={(e) => setFormData({ ...formData, solicitanteDocumento: e.target.value })}
+                    readOnly={Boolean(formData.tramiteId)}
                     inputClassName="font-mono font-bold"
                   />
                 </div>
@@ -513,9 +580,9 @@ export function PermisoFormularioVentana() {
                 <div>
                   <FloatingInput
                     id="perm_expediente_win"
-                    label="Expediente UTD / SISGEDO"
+                    label="N.º de expediente UTD / SISGEDO"
                     value={formData.expediente}
-                    onChange={(e) => setFormData({ ...formData, expediente: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, expediente: e.target.value, referenciaSisgedo: e.target.value })}
                     inputClassName="font-mono"
                   />
                 </div>
@@ -560,29 +627,7 @@ export function PermisoFormularioVentana() {
                   />
                 </div>
 
-                {/* Recibo TUPA */}
-                <div>
-                  <FloatingInput
-                    id="perm_recibo_numero_win"
-                    label="N° Recibo de Pago"
-                    value={formData.reciboIngresoNumero}
-                    onChange={(e) => setFormData({ ...formData, reciboIngresoNumero: e.target.value })}
-                    inputClassName="font-mono font-bold"
-                  />
-                </div>
-
-                {/* Monto TUPA */}
-                <div>
-                  <FloatingInput
-                    id="perm_recibo_monto_win"
-                    label="Monto Pagado (S/)"
-                    type="number"
-                    step="0.01"
-                    value={formData.reciboIngresoMonto}
-                    onChange={(e) => setFormData({ ...formData, reciboIngresoMonto: e.target.value })}
-                    inputClassName="font-mono font-bold"
-                  />
-                </div>
+                <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-[var(--border)] dark:bg-slate-900/40"><span className="font-bold">Pago vinculado: </span>{formData.reciboIngresoNumero ? `Recibo ${formData.reciboIngresoNumero}${formData.reciboIngresoMonto !== '' ? ` · S/ ${Number(formData.reciboIngresoMonto).toLocaleString('es-PE', { maximumFractionDigits: 2 })}` : ''}${formData.reciboIngresoFecha ? ` · ${formatFecha(formData.reciboIngresoFecha)}` : ''}` : 'Sin pago vinculado'}</div>
 
                 {/* Vigencia */}
                 <div>
@@ -616,7 +661,7 @@ export function PermisoFormularioVentana() {
                   onClick={() => goToScreen('CUERPO')}
                   className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2"
                 >
-                  <span>Continuar a Redacción de Resolución (Cuerpo Oficial)</span>
+                  <span>Redactar autorización</span>
                   <span className="text-base leading-none">→</span>
                 </BotonGuardar>
               </div>
@@ -628,58 +673,22 @@ export function PermisoFormularioVentana() {
         {/* PANTALLA 2: CUERPO OFICIAL CON EDITOR TINYMCE AMPLIO       */}
         {/* ========================================================= */}
         {activeScreen === 'CUERPO' && (
-          <div className="space-y-4 animate-enter">
-            {/* Barra Superior de Redacción: Información de contexto y controles */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="text-xs">
-                  <span className="font-extrabold text-slate-900 dark:text-white">
-                    {formData.solicitanteNombre || 'Sin administrado'}
-                  </span>
-                  {formData.solicitanteDocumento && (
-                    <span className="ml-1.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                      ({formData.solicitanteDocumento})
-                    </span>
-                  )}
-                  {formData.vehiculoPlaca && (
-                    <span className="ml-2 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
-                      Placa: {formData.vehiculoPlaca}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleRecargarPlantilla}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20 text-sm font-semibold transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                  title="Regenera el texto y la tabla de resolución incorporando los datos ingresados en el Paso 1"
-                >
-                  <Icon name="refresh" className="size-4 shrink-0" />
-                  <span>Regenerar plantilla con datos</span>
-                </button>
-              </div>
-            </div>
-
+          <div className="space-y-3 animate-enter">
             {/* Contenedor del Editor TinyMCE: Alto y Espacioso para Redacción Cómoda */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[var(--border)] pb-2.5">
+            <div className="rounded-xl border border-slate-200 bg-white dark:border-[var(--border)] dark:bg-[#1C2438]">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[var(--border)] px-4 py-3">
                 <div>
                   <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
                     <Icon name="fileText" className="size-4 text-indigo-600" />
-                    <span>Cuerpo Oficial de la Resolución / Autorización</span>
+                    <span>Redacción de la autorización</span>
                   </h2>
-                  <p className="text-[11px] text-slate-400">
-                    Espacio amplio de redacción jurídica y resolutiva. Formato enriquecido compatible con impresión A4.
-                  </p>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                  Modo Redacción Amplia
+                <span className="text-[10px] font-semibold text-slate-400">
+                  A4
                 </span>
               </div>
 
-              <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-[var(--border-strong)] shadow-xs">
+              <div className="permiso-editor">
                 <Editor
                   tinymceScriptSrc={TINYMCE_SCRIPT}
                   licenseKey="gpl"
@@ -687,11 +696,14 @@ export function PermisoFormularioVentana() {
                   onEditorChange={handleEditorChange}
                   onBeforeSetContent={(evento) => { if (evento.format !== 'raw') evento.content = normalizarFormatoEnLinea(evento.content) }}
                   init={{
-                    min_height: 1123,
-                    autoresize_bottom_margin: 40,
+                    min_height: 680,
+                    autoresize_bottom_margin: 24,
+                    resize: false,
+                    toolbar_mode: 'sliding',
                     toolbar_sticky: true,
-                    toolbar_sticky_offset: 0,
-                    menubar: true,
+                    toolbar_sticky_offset: 54,
+                    menubar: 'file edit view insert format tools table help',
+                    statusbar: false,
                     language: 'es',
                     promotion: false,
                     branding: false,
@@ -707,50 +719,16 @@ export function PermisoFormularioVentana() {
                     font_family_formats: 'Times New Roman=times new roman,times,serif; Arial=arial,helvetica,sans-serif; Calibri=calibri,sans-serif; Courier New=courier new,courier,monospace; Georgia=georgia,serif; Verdana=verdana,sans-serif',
                     font_size_formats: '8pt 9pt 10pt 11pt 12pt 13pt 14pt 16pt 18pt 20pt 24pt 28pt',
                     content_style:
-                      'html { background: #cbd5e1; padding: 28px 0; } ' +
-                      'body { background: #ffffff; box-sizing: border-box; width: 794px; min-height: 1123px !important; margin: 0 auto !important; padding: 56px 64px !important; ' +
-                      'box-shadow: 0 2px 10px rgba(15,23,42,0.35); font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.3; color: #000; } ' +
+                      'html { background: #e8edf3; padding: 16px 10px; } ' +
+                      'body { background: #ffffff; box-sizing: border-box; width: 100%; max-width: 794px; min-height: 1123px; margin: 0 auto !important; padding: 30px 56px; ' +
+                      'box-shadow: 0 1px 5px rgba(15,23,42,0.12); font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.3; color: #000; } ' +
+                      '@media(max-width:600px) { html { padding: 8px 4px; } body { padding: 20px 14px; } } ' +
                       'p { margin: 0 0 8pt; } table { border-collapse: collapse; } img { max-width: 100%; }',
                   }}
                 />
               </div>
             </div>
 
-            {/* Barra Inferior de Acciones en Pantalla 2 */}
-            <div className="sticky bottom-0 z-10 flex flex-col items-stretch justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center dark:border-[var(--border)] dark:bg-[#1C2438]/95">
-              <button
-                type="button"
-                onClick={handleVolverADatosModal}
-                className="inline-flex h-[34px] cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-rose-500/15 bg-rose-500/10 px-3 text-xs font-semibold text-rose-500 transition hover:border-rose-500/40 hover:bg-rose-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
-              >
-                <Icon name="logout" className="size-4" /><span>Volver a datos del trámite</span>
-              </button>
-
-              <div className="flex flex-col sm:flex-row items-stretch gap-3 sm:w-auto">
-                <button type="button" onClick={handleCerrar} disabled={isSubmitting} className="min-h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 transition disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500">
-                  Cancelar
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="min-h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition cursor-pointer disabled:opacity-50 disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <span className="animate-spin text-sm">⟳</span>
-                      <span>Guardando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Icon name="check" className="size-4" />
-                      <span>Guardar y Emitir Autorización</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
           </div>
         )}
       </main>

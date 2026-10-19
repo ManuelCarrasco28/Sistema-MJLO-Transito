@@ -24,10 +24,16 @@ export function BuscadorAdministrados({ onSelect }) {
   // Buscar con debounce
   useEffect(() => {
     let cancelled = false
+    const term = query.trim()
+    if (term.length < 2) {
+      setResults([])
+      setIsLoading(false)
+      return undefined
+    }
     const timer = setTimeout(async () => {
       setIsLoading(true)
       try {
-        const url = `/permisos/buscar-administrados?q=${encodeURIComponent(query.trim())}`
+        const url = `/permisos/buscar-administrados?q=${encodeURIComponent(term)}`
         const res = await apiFetch(url)
         if (res.ok) {
           const json = await res.json()
@@ -69,7 +75,7 @@ export function BuscadorAdministrados({ onSelect }) {
       <div className="flex items-center justify-between mb-1.5">
         <label className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
           <Icon name="search" className="size-3.5" />
-          <span>Buscar Administrado / Empresa Registrada (Auto-rellenado)</span>
+          <span>Buscar solicitante</span>
         </label>
         {selectedItem && (
           <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
@@ -114,7 +120,9 @@ export function BuscadorAdministrados({ onSelect }) {
       {/* Dropdown de Resultados */}
       {isOpen && (
         <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
-          {isLoading && results.length === 0 ? (
+          {query.trim().length < 2 ? (
+            <div className="p-4 text-center text-xs text-slate-500 font-medium">Escribe al menos 2 caracteres para buscar.</div>
+          ) : isLoading && results.length === 0 ? (
             <div className="p-4 text-center text-xs text-slate-500 font-medium">
               Buscando en la base de datos municipal...
             </div>
@@ -125,7 +133,7 @@ export function BuscadorAdministrados({ onSelect }) {
           ) : (
             <div className="space-y-1">
               <div className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-[var(--border)]">
-                Coincidencias encontradas ({results.length}) — Haz clic para auto-rellenar
+                Resultados ({results.length})
               </div>
 
               {results.map((item, idx) => (
@@ -149,7 +157,7 @@ export function BuscadorAdministrados({ onSelect }) {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-black text-slate-800 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                      <p className="text-xs font-black text-slate-800 dark:text-white min-w-0 break-words group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
                         {item.nombre || 'Sin nombre registrado'}
                       </p>
                       <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 dark:bg-[var(--bg-subtle)] text-slate-600 dark:text-slate-300">
