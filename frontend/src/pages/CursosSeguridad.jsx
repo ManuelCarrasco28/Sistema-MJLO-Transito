@@ -17,6 +17,8 @@ import { CarnetCursoTab } from '../components/cursos/CarnetCursoTab'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { puedeEliminarRegistros } from '../config/roles'
 import { usePersonaRapida } from '../hooks/usePersonaRapida'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 // El carnet del curso dura un año: vence en la misma fecha del año siguiente.
 const masUnAnio = (fecha) => {
@@ -374,6 +376,8 @@ export function CursosSeguridad() {
     }
   }, [isModalOpen])
 
+  useRecargaSilenciosa('/cursos', [() => setRevision((n) => n + 1)])
+
   useEffect(() => {
     const controller = new AbortController()
     setIsLoading(true)
@@ -511,7 +515,7 @@ export function CursosSeguridad() {
       <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438] flex flex-col">
 
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
-          <div className="relative w-full sm:max-w-xs">
+          <div className="relative w-full sm:min-w-0 sm:flex-1">
             <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -592,22 +596,7 @@ export function CursosSeguridad() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
               {isLoading && cursos.length === 0 ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-3 py-3"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3 py-3">
-                      <div className="space-y-1.5">
-                        <div className="h-3.5 w-44 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                      </div>
-                    </td>
-                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3 py-3"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] px-3 py-3 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                  </tr>
-                ))
+                <FilaCargando colSpan={7} />
               ) : filteredCursos.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="p-12 text-center">
@@ -628,7 +617,7 @@ export function CursosSeguridad() {
                       <p className="font-bold text-[11.5px] leading-snug text-slate-900 dark:text-white" title={c.titulo}>{c.titulo}</p>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/cursos/${c.uuid || c.id}/popup`) }}
+                        onClick={(e) => { e.stopPropagation(); navigate('/cursos/detalle', { state: { cursoId: c.uuid || c.id } }) }}
                         className="mt-0.5 flex cursor-pointer items-center gap-1 text-[10px] font-bold text-indigo-600 hover:underline dark:text-indigo-400"
                       >
                         <Icon name="course" className="size-3" />

@@ -8,6 +8,7 @@ import { useDebounce } from '../../hooks/useDebounce'
 import { apiFetch } from '../../config/api'
 import { formatFecha } from '../../utils/formatters'
 import { PersonaEnlace } from '../personas/PersonaEnlace'
+import { FilaCargando } from '../ui/FilaCargando'
 
 // Nombres primero y luego los apellidos, como en el resto del sistema
 function nombreCompleto(p) {
@@ -70,7 +71,7 @@ export function CarnetCursoTab() {
   return (
     <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">
       <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
-        <div className="relative w-full sm:max-w-xs">
+        <div className="relative w-full sm:min-w-0 sm:flex-1">
           <Icon name="search" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -115,11 +116,7 @@ export function CarnetCursoTab() {
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
             {cargando && filas.length === 0 ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="animate-pulse">
-                  <td colSpan="6" className="px-3 py-4"><div className="h-4 w-2/3 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                </tr>
-              ))
+              <FilaCargando colSpan={1} />
             ) : filas.length === 0 ? (
               <tr>
                 <td colSpan="6" className="p-12 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
@@ -136,7 +133,7 @@ export function CarnetCursoTab() {
                       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-purple-100 text-[11px] font-black text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">{iniciales(p)}</span>
                     )}
                     <PersonaEnlace personaId={p.idPersona}>
-                      <span className="block truncate font-bold text-slate-900 dark:text-white" title={nombreCompleto(p)}>{nombreCompleto(p)}</span>
+                      <span className="block min-w-0 break-words font-bold text-slate-900 dark:text-white" title={nombreCompleto(p)}>{nombreCompleto(p)}</span>
                       <span className="block font-mono text-[11px] text-slate-500 dark:text-slate-400">DNI: {p.dni}</span>
                     </PersonaEnlace>
                   </div>
@@ -144,7 +141,7 @@ export function CarnetCursoTab() {
                 <td className="px-3 py-3 font-mono text-slate-600 dark:text-slate-300">{p.licencia || '—'}</td>
                 <td className="px-3 py-3">
                   <p className="font-bold text-slate-800 dark:text-slate-200">{p.cursoCodigo || '—'}</p>
-                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400" title={p.cursoTitulo}>{p.cursoTitulo}</p>
+                  <p className="min-w-0 break-words text-[11px] text-slate-500 dark:text-slate-400" title={p.cursoTitulo}>{p.cursoTitulo}</p>
                 </td>
                 <td className="px-3 py-3 text-center font-mono text-slate-600 dark:text-slate-300">{formatFecha(p.ultimoCurso)}</td>
                 <td className="px-3 py-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">

@@ -3,10 +3,12 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { estadoParticipante, actualizarParticipante } from '../utils/participantesCurso'
 import { inscripcionCursoAbierta, fechaLocalActual } from '../utils/calendarioCurso'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { apiFetch, getCachedData, leerMensajeError } from '../config/api'
 import { showError, showWarning, showToast } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
+import { Cargando } from '../components/ui/Cargando'
+import { CobrarPagoModal } from '../components/pagos/CobrarPagoModal'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import './CursoDetalleVentana.css'
@@ -48,8 +50,16 @@ function getPersonaNombre(p) {
 }
 
 export default function CursoDetalleVentana() {
-  const { id } = useParams()
+  const { id: idEnRuta } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  // El identificador del curso no se muestra en la dirección: llega en el estado de la navegación
+  // (sobrevive a recargar la página). Un enlace antiguo con el id en la ruta se reescribe sin él.
+  const id = idEnRuta || location.state?.cursoId
+  useEffect(() => {
+    if (idEnRuta) navigate('/cursos/detalle', { replace: true, state: { cursoId: idEnRuta } })
+    else if (!id) navigate('/cursos', { replace: true })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [curso, setCurso] = useState(() => {
     const cached = getCachedData('/cursos')
     if (cached) return cached.find(x => x.id == id || x.uuid === id) || null
@@ -101,6 +111,8 @@ export default function CursoDetalleVentana() {
     }
   }, [showParticipanteResults, participanteSearch])
   const [retirando, setRetirando] = useState(null)
+  // Participante cuya inscripción se está cobrando desde esta pantalla
+  const [cobrando, setCobrando] = useState(null)
 
   const handleRetirar = async (participante) => {
     if (curso?.estado === 'FINALIZADO') return
@@ -275,7 +287,7 @@ export default function CursoDetalleVentana() {
     return () => { clearTimeout(timer); controller.abort() }
   }, [participanteSearch, curso])
 
-  if (loading) return <div className="p-10 text-center font-bold text-slate-500">Cargando curso...</div>
+  if (loading) return <Cargando className="min-h-[60vh]" />
   if (error || !curso) return <div className="p-10 text-center font-bold text-rose-500">{error || 'Curso no encontrado.'}</div>
 
   const inscritos = Number(curso.cuposInscritos ?? curso.participantes?.length ?? 0)
@@ -560,6 +572,17 @@ export default function CursoDetalleVentana() {
                           </span>
                         )
                       })()}
+                      {String(p.estado_pago || p.estadoPago || '').toUpperCase() !== 'PAGADO' && !['ANULADO', 'CANCELADO'].includes(String(p.estado || '').toUpperCase()) && (
+                        <button
+                          type="button"
+                          onClick={() => setCobrando(p)}
+                          title="Cobrar la inscripción"
+                          className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-300/90 bg-amber-50 px-2.5 text-xs font-bold text-amber-700 shadow-2xs outline-none transition-all hover:border-amber-500 hover:bg-amber-500 hover:text-white focus:outline-none dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-600 dark:hover:text-white active:scale-95"
+                        >
+                          <Icon name="payment" className="size-3.5" />
+                          <span>Cobrar</span>
+                        </button>
+                      )}
                       <div className="curso-detalle__resultado shrink-0 flex justify-end">
                         {estadoReal === 'APROBADO' ? (
                           <span className="text-emerald-600 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/50 dark:border-emerald-800/50 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase w-full text-center tracking-wider shadow-xs">Aprobado</span>
@@ -604,6 +627,14 @@ export default function CursoDetalleVentana() {
           estadoOptions={ESTADO_OPTIONS}
           onSubmit={handleFormSubmit}
           onClose={() => setPersonaModalOpen(false)}
+        />
+      )}
+
+      {cobrando && (
+        <CobrarPagoModal
+          inscripcion={{ id: cobrando.idInscripcion, dni: cobrando.dni }}
+          onClose={() => setCobrando(null)}
+          onPagado={() => setCurso(actual => ({ ...actual, participantes: actualizarParticipante(actual.participantes, cobrando, { estado_pago: 'PAGADO', estadoPago: 'PAGADO' }) }))}
         />
       )}
     </div>
