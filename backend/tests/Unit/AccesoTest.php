@@ -11,13 +11,13 @@ final class AccesoTest extends TestCase
     {
         $this->assertLessThan(Acceso::rango('GERENTE'), Acceso::rango('SUPERADMIN'));
         $this->assertLessThan(Acceso::rango('SUBGERENTE'), Acceso::rango('GERENTE'));
-        $this->assertLessThan(Acceso::rango('TRABAJADOR'), Acceso::rango('SECRETARIA'));
+        $this->assertLessThan(Acceso::rango('INSPECTOR TÉCNICO'), Acceso::rango('SECRETARIA'));
         $this->assertSame(Acceso::rango('SubGerente'), Acceso::rango('SUBGERENTE'));
     }
 
     public function testUnRolDesconocidoNoTienePrivilegios(): void
     {
-        $this->assertGreaterThan(Acceso::rango('TRABAJADOR'), Acceso::rango('INVENTADO'));
+        $this->assertGreaterThan(Acceso::rango('INSPECTOR TÉCNICO'), Acceso::rango('INVENTADO'));
     }
 
     private function peticion(array $cabeceras): object
@@ -49,14 +49,5 @@ final class AccesoTest extends TestCase
         $this->assertNotNull(Acceso::errorDePassword('12345678901'));
         $this->assertNotNull(Acceso::errorDePassword('admin12345', 'ADMIN12345'));
         $this->assertNull(Acceso::errorDePassword('Clave12345', 'admin'));
-    }
-
-    public function testVerificaTipoDeInspectorDeTransito(): void
-    {
-        $this->assertTrue(Acceso::esInspectorTransito(['tipo_inspector' => 'TRANSITO']));
-        $this->assertTrue(Acceso::esInspectorTransito(['tipo_inspector' => 'transito']));
-        $this->assertFalse(Acceso::esInspectorTransito(['tipo_inspector' => 'TECNICO']));
-        $this->assertFalse(Acceso::esInspectorTransito(['tipo_inspector' => null]));
-        $this->assertFalse(Acceso::esInspectorTransito([]));
     }
 }

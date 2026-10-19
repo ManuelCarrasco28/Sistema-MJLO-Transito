@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useDebounce } from '../hooks/useDebounce'
-import { usePersonaRapida } from '../hooks/usePersonaRapida'
-import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
+import { showToast, showConfirm, showError, showSuccess, showWarning } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import { Pagination } from '../components/ui/Pagination'
@@ -13,7 +12,10 @@ import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../con
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { errorPasswordUsuario } from '../utils/passwordPolicy'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
-import { exportToExcel } from '../utils/exportToExcel'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { esRolCampo } from '../config/roles'
+import { BotonVerClave } from '../components/ui/BotonVerClave'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -39,6 +41,16 @@ function escapeXml(unsafe) {
     .replace(/'/g, '&apos;')
 }
 
+// El servidor devuelve el motivo como messages.error o como un campo (p. ej. messages.usuario): se muestra el que haya.
+function mensajeDeError(datos, respaldo) {
+  const mensajes = datos?.messages
+  if (mensajes && typeof mensajes === 'object') {
+    const textos = Object.values(mensajes).flat().filter((valor) => typeof valor === 'string' && valor.trim())
+    if (textos.length) return textos.join(' ')
+  }
+  return typeof datos?.message === 'string' && datos.message.trim() ? datos.message : respaldo
+}
+
 export function Usuarios({ user }) {
   const cachedUsers = getCachedData('/usuarios')
   const [usuarios, setUsuarios] = useState(cachedUsers || [])
@@ -59,12 +71,21 @@ export function Usuarios({ user }) {
   // Modales
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
   // Estados de formularios
   const [selectedUser, setSelectedUser] = useState(null)
   const [userForm, setUserForm] = useState(DEFAULT_USER_FORM)
+  const [verClaveNueva, setVerClaveNueva] = useState(false)
+  // Errores por campo del alta de usuario; cada uno se borra cuando se toca o se corrige su campo
+  const [erroresAlta, setErroresAlta] = useState({})
+  const quitarErrorAlta = (campo) => setErroresAlta((prev) => (prev[campo] ? { ...prev, [campo]: undefined } : prev))
+  const [avisoEspacios, setAvisoEspacios] = useState(false)
+  // El aviso de espacios se retira solo a los pocos segundos
+  useEffect(() => {
+    if (!avisoEspacios) return undefined
+    const temporizador = setTimeout(() => setAvisoEspacios(false), 3000)
+    return () => clearTimeout(temporizador)
+  }, [avisoEspacios])
   const [trabajadorSearch, setTrabajadorSearch] = useState('')
   const [trabajadorDropdownOpen, setTrabajadorDropdownOpen] = useState(false)
   const [personaElegida, setPersonaElegida] = useState(null)
@@ -73,7 +94,6 @@ export function Usuarios({ user }) {
   const [newPassword, setNewPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [isExportingExcel, setIsExportingExcel] = useState(false)
 
   // Carga de datos
   const loadData = async () => {
@@ -113,6 +133,8 @@ export function Usuarios({ user }) {
     loadData()
   }, [])
 
+  useRecargaSilenciosa('/usuarios', [() => loadData()])
+
   // Métricas KPI
   const totalUsuarios = usuarios.length
   const activos = usuarios.filter((u) => u.usuario_estado === 'ACTIVO').length
@@ -121,10 +143,8 @@ export function Usuarios({ user }) {
     const r = (u.rol || '').toUpperCase()
     return r === 'SUPERADMIN' || r === 'GERENTE' || r === 'SUBGERENTE'
   }).length
-  const inspectores = usuarios.filter((u) => {
-    const r = (u.rol || '').toUpperCase()
-    return r === 'SECRETARIA'
-  }).length
+  // Personal de campo: usa solo la app móvil (inspectores y encargado del depósito)
+  const inspectores = usuarios.filter((u) => esRolCampo(u.rol)).length
 
   // Filtrado
   const filteredUsuarios = useMemo(() => {
@@ -197,10 +217,6 @@ export function Usuarios({ user }) {
     setTrabajadorDropdownOpen(false)
   }
 
-  const { abrir: abrirRegistroPersona, modal: modalPersonaRapida } = usePersonaRapida({
-    alCrear: (persona) => elegirPersona(persona),
-  })
-
   // Acciones: Nuevo Usuario
   const handleOpenCreateModal = () => {
     setUserForm(DEFAULT_USER_FORM)
@@ -208,51 +224,58 @@ export function Usuarios({ user }) {
     setPersonaElegida(null)
     setResultadosPadron([])
     setTrabajadorDropdownOpen(false)
+    setVerClaveNueva(false)
+    setAvisoEspacios(false)
+    setErroresAlta({})
     setIsCreateModalOpen(true)
   }
 
   const handleCreateUser = async (e) => {
     e.preventDefault()
-    if (!userForm.id_trabajador) {
-      showError('Falta información', 'Por favor selecciona una persona del padrón (o regístrala con «Registrar nueva persona»).')
-      return
-    }
+    const errores = {}
+    if (!userForm.id_trabajador) errores.persona = 'Seleccione un trabajador.'
     if (!/^[A-Za-z0-9_-]{3,50}$/.test(userForm.nombre_usuario || '')) {
-      showError('Validación', 'El usuario debe tener entre 3 y 50 caracteres: letras, números, guiones o guion bajo.')
-      return
+      errores.nombre_usuario = 'Use de 3 a 50 caracteres: letras, números, guion o guion bajo.'
     }
     const errorPassword = errorPasswordUsuario(userForm.password, userForm.nombre_usuario)
-    if (errorPassword) {
-      showError('Validación', errorPassword)
+    if (errorPassword) errores.password = errorPassword
+    if (!userForm.id_rol) errores.id_rol = 'Seleccione el rol del usuario.'
+    if (Object.keys(errores).length) {
+      setErroresAlta(errores)
       return
     }
-    if (!userForm.id_rol) {
-      showError('Falta información', 'Por favor selecciona el rol que tendrá este usuario.')
-      return
-    }
+    setErroresAlta({})
 
     setSaving(true)
     try {
       const res = await apiFetch('/usuarios', {
         method: 'POST',
-        body: userForm,
+        body: { ...userForm, estado: 'ACTIVO' },
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo crear el usuario.')
+      if (!res.ok) throw new Error(mensajeDeError(data, 'No se pudo crear el usuario.'))
 
       showToast('Usuario registrado correctamente', 'crear')
       setIsCreateModalOpen(false)
       loadData()
     } catch (err) {
-      showError('Error al crear usuario', sanitizarMensaje(err.message, 'No se pudo crear el usuario.'))
+      // El servidor rechaza por reglas de negocio (usuario repetido, contraseña débil…): es un aviso, no un fallo
+      const mensaje = sanitizarMensaje(err.message, 'Revise los datos e intente nuevamente.')
+      if (/usuario/i.test(mensaje) && /(existe|registrad|uso|repetid)/i.test(mensaje)) {
+        setErroresAlta({ nombre_usuario: mensaje })
+      } else {
+        showWarning('No se pudo crear el usuario', mensaje)
+      }
     } finally {
       setSaving(false)
     }
   }
 
-  // Acciones: Editar Rol y Estado
+  // Acciones: Editar usuario (rol, estado y, si se desea, nueva contraseña)
   const handleOpenEditModal = (u) => {
     setSelectedUser(u)
+    setNewPassword('')
+    setShowPassword(false)
     setUserForm({
       id_rol: u.id_rol || '',
       estado: u.usuario_estado || 'ACTIVO',
@@ -263,6 +286,14 @@ export function Usuarios({ user }) {
   const handleSaveEditUser = async (e) => {
     e.preventDefault()
     if (!selectedUser) return
+    // La contraseña es opcional: solo se cambia si se escribió una nueva
+    if (newPassword) {
+      const errorPassword = errorPasswordUsuario(newPassword, selectedUser.nombre_usuario)
+      if (errorPassword) {
+        showWarning('Contraseña inválida', errorPassword)
+        return
+      }
+    }
     setSaving(true)
     try {
       const res = await apiFetch(`/usuarios/${selectedUser.id}`, {
@@ -273,47 +304,22 @@ export function Usuarios({ user }) {
         },
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo actualizar el usuario.')
+      if (!res.ok) throw new Error(mensajeDeError(data, 'No se pudo actualizar el usuario.'))
+
+      if (newPassword) {
+        const resClave = await apiFetch(`/usuarios/${selectedUser.id}/password`, {
+          method: 'PUT',
+          body: { password: newPassword },
+        })
+        const datosClave = await resClave.json().catch(() => ({}))
+        if (!resClave.ok) throw new Error(mensajeDeError(datosClave, 'Se guardaron los cambios, pero no se pudo cambiar la contraseña.'))
+      }
 
       showToast('Usuario actualizado correctamente', 'editar')
       setIsEditModalOpen(false)
       loadData()
     } catch (err) {
       showError('Error al editar', sanitizarMensaje(err.message, 'No se pudo editar el usuario.'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // Acciones: Cambiar Contraseña
-  const handleOpenPasswordModal = (u) => {
-    setSelectedUser(u)
-    setNewPassword('')
-    setShowPassword(false)
-    setIsPasswordModalOpen(true)
-  }
-
-  const handleResetPassword = async (e) => {
-    e.preventDefault()
-    const errorPassword = errorPasswordUsuario(newPassword, selectedUser?.nombre_usuario)
-    if (errorPassword) {
-      showError('Contraseña inválida', errorPassword)
-      return
-    }
-
-    setSaving(true)
-    try {
-      const res = await apiFetch(`/usuarios/${selectedUser.id}/password`, {
-        method: 'PUT',
-        body: { password: newPassword },
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo cambiar la contraseña.')
-
-      showToast('Contraseña actualizada correctamente', 'editar')
-      setIsPasswordModalOpen(false)
-    } catch (err) {
-      showError('Error al cambiar contraseña', sanitizarMensaje(err.message, 'No se pudo cambiar la contraseña.'))
     } finally {
       setSaving(false)
     }
@@ -331,40 +337,12 @@ export function Usuarios({ user }) {
       try {
         const res = await apiFetch(`/usuarios/${u.id}`, { method: 'DELETE' })
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.messages?.error || data.message || 'No se pudo eliminar el usuario.')
+        if (!res.ok) throw new Error(mensajeDeError(data, 'No se pudo eliminar el usuario.'))
         showToast('Usuario eliminado correctamente')
         loadData()
       } catch (err) {
         showError('Error al eliminar', sanitizarMensaje(err.message, 'No se pudo eliminar el usuario.'))
       }
-    }
-  }
-
-  // Acciones: Ver Ficha Detalle
-  const handleOpenDetailModal = (u) => {
-    setSelectedUser(u)
-    setIsDetailModalOpen(true)
-  }
-
-  // Reutiliza el exportador XLSX para conservar documentos y filtros.
-  const handleExportExcel = async () => {
-    setIsExportingExcel(true)
-    try {
-      await exportToExcel({
-        filename: 'Padron_Usuarios_MJLO.xlsx', sheetName: 'Usuarios',
-        subtitle: 'Padrón Oficial de Usuarios del Sistema',
-        columns: [
-          { header: 'N°', render: (_, __, i) => i + 1, width: 45 },
-          { header: 'USUARIO', key: 'nombre_usuario', isText: true, width: 140 },
-          { header: 'COLABORADOR', key: 'nombre_completo', width: 260 },
-          { header: 'DNI', key: 'numero_documento', isText: true, width: 110 },
-          { header: 'ROL', key: 'rol', width: 200 },
-          { header: 'ESTADO', key: 'usuario_estado', width: 100 },
-        ],
-        data: sortedUsuarios,
-      })
-    } finally {
-      setIsExportingExcel(false)
     }
   }
 
@@ -379,7 +357,7 @@ export function Usuarios({ user }) {
     if (r === 'GERENTE' || r === 'SUBGERENTE') {
       return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-[var(--border)]'
     }
-    if (r === 'TRABAJADOR') {
+    if (r === 'INSPECTOR DE TRÁNSITO' || r === 'INSPECTOR TÉCNICO' || r === 'ENCARGADO DE DEPÓSITO') {
       return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-[var(--border)]'
     }
     if (r === 'SECRETARIA') {
@@ -448,7 +426,7 @@ export function Usuarios({ user }) {
         <div className="relative overflow-hidden rounded-xl border-[1.5px] border-cyan-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
-              Inspectores
+              Personal móvil
             </span>
             <span className="grid size-6 place-items-center rounded-md text-cyan-600 dark:text-cyan-400">
               <Icon name="deviceMobile" className="size-3.5" />
@@ -553,17 +531,6 @@ export function Usuarios({ user }) {
 
             <button
               type="button"
-              onClick={handleExportExcel}
-              title="Descargar padrón de usuarios en Excel (.xlsx)"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-all active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-              disabled={isExportingExcel}>
-              <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
-              <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
-            </button>
-
-
-            <button
-              type="button"
               onClick={handleOpenCreateModal}
               className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
               style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}
@@ -597,31 +564,7 @@ export function Usuarios({ user }) {
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && usuarios.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && usuarios.length === 0 ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)] shrink-0" />
-                        <div className="space-y-1.5 flex-1">
-                          <div className="h-3.5 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                          <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="h-4 w-36 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="h-5 w-28 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                    </td>
-                    <td className="sticky right-0 z-10 px-4 py-3.5 text-right bg-white dark:bg-[#1C2438]">
-                      <div className="h-8 w-28 ml-auto rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                    </td>
-                  </tr>
-                ))
+                <FilaCargando colSpan={5} />
               ) : filteredUsuarios.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
@@ -704,38 +647,11 @@ export function Usuarios({ user }) {
                       {/* Acciones */}
                       <td className="sticky right-0 z-10 px-4 py-3 text-right bg-white dark:bg-[#1C2438] border-l border-slate-100 dark:border-slate-800/80 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* OJO: Ver Ficha Detalle */}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDetailModal(u)}
-                            title="Ver ficha de usuario"
-                            className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
-                            style={{
-                              backgroundColor: 'var(--action-eye-bg)',
-                              borderColor: 'var(--action-eye-border)',
-                              color: 'var(--action-eye-text)',
-                              borderWidth: '1.5px',
-                              borderStyle: 'solid',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--action-eye-hover)'
-                              e.currentTarget.style.borderColor = 'var(--action-eye-hover)'
-                              e.currentTarget.style.color = '#ffffff'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--action-eye-bg)'
-                              e.currentTarget.style.borderColor = 'var(--action-eye-border)'
-                              e.currentTarget.style.color = 'var(--action-eye-text)'
-                            }}
-                          >
-                            <Icon name="eye" className="size-4" />
-                          </button>
-
                           {/* EDITAR: Modificar Rol / Estado */}
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(u)}
-                            title="Modificar rol y estado"
+                            title="Editar usuario"
                             className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
                             style={{
                               backgroundColor: 'var(--action-edit-bg)',
@@ -756,33 +672,6 @@ export function Usuarios({ user }) {
                             }}
                           >
                             <Icon name="pencil" className="size-4" />
-                          </button>
-
-                          {/* CLAVE: Cambiar Contraseña */}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPasswordModal(u)}
-                            title="Restablecer contraseña"
-                            className="size-8 rounded-lg grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95"
-                            style={{
-                              backgroundColor: 'var(--action-print-bg)',
-                              borderColor: 'var(--action-print-border)',
-                              color: 'var(--action-print-text)',
-                              borderWidth: '1.5px',
-                              borderStyle: 'solid',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--action-print-hover)'
-                              e.currentTarget.style.borderColor = 'var(--action-print-hover)'
-                              e.currentTarget.style.color = '#ffffff'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--action-print-bg)'
-                              e.currentTarget.style.borderColor = 'var(--action-print-border)'
-                              e.currentTarget.style.color = 'var(--action-print-text)'
-                            }}
-                          >
-                            <Icon name="settings" className="size-4" />
                           </button>
 
                           {/* ELIMINAR: Dar de baja */}
@@ -848,55 +737,56 @@ export function Usuarios({ user }) {
                   <h3 className="text-base font-black text-slate-900 dark:text-white">
                     Registrar Nuevo Usuario
                   </h3>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                    Crea credenciales institucionales vinculadas a un colaborador
-                  </p>
                 </div>
               </div>
               <BotonCerrarModal onClick={() => setIsCreateModalOpen(false)} title="Cerrar" />
             </div>
 
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+            <form onSubmit={handleCreateUser} className="space-y-6 p-6 sm:p-8">
               {/* Buscador de Colaborador */}
               <div className="relative">
-                <label className="block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-1.5">
-                  1. Persona del padrón *
+                <label className="mb-2.5 block text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                  1. Trabajador *
                 </label>
                 <div className="relative">
                   <Icon name="search" className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    required
                     value={trabajadorSearch}
-                    onFocus={() => setTrabajadorDropdownOpen(true)}
+                    onFocus={() => { setTrabajadorDropdownOpen(true); quitarErrorAlta('persona') }}
                     onBlur={() => setTimeout(() => setTrabajadorDropdownOpen(false), 200)}
                     onChange={(e) => {
                       setTrabajadorSearch(e.target.value)
                       setPersonaElegida(null)
                       setUserForm((prev) => ({ ...prev, id_trabajador: '' }))
                       setTrabajadorDropdownOpen(true)
+                      quitarErrorAlta('persona')
                     }}
-                    placeholder="Escribe DNI o nombres para buscar en el padrón"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
+                    placeholder="Escribe DNI o nombres para buscar un trabajador"
+                    aria-invalid={erroresAlta.persona ? true : undefined}
+                    className={`w-full rounded-xl border bg-slate-50/70 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white dark:focus:bg-[var(--bg-subtle)] focus:ring-1 focus:ring-indigo-500/20 dark:bg-[#1C2438] dark:text-white ${erroresAlta.persona ? 'border-red-500 dark:border-red-500' : 'border-slate-200 dark:border-[var(--border-strong)]'}`}
                   />
                 </div>
+                {erroresAlta.persona && (
+                  <p role="alert" className="mt-1 px-1 text-[11px] font-medium leading-4 text-red-600 dark:text-red-400">{erroresAlta.persona}</p>
+                )}
 
                 {personaElegida && (
-                  <div className="mt-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2 text-xs dark:border-[var(--border)] dark:bg-emerald-950/30">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-emerald-800 dark:text-emerald-300">
-                        ✓ Seleccionada:
-                      </span>
-                      <span className="font-black text-slate-800 dark:text-white">
-                        {personaElegida.nombres} {personaElegida.apellidoPaterno} {personaElegida.apellidoMaterno}
-                      </span>
-                      <span className="font-mono text-slate-500">
-                        (DNI: {personaElegida.numeroDocumento})
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-extrabold uppercase text-emerald-700 dark:text-emerald-400">
-                      {cargoDe(personaElegida.id) || 'Se registrará como trabajador'}
+                  <div className="mt-3 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 dark:border-[var(--border)] dark:bg-emerald-950/30">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
+                      <Icon name="check" className="size-4" />
                     </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="min-w-0 break-words text-sm font-black text-slate-800 dark:text-white">
+                        {personaElegida.nombres} {personaElegida.apellidoPaterno} {personaElegida.apellidoMaterno}
+                      </p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+                        <span className="font-mono text-slate-500 dark:text-slate-400">DNI {personaElegida.numeroDocumento}</span>
+                        <span className="font-extrabold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                          {cargoDe(personaElegida.id)}
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 )}
 
@@ -904,8 +794,8 @@ export function Usuarios({ user }) {
                   <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
                     {buscandoPadron && !resultadosPadron.length ? (
                       <p className="p-3 text-center text-xs text-slate-500">Buscando en el padrón...</p>
-                    ) : resultadosPadron.length ? (
-                      resultadosPadron.map((persona) => {
+                    ) : resultadosPadron.some((persona) => cargoDe(persona.id)) ? (
+                      resultadosPadron.filter((persona) => cargoDe(persona.id)).map((persona) => {
                         const conCuenta = personasConCuenta.has(String(persona.id))
                         return (
                           <button
@@ -924,79 +814,77 @@ export function Usuarios({ user }) {
                               </p>
                             </div>
                             <span className="text-[10px] font-bold text-slate-400">
-                              {conCuenta ? 'Ya tiene usuario' : (cargoDe(persona.id) || 'Nuevo trabajador')}
+                              {conCuenta ? 'Ya tiene usuario' : cargoDe(persona.id)}
                             </span>
                           </button>
                         )
                       })
                     ) : (
                       <p className="p-3 text-center text-xs text-slate-500">
-                        No hay coincidencias en el padrón.
+                        No hay trabajadores que coincidan.
                       </p>
                     )}
-                    <button
-                      type="button"
-                      onMouseDown={() => { setTrabajadorDropdownOpen(false); abrirRegistroPersona(trabajadorSearch) }}
-                      className="mt-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-indigo-300 px-3 py-2 text-left text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-slate-700"
-                    >
-                      <Icon name="plus" className="size-3.5" /> ¿No está en el padrón? Registrar nueva persona
-                    </button>
                   </div>
                 )}
               </div>
 
               {/* Formulario de Cuenta */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+              <div className="grid grid-cols-1 items-start gap-x-5 gap-y-6 sm:grid-cols-2">
                 <div>
                   <FloatingInput
                     id="nombre_usuario"
                     label="2. Nombre de Usuario"
-                    required
                     value={userForm.nombre_usuario}
-                    onChange={(e) =>
+                    error={erroresAlta.nombre_usuario}
+                    onFocus={() => quitarErrorAlta('nombre_usuario')}
+                    onChange={(e) => {
+                      quitarErrorAlta('nombre_usuario')
+                      // Los espacios se quitan solos; si se intentó escribir uno, se avisa.
+                      setAvisoEspacios(/\s/.test(e.target.value))
                       setUserForm({
                         ...userForm,
                         nombre_usuario: e.target.value.toLowerCase().replace(/\s+/g, ''),
                       })
-                    }
+                    }}
                   />
-                  <p className="mt-1 text-[10.5px] text-slate-400">
-                    Solo minúsculas y sin espacios.
-                  </p>
+                  {avisoEspacios && (
+                    <p className="mt-2 px-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                      El nombre de usuario no puede tener espacios.
+                    </p>
+                  )}
                 </div>
 
-                <FloatingInput
-                  id="password_inicial"
-                  label="3. Contraseña Inicial"
-                  type="password"
-                  required
-                  minLength={8}
-                  maxLength={128}
-                  value={userForm.password}
-                  onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                />
+                <div className="relative">
+                  <FloatingInput
+                    id="password_inicial"
+                    label="3. Contraseña Inicial"
+                    type={verClaveNueva ? 'text' : 'password'}
+                    maxLength={128}
+                    value={userForm.password}
+                    error={erroresAlta.password}
+                    onFocus={() => quitarErrorAlta('password')}
+                    onChange={(e) => { quitarErrorAlta('password'); setUserForm({ ...userForm, password: e.target.value }) }}
+                    inputClassName="pr-12"
+                  />
+                  <BotonVerClave visible={verClaveNueva} onToggle={() => setVerClaveNueva((v) => !v)} />
+                </div>
 
+                <div onClickCapture={() => quitarErrorAlta('id_rol')}>
                 <FloatingSelect
                   id="cargo_usuario"
                   label="4. Rol / Permiso Asignado"
+                  placeholder="Seleccionar rol"
+                  menuGrande
                   value={userForm.id_rol}
-                  onChange={(e) => setUserForm({ ...userForm, id_rol: e.target.value })}
+                  error={erroresAlta.id_rol}
+                  onChange={(e) => { quitarErrorAlta('id_rol'); setUserForm({ ...userForm, id_rol: e.target.value }) }}
                   options={roles.map((r) => ({ value: String(r.id), label: r.nombre }))}
                 />
+                </div>
 
-                <FloatingSelect
-                  id="estado_cuenta"
-                  label="5. Estado de la Cuenta"
-                  value={userForm.estado}
-                  onChange={(e) => setUserForm({ ...userForm, estado: e.target.value })}
-                  options={[
-                    { value: 'ACTIVO', label: 'ACTIVO (Permite iniciar sesión)' },
-                    { value: 'INACTIVO', label: 'INACTIVO (Acceso bloqueado)' },
-                  ]}
-                />
               </div>
 
-              <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-[var(--border)]">
                 <BotonCancelar onClick={() => setIsCreateModalOpen(false)} />
                 <BotonGuardar disabled={saving}>
                   <Icon name="check" className="size-4" />
@@ -1008,18 +896,18 @@ export function Usuarios({ user }) {
         </div>
       )}
 
-      {/* MODAL 2: EDITAR ROL Y ESTADO */}
+      {/* MODAL 2: EDITAR USUARIO */}
       {isEditModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)] overflow-visible">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[#1C2438] rounded-t-3xl">
+          <div className="relative w-full max-w-xl rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)] overflow-visible">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 sm:px-8 dark:border-[var(--border)] dark:bg-[#1C2438] rounded-t-3xl">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
                   <Icon name="pencil" className="size-4" />
                 </span>
                 <div>
                   <h3 className="text-base font-black text-slate-900 dark:text-white">
-                    Modificar Rol y Estado
+                    Editar Usuario
                   </h3>
                   <p className="font-mono text-xs text-indigo-600 dark:text-indigo-400">
                     @{selectedUser.nombre_usuario}
@@ -1029,8 +917,8 @@ export function Usuarios({ user }) {
               <BotonCerrarModal onClick={() => setIsEditModalOpen(false)} title="Cerrar" />
             </div>
 
-            <form onSubmit={handleSaveEditUser} className="p-6 space-y-4">
-              <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
+            <form onSubmit={handleSaveEditUser} className="space-y-6 p-6 sm:p-8">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50 px-4 py-3.5 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
                 <p className="text-xs font-bold text-slate-500">Colaborador:</p>
                 <p className="text-sm font-black text-slate-800 dark:text-white">
                   {selectedUser.nombre_completo || 'Sin personal asignado'}
@@ -1040,6 +928,7 @@ export function Usuarios({ user }) {
               <FloatingSelect
                 id="cargo_edit"
                 label="Rol en el Sistema"
+                menuGrande
                 value={userForm.id_rol}
                 onChange={(e) => setUserForm({ ...userForm, id_rol: e.target.value })}
                 options={roles.map((r) => ({ value: String(r.id), label: r.nombre }))}
@@ -1048,6 +937,7 @@ export function Usuarios({ user }) {
               <FloatingSelect
                 id="estado_edit"
                 label="Estado"
+                menuGrande
                 value={userForm.estado}
                 onChange={(e) => setUserForm({ ...userForm, estado: e.target.value })}
                 options={[
@@ -1056,7 +946,26 @@ export function Usuarios({ user }) {
                 ]}
               />
 
-              <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
+              <div>
+                <div className="relative">
+                  <FloatingInput
+                    id="nueva_password"
+                    label="Nueva contraseña (opcional)"
+                    type={showPassword ? 'text' : 'password'}
+                    maxLength={128}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    inputClassName="pr-12"
+                  />
+                  <BotonVerClave visible={showPassword} onToggle={() => setShowPassword(!showPassword)} />
+                </div>
+                <p className="mt-2.5 px-1 text-[11px] leading-relaxed text-slate-400">
+                  Déjela vacía para conservar la actual. Si escribe una, la anterior dejará de ser válida.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-[var(--border)]">
                 <BotonCancelar onClick={() => setIsEditModalOpen(false)} />
                 <BotonGuardar disabled={saving}>
                   <Icon name="check" className="size-4" />
@@ -1068,152 +977,6 @@ export function Usuarios({ user }) {
         </div>
       )}
 
-      {/* MODAL 3: RESTABLECER CONTRASEÑA */}
-      {isPasswordModalOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 dark:border-[var(--border)] dark:bg-[#1C2438] rounded-t-3xl">
-              <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
-                  <Icon name="settings" className="size-4" />
-                </span>
-                <div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">
-                    Restablecer Contraseña
-                  </h3>
-                  <p className="font-mono text-xs text-indigo-600 dark:text-indigo-400">
-                    @{selectedUser.nombre_usuario}
-                  </p>
-                </div>
-              </div>
-              <BotonCerrarModal onClick={() => setIsPasswordModalOpen(false)} title="Cerrar" />
-            </div>
-
-            <form onSubmit={handleResetPassword} className="p-6 space-y-4">
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                Ingresa una nueva contraseña para la cuenta del usuario. La clave anterior dejará de ser válida inmediatamente.
-              </p>
-
-              <div className="relative">
-                <FloatingInput
-                  id="nueva_password"
-                  label="Nueva Contraseña"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  minLength={8}
-                  maxLength={128}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  inputClassName="pr-12"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                >
-                  {showPassword ? 'Ocultar' : 'Ver'}
-                </button>
-              </div>
-
-              <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
-                <BotonCancelar onClick={() => setIsPasswordModalOpen(false)} />
-                <BotonGuardar disabled={saving}>
-                  <Icon name="check" className="size-4" />
-                  <span>{saving ? 'Cambiando...' : 'Actualizar Clave'}</span>
-                </BotonGuardar>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 4: FICHA DETALLE DEL USUARIO */}
-      {isDetailModalOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4 rounded-t-3xl dark:border-[var(--border)] dark:bg-[#1C2438]">
-              <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-xl bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400">
-                  <Icon name="eye" className="size-4" />
-                </span>
-                <div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">
-                    Ficha de Usuario
-                  </h3>
-                  <p className="text-xs font-medium text-slate-400">
-                    Información técnica y permisos asignados
-                  </p>
-                </div>
-              </div>
-              <BotonCerrarModal onClick={() => setIsDetailModalOpen(false)} title="Cerrar" />
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
-                <div className="size-14 rounded-2xl font-black text-lg flex items-center justify-center border border-indigo-200 bg-indigo-100 text-indigo-700 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-indigo-300">
-                  {(selectedUser.nombre_usuario || 'U').slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <h4 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    @{selectedUser.nombre_usuario}
-                    <StatusBadge status={selectedUser.usuario_estado || 'ACTIVO'} />
-                  </h4>
-                  <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mt-0.5">
-                    {selectedUser.nombre_completo || 'Sin colaborador vinculado'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Rol en Sistema
-                  </span>
-                  <p className="mt-1 font-black text-slate-800 dark:text-white">
-                    {selectedUser.rol || 'Sin rol'}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    ID Trabajador
-                  </span>
-                  <p className="mt-1 font-mono font-black text-slate-800 dark:text-white">
-                    {selectedUser.id_trabajador || 'N/A'}
-                  </p>
-                </div>
-
-                {selectedUser.numero_documento && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Documento de Identidad
-                    </span>
-                    <p className="mt-1 font-mono font-black text-slate-800 dark:text-white">
-                      DNI: {selectedUser.numero_documento}
-                    </p>
-                  </div>
-                )}
-
-                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-[var(--border)] dark:bg-slate-900/40">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Acceso Municipal
-                  </span>
-                  <p className="mt-1 font-bold text-emerald-600 dark:text-emerald-400">
-                    Autorizado MDJLO
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex items-center justify-end gap-2 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
-                <BotonCancelar onClick={() => setIsDetailModalOpen(false)}>Cerrar</BotonCancelar>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Alta rápida de una persona del padrón (desde «Nuevo usuario») */}
-      {modalPersonaRapida}
     </div>
   )
 }

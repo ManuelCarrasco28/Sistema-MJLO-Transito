@@ -838,7 +838,6 @@ CREATE TABLE `trabajadores` (
   `fecha_created` timestamp NOT NULL DEFAULT current_timestamp(),
   `fecha_updated` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `tipo` enum('INTERNO','EXTERNO','OTROS') NOT NULL,
-  `tipo_inspector` enum('TRANSITO','TECNICO') DEFAULT NULL,
   `tiene_cuenta` tinyint(1) NOT NULL DEFAULT 0,
   `estado` enum('ACTIVO','INACTIVO') NOT NULL,
   PRIMARY KEY (`id_persona`),
@@ -1007,7 +1006,7 @@ CREATE TABLE `vehiculos` (
 
 LOCK TABLES `roles` WRITE;
 /*!40000 ALTER TABLE `roles` DISABLE KEYS */;
-INSERT INTO `roles` (`id`, `fecha_created`, `fecha_updated`, `nombre`, `estado`) VALUES (1,'2026-09-24 15:37:02','2026-09-24 15:37:02','SuperAdmin','ACTIVO'),(2,'2026-09-24 15:37:02','2026-09-24 15:37:02','Gerente','ACTIVO'),(3,'2026-09-24 15:37:02','2026-09-24 15:37:02','SubGerente','ACTIVO'),(4,'2026-09-24 15:37:02','2026-09-24 15:37:02','Secretaria','ACTIVO'),(5,'2026-09-24 15:37:02','2026-09-24 15:37:02','Trabajador','ACTIVO');
+INSERT INTO `roles` (`id`, `fecha_created`, `fecha_updated`, `nombre`, `estado`) VALUES (1,'2026-09-24 15:37:02','2026-09-24 15:37:02','SuperAdmin','ACTIVO'),(2,'2026-09-24 15:37:02','2026-09-24 15:37:02','Gerente','ACTIVO'),(3,'2026-09-24 15:37:02','2026-09-24 15:37:02','SubGerente','ACTIVO'),(4,'2026-09-24 15:37:02','2026-09-24 15:37:02','Secretaria','ACTIVO'),(5,'2026-09-24 15:37:02','2026-09-24 15:37:02','Inspector de Tránsito','ACTIVO'),(6,'2026-10-18 00:00:00','2026-10-18 00:00:00','Inspector Técnico','ACTIVO'),(7,'2026-10-19 00:00:00','2026-10-19 00:00:00','Encargado de Depósito','ACTIVO');
 /*!40000 ALTER TABLE `roles` ENABLE KEYS */;
 UNLOCK TABLES;
 

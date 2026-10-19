@@ -9,8 +9,9 @@ import { formatNumeroTarjeta } from '../utils/formatters'
 import { FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { puedeEliminarRegistros } from '../config/roles'
+import { FilaCargando } from '../components/ui/FilaCargando'
 
-const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_inspector: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
+const emptyForm = { id_persona: '', cargo: '', id_unidad_organica: '', tipo_funcion: 'Titular', solicitud: '', documento: '', fecha_documento: '', firma_documento: '', fecha_termino: '', estado: 'ACTIVO' }
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -176,6 +177,7 @@ export function Trabajadores() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [catalogos, setCatalogos] = useState({ cargos: [], unidades: [] })
+  const unidadTransito = catalogos.unidades.find((unidad) => unidad.siglas === 'STTS')
   const [personasResultados, setPersonasResultados] = useState([])
   const [isSearchingPersona, setIsSearchingPersona] = useState(false)
   const [selectedPersonaObj, setSelectedPersonaObj] = useState(null)
@@ -185,7 +187,7 @@ export function Trabajadores() {
 
   useEffect(() => {
     let active = true
-    apiFetch('/personal').then(async (response) => {
+    apiFetch('/personal?unidad=TRANSITO').then(async (response) => {
       if (!response.ok) throw new Error('No se pudo cargar los trabajadores. Intente nuevamente.')
       const result = await response.json()
       if (active) setRows(result.data || [])
@@ -265,7 +267,11 @@ export function Trabajadores() {
 
 
   const openForm = (record) => {
-    setForm({ ...emptyForm, ...record, id_persona: record?.id_persona || record?.id || '' })
+    if (!unidadTransito) {
+      showToast('No se encontró la unidad de Tránsito en el catálogo. Revisa su configuración.', 'warning')
+      return
+    }
+    setForm({ ...emptyForm, ...record, id_persona: record?.id_persona || record?.id || '', id_unidad_organica: String(unidadTransito.id) })
     if (record?.id) {
       setPersonaSearch(record?.numero_documento ? `${record.numero_documento} — ${record.nombres || ''} ${record.apellidos || ''}`.trim() : '')
       setSelectedPersonaObj({
@@ -313,10 +319,15 @@ export function Trabajadores() {
     setSaving(true)
     setFormError('')
     try {
-      const response = await apiFetch(form.id ? `/personal/${form.id}` : '/personal', { method: form.id ? 'PUT' : 'POST', body: form })
+      if (!unidadTransito) throw new Error('La unidad de Tránsito no está configurada.')
+      const response = await apiFetch(form.id ? `/personal/${form.id}?unidad=TRANSITO` : '/personal?unidad=TRANSITO', { method: form.id ? 'PUT' : 'POST', body: { ...form, id_unidad_organica: unidadTransito.id } })
       const result = await response.json()
       if (!response.ok) throw new Error(result.messages ? Object.values(result.messages).join(' ') : 'No se pudo guardar el trabajador.')
-      setRows((current) => form.id ? current.map((row) => String(row.id) === String(form.id) ? result.data : row) : [result.data, ...current])
+      const perteneceUnidad = unidadTransito && String(result.data.id_unidad_organica) === String(unidadTransito.id)
+      setRows((current) => {
+        const anteriores = current.filter((row) => String(row.id) !== String(result.data.id))
+        return perteneceUnidad ? [result.data, ...anteriores] : anteriores
+      })
       showToast(form.id ? 'Trabajador actualizado correctamente' : 'Trabajador registrado correctamente', form.id ? 'editar' : 'crear')
       setForm(null)
     } catch (e) { setFormError(e.message) }
@@ -354,7 +365,7 @@ export function Trabajadores() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black leading-tight text-slate-800 dark:text-white">
-              {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-700">...</span> : error ? '—' : formatNumeroTarjeta(rows.length)}
+              {loading ? <span role="status" aria-label="Cargando" className="inline-block h-6 w-12 animate-pulse rounded-md bg-slate-200 align-middle dark:bg-slate-700" /> : error ? '—' : formatNumeroTarjeta(rows.length)}
             </p>
           </div>
         </div>
@@ -369,7 +380,7 @@ export function Trabajadores() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black leading-tight text-slate-800 dark:text-white">
-              {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-700">...</span> : error ? '—' : formatNumeroTarjeta(rows.filter((r) => r.estado === 'ACTIVO').length)}
+              {loading ? <span role="status" aria-label="Cargando" className="inline-block h-6 w-12 animate-pulse rounded-md bg-slate-200 align-middle dark:bg-slate-700" /> : error ? '—' : formatNumeroTarjeta(rows.filter((r) => r.estado === 'ACTIVO').length)}
             </p>
           </div>
         </div>
@@ -384,7 +395,7 @@ export function Trabajadores() {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black leading-tight text-slate-800 dark:text-white">
-              {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-700">...</span> : error ? '—' : formatNumeroTarjeta(rows.filter((r) => r.estado === 'INACTIVO').length)}
+              {loading ? <span role="status" aria-label="Cargando" className="inline-block h-6 w-12 animate-pulse rounded-md bg-slate-200 align-middle dark:bg-slate-700" /> : error ? '—' : formatNumeroTarjeta(rows.filter((r) => r.estado === 'INACTIVO').length)}
             </p>
           </div>
         </div>
@@ -495,14 +506,13 @@ export function Trabajadores() {
 
                   {/* Cargo & Unidad */}
                   <td className="px-4 py-3 max-w-[240px]">
-                    <p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200" title={row.cargo}>{row.cargo || 'Sin cargo'}</p>
-                    <p className="truncate text-[11px] font-semibold text-slate-500" title={row.unidad_organica}>{row.unidad_organica || 'Sin unidad'}</p>
+                    <p className="min-w-0 break-words text-xs font-bold text-slate-700 dark:text-slate-200" title={row.cargo}>{row.cargo || 'Sin cargo'}</p>
+                    <p className="min-w-0 break-words text-[11px] font-semibold text-slate-500" title={row.unidad_organica}>{row.unidad_organica || 'Sin unidad'}</p>
                     {row.jerarquia && <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-500">{row.jerarquia}</p>}
                   </td>
 
                   {/* Asignación */}
                   <td className="px-4 py-3 max-w-[200px]">
-                    {row.tipo_inspector && <p className="mb-1 text-xs font-semibold text-blue-800 dark:text-blue-300">{row.tipo_inspector === 'TECNICO' ? 'Inspección técnica · Sin cuenta' : 'Inspector de tránsito · Móvil'}</p>}
                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.documento || 'Sin doc.'}</p>
                     <p className="text-[11px] font-medium text-slate-500">{row.fecha_documento || '—'}</p>
                     <span className="mt-1 inline-block rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">{row.tipo_funcion}</span>
@@ -579,17 +589,7 @@ export function Trabajadores() {
                 </tr>
               ))}
 
-              {loading && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-16 text-center">
-                    <div className="mx-auto flex flex-col items-center justify-center space-y-3">
-                      <div className="size-8 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600 dark:border-[var(--border)] dark:border-t-indigo-500"></div>
-                      <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Cargando trabajadores...</p>
-                      <p className="text-xs font-medium text-slate-400 dark:text-slate-500">Conectando con el servidor</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
+              {loading && <FilaCargando colSpan={6} />}
 
               {!loading && !visible.length && (
                 <tr>
@@ -724,20 +724,12 @@ export function Trabajadores() {
                     </div>
 
                     <div className="relative sm:col-span-1">
-                      <SearchableSelect
+                      <FloatingInput
                         id="unidad"
                         label="Unidad Orgánica"
-                        value={form.id_unidad_organica || ''}
-                        onChange={(e) => setForm({ ...form, id_unidad_organica: e.target.value })}
-                        options={[
-                          { value: '', label: 'Sin unidad asignada' },
-                          ...catalogos.unidades.map(u => ({
-                            value: String(u.id),
-                            label: u.jerarquia && u.nombre !== u.jerarquia && !u.nombre.startsWith(u.jerarquia)
-                              ? `${u.nombre} (${u.jerarquia})`
-                              : u.nombre
-                          }))
-                        ]}
+                        value={unidadTransito?.nombre || ''}
+                        readOnly
+                        title={unidadTransito?.nombre || ''}
                       />
                     </div>
 
@@ -771,17 +763,6 @@ export function Trabajadores() {
                         { value: 'Titular', label: 'Titular' },
                         { value: 'Encargado', label: 'Encargado' },
                         { value: 'Operador', label: 'Operador' },
-                      ]}
-                    />
-                    <FloatingSelect
-                      id="tipo_inspector"
-                      label="Tipo de inspector"
-                      value={form.tipo_inspector || ''}
-                      onChange={(e) => setForm({ ...form, tipo_inspector: e.target.value })}
-                      options={[
-                        { value: '', label: 'No corresponde' },
-                        { value: 'TRANSITO', label: 'Tránsito (acceso móvil)' },
-                        { value: 'TECNICO', label: 'Inspección técnica (sin cuenta)' },
                       ]}
                     />
 
@@ -834,7 +815,7 @@ export function Trabajadores() {
                             <p className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{h.cargo || 'Cargo no registrado'} · {h.unidad_organica || 'Sin unidad'}</p>
                             <p className="text-[10.5px] font-medium text-slate-500 mt-0.5">{h.documento || 'Sin doc.'} · {h.fecha_documento || 'Sin fecha'}</p>
                             <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">{h.tipo_funcion || 'Sin función'} {h.fecha_termino ? `(Terminó ${h.fecha_termino})` : '(Vigente)'}</p>
-                            {h.solicitud && <p className="mt-1 line-clamp-2 text-[11px] font-medium italic text-slate-500">{h.solicitud}</p>}
+                            {h.solicitud && <p className="mt-1 text-[11px] font-medium italic text-slate-500">{h.solicitud}</p>}
                           </div>
                         ))}
                       </div>

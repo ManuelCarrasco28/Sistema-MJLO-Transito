@@ -8,12 +8,17 @@ class Acceso
 {
     public const ROLES_OFICINA = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE', 'SECRETARIA'];
 
+    /** Roles de campo: solo usan la app móvil. */
+    public const ROLES_CAMPO = ['INSPECTOR DE TRÁNSITO', 'INSPECTOR TÉCNICO', 'ENCARGADO DE DEPÓSITO'];
+
     private const RANGO = [
         'SUPERADMIN' => 1,
         'GERENTE'    => 2,
         'SUBGERENTE' => 3,
         'SECRETARIA' => 4,
-        'TRABAJADOR' => 5,
+        'INSPECTOR DE TRÁNSITO' => 5,
+        'INSPECTOR TÉCNICO' => 5,
+        'ENCARGADO DE DEPÓSITO' => 5,
     ];
 
     public static function usuario(): ?array
@@ -25,7 +30,18 @@ class Acceso
     {
         $usuario ??= self::usuario();
 
-        return strtoupper((string) ($usuario['rol'] ?? ''));
+        return mb_strtoupper((string) ($usuario['rol'] ?? ''));
+    }
+
+    public static function esRolCampo(?string $rol): bool
+    {
+        return in_array(mb_strtoupper((string) $rol), self::ROLES_CAMPO, true);
+    }
+
+    /** Quien custodia el depósito: completa el inventario y las observaciones, sin tocar el resto del internamiento. */
+    public static function esEncargadoDeposito(?array $usuario = null): bool
+    {
+        return self::rol($usuario) === 'ENCARGADO DE DEPÓSITO';
     }
 
     public static function esOficina(?array $usuario = null): bool
@@ -60,24 +76,6 @@ class Acceso
             || trim((string) $request->getHeaderLine('Origin')) === '';
     }
 
-    public static function esInspectorTransito(?array $usuario = null): bool
-    {
-        $usuario ??= self::usuario();
-        if (isset($usuario['tipo_inspector'])) {
-            return strtoupper(trim((string) $usuario['tipo_inspector'])) === 'TRANSITO';
-        }
-
-        $idPersona = (int) ($usuario['id_persona'] ?? 0);
-        if ($idPersona <= 0) {
-            return false;
-        }
-
-        $db = \Config\Database::connect();
-        $fila = $db->table('trabajadores')->select('tipo_inspector')->where('id_persona', $idPersona)->get()->getRowArray();
-
-        return strtoupper(trim((string) ($fila['tipo_inspector'] ?? ''))) === 'TRANSITO';
-    }
-
     public static function movilPuedeAplicarPapeletas(): bool
     {
         $db = \Config\Database::connect();
@@ -92,7 +90,7 @@ class Acceso
 
     public static function rango(string $rol): int
     {
-        return self::RANGO[strtoupper($rol)] ?? 99;
+        return self::RANGO[mb_strtoupper($rol)] ?? 99;
     }
 
     public static function errorDePassword(string $password, string $usuario = ''): ?string

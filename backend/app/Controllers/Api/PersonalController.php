@@ -8,16 +8,35 @@ class PersonalController extends ResourceController
 {
     protected $format = 'json';
 
+    private function unidadFiltro(): ?int
+    {
+        $unidad = trim((string) $this->request->getGet('unidad'));
+        if ($unidad === '') return null;
+        if ($unidad === 'TRANSITO') {
+            $row = \Config\Database::connect()->table('unidades_organicas')
+                ->select('id')->where('siglas', 'STTS')->get()->getRowArray();
+            return isset($row['id']) ? (int) $row['id'] : -1;
+        }
+        return ctype_digit($unidad) && (int) $unidad > 0 ? (int) $unidad : -1;
+    }
+
     public function estadisticas()
     {
         $db = \Config\Database::connect();
-        $row = $db->table('trabajadores')
+        $builder = $db->table('trabajadores')
             ->select("
                 COUNT(*) as total,
                 SUM(CASE WHEN estado = 'ACTIVO' THEN 1 ELSE 0 END) as activos,
                 SUM(CASE WHEN estado = 'INACTIVO' THEN 1 ELSE 0 END) as inactivos
-            ", false)
-            ->get()->getRowArray();
+            ", false);
+        $unidad = $this->unidadFiltro();
+        if ($unidad !== null) {
+            $asignaciones = $db->table('desplazamiento_oficina')
+                ->select('id_trabajador')->where('id_unidad_organica', $unidad)
+                ->groupStart()->where('fecha_termino', null)->orWhere('fecha_termino >', date('Y-m-d'))->groupEnd();
+            $builder->whereIn('id_persona', $asignaciones);
+        }
+        $row = $builder->get()->getRowArray();
 
         return $this->respond(['data' => [
             'total' => (int) ($row['total'] ?? 0),
@@ -32,11 +51,12 @@ class PersonalController extends ResourceController
         $user = \App\Services\AuthSession::resolveActiveUser($this->request->getCookie('session_user'));
         $rol = strtoupper($user['rol'] ?? '');
 
+        $tipoInspectorSql = \App\Libraries\TipoInspector::sqlTipo('pe');
         $builder = $db->table('trabajadores pe')
             ->select("
                 pe.id_persona as id,
                 pe.id_persona as id_persona,
-                pe.tipo_inspector,
+                {$tipoInspectorSql} as tipo_inspector,
                 COALESCE(td.nombre, 'DNI') as tipo_documento,
                 p.numero as numero_documento,
                 c.nombres,
@@ -71,6 +91,10 @@ class PersonalController extends ResourceController
         }
 
         $buscar = trim((string)$this->request->getGet('buscar'));
+        $unidad = $this->unidadFiltro();
+        if ($unidad !== null) {
+            $builder->where('dof.id_unidad_organica', $unidad);
+        }
         if ($buscar !== '') {
             $builder->groupStart()
                 ->like('p.numero', $buscar)
@@ -86,7 +110,7 @@ class PersonalController extends ResourceController
         $estado = strtoupper(trim((string)$this->request->getGet('estado')));
         $tipoInspector = strtoupper(trim((string)$this->request->getGet('tipoInspector')));
         if (in_array($tipoInspector, ['TRANSITO', 'TECNICO'], true)) {
-            $builder->where('pe.tipo_inspector', $tipoInspector);
+            $builder->where(\App\Libraries\TipoInspector::sqlTieneRol('pe', $tipoInspector), null, false);
         }
         if (in_array($estado, ['ACTIVO', 'INACTIVO'], true)) {
             $builder->where('pe.estado', $estado);
@@ -173,11 +197,12 @@ class PersonalController extends ResourceController
     private function getTrabajadorRow($id_persona)
     {
         $db = \Config\Database::connect();
+        $tipoInspectorSql = \App\Libraries\TipoInspector::sqlTipo('pe');
         $builder = $db->table('trabajadores pe')
             ->select("
                 pe.id_persona as id,
                 pe.id_persona as id_persona,
-                pe.tipo_inspector,
+                {$tipoInspectorSql} as tipo_inspector,
                 COALESCE(td.nombre, 'DNI') as tipo_documento,
                 p.numero as numero_documento,
                 c.nombres,
@@ -268,9 +293,16 @@ class PersonalController extends ResourceController
     private function saveRecord($id = null)
     {
         $input = $this->request->getJSON(true) ?: [];
+        $unidad = $this->unidadFiltro();
+        if ($unidad !== null) {
+            if ($unidad <= 0) return $this->failValidationErrors('La unidad orgánica no está configurada.');
+            if (isset($input['id_unidad_organica']) && (int) $input['id_unidad_organica'] !== $unidad) {
+                return $this->failValidationErrors('La unidad del trabajador debe corresponder al módulo seleccionado.');
+            }
+            $input['id_unidad_organica'] = $unidad;
+        }
 
         $rules = [
-            'tipo_inspector' => 'permit_empty|in_list[TRANSITO,TECNICO]',
             'cargo' => [
                 'rules' => 'required',
                 'errors' => ['required' => 'El cargo es obligatorio.']
@@ -298,18 +330,7 @@ class PersonalController extends ResourceController
         $estado = trim($input['estado']);
 
         $db = \Config\Database::connect();
-        $tipoInspector = array_key_exists('tipo_inspector', $input)
-            ? ($input['tipo_inspector'] ?: null)
-            : ($id ? ($db->table('trabajadores')->where('id_persona', $id)->get()->getRow('tipo_inspector') ?: null) : null);
         $personaId = $id ?? (int)($input['id_persona'] ?? 0);
-        if ($tipoInspector === 'TECNICO' && $db->table('usuarios')->where('id_persona', $personaId)->where('estado', 'ACTIVO')->countAllResults() > 0) {
-            return $this->failValidationErrors('El inspector técnico se registra sin cuenta. Desactive su usuario antes de cambiar este tipo.');
-        }
-        if ($tipoInspector === 'TRANSITO' && $db->table('usuarios u')->join('roles r', 'r.id=u.id_rol')
-            ->where('u.id_persona', $personaId)->where('u.estado', 'ACTIVO')
-            ->where('UPPER(r.nombre) !=', 'TRABAJADOR')->countAllResults() > 0) {
-            return $this->failValidationErrors('El inspector de tránsito debe tener el rol Trabajador para acceder solo al móvil.');
-        }
         $db->transException(true)->transBegin();
         try {
 
@@ -343,7 +364,6 @@ class PersonalController extends ResourceController
                 $db->table('trabajadores')->insert([
                     'id_persona' => $id,
                     'tipo' => 'INTERNO',
-                    'tipo_inspector' => $tipoInspector,
                     'tiene_cuenta' => 0,
                     'estado' => $input['estado']
                 ]);
@@ -367,7 +387,6 @@ class PersonalController extends ResourceController
                 }
 
                 $db->table('trabajadores')->where('id_persona', $id)->update([
-                    'tipo_inspector' => $tipoInspector,
                     'estado' => $input['estado'],
                 ]);
 

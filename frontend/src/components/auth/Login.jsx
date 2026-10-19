@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { apiFetch } from '../../config/api'
+import { esRolCampo } from '../../config/roles'
 
 export function Login({ onLogin }) {
   const isLocalTurnstileBypass = import.meta.env.DEV
@@ -116,8 +117,7 @@ export function Login({ onLogin }) {
       }
 
       const userRol = String(data.data?.rol || '').toUpperCase()
-      const userTipoInspector = String(data.data?.tipo_inspector || '').toUpperCase()
-      if (userRol === 'TRABAJADOR' || userTipoInspector === 'TRANSITO') {
+      if (esRolCampo(userRol)) {
         setError('El acceso al sistema web está reservado para el personal administrativo y de oficina. Por favor, utilice la aplicación móvil.')
         setIsShaking(true)
         resetCaptcha()

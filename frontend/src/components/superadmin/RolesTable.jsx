@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
 import { BotonAccion, BotonSecundario, CLASE_TABLA_ENCABEZADO } from '../ui/ToolbarButtons'
+import { FilaCargando } from '../ui/FilaCargando'
 
 export function RolesTable({ roles, loading, onEdit, onReload }) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -64,7 +65,7 @@ export function RolesTable({ roles, loading, onEdit, onReload }) {
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
             {loading ? (
-              <tr><td colSpan="5" className="px-4 py-8 text-center font-bold text-slate-500">Cargando roles...</td></tr>
+              <FilaCargando colSpan={5} />
             ) : filteredRoles.length ? filteredRoles.map((grupo) => (
               <tr key={grupo.rol} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
                 <td className="px-4 py-3 align-top">

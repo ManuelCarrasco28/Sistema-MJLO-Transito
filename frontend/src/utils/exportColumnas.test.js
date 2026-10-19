@@ -11,7 +11,7 @@ const columnas = (modulo) => {
 }
 describe('columnas de exportación de módulos', () => {
   it('no repite encabezados en ningún padrón', () => {
-    for (const module of ['Vehiculos', 'Inspecciones', 'CursosSeguridad', 'Documentos', 'Asociaciones', 'Permisos', 'Pagos', 'Retenciones', 'Trabajadores', 'Operativos', 'Papeletas', 'Usuarios']) {
+    for (const module of ['Vehiculos', 'Inspecciones', 'CursosSeguridad', 'Documentos', 'Asociaciones', 'Permisos', 'Pagos', 'Retenciones', 'Trabajadores', 'Operativos', 'Papeletas']) {
       const headers = columnas(module).map(c => c.header)
       expect(new Set(headers).size, module).toBe(headers.length)
     }
@@ -32,10 +32,9 @@ describe('columnas de exportación de módulos', () => {
     expect(access.render(null, { tiene_cuenta: '0' })).toBe('NO')
     expect(access.render(null, { tiene_cuenta: '1' })).toBe('SÍ')
   })
-  it('no inventa series y protege el documento de Usuarios como texto', () => {
+  it('no inventa series de CERTICAV', () => {
     const serie = columnas('Inspecciones').find(c => c.header === 'SERIE CERTICAV')
     expect(serie.key).toBe('numeroSerieCerticav')
     expect(serie.render).toBeUndefined()
-    expect(columnas('Usuarios').find(c => c.header === 'DNI').isText).toBe(true)
   })
 })

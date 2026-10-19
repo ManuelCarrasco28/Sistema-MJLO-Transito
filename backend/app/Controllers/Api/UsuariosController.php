@@ -6,16 +6,6 @@ use CodeIgniter\RESTful\ResourceController;
 
 class UsuariosController extends ResourceController
 {
-    private function errorTipoInspector($db, int $personaId, string $rol, string $estado): ?string
-    {
-        if ($estado !== 'ACTIVO') return null;
-        $tipo = $db->table('trabajadores')->where('id_persona', $personaId)->get()->getRow('tipo_inspector');
-        if ($tipo === 'TECNICO') return 'Los inspectores de inspección técnica se registran sin cuenta de acceso.';
-        if ($tipo === 'TRANSITO' && strtoupper($rol) !== 'TRABAJADOR') {
-            return 'El inspector de tránsito debe usar el rol Trabajador, destinado al acceso móvil.';
-        }
-        return null;
-    }
     protected $format = 'json';
 
 /**
@@ -164,10 +154,6 @@ class UsuariosController extends ResourceController
             return $this->failValidationErrors('La persona seleccionada no existe en el padrón. Regístrela primero en Personas.');
         }
 
-        if ($error = $this->errorTipoInspector($db, $idPersona, $rolRow['nombre'], $estado)) {
-            return $this->failValidationErrors($error);
-        }
-
         $db->transStart();
 
         if (!$db->table('trabajadores')->where('id_persona', $idPersona)->countAllResults()) {
@@ -200,10 +186,6 @@ class UsuariosController extends ResourceController
             'estado'     => $estado
         ]);
         $newUserId = $db->insertID();
-
-        if ($estado === 'ACTIVO' && strtoupper($rolRow['nombre']) === 'TRABAJADOR') {
-            $db->table('trabajadores')->where('id_persona', $idPersona)->update(['tipo_inspector' => 'TRANSITO']);
-        }
 
         $db->table('trabajadores')->where('id_persona', $idPersona)->update([
             'tiene_cuenta' => $estado === 'ACTIVO' ? 1 : 0
@@ -280,19 +262,12 @@ class UsuariosController extends ResourceController
             return $this->fail('No tiene jerarquía para modificar esta cuenta ni para asignar ese rol.', 403);
         }
 
-        if ($error = $this->errorTipoInspector($db, (int)$usuario['id_persona'], $rolRow['nombre'], $estado)) {
-            return $this->failValidationErrors($error);
-        }
-
         $db->transStart();
 
         $db->table('usuarios')->where('id', $id)->update([
             'id_rol' => $idRol,
             'estado' => $estado
         ]);
-        if ($estado === 'ACTIVO' && strtoupper($rolRow['nombre']) === 'TRABAJADOR') {
-            $db->table('trabajadores')->where('id_persona', $usuario['id_persona'])->update(['tipo_inspector' => 'TRANSITO']);
-        }
         $db->table('trabajadores')->where('id_persona', $usuario['id_persona'])->update([
             'tiene_cuenta' => $estado === 'ACTIVO' ? 1 : 0
         ]);
