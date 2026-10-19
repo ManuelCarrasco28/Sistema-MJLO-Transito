@@ -12,7 +12,14 @@ const TIPOS_DOC = [
   { value: 'CE', label: 'Carnet de Extranjería' },
   { value: 'PASAPORTE', label: 'Pasaporte' },
 ]
-const ESTADO_CIVIL = ['SOLTERO(A)', 'CASADO(A)', 'DIVORCIADO(A)', 'VIUDO(A)']
+// Mismos valores que usa la pantalla de Personas (y que devuelve RENIEC): SOLTERO, CASADO…
+const ESTADO_CIVIL = [
+  { value: '', label: '' },
+  { value: 'SOLTERO', label: 'SOLTERO(A)' },
+  { value: 'CASADO', label: 'CASADO(A)' },
+  { value: 'DIVORCIADO', label: 'DIVORCIADO(A)' },
+  { value: 'VIUDO', label: 'VIUDO(A)' },
+]
 const ESTADOS = ['ACTIVO', 'INACTIVO', 'FALLECIDO', 'RETIRADO']
 
 /**
@@ -55,6 +62,10 @@ export function usePersonaRapida({ alCrear }) {
         apellidoPaterno: paterno,
         apellidoMaterno: materno,
         nombres: nombres,
+        fechaNacimiento: String(paramInicial.fechaNacimiento || ''),
+        estadoCivil: String(paramInicial.estadoCivil || '').toUpperCase(),
+        direccion: String(paramInicial.direccion || ''),
+        fotoImg: String(paramInicial.fotoImg || ''),
       }
     } else {
       soloDigitos = String(paramInicial || '').replace(/\D/g, '').slice(0, 8)
@@ -117,7 +128,7 @@ export function usePersonaRapida({ alCrear }) {
         apellidoPaterno: datos.apellidoPaterno || datos.apellido_paterno || p.apellidoPaterno,
         apellidoMaterno: datos.apellidoMaterno || datos.apellido_materno || p.apellidoMaterno,
         direccion: datos.direccion || p.direccion,
-        estadoCivil: datos.estadoCivil || datos.estado_civil || p.estadoCivil,
+        estadoCivil: String(datos.estadoCivil || datos.estado_civil || '').toUpperCase() || p.estadoCivil,
       }))
       showToast('Datos cargados desde RENIEC')
     } catch (err) {

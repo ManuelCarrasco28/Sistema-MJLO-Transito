@@ -4,6 +4,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Icon } from './Icon'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from './ModalControls'
+import { buscarCoordenadasDeDireccion } from '../../utils/geocodificarDireccion'
 
 const markerIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -34,6 +35,8 @@ export function MapaCoordenadasPicker({ isOpen, onClose, onConfirm, initialValue
   const [searchTerm, setSearchTerm] = useState('')
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+  // Cuando solo se halló el barrio o el distrito, se avisa que el punto es aproximado
+  const [searchAviso, setSearchAviso] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
@@ -42,6 +45,7 @@ export function MapaCoordenadasPicker({ isOpen, onClose, onConfirm, initialValue
     setPosition(initial)
     setSearchTerm('')
     setSearchError('')
+    setSearchAviso('')
 
     const map = L.map(mapElRef.current, {
       center: initial,
@@ -85,21 +89,19 @@ export function MapaCoordenadasPicker({ isOpen, onClose, onConfirm, initialValue
     if (!value) return
     setSearching(true)
     setSearchError('')
+    setSearchAviso('')
     try {
-      const query = `${value}, Chiclayo, Lambayeque, Perú`
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`
-      )
-      const results = await res.json()
-      if (!results?.length) {
-        setSearchError('No se encontró esa dirección. Intenta ser más específico o busca el punto directamente en el mapa.')
+      // La dirección se limpia (manzana, lote, «P.J.»…) y se prueban consultas de la más precisa a la más general
+      const resultado = await buscarCoordenadasDeDireccion(value)
+      if (!resultado) {
+        setSearchError('No se encontró esa dirección. Busca el punto directamente en el mapa o haz clic sobre él.')
         return
       }
-      const { lat, lon } = results[0]
-      const latlng = { lat: parseFloat(lat), lng: parseFloat(lon) }
+      const latlng = { lat: resultado.lat, lng: resultado.lng }
       setPosition([latlng.lat, latlng.lng])
       markerRef.current?.setLatLng(latlng)
-      mapRef.current?.setView(latlng, 17)
+      mapRef.current?.setView(latlng, resultado.aproximada ? 15 : 17)
+      if (resultado.aproximada) setSearchAviso('Ubicación aproximada (barrio o distrito): mueve el pin al punto exacto.')
     } catch {
       setSearchError('No se pudo buscar la dirección. Verifica tu conexión.')
     } finally {
@@ -149,6 +151,9 @@ export function MapaCoordenadasPicker({ isOpen, onClose, onConfirm, initialValue
               {searching ? 'Buscando...' : 'Buscar'}
             </button>
           </form>
+          {searchAviso && !searchError && (
+            <p className="mt-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">{searchAviso}</p>
+          )}
           {searchError && (
             <p className="mt-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">{searchError}</p>
           )}

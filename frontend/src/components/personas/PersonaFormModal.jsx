@@ -1,6 +1,7 @@
 import { Icon } from '../ui/Icon'
 import { FloatingInput, FloatingSelect, FloatingTextarea } from '../ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
+import { abrirConsultaLicenciaMtc } from '../../utils/consultaLicenciaMtc'
 
 export function PersonaFormModal({
   isEditing,
@@ -236,17 +237,31 @@ export function PersonaFormModal({
                   Licencia y contacto
                 </h4>
 
-                <div className={`grid grid-cols-1 sm:grid-cols-2 ${isEditing ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
-                  <FloatingInput
-                    id="per_licencia"
-                    label="Número de licencia"
-                    optional
-                    maxLength={11}
-                    value={formData.numeroLicencia}
-                    error={fieldErrors.numeroLicencia}
-                    inputClassName="font-mono font-bold uppercase"
-                    onChange={(e) => { setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() }); onClearFieldError?.('numeroLicencia') }}
-                  />
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${isEditing ? 'lg:grid-cols-3' : ''} gap-3`}>
+                  <div className="col-span-full grid min-w-0 grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="min-w-0 flex-1">
+                      <FloatingInput
+                        id="per_licencia"
+                        label="Número de licencia"
+                        optional
+                        maxLength={11}
+                        value={formData.numeroLicencia}
+                        error={fieldErrors.numeroLicencia}
+                        inputClassName="font-mono font-bold uppercase"
+                        onChange={(e) => { setFormData({ ...formData, numeroLicencia: e.target.value.toUpperCase() }); onClearFieldError?.('numeroLicencia') }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      title="Consultar licencia en el portal del MTC"
+                      aria-label="Validar licencia en MTC (abre una ventana nueva)"
+                      onClick={() => abrirConsultaLicenciaMtc()}
+                      className="inline-flex !h-[42px] !min-h-0 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#595959] bg-[#595959] px-4 !py-0 !text-xs !font-semibold !leading-none text-white transition-colors hover:border-[#e30613] hover:bg-[#e30613] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e30613]"
+                    >
+                      <img src="/img/mtc-logo.png" alt="" aria-hidden="true" className="size-7 shrink-0 rounded-md object-contain" />
+                      <span>Validar en MTC</span>
+                    </button>
+                  </div>
 
                   <FloatingInput
                     id="per_celular"

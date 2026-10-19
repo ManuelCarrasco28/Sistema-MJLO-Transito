@@ -19,6 +19,8 @@ import { MapaCoordenadasPicker } from '../components/ui/MapaCoordenadasPicker'
 import { MapaInline, MapaPreviewModal, MapaTodasUbicacionesModal } from '../components/ui/MapaVisualizador'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { puedeEliminarRegistros } from '../config/roles'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
@@ -69,6 +71,10 @@ export function Asociaciones() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [isSearchingRuc, setIsSearchingRuc] = useState(false)
+  // Estado del RUC según SUNAT (se muestra bajo el campo del RUC tras consultarlo)
+  const [estadoRuc, setEstadoRuc] = useState(null)
+  // Representante consultado (SUNAT / RENIEC) que todavía no está registrado en Personas
+  const [repNuevo, setRepNuevo] = useState(null)
   const rucRequestRef = useRef(null)
   useEffect(() => {
     if (!isModalOpen) {
@@ -143,6 +149,12 @@ export function Asociaciones() {
 
   const [formData, setFormData] = useState(emptyForm)
 
+  // Busca en Personas al representante que informa SUNAT: si está se elige solo; si no, se deja listo para registrarlo
+  const proponerRepresentanteSunat = async (rep) => {
+    const encontrado = await consultarRepresentante(rep.numeroDocumento, { nombreCompleto: rep.nombreCompleto, fechaNacimiento: rep.fechaNacimiento, cargo: rep.cargo })
+    if (encontrado) showToast(`Representante legal según SUNAT: ${rep.nombreCompleto}`, 'success')
+  }
+
   const buscarRuc = async () => {
     const ruc = formData.ruc.trim()
     if (!/^\d{11}$/.test(ruc)) {
@@ -161,9 +173,17 @@ export function Asociaciones() {
       if (controller.signal.aborted) return
       const datos = payload.data
       if (!datos?.razonSocial || datos.ruc !== ruc) throw new Error('No se encontraron datos para este RUC.')
-      setFormData(prev => prev.ruc.trim() === ruc ? { ...prev, razonSocial: datos.razonSocial, direccion: datos.direccion || prev.direccion } : prev)
+      setFormData(prev => prev.ruc.trim() === ruc ? { ...prev, razonSocial: datos.razonSocial, direccion: datos.direccion || prev.direccion, fechaCreacion: prev.fechaCreacion || datos.fechaInscripcion || '' } : prev)
       setFieldErrors(prev => ({ ...prev, ruc: '', razonSocial: '' }))
+      setEstadoRuc({ estado: String(datos.estadoSunat || '').toUpperCase(), condicion: String(datos.condicion || '').toUpperCase() })
       showToast('Datos del RUC encontrados', 'success')
+      // El presidente que figura en SUNAT se propone como representante legal, sin pisar uno ya elegido
+      if (!formData.idRepresentanteLegal) {
+        const reps = Array.isArray(datos.representantesLegales) ? datos.representantesLegales : []
+        const presidente = reps.find((r) => /PRESIDENT|GERENTE|REPRESENTANTE/i.test(r.cargo || '') && /^\d{8}$/.test(r.numeroDocumento))
+          || reps.find((r) => /^\d{8}$/.test(r.numeroDocumento))
+        if (presidente) await proponerRepresentanteSunat(presidente)
+      }
     } catch (error) {
       if (!controller.signal.aborted) setFieldErrors(prev => ({ ...prev, ruc: error.message || 'No se pudo consultar el RUC.' }))
     } finally {
@@ -224,6 +244,8 @@ export function Asociaciones() {
     loadStats()
   }, [])
 
+  useRecargaSilenciosa('/asociaciones', [() => loadStats()])
+
   // Los socios (miles de filas) y el catálogo del filtro solo se consultan con la pestaña abierta.
   useEffect(() => {
     if (activeTab !== 'SOCIOS' || orgOptionsRaw.length > 0) return
@@ -257,6 +279,7 @@ export function Asociaciones() {
     }))
     setRepPersona(p)
     setRepSearch('')
+    setRepNuevo(null)
     setShowRepResults(false)
   }
 
@@ -269,7 +292,50 @@ export function Asociaciones() {
     }))
     setRepPersona(null)
     setRepSearch('')
+    setRepNuevo(null)
     setShowRepResults(false)
+  }
+
+  // Busca al representante en Personas; si no está, trae sus nombres de RENIEC para mostrarlos y poder agregarlo
+  const consultarRepresentante = async (dni, extra = {}) => {
+    setIsSearchingRep(true)
+    setShowRepResults(false)
+    try {
+      const response = await apiFetch(`/personas?page=1&buscar=${encodeURIComponent(dni)}&porPagina=10`)
+      if (!response.ok) throw new Error(await leerMensajeError(response, 'No se pudo buscar el DNI.'))
+      const payload = await response.json()
+      const encontrada = (payload.data || []).find((persona) => String(persona.numeroDocumento || persona.numero || '') === dni)
+      if (encontrada) {
+        selectRepresentante(encontrada)
+        return true
+      }
+      let nombres = ''
+      let apellidoPaterno = ''
+      let apellidoMaterno = ''
+      let estadoCivil = ''
+      let direccion = ''
+      let fotoImg = ''
+      try {
+        const reniec = await apiFetch(`/pide/reniec/${dni}`)
+        if (reniec.ok) {
+          const datos = (await reniec.json()).data || {}
+          nombres = datos.nombres || ''
+          apellidoPaterno = datos.apellidoPaterno || datos.apellido_paterno || ''
+          apellidoMaterno = datos.apellidoMaterno || datos.apellido_materno || ''
+          estadoCivil = datos.estadoCivil || datos.estado_civil || ''
+          direccion = datos.direccion || ''
+          fotoImg = datos.foto_url || datos.foto || ''
+        }
+      } catch { /* sin RENIEC se usa el nombre completo que informó SUNAT */ }
+      setRepSearch(dni)
+      setRepNuevo({ dni, nombres, apellidoPaterno, apellidoMaterno, estadoCivil, direccion, fotoImg, nombreCompleto: extra.nombreCompleto || '', fechaNacimiento: extra.fechaNacimiento || '', cargo: extra.cargo || '' })
+      return false
+    } catch (error) {
+      showError('Error de búsqueda', sanitizarMensaje(error.message, 'No se pudo buscar el DNI.'))
+      return false
+    } finally {
+      setIsSearchingRep(false)
+    }
   }
 
   const buscarRepresentantePorDni = async () => {
@@ -278,25 +344,7 @@ export function Asociaciones() {
       showError('DNI inválido', 'Ingresa los 8 dígitos del DNI para buscar.')
       return
     }
-
-    setIsSearchingRep(true)
-    setShowRepResults(false)
-    try {
-      const response = await apiFetch(`/personas?page=1&buscar=${encodeURIComponent(dni)}&porPagina=10`)
-      if (!response.ok) throw new Error(await leerMensajeError(response, 'No se pudo buscar el DNI.'))
-      const payload = await response.json()
-      const personas = payload.data || []
-      const encontrada = personas.find((persona) => String(persona.numeroDocumento || persona.numero || '') === dni)
-      if (encontrada) {
-        selectRepresentante(encontrada)
-      } else {
-        setShowRepResults(true)
-      }
-    } catch (error) {
-      showError('Error de búsqueda', sanitizarMensaje(error.message, 'No se pudo buscar el DNI.'))
-    } finally {
-      setIsSearchingRep(false)
-    }
+    await consultarRepresentante(dni)
   }
 
   const { abrir: abrirRegistroPersona, modal: modalRegistroPersona } = usePersonaRapida({
@@ -451,6 +499,8 @@ export function Asociaciones() {
     setFormData(emptyForm)
     setRepPersona(null)
     setRepSearch('')
+    setRepNuevo(null)
+    setEstadoRuc(null)
     setShowRepResults(false)
     setIsEditing(false)
     setIsModalOpen(true)
@@ -472,6 +522,8 @@ export function Asociaciones() {
       representanteDni: org.representanteDni || '',
     })
     setRepSearch('')
+    setRepNuevo(null)
+    setEstadoRuc(null)
     setShowRepResults(false)
     setIsEditing(true)
     setIsModalOpen(true)
@@ -794,44 +846,7 @@ export function Asociaciones() {
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && asociaciones.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && asociaciones.length === 0 ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-3.5 py-3 min-w-[220px]">
-                      <div className="space-y-1.5">
-                        <div className="h-3.5 w-40 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                      </div>
-                    </td>
-                    <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3 py-3 min-w-[170px]">
-                      <div className="space-y-1.5">
-                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                        <div className="h-2.5 w-24 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 min-w-[150px]">
-                      <div className="space-y-1.5">
-                        <div className="h-3.5 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                        <div className="h-2.5 w-32 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 min-w-[200px]">
-                      <div className="space-y-1.5">
-                        <div className="h-3.5 w-48 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                        <div className="h-2.5 w-16 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 min-w-[140px] text-center">
-                      <div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                    </td>
-                    <td className="sticky right-0 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-3 text-center min-w-[130px]">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                        <div className="size-7 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                <FilaCargando colSpan={7} />
               ) : asociaciones.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-12 text-center align-middle">
@@ -887,7 +902,7 @@ export function Asociaciones() {
                             <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{o.telefono}</p>
                           )}
                           {o.email && (
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap truncate max-w-[180px]" title={o.email}>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium min-w-0 break-words max-w-[180px]" title={o.email}>
                               {o.email}
                             </p>
                           )}
@@ -1095,12 +1110,7 @@ export function Asociaciones() {
               </thead>
               <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isSociosLoading && sociosList.length > 0 ? 'opacity-50' : ''}`}>
                 {isSociosLoading && sociosList.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="p-12 text-center">
-                      <Icon name="refresh" className="mx-auto size-8 animate-spin text-slate-300" />
-                      <p className="mt-2 text-sm font-semibold text-slate-500">Cargando socios...</p>
-                    </td>
-                  </tr>
+                  <FilaCargando colSpan={4} />
                 ) : sociosList.length === 0 ? (
                   <tr>
                     <td colSpan="4" className="p-12 text-center">
@@ -1120,7 +1130,7 @@ export function Asociaciones() {
                           {(socio.vinculos || []).map((v) => (
                             <div key={v.idAsociacion} className="grid grid-cols-[minmax(0,1fr)_minmax(150px,230px)] items-center gap-4 py-2 first:pt-1 last:pb-1">
                               <div className="min-w-0">
-                                <p className="line-clamp-2 text-xs font-bold leading-snug text-slate-800 dark:text-slate-100" title={v.asociacionNombre}>{v.asociacionNombre}</p>
+                                <p className=" text-xs font-bold leading-snug text-slate-800 dark:text-slate-100" title={v.asociacionNombre}>{v.asociacionNombre}</p>
                                 <p className={`mt-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide ${v.tipo === 'PARTICULAR' ? 'text-cyan-600 dark:text-cyan-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
                                   <span className={`size-1.5 rounded-full ${v.tipo === 'PARTICULAR' ? 'bg-cyan-500' : 'bg-indigo-500'}`} />
                                   {v.tipo === 'PARTICULAR' ? 'Particular' : 'Asociación'}
@@ -1229,6 +1239,7 @@ export function Asociaciones() {
                           if (!/^\d*$/.test(val)) return;
                           setFormData({ ...formData, ruc: val });
                           setFieldErrors(prev => ({ ...prev, ruc: '' }));
+                          setEstadoRuc(null);
                         }}
                         inputClassName="font-mono"
                       />
@@ -1244,6 +1255,16 @@ export function Asociaciones() {
                       {isSearchingRuc ? 'Buscando…' : 'Buscar'}
                     </button>
                   </div>
+                  {/* Solo se avisa si SUNAT no lo tiene activo y habido; cuando todo está bien no se muestra nada */}
+                  {estadoRuc && !(estadoRuc.estado === 'ACTIVO' && estadoRuc.condicion === 'HABIDO') && (() => {
+                    const ok = false
+                    return (
+                      <p role="status" className={`-mt-1 flex items-center gap-1.5 px-1 text-[11px] font-bold ${ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                        <Icon name={ok ? 'check' : 'alert'} className="size-3.5 shrink-0" />
+                        SUNAT: {estadoRuc.estado || 'sin estado'} · {estadoRuc.condicion || 'sin condición'}{ok ? '' : ' — revisa si esta asociación puede operar'}
+                      </p>
+                    )
+                  })()}
 
                   <FloatingInput
                     id="org_partida"
@@ -1251,6 +1272,14 @@ export function Asociaciones() {
                     value={formData.partidaRegistral || ''}
                     onChange={(e) => setFormData({ ...formData, partidaRegistral: e.target.value })}
                     inputClassName="font-mono uppercase"
+                  />
+
+                  <FloatingInput
+                    id="org_fecha_creacion"
+                    type="date"
+                    label="Fecha creación"
+                    value={formData.fechaCreacion || ''}
+                    onChange={(e) => setFormData({ ...formData, fechaCreacion: e.target.value })}
                   />
 
                   <div className="sm:col-span-4">
@@ -1265,7 +1294,7 @@ export function Asociaciones() {
                   </div>
 
                   {/* Selector de Representante Legal vinculado a Personas */}
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-4">
                     <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                       <Icon name="user" className="size-3.5 text-indigo-500" />
                       <span>Representante Legal (Persona Natural)</span>
@@ -1306,63 +1335,65 @@ export function Asociaciones() {
                       </div>
                     ) : (
                       <div className="relative" ref={repDropdownRef}>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={8}
-                            placeholder="DNI del representante (8 dígitos)"
-                            value={repSearch}
-                            onChange={(e) => {
-                              setRepSearch(e.target.value.replace(/\D/g, '').slice(0, 8))
-                              setShowRepResults(false)
-                            }}
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); buscarRepresentantePorDni() } }}
-                            className="h-[42px] min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[#1C2438] dark:text-white"
-                          />
-                          <button
-                            type="button"
-                            onClick={buscarRepresentantePorDni}
-                            disabled={isSearchingRep}
-                            aria-label="Buscar representante por DNI"
-                            title="Buscar por DNI"
-                            className="grid size-[42px] shrink-0 place-items-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
-                          >
-                            {isSearchingRep
-                              ? <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                              : <Icon name="search" className="size-4" />}
-                          </button>
+                        <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={8}
+                              placeholder="DNI del representante (8 dígitos)"
+                              value={repSearch}
+                              onChange={(e) => {
+                                setRepSearch(e.target.value.replace(/\D/g, '').slice(0, 8))
+                                setRepNuevo(null)
+                                setShowRepResults(false)
+                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); buscarRepresentantePorDni() } }}
+                              className="h-[42px] min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={buscarRepresentantePorDni}
+                              disabled={isSearchingRep}
+                              aria-label="Buscar representante por DNI"
+                              title="Buscar por DNI"
+                              className="grid size-[42px] shrink-0 place-items-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                            >
+                              {isSearchingRep
+                                ? <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                : <Icon name="search" className="size-4" />}
+                            </button>
+                          </div>
+                          <FloatingInput id="org_representante_nombres_nuevo" label="Nombres" value={repNuevo ? (repNuevo.nombres || (repNuevo.apellidoPaterno ? '' : repNuevo.nombreCompleto)) : ''} readOnly />
+                          <FloatingInput id="org_representante_apellidos_nuevo" label="Apellidos" value={repNuevo ? `${repNuevo.apellidoPaterno} ${repNuevo.apellidoMaterno}`.trim() : ''} readOnly />
                         </div>
 
-                        {showRepResults && (
-                          <div className="absolute left-0 right-0 top-full z-50 mt-1.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xl dark:border-[var(--border-strong)] dark:bg-[#1C2438]">
-                            <p className="text-xs text-slate-600 dark:text-slate-300">
-                              No se encontró ese DNI en Personas.
+                        {repNuevo && (
+                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs dark:border-amber-900/60 dark:bg-amber-950/30">
+                            <p className="min-w-0 flex-1 font-semibold text-amber-800 dark:text-amber-300">
+                              La persona no está registrada en el sistema. Agrégala para vincularla como representante legal.
                             </p>
                             <button
                               type="button"
-                              onClick={() => {
-                                setShowRepResults(false)
-                                abrirRegistroPersona(repSearch)
-                              }}
-                              className="mt-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700"
+                              onClick={() => abrirRegistroPersona({
+                                numeroDocumento: repNuevo.dni,
+                                nombres: repNuevo.nombres,
+                                apellidoPaterno: repNuevo.apellidoPaterno,
+                                apellidoMaterno: repNuevo.apellidoMaterno,
+                                nombre: repNuevo.nombres || repNuevo.apellidoPaterno ? '' : repNuevo.nombreCompleto,
+                                fechaNacimiento: repNuevo.fechaNacimiento,
+                                estadoCivil: repNuevo.estadoCivil,
+                                direccion: repNuevo.direccion,
+                                fotoImg: repNuevo.fotoImg,
+                              })}
+                              className="shrink-0 cursor-pointer rounded-lg bg-blue-600 px-3 py-1.5 font-bold text-white transition hover:bg-blue-700"
                             >
-                              Registrar persona con DNI {repSearch}
+                              Agregar a Personas
                             </button>
                           </div>
                         )}
                       </div>
                     )}
-                  </div>
-
-                  <div className="self-end">
-                    <FloatingInput
-                      id="org_fecha_creacion"
-                      type="date"
-                      label="Fecha creación"
-                      value={formData.fechaCreacion || ''}
-                      onChange={(e) => setFormData({ ...formData, fechaCreacion: e.target.value })}
-                    />
                   </div>
                 </div>
               </fieldset>
@@ -1641,7 +1672,7 @@ export function Asociaciones() {
                   </div>
                   <div className="flex justify-between">
                     <span className="font-bold text-slate-400">Dirección</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-200 truncate max-w-xs">{detailOrg.direccion || '—'}</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-200 min-w-0 break-words">{detailOrg.direccion || '—'}</span>
                   </div>
                 </div>
 

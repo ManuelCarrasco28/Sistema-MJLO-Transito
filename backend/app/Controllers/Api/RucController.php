@@ -78,6 +78,26 @@ if($rucDevuelto!==$ruc||!is_string($razonSocial)||trim($razonSocial)===''){
 return$this->fail(self::NO_DISPONIBLE,502);
         }
 
+        // Representantes legales (presidente, gerente…): solo los que traen documento y nombre
+        $representantes = [];
+        foreach ((array) ($data['representantesLegales'] ?? $data['representantes_legales'] ?? []) as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            $documento = trim((string) ($r['numeroDocumento'] ?? ''));
+            $nombre = trim((string) ($r['nombreCompleto'] ?? ''));
+            if ($documento === '' || $nombre === '') {
+                continue;
+            }
+            $representantes[] = [
+                'tipoDocumento' => (string) ($r['tipoDocumento'] ?? ''),
+                'numeroDocumento' => $documento,
+                'nombreCompleto' => $nombre,
+                'cargo' => trim((string) ($r['cargoDescripcion'] ?? '')),
+                'fechaNacimiento' => preg_match('/^\d{4}-\d{2}-\d{2}/', (string) ($r['fechaNacimiento'] ?? '')) ? substr((string) $r['fechaNacimiento'], 0, 10) : '',
+            ];
+        }
+
         $resultado = [
             'ruc' => $ruc,
 'razonSocial'=>trim($razonSocial),
@@ -86,6 +106,9 @@ return$this->fail(self::NO_DISPONIBLE,502);
 'condicion'=>(string)($data['condicion']??$data['condicionDomicilio']??''),
             'ubigeo' => (string) ($data['ubigeo'] ?? ''),
 'fechaDatos'=>(string)($data['fechaActualizacion']??''),
+            // Fecha de inscripción en SUNAT (AAAA-MM-DD): se propone como fecha de creación de la asociación
+            'fechaInscripcion' => preg_match('/^\d{4}-\d{2}-\d{2}/', (string) ($data['fechaInscripcion'] ?? '')) ? substr((string) $data['fechaInscripcion'], 0, 10) : '',
+            'representantesLegales' => $representantes,
         ];
         $cache->save($cacheKey, $resultado, 3600);
         return $this->respond(['data' => $resultado]);

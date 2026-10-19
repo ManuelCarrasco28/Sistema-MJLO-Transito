@@ -15,6 +15,8 @@ import { PersonaDetalleModal } from '../components/personas/PersonaDetalleModal'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { puedeEliminarRegistros } from '../config/roles'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 function formatTipoDocLabel(t) {
   const code = (t.codigo || '').toUpperCase().trim()
@@ -150,6 +152,8 @@ export function Personas({ user, onUserUpdate }) {
       .catch(() => setLoadError('No se pudo cargar el padrón de personas.'))
       .finally(() => setIsLoading(false))
   }, [currentPage, itemsPerPage, debouncedSearchTerm, filterEstado, sortBy, sortDir])
+
+  useRecargaSilenciosa('/personas', [() => loadPersonas().catch(() => {}), () => loadStats()])
 
   useEffect(() => {
     loadStats()
@@ -638,8 +642,8 @@ export function Personas({ user, onUserUpdate }) {
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon
-              name={isLoading ? "refresh" : "search"}
-              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-indigo-500' : 'text-slate-400'}`}
+              name="search"
+              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors text-slate-400`}
             />
             <input
               type="text"
@@ -736,63 +740,7 @@ export function Personas({ user, onUserUpdate }) {
             </thead>
             <tbody className={isLoading && personas.length > 0 ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
               {isLoading && personas.length === 0 ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="size-9 rounded-full shrink-0"
-                          style={{ backgroundColor: 'var(--bg-subtle)' }}
-                        />
-                        <div className="space-y-1.5 flex-1 min-w-0">
-                          <div
-                            className="h-3.5 w-32 rounded"
-                            style={{ backgroundColor: 'var(--bg-subtle)' }}
-                          />
-                          <div
-                            className="h-2.5 w-24 rounded"
-                            style={{ backgroundColor: 'var(--bg-subtle)' }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div
-                        className="h-4 w-20 rounded"
-                        style={{ backgroundColor: 'var(--bg-subtle)' }}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div
-                        className="h-4 w-24 rounded"
-                        style={{ backgroundColor: 'var(--bg-subtle)' }}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div
-                        className="h-4 w-20 rounded"
-                        style={{ backgroundColor: 'var(--bg-subtle)' }}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div
-                        className="h-5 w-16 rounded-full"
-                        style={{ backgroundColor: 'var(--bg-subtle)' }}
-                      />
-                    </td>
-                    <td
-                      className="sticky right-0 z-10 px-4 py-3 text-right"
-                      style={{
-                        backgroundColor: 'var(--bg-surface)',
-                      }}
-                    >
-                      <div
-                        className="h-7 w-20 ml-auto rounded"
-                        style={{ backgroundColor: 'var(--bg-subtle)' }}
-                      />
-                    </td>
-                  </tr>
-                ))
+                <FilaCargando colSpan={6} />
               ) : paginatedPersonas.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="p-12 text-center">
