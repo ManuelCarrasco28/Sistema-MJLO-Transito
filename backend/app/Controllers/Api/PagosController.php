@@ -96,7 +96,7 @@ class PagosController extends ResourceController
         $pagados = $db->table('ordenes_libertad ol')
             ->select("ol.id, ol.id_internamiento, 'INTERNAMIENTO' as tipo_pago, COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_remolque, 'VARIOS') as numero_recibo, NULL as numero_voucher,
                 COALESCE(NULLIF(CONCAT_WS(' + ',
-                    IF(ol.monto_guardiania > 0, 'GUARDIANÍA', NULL),
+                    IF(ol.monto_guardiania > 0, 'DEPÓSITO', NULL),
                     IF(ol.monto_remolque > 0, 'REMOLQUE', NULL)
                 ), ''), 'VARIOS CONCEPTOS') as medio_pago,
                 CONCAT('Orden #', ol.numero_orden) as referencia_pago, (ol.monto_guardiania + ol.monto_remolque) as total, ol.fecha_emision as fecha_pago, 'PAGADO' as estado", false)
@@ -291,7 +291,22 @@ class PagosController extends ResourceController
     private function listarPagina($db, int $page, int $porPagina, string $buscar, string $tipo, string $estado, string $metodo = '')
     {
         $builder = \App\Libraries\PagosListado::builder($db);
-        if ($tipo !== '' && $tipo !== 'TODOS') $builder->where('listado.tipo_pago', $tipo);
+        $papeletaId = trim((string) $this->request->getGet('papeletaId'));
+        if ($papeletaId !== '') {
+            if (!ctype_digit($papeletaId) || (int) $papeletaId <= 0) {
+                return $this->failValidationErrors('La papeleta no es válida.');
+            }
+            $builder->where('listado.id_papeleta', (int) $papeletaId);
+        }
+        // CERTICAV es un trámite con su propio filtro: "Trámites" muestra el resto.
+        $tramiteCerticav = "EXISTS (SELECT 1 FROM tramites_documentarios tc JOIN procedimientos_administrativos pc ON pc.id = tc.id_procedimiento_admin WHERE tc.id = listado.id_tramite AND pc.codigo = '" . \App\Services\CerticavPago::CODIGO . "')";
+        if ($tipo === 'CERTICAV') {
+            $builder->where('listado.tipo_pago', 'TRAMITE')->where($tramiteCerticav, null, false);
+        } elseif ($tipo === 'TRAMITE') {
+            $builder->where('listado.tipo_pago', 'TRAMITE')->where('NOT ' . $tramiteCerticav, null, false);
+        } elseif ($tipo !== '' && $tipo !== 'TODOS') {
+            $builder->where('listado.tipo_pago', $tipo);
+        }
         if ($estado !== '' && $estado !== 'TODOS') $builder->where('listado.estado', $estado);
         if ($metodo === 'SIN_CONFIRMAR') {
             $builder->groupStart()->where("COALESCE(listado.medio_pago, '') IN ('', 'SIN CONFIRMAR')", null, false)->groupEnd();
@@ -308,11 +323,18 @@ class PagosController extends ResourceController
                 ->orLike('listado.medio_pago', $buscar)
                 ->orWhere("EXISTS (SELECT 1 FROM papeletas p LEFT JOIN personas per ON per.id=p.id_persona_infractor LEFT JOIN ciudadanos c ON c.id_persona=per.id WHERE p.id=listado.id_papeleta AND $coincide)", null, false)
                 ->orWhere("EXISTS (SELECT 1 FROM inscripciones_curso i LEFT JOIN personas per ON per.id=i.id_persona LEFT JOIN ciudadanos c ON c.id_persona=per.id WHERE i.id=listado.id_inscripcion AND $coincide)", null, false)
-                ->orWhere("EXISTS (SELECT 1 FROM tramites_documentarios t LEFT JOIN personas per ON per.id=t.id_persona LEFT JOIN ciudadanos c ON c.id_persona=per.id LEFT JOIN asociaciones a ON a.id=t.id_asociacion WHERE t.id=listado.id_tramite AND ($coincide OR a.razon_social LIKE $patron ESCAPE '!'))", null, false)
+                ->orWhere("EXISTS (SELECT 1 FROM tramites_documentarios t LEFT JOIN personas per ON per.id=t.id_persona LEFT JOIN ciudadanos c ON c.id_persona=per.id LEFT JOIN asociaciones a ON a.id=t.id_asociacion LEFT JOIN vehiculos ve ON ve.id=t.id_vehiculo WHERE t.id=listado.id_tramite AND ($coincide OR a.razon_social LIKE $patron ESCAPE '!' OR t.numero_expediente LIKE $patron ESCAPE '!' OR ve.placa LIKE $patron ESCAPE '!'))", null, false)
                 ->orWhere("EXISTS (SELECT 1 FROM ordenes_internamiento oi JOIN vehiculo_propietarios vp ON vp.id_vehiculo=oi.id_vehiculo AND vp.estado='ACTIVO' LEFT JOIN personas per ON per.id=vp.id_persona LEFT JOIN ciudadanos c ON c.id_persona=per.id WHERE oi.id=listado.id_internamiento AND $coincide)", null, false)
                 ->groupEnd();
         }
         $total = (clone $builder)->countAllResults();
+        // Sin un orden elegido, lo más reciente arriba: un cobro recién pagado y una solicitud recién creada
+        // aparecen juntos al inicio. Un cobro pendiente cuenta desde su fecha de registro y, dentro de su día, va primero
+        // (no tiene hora de pago; así una solicitud de hoy no queda debajo de los cobros ya hechos hoy).
+        if (trim((string) $this->request->getGet('sortBy')) === '') {
+            $builder->orderBy('COALESCE(listado.fecha_pago, listado.fecha_registro)', 'DESC', false)
+                ->orderBy("COALESCE(listado.hora_pago, '23:59:59')", 'DESC', false);
+        }
         \App\Libraries\QuerySort::aplicar($builder, $this->request, [
             'numeroRecibo'=>'listado.numero_recibo', 'referenciaPago'=>'listado.referencia_pago',
             'metodoPago'=>'listado.medio_pago', 'montoTotal'=>'listado.total',
@@ -320,6 +342,7 @@ class PagosController extends ResourceController
         ], 'listado.fecha_pago');
         $rows = $builder->orderBy('listado.prefijo', 'ASC')->orderBy('listado.id', 'DESC')
             ->limit($porPagina, ($page - 1) * $porPagina)->get()->getResultArray();
+        $rows = $this->completarFilasDeListado($db, $rows);
         $mapas = $this->resolverPagadoresEnBloque($db,
             array_filter(array_column($rows, 'id_papeleta')), array_filter(array_column($rows, 'id_tramite')),
             array_filter(array_column($rows, 'id_inscripcion')), array_filter(array_column($rows, 'id_internamiento')));
@@ -335,6 +358,76 @@ class PagosController extends ResourceController
         return $this->respond(['data'=>$data, 'meta'=>[
             'total'=>$total, 'page'=>$page, 'porPagina'=>$porPagina, 'totalPaginas'=>(int)ceil($total/$porPagina),
         ]]);
+    }
+
+    /**
+     * Datos que el listado unificado no trae: quién pagó realmente y la observación (solo cobros ya registrados),
+     * y el concepto, la placa y la asociación de los trámites.
+     */
+    private function completarFilasDeListado($db, array $rows): array
+    {
+        $ids = array_values(array_filter(array_map(static fn ($r) => ($r['prefijo'] ?? '') === '' ? (int) $r['id'] : 0, $rows)));
+        if (!$ids) {
+            return $rows;
+        }
+        $extras = [];
+        foreach ($db->table('pagos_transito pt')->select('pt.id, pt.pagado_por_nombre, pt.pagado_por_documento, pt.observaciones, u.usuario AS cajero')->join('usuarios u', 'u.id = pt.id_usuario_cobra', 'left')->whereIn('pt.id', $ids)->get()->getResultArray() as $e) {
+            $extras[(int) $e['id']] = $e;
+        }
+        $tramites = [];
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $filas = $db->query(
+            "SELECT pt.id, pa.nombre AS concepto, pa.codigo AS codigo_procedimiento, v.placa, a.razon_social AS asociacion
+             FROM pagos_transito pt
+             JOIN tramites_documentarios t ON t.id = pt.id_tramite
+             LEFT JOIN procedimientos_administrativos pa ON pa.id = t.id_procedimiento_admin
+             LEFT JOIN vehiculos v ON v.id = t.id_vehiculo
+             LEFT JOIN asociaciones a ON a.id = t.id_asociacion
+             WHERE pt.id IN ($marcas)",
+            $ids
+        )->getResultArray();
+        foreach ($filas as $f) {
+            $tramites[(int) $f['id']] = $f;
+        }
+        $depositos = [];
+        $libertades = $db->query(
+            "SELECT pt.id AS pago_id, ol.id AS orden_id, ol.numero_orden, ol.fecha_emision,
+                    ol.numero_recibo_guardiania, ol.monto_guardiania, ol.numero_recibo_remolque, ol.monto_remolque,
+                    oi.numero_boleta, oi.fecha_ingreso, oi.fecha_salida, oi.total_dias
+             FROM pagos_transito pt
+             JOIN ordenes_internamiento oi ON oi.id_papeleta = pt.id_papeleta
+             JOIN ordenes_libertad ol ON ol.id_internamiento = oi.id AND ol.estado = 'EMITIDA'
+                 AND ol.numero_recibo_papeleta = pt.numero_recibo
+             WHERE pt.id IN ($marcas) AND pt.estado = 'PAGADO'
+             ORDER BY ol.id ASC",
+            $ids
+        )->getResultArray();
+        foreach ($libertades as $libertad) {
+            $depositos[(int) $libertad['pago_id']][] = [
+                'ordenId' => (int) $libertad['orden_id'],
+                'numeroOrden' => $libertad['numero_orden'],
+                'numeroBoleta' => $libertad['numero_boleta'],
+                'fechaIngreso' => $libertad['fecha_ingreso'],
+                'fechaSalida' => $libertad['fecha_salida'],
+                'fechaPago' => $libertad['fecha_emision'],
+                'dias' => (int) $libertad['total_dias'],
+                'numeroRecibo' => $libertad['numero_recibo_guardiania'],
+                'montoDeposito' => (float) $libertad['monto_guardiania'],
+                'numeroReciboRemolque' => $libertad['numero_recibo_remolque'],
+                'montoRemolque' => (float) $libertad['monto_remolque'],
+            ];
+        }
+        foreach ($rows as &$fila) {
+            if (($fila['prefijo'] ?? '') !== '') {
+                continue;
+            }
+            $id = (int) $fila['id'];
+            $fila['depositos'] = $depositos[$id] ?? [];
+            $fila = array_merge($fila, $extras[$id] ?? [], ['concepto' => $tramites[$id]['concepto'] ?? null, 'placa' => $tramites[$id]['placa'] ?? null, 'asociacion' => $tramites[$id]['asociacion'] ?? null, 'es_certicav' => ($tramites[$id]['codigo_procedimiento'] ?? null) === \App\Services\CerticavPago::CODIGO]);
+        }
+        unset($fila);
+
+        return $rows;
     }
 
     public function origen()
@@ -384,6 +477,7 @@ class PagosController extends ResourceController
             'montoTotal' => (float)$row['total'],
             'fecha' => $row['fecha_pago'],
             'fechaHora' => $row['fecha_pago'],
+            'fechaRegistro' => $row['fecha_registro'] ?? null,
             'estado' => $row['estado'],
             'pagadoPor' => $mapasPagador['internamiento'][(int) ($row['id_internamiento'] ?? $row['id'])] ?? null,
         ];
@@ -413,8 +507,24 @@ class PagosController extends ResourceController
             'numeroRecibo' => $row['numero_recibo'], 'numeroVoucher' => $row['numero_voucher'],
             'metodo' => $row['medio_pago'], 'metodoPago' => $row['medio_pago'],
             'referenciaPago' => $row['referencia_pago'], 'montoTotal' => (float)$row['total'],
-            'fecha' => $row['fecha_pago'], 'fechaHora' => $row['fecha_pago'], 'estado' => $row['estado'],
-            'pagadoPor' => $pagadoPor,
+            'fecha' => $row['fecha_pago'], 'fechaHora' => $row['fecha_pago'], 'fechaRegistro' => $row['fecha_registro'] ?? null,
+            'horaPago' => $row['hora_pago'] ?? null,
+            'cajero' => $row['cajero'] ?? null,
+            'estado' => $row['estado'],
+            // Quien pagó realmente tiene prioridad sobre el titular del registro
+            'pagadoPor' => (isset($row['pagado_por_nombre']) && $row['pagado_por_nombre'] !== '') ? $row['pagado_por_nombre'] : $pagadoPor,
+            'pagadoPorDocumento' => $row['pagado_por_documento'] ?? null,
+            'observaciones' => $row['observaciones'] ?? null,
+            'depositos' => $row['depositos'] ?? [],
+            'concepto' => $row['concepto'] ?? null, 'placa' => $row['placa'] ?? null, 'asociacion' => $row['asociacion'] ?? null,
+            'esCerticav' => (bool) ($row['es_certicav'] ?? false),
+            'titular' => $pagadoPor,
+            'titularDocumento' => match ($tipo) {
+                'papeleta' => $mapasPagador['doc']['papeleta'][(int) ($row['id_papeleta'] ?? 0)] ?? null,
+                'tramite' => $mapasPagador['doc']['tramite'][(int) ($row['id_tramite'] ?? 0)] ?? null,
+                'curso' => $mapasPagador['doc']['curso'][(int) ($row['id_inscripcion'] ?? 0)] ?? null,
+                default => null,
+            },
             'operacionRepetida' => (int)($row['operacion_repetida'] ?? 0),
         ];
     }
@@ -422,16 +532,24 @@ class PagosController extends ResourceController
     private function resolverPagadoresEnBloque($db, array $idsPapeleta, array $idsTramite, array $idsCurso, array $idsInternamiento): array
     {
         $mapas = ['papeleta' => [], 'tramite' => [], 'curso' => [], 'internamiento' => []];
+        // Documento (DNI o RUC) de cada titular, para precargarlo al cobrar.
+        $mapas['doc'] = ['papeleta' => [], 'tramite' => [], 'curso' => [], 'internamiento' => []];
 
         if (!empty($idsPapeleta)) {
+            // Sin infractor identificado, el cobro queda a nombre del propietario del vehículo.
             $rows = $db->table('papeletas p')
-                ->select("p.id, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
+                ->select("p.id, COALESCE(NULLIF(TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))), ''), NULLIF(TRIM(CONCAT(co.nombres, ' ', co.apellido_paterno, ' ', COALESCE(co.apellido_materno, ''))), '')) as nombre,
+                    CASE WHEN per.id IS NOT NULL THEN per.numero ELSE po.numero END as documento", false)
                 ->join('personas per', 'per.id = p.id_persona_infractor', 'left')
                 ->join('ciudadanos c', 'c.id_persona = per.id', 'left')
+                ->join('vehiculo_propietarios vpo', "vpo.id_vehiculo = p.id_vehiculo AND vpo.estado = 'ACTIVO'", 'left')
+                ->join('personas po', 'po.id = vpo.id_persona', 'left')
+                ->join('ciudadanos co', 'co.id_persona = vpo.id_persona', 'left')
                 ->whereIn('p.id', $idsPapeleta)
                 ->get()->getResultArray();
             foreach ($rows as $r) {
                 $mapas['papeleta'][(int) $r['id']] = $r['nombre'] ?: null;
+                $mapas['doc']['papeleta'][(int) $r['id']] = $r['documento'] ?: null;
             }
         }
 
@@ -445,51 +563,60 @@ class PagosController extends ResourceController
             $idsAsociacionTramite = array_values(array_unique(array_filter(array_map(static fn ($t) => (int) ($t['id_asociacion'] ?? 0), $tramites))));
 
             $nombresPersona = [];
+            $documentosPersona = [];
+            $documentosAsociacion = [];
             if (!empty($idsPersonaTramite)) {
                 $rows = $db->table('personas p')
-                    ->select("p.id, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
+                    ->select("p.id, p.numero as documento, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
                     ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
                     ->whereIn('p.id', $idsPersonaTramite)
                     ->get()->getResultArray();
                 foreach ($rows as $r) {
                     $nombresPersona[(int) $r['id']] = $r['nombre'] ?: null;
+                    $documentosPersona[(int) $r['id']] = $r['documento'] ?: null;
                 }
             }
 
             $nombresAsociacion = [];
             if (!empty($idsAsociacionTramite)) {
-                $rows = $db->table('asociaciones')->select('id, razon_social')->whereIn('id', $idsAsociacionTramite)->get()->getResultArray();
+                $rows = $db->table('asociaciones')->select('id, razon_social, ruc')->whereIn('id', $idsAsociacionTramite)->get()->getResultArray();
                 foreach ($rows as $r) {
                     $nombresAsociacion[(int) $r['id']] = $r['razon_social'] ?? null;
+                    $documentosAsociacion[(int) $r['id']] = $r['ruc'] ?? null;
                 }
             }
 
             foreach ($tramites as $t) {
                 $nombre = null;
+                $documento = null;
                 if (!empty($t['id_persona']) && !empty($nombresPersona[(int) $t['id_persona']])) {
                     $nombre = $nombresPersona[(int) $t['id_persona']];
+                    $documento = $documentosPersona[(int) $t['id_persona']] ?? null;
                 } elseif (!empty($t['id_asociacion'])) {
                     $nombre = $nombresAsociacion[(int) $t['id_asociacion']] ?? null;
+                    $documento = $documentosAsociacion[(int) $t['id_asociacion']] ?? null;
                 }
                 $mapas['tramite'][(int) $t['id']] = $nombre;
+                $mapas['doc']['tramite'][(int) $t['id']] = $documento;
             }
         }
 
         if (!empty($idsCurso)) {
             $rows = $db->table('inscripciones_curso i')
-                ->select("i.id, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
+                ->select("i.id, p.numero as documento, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
                 ->join('personas p', 'p.id = i.id_persona', 'left')
                 ->join('ciudadanos c', 'c.id_persona = p.id', 'left')
                 ->whereIn('i.id', $idsCurso)
                 ->get()->getResultArray();
             foreach ($rows as $r) {
                 $mapas['curso'][(int) $r['id']] = $r['nombre'] ?: null;
+                $mapas['doc']['curso'][(int) $r['id']] = $r['documento'] ?: null;
             }
         }
 
         if (!empty($idsInternamiento)) {
             $rows = $db->table('ordenes_internamiento oi')
-                ->select("oi.id, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
+                ->select("oi.id, p.numero as documento, TRIM(CONCAT(c.nombres, ' ', c.apellido_paterno, ' ', COALESCE(c.apellido_materno, ''))) as nombre", false)
                 ->join('vehiculos v', 'v.id = oi.id_vehiculo', 'left')
                 ->join('vehiculo_propietarios vp', "vp.id_vehiculo = v.id AND vp.estado = 'ACTIVO'", 'left')
                 ->join('personas p', 'p.id = vp.id_persona', 'left')
@@ -498,6 +625,7 @@ class PagosController extends ResourceController
                 ->get()->getResultArray();
             foreach ($rows as $r) {
                 $mapas['internamiento'][(int) $r['id']] = $r['nombre'] ?: null;
+                $mapas['doc']['internamiento'][(int) $r['id']] = $r['documento'] ?: null;
             }
         }
 
@@ -703,36 +831,35 @@ class PagosController extends ResourceController
             ->get()
             ->getResultArray();
 
+        // Cada movimiento con el formato que consume el arqueo del frontend
         $todosPagos = [];
         foreach ($pagosTransito as $p) {
             $todosPagos[] = [
                 'id' => (int)$p['id'],
                 'numeroRecibo' => $p['numero_recibo'] ?: 'REC-' . $p['id'],
                 'tipoPago' => $p['tipo_pago'],
-                'metodoPago' => strtoupper($p['medio_pago'] ?: 'EFECTIVO'),
-                'monto' => (float)$p['total'],
-                'referencia' => $p['referencia_pago'] ?: '',
-                'hora' => $p['hora_pago'] ?: '00:00:00',
-                'cajero' => ($p['cajero'] ?? '') ?: 'Cajero Principal',
+                'metodo' => strtoupper($p['medio_pago'] ?: 'EFECTIVO'),
+                'numeroVoucher' => $p['numero_voucher'] ?? '',
+                'montoTotal' => (float)$p['total'],
+                'fecha' => $fecha . ' ' . ($p['hora_pago'] ?: '00:00:00'),
+                'cajero' => ($p['cajero'] ?? '') ?: 'No registrado',
             ];
         }
         foreach ($pagosInternamiento as $p) {
+            // El cobro de depósito se recibe en efectivo en el depósito; la orden solo guarda la fecha, no la hora
             $todosPagos[] = [
                 'id' => 'int_' . $p['id'],
                 'numeroRecibo' => $p['numero_recibo'],
                 'tipoPago' => 'INTERNAMIENTO',
-                'metodoPago' => 'EFECTIVO',
-                'monto' => (float)$p['total'],
-                'referencia' => $p['referencia_pago'],
-                'hora' => '12:00:00',
-                'cajero' => 'Cajero Depósito',
+                'metodo' => 'DEPÓSITO',
+                'montoTotal' => (float)$p['total'],
+                'fecha' => $fecha,
+                'cajero' => 'Depósito',
             ];
         }
 
         $totalRecaudado = 0;
-        $totalEfectivo = 0;
-        $totalTarjeta = 0;
-        $totalTransferencia = 0;
+        $porMetodo = ['efectivo' => 0, 'tarjeta' => 0];
         $porConcepto = [
             'PAPELETA' => ['tipoPago' => 'PAPELETA', 'cantidad' => 0, 'total' => 0],
             'TRAMITE' => ['tipoPago' => 'TRAMITE', 'cantidad' => 0, 'total' => 0],
@@ -742,16 +869,14 @@ class PagosController extends ResourceController
         $porCajero = [];
 
         foreach ($todosPagos as $item) {
-            $m = $item['monto'];
+            $m = $item['montoTotal'];
             $totalRecaudado += $m;
 
-            $metodo = $item['metodoPago'];
-            if (str_contains($metodo, 'TARJETA') || str_contains($metodo, 'POS') || str_contains($metodo, 'DEBITO') || str_contains($metodo, 'CREDITO')) {
-                $totalTarjeta += $m;
-            } elseif (str_contains($metodo, 'TRANS') || str_contains($metodo, 'DEPOSITO') || str_contains($metodo, 'BBVA') || str_contains($metodo, 'BN')) {
-                $totalTransferencia += $m;
+            // Solo se cobra en efectivo o con tarjeta; el depósito entra como efectivo en caja
+            if (str_contains($item['metodo'], 'TARJETA')) {
+                $porMetodo['tarjeta'] += $m;
             } else {
-                $totalEfectivo += $m;
+                $porMetodo['efectivo'] += $m;
             }
 
             $c = $item['tipoPago'];
@@ -763,10 +888,10 @@ class PagosController extends ResourceController
 
             $caj = $item['cajero'];
             if (!isset($porCajero[$caj])) {
-                $porCajero[$caj] = ['cajero' => $caj, 'operaciones' => 0, 'monto' => 0];
+                $porCajero[$caj] = ['usuario' => $caj, 'cantidad' => 0, 'total' => 0];
             }
-            $porCajero[$caj]['operaciones']++;
-            $porCajero[$caj]['monto'] += $m;
+            $porCajero[$caj]['cantidad']++;
+            $porCajero[$caj]['total'] += $m;
         }
 
         return $this->respond([
@@ -774,12 +899,10 @@ class PagosController extends ResourceController
                 'fecha' => $fecha,
                 'totalOperaciones' => count($todosPagos),
                 'totalRecaudado' => round($totalRecaudado, 2),
-                'totalEfectivo' => round($totalEfectivo, 2),
-                'totalTarjeta' => round($totalTarjeta, 2),
-                'totalTransferencia' => round($totalTransferencia, 2),
-                'porConcepto' => array_values($porConcepto),
-                'porCajero' => array_values($porCajero),
-                'detalles' => $todosPagos,
+                'porMetodo' => array_map(static fn ($v) => round($v, 2), $porMetodo),
+                'porConcepto' => array_map(static fn ($c) => ['total' => round($c['total'], 2)] + $c, array_values($porConcepto)),
+                'porCajero' => array_map(static fn ($c) => ['total' => round($c['total'], 2)] + $c, array_values($porCajero)),
+                'pagos' => $todosPagos,
             ]
         ]);
     }

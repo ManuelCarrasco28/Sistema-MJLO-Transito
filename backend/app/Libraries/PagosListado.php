@@ -50,29 +50,36 @@ SELECT pt.id, CONVERT(pt.uuid USING utf8mb4) COLLATE utf8mb4_unicode_ci AS uuid,
  WHEN pt.tipo_pago = 'TRAMITE' AND pt.id_tramite IS NOT NULL AND COALESCE(pt.referencia_pago, '') = ''
  THEN (SELECT CONCAT('Trámite ', COALESCE(NULLIF(trr.numero_expediente, ''), CONCAT('N° ', trr.id))) FROM tramites_documentarios trr WHERE trr.id = pt.id_tramite)
  ELSE pt.referencia_pago END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS referencia_pago, pt.total,
- CONVERT(pt.estado USING utf8mb4) COLLATE utf8mb4_unicode_ci AS estado
+ CONVERT(pt.estado USING utf8mb4) COLLATE utf8mb4_unicode_ci AS estado,
+ CAST(COALESCE((SELECT trf.fecha_solicitud FROM tramites_documentarios trf WHERE trf.id = pt.id_tramite),
+ (SELECT pf.fecha_hora FROM papeletas pf WHERE pf.id = pt.id_papeleta),
+ (SELECT inf.fecha_inscripcion FROM inscripciones_curso inf WHERE inf.id = pt.id_inscripcion)) AS DATE) AS fecha_registro
 FROM pagos_transito pt
 WHERE NOT (pt.estado = 'ANULADO' AND pt.tipo_pago = 'CURSO' AND COALESCE(pt.referencia_pago, '') = 'Inscripción retirada sin pago')
 UNION ALL
 SELECT oi.id AS id, NULL AS uuid, NULL AS id_papeleta, NULL AS id_tramite, NULL AS id_inscripcion, oi.id AS id_internamiento,
  'int_p_' AS prefijo, NULL AS fecha_pago, NULL AS hora_pago, 'INTERNAMIENTO' AS tipo_pago,
  NULL AS numero_recibo, NULL AS numero_voucher, 'SIN CONFIRMAR' AS medio_pago,
- CONCAT('Boleta #', oi.numero_boleta) AS referencia_pago, 0 AS total, 'PENDIENTE' AS estado
+ CONCAT('Boleta #', oi.numero_boleta) AS referencia_pago,
+ GREATEST(1, DATEDIFF(CURDATE(), DATE(oi.fecha_ingreso))) * COALESCE((SELECT CAST(cs.valor AS DECIMAL(12,2)) FROM configuracion_sistema cs WHERE cs.clave = 'tarifa_guardiania_dia'), 0) AS total, 'PENDIENTE' AS estado,
+ DATE(oi.fecha_ingreso) AS fecha_registro
 FROM ordenes_internamiento oi WHERE oi.estado = 'RETENIDO'
 UNION ALL
 SELECT ol.id AS id, NULL AS uuid, NULL AS id_papeleta, NULL AS id_tramite, NULL AS id_inscripcion, ol.id_internamiento,
  'int_l_' AS prefijo, ol.fecha_emision AS fecha_pago, NULL AS hora_pago, 'INTERNAMIENTO' AS tipo_pago,
  COALESCE(ol.numero_recibo_guardiania, ol.numero_recibo_remolque, 'VARIOS') AS numero_recibo, NULL AS numero_voucher,
- COALESCE(NULLIF(CONCAT_WS(' + ', IF(ol.monto_guardiania > 0, 'GUARDIANÍA', NULL),
+ COALESCE(NULLIF(CONCAT_WS(' + ', IF(ol.monto_guardiania > 0, 'DEPÓSITO', NULL),
  IF(ol.monto_remolque > 0, 'REMOLQUE', NULL)), ''), 'VARIOS CONCEPTOS') AS medio_pago,
- CONCAT('Orden #', ol.numero_orden) AS referencia_pago, (ol.monto_guardiania + ol.monto_remolque) AS total, 'PAGADO' AS estado
+ CONCAT('Orden #', ol.numero_orden) AS referencia_pago, (ol.monto_guardiania + ol.monto_remolque) AS total, 'PAGADO' AS estado,
+ DATE(ol.fecha_emision) AS fecha_registro
 FROM ordenes_libertad ol
 WHERE (ol.monto_guardiania + ol.monto_remolque) > 0
 UNION ALL
 SELECT p.id AS id, NULL AS uuid, p.id AS id_papeleta, NULL AS id_tramite, NULL AS id_inscripcion, NULL AS id_internamiento,
  'pap_pend_' AS prefijo, p.fecha_hora AS fecha_pago, NULL AS hora_pago, 'PAPELETA' AS tipo_pago,
  NULL AS numero_recibo, NULL AS numero_voucher, 'SIN CONFIRMAR' AS medio_pago,
- CONCAT('Papeleta N° ', p.numero_papeleta, COALESCE(CONCAT(' — ', v.placa), '')) AS referencia_pago, p.monto_total AS total, 'PENDIENTE' AS estado
+ CONCAT('Papeleta N° ', p.numero_papeleta, COALESCE(CONCAT(' — ', v.placa), '')) AS referencia_pago, p.monto_total AS total, 'PENDIENTE' AS estado,
+ DATE(p.fecha_hora) AS fecha_registro
 FROM papeletas p LEFT JOIN vehiculos v ON v.id = p.id_vehiculo
 WHERE p.estado = 'PENDIENTE_PAGO' AND NOT EXISTS
  (SELECT 1 FROM pagos_transito pt WHERE pt.id_papeleta = p.id AND pt.estado <> 'ANULADO')
@@ -81,7 +88,8 @@ SELECT i.id AS id, NULL AS uuid, NULL AS id_papeleta, NULL AS id_tramite, i.id A
  'cur_pend_' AS prefijo, i.fecha_inscripcion AS fecha_pago, NULL AS hora_pago, 'CURSO' AS tipo_pago,
  NULL AS numero_recibo, NULL AS numero_voucher, 'SIN CONFIRMAR' AS medio_pago,
  CONCAT('Curso ', cu.nombre, ' — ', COALESCE(ci.nombres, ''), ' ', COALESCE(ci.apellido_paterno, '')) AS referencia_pago,
- cu.costo_inscripcion AS total, 'PENDIENTE' AS estado
+ cu.costo_inscripcion AS total, 'PENDIENTE' AS estado,
+ DATE(i.fecha_inscripcion) AS fecha_registro
 FROM inscripciones_curso i JOIN cursos_seguridad_vial cu ON cu.id = i.id_curso
 LEFT JOIN ciudadanos ci ON ci.id_persona = i.id_persona
 WHERE i.estado_pago = 'PENDIENTE' AND cu.costo_inscripcion > 0 AND i.estado NOT IN ('ANULADO','CANCELADO')

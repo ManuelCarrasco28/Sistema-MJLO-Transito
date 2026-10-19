@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fechaLocalActual } from '../utils/calendarioCurso'
 import { showToast, showConfirm, showError, showSuccess } from '../utils/SwalUtil'
 import { Icon } from '../components/ui/Icon'
+import { Cargando } from '../components/ui/Cargando'
+import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
+import { ArqueoCajaPrint } from '../components/pagos/ArqueoCajaPrint'
+import { CobrarConDepositoModal } from '../components/pagos/CobrarConDepositoModal'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PapeletaDetalleModal } from '../components/papeletas/PapeletaDetalleModal'
 import { PapeletaOficialPrint } from '../components/papeletas/PapeletaOficialPrint'
@@ -10,13 +15,15 @@ import { PageLoadError } from '../components/ui/PageLoadError'
 import { useQuickCreate } from '../hooks/useQuickCreate'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
-import { sanitizarMensaje, apiFetch, getCachedData, setCachedData } from '../config/api'
+import { sanitizarMensaje, leerMensajeError, apiFetch, getCachedData, setCachedData } from '../config/api'
 import { exportToExcel } from '../utils/exportToExcel'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { formatNumeroTarjeta } from '../utils/formatters'
 import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { puedeEliminarRegistros } from '../config/roles'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los estados' },
@@ -34,16 +41,24 @@ const FILTER_TIPO_OPTIONS = [
   { value: 'TODOS', label: 'Todos los tipos' },
   { value: 'PAPELETA', label: 'Papeletas' },
   { value: 'TRAMITE', label: 'Trámites' },
+  { value: 'CERTICAV', label: 'CERTICAV' },
   { value: 'CURSO', label: 'Cursos' },
-  { value: 'INTERNAMIENTO', label: 'Internamientos' },
+  { value: 'INTERNAMIENTO', label: 'Depósitos' },
 ]
 
 export function Pagos() {
+  const navigate = useNavigate()
   const cached = getCachedData('/pagos')
   const [pagos, setPagos] = useState(cached || [])
   const [isLoading, setIsLoading] = useState(!cached)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  // Desde otros módulos (p. ej. CERTICAV por cobrar) se llega con ?search=EXP-000001 ya filtrado
+  const busquedaInicial = new URLSearchParams(window.location.search).get('search') || ''
+  const [searchTerm, setSearchTerm] = useState(busquedaInicial)
+  const [debouncedSearch, setDebouncedSearch] = useState(busquedaInicial)
+
+  useEffect(() => {
+    if (busquedaInicial) window.history.replaceState(null, '', '/pagos')
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -70,6 +85,8 @@ export function Pagos() {
   const [isSaving, setIsSaving] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+  // Cobro de una papeleta con vehículo en el depósito (papeleta + depósito en un recibo, y se libera el vehículo)
+  const [cobroConDeposito, setCobroConDeposito] = useState(null)
   const [selectedPago, setSelectedPago] = useState(null)
   const [papeletaVista, setPapeletaVista] = useState(null)
   const [papeletaFotos, setPapeletaFotos] = useState([])
@@ -171,19 +188,29 @@ export function Pagos() {
   }
 
   const handleSeleccionarDeuda = (deuda) => {
-    setFormData({ ...formData, tipoPago: deuda.tipoPago, origenId: String(deuda.id) })
+    setFormData({ ...formData, tipoPago: deuda.tipoPago, origenId: String(deuda.id), pagadoPorNombre: deudaPersona?.nombre || '', pagadoPorDocumento: deudaPersona?.dni || '' })
+  }
+
+  // Con el DNI se busca primero en el padrón del sistema y, si no está, en RENIEC; con un RUC, en SUNAT.
+  // Una papeleta con el vehículo en el depósito se cobra con el depósito y se libera; si no hay internamiento
+  // retenido, el modal avisa y se sigue con el cobro simple de siempre (`sinDeposito`).
+  const cobrarPapeletaConDeposito = (pago, accion) => {
+    const numeroPapeleta = (String(pago.referenciaPago || '').match(/\d{4,}/) || [])[0]
+    setCobroConDeposito({ papeletaId: pago.papeletaId || pago.origenId, numeroPapeleta, pago, accion })
   }
 
   const handleConfirm = (pago) => {
+    if (pago.tipoPago === 'PAPELETA' && !pago.sinDeposito) { cobrarPapeletaConDeposito(pago, handleConfirm); return }
     setPagoToConfirm(pago)
-    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', fechaPago: fechaLocalActual() })
+    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', fechaPago: fechaLocalActual(), pagadoPorNombre: pago.pagadoPor || '', pagadoPorDocumento: pago.pagadoPorDocumento || pago.titularDocumento || '' })
     setIsModalOpen(true)
   }
 
   // Abrir el cobro pendiente con el origen ya seleccionado.
   const handleGenerarRecibo = (pago) => {
+    if (pago.tipoPago === 'PAPELETA' && !pago.sinDeposito) { cobrarPapeletaConDeposito(pago, handleGenerarRecibo); return }
     setPagoToConfirm(null)
-    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: String(pago.origenId), fechaPago: fechaLocalActual() })
+    setFormData({ numeroRecibo: '', tipoPago: pago.tipoPago, metodo: 'EFECTIVO', numeroVoucher: '', referenciaPago: '', origenId: String(pago.origenId), fechaPago: fechaLocalActual(), pagadoPorNombre: pago.pagadoPor || '', pagadoPorDocumento: pago.titularDocumento || '' })
     setDeudaDni('')
     setDeudaPersona(null)
     setDeudaLista([])
@@ -240,11 +267,13 @@ export function Pagos() {
     setIsSaving(true)
     try {
       const key = { PAPELETA: 'papeletaId', TRAMITE: 'tramiteId', CURSO: 'inscripcionId' }[formData.tipoPago]
+      // El cobro queda a nombre del titular del trámite
+      const datosPagador = { pagadoPorNombre: '', pagadoPorDocumento: '' }
       const response = await apiFetch(pagoToConfirm ? `/pagos/${pagoToConfirm.id}/confirmar` : '/pagos', {
         method: 'POST',
         body: pagoToConfirm
-          ? { ...formData, metodoPago: formData.metodo }
-          : { tipoPago: formData.tipoPago, [key]: Number(formData.origenId), ...formData, metodoPago: formData.metodo }
+          ? { ...formData, ...datosPagador, metodoPago: formData.metodo }
+          : { tipoPago: formData.tipoPago, [key]: Number(formData.origenId), ...formData, ...datosPagador, metodoPago: formData.metodo }
       })
       const result = await response.json()
       if (!response.ok) throw new Error(Object.values(result.messages || {}).join(' ') || result.message || 'No se pudo guardar el pago.')
@@ -313,7 +342,7 @@ export function Pagos() {
           { header: 'N° RECIBO', key: 'numeroRecibo', isText: true, width: 140 },
           { header: 'FECHA PAGO', render: (_, r) => r.fecha ? new Date(r.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente', width: 110 },
           { header: 'TIPO PAGO', key: 'tipoPago', width: 130 },
-          { header: 'PAGADO POR', render: (_, r) => r.pagadoPor || '—', width: 180 },
+          { header: 'A NOMBRE DE', render: (_, r) => r.pagadoPor || 'No identificado', width: 180 },
           { header: 'N° OPERACIÓN', key: 'numeroVoucher', isText: true, width: 140 },
           { header: 'REFERENCIA', key: 'referenciaPago', width: 160 },
           { header: 'MÉTODO DE PAGO', key: 'metodo', width: 120 },
@@ -339,11 +368,10 @@ export function Pagos() {
       subtitle: 'Municipalidad Distrital José Leonardo Ortiz - Subgerencia de Tránsito',
       metadata: [
         { label: 'Fecha Cierre', value: arqueoData.fecha },
-        { label: 'Total Recaudado', value: `S/ ${arqueoData.totalRecaudado.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
-        { label: 'Efectivo', value: `S/ ${(arqueoData.porMetodo?.efectivo || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
-        { label: 'Tarjeta', value: `S/ ${(arqueoData.porMetodo?.tarjeta || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
-        { label: 'Transferencia', value: `S/ ${(arqueoData.porMetodo?.transferencia || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` },
-        { label: 'Total Operaciones', value: String(arqueoData.totalOperaciones || 0) }
+        { label: 'Total Recaudado', value: `S/ ${arqueoData.totalRecaudado.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+        { label: 'Efectivo', value: `S/ ${(arqueoData.porMetodo?.efectivo || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+        { label: 'Tarjeta', value: `S/ ${(arqueoData.porMetodo?.tarjeta || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+                { label: 'Total Operaciones', value: String(arqueoData.totalOperaciones || 0) }
       ],
       columns: [
         { header: 'N° RECIBO', key: 'numeroRecibo', isText: true, width: 140 },
@@ -352,7 +380,7 @@ export function Pagos() {
         { header: 'N° OPERACIÓN', key: 'numeroVoucher', isText: true, width: 130 },
         { header: 'MÉTODO DE PAGO', key: 'metodo', width: 120 },
         { header: 'CAJERO / OPERADOR', key: 'cajero', width: 180 },
-        { header: 'IMPORTE (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 120 }
+        { header: 'IMPORTE (S/)', render: (_, r) => `S/ ${(r.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, align: 'right', width: 120 }
       ],
       data: arqueoData.pagos
     })
@@ -383,11 +411,17 @@ export function Pagos() {
     window.print()
   }
 
-  const handlePrintArqueo = () => {
-    document.body.setAttribute('data-print-orientation', 'landscape')
-    document.body.classList.add('is-printing-landscape')
-    window.print()
-  }
+  // El arqueo se imprime como una hoja A4 propia (portal en <body>), no la pantalla de Pagos con el modal encima
+  const [imprimiendoArqueo, setImprimiendoArqueo] = useState(false)
+  const handlePrintArqueo = () => setImprimiendoArqueo(true)
+  useEffect(() => {
+    if (!imprimiendoArqueo) return undefined
+    const t = setTimeout(() => {
+      window.print()
+      setImprimiendoArqueo(false)
+    }, 150)
+    return () => clearTimeout(t)
+  }, [imprimiendoArqueo])
 
   const [filterEstado, setFilterEstado] = useState('TODOS')
   const [totalFiltrado, setTotalFiltrado] = useState(0)
@@ -425,6 +459,8 @@ export function Pagos() {
     loadPagos()
     return () => cargaPagos.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterTipoPago, filterEstado, filterMetodo, sortBy, sortDir])
+
+  useRecargaSilenciosa('/pagos', [() => loadPagos(), () => loadStats()])
 
   const loadStats = () => {
     apiFetch('/pagos/estadisticas')
@@ -523,8 +559,8 @@ export function Pagos() {
         <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-100 p-3 dark:border-[var(--border)]">
           <div className="relative min-w-[340px] flex-1">
             <Icon
-              name={isLoading ? "refresh" : "search"}
-              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-emerald-500' : 'text-slate-400'}`}
+              name="search"
+              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors text-slate-400`}
             />
             <input
               type="text"
@@ -627,23 +663,25 @@ export function Pagos() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] table-fixed text-left text-xs">
+          <table className="w-full min-w-[1180px] table-fixed text-left text-xs">
             <colgroup>
-              <col className="w-[12%]" />
+              <col className="w-[11%]" />
               <col className="w-[10%]" />
-              <col className="w-[19%]" />
-              <col className="w-[18%]" />
-              <col className="w-[10%]" />
+              <col className="w-[11%]" />
+              <col className="w-[14%]" />
+              <col className="w-[17%]" />
+              <col className="w-[9%]" />
+              <col className="w-[9%]" />
               <col className="w-[9%]" />
               <col className="w-[10%]" />
-              <col className="w-[12%]" />
             </colgroup>
             <thead className="bg-slate-50/75 dark:bg-[var(--bg-subtle)] text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="numeroRecibo" label="N° RECIBO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="fecha" label="FECHA DE PAGO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
-                <th className="px-4 py-3.5 whitespace-nowrap">CONCEPTO / REFERENCIA</th>
-                <th className="px-4 py-3.5">PAGADO POR</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">CONCEPTO</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">REFERENCIA</th>
+                <th className="px-4 py-3.5">A NOMBRE DE</th>
                 <th className="px-4 py-3.5 whitespace-nowrap"><SortableHeader column="metodoPago" label="MÉTODO" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} /></th>
                 <th className="px-4 py-3.5 whitespace-nowrap text-center"><SortableHeader column="montoTotal" label="MONTO TOTAL" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="center" /></th>
                 <th className="px-4 py-3.5 text-center">ESTADO</th>
@@ -652,46 +690,71 @@ export function Pagos() {
             </thead>
             <tbody className={`divide-y divide-slate-100 bg-white dark:divide-slate-800/50 dark:bg-[#1C2438] transition-opacity ${isLoading && pagos.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && pagos.length === 0 ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-4 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-4 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-4 py-4"><div className="h-4 w-40 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-4 py-4">
-                      <div className="space-y-1.5">
-                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                      </div>
-                    </td>
-                    <td className="px-4 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-4 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-4 py-4"><div className="h-5 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="bg-white dark:bg-[#1C2438] px-4 py-4 text-right border-l border-slate-100 dark:border-[var(--border)]"><div className="h-7 w-20 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                  </tr>
-                ))
+                <FilaCargando colSpan={9} />
               ) : filteredPagos.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="p-12 text-center">
+                  <td colSpan="9" className="p-12 text-center">
                     <Icon name="payment" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
                     <p className="font-bold text-slate-600 dark:text-slate-300">No se encontraron pagos registrados</p>
                   </td>
                 </tr>
               ) : (
                 paginatedPagos.map((p) => (
-                  <tr key={p.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-[var(--bg-subtle)]">
+                  <tr key={p.id} className="group align-middle transition-colors hover:bg-emerald-50/30 dark:hover:bg-[var(--bg-subtle)]">
                     <td className="px-4 py-3.5">
-                      <p className="font-bold text-xs text-slate-900 dark:text-white">{p.numeroRecibo || 'Pendiente de recibo'}</p>
+                      {p.numeroRecibo
+                        ? <p className="font-mono text-xs font-bold text-slate-900 dark:text-white">{p.numeroRecibo}</p>
+                        : <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">Sin recibo aún</p>}
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-medium text-xs text-slate-800 dark:text-slate-200">{p.fecha && p.estado !== 'PENDIENTE' ? new Date(String(p.fecha).slice(0, 10) + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sin fecha de pago'}</p>
+                      {p.fecha && p.estado !== 'PENDIENTE' ? (
+                        <>
+                          <p className="font-medium text-xs text-slate-800 dark:text-slate-200">{new Date(String(p.fecha).slice(0, 10) + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
+                          {p.horaPago && <p className="font-mono text-[11px] text-slate-400 dark:text-slate-500">{String(p.horaPago).slice(0, 5)}</p>}
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">Sin pagar</p>
+                          {p.fechaRegistro && (
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500">Desde el {new Date(String(p.fechaRegistro).slice(0, 10) + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
+                          )}
+                        </>
+                      )}
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-semibold text-xs text-slate-900 dark:text-white">{p.tipoPago || 'TRAMITE'}</p>
-                      {(p.papeletaId || p.inscripcionId || p.tramiteId || p.internamientoId) ? <button type="button" onClick={() => abrirOrigenPago(p)} disabled={cargandoPapeleta !== null || cargandoOrigen !== null} title="Ver registro relacionado" className="mt-1 text-left text-[11px] leading-snug text-sky-700 dark:text-sky-300 hover:underline focus-visible:outline-2 focus-visible:outline-sky-500 disabled:opacity-60 break-words">{(cargandoPapeleta === p.id || cargandoOrigen === p.id) ? 'Cargando…' : p.referenciaPago}</button> : <p className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400 break-words">{p.referenciaPago || ''}</p>}
+                      {(() => {
+                        const tipo = p.esCerticav ? 'CERTICAV' : (p.tipoPago || 'TRAMITE')
+                        const color = {
+                          CERTICAV: 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300',
+                          TRAMITE: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300',
+                          PAPELETA: 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300',
+                          CURSO: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
+                          INTERNAMIENTO: 'bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
+                        }[tipo] || 'bg-slate-100 text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300'
+                        const etiqueta = tipo === 'TRAMITE' ? 'Trámite' : tipo === 'INTERNAMIENTO' ? 'Depósito' : tipo
+                        const clases = `inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${color}`
+                        // La etiqueta abre el registro relacionado (antes se mostraba su referencia debajo)
+                        return (p.papeletaId || p.inscripcionId || p.tramiteId || p.internamientoId)
+                          ? <button type="button" onClick={() => abrirOrigenPago(p)} disabled={cargandoPapeleta !== null || cargandoOrigen !== null} title="Ver registro relacionado" className={`${clases} cursor-pointer outline-none transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-60`}>{(cargandoPapeleta === p.id || cargandoOrigen === p.id) ? 'Cargando' : etiqueta}</button>
+                          : <span className={clases}>{etiqueta}</span>
+                      })()}
                       {p.numeroVoucher && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Operación: {p.numeroVoucher}</p>}
                     </td>
                     <td className="px-4 py-3.5">
-                      <p className="font-medium text-xs leading-relaxed text-slate-800 dark:text-slate-200 break-words">{p.pagadoPor || ''}</p>
+                      {(() => {
+                        const texto = String(p.referenciaPago || '')
+                        const codigo = (texto.match(/EXP-\d+/) || texto.match(/LIB-\d+/) || texto.match(/N°\s*(\S+)/) || [])[0]
+                        const corto = p.tipoPago === 'CURSO' ? texto.replace(/^Curso\s+/i, '').split(' — ')[0] : (codigo || texto.replace(/^[^\d#]*/, '') || '—')
+                        return (
+                          <>
+                            <p className={`text-xs font-semibold text-slate-700 dark:text-slate-200 break-words ${p.tipoPago === 'CURSO' ? 'leading-snug' : 'font-mono'}`}>{corto}</p>
+                            {p.placa && <div className="mt-1"><PlacaVehiculo placa={p.placa} size="sm" /></div>}
+                          </>
+                        )
+                      })()}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <p className="font-medium text-xs leading-relaxed text-slate-800 dark:text-slate-200 break-words">{p.pagadoPor || <span className="text-slate-400">No identificado</span>}</p>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${p.metodo === 'EFECTIVO'
@@ -704,7 +767,7 @@ export function Pagos() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                      <p className="font-black text-xs text-slate-900 dark:text-white">
+                      <p className="font-black text-xs tabular-nums text-slate-900 dark:text-white">
                         S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </td>
@@ -730,13 +793,24 @@ export function Pagos() {
                               <button
                                 type="button"
                                 onClick={() => handleConfirm(p)}
-                                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-300/90 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 shadow-2xs transition-all hover:bg-emerald-600 hover:border-emerald-600 hover:text-white dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-600 dark:hover:text-white active:scale-95 whitespace-nowrap cursor-pointer shrink-0"
-                                title="Confirmar recibo de pago"
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300/90 bg-amber-50 px-2.5 text-xs font-bold text-amber-700 shadow-2xs transition-all hover:bg-amber-500 hover:border-amber-500 hover:text-white dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-600 dark:hover:text-white active:scale-95 whitespace-nowrap cursor-pointer shrink-0"
+                                title="Cobrar y generar el recibo"
                               >
-                                <Icon name="receiptCheck" className="size-3.5" />
-                                <span>Confirmar</span>
+                                <Icon name="payment" className="size-3.5" />
+                                <span>Cobrar</span>
                               </button>
                             )
+                        )}
+                        {p.estado === 'PENDIENTE' && p.tipoPago === 'INTERNAMIENTO' && (
+                          <button
+                            type="button"
+                            onClick={() => setCobroConDeposito({ internamientoId: p.internamientoId })}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300/90 bg-amber-50 px-2.5 text-xs font-bold text-amber-700 shadow-2xs transition-all hover:bg-amber-500 hover:border-amber-500 hover:text-white dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-600 dark:hover:text-white active:scale-95 whitespace-nowrap cursor-pointer shrink-0"
+                            title="Cobrar la papeleta y el depósito, y liberar el vehículo"
+                          >
+                            <Icon name="payment" className="size-3.5" />
+                            <span>Cobrar</span>
+                          </button>
                         )}
                         </div>
                         {p.estado === 'PAGADO' && <button disabled={p.estado !== 'PAGADO'} onClick={() => { setSelectedPago(p); setIsPreviewModalOpen(true); }} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" title={p.estado === 'PAGADO' ? 'Imprimir recibo' : 'Solo se pueden imprimir pagos confirmados'} aria-label="Imprimir recibo">
@@ -766,30 +840,40 @@ export function Pagos() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget) e.currentTarget.dataset.downOnOverlay = "1" }} onMouseUp={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.downOnOverlay === "1") setIsModalOpen(false); e.currentTarget.dataset.downOnOverlay = "" }}>
-          <div className="flex w-full max-w-2xl flex-col rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
+          <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3.5 dark:border-[var(--border)] dark:bg-[#1C2438] rounded-t-3xl">
               <div className="flex items-center gap-2.5">
                 <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="payment" className="size-4" />
                 </span>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">{pagoToConfirm ? 'Confirmar recibo de pago' : 'Registrar Pago'}</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">{pagoToConfirm ? 'Cobrar pago' : 'Registrar Pago'}</h3>
               </div>
               <BotonCerrarModal onClick={() => setIsModalOpen(false)} title="Cerrar" />
             </div>
-            <form onSubmit={handleFormSubmit} className="flex flex-col rounded-b-3xl">
-              <div className="space-y-6 p-8 min-h-[400px]">
+            <form onSubmit={handleFormSubmit} className="flex min-h-0 flex-1 flex-col rounded-b-3xl">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 sm:p-6">
                 {pagoToConfirm ? (
-                  <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
+                  <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
                     <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">DETALLES DEL RECIBO</legend>
-                    <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                    <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                       <p className="font-black text-emerald-700 dark:text-emerald-300 text-lg">Monto: S/ {pagoToConfirm.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                       <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{pagoToConfirm.referenciaPago}</p>
+                      <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-emerald-200/70 pt-2 text-[11px] sm:grid-cols-2 dark:border-emerald-900/50">
+                        {[
+                          ['Concepto', pagoToConfirm.concepto, 'sm:col-span-2'],
+                          ['Placa', pagoToConfirm.placa],
+                          ['Asociación', pagoToConfirm.asociacion],
+                          ['A nombre de', pagoToConfirm.titular || pagoToConfirm.pagadoPor],
+                          ['Pendiente desde', pagoToConfirm.fechaRegistro ? new Date(String(pagoToConfirm.fechaRegistro).slice(0, 10) + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null],
+                        ].filter(([, valor]) => valor).map(([etiqueta, valor, ancho]) => (
+                          <div key={etiqueta} className={ancho || ''}>
+                            <dt className="font-semibold uppercase tracking-wider text-emerald-700/70 dark:text-emerald-400/70">{etiqueta}</dt>
+                            <dd className="font-bold text-emerald-800 dark:text-emerald-200">{valor}</dd>
+                          </div>
+                        ))}
+                      </dl>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="sm:col-span-2">
-                        <FloatingInput id="pago_recibo" label="Número de recibo" optional maxLength={50} value={formData.numeroRecibo} onChange={e => setFormData({ ...formData, numeroRecibo: e.target.value })} />
-                        <p className="mt-1 text-[10.5px] text-slate-400">Si lo dejas vacío, el sistema le asigna uno automáticamente. Solo llénalo si usas un talonario físico propio.</p>
-                      </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <FloatingInput id="pago_fecha" label="Fecha que figura en el recibo" required type="date" value={formData.fechaPago} onChange={e => setFormData({ ...formData, fechaPago: e.target.value })} />
                       <FloatingSelect
                         id="pago_metodo"
@@ -802,13 +886,13 @@ export function Pagos() {
                         ]}
                       />
                       {formData.metodo !== 'EFECTIVO' && (
-                        <FloatingInput id="pago_operacion" label="N° de operación" required maxLength={50} value={formData.numeroVoucher} onChange={e => setFormData({ ...formData, numeroVoucher: e.target.value })} />
+                        <FloatingInput id="pago_operacion" className="sm:col-span-2" label="N° de operación" required maxLength={50} value={formData.numeroVoucher} onChange={e => setFormData({ ...formData, numeroVoucher: e.target.value })} />
                       )}
                     </div>
                   </fieldset>
                 ) : (
                   <>
-                    <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
+                    <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
                       <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">{origenPreseleccionado ? 'Datos del registro a cobrar' : 'Buscar deudas de una persona'}</legend>
                       {!origenPreseleccionado && <>
                       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3">Busca por DNI para ver todas sus papeletas, trámites y cursos pendientes de pago, y elige cuál cobrar.</p>
@@ -892,7 +976,7 @@ export function Pagos() {
                     </fieldset>
 
                     {formData.origenId && (
-                      <fieldset className="rounded-xl border border-slate-200 p-5 dark:border-[var(--border-strong)]">
+                      <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
                         <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Datos del pago recibido</legend>
                         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-4">El número de recibo lo asigna el sistema automáticamente.</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -919,7 +1003,7 @@ export function Pagos() {
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-7 py-4 dark:border-[var(--border)]">
                 <BotonCancelar onClick={() => setIsModalOpen(false)} />
                 <BotonGuardar disabled={isSaving}>
-                  {isSaving ? 'Guardando…' : pagoToConfirm ? 'Confirmar recibo' : 'Generar pago'}
+                  {isSaving ? 'Guardando…' : pagoToConfirm ? 'Cobrar y generar recibo' : 'Generar pago'}
                 </BotonGuardar>
               </div>
             </form>
@@ -939,9 +1023,9 @@ export function Pagos() {
             <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
               <p><strong>Fecha:</strong> {selectedPago.fecha ? new Date(selectedPago.fecha + 'T00:00:00').toLocaleDateString() : 'Pendiente'}</p>
               <p><strong>Tipo de pago:</strong> {selectedPago.tipoPago || 'TRAMITE'}</p>
-              <p><strong>Pagado por:</strong> {selectedPago.pagadoPor || 'No identificado'}</p>
+              <p><strong>Pagado por:</strong> {selectedPago.pagadoPor || 'No identificado'}{selectedPago.pagadoPorDocumento ? ` (${selectedPago.pagadoPorDocumento})` : ''}</p>
               <p><strong>Método de Pago:</strong> {selectedPago.metodo}</p>
-              <p><strong>N° de operación:</strong> {selectedPago.numeroVoucher || '—'}</p>
+              {selectedPago.metodo === 'TARJETA' && <p><strong>N° de operación:</strong> {selectedPago.numeroVoucher || '—'}</p>}
               <p><strong>Referencia:</strong> {selectedPago.referenciaPago || 'Sin referencia'}</p>
               <p className="text-emerald-600 font-bold dark:text-emerald-400"><strong>Monto ({selectedPago.estado}):</strong> S/ {selectedPago.montoTotal?.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
             </div>
@@ -956,22 +1040,46 @@ export function Pagos() {
       {isPreviewModalOpen && selectedPago && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-enter print:static print:block print:p-0 print:bg-transparent">
           <div id="seccion-impresion-ticket" className="w-full max-w-[330px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-100 p-5 text-center text-slate-900 font-mono text-xs print:rounded-none print:shadow-none print:p-1.5 print:max-w-full">
-            <h4 className="font-bold text-sm mb-1">MUNICIPALIDAD DISTRITAL JLO</h4>
-            <p className="mb-4">CONSTANCIA INTERNA DE PAGO</p>
-            <p className="text-left"><strong>N° REGISTRADO:</strong> {selectedPago.numeroRecibo || '—'}</p>
-            <p className="text-left"><strong>FECHA REGISTRADA:</strong> {selectedPago.fecha ? String(selectedPago.fecha).slice(0, 10) : '—'}</p>
-            <div className="my-4 border-y border-dashed border-slate-400 py-2 text-left">
-              <p className="font-bold mb-1">TIPO: {selectedPago.tipoPago || 'TRAMITE'}</p>
-              <p className="break-words">CONCEPTO: {selectedPago.referenciaPago || '—'}</p>
-              <p>PAGADO POR: {selectedPago.pagadoPor || 'No identificado'}</p>
-              <p>N° OPERACIÓN: {selectedPago.numeroVoucher || '---'}</p>
-              {selectedPago.tipoPago === 'INTERNAMIENTO'
-                ? <><p>CONCEPTOS: {selectedPago.metodo || '—'}</p><p>MÉTODO: No registrado por separado</p></>
-                : <p>MÉTODO: {selectedPago.metodo || '—'}</p>}
-            </div>
-            <div className="text-right text-sm">
-              <p><strong>TOTAL: S/ {selectedPago.montoTotal?.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong></p>
-            </div>
+            <h4 className="font-bold text-sm mb-0.5">MUNICIPALIDAD DISTRITAL JLO</h4>
+            <p className="text-[10px]">SUBGERENCIA DE TRÁNSITO</p>
+            <p className="mb-4 mt-1 font-bold">CONSTANCIA DE PAGO</p>
+            {(() => {
+              const t = selectedPago
+              const esInternamiento = t.tipoPago === 'INTERNAMIENTO'
+              const tipo = t.esCerticav ? 'CERTICAV' : ({ TRAMITE: 'TRÁMITE', PAPELETA: 'PAPELETA', CURSO: 'CURSO', INTERNAMIENTO: 'DEPÓSITO' }[t.tipoPago] || t.tipoPago || 'TRÁMITE')
+              const fecha = t.fecha ? new Date(String(t.fecha).slice(0, 10) + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
+              const hora = t.horaPago ? ` ${String(t.horaPago).slice(0, 5)}` : ''
+              const aNombre = t.titular || t.pagadoPor
+              const pagadoPorOtro = t.pagadoPor && t.titular && t.pagadoPor !== t.titular
+              const filas = [
+                ['N° RECIBO', t.numeroRecibo || '—'],
+                ['FECHA', `${fecha}${hora}`],
+              ]
+              const detalle = [
+                ['TIPO', tipo],
+                t.concepto && ['CONCEPTO', t.concepto],
+                ['REFERENCIA', t.referenciaPago || '—'],
+                t.placa && ['PLACA', t.placa],
+                t.asociacion && ['ASOCIACIÓN', t.asociacion],
+                ['A NOMBRE DE', `${aNombre || 'No identificado'}${!pagadoPorOtro && t.pagadoPorDocumento ? ` (${t.pagadoPorDocumento})` : ''}`],
+                pagadoPorOtro && ['PAGADO POR', `${t.pagadoPor}${t.pagadoPorDocumento ? ` (${t.pagadoPorDocumento})` : ''}`],
+                esInternamiento ? ['CONCEPTOS', t.metodo || '—'] : ['MÉTODO', t.metodo || '—'],
+                // El N° de operación solo existe en los cobros con tarjeta
+                !esInternamiento && t.metodo === 'TARJETA' && t.numeroVoucher && ['N° OPERACIÓN', t.numeroVoucher],
+                t.cajero && ['CAJERO', t.cajero],
+              ].filter(Boolean)
+              return (
+                <>
+                  {filas.map(([k, v]) => <p key={k} className="text-left"><strong>{k}:</strong> {v}</p>)}
+                  <div className="my-4 space-y-0.5 border-y border-dashed border-slate-400 py-2 text-left">
+                    {detalle.map(([k, v]) => <p key={k} className="break-words"><strong>{k}:</strong> {v}</p>)}
+                  </div>
+                  <div className="text-right text-sm">
+                    <p><strong>TOTAL: S/ {Number(t.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></p>
+                  </div>
+                </>
+              )
+            })()}
             <p className="mt-4 text-left text-[10px] leading-tight">Esta constancia muestra lo registrado en el sistema. No sustituye un comprobante oficial emitido por el SAT.</p>
             <div className="mt-8 pt-4 border-t border-slate-300 flex justify-between print:hidden">
               <button onClick={handlePrintTicket} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-sans font-bold hover:bg-emerald-700 cursor-pointer">Imprimir Ticket</button>
@@ -980,6 +1088,23 @@ export function Pagos() {
           </div>
         </div>
       )}
+
+      {cobroConDeposito && (
+        <CobrarConDepositoModal
+          papeletaId={cobroConDeposito.papeletaId}
+          numeroPapeleta={cobroConDeposito.numeroPapeleta}
+          internamientoId={cobroConDeposito.internamientoId}
+          onClose={() => setCobroConDeposito(null)}
+          onSinInternamiento={() => {
+            const { pago, accion } = cobroConDeposito
+            setCobroConDeposito(null)
+            if (pago && accion) accion({ ...pago, sinDeposito: true })
+          }}
+          onPagado={() => { loadPagos(); loadStats() }}
+        />
+      )}
+
+      {imprimiendoArqueo && arqueoData && <ArqueoCajaPrint data={arqueoData} />}
 
       {/* MODAL DE ARQUEO Y CIERRE DE CAJA DIARIO */}
       {isArqueoModalOpen && (
@@ -1026,10 +1151,7 @@ export function Pagos() {
             {/* Contenido scrolleable */}
             <div className="flex-1 space-y-6 overflow-y-auto p-6 print:overflow-visible print:p-0">
               {isLoadingArqueo ? (
-                <div className="py-16 text-center">
-                  <div className="inline-block size-8 animate-spin rounded-full border-4 border-purple-600 border-t-transparent"></div>
-                  <p className="mt-3 text-xs font-bold text-slate-500">Calculando balance de caja...</p>
-                </div>
+                <Cargando className="py-16" />
               ) : !arqueoData ? (
                 <div className="py-12 text-center text-slate-500">
                   <p className="text-sm">No se pudieron cargar los datos del arqueo.</p>
@@ -1037,14 +1159,14 @@ export function Pagos() {
               ) : (
                 <>
                   {/* Tarjetas de Balance */}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-2 print:gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-4">
                     <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/60 dark:bg-purple-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
                       <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 print:text-black">
                         <span>Total Recaudado</span>
                         <Icon name="payment" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
-                        S/ {Number(arqueoData.totalRecaudado || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        S/ {Number(arqueoData.totalRecaudado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       <span className="mt-1 inline-block rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900 dark:text-purple-300 print:bg-transparent print:p-0 print:text-black font-mono">
                         {arqueoData.totalOperaciones} operaciones
@@ -1057,38 +1179,26 @@ export function Pagos() {
                         <Icon name="payment" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
-                        S/ {Number(arqueoData.porMetodo?.efectivo || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        S/ {Number(arqueoData.porMetodo?.efectivo || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 print:text-black font-mono">
-                        Caja física para custodia
+                        Caja física, incluye depósito
                       </p>
                     </div>
 
                     <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-900/60 dark:bg-sky-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
                       <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 print:text-black">
-                        <span>Tarjetas (POS)</span>
+                        <span>Tarjetas</span>
                         <Icon name="creditCard" className="size-3.5 print:hidden" />
                       </div>
                       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
-                        S/ {Number(arqueoData.porMetodo?.tarjeta || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        S/ {Number(arqueoData.porMetodo?.tarjeta || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 print:text-black font-mono">
-                        Liquidación electrónica
+                        Cobros con tarjeta
                       </p>
                     </div>
 
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30 print:bg-transparent print:border-slate-400 print:rounded-none print:p-3">
-                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 print:text-black">
-                        <span>Transferencias</span>
-                        <Icon name="building" className="size-3.5 print:hidden" />
-                      </div>
-                      <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white print:text-black print:text-lg">
-                        S/ {Number(arqueoData.porMetodo?.transferencia || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                      </p>
-                      <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 print:text-black font-mono">
-                        Banco de la Nación / Cta Cte
-                      </p>
-                    </div>
                   </div>
 
                   {/* Tablas de Desglose */}
@@ -1115,10 +1225,10 @@ export function Pagos() {
                             ) : (
                               arqueoData.porConcepto?.map((c, i) => (
                                 <tr key={i} className="hover:bg-white/60 dark:hover:bg-slate-800/30">
-                                  <td className="py-2 font-bold text-slate-800 dark:text-slate-200 print:text-black">{c.tipoPago}</td>
+                                  <td className="py-2 font-bold text-slate-800 dark:text-slate-200 print:text-black">{{ TRAMITE: 'Trámite', PAPELETA: 'Papeleta', CURSO: 'Curso', INTERNAMIENTO: 'Depósito' }[c.tipoPago] || c.tipoPago}</td>
                                   <td className="py-2 text-center text-slate-600 dark:text-slate-400 print:text-black">{c.cantidad}</td>
                                   <td className="py-2 text-right font-black text-slate-900 dark:text-white print:text-black">
-                                    S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                               ))
@@ -1153,7 +1263,7 @@ export function Pagos() {
                                   <td className="py-2 font-bold text-slate-800 dark:text-slate-200 print:text-black">{c.usuario}</td>
                                   <td className="py-2 text-center text-slate-600 dark:text-slate-400 print:text-black">{c.cantidad}</td>
                                   <td className="py-2 text-right font-black text-emerald-600 dark:text-emerald-400 print:text-black">
-                                    S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    S/ {Number(c.total || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                               ))
@@ -1201,7 +1311,7 @@ export function Pagos() {
                                   {p.numeroRecibo || `#${p.id}`}
                                 </td>
                                 <td className="py-2 text-slate-500 print:text-black print:py-1 font-mono">
-                                  {p.fecha ? p.fecha.split(' ')[1] || p.fecha : '---'}
+                                  {p.fecha && p.fecha.includes(' ') ? p.fecha.split(' ')[1].slice(0, 5) : '—'}
                                 </td>
                                 <td className="py-2 print:py-1">
                                   <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-[var(--bg-subtle)] dark:text-slate-300 print:bg-transparent print:p-0 print:text-black">
@@ -1215,7 +1325,7 @@ export function Pagos() {
                                   {p.cajero}
                                 </td>
                                 <td className="py-2 text-right font-black text-slate-900 dark:text-white print:text-black print:py-1">
-                                  S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                  S/ {Number(p.montoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
                               </tr>
                             ))

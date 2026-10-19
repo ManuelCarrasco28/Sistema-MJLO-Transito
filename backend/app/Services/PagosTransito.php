@@ -127,6 +127,12 @@ class PagosTransito
             }
             if (strlen($operacion) > 50) throw new DomainException('El N° de operación no puede exceder los 50 caracteres.');
             if ($medio === '' || $medio === 'EFECTIVO') $operacion = '';
+            $pagador = preg_replace('/\s+/u', ' ', trim((string) ($input['pagadoPorNombre'] ?? '')));
+            $documentoPagador = strtoupper(trim((string) ($input['pagadoPorDocumento'] ?? '')));
+            $observaciones = trim((string) ($input['observaciones'] ?? ''));
+            if (mb_strlen($pagador) > 160) throw new DomainException('El nombre de quien paga no puede exceder los 160 caracteres.');
+            if ($documentoPagador !== '' && !preg_match('/^[A-Z0-9-]{6,20}$/', $documentoPagador)) throw new DomainException('El documento de quien paga debe tener entre 6 y 20 letras o números.');
+            if (mb_strlen($observaciones) > 300) throw new DomainException('Las observaciones no pueden exceder los 300 caracteres.');
             $this->db->table('pagos_transito')->where('id', $id)->update([
                 'numero_recibo' => $recibo, 'fecha_pago' => $fecha,
 
@@ -136,6 +142,9 @@ class PagosTransito
                 'medio_pago' => $medio ?: null,
 
                 'referencia_pago' => trim($input['referenciaPago'] ?? '') ?: ($pago['referencia_pago'] ?? null),
+                'pagado_por_nombre' => $pagador !== '' ? $pagador : null,
+                'pagado_por_documento' => $documentoPagador !== '' ? $documentoPagador : null,
+                'observaciones' => $observaciones !== '' ? $observaciones : null,
                 'estado' => 'PAGADO',
             ]);
             if ($pago['tipo_pago'] === 'PAPELETA') $this->db->table('papeletas')->where('id', $pago['id_papeleta'])->update(['estado' => 'PAGADA']);
