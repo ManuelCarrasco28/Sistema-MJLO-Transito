@@ -12,10 +12,10 @@ class AuthController extends ResourceController
     private function encodeSessionCookie(array $userData): string
     {
         $payload = rtrim(strtr(base64_encode(json_encode($userData)), '+/', '-_'), '=');
-        $secret = (string) env('app.sessionSecret', 'un_secreto_super_seguro_para_sesiones_12345');
+        $secret = (string) env('app.sessionSecret', '');
 
         if ($secret === '' || strlen($secret) < 32) {
-            $secret = 'un_secreto_super_seguro_para_sesiones_12345';
+            throw new \RuntimeException('La clave app.sessionSecret debe tener al menos 32 caracteres para garantizar seguridad criptográfica.');
         }
 
         return $payload . '.' . hash_hmac('sha256', $payload, $secret);
@@ -367,7 +367,7 @@ class AuthController extends ResourceController
             return $this->failUnauthorized('El usuario se encuentra inactivo.');
         }
 
-        if (strtoupper((string) ($userData['rol'] ?? '')) === 'TRABAJADOR' && !\App\Libraries\Acceso::esClienteMovil($this->request)) {
+        if (\App\Libraries\Acceso::esRolCampo($userData['rol'] ?? '') && !\App\Libraries\Acceso::esClienteMovil($this->request)) {
             return $this->failForbidden('El acceso al sistema web está restringido para este rol. Por favor, utilice la aplicación móvil.');
         }
 

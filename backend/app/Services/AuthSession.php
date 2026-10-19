@@ -11,10 +11,10 @@ class AuthSession
         }
 
         [$payload, $signature] = explode('.', $cookie, 2);
-        $secret = (string) env('app.sessionSecret', 'un_secreto_super_seguro_para_sesiones_12345');
+        $secret = (string) env('app.sessionSecret', '');
 
         if ($secret === '' || strlen($secret) < 32) {
-            $secret = 'un_secreto_super_seguro_para_sesiones_12345';
+            return null;
         }
 
         $expectedSignature = hash_hmac('sha256', $payload, $secret);

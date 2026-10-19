@@ -25,7 +25,7 @@ class CorsFilter implements FilterInterface
         }
 
         $response->setHeader('Vary', 'Origin');
-        $response->setHeader('Access-Control-Allow-Headers', 'X-API-KEY, Origin, X-Requested-With, Content-Type, Accept, Access-Control-Request-Method, Authorization');
+        $response->setHeader('Access-Control-Allow-Headers', 'X-API-KEY, Origin, X-Requested-With, Content-Type, Accept, Access-Control-Request-Method, Authorization, X-Version-Registro');
         $response->setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
         $response->setHeader('Access-Control-Allow-Credentials', 'true');
         $response->setHeader('Connection', 'close');

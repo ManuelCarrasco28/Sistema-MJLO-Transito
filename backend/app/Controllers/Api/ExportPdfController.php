@@ -13,6 +13,7 @@ class ExportPdfController extends ResourceController
     private const MAXIMO_FILAS = 10000;
     private const FILAS_POR_BLOQUE = 40;
 
+
     public function generar()
     {
         $input = $this->request->getJSON(true) ?: [];

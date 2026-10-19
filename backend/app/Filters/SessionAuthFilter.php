@@ -27,8 +27,8 @@ class SessionAuthFilter implements FilterInterface
         }
 
         if (is_array($arguments) && !empty($arguments)) {
-            $rol = strtoupper((string) ($user['rol'] ?? ''));
-            $allowedRoles = array_map('strtoupper', $arguments);
+            $rol = mb_strtoupper((string) ($user['rol'] ?? ''));
+            $allowedRoles = array_map('mb_strtoupper', $arguments);
             if (!in_array($rol, $allowedRoles, true)) {
                 return service('response')
                     ->setStatusCode(403)

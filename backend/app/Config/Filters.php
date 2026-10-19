@@ -33,6 +33,7 @@ class Filters extends BaseFilters
         'cors'          => \App\Filters\CorsFilter::class,
         'csrforigin'    => \App\Filters\CsrfOriginFilter::class,
         'sessionauth'  => \App\Filters\SessionAuthFilter::class,
+        'concurrencia' => \App\Filters\ConcurrenciaFilter::class,
         'forcehttps'    => ForceHTTPS::class,
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
@@ -76,11 +77,13 @@ class Filters extends BaseFilters
         'before' => [
             'cors',
             'csrforigin',
+            'concurrencia',
 
         ],
         'after' => [
             'cors',
             'secureheaders',
+            'concurrencia',
 
         ],
     ];
