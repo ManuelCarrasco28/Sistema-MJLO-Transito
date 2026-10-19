@@ -5,7 +5,7 @@ namespace App\Libraries;
 final class TarifasDeposito
 {
     public const CLAVES = [
-        'tarifa_guardiania_dia' => 'Tarifa de guardianía por día de custodia (S/).',
+        'tarifa_guardiania_dia' => 'Tarifa del depósito por día de custodia (S/).',
         'tarifa_remolque' => 'Tarifa fija del remolque (S/).',
     ];
 
@@ -46,11 +46,11 @@ final class TarifasDeposito
         $esperadoGuardiania = round($tarifas['guardianiaDia'] * $dias, 2);
         if ($tarifas['guardianiaDia'] > 0) {
             if ($montoGuardiania > $esperadoGuardiania + 0.001) {
-                throw new \DomainException('La guardianía no puede superar la tarifa (S/ ' . number_format($esperadoGuardiania, 2) . ' por ' . $dias . ' día(s)).');
+                throw new \DomainException('El depósito no puede superar la tarifa (S/ ' . number_format($esperadoGuardiania, 2) . ' por ' . $dias . ' día(s)).');
             }
             if (abs($montoGuardiania - $esperadoGuardiania) > 0.001) {
                 if (!$jefatura) {
-                    throw new \DomainException('La guardianía debe ser S/ ' . number_format($esperadoGuardiania, 2) . ' (' . $dias . ' día(s) × S/ ' . number_format($tarifas['guardianiaDia'], 2) . '). Solo la jefatura puede rebajarla.');
+                    throw new \DomainException('El depósito debe ser S/ ' . number_format($esperadoGuardiania, 2) . ' (' . $dias . ' día(s) × S/ ' . number_format($tarifas['guardianiaDia'], 2) . '). Solo la jefatura puede rebajarla.');
                 }
                 $rebaja = true;
             }

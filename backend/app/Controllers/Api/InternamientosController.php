@@ -27,16 +27,16 @@ class InternamientosController extends ResourceController
     public function guardarTarifas()
     {
         $input = $this->request->getJSON(true) ?? [];
-        $guardiania = round((float) ($input['guardianiaDia'] ?? -1), 2);
-        $remolque = round((float) ($input['remolque'] ?? -1), 2);
-        if ($guardiania < 0 || $remolque < 0 || $guardiania > 10000 || $remolque > 10000) {
-            return $this->failValidationErrors('Las tarifas deben estar entre 0 y 10,000 soles.');
+        $deposito = round((float) ($input['guardianiaDia'] ?? -1), 2);
+        if ($deposito < 0 || $deposito > 10000) {
+            return $this->failValidationErrors('La tarifa del depósito debe estar entre 0 y 10,000 soles por día.');
         }
         $db = \Config\Database::connect();
-        \App\Libraries\TarifasDeposito::guardar($db, $guardiania, $remolque);
-        \App\Services\AuditoriaService::registrar('INTERNAMIENTOS', 'TARIFAS', 'Tarifas del depósito actualizadas: guardianía S/ ' . $guardiania . ' por día, remolque S/ ' . $remolque, ['guardianiaDia' => $guardiania, 'remolque' => $remolque]);
+        $actual = \App\Libraries\TarifasDeposito::obtener($db);
+        \App\Libraries\TarifasDeposito::guardar($db, $deposito, $actual['remolque']);
+        \App\Services\AuditoriaService::registrar('INTERNAMIENTOS', 'TARIFAS', 'Tarifa del depósito actualizada: S/ ' . $deposito . ' por día (antes S/ ' . $actual['guardianiaDia'] . ')', ['depositoDia' => $deposito, 'anterior' => $actual['guardianiaDia']]);
 
-        return $this->respond(['data' => \App\Libraries\TarifasDeposito::obtener($db) + ['puedeEditar' => true], 'message' => 'Tarifas actualizadas.']);
+        return $this->respond(['data' => \App\Libraries\TarifasDeposito::obtener($db) + ['puedeEditar' => true], 'message' => 'Tarifa del depósito actualizada.']);
     }
 
     public function estadisticas()
@@ -434,26 +434,17 @@ class InternamientosController extends ResourceController
         try {
             $fechaPago = trim((string)($input['fechaPago'] ?? date('Y-m-d')));
             $reciboPapeleta = trim((string)($input['reciboPapeleta'] ?? ''));
-            $reciboGuardiania = trim((string)($input['reciboGuardiania'] ?? ''));
-            $reciboRemolque = trim((string)($input['reciboRemolque'] ?? ''));
+            // Un solo recibo de la M.J.L.O. cubre la papeleta y el depósito por día; ya no hay guardianía ni remolque aparte
             $montoGuardiania = round((float)($input['montoGuardiania'] ?? 0), 2);
-            $montoRemolque = round((float)($input['montoRemolque'] ?? 0), 2);
+            $montoRemolque = 0.0;
             $observaciones = trim((string)($input['observaciones'] ?? ''));
             $dniAutorizado = trim((string)($input['autorizadoDni'] ?? ''));
 
             if ($montoGuardiania < 0 || $montoRemolque < 0 || $montoGuardiania > 100000 || $montoRemolque > 100000) {
                 throw new \DomainException('Los montos no son válidos.');
             }
-            if ($montoGuardiania > 0 && $reciboGuardiania === '') {
-                throw new \DomainException('Ingrese el N° de recibo de la guardianía.');
-            }
-            if ($montoRemolque > 0 && $reciboRemolque === '') {
-                throw new \DomainException('Ingrese el N° de recibo del remolque.');
-            }
-            foreach ([$reciboPapeleta, $reciboGuardiania, $reciboRemolque] as $recibo) {
-                if (strlen($recibo) > 50) {
-                    throw new \DomainException('Un número de recibo supera los 50 caracteres.');
-                }
+            if (strlen($reciboPapeleta) > 50) {
+                throw new \DomainException('El número de recibo supera los 50 caracteres.');
             }
 
 // Serializar el correlativo de libertad hasta finalizar la operación.
@@ -497,21 +488,25 @@ class InternamientosController extends ResourceController
                 }
                 $montoPapeleta = (float)$papeleta['monto_total'];
                 if ($papeleta['estado'] !== 'PAGADA') {
-                    if ($reciboPapeleta === '') {
-                        throw new \DomainException('Ingrese el N° de recibo del pago de la papeleta.');
-                    }
+                    // Sin N° de recibo escrito, el sistema emite el recibo automático (REC-…), igual que en Pagos
                     $servicio = new \App\Services\PagosTransito($db);
                     $pago = $servicio->generar('PAPELETA', (int)$papeleta['id']);
-                    $servicio->confirmar((int)$pago['id'], [
+                    $confirmado = $servicio->confirmar((int)$pago['id'], [
                         'numeroRecibo' => $reciboPapeleta,
                         'fechaPago' => $fechaPago,
                         'metodoPago' => trim((string)($input['metodoPago'] ?? '')),
+                        'numeroVoucher' => trim((string)($input['numeroVoucher'] ?? '')),
                     ]);
+                    $reciboPapeleta = (string)($confirmado['numero_recibo'] ?? $reciboPapeleta);
                 } else {
                     $pagado = $db->table('pagos_transito')->select('numero_recibo')
                         ->where('id_papeleta', (int)$papeleta['id'])->where('estado', 'PAGADO')->get()->getRowArray();
                     $reciboPapeleta = $pagado['numero_recibo'] ?? $reciboPapeleta;
                 }
+            }
+
+            if ($montoGuardiania > 0 && $reciboPapeleta === '') {
+                throw new \DomainException('Ingrese el N° de recibo de la M.J.L.O.');
             }
 
             $siguiente = (int)($db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(numero_orden, 5) AS UNSIGNED)), 0) AS m FROM ordenes_libertad WHERE numero_orden LIKE 'LIB-%'")->getRowArray()['m'] ?? 0) + 1;
@@ -526,9 +521,9 @@ class InternamientosController extends ResourceController
                 'numero_orden' => $numeroOrden,
                 'numero_recibo_papeleta' => $reciboPapeleta !== '' ? $reciboPapeleta : null,
                 'monto_papeleta' => $montoPapeleta,
-                'numero_recibo_guardiania' => $reciboGuardiania !== '' ? $reciboGuardiania : null,
+                'numero_recibo_guardiania' => $montoGuardiania > 0 ? $reciboPapeleta : null,
                 'monto_guardiania' => $montoGuardiania,
-                'numero_recibo_remolque' => $reciboRemolque !== '' ? $reciboRemolque : null,
+                'numero_recibo_remolque' => null,
                 'monto_remolque' => $montoRemolque,
                 'monto_total' => $total,
                 'observaciones' => $observaciones !== '' ? $observaciones : null,
@@ -587,6 +582,10 @@ class InternamientosController extends ResourceController
 // No modificar los datos de una orden ya liberada.
             if ($orden['estado'] !== 'RETENIDO') {
                 unset($input['motivo'], $input['interesadoDni'], $input['inventario']);
+            }
+            // El encargado del depósito completa el inventario y las observaciones; el motivo y el interesado son de oficina.
+            if (\App\Libraries\Acceso::esEncargadoDeposito()) {
+                unset($input['motivo'], $input['interesadoDni']);
             }
             $cambios = [];
             $mapa = [

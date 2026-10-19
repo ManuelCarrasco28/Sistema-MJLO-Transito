@@ -81,12 +81,17 @@ class ReportesIntervencionController extends ResourceController
             } elseif (in_array($estadoFiltro, ['PENDIENTE', 'RECHAZADO'], true)) {
                 $query->where('r.estado', $estadoFiltro);
             }
+            // Reportes sin vehículo vinculado ni una placa que exista en el padrón: los que oficina debe identificar
+            if (strtoupper(trim((string) $this->request->getGet('identificacion'))) === 'SIN_IDENTIFICAR') {
+                $query->where("(r.id_vehiculo IS NULL AND (COALESCE(r.placa, '') = '' OR NOT EXISTS (SELECT 1 FROM vehiculos vsi WHERE vsi.placa = r.placa)))", null, false);
+            }
             $buscar = trim((string) $this->request->getGet('buscar'));
             if ($buscar !== '') {
                 $patron = $db->escape('%' . $db->escapeLikeString($buscar) . '%');
                 $num = ltrim($buscar, '#');
+                $sinPlaca = preg_match('/^sin[\s_-]*placa$/i', $buscar) === 1 ? " OR (v.placa IS NULL AND COALESCE(r.placa, '') = '')" : '';
                 $query->groupStart()
-                    ->where("(COALESCE(v.placa, r.placa) LIKE $patron ESCAPE '!' OR r.lugar LIKE $patron ESCAPE '!' OR r.observaciones LIKE $patron ESCAPE '!'"
+                    ->where("(COALESCE(v.placa, r.placa) LIKE $patron ESCAPE '!' OR r.lugar LIKE $patron ESCAPE '!' OR r.observaciones LIKE $patron ESCAPE '!'" . $sinPlaca
                         . " OR p.numero_papeleta LIKE $patron ESCAPE '!' OR cond_per.numero LIKE $patron ESCAPE '!' OR r.conductor_informal_dni LIKE $patron ESCAPE '!'"
                         . " OR EXISTS (SELECT 1 FROM reporte_intervencion_infracciones rx JOIN tipos_infraccion tx ON tx.id = rx.id_tipo_infraccion WHERE rx.id_reporte = r.id AND tx.codigo LIKE $patron ESCAPE '!')"
                         . (ctype_digit($num) ? ' OR r.id = ' . (int) $num : '') . ')', null, false)
@@ -398,8 +403,13 @@ class ReportesIntervencionController extends ResourceController
                 $vehiculo = $db->table('vehiculos')->where('placa', $reporte['placa'])->get()->getRowArray();
                 $vehiculoId = $vehiculo ? (int)$vehiculo['id'] : 0;
             }
+            if ($vehiculoId <= 0 && !empty($reporte['placa'])) {
+                // La placa viene de SUNARP: no hace falta que el vehículo esté en Vehículos; se verifica y, si no está, se registra
+                $datosVehiculo = is_array($input['vehiculoDatos'] ?? null) ? $input['vehiculoDatos'] : [];
+                $vehiculoId = (int) (\App\Services\VehiculoPorPlaca::resolverOCrear($db, (string) $reporte['placa'], $datosVehiculo) ?? 0);
+            }
             if ($vehiculoId <= 0) {
-                throw new \DomainException('Antes de generar papeleta debe identificar o registrar el vehículo.');
+                throw new \DomainException('El reporte no tiene una placa válida: identifique el vehículo (por su motor o serie) en Vehículos antes de generar la papeleta.');
             }
 
             $vehiculo = $db->table('vehiculos')->where('id', $vehiculoId)->get()->getRowArray();

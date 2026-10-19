@@ -19,16 +19,19 @@ function render(Component, item) {
   return document.querySelector('#seccion-impresion')
 }
 describe('campos de los documentos de internamiento', () => {
-  it('imprime la fecha de ingreso, carrocería, carné, documento e inventario real', () => {
+  it('imprime la fecha de ingreso, carrocería, documento e inventario real, sin el N° de carné', () => {
     const doc = render(BoletaInternamientoPrint, {
       fechaIngreso: '2026-09-02 12:05:00', estadoCarroceria: 'Sin abolladuras',
       carnetRemisor: 'REM-45', numeroPapeleta: 'PAP-77',
       inventario: [{ nombre: 'Veh. Gr. Ab.', cantidad: 2 }, { nombre: 'Llantas', cantidad: 0 }],
     })
     expect(doc.textContent).toContain('020926')
-    for (const value of ['12:05', 'Sin abolladuras', 'REM-45', 'PAP-77', 'VEH. GR. AB.2', 'LLANTAS0']) {
+    for (const value of ['12:05', 'Sin abolladuras', 'PAP-77', 'VEH. GR. AB.2', 'LLANTAS0']) {
       expect(doc.textContent).toContain(value)
     }
+    // El carné del remisor ya no se imprime
+    expect(doc.textContent).not.toContain('REM-45')
+    expect(doc.textContent).not.toMatch(/CARN/i)
   })
   it('imprime número de libertad y fecha de internamiento, sin nacimiento ni sello artificial', () => {
     const doc = render(OrdenLibertadPrint, {

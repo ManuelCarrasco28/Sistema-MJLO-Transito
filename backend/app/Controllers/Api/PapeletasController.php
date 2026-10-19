@@ -340,6 +340,9 @@ class PapeletasController extends ResourceController
 // Exigir también en el servidor el permiso de emisión móvil.
         $usuarioSesion = \App\Libraries\Acceso::usuario();
 
+        if (\App\Libraries\Acceso::esEncargadoDeposito($usuarioSesion)) {
+            return $this->failForbidden('El encargado del depósito no emite papeletas.');
+        }
         if (!\App\Libraries\Acceso::esOficina($usuarioSesion)
             && !\App\Libraries\Acceso::movilPuedeAplicarPapeletas()) {
             return $this->failForbidden('La aplicación móvil está en modo "solo reportes/evidencias": no puede emitir papeletas.');
@@ -770,6 +773,14 @@ class PapeletasController extends ResourceController
                     $duenoId = (int)$propietarioActual['id_persona'];
                 }
             }
+        }
+
+        // La placa viene de SUNARP: si no está en Vehículos se registra con lo que se sepa, para que haya internamiento
+        if (!$vehiculoId && $placa !== '' && $placa !== 'SIN_PLACA') {
+            $vehiculoId = \App\Services\VehiculoPorPlaca::resolverOCrear($db, $placa, [
+                'marca' => $marca, 'color' => $color, 'clase' => $clase, 'motor' => $motor,
+                'modelo' => (string) ($input['modeloVehiculo'] ?? ''),
+            ]);
         }
 
         if (!$vehiculoId) {

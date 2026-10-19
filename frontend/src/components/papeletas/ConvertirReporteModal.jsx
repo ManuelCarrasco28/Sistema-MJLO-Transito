@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../ui/Icon'
+import { Cargando } from '../ui/Cargando'
 import { PlacaBadge } from '../ui/PlacaBadge'
 import { StandaloneVehiculoFormModal } from '../vehiculos/StandaloneVehiculoFormModal'
 import { FloatingSelect } from '../ui/FormInputs'
@@ -237,10 +238,7 @@ export function ConvertirReporteModal({
 
           <div className="rounded-2xl bg-slate-50 p-5 border border-slate-200 dark:bg-[var(--bg-subtle)] dark:border-[var(--border)] shadow-sm">
             {reporteToConvert.loadingFotos ? (
-              <div className="flex items-center gap-3 text-slate-400 py-2">
-                <div className="size-5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600 dark:border-slate-700 dark:border-t-emerald-500"></div>
-                <p className="text-xs font-black uppercase tracking-wider">Cargando fotos...</p>
-              </div>
+              <Cargando className="py-4" />
             ) : reporteToConvert.fotos && reporteToConvert.fotos.length > 0 ? (
               <div>
                 <div className="mb-3 flex items-center gap-2 text-slate-500 dark:text-slate-400">

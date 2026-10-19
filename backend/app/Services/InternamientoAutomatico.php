@@ -67,7 +67,7 @@ class InternamientoAutomatico
             'numero_boleta' => $numeroBoleta,
             'id_remisor' => $idRemisor,
             'id_interesado' => !empty($papeleta['id_persona_infractor']) ? (int) $papeleta['id_persona_infractor'] : null,
-            'fecha_ingreso' => date('Y-m-d H:i:s'),
+            'fecha_ingreso' => self::fechaDeIngreso($papeleta),
             'deposito' => self::DEPOSITO_OFICIAL,
             'motivo' => 'Generado con la papeleta N° ' . ($papeleta['numero_papeleta'] ?? $idPapeleta),
             'lugar_intervencion' => trim((string) ($papeleta['lugar'] ?? '')),
@@ -80,6 +80,19 @@ class InternamientoAutomatico
         ]);
 
         return ['id' => (int) $this->db->insertID(), 'numeroBoleta' => $numeroBoleta];
+    }
+
+    /**
+     * El vehículo entra al depósito en el momento de la intervención, no cuando oficina termina de identificarlo:
+     * los días de depósito cuentan desde la fecha y hora de la papeleta (o del reporte del inspector del que nace).
+     * Una fecha vacía, inválida o futura se reemplaza por el momento actual.
+     */
+    public static function fechaDeIngreso(array $papeleta): string
+    {
+        $ahora = time();
+        $momento = strtotime((string) ($papeleta['fecha_hora'] ?? ''));
+
+        return date('Y-m-d H:i:s', ($momento !== false && $momento > 0 && $momento <= $ahora) ? $momento : $ahora);
     }
 
     public static function cargoDelInspector($db, array $papeleta): string

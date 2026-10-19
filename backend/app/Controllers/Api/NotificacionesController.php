@@ -13,6 +13,7 @@ class NotificacionesController extends BaseController
     {
         $db = \Config\Database::connect();
         $notificaciones = [];
+        $prioritarias = [];
         $movilAplicaPapeleta = \App\Libraries\Acceso::movilPuedeAplicarPapeletas();
 
 // 1. Permisos próximos a vencer (en los próximos 30 días)
@@ -103,14 +104,14 @@ class NotificacionesController extends BaseController
                     'icon' => 'document',
                     'tone' => 'amber',
                     'unread' => true,
-                    'link' => '/papeletas?vista=reportes',
+                    'link' => '/papeletas?vista=reportes&estado=PENDIENTE',
                 ];
                 $recientes = $db->table('reportes_intervencion r')
                     ->select("r.id, COALESCE(v.placa, r.placa, 'SIN PLACA') AS placa, r.fecha_hora, TRIM(CONCAT(COALESCE(ci.nombres, ''), ' ', COALESCE(ci.apellido_paterno, ''))) AS inspector", false)
                     ->join('vehiculos v', 'v.id = r.id_vehiculo', 'left')
                     ->join('ciudadanos ci', 'ci.id_persona = r.id_inspector', 'left')
                     ->where('r.estado', 'PENDIENTE')
-                    ->orderBy('r.id', 'DESC')->limit(8)
+                    ->orderBy('r.fecha_hora', 'DESC')->orderBy('r.id', 'DESC')->limit(8)
                     ->get()->getResult();
                 foreach ($recientes as $r) {
                     $notificaciones[] = [
@@ -128,11 +129,37 @@ class NotificacionesController extends BaseController
             }
         }
 
+        // Un reporte sin vehículo identificado no genera papeleta ni internamiento, pero el vehículo puede estar ya en el
+        // depósito acumulando días (se cuentan desde la fecha del reporte). Se avisa aunque el móvil emita papeletas.
+        if ($db->tableExists('reportes_intervencion')) {
+            $sinIdentificar = $db->query(
+                "SELECT COUNT(*) AS total, MIN(r.fecha_hora) AS mas_antiguo FROM reportes_intervencion r
+                 WHERE r.estado = 'PENDIENTE' AND r.id_vehiculo IS NULL
+                   AND (COALESCE(r.placa, '') = '' OR NOT EXISTS (SELECT 1 FROM vehiculos v WHERE v.placa = r.placa))"
+            )->getRowArray();
+            $total = (int) ($sinIdentificar['total'] ?? 0);
+            if ($total > 0) {
+                $desde = date('d/m/Y', strtotime((string) $sinIdentificar['mas_antiguo']));
+                $prioritarias[] = [
+                    'id' => 'reportes_sin_identificar_' . $total,
+                    'categoria' => 'reportes',
+                    'title' => $total === 1 ? '1 reporte con vehículo sin identificar' : "{$total} reportes con vehículo sin identificar",
+                    'description' => "Pueden estar ya en el depósito; los días corren desde el reporte (el más antiguo, {$desde}).",
+                    'time' => 'Pendiente',
+                    'icon' => 'alert',
+                    'tone' => 'amber',
+                    'unread' => true,
+                    'link' => '/papeletas?vista=reportes&estado=PENDIENTE&identificacion=SIN_IDENTIFICAR',
+                ];
+            }
+        }
+
         return $this->respond([
             'status' => 200,
             'message' => 'Notificaciones operativas',
             'movilAplicaPapeleta' => $movilAplicaPapeleta,
-            'data' => $notificaciones
+            // Lo que pide acción de la oficina va primero
+            'data' => array_merge($prioritarias, $notificaciones)
         ]);
     }
 }

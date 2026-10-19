@@ -12,6 +12,9 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
 
 // Solo jefatura elimina; resolver estas rutas antes del grupo general.
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE'], static function ($routes): void {
+        $routes->post('catalogo-procedimientos', 'ProcedimientosController::create');
+        $routes->put('catalogo-procedimientos/(:num)', 'ProcedimientosController::update/$1');
+        $routes->delete('catalogo-procedimientos/(:num)', 'ProcedimientosController::delete/$1');
         $recursosEliminables = [
             'vehiculos' => 'VehiculosController',
             'personal' => 'PersonalController',
@@ -30,6 +33,16 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         foreach ($recursosEliminables as $recurso => $controlador) {
             $routes->delete("{$recurso}/(:segment)", "{$controlador}::delete/$1");
         }
+    });
+
+// El encargado del depósito (app móvil) ve los internamientos y completa su inventario; nada más del módulo.
+    $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA,ENCARGADO DE DEPÓSITO'], static function ($routes): void {
+        $routes->get('internamientos', 'InternamientosController::index');
+        // Solo id numérico o uuid (hexadecimal con guiones): así «estadisticas» y «tarifas» siguen yendo a sus rutas
+        $routes->get('internamientos/([0-9a-fA-F-]+)', 'InternamientosController::show/$1');
+        $routes->put('internamientos/([0-9a-fA-F-]+)', 'InternamientosController::update/$1');
+        $routes->patch('internamientos/([0-9a-fA-F-]+)', 'InternamientosController::update/$1');
+        $routes->get('inventario-criterios', 'InternamientosController::criterios');
     });
 
 // Rutas de oficina con permisos de servidor; preceden al grupo general.
@@ -61,6 +74,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('permisos/estadisticas', 'PermisosController::estadisticas');
         $routes->resource('permisos', ['controller' => 'PermisosController']);
         $routes->get('procedimientos-admin', 'PermisosController::procedimientos');
+        $routes->get('catalogo-procedimientos', 'ProcedimientosController::index');
+        $routes->get('catalogo-procedimientos/(:num)', 'ProcedimientosController::show/$1');
 
         $routes->post('papeletas/(:segment)/pagar', 'PapeletasController::pagar/$1');
         $routes->get('pagos/origenes', 'PagosController::origenes');
@@ -106,6 +121,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         $routes->get('inspecciones/siguiente-correlativo', 'InspeccionesController::siguienteCorrelativo');
         $routes->get('inspecciones/estadisticas', 'InspeccionesController::estadisticas');
         $routes->get('inspecciones/certicav-estado', 'InspeccionesController::certicavEstado');
+        $routes->get('inspecciones/certicav-solicitudes', 'InspeccionesController::certicavSolicitudes');
         $routes->post('inspecciones/certicav-solicitar', 'InspeccionesController::certicavSolicitar');
         $routes->resource('inspecciones', ['controller' => 'InspeccionesController']);
         $routes->get('inspeccion-criterios', 'InspeccionesController::criterios');

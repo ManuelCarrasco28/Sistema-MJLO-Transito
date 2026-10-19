@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../ui/Icon'
+import { FilaCargando } from '../ui/FilaCargando'
 import { FloatingInput, FloatingSelect, FloatingTextarea } from '../ui/FormInputs'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../ui/ModalControls'
 import { apiFetch, sanitizarMensaje } from '../../config/api'
@@ -192,14 +193,14 @@ export function CatalogoInfraccionesModal({ onClose, onChanged, editarCodigo = n
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                 {cargando && filas.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">Cargando...</td></tr>
+                  <FilaCargando colSpan={7} />
                 ) : filas.map((f) => (
                   <tr key={f.id} className={f.estado === 'INACTIVO' ? 'opacity-55' : ''}>
                     <td className="px-3 py-2.5 text-center">
                       <span className="inline-flex rounded-md border border-rose-200/70 bg-rose-50 px-2 py-0.5 font-mono text-xs font-black text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">{f.codigo}</span>
                     </td>
                     <td className="px-3 py-2.5 text-slate-700 dark:text-slate-200">
-                      <span className="line-clamp-2 leading-snug" title={f.descripcion}>{f.descripcion}</span>
+                      <span className=" leading-snug" title={f.descripcion}>{f.descripcion}</span>
                       {f.estado === 'INACTIVO' && <span className="text-[10px] font-bold uppercase text-slate-400">Inactiva</span>}
                     </td>
                     <td className="px-3 py-2.5 text-center">

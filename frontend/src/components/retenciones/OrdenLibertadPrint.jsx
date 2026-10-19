@@ -118,26 +118,12 @@ export const OrdenLibertadPrint = ({ item }) => {
           <span className="mr-2">N° de recibo de la M.J.L.O.</span>
           <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.reciboPapeleta || ''}</div>
           <span className="mx-2 font-bold">Monto S/.</span>
-          <div className="border-b border-black w-32 font-sans uppercase px-2 text-right">{item?.montoPapeletaCobrada != null ? Number(item.montoPapeletaCobrada).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
+          <div className="border-b border-black w-32 font-sans uppercase px-2 text-right">{item?.montoPapeletaCobrada != null ? (Number(item.montoPapeletaCobrada) + Number(item.montoGuardiania || 0) + Number(item.montoRemolque || 0)).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</div>
         </div>
         
-        <div className="flex items-end text-[15px]">
-          <span className="mr-2">Guardianía N° de Recibo</span>
-          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.reciboGuardiania || ''}</div>
-          <span className="mx-2 font-bold">Monto S/.</span>
-          <div className="border-b border-black w-32 font-sans uppercase px-2 text-right">{item?.montoGuardiania != null ? Number(item.montoGuardiania).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
-        </div>
-
-        <div className="flex items-end text-[15px]">
-          <span className="mr-2">Remolque N° de Recibo</span>
-          <div className="border-b border-black flex-1 font-sans uppercase px-2">{item?.reciboRemolque || ''}</div>
-          <span className="mx-2 font-bold">Monto S/.</span>
-          <div className="border-b border-black w-32 font-sans uppercase px-2 text-right">{item?.montoRemolque != null ? Number(item.montoRemolque).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
-        </div>
-
         <div className="flex items-end justify-end text-[15px] mt-1">
           <span className="font-bold mr-2 text-base">TOTAL S/.</span>
-          <div className="border-b border-black w-40 font-sans uppercase px-2 text-right font-bold text-base">{item?.montoTotalLiberacion != null ? Number(item.montoTotalLiberacion).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : ''}</div>
+          <div className="border-b border-black w-40 font-sans uppercase px-2 text-right font-bold text-base">{item?.montoTotalLiberacion != null ? Number(item.montoTotalLiberacion).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</div>
         </div>
       </div>
 
@@ -165,7 +151,6 @@ export const OrdenLibertadPrint = ({ item }) => {
         <div className="space-y-4">
           <div className="flex gap-2">REMISOR <span className="flex-1 border-b border-black min-h-5" /></div>
           <div className="flex gap-2">NOMBRE <span className="flex-1 border-b border-black uppercase">{item?.remisorNombre || ''}</span></div>
-          <div className="flex gap-2">N° DE CARNÉ <span className="flex-1 border-b border-black">{item?.carnetRemisor || ''}</span></div>
         </div>
         <div className="space-y-4">
           <div className="flex gap-2">INTERESADO <span className="flex-1 border-b border-black uppercase">{item?.autorizadoNombre ?? item?.interesadoNombre ?? ''}</span></div>

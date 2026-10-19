@@ -3,6 +3,7 @@ import { useDebounce } from '../hooks/useDebounce'
 import { suscribirConfigMovil } from '../utils/configMovil'
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../components/ui/Icon'
+import { Cargando } from '../components/ui/Cargando'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { PageLoadError } from '../components/ui/PageLoadError'
@@ -15,10 +16,12 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
 import { PagoPapeletaModal } from '../components/papeletas/PagoPapeletaModal'
+import { CobrarConDepositoModal } from '../components/pagos/CobrarConDepositoModal'
 import { NuevaPapeletaModal } from '../components/papeletas/NuevaPapeletaModal'
 import { PapeletaDetalleModal } from '../components/papeletas/PapeletaDetalleModal'
 import { ConvertirReporteModal } from '../components/papeletas/ConvertirReporteModal'
 import { PapeletaOficialPrint } from '../components/papeletas/PapeletaOficialPrint'
+import { PapeletaTicketPrint } from '../components/papeletas/PapeletaTicketPrint'
 import { InfraccionDetalleModal } from '../components/papeletas/InfraccionDetalleModal'
 import { CatalogoInfraccionesModal } from '../components/papeletas/CatalogoInfraccionesModal'
 import { BotonCancelar, BotonCerrarModal } from '../components/ui/ModalControls'
@@ -111,7 +114,10 @@ export function Papeletas({ user }) {
     if (params.get('vista') === 'reportes') {
       setActiveView('REPORTES')
       setReportesSearch(s)
-      setReportesFilterEstado('TODOS')
+      // El vínculo puede traer el estado y el filtro de identificación (p. ej. desde las notificaciones)
+      const estadoVinculo = String(params.get('estado') || '').toUpperCase()
+      setReportesFilterEstado(['PENDIENTE', 'RECHAZADO', 'CONVERTIDO_PAPELETA'].includes(estadoVinculo) ? estadoVinculo : 'TODOS')
+      setReportesIdentificacion(String(params.get('identificacion') || '').toUpperCase() === 'SIN_IDENTIFICAR' ? 'SIN_IDENTIFICAR' : '')
       setReportesPage(1)
     } else {
       setActiveView('PAPELETAS')
@@ -137,6 +143,8 @@ export function Papeletas({ user }) {
   const [stats, setStats] = useState({ total: 0, pendientes: 0, pagadas: 0, anuladas: 0 })
   const [reportesSearch, setReportesSearch] = useState(() => (vistaInicial === 'REPORTES' ? new URLSearchParams(window.location.search).get('search') || '' : ''))
   const [reportesFilterEstado, setReportesFilterEstado] = useState('TODOS')
+  // «Sin identificar»: reportes sin vehículo vinculado ni placa del padrón (llega desde las notificaciones)
+  const [reportesIdentificacion, setReportesIdentificacion] = useState('')
   const [reportesPage, setReportesPage] = useState(1)
   const [reportesSortBy, setReportesSortBy] = useState('')
   const [reportesSortDir, setReportesSortDir] = useState('DESC')
@@ -155,6 +163,7 @@ export function Papeletas({ user }) {
   const [loadingPapeletaFotos, setLoadingPapeletaFotos] = useState(false)
 
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+  const [ticketPapeleta, setTicketPapeleta] = useState(null)
   const [isPagarModalOpen, setIsPagarModalOpen] = useState(false)
   const [selectedInfraccion, setSelectedInfraccion] = useState(null)
   const [catalogoInfracciones, setCatalogoInfracciones] = useState(null)
@@ -166,6 +175,8 @@ export function Papeletas({ user }) {
   }
   const puedeAdministrarInfracciones = ['SUPERADMIN', 'GERENTE', 'SUBGERENTE'].includes(String(user?.rol || '').toUpperCase())
   const [papeletaToAction, setPapeletaToAction] = useState(null)
+  // Papeleta cuyo vehículo está en el depósito: se cobra con el depósito y se libera (modal compartido con Pagos)
+  const [cobroConDeposito, setCobroConDeposito] = useState(null)
   const [reporteToConvert, setReporteToConvert] = useState(null)
   const [reporteToReject, setReporteToReject] = useState(null)
   const [selectedImage, setSelectedImage] = useState(null)
@@ -212,7 +223,7 @@ export function Papeletas({ user }) {
 
   useEffect(() => {
     setReportesPage(1)
-  }, [reportesSearch, reportesFilterEstado])
+  }, [reportesSearch, reportesFilterEstado, reportesIdentificacion])
 
   // Los reportes ya llegan filtrados y paginados desde el servidor
   const filteredReportes = reportes
@@ -337,6 +348,7 @@ export function Papeletas({ user }) {
     setLoadingReportes(true)
     const params = new URLSearchParams({ page: String(reportesPage), porPagina: String(reportesPerPage) })
     if (reportesFilterEstado !== 'TODOS') params.set('estado', reportesFilterEstado)
+    if (reportesIdentificacion) params.set('identificacion', reportesIdentificacion)
     if (reportesBusqueda) params.set('buscar', reportesBusqueda)
     if (reportesSortBy) { params.set('sortBy', reportesSortBy); params.set('sortDir', reportesSortDir) }
     apiFetch(`/reportes-intervencion?${params}`)
@@ -431,6 +443,8 @@ export function Papeletas({ user }) {
     return () => cargaPapeletas.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, filterOrigen, filterFormalidad, filterTipoInfraccion, filterFecha, sortBy, sortDir])
 
+  useRecargaSilenciosa('/papeletas', [() => loadData(), () => loadStats()])
+
   // Actualizar el permiso móvil periódicamente y al recuperar el foco.
   useEffect(() => {
     // La primera consulta se hace siempre; las siguientes solo si la pestaña está a la vista
@@ -463,7 +477,7 @@ export function Papeletas({ user }) {
   // Reportes: se piden al servidor ya filtrados y paginados (solo la página visible)
   useEffect(() => {
     if (movilAplicaPapeleta === false) loadReportes()
-  }, [movilAplicaPapeleta, reportesPage, reportesPerPage, reportesFilterEstado, reportesBusqueda, reportesSortBy, reportesSortDir])
+  }, [movilAplicaPapeleta, reportesPage, reportesPerPage, reportesFilterEstado, reportesIdentificacion, reportesBusqueda, reportesSortBy, reportesSortDir])
 
   useEffect(() => {
     loadStats()
@@ -510,6 +524,11 @@ export function Papeletas({ user }) {
       showError('Atención', 'Esta papeleta ya se encuentra pagada.')
       return
     }
+    // Primero se intenta el cobro con depósito; si no hay vehículo retenido, el modal avisa y se usa el cobro simple
+    setCobroConDeposito(papeleta)
+  }
+
+  const abrirPagoSimple = (papeleta) => {
     setPapeletaToAction(papeleta)
     setNumeroRecibo('')
     setFechaPago('')
@@ -589,8 +608,10 @@ export function Papeletas({ user }) {
       showError('Atención', 'Selecciona al menos una infracción.')
       return
     }
-    if (!convertForm.vehiculoId) {
-      showError('Atención', 'Para generar papeleta primero debes identificar o registrar el vehículo.')
+    // Con una placa válida basta: si no está en Vehículos, el sistema la registra al generar la papeleta
+    const placaDelReporte = String(reporteToConvert.placa || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    if (!convertForm.vehiculoId && !/^[A-Z0-9]{5,7}$/.test(placaDelReporte)) {
+      showError('Atención', 'El reporte no tiene una placa válida: identifica el vehículo (por su motor o serie) antes de generar la papeleta.')
       return
     }
     setIsProcessingAction(true)
@@ -599,7 +620,7 @@ export function Papeletas({ user }) {
         method: 'POST',
         body: {
           infraccionesIds: validInfracciones,
-          vehiculoId: Number(convertForm.vehiculoId),
+          vehiculoId: convertForm.vehiculoId ? Number(convertForm.vehiculoId) : null,
           conductorDni: convertForm.conductorDni,
           observacionesAutoridad: convertForm.observacionesAutoridad,
           observacionesConductor: convertForm.observacionesConductor || ''
@@ -830,10 +851,10 @@ export function Papeletas({ user }) {
           {/* Top toolbar */}
           <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 dark:border-[var(--border)]">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="relative w-full sm:max-w-md">
+              <div className="relative w-full sm:min-w-0 sm:flex-1">
                 <Icon
-                  name={loadingReportes ? "refresh" : "search"}
-                  className={`absolute left-3.5 top-1/2 size-4 -translate-y-1/2 transition-colors ${loadingReportes ? 'animate-spin text-amber-500' : 'text-slate-400'}`}
+                  name="search"
+                  className={`absolute left-3.5 top-1/2 size-4 -translate-y-1/2 transition-colors text-slate-400`}
                 />
                 <input
                   type="text"
@@ -854,16 +875,29 @@ export function Papeletas({ user }) {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
-                {(reportesFilterEstado !== 'TODOS' || reportesSearch) && (
+                {(reportesFilterEstado !== 'TODOS' || reportesSearch || reportesIdentificacion) && (
                   <button
                     type="button"
                     onClick={() => {
                       setReportesSearch('')
                       setReportesFilterEstado('TODOS')
+                      setReportesIdentificacion('')
                     }}
                     className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer transition-colors whitespace-nowrap"
                   >
                     Limpiar Filtros
+                  </button>
+                )}
+
+                {reportesIdentificacion && (
+                  <button
+                    type="button"
+                    onClick={() => setReportesIdentificacion('')}
+                    title="Quitar este filtro"
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                  >
+                    <span>Sin identificar</span>
+                    <Icon name="x" className="size-3" />
                   </button>
                 )}
 
@@ -887,7 +921,7 @@ export function Papeletas({ user }) {
             </div>
           </div>
 
-          {(reportesFilterEstado !== 'TODOS' || reportesSearch) && (
+          {(reportesFilterEstado !== 'TODOS' || reportesSearch || reportesIdentificacion) && (
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4 py-2 dark:border-[var(--border)] dark:bg-slate-900/30">
               <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
                 Filtros activos: {reportesTotal.toLocaleString('es-PE')} {reportesTotal === 1 ? 'reporte encontrado' : 'reportes encontrados'}
@@ -927,17 +961,7 @@ export function Papeletas({ user }) {
               </thead>
               <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${loadingReportes && reportes.length > 0 ? 'opacity-50' : ''}`}>
                 {loadingReportes && reportes.length === 0 ? (
-                  Array.from({ length: 4 }).map((_, idx) => (
-                    <tr key={idx} className="animate-pulse">
-                      <td className="px-3.5 py-4"><div className="h-5 w-16 mx-auto rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                      <td className="px-3.5 py-4"><div className="h-6 w-20 mx-auto rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                      <td className="px-3.5 py-4"><div className="h-4 w-32 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                      <td className="px-3.5 py-4"><div className="h-4 w-40 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                      <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                      <td className="px-3.5 py-4 text-center"><div className="h-6 w-16 mx-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                      <td className="px-3.5 py-4 text-center"><div className="h-7 w-24 mx-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    </tr>
-                  ))
+                  <FilaCargando colSpan={7} />
                 ) : filteredReportes.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
@@ -1019,7 +1043,7 @@ export function Papeletas({ user }) {
                           {reporte.inspector_nombre || 'Inspector S/D'}
                         </p>
                         {reporte.operativoNombre && (
-                          <span className="inline-block mt-0.5 rounded bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.2 font-mono text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-900/50 truncate max-w-full" title={reporte.operativoNombre}>
+                          <span className="inline-block mt-0.5 rounded bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.2 font-mono text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-900/50 min-w-0 break-words max-w-full" title={reporte.operativoNombre}>
                             {reporte.operativoNombre}
                           </span>
                         )}
@@ -1105,8 +1129,8 @@ export function Papeletas({ user }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:flex-1">
               <Icon
-                name={isLoading ? "refresh" : "search"}
-                className={`absolute left-3.5 top-1/2 size-4 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-rose-500' : 'text-slate-400'}`}
+                name="search"
+                className={`absolute left-3.5 top-1/2 size-4 -translate-y-1/2 transition-colors text-slate-400`}
               />
               <input
                 type="text"
@@ -1230,14 +1254,14 @@ export function Papeletas({ user }) {
           <table className="w-full min-w-[1200px] table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[10%]" />
-              <col className="w-[14%]" />
-              <col className="w-[14%]" />
-              <col className="w-[11%]" />
+              <col className="w-[13%]" />
+              <col className="w-[13%]" />
+              <col className="w-[10%]" />
+              <col className="w-[9%]" />
+              <col className="w-[9%]" />
               <col className="w-[10%]" />
               <col className="w-[10%]" />
-              <col className="w-[10%]" />
-              <col className="w-[10%]" />
-              <col className="w-[11%]" />
+              <col className="w-[16%]" />
             </colgroup>
             <thead className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)] dark:text-slate-400">
               <tr>
@@ -1254,19 +1278,7 @@ export function Papeletas({ user }) {
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && papeletas.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && papeletas.length === 0 ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-3.5 py-4"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-4"><div className="h-5 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-4 text-center"><div className="h-5 w-16 mx-auto rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-4 text-center"><div className="h-5 w-16 mx-auto rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-4 text-right"><div className="h-7 w-28 ml-auto rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                  </tr>
-                ))
+                <FilaCargando colSpan={9} />
               ) : filteredPapeletas.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="px-5 py-12 text-center text-slate-400">
@@ -1401,7 +1413,10 @@ export function Papeletas({ user }) {
                           <button onClick={() => handleOpenDetail(p)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-eye-bg)] border-[var(--action-eye-border)] text-[var(--action-eye-text)] hover:bg-[var(--action-eye-hover)] hover:border-[var(--action-eye-hover)] hover:text-white" title="Ver Detalle">
                             <Icon name="eye" className="size-4" />
                           </button>
-                          <button onClick={() => handleOpenPreview(p)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white" title="Imprimir Boleta">
+                          {p.estado === 'PAGADA' && <button type="button" onClick={() => setTicketPapeleta(p)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300" title="Imprimir ticket de pago (80 mm)" aria-label="Imprimir ticket de pago">
+                            <Icon name="ticket" className="size-4" />
+                          </button>}
+                          <button onClick={() => handleOpenPreview(p)} className="size-8 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-print-bg)] border-[var(--action-print-border)] text-[var(--action-print-text)] hover:bg-[var(--action-print-hover)] hover:border-[var(--action-print-hover)] hover:text-white" title="Imprimir papeleta A4">
                             <Icon name="print" className="size-4" />
                           </button>
                         </div>
@@ -1487,6 +1502,20 @@ export function Papeletas({ user }) {
         />
       )}
 
+      {cobroConDeposito && (
+        <CobrarConDepositoModal
+          papeletaId={cobroConDeposito.id}
+          numeroPapeleta={cobroConDeposito.numeroPapeleta}
+          onClose={() => setCobroConDeposito(null)}
+          onSinInternamiento={() => { const papeleta = cobroConDeposito; setCobroConDeposito(null); abrirPagoSimple(papeleta) }}
+          onPagado={() => {
+            const id = cobroConDeposito.id
+            setPapeletas((prev) => prev.map((p) => (p.id === id ? { ...p, estado: 'PAGADA' } : p)))
+            loadStats()
+          }}
+        />
+      )}
+
       {isPagarModalOpen && (
         <PagoPapeletaModal
           papeletaToAction={papeletaToAction}
@@ -1508,6 +1537,7 @@ export function Papeletas({ user }) {
       {isPreviewModalOpen && (
         <PapeletaOficialPrint papeleta={selectedPapeleta} onClose={() => setIsPreviewModalOpen(false)} />
       )}
+      {ticketPapeleta && <PapeletaTicketPrint papeleta={ticketPapeleta} onClose={() => setTicketPapeleta(null)} />}
 
       {catalogoInfracciones && (
         <CatalogoInfraccionesModal editarCodigo={catalogoInfracciones.codigo} onClose={() => setCatalogoInfracciones(null)} onChanged={recargarTiposInfraccion} />
@@ -1517,7 +1547,6 @@ export function Papeletas({ user }) {
         <InfraccionDetalleModal
           selectedInfraccion={selectedInfraccion}
           onClose={() => setSelectedInfraccion(null)}
-          onEditar={puedeAdministrarInfracciones ? (codigo) => { setSelectedInfraccion(null); setCatalogoInfracciones({ codigo }) } : null}
         />
       )}
 
@@ -1542,10 +1571,7 @@ export function Papeletas({ user }) {
 
             <div className="p-6 max-h-[70vh] overflow-y-auto">
               {fotosModalReporte.loading ? (
-                <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
-                  <Icon name="refresh" className="size-8 animate-spin text-amber-500" />
-                  <p className="text-xs font-bold">Cargando evidencias fotográficas...</p>
-                </div>
+                <Cargando />
               ) : fotosModalReporte.fotos?.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {fotosModalReporte.fotos.map((foto, idx) => (
@@ -1599,3 +1625,5 @@ export function Papeletas({ user }) {
 }
 export default Papeletas
 import { formatoNumeroPapeleta } from '../utils/numeroPapeleta'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'

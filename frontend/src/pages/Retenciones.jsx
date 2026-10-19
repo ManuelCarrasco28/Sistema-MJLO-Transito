@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useDebounce } from '../hooks/useDebounce'
 import { usePersonaRapida } from '../hooks/usePersonaRapida'
 import { Icon } from '../components/ui/Icon'
+import { Cargando } from '../components/ui/Cargando'
 import { Pagination } from '../components/ui/Pagination'
 import { SortableHeader } from '../components/ui/SortableHeader'
 import { apiFetch, getCachedData, setCachedData } from '../config/api'
@@ -15,13 +16,14 @@ import { RoundedSelect, FloatingInput, FloatingSelect } from '../components/ui/F
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PlacaBadge } from '../components/ui/PlacaBadge'
 import { PlacaVehiculo } from '../components/vehiculos/PlacaVehiculo'
-import { showToast, showError, showConfirm } from '../utils/SwalUtil'
+import { showToast, showError } from '../utils/SwalUtil'
 import { sanitizarMensaje } from '../config/api'
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
-import { puedeEliminarRegistros } from '../config/roles'
 import { PageLoadError } from '../components/ui/PageLoadError'
 import './Retenciones.css'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos' },
@@ -50,6 +52,37 @@ export function Retenciones({ user }) {
   }, [searchTerm])
 
   const [isExportingExcel, setIsExportingExcel] = useState(false)
+  // Tarifa del depósito por día de custodia (la configura la jefatura)
+  const [tarifa, setTarifa] = useState({ guardianiaDia: 0, puedeEditar: false })
+  const [tarifaModal, setTarifaModal] = useState(null)
+  const [guardandoTarifa, setGuardandoTarifa] = useState(false)
+  useEffect(() => {
+    apiFetch('/internamientos/tarifas')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => { if (payload?.data) setTarifa(payload.data) })
+      .catch(() => {})
+  }, [])
+  const guardarTarifa = async (e) => {
+    e.preventDefault()
+    const valor = Number(tarifaModal)
+    if (tarifaModal === '' || !Number.isFinite(valor) || valor < 0 || valor > 10000) {
+      showError('Validación', 'Ingresa una tarifa entre 0 y 10,000 soles por día.')
+      return
+    }
+    setGuardandoTarifa(true)
+    try {
+      const res = await apiFetch('/internamientos/tarifas', { method: 'PUT', body: { guardianiaDia: valor } })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo guardar la tarifa.')
+      setTarifa(data.data || { ...tarifa, guardianiaDia: valor })
+      setTarifaModal(null)
+      showToast('Tarifa del depósito actualizada')
+    } catch (err) {
+      showError('Error', sanitizarMensaje(err.message, 'No se pudo guardar la tarifa.'))
+    } finally {
+      setGuardandoTarifa(false)
+    }
+  }
 
   const location = useLocation()
   useEffect(() => {
@@ -78,19 +111,6 @@ export function Retenciones({ user }) {
   const [infraccionVista, setInfraccionVista] = useState(null)
   // Internamiento que se está editando (null = el formulario crea uno nuevo)
   const [editandoItem, setEditandoItem] = useState(null)
-  // Cobro y liberación de un vehículo internado
-  const [pagoItem, setPagoItem] = useState(null)
-  // Tarifas del depósito (guardianía por día y remolque): el servidor valida que el cobro las respete
-  const [tarifas, setTarifas] = useState({ guardianiaDia: 0, remolque: 0, puedeEditar: false })
-  const cargarTarifas = () => {
-    apiFetch('/internamientos/tarifas')
-      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-      .then((payload) => setTarifas(payload.data || { guardianiaDia: 0, remolque: 0, puedeEditar: false }))
-      .catch(() => {})
-  }
-  useEffect(() => { cargarTarifas() }, [])
-  const [pagoForm, setPagoForm] = useState({})
-  const [pagando, setPagando] = useState(false)
   const [criteriosInventario, setCriteriosInventario] = useState([])
   const [inventarioMarcado, setInventarioMarcado] = useState({})
   const [busquedaPapeleta, setBusquedaPapeleta] = useState('')
@@ -143,6 +163,8 @@ export function Retenciones({ user }) {
     loadInternamientos()
     return () => cargaInternamientos.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearch, filterEstado, sortBy, sortDir])
+
+  useRecargaSilenciosa('/internamientos', [() => loadInternamientos(), () => loadStats()])
 
   const [stats, setStats] = useState({ total: 0, enDeposito: 0, liberados: 0, avgDias: 0 })
 
@@ -267,92 +289,6 @@ export function Retenciones({ user }) {
     }
   }
 
-  const handleEliminar = async (item) => {
-    if (item.estado === 'LIBERADO' || item.numeroOrdenLibertad) {
-      showError('No se puede eliminar', 'Este internamiento tiene una orden de libertad. Debe conservarse su historial de cobros.')
-      return
-    }
-    const resultado = await showConfirm(
-      '¿Eliminar internamiento?',
-      `Se eliminará la boleta ${item.numeroBoleta} (placa ${item.vehiculoPlaca}) junto con su inventario. Esta acción no se puede deshacer.`,
-      'Sí, eliminar',
-      'Cancelar',
-      { confirmColor: 'oklch(58.6% 0.253 17.585)', cancelColor: 'oklch(71.2% 0.194 13.428)' },
-    )
-    if (!resultado.isConfirmed) return
-    try {
-      const res = await apiFetch(`/internamientos/${item.uuid || item.id}`, { method: 'DELETE' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo eliminar el internamiento.')
-      loadInternamientos()
-      loadStats()
-      showToast('Internamiento eliminado correctamente')
-    } catch (err) {
-      showError('Error', sanitizarMensaje(err.message, 'No se pudo eliminar el internamiento.'))
-    }
-  }
-
-  const hoyISO = () => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }
-
-  const handleOpenPago = (item) => {
-    setPagoForm({
-      fechaPago: hoyISO(), reciboPapeleta: '',
-      // Con tarifa configurada, la guardianía se propone según los días de custodia
-      montoGuardiania: tarifas.guardianiaDia > 0 ? (tarifas.guardianiaDia * Math.max(1, Number(item.totalDias || 1))).toFixed(2) : '',
-      reciboGuardiania: '',
-      montoRemolque: '', reciboRemolque: '', autorizadoDni: item.interesadoDni && item.interesadoDni !== 'S/D' ? item.interesadoDni : '',
-      observaciones: '',
-    })
-    setPagoItem(item)
-  }
-
-  const papeletaPorCobrar = (item) => Boolean(item?.papeletaId) && item.papeletaEstado !== 'PAGADA'
-  const totalPago = (item, form) => (
-    (papeletaPorCobrar(item) || item?.papeletaEstado === 'PAGADA' ? Number(item?.montoPapeleta || 0) : 0)
-    + Number(form.montoGuardiania || 0) + Number(form.montoRemolque || 0)
-  )
-
-  const handleConfirmarPago = async (e) => {
-    e.preventDefault()
-    if (!pagoItem) return
-    if (papeletaPorCobrar(pagoItem) && !pagoForm.reciboPapeleta.trim()) {
-      showError('Atención', 'Ingresa el N° de recibo del pago de la papeleta.')
-      return
-    }
-    if (Number(pagoForm.montoGuardiania || 0) > 0 && !pagoForm.reciboGuardiania.trim()) {
-      showError('Atención', 'Ingresa el N° de recibo de la guardianía.')
-      return
-    }
-    if (Number(pagoForm.montoRemolque || 0) > 0 && !pagoForm.reciboRemolque.trim()) {
-      showError('Atención', 'Ingresa el N° de recibo del remolque.')
-      return
-    }
-    setPagando(true)
-    try {
-      const res = await apiFetch(`/internamientos/${pagoItem.uuid || pagoItem.id}/liberar`, {
-        method: 'POST',
-        body: {
-          ...pagoForm,
-          montoGuardiania: Number(pagoForm.montoGuardiania || 0),
-          montoRemolque: Number(pagoForm.montoRemolque || 0),
-        },
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(Object.values(data.messages || {}).join(' ') || data.message || 'No se pudo registrar el pago.')
-      setPagoItem(null)
-      loadInternamientos()
-      loadStats()
-      showToast(`Pago registrado. Orden de libertad ${data.data?.numeroOrdenLibertad || ''}`.trim())
-    } catch (err) {
-      showError('Error', sanitizarMensaje(err.message, 'No se pudo registrar el pago.'))
-    } finally {
-      setPagando(false)
-    }
-  }
-
   const handleRegistrarInternamiento = async (e) => {
     e.preventDefault()
     if (!nuevoInternamiento.idPapeleta) {
@@ -459,12 +395,9 @@ export function Retenciones({ user }) {
               { header: 'FECHA SALIDA', render: (_, i) => i.fechaSalida || 'EN CUSTODIA', width: 130, align: 'center' },
               { header: 'N° ORDEN DE LIBERTAD', key: 'numeroOrdenLibertad', isText: true, width: 140, align: 'center' },
               { header: 'FECHA LIBERACIÓN', render: (_, i) => i.fechaLiberacion || 'EN CUSTODIA', width: 130, align: 'center' },
-              { header: 'RECIBO PAPELETA', key: 'reciboPapeleta', isText: true, width: 120, align: 'center' },
+              { header: 'RECIBO M.J.L.O.', key: 'reciboPapeleta', isText: true, width: 120, align: 'center' },
               { header: 'MONTO PAPELETA COBRADO (S/)', render: (_, i) => `S/ ${Number(i.montoPapeletaCobrada || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 150 },
-              { header: 'RECIBO GUARDIANÍA', key: 'reciboGuardiania', isText: true, width: 120, align: 'center' },
-              { header: 'MONTO GUARDIANÍA (S/)', render: (_, i) => `S/ ${Number(i.montoGuardiania || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 140 },
-              { header: 'RECIBO REMOLQUE', key: 'reciboRemolque', isText: true, width: 120, align: 'center' },
-              { header: 'MONTO REMOLQUE (S/)', render: (_, i) => `S/ ${Number(i.montoRemolque || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 140 },
+              { header: 'MONTO DEPÓSITO (S/)', render: (_, i) => `S/ ${Number(i.montoGuardiania || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 140 },
               { header: 'TOTAL LIBERACIÓN (S/)', render: (_, i) => `S/ ${Number(i.montoTotalLiberacion || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, align: 'right', width: 140 },
               { header: 'OBSERVACIONES', key: 'observaciones', width: 240 },
               { header: 'ESTADO', key: 'estado', width: 110, align: 'center' }
@@ -588,8 +521,8 @@ export function Retenciones({ user }) {
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
           <div className="relative w-full sm:w-72 sm:shrink-0">
               <Icon
-                name={isLoading ? "refresh" : "search"}
-                className={`absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-rose-500' : 'text-slate-400'}`}
+                name="search"
+                className={`absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors text-slate-400`}
               />
               <input
                 type="text"
@@ -639,6 +572,17 @@ export function Retenciones({ user }) {
 
           <div className="flex flex-wrap items-center gap-2">
 
+            {tarifa.puedeEditar && (
+              <button
+                type="button"
+                onClick={() => setTarifaModal(String(tarifa.guardianiaDia ?? 0))}
+                title="Configurar el precio del depósito por día"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] dark:text-slate-200 dark:hover:bg-slate-700/60 cursor-pointer"
+              >
+                <Icon name="payment" className="size-3.5" />
+                <span>Depósito: S/ {Number(tarifa.guardianiaDia || 0).toFixed(2)} / día</span>
+              </button>
+            )}
             <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-colors" disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
@@ -677,11 +621,7 @@ export function Retenciones({ user }) {
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] print:divide-black transition-opacity ${isLoading && internamientos.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && internamientos.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                    Cargando internamientos...
-                  </td>
-                </tr>
+                <FilaCargando colSpan={8} />
               ) : paginatedItems.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-12 text-center">
@@ -782,17 +722,6 @@ export function Retenciones({ user }) {
 
                     <td data-label="Acciones" className="px-4 py-2.5 text-center">
                       <div className="flex flex-nowrap items-center justify-center gap-1.5">
-                        {item.estado === 'RETENIDO' && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPago(item)}
-                            className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border-[1.5px] border-emerald-300 bg-emerald-50 px-2.5 text-[11px] font-bold text-emerald-700 shadow-xs transition-all cursor-pointer hover:bg-emerald-600 hover:border-emerald-600 hover:text-white active:scale-95 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-                            title="Cobrar y liberar el vehículo"
-                          >
-                            <Icon name="creditCard" className="size-4" />
-                            <span>Pagar</span>
-                          </button>
-                        )}
                         {(
                           <>
                             <button
@@ -803,16 +732,6 @@ export function Retenciones({ user }) {
                             >
                               <Icon name="pencil" className="size-4" />
                             </button>
-                            {item.estado !== 'LIBERADO' && !item.numeroOrdenLibertad && (
-                            <button style={puedeEliminarRegistros() ? undefined : { display: 'none' }}
-                              type="button"
-                              onClick={() => handleEliminar(item)}
-                              className="size-8 shrink-0 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-del-bg)] border-[var(--action-del-border)] text-[var(--action-del-text)] hover:bg-[var(--action-del-hover)] hover:border-[var(--action-del-hover)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                              title="Eliminar internamiento"
-                            >
-                              <Icon name="trash" className="size-4" />
-                            </button>
-                            )}
                           </>
                         )}
                         <button
@@ -896,7 +815,7 @@ export function Retenciones({ user }) {
                           >
                             <span className="min-w-0">
                               <span className="block font-bold text-slate-800 dark:text-white">{p.numeroPapeleta} — {p.vehiculoPlaca}</span>
-                              <span className="block truncate text-[11px] text-slate-500">{p.conductorNombre || p.infractor || 'Sin conductor'}</span>
+                              <span className="block min-w-0 break-words text-[11px] text-slate-500">{p.conductorNombre || p.infractor || 'Sin conductor'}</span>
                             </span>
                             {p.tipoInfraccionCodigo && p.tipoInfraccionCodigo !== 'SIN DETALLE' && (
                               <span className="shrink-0 rounded-md border border-rose-200/70 bg-rose-50 px-1.5 py-0.5 font-mono text-[11px] font-black text-rose-700">{p.tipoInfraccionCodigo}</span>
@@ -985,7 +904,7 @@ export function Retenciones({ user }) {
               <fieldset className="rounded-xl border border-slate-200 p-4 dark:border-[var(--border-strong)]">
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Inventario del vehículo</legend>
                 {criteriosInventario.length === 0 ? (
-                  <p className="text-xs text-slate-400">Cargando ítems del inventario...</p>
+                  <Cargando className="py-6" />
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-3">
                     {['PARTE EXTERIOR', 'PARTE INTERIOR', 'MOTOR'].map((seccion) => (
@@ -994,7 +913,7 @@ export function Retenciones({ user }) {
                         <div className="space-y-1">
                           {criteriosInventario.filter((c) => c.seccion === seccion).map((c) => (
                             <div key={c.id} className="flex items-center justify-between gap-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
-                              <span className="min-w-0 truncate" title={c.nombre}>{c.nombre}</span>
+                              <span className="min-w-0 min-w-0 break-words" title={c.nombre}>{c.nombre}</span>
                               <button
                                 type="button"
                                 aria-label={`${c.nombre}: ${inventarioMarcado[c.id] ? 'marcado' : 'sin marcar'}`}
@@ -1045,78 +964,29 @@ export function Retenciones({ user }) {
         </div>
       )}
 
-      {pagoItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs animate-enter" onMouseDown={(e) => { if (e.target === e.currentTarget && !pagando) setPagoItem(null) }}>
-          <form onSubmit={handleConfirmarPago} className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#1C2438] border border-slate-200/80 dark:border-[var(--border)]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-[var(--border)]">
+      {tarifaModal !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-enter">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-[var(--border)] dark:bg-[#1C2438]">
+            <div className="flex items-center justify-between rounded-t-3xl border-b border-slate-100 px-6 py-3.5 dark:border-[var(--border)]">
               <div className="flex items-center gap-2.5">
-                <span className="grid size-9 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  <Icon name="creditCard" className="size-4.5" />
+                <span className="grid size-8 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
+                  <Icon name="payment" className="size-4" />
                 </span>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">Cobrar y liberar vehículo</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Boleta {pagoItem.numeroBoleta} · placa {pagoItem.vehiculoPlaca}</p>
-                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Tarifa del depósito</h3>
               </div>
-              <BotonCerrarModal onClick={() => !pagando && setPagoItem(null)} title="Cerrar" />
+              <BotonCerrarModal onClick={() => !guardandoTarifa && setTarifaModal(null)} title="Cerrar" />
             </div>
-
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
-              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)]">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">Papeleta {pagoItem.numeroPapeleta || '—'}</span>
-                  <span className="font-bold text-slate-900 dark:text-white">S/ {Number(pagoItem.montoPapeleta || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                  {pagoItem.papeletaEstado === 'PAGADA'
-                    ? 'La papeleta ya está pagada: solo se cobra la guardianía y el remolque.'
-                    : papeletaPorCobrar(pagoItem)
-                      ? 'La papeleta está pendiente de pago: se cobra junto con la liberación.'
-                      : 'Este internamiento no tiene papeleta asociada.'}
-                </p>
+            <form onSubmit={guardarTarifa} className="space-y-4 p-6">
+              <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                Es el monto que se cobra por cada día que el vehículo permanece en el depósito (mínimo 1 día). Se suma a la papeleta en un solo recibo.
+              </p>
+              <FloatingInput id="tarifa_deposito" label="Precio por día (S/)" type="number" min="0" max="10000" step="0.01" required value={tarifaModal} onChange={(e) => setTarifaModal(e.target.value)} />
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-[var(--border)]">
+                <BotonCancelar onClick={() => !guardandoTarifa && setTarifaModal(null)} />
+                <BotonGuardar disabled={guardandoTarifa}>{guardandoTarifa ? 'Guardando…' : 'Guardar tarifa'}</BotonGuardar>
               </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FloatingInput id="pago_fecha" label="Fecha de pago" type="date" required max={hoyISO()} value={pagoForm.fechaPago} onChange={(e) => setPagoForm({ ...pagoForm, fechaPago: e.target.value })} />
-                {papeletaPorCobrar(pagoItem) && (
-                  <FloatingInput id="pago_rec_pap" label="N° de recibo de la papeleta" required value={pagoForm.reciboPapeleta} onChange={(e) => setPagoForm({ ...pagoForm, reciboPapeleta: e.target.value })} />
-                )}
-                <FloatingInput id="pago_monto_guard" label="Guardianía (S/)" type="number" min="0" step="0.01" optional value={pagoForm.montoGuardiania} onChange={(e) => setPagoForm({ ...pagoForm, montoGuardiania: e.target.value })} />
-                <FloatingInput id="pago_rec_guard" label="N° de recibo de guardianía" optional value={pagoForm.reciboGuardiania} onChange={(e) => setPagoForm({ ...pagoForm, reciboGuardiania: e.target.value })} />
-                <FloatingInput id="pago_monto_rem" label="Remolque (S/)" type="number" min="0" step="0.01" optional value={pagoForm.montoRemolque} onChange={(e) => setPagoForm({ ...pagoForm, montoRemolque: e.target.value })} />
-                <FloatingInput id="pago_rec_rem" label="N° de recibo de remolque" optional value={pagoForm.reciboRemolque} onChange={(e) => setPagoForm({ ...pagoForm, reciboRemolque: e.target.value })} />
-                {(tarifas.guardianiaDia > 0 || tarifas.remolque > 0) && (
-                  <p className="sm:col-span-2 -mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                    Tarifa del depósito:{' '}
-                    {tarifas.guardianiaDia > 0 && `guardianía S/ ${tarifas.guardianiaDia.toFixed(2)} por día × ${Math.max(1, Number(pagoItem.totalDias || 1))} día(s) = S/ ${(tarifas.guardianiaDia * Math.max(1, Number(pagoItem.totalDias || 1))).toFixed(2)}`}
-                    {tarifas.guardianiaDia > 0 && tarifas.remolque > 0 && ' · '}
-                    {tarifas.remolque > 0 && `remolque S/ ${tarifas.remolque.toFixed(2)} (deja 0 si no hubo remolque)`}
-                    . Solo la jefatura puede cobrar menos.
-                  </p>
-                )}
-                <div className="sm:col-span-2">
-                  <FloatingInput id="pago_dni" label="DNI de quien retira el vehículo" required maxLength={15} value={pagoForm.autorizadoDni} onChange={(e) => setPagoForm({ ...pagoForm, autorizadoDni: e.target.value.replace(/\D/g, '') })} />
-                </div>
-                <div className="sm:col-span-2">
-                  <FloatingInput id="pago_obs" label="Observaciones" optional value={pagoForm.observaciones} onChange={(e) => setPagoForm({ ...pagoForm, observaciones: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Total a cobrar</span>
-                <span className="text-xl font-black text-emerald-700 dark:text-emerald-300">
-                  S/ {totalPago(pagoItem, pagoForm).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[#1C2438]">
-              <BotonCancelar onClick={() => !pagando && setPagoItem(null)} />
-              <BotonGuardar disabled={pagando}>
-                {pagando ? 'Registrando...' : 'Cobrar y liberar'}
-              </BotonGuardar>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
@@ -1127,8 +997,8 @@ export function Retenciones({ user }) {
               <div className="flex min-w-0 items-center gap-3">
                 <PlacaBadge placa={selectedItem.vehiculoPlaca} />
                 <div className="min-w-0">
-                  <h3 className="truncate text-base font-bold leading-tight text-slate-900 dark:text-white">Boleta {selectedItem.numeroBoleta}</h3>
-                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                  <h3 className="min-w-0 break-words text-base font-bold leading-tight text-slate-900 dark:text-white">Boleta {selectedItem.numeroBoleta}</h3>
+                  <p className="min-w-0 break-words text-[11px] text-slate-500 dark:text-slate-400">
                     {selectedItem.vehiculoMarca} {selectedItem.vehiculoModelo} ({selectedItem.vehiculoColor}) · {selectedItem.totalDias} {selectedItem.totalDias === 1 ? 'día' : 'días'} en custodia
                   </p>
                 </div>
@@ -1203,7 +1073,7 @@ export function Retenciones({ user }) {
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl border border-slate-200/80 p-3 text-[11px] dark:border-[var(--border)] sm:grid-cols-3">
                     {selectedItem.inventario.map((inv) => (
                       <div key={inv.criterioId || inv.codigo} className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate font-semibold text-slate-700 dark:text-slate-200" title={`${inv.nombre} · ${inv.estado}`}>{inv.nombre}</span>
+                        <span className="min-w-0 min-w-0 break-words font-semibold text-slate-700 dark:text-slate-200" title={`${inv.nombre} · ${inv.estado}`}>{inv.nombre}</span>
                         <span className="flex shrink-0 items-center gap-1.5 font-black text-slate-800 dark:text-white">
                           {Number(inv.cantidad) > 1 && <span>×{inv.cantidad}</span>}
                           <span className={`size-2 rounded-full ${inv.estado === 'MALO' ? 'bg-rose-500' : inv.estado === 'REGULAR' ? 'bg-amber-400' : 'bg-emerald-500'}`} aria-label={inv.estado} />
@@ -1241,7 +1111,7 @@ export function Retenciones({ user }) {
       {(printLayout === 'INTERNAMIENTO' || printLayout === 'LIBERTAD') && selectedItem && (
         // Sin margen de página, el navegador no imprime fecha, título, dirección ni "1/1" en los bordes;
         // el margen institucional (12 mm × 14 mm) pasa a ser relleno de la propia hoja.
-        <style>{`@page { size: A4 portrait; margin: 0; } @media print { body > #seccion-impresion.boleta-internamiento-a4, body > #seccion-impresion.orden-libertad-a4 { padding: 12mm 14mm !important; box-sizing: border-box !important; } }`}</style>
+        <style>{`@page { size: A4 portrait; margin: 0; } @media print { body > #seccion-impresion.boleta-internamiento-a4, body > #seccion-impresion.orden-libertad-a4 { padding: 12mm 14mm !important; box-sizing: border-box !important; } body > #seccion-impresion.boleta-internamiento-a4 { min-height: 296mm !important; display: flex !important; flex-direction: column !important; justify-content: space-between !important; align-items: stretch !important; gap: 0 !important; } }`}</style>
       )}
       {printLayout === 'INTERNAMIENTO' && selectedItem && (
         <BoletaInternamientoPrint item={selectedItem} />
